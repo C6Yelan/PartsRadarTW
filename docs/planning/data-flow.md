@@ -2,7 +2,7 @@
 
 本文件定義 PartsRadarTW 第一版資料如何從原價屋公開頁面進入系統，並支撐網站查詢。實際資料表、API contract 與 crawler 實作細節會在後續文件或實作階段再細化。
 
-尚未定案的資料流決策統一記錄於 `decision-log.md`，本文件不另外維護待決清單。
+尚未定案的資料流決策統一記錄於 [decision-log.md](decision-log.md)，本文件不另外維護待決清單。
 
 ## 目標
 
@@ -43,7 +43,7 @@
   -> parse product candidates（解析候選商品）
   -> validate parsed items（驗證解析結果）
   -> upsert products（新增或更新商品主檔）
-  -> insert price snapshots（寫入價格快照）
+  -> insert price snapshots when needed（必要時寫入價格快照）
   -> update current prices（更新目前價格）
   -> read API（讀取 API）
   -> web UI（網站介面）
@@ -68,12 +68,16 @@ Raw snapshot 至少應記錄：
 - 抓取時間。
 - HTTP 狀態或錯誤資訊。
 - 內容判定狀態，例如 valid、suspected_block、invalid。
+- 內容 hash。
 - 原始 HTML 壓縮檔路徑或可重放的原始內容位置。
+- 若內容與既有 snapshot 完全相同，記錄重複來源 snapshot。
 
 Raw snapshot 保存方式：
 
 - 重要 metadata、內容判定狀態與錯誤資訊存入資料庫。
 - 原始 HTML 在解析使用後壓縮保存成檔案。
+- 原始 HTML 需以內容 hash 去重；內容完全相同時，不重複保存相同壓縮檔。
+- 重複內容的 snapshot metadata 應指向既有 raw snapshot 或記錄 `duplicate_of_snapshot_id`。
 - 一般 snapshot 最長保留 30 天。
 - 異常 snapshot 最長保留 90 天。
 - 保存期限未來可依實際儲存空間、除錯需求與資料量調整。
@@ -137,7 +141,7 @@ Product 是商品主檔，用來表示同一個原價屋商品。
 
 ### Price Snapshot
 
-每次成功抓到價格時，應寫入一筆價格紀錄。
+首次看到商品價格或價格變動時，應寫入一筆價格紀錄。
 
 用途：
 
@@ -153,6 +157,8 @@ Product 是商品主檔，用來表示同一個原價屋商品。
 - `captured_at`。
 - `crawl_run_id`。
 
+Price snapshot 屬於長期價格資料，不套用 raw snapshot 的 30 / 90 天保存期限。若未來資料量過大，再另行規劃價格歷史彙總或封存策略。
+
 ### Current Price
 
 網站第一版主要讀取目前有效價格。
@@ -163,9 +169,16 @@ Current price 使用獨立 `current_prices` 表，讓網站商品列表、搜尋
 
 更新規則：
 
-- 成功解析商品價格時，寫入 price snapshot，並更新 `current_prices`。
+- 新商品或價格變動時，寫入 price snapshot，並更新 `current_prices`。
 - 價格未變時，可只更新 `current_prices.last_seen_at`，避免每 5 分鐘產生大量重複歷史紀錄。
 - 抓取失敗、疑似攔截或解析異常時，不更新 `current_prices`。
+
+時間欄位應區分不同意義：
+
+- `last_checked_at`：系統最後一次檢查來源頁面的時間。
+- `last_seen_at`：商品最後一次仍在來源中被看見的時間。
+- `captured_at`：價格快照實際被記錄的時間。
+- `price_changed_at`：目前價格最後一次變動的時間。
 
 ## 商品識別
 
@@ -212,9 +225,22 @@ coolpc:igrp:{IGrp}:ibuy:{iBuyToken}
 5. 解析商品資料。
 6. 驗證 parsed item 必要欄位。
 7. 用 `source_item_key` upsert product。
-8. 寫入 price snapshot。
+8. 新商品或價格變動時寫入 price snapshot。
 9. 更新目前價格讀取口徑。
 10. 網站可查詢到更新後資料。
+
+### 資料未變流程
+
+若本次抓取、內容驗證與解析都成功，但商品清單與價格相較上一個成功結果完全沒有變化，應視為成功檢查，不視為失敗或異常。
+
+處理規則：
+
+- crawl run 記錄為成功，狀態可標記為 `unchanged`。
+- 更新來源或分類層級的 `last_checked_at`。
+- 不新增 price snapshot，避免重複價格歷史。
+- 不重複 upsert 所有商品，避免不必要的 DB 寫入。
+- 可依實作需要更新 `current_prices.last_seen_at`，表示商品仍存在於來源頁。
+- raw snapshot 以內容 hash 去重；若原始 HTML 與既有 snapshot 完全相同，不重複保存相同壓縮檔。
 
 ## 失敗處理
 
@@ -228,6 +254,18 @@ coolpc:igrp:{IGrp}:ibuy:{iBuyToken}
 - crawl run 狀態。
 
 抓取失敗不應刪除既有商品資料。
+
+### 商品從來源消失
+
+若某次成功 crawl 沒有看到既有商品，不應立即刪除 product，也不應刪除 price snapshot。
+
+處理規則：
+
+- 先記錄商品 missing 狀態，例如 `missing_since` 或 `missing_seen_count`。
+- 不立即將商品視為永久下架，避免原價屋短暫頁面異常造成誤判。
+- 連續 6 次成功 crawl 都未看到同一商品時，才將商品改為 inactive。
+- 若商品未來以相同 `source_item_key` 重新出現，應恢復 active 並延續原價格歷史。
+- 網站是否顯示 inactive 商品，留待網站呈現規則決定。
 
 ### 疑似被攔截
 
@@ -271,4 +309,6 @@ coolpc:igrp:{IGrp}:ibuy:{iBuyToken}
 - 資料更新時間。
 - 原價屋來源連結。
 
-最新一次抓取失敗時，網站是否顯示資料過期提示，以 `decision-log.md` 的待決事項追蹤。
+第一版來源連結先指向不含 `PHPSESSID` 的原價屋分類頁，不保證能直接定位到單一商品。
+
+最新一次抓取失敗、疑似攔截或解析失敗時，網站仍顯示最後一次成功處理的有效資料，並透過來源狀態呈現資料是否可能過期。來源狀態規則以 [decision-log.md](decision-log.md) 為準，API contract 與 UI 呈現分別由 API 與 Web UI 文件定義。

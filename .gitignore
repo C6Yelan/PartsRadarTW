@@ -2,6 +2,7 @@
 AGENTS.md
 .agents/
 .codex/
+structure.txt
 
 # Environment and secrets
 .env
