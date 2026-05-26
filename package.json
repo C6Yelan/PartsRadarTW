@@ -4,6 +4,9 @@
   "private": true,
   "packageManager": "pnpm@11.3.0",
   "scripts": {
+    "dev": "pnpm dev:web",
+    "build": "pnpm build:web",
+    "typecheck": "pnpm typecheck:web",
     "dev:web": "pnpm --filter @partsradar/web dev",
     "build:web": "pnpm --filter @partsradar/web build",
     "typecheck:web": "pnpm --filter @partsradar/web typecheck"
