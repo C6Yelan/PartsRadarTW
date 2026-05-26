@@ -100,13 +100,17 @@ HTTP status 不足以判斷成功，需測試內容驗證。
 - 新商品第一次出現時建立 product、price snapshot 與 current price。
 - 價格變動時新增 price snapshot 並更新 current price。
 - 價格未變時不新增重複 price snapshot。
+- `success_unchanged` 仍會更新分類 `last_success_at`。
 - parsed result hash 相同時走 `success_unchanged` 流程。
 - raw content hash 相同時不重複保存 HTML 壓縮檔。
+- raw snapshot metadata 或檔案清理不會刪除 price snapshots。
 - 沒有 `iBuyToken` 的商品不寫入 products，但保留解析紀錄。
 - 商品從來源消失時不刪除 product。
 - 商品從來源消失時不刪除 price snapshots。
 - 商品重新出現且 `source_item_key` 相同時延續原商品歷史。
 - fetch 失敗、疑似攔截或 parse 失敗時不覆蓋既有 current price。
+- fetch 失敗、疑似攔截或 parse 失敗會更新 `last_checked_at`，但不更新 `last_success_at`。
+- parse 失敗不累計商品 missing count。
 
 ## API 測試
 
@@ -115,6 +119,7 @@ API 測試可先以 route handler 內的查詢邏輯或資料存取函式為單�
 至少測試：
 
 - `GET /api/categories` 只回傳 enabled 分類。
+- `GET /api/categories` 回傳 `displayName` 與 `sourceName`。
 - `GET /api/products` 預設只回傳 active 商品。
 - `GET /api/products` 可依 `q` 查詢商品。
 - `GET /api/products` 可依 `igrp` 篩選分類。
@@ -125,6 +130,9 @@ API 測試可先以 route handler 內的查詢邏輯或資料存取函式為單�
 - 商品不存在時 `GET /api/products/{id}` 回傳 `404`。
 - inactive 商品詳情仍可回傳 `200` 並標示 inactive。
 - `GET /api/source-status` 能區分 `ok`、`stale`、`unavailable`。
+- `GET /api/source-status` 能依 enabled 分類聚合全域狀態。
+- `GET /api/source-status` 的 `categories[]` 含分類層級狀態。
+- `GET /api/source-status` 的 top-level `lastCheckedAt` / `lastSuccessAt` 符合聚合規則。
 
 API 測試不應暴露：
 

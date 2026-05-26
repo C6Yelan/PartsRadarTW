@@ -31,7 +31,7 @@
 - 機殼。
 - 散熱器。
 
-商品分類第一版先保留原價屋分類。若後續發現原價屋分類不利搜尋、篩選或呈現，再新增 PartsRadarTW 自己的顯示分類。
+商品分類第一版先保留原價屋分類脈絡。資料庫應同時保存原價屋分類名稱與 PartsRadarTW 顯示名稱，讓 crawler 可追溯來源分類，網站也能使用較簡潔的分類標籤。
 
 ## 整體流程
 
@@ -80,6 +80,7 @@ Raw snapshot 保存方式：
 - 重複內容的 snapshot metadata 應指向既有 raw snapshot 或記錄 `duplicate_of_snapshot_id`。
 - 一般 snapshot 最長保留 30 天。
 - 異常 snapshot 最長保留 90 天。
+- raw snapshot 清理不得影響長期價格歷史；若 price snapshot 參照 raw snapshot，該關聯需允許清空或以不破壞外鍵的方式處理。
 - 保存期限未來可依實際儲存空間、除錯需求與資料量調整。
 
 HTTP 狀態碼不可作為唯一成功依據。過去經驗顯示，原價屋在短時間內請求頻率過快時，可能回傳 HTTP 200，但頁面內容已變成攔截或提示頁，而不是原本的商品資料頁。
@@ -156,8 +157,9 @@ Product 是商品主檔，用來表示同一個原價屋商品。
 - `currency`。
 - `captured_at`。
 - `crawl_run_id`。
+- `raw_snapshot_id`，可為空，用來追溯當時來源 snapshot。
 
-Price snapshot 屬於長期價格資料，不套用 raw snapshot 的 30 / 90 天保存期限。若未來資料量過大，再另行規劃價格歷史彙總或封存策略。
+Price snapshot 屬於長期價格資料，不套用 raw snapshot 的 30 / 90 天保存期限。若對應 raw snapshot metadata 或壓縮檔因保存期限被清理，price snapshot 仍必須保留；`raw_snapshot_id` 可被清空，但 `product_id`、價格、幣別、`captured_at` 與 `crawl_run_id` 不可因此遺失。若未來資料量過大，再另行規劃價格歷史彙總或封存策略。
 
 ### Current Price
 
@@ -176,6 +178,7 @@ Current price 使用獨立 `current_prices` 表，讓網站商品列表、搜尋
 時間欄位應區分不同意義：
 
 - `last_checked_at`：系統最後一次檢查來源頁面的時間。
+- `last_success_at`：系統最後一次成功抓取、驗證並解析有效資料的時間。
 - `last_seen_at`：商品最後一次仍在來源中被看見的時間。
 - `captured_at`：價格快照實際被記錄的時間。
 - `price_changed_at`：目前價格最後一次變動的時間。
@@ -227,7 +230,8 @@ coolpc:igrp:{IGrp}:ibuy:{iBuyToken}
 7. 用 `source_item_key` upsert product。
 8. 新商品或價格變動時寫入 price snapshot。
 9. 更新目前價格讀取口徑。
-10. 網站可查詢到更新後資料。
+10. 更新來源或分類層級的 `last_checked_at` 與 `last_success_at`。
+11. 網站可查詢到更新後資料。
 
 ### 資料未變流程
 
@@ -237,6 +241,7 @@ coolpc:igrp:{IGrp}:ibuy:{iBuyToken}
 
 - crawl run 記錄為成功，狀態可標記為 `unchanged`。
 - 更新來源或分類層級的 `last_checked_at`。
+- 更新來源或分類層級的 `last_success_at`，因為 fetch、內容驗證與解析都已成功。
 - 不新增 price snapshot，避免重複價格歷史。
 - 不重複 upsert 所有商品，避免不必要的 DB 寫入。
 - 可依實作需要更新 `current_prices.last_seen_at`，表示商品仍存在於來源頁。
@@ -254,6 +259,8 @@ coolpc:igrp:{IGrp}:ibuy:{iBuyToken}
 - crawl run 狀態。
 
 抓取失敗不應刪除既有商品資料。
+
+分類層級的 fetch failed 只代表該分類本次失敗。該分類可更新 `last_checked_at`，但不得更新 `last_success_at`。第一版可繼續處理下一個分類，並將整輪 crawl 記錄為 `success_with_errors` 或對應的部分成功狀態。只有疑似被攔截、進入 backoff、或整輪都無法取得有效資料時，才停止或標記整輪失敗。
 
 ### 商品從來源消失
 
@@ -282,7 +289,7 @@ coolpc:igrp:{IGrp}:ibuy:{iBuyToken}
 
 疑似被攔截時不應進入 product upsert 或 price snapshot 寫入流程，也不應覆蓋既有目前價格。
 
-疑似被攔截時應立即停止當次 crawl cycle，等待下一次 5 分鐘循環再嘗試。若連續失敗多次，下一輪應延後 1 小時。
+疑似被攔截時可更新命中分類的 `last_checked_at`，但不得更新 `last_success_at`。接著應立即停止當次 crawl cycle，等待下一次 5 分鐘循環再嘗試。若連續失敗多次，下一輪應延後 1 小時。
 
 異常狀況應保留紀錄，包含命中的內容特徵、失敗分類、失敗時間與 crawl run 狀態。這些紀錄未來可作為 Discord bot 通知管理者的資料來源。
 
@@ -291,6 +298,8 @@ coolpc:igrp:{IGrp}:ibuy:{iBuyToken}
 若 raw snapshot 存在但 parser 無法解析，應保留 raw snapshot 與錯誤資訊，方便後續修正 parser 後重跑。
 
 解析失敗不應直接覆蓋既有商品資料。
+
+分類層級的 parse failed 可更新該分類的 `last_checked_at`，但不得更新 `last_success_at`，也不應累計該分類商品的 missing count，因為本次沒有得到可靠的成功商品清單。第一版可繼續處理下一個分類，並保存該分類的錯誤結果供後續修正 parser。
 
 ### 商品識別失敗
 

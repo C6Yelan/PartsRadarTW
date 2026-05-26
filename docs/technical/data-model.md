@@ -37,7 +37,7 @@ crawl_runs
 
 - 管理 crawler 要抓取的 `IGrp`。
 - 讓網站可以列出分類。
-- 保存分類層級的最後檢查時間。
+- 保存分類層級的最後檢查時間與最後成功時間。
 
 概念欄位：
 
@@ -45,7 +45,8 @@ crawl_runs
 - `source`：固定為 `coolpc`。
 - `source_category_key`：例如 `igrp:4`。
 - `igrp`：原價屋分類編號。
-- `name`：原價屋分類名稱。
+- `source_name`：原價屋分類名稱，例如 `處理器 CPU`。
+- `display_name`：PartsRadarTW 顯示名稱，例如 `CPU`。
 - `enabled`。
 - `last_checked_at`。
 - `last_success_at`。
@@ -118,7 +119,7 @@ crawl_runs
 - `currency`：第一版固定 `TWD`。
 - `captured_at`。
 - `crawl_run_id`。
-- `raw_snapshot_id`。
+- `raw_snapshot_id`，可為空。
 - `created_at`。
 
 規則：
@@ -127,6 +128,7 @@ crawl_runs
 - 價格變動時寫入。
 - 價格未變時不新增重複 price snapshot。
 - price snapshot 第一版長期保留，不套用 raw snapshot 的 30 / 90 天保存期限。
+- `raw_snapshot_id` 若指向 raw snapshot，應使用 `ON DELETE SET NULL` 或等效策略，避免 raw snapshot metadata 清理時刪除價格歷史。
 - 若未來資料量過大，再另行規劃價格歷史彙總或封存策略。
 
 建議索引：
@@ -169,6 +171,7 @@ crawl_runs
 - 追蹤 crawler 是否成功。
 - 記錄 unchanged、失敗、攔截與 backoff 狀態。
 - 支援未來管理通知與除錯。
+- 作為整輪 crawl cycle 的摘要；第一版分類層級細節先存在 `category_results` JSON，等需要查詢統計或管理介面時再拆成獨立資料表。
 
 概念欄位：
 
@@ -182,6 +185,7 @@ crawl_runs
 - `changed_category_count`。
 - `error_category_key`。
 - `error_message`。
+- `category_results`：JSON，記錄本輪各分類的狀態摘要。
 - `backoff_until`。
 - `created_at`。
 
@@ -190,11 +194,45 @@ crawl_runs
 - `running`。
 - `success_changed`。
 - `success_unchanged`。
+- `success_with_errors`。
 - `fetch_failed`。
 - `suspected_block`。
 - `parse_failed`。
 - `skipped_overlap`。
 - `backoff`。
+
+### category_results JSON
+
+第一版不強制建立獨立分類結果資料表。多分類結果先存在 `crawl_runs.category_results`，用來保留每個分類的最小狀態摘要。
+
+用途：
+
+- 支援多分類 crawl 的部分成功狀態。
+- 區分單一分類 fetch failed / parse failed 與整輪 suspected block。
+- 作為更新 `source_categories.last_checked_at` / `last_success_at` 的依據。
+- 降低第一版 migration 與關聯查詢複雜度。
+
+建議 JSON item 欄位：
+
+- `igrp`。
+- `status`。
+- `raw_snapshot_id`，可為空。
+- `error_message`。
+
+第一版狀態概念：
+
+- `success_changed`。
+- `success_unchanged`。
+- `fetch_failed`。
+- `suspected_block`。
+- `parse_failed`。
+
+規則：
+
+- 任一分類被實際嘗試處理時，都可更新該分類的 `last_checked_at`。
+- 分類 fetch failed 或 parse failed 不更新該分類的 `last_success_at`。
+- 分類成功但資料未變時仍需更新該分類的 `last_success_at`。
+- parse failed 不應累計該分類商品的 missing count。
 
 ## raw_snapshots
 
@@ -233,6 +271,7 @@ crawl_runs
 - 一般 snapshot 最長保留 30 天。
 - 異常 snapshot 最長保留 90 天。
 - raw snapshot retention 只適用於原始 HTML 與 snapshot metadata 清理策略，不影響 `price_snapshots`。
+- 清理 raw snapshot metadata 時，參照它的長期資料需使用 nullable reference 或等效策略，不可因外鍵刪除價格歷史。
 
 建議索引：
 
@@ -254,7 +293,7 @@ crawl_runs
 
 - `id`：內部 UUID。
 - `crawl_run_id`。
-- `raw_snapshot_id`。
+- `raw_snapshot_id`，可為空。
 - `source`。
 - `igrp`。
 - `error_type`。
@@ -307,6 +346,7 @@ Crawler 主要寫入：
 - `current_prices`
 - `parse_errors`
 - `source_categories.last_checked_at`
+- `source_categories.last_success_at`
 
 Crawler 不應直接刪除既有正式商品資料。
 

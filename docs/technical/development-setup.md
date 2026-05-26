@@ -45,6 +45,7 @@ pnpm 建議透過 Corepack 啟用，避免每台機器手動安裝不同版本�
 預期開發目錄：
 
 ```text
+pnpm-workspace.yaml
 apps/
   web/
   crawler/
@@ -56,6 +57,7 @@ docs/
 
 責任：
 
+- `pnpm-workspace.yaml`：定義 workspace package 範圍，例如 `apps/*` 與 `packages/*`。
 - `apps/web`：Next.js 網站與 Route Handlers。
 - `apps/crawler`：獨立 crawler process。
 - `packages/db`：Prisma schema、migration 與 database client。
@@ -134,7 +136,7 @@ storage/snapshots/
 | `pnpm db:migrate` | 執行 Prisma migration |
 | `pnpm db:generate` | 產生 Prisma client |
 | `pnpm test` | 執行 Vitest |
-| `pnpm lint` | 執行 ESLint |
+| `pnpm lint` | 使用 ESLint CLI 執行 lint，例如 `eslint .` |
 | `pnpm typecheck` | 執行 TypeScript type check |
 
 第一版不要求一開始就建立所有 script，但正式開發前應至少有：
@@ -143,6 +145,8 @@ storage/snapshots/
 - `pnpm test`
 - `pnpm lint`
 - `pnpm typecheck`
+
+ESLint 設定應使用 `eslint.config.mjs` 與 Next.js ESLint config。因為 Next.js app 不在 repo root，設定時需讓 Next.js ESLint plugin 知道 `apps/web` 是 web app 目錄。
 
 ## 開發流程
 

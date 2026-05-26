@@ -18,6 +18,7 @@
 範圍：
 
 - 建立 pnpm workspace。
+- 建立 root `pnpm-workspace.yaml`，包含 `apps/*` 與 `packages/*`。
 - 建立 Next.js web app。
 - 建立 crawler app 基本入口。
 - 建立 shared / db package 初始結構。
@@ -53,8 +54,11 @@
 - 建立 `price_snapshots`。
 - 建立 `current_prices`。
 - 建立 `crawl_runs`。
+- 在 `crawl_runs` 增加 `category_results` JSON，先記錄分類層級結果。
 - 建立 `raw_snapshots`。
 - 建立 `parse_errors`。
+- 建立 `source_categories.source_name` / `display_name`。
+- 設定 `price_snapshots.raw_snapshot_id` 可為空，避免 raw snapshot 清理影響價格歷史。
 - 建立必要 enum 與索引。
 - 建立基本 seed 或分類初始化資料。
 
@@ -83,6 +87,7 @@
 - 解析 `div.w`、`div.t`、`div.x`。
 - 解析價格文字。
 - 產生 `source_item_key`。
+- 驗證第一版目標分類是否能穩定取得 `iBuyToken`。
 - 建立 response content validation。
 - 建立 parser / validation Vitest 測試。
 
@@ -95,6 +100,7 @@
 完成條件：
 
 - 正常 fixture 可解析商品。
+- 第一版目標分類的 fixture 驗證 `iBuyToken` 與必要結構；未通過的分類不進入正式商品匯入。
 - 缺少必要結構時不產生正式商品資料。
 - HTTP 200 但內容異常時可標記為 invalid 或 suspected block。
 - parser 測試通過。
@@ -113,6 +119,7 @@
 - 建立 new product / price changed 的 price snapshot 寫入。
 - 建立 current price 更新。
 - 建立 unchanged 流程。
+- 建立成功檢查時更新 `last_success_at` 的規則，包含 `success_unchanged`。
 - 建立商品消失 / inactive 記錄邏輯。
 - 建立 fetch failed、suspected block、parse failed 的停止與保護規則。
 
@@ -127,6 +134,7 @@
 - 新商品可建立 product、price snapshot、current price。
 - 價格變動才新增 price snapshot。
 - 價格未變不新增重複 price snapshot。
+- `success_unchanged` 會更新分類 `last_success_at`。
 - 疑似攔截不更新正式商品與價格。
 - 商品消失不刪除 product 或價格歷史。
 - data flow 測試通過。
@@ -145,6 +153,7 @@
 - 分頁、排序、分類篩選、價格篩選。
 - active / inactive 商品狀態。
 - stale / unavailable 來源狀態。
+- `/api/source-status` 支援全域與分類層級狀態。
 
 不包含：
 
@@ -158,6 +167,7 @@
 - API contract 與 `api-design.md` 一致。
 - 不合法 query 回傳 `400` 與泛用錯誤。
 - 商品不存在回傳 `404`。
+- 全域來源狀態與分類來源狀態符合 API 文件。
 - API 不暴露 `source_item_key`、`iBuyToken`、raw snapshot 或內部錯誤堆疊。
 - API 測試通過。
 

@@ -106,6 +106,7 @@ Raw snapshot 的 metadata 存入 PostgreSQL，原始 HTML 使用後壓縮保存�
 - 以內容 hash 去重，避免重複保存相同 HTML。
 - 一般 snapshot 最長保留 30 天。
 - 異常 snapshot 最長保留 90 天。
+- raw snapshot 清理不得影響長期價格歷史。
 
 raw snapshot 的實際檔案位置與清理方式會在 crawler 或部署文件中細化。
 
@@ -154,7 +155,7 @@ docs/
 - HTTP 200 不代表抓取成功。
 - 被判定為攔截或非預期內容時，不更新正式商品與價格資料。
 - 商品識別使用 `coolpc:igrp:{IGrp}:ibuy:{iBuyToken}`。
-- 資料完全沒變時，記錄成功檢查但不新增重複價格歷史。
+- 資料完全沒變時，記錄成功檢查、更新成功時間，但不新增重複價格歷史。
 - 網站只讀取已成功處理的資料。
 
 完整資料流規則以 [data-flow.md](../planning/data-flow.md) 為準。

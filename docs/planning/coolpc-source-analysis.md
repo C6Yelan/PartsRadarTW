@@ -29,7 +29,7 @@ HTTP 狀態碼不能作為唯一成功依據。即使狀態碼為 200，仍需�
 - 頁面標題可作為內容驗證線索之一。
 - 每個商品區塊包含隱藏的 `iBuy` token、商品標題與價格區塊。
 
-後續正式實作前仍應抽查第一版目標分類，確認其他 `IGrp` 頁面是否都具備相同商品區塊與 `iBuy` token。
+後續 Phase 2 建立 parser fixture 時，需抽查所有第一版目標分類，確認各 `IGrp` 頁面是否都具備相同商品區塊與穩定 `iBuy` token。未通過驗證的分類先不匯入正式商品資料，或另開決策調整商品識別策略。
 
 ## 第一版分類對應
 
@@ -53,7 +53,7 @@ HTTP 狀態碼不能作為唯一成功依據。即使狀態碼為 200，仍需�
 
 商品主檔仍應使用內部 UUID 作為資料庫主鍵；crawler 判斷同一個原價屋商品時，應使用來源鍵 `source_item_key`。
 
-若 `eachview.php` 各分類頁都能取得穩定的 `iBuy` token，建議第一版 `source_item_key` 使用下列概念：
+第一版 `source_item_key` 採用下列概念，前提是 Phase 2 fixture 驗證確認目標分類能取得穩定 `iBuy` token：
 
 ```text
 coolpc:igrp:{IGrp}:ibuy:{iBuyToken}
@@ -91,6 +91,6 @@ coolpc:igrp:{IGrp}:ibuy:{iBuyToken}
 
 ## 後續驗證重點
 
-後續正式寫 crawler 前，應再抽查第一版目標分類的 `eachview.php?IGrp={分類編號}` 頁面，確認是否都具備 CPU 分類頁觀察到的商品區塊與 `iBuy` token。
+後續正式寫入資料庫前，應先在 Phase 2 抽查第一版目標分類的 `eachview.php?IGrp={分類編號}` 頁面，確認是否都具備 CPU 分類頁觀察到的商品區塊與穩定 `iBuy` token。
 
 若未來實際遇到原價屋攔截頁，應保存 raw snapshot 並補充其內容特徵，讓內容驗證規則能穩定排除 HTTP 200 但非商品資料頁的情況。

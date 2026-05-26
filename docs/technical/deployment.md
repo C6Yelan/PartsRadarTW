@@ -196,12 +196,13 @@ postgres
 2. VM 取得 repo 或部署產物。
 3. 建立正式環境變數。
 4. 建立 PostgreSQL 與 snapshot persistent volume。
-5. 執行 migration。
-6. 啟動 `postgres`。
-7. 啟動 `web`。
-8. 啟動 `crawler`。
-9. 設定 reverse proxy 與 HTTPS。
-10. 檢查網站、API、crawler run 與資料更新狀態。
+5. 啟動 `postgres`。
+6. 等待 PostgreSQL 可連線。
+7. 執行 Prisma migration。
+8. migration 成功後啟動 `web`。
+9. 啟動 `crawler`。
+10. 設定 reverse proxy 與 HTTPS。
+11. 檢查網站、API、crawler run 與資料更新狀態。
 
 正式指令等專案初始化與 compose 檔建立後再補。
 
@@ -211,6 +212,8 @@ Prisma migration 應在部署時明確執行。
 
 原則：
 
+- migration 應在 PostgreSQL service 可連線後執行。
+- 正式部署使用 `prisma migrate deploy` 或對應 package script 套用已提交的 migration。
 - migration 不由 web request 觸發。
 - migration 失敗時不應繼續啟動新版服務。
 - migration 前應確認有可用備份。

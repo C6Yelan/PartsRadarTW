@@ -75,7 +75,8 @@
       "source": "coolpc",
       "sourceCategoryKey": "igrp:4",
       "igrp": 4,
-      "name": "CPU",
+      "displayName": "CPU",
+      "sourceName": "處理器 CPU",
       "enabled": true,
       "lastCheckedAt": "2026-05-25T12:00:00.000Z",
       "lastSuccessAt": "2026-05-25T12:00:00.000Z"
@@ -88,8 +89,10 @@
 
 - 只回傳 `enabled = true` 的分類。
 - 排序順序以網站第一版分類順序為準。
+- `displayName` 是網站顯示名稱。
+- `sourceName` 是原價屋分類名稱，用於保留來源脈絡。
 - `lastCheckedAt` 代表最近一次檢查時間，不等於資料一定成功更新。
-- `lastSuccessAt` 代表最近一次成功處理有效資料的時間。
+- `lastSuccessAt` 代表最近一次成功處理有效資料的時間；尚未成功時可為 `null`。
 
 ## GET /api/products
 
@@ -135,7 +138,8 @@
         "id": "category-uuid",
         "sourceCategoryKey": "igrp:4",
         "igrp": 4,
-        "name": "CPU"
+        "displayName": "CPU",
+        "sourceName": "處理器 CPU"
       },
       "price": {
         "amount": 4880,
@@ -176,6 +180,7 @@
 - `minPrice` 與 `maxPrice` 只針對目前價格過濾。
 - `source.url` 不包含 `PHPSESSID`。
 - 第一版 `source.url` 指向原價屋分類頁，不保證能直接定位到單一商品。
+- 若 query 指定 `igrp`，`meta.sourceStatus` 優先回傳該分類狀態；未指定分類時回傳全域狀態。
 - API 不回傳 `source_item_key` 與 `iBuyToken`，避免把內部識別細節暴露給網站畫面。
 
 ## GET /api/products/{id}
@@ -198,7 +203,8 @@
     "id": "category-uuid",
     "sourceCategoryKey": "igrp:4",
     "igrp": 4,
-    "name": "CPU"
+    "displayName": "CPU",
+    "sourceName": "處理器 CPU"
   },
   "price": {
     "amount": 4880,
@@ -249,7 +255,9 @@
   "categories": [
     {
       "igrp": 4,
-      "name": "CPU",
+      "displayName": "CPU",
+      "sourceName": "處理器 CPU",
+      "status": "ok",
       "lastCheckedAt": "2026-05-25T12:05:00.000Z",
       "lastSuccessAt": "2026-05-25T12:00:00.000Z"
     }
@@ -263,11 +271,20 @@
 - `stale`：一段時間內沒有成功處理有效資料，但仍可顯示最後一次有效價格。
 - `unavailable`：尚未有任何可用資料。
 
-第一版規則：
+分類狀態規則：
 
+- 有效商品資料第一版以該分類存在可供網站顯示的 product + current price 判斷。
 - 最近 30 分鐘內有成功處理資料，狀態為 `ok`。
 - 超過 30 分鐘沒有成功處理資料，但資料庫仍有有效商品資料，狀態為 `stale`。
 - 沒有任何有效商品資料，狀態為 `unavailable`。
+
+全域狀態聚合規則：
+
+- 所有 enabled 分類都是 `ok`，全域狀態為 `ok`。
+- 至少一個 enabled 分類有有效商品資料，但不是所有分類都是 `ok`，全域狀態為 `stale`。
+- 所有 enabled 分類都沒有任何有效商品資料，全域狀態為 `unavailable`。
+- top-level `lastCheckedAt` 取 enabled 分類中最新的 `lastCheckedAt`。
+- top-level `lastSuccessAt` 取 enabled 分類中最舊的非空 `lastSuccessAt`；若沒有任何成功分類則為 `null`。
 
 網站顯示規則：
 

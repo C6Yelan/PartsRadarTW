@@ -59,6 +59,7 @@ Crawler 是獨立 TypeScript process，以 Node.js 執行。
 - 若上一輪尚未完成，不啟動新的 crawl cycle。
 - 每輪依第一版分類清單逐一抓取。
 - 疑似被攔截時，立即停止當次 crawl cycle。
+- 單一分類 fetch failed 或 parse failed 時，記錄該分類結果後可繼續下一分類；疑似被攔截例外，需停止整輪。
 - 連續失敗多次時，延後 1 小時再嘗試。
 - 不在 Next.js request / API route 內執行 crawler。
 
@@ -100,6 +101,7 @@ Raw snapshot metadata 至少包含：
 - 重複內容的 snapshot metadata 應指向既有 snapshot，例如 `duplicate_of_snapshot_id`。
 - 一般 snapshot 最長保留 30 天。
 - 異常 snapshot 最長保留 90 天。
+- raw snapshot 清理不得影響長期價格歷史；price snapshot 若參照 raw snapshot，關聯需允許清空。
 
 raw content hash 用於原始檔去重；parsed result hash 用於判斷商品資料是否實際變化。
 
@@ -201,6 +203,7 @@ coolpc:igrp:{IGrp}:ibuy:{iBuyToken}
 - 新商品或價格變動時，寫入 price snapshot。
 - 更新 `current_prices`。
 - 更新 `last_seen_at`。
+- 更新分類層級的 `last_checked_at` 與 `last_success_at`。
 - 記錄 crawl run 為成功且有變更。
 
 ### 資料未變
@@ -209,6 +212,7 @@ coolpc:igrp:{IGrp}:ibuy:{iBuyToken}
 
 - 記錄 crawl run 成功，狀態可標記為 `unchanged`。
 - 更新來源或分類層級的 `last_checked_at`。
+- 更新來源或分類層級的 `last_success_at`。
 - 不新增 price snapshot。
 - 不重複 upsert 所有商品。
 - 可依實作需要更新 `current_prices.last_seen_at`。
@@ -235,12 +239,16 @@ Fetch 失敗時：
 - 記錄 URL、分類、錯誤訊息與發生時間。
 - 不刪除既有商品資料。
 - 不更新 current price。
+- 更新該分類的 `last_checked_at`。
+- 不更新該分類的 `last_success_at`。
+- 第一版可繼續下一分類；整輪結束時若有成功分類與失敗分類，整輪狀態應標記為部分成功。
 
 ### 疑似被攔截
 
 疑似被攔截時：
 
 - 標記 snapshot 為 `suspected_block`。
+- 更新命中分類的 `last_checked_at`。
 - 立即停止當次 crawl cycle。
 - 不進入 product upsert。
 - 不寫入 price snapshot。
@@ -254,7 +262,35 @@ Parse 失敗時：
 - 保存 raw snapshot。
 - 保存 parser error 與命中的分類。
 - 不更新正式商品與價格資料。
+- 更新該分類的 `last_checked_at`。
+- 不更新該分類的 `last_success_at`。
+- 不累計該分類商品的 missing count。
+- 第一版可繼續下一分類；整輪結束時若有成功分類與失敗分類，整輪狀態應標記為部分成功。
 - 後續修正 parser 後可用 raw snapshot 重跑。
+
+## 分類結果與整輪結果
+
+crawler 應同時記錄分類層級結果與整輪 crawl run 摘要。
+
+分類層級結果用來判斷該 `IGrp` 本次是否成功，並更新 `source_categories.last_checked_at` / `last_success_at`。整輪 crawl run 則用來觀察排程是否正常、是否進入 backoff，以及本輪是否全部成功或部分成功。
+
+第一版分類層級結果先寫在 `crawl_runs.category_results` JSON，不強制建立獨立資料表。每筆結果先只記錄 `igrp`、`status`、`raw_snapshot_id` 與 `error_message`；若後續需要查詢每個分類的歷史成功率、管理介面或告警統計，再拆成正式關聯表。
+
+狀態規則：
+
+- `success_changed`：該分類成功，且商品清單、商品名稱或價格有變。
+- `success_unchanged`：該分類成功，但 parsed result 與上一個成功結果相同。
+- `fetch_failed`：該分類無法取得可驗證內容，可繼續下一分類。
+- `parse_failed`：該分類內容取得成功但解析失敗，可繼續下一分類。
+- `suspected_block`：疑似被攔截，立即停止整輪並進入既有 backoff 規則。
+
+整輪結果：
+
+- 全部分類成功且至少一個分類有變更，整輪為 `success_changed`。
+- 全部分類成功且都未變，整輪為 `success_unchanged`。
+- 同一輪內同時存在成功與失敗分類，整輪為 `success_with_errors`。
+- 疑似被攔截時，整輪為 `suspected_block`。
+- 沒有任何分類成功時，整輪使用對應的失敗狀態。
 
 ## Crawl Run 狀態
 
@@ -263,6 +299,7 @@ Parse 失敗時：
 - `running`
 - `success_changed`
 - `success_unchanged`
+- `success_with_errors`
 - `fetch_failed`
 - `suspected_block`
 - `parse_failed`
