@@ -268,6 +268,8 @@ Prisma migration 應在部署時明確執行。
 - raw snapshot 不提供公開下載。
 - API 不暴露 crawler internal error、raw HTML 或內部 token。
 
+完整第一版資安基準以 [security.md](security.md) 為準。
+
 ## Rollback
 
 第一版 rollback 概念：

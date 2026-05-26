@@ -21,6 +21,7 @@ docs/
     web-ui-design.md
     development-setup.md
     deployment.md
+    security.md
     testing-strategy.md
 ```
 
@@ -42,4 +43,5 @@ docs/
 - [Web UI 設計](technical/web-ui-design.md)
 - [開發環境設定](technical/development-setup.md)
 - [部署設計](technical/deployment.md)
+- [資安基準](technical/security.md)
 - [測試策略](technical/testing-strategy.md)
