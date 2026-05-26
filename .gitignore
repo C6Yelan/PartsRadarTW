@@ -21,6 +21,7 @@ out/
 .next/
 .nuxt/
 coverage/
+*.tsbuildinfo
 
 # Python cache and virtualenv
 __pycache__/

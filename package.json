@@ -2,5 +2,10 @@
   "name": "partsradar-tw",
   "version": "0.1.0",
   "private": true,
-  "packageManager": "pnpm@11.3.0"
+  "packageManager": "pnpm@11.3.0",
+  "scripts": {
+    "dev:web": "pnpm --filter @partsradar/web dev",
+    "build:web": "pnpm --filter @partsradar/web build",
+    "typecheck:web": "pnpm --filter @partsradar/web typecheck"
+  }
 }
