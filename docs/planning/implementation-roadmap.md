@@ -22,7 +22,7 @@
 - 建立 Next.js web app。
 - 建立 crawler app 基本入口。
 - 建立 shared / db package 初始結構。
-- 建立 Vitest、ESLint、TypeScript type check 基本設定。
+- 建立 Vitest、Biome、TypeScript type check 與 Next.js build validation 基本設定。
 - 建立 `.env.example`。
 - 建立本機 PostgreSQL 開發用 Docker Compose。
 
@@ -38,6 +38,8 @@
 - `pnpm install` 可成功。
 - `pnpm lint` 可執行。
 - `pnpm typecheck` 可執行。
+- `pnpm build` 可執行。
+- `pnpm check` 可執行。
 - `pnpm test` 可執行。
 - web dev server 可啟動。
 - PostgreSQL 可在本機啟動。

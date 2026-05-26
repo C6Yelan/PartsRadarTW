@@ -1,6 +1,6 @@
 # 測試策略
 
-本文件定義 PartsRadarTW 第一版的測試方向。第一版以 Vitest、TypeScript type check、ESLint 與手動驗收為主，先避免導入過多測試工具。
+本文件定義 PartsRadarTW 第一版的測試方向。第一版以 Vitest、TypeScript type check、Biome、Next.js build 與手動驗收為主，先避免導入過多測試工具。
 
 ## 測試目標
 
@@ -22,7 +22,8 @@
 | --- | --- |
 | Vitest | parser、資料處理、API 邏輯與 shared utils 測試 |
 | TypeScript type check | 檢查型別錯誤 |
-| ESLint | 檢查 Next.js / TypeScript 基本 lint |
+| Biome | 檢查 lint 與執行 format |
+| Next.js build | 確認 Next.js production build 可正常編譯 |
 | 手動驗收 checklist | 檢查網站操作流程與部署後狀態 |
 
 第一版不先導入：
@@ -199,8 +200,7 @@ API 測試不應暴露：
 ### 專案初始化階段
 
 - `pnpm install`
-- `pnpm lint`
-- `pnpm typecheck`
+- `pnpm check`
 - `pnpm test`
 
 ### 資料模型階段
@@ -224,7 +224,7 @@ API 測試不應暴露：
 
 ### Web UI 階段
 
-- lint / typecheck 通過。
+- `pnpm check` 通過。
 - 商品查詢頁手動驗收完成。
 - 商品詳細頁手動驗收完成。
 - 桌面與手機版 RWD 基本檢查完成。

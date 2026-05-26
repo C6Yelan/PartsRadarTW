@@ -14,5 +14,5 @@
 | ORM / migration 工具 | Prisma | 第一版使用 Prisma 管理 PostgreSQL schema、migration 與 TypeScript database client；若未來遇到複雜查詢，可再以 raw SQL 補充。 |
 | package manager | pnpm | 第一版使用 pnpm 管理依賴、scripts、workspace 與 lockfile，方便單一 repo 內的 web、crawler、shared packages 與未來 Discord bot 共用工具鏈。 |
 | 測試工具 | Vitest | 第一版使用 Vitest 測試 crawler parser、資料處理、API 邏輯與共用工具函式；瀏覽器 E2E 測試工具先不列入第一版決策。 |
-| lint / format | ESLint + Next.js config | 第一版使用 ESLint CLI 搭配 Next.js 官方 ESLint config，不使用已移除的 `next lint`；不額外導入 Prettier 或其他格式化工具，若實作過程出現格式不一致或 CI 需求，再另行補充。 |
+| lint / format | Biome | 第一版使用 Biome 負責 lint 與 format，不使用 ESLint + Next.js config；TypeScript typecheck 負責型別檢查，Next.js build 負責確認網站可正常編譯。 |
 | 部署方向 | 自架 + Docker | 專案未來以自架為主要部署方向，第一個目標環境預計是 Ubuntu 虛擬機，第一版部署設計以 Docker 為主。Docker Compose、反向代理、CI/CD 與正式主機細節等到部署文件階段再定。 |

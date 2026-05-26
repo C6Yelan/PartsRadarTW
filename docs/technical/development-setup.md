@@ -136,8 +136,11 @@ storage/snapshots/
 | `pnpm db:migrate` | 執行 Prisma migration |
 | `pnpm db:generate` | 產生 Prisma client |
 | `pnpm test` | 執行 Vitest |
-| `pnpm lint` | 使用 ESLint CLI 執行 lint，例如 `eslint .` |
+| `pnpm lint` | 使用 Biome 執行 lint |
+| `pnpm format` | 使用 Biome 格式化檔案 |
 | `pnpm typecheck` | 執行 TypeScript type check |
+| `pnpm build` | 執行 Next.js production build |
+| `pnpm check` | 依序執行 typecheck、lint 與 build |
 
 第一版不要求一開始就建立所有 script，但正式開發前應至少有：
 
@@ -145,8 +148,10 @@ storage/snapshots/
 - `pnpm test`
 - `pnpm lint`
 - `pnpm typecheck`
+- `pnpm build`
+- `pnpm check`
 
-ESLint 設定應使用 `eslint.config.mjs` 與 Next.js ESLint config。因為 Next.js app 不在 repo root，設定時需讓 Next.js ESLint plugin 知道 `apps/web` 是 web app 目錄。
+第一版程式品質工具以 Biome、TypeScript 與 Next.js build 分工處理：Biome 負責 lint / format，TypeScript typecheck 負責型別檢查，Next.js build 負責確認網站可正常編譯。第一版不使用 `eslint-config-next`，也不把 ESLint 列為必要工具。
 
 ## 開發流程
 

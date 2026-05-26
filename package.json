@@ -7,8 +7,14 @@
     "dev": "pnpm dev:web",
     "build": "pnpm build:web",
     "typecheck": "pnpm typecheck:web",
+    "lint": "biome lint .",
+    "format": "biome format --write .",
+    "check": "pnpm typecheck && pnpm lint && pnpm build",
     "dev:web": "pnpm --filter @partsradar/web dev",
     "build:web": "pnpm --filter @partsradar/web build",
     "typecheck:web": "pnpm --filter @partsradar/web typecheck"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.15"
   }
 }

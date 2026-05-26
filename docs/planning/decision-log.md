@@ -27,6 +27,7 @@
 | 解析失敗資料第一版使用 `parse_errors` 追蹤 | 缺少 `iBuyToken`、價格無法解析、重複 `source_item_key` 或內容驗證失敗等，不進入正式商品資料，但寫入 parse error 與 raw snapshot 供後續檢查。 |
 | 商品連續 6 次成功 crawl 都消失才改為 inactive | 單次成功 crawl 沒看到商品不視為下架；連續 6 次成功 crawl 都未看到同一商品時，才將商品標記為 inactive。 |
 | 第一版商品詳細頁不拆規格欄位 | 電腦硬體命名不穩定，第一版商品詳細頁先完整顯示原始商品名稱、分類、價格、來源與狀態，不解析 CPU、GPU、SSD 等分類規格欄位。 |
+| 第一版改用 Biome 作為 lint / format 工具 | 第一版不使用 ESLint + Next.js config，避免 ESLint 9 EOL 與 ESLint 10 plugin 相容性問題；TypeScript typecheck 與 Next.js build 仍保留作為正式檢查。 |
 
 ## 延後處理
 
