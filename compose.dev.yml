@@ -1,0 +1,24 @@
+name: partsradar-tw-dev
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: partsradar-postgres-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: partsradar_dev
+      POSTGRES_USER: partsradar
+      POSTGRES_PASSWORD: partsradar
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U partsradar -d partsradar_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  postgres_data:

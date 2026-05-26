@@ -47,6 +47,8 @@ temp/
 # Crawler generated data
 data/raw-snapshots/
 data/tmp/
+storage/snapshots/
+storage/tmp/
 
 # Editors and OS files
 .vscode/

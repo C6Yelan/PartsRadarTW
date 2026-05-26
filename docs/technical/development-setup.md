@@ -107,6 +107,24 @@ postgres
 compose.dev.yml
 ```
 
+目前本機開發提供 `compose.dev.yml` 啟動 PostgreSQL：
+
+```bash
+docker compose -f compose.dev.yml up -d postgres
+```
+
+停止本機 PostgreSQL：
+
+```bash
+docker compose -f compose.dev.yml down
+```
+
+本機連線設定需和 `.env.example` 的 `DATABASE_URL` 保持一致：
+
+```text
+postgresql://partsradar:partsradar@localhost:5432/partsradar_dev?schema=public
+```
+
 ## Raw Snapshot Storage
 
 本機 raw snapshot 可保存於 repo 外或 repo 內被忽略的資料夾。
