@@ -210,7 +210,7 @@ coolpc:igrp:{IGrp}:ibuy:{iBuyToken}
 
 若商品清單與價格完全沒變：
 
-- 記錄 crawl run 成功，狀態可標記為 `unchanged`。
+- 記錄 crawl run 成功，狀態標記為 `success_unchanged`。
 - 更新來源或分類層級的 `last_checked_at`。
 - 更新來源或分類層級的 `last_success_at`。
 - 不新增 price snapshot。

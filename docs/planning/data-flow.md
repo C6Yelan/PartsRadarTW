@@ -239,7 +239,7 @@ coolpc:igrp:{IGrp}:ibuy:{iBuyToken}
 
 處理規則：
 
-- crawl run 記錄為成功，狀態可標記為 `unchanged`。
+- crawl run 記錄為成功，狀態標記為 `success_unchanged`。
 - 更新來源或分類層級的 `last_checked_at`。
 - 更新來源或分類層級的 `last_success_at`，因為 fetch、內容驗證與解析都已成功。
 - 不新增 price snapshot，避免重複價格歷史。
