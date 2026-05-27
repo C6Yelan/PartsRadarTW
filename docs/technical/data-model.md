@@ -409,7 +409,7 @@ product_list_view
 - 缺少 `iBuyToken`。
 - 缺少商品名稱。
 - 價格無法解析。
-- 來源商品識別重複，例如同一分類同一 snapshot 內出現重複 `iBuyToken` / computed `source_item_key`。
+- 來源商品識別衝突，例如同一分類同一 snapshot 內相同 `iBuyToken` / computed `source_item_key` 對應不同商品名稱或價格。相同商品名稱與價格的完全重複列可由 parser 去重，不需寫入 `parse_errors`。
 - response content validation 失敗。
 
 ## Website Read Model

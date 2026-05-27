@@ -74,7 +74,8 @@ Crawler parser 測試使用 Vitest。
 - 缺少 `iBuyToken` 時不匯入正式商品。
 - 缺少商品名稱時不匯入正式商品。
 - 缺少可解析價格時不匯入正式商品。
-- 來源商品識別重複時，例如同一分類同一 snapshot 內出現重複 `iBuyToken` / computed `source_item_key`，標記為解析異常。
+- 同一分類同一 snapshot 內出現相同 `iBuyToken`、商品名稱與價格時，可去重後只保留一筆。
+- 同一分類同一 snapshot 內相同 `iBuyToken` 對應不同商品名稱或價格時，標記為解析異常。
 
 ## Response Validation 測試
 

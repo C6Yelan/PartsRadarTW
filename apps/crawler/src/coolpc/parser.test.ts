@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { COOLPC_TARGET_CATEGORIES } from "./categories";
+import { COOLPC_TARGET_CATEGORIES, type CoolpcTargetCategory } from "./categories";
 import {
   createCoolpcCategoryUrl,
   createSourceItemKey,
@@ -26,10 +26,32 @@ function fixture(name: string): string {
   return readFileSync(join(fixtureDir, name), "utf8");
 }
 
+function contextForCategory(igrp: number): SourceCategoryContext {
+  const category: CoolpcTargetCategory | undefined = COOLPC_TARGET_CATEGORIES.find(
+    (candidate) => candidate.igrp === igrp,
+  );
+
+  if (!category) {
+    throw new Error(`Missing test category for IGrp=${igrp}`);
+  }
+
+  return {
+    sourceCategoryId: `test-coolpc-igrp-${category.igrp}`,
+    igrp: category.igrp,
+    sourceName: category.sourceName,
+    displayName: category.displayName,
+    fetchedAt: context.fetchedAt,
+    sourceUrl: createCoolpcCategoryUrl(category.igrp),
+    expectedTitleKeywords: category.expectedTitleKeywords
+      ? [...category.expectedTitleKeywords]
+      : undefined,
+  };
+}
+
 describe("CoolPC parser helpers", () => {
   it("keeps the first-version target categories in code", () => {
     expect(COOLPC_TARGET_CATEGORIES.map((category) => category.igrp)).toEqual([
-      4, 5, 6, 7, 8, 10, 12, 14, 15,
+      4, 5, 6, 7, 10, 12, 14, 15,
     ]);
   });
 
@@ -112,6 +134,38 @@ describe("CoolPC category parser", () => {
     });
   });
 
+  it("parses reduced live title variants for target storage and cooler categories", () => {
+    const fixtures = [
+      [7, "coolpc-live-igrp-7.sample.html"],
+      [10, "coolpc-live-igrp-10.sample.html"],
+    ] as const;
+
+    for (const [igrp, fixtureName] of fixtures) {
+      const result = parseCoolpcCategoryPage(fixture(fixtureName), contextForCategory(igrp));
+
+      expect(result.validation.status).toBe("valid");
+      expect(result.canImport).toBe(true);
+      expect(result.items).toHaveLength(1);
+    }
+  });
+
+  it("deduplicates exact duplicate rows from reduced live case and power supply fixtures", () => {
+    const fixtures = [
+      [14, "coolpc-live-igrp-14-duplicate.html"],
+      [15, "coolpc-live-igrp-15-duplicate.html"],
+    ] as const;
+
+    for (const [igrp, fixtureName] of fixtures) {
+      const result = parseCoolpcCategoryPage(fixture(fixtureName), contextForCategory(igrp));
+
+      expect(result.validation.status).toBe("valid");
+      expect(result.canImport).toBe(true);
+      expect(result.items).toHaveLength(1);
+      expect(result.deduplicatedItemCount).toBe(1);
+      expect(result.issues).toEqual([]);
+    }
+  });
+
   it("keeps invalid product candidates out of parsed items and reports parse issues", () => {
     const result = parseCoolpcCategoryPage(
       fixture("cpu-category.mixed-invalid-items.html"),
@@ -127,8 +181,20 @@ describe("CoolPC category parser", () => {
     ]);
   });
 
-  it("blocks import when source identity is duplicated in the same snapshot", () => {
+  it("deduplicates identical source identity repeats in the same snapshot", () => {
     const result = parseCoolpcCategoryPage(fixture("cpu-category.duplicate-token.html"), context);
+
+    expect(result.canImport).toBe(true);
+    expect(result.items).toHaveLength(1);
+    expect(result.deduplicatedItemCount).toBe(1);
+    expect(result.issues).toEqual([]);
+  });
+
+  it("blocks import when duplicate source identity has conflicting product data", () => {
+    const result = parseCoolpcCategoryPage(
+      fixture("cpu-category.conflicting-duplicate-token.html"),
+      context,
+    );
 
     expect(result.canImport).toBe(false);
     expect(result.items).toHaveLength(1);

@@ -12,6 +12,7 @@ docs/
     data-flow.md
     coolpc-source-analysis.md
     implementation-roadmap.md
+    phase-02-coolpc-live-validation.md
   technical/
     tech-stack.md
     architecture.md
@@ -32,6 +33,7 @@ docs/
 - [資料流設計](planning/data-flow.md)
 - [原價屋資料來源分析](planning/coolpc-source-analysis.md)
 - [實作 Roadmap](planning/implementation-roadmap.md)
+- [Phase 2 原價屋 live validation](planning/phase-02-coolpc-live-validation.md)
 
 ## 技術文件
 

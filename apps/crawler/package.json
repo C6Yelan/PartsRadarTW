@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "validate:coolpc-live": "tsx src/scripts/validate-coolpc-live.ts"
   },
   "dependencies": {
     "cheerio": "^1.2.0",

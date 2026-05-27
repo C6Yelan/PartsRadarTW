@@ -18,13 +18,8 @@ const coolpcCategories = [
   },
   {
     igrp: 7,
-    sourceName: "固態硬碟 M.2 / SSD",
-    displayName: "SSD",
-  },
-  {
-    igrp: 8,
-    sourceName: "2.5 / 3.5 傳統內接硬碟 HDD",
-    displayName: "HDD",
+    sourceName: "內接硬碟 HDD / 固態 SSD",
+    displayName: "SSD / HDD",
   },
   {
     igrp: 10,

@@ -40,14 +40,15 @@ https://www.coolpc.com.tw/eachview.php?IGrp={分類編號}
 | CPU | `4` | `https://www.coolpc.com.tw/eachview.php?IGrp=4` |
 | 主機板 | `5` | `https://www.coolpc.com.tw/eachview.php?IGrp=5` |
 | 記憶體 | `6` | `https://www.coolpc.com.tw/eachview.php?IGrp=6` |
-| SSD | `7` | `https://www.coolpc.com.tw/eachview.php?IGrp=7` |
-| HDD | `8` | `https://www.coolpc.com.tw/eachview.php?IGrp=8` |
+| SSD / HDD | `7` | `https://www.coolpc.com.tw/eachview.php?IGrp=7` |
 | 散熱器 | `10` | `https://www.coolpc.com.tw/eachview.php?IGrp=10` |
 | 顯示卡 | `12` | `https://www.coolpc.com.tw/eachview.php?IGrp=12` |
 | 機殼 | `14` | `https://www.coolpc.com.tw/eachview.php?IGrp=14` |
 | 電源供應器 | `15` | `https://www.coolpc.com.tw/eachview.php?IGrp=15` |
 
-水冷分類 `IGrp=11` 與機殼風扇 / 配件 `IGrp=16` 暫不列入第一版主線。
+2026-05-27 Phase 2 live validation 顯示，`IGrp=7` 頁面標題為「內接硬碟HDD｜固態SSD」，可作為第一版內接儲存分類；`IGrp=8` 頁面標題為「外接硬碟｜隨身碟｜記憶卡」，不屬於第一版組電腦必要硬體，第一版不建立此分類資料。
+
+水冷分類 `IGrp=11`、機殼風扇 / 配件 `IGrp=16` 與外接儲存 `IGrp=8` 不列入第一版主線，未來版本需要時再新增回來。
 
 ## 執行方式
 
@@ -196,7 +197,10 @@ DB 不保存 `source_item_key` 欄位；正式商品 upsert 使用 `sourceCatego
 - 不匯入正式商品資料。
 - 保留原始商品名稱、分類、raw snapshot 與解析紀錄。
 
-若來源商品識別重複，例如同一分類同一 snapshot 內出現重複 `iBuyToken` / computed `source_item_key`，該分類本次結果應標記為解析異常，不更新正式商品與價格資料。
+若同一分類同一 snapshot 內出現重複 `iBuyToken` / computed `source_item_key`：
+
+- 重複項目的商品名稱與價格完全相同時，視為來源頁重複列出同一商品，parser 可去重後保留一筆。
+- 重複項目的商品名稱或價格不同時，該分類本次結果應標記為解析異常，不更新正式商品與價格資料。
 
 ## 資料更新規則
 

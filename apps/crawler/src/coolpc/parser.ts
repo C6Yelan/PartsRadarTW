@@ -70,6 +70,7 @@ export interface CoolpcParseResult {
   validation: ContentValidationResult;
   items: ParsedCoolpcProduct[];
   issues: CoolpcParseIssue[];
+  deduplicatedItemCount: number;
   canImport: boolean;
 }
 
@@ -214,6 +215,7 @@ export function parseCoolpcCategoryPage(
           message: validation.reason ?? "content validation failed",
         },
       ],
+      deduplicatedItemCount: 0,
       canImport: false,
     };
   }
@@ -222,7 +224,8 @@ export function parseCoolpcCategoryPage(
   const candidates = extractCoolpcProductCandidates($);
   const items: ParsedCoolpcProduct[] = [];
   const issues: CoolpcParseIssue[] = [];
-  const seenSourceItemKeys = new Set<string>();
+  const seenItemsBySourceKey = new Map<string, ParsedCoolpcProduct>();
+  let deduplicatedItemCount = 0;
   let hasFatalIssue = false;
 
   for (const candidate of candidates) {
@@ -264,8 +267,14 @@ export function parseCoolpcCategoryPage(
     }
 
     const sourceItemKey = createSourceItemKey(context.igrp, ibuyToken);
+    const existingItem = seenItemsBySourceKey.get(sourceItemKey);
 
-    if (seenSourceItemKeys.has(sourceItemKey)) {
+    if (existingItem) {
+      if (existingItem.name === name && existingItem.price === price) {
+        deduplicatedItemCount += 1;
+        continue;
+      }
+
       hasFatalIssue = true;
       issues.push({
         type: "duplicate_source_identity",
@@ -278,8 +287,7 @@ export function parseCoolpcCategoryPage(
       continue;
     }
 
-    seenSourceItemKeys.add(sourceItemKey);
-    items.push({
+    const item: ParsedCoolpcProduct = {
       sourceCategoryId: context.sourceCategoryId,
       igrp: context.igrp,
       sourceName: context.sourceName,
@@ -294,13 +302,17 @@ export function parseCoolpcCategoryPage(
         context.sourceUrl ?? createCoolpcCategoryUrl(context.igrp),
       ),
       fetchedAt: context.fetchedAt,
-    });
+    };
+
+    seenItemsBySourceKey.set(sourceItemKey, item);
+    items.push(item);
   }
 
   return {
     validation,
     items,
     issues,
+    deduplicatedItemCount,
     canImport: items.length > 0 && !hasFatalIssue,
   };
 }

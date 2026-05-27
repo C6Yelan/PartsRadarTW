@@ -25,7 +25,8 @@
 | 抓取失敗時網站顯示最後有效資料 | API 不因單次 fetch 失敗、疑似攔截或解析失敗清空商品；網站透過來源狀態判斷資料是否可能過期。 |
 | 來源狀態第一版以 30 分鐘作為 stale 門檻 | 分類最近 30 分鐘內有成功處理有效資料視為 `ok`；超過 30 分鐘但仍有有效商品資料視為 `stale`；沒有任何有效商品資料視為 `unavailable`。全域狀態由 enabled 分類聚合，全部分類 `ok` 才是全域 `ok`，至少一個分類有有效資料但不是全部 `ok` 時為全域 `stale`，完全沒有有效資料時為全域 `unavailable`。 |
 | stale 狀態使用低干擾提示 | `stale` 不代表資料不可用，第一版只在列表或詳細頁用低干擾文字提示資料可能未更新。 |
-| 解析失敗資料第一版使用 `parse_errors` 追蹤 | 缺少 `iBuyToken`、價格無法解析、來源商品識別重複，例如同一分類同一 snapshot 內出現重複 `iBuyToken` / computed `source_item_key`，或內容驗證失敗等，不進入正式商品資料，但寫入 parse error 與 raw snapshot 供後續檢查。 |
+| 同一 snapshot 完全重複商品可去重 | Phase 2 live validation 顯示機殼與電源頁會把相同 `iBuyToken`、商品名稱與價格的商品列出兩次；第一版 parser 可去重後保留一筆。若同一 `iBuyToken` 對應不同商品名稱或價格，仍視為解析異常，不進入正式商品資料。 |
+| 解析失敗資料第一版使用 `parse_errors` 追蹤 | 缺少 `iBuyToken`、價格無法解析、來源商品識別衝突，例如同一分類同一 snapshot 內相同 `iBuyToken` / computed `source_item_key` 對應不同商品名稱或價格，或內容驗證失敗等，不進入正式商品資料，但寫入 parse error 與 raw snapshot 供後續檢查。 |
 | 商品連續 6 次成功 crawl 都消失才改為 inactive | 單次成功 crawl 沒看到商品不視為下架；連續 6 次成功 crawl 都未看到同一商品時，才將商品標記為 inactive。 |
 | 第一版商品詳細頁不拆規格欄位 | 電腦硬體命名不穩定，第一版商品詳細頁先完整顯示原始商品名稱、分類、價格、來源與狀態，不解析 CPU、GPU、SSD 等分類規格欄位。 |
 | 第一版改用 Biome 作為 lint / format 工具 | 第一版不使用 ESLint + Next.js config，避免 ESLint 9 EOL 與 ESLint 10 plugin 相容性問題；TypeScript typecheck 與 Next.js build 仍保留作為正式檢查。 |

@@ -2,6 +2,7 @@ export interface CoolpcTargetCategory {
   igrp: number;
   sourceName: string;
   displayName: string;
+  expectedTitleKeywords?: readonly string[];
 }
 
 export const COOLPC_TARGET_CATEGORIES = [
@@ -22,18 +23,15 @@ export const COOLPC_TARGET_CATEGORIES = [
   },
   {
     igrp: 7,
-    sourceName: "固態硬碟 M.2 / SSD",
-    displayName: "SSD",
-  },
-  {
-    igrp: 8,
-    sourceName: "2.5 / 3.5 傳統內接硬碟 HDD",
-    displayName: "HDD",
+    sourceName: "內接硬碟 HDD / 固態 SSD",
+    displayName: "SSD / HDD",
+    expectedTitleKeywords: ["內接硬碟", "固態SSD", "HDD", "SSD"],
   },
   {
     igrp: 10,
     sourceName: "散熱器 / 散熱墊 / 散熱膏",
     displayName: "散熱器",
+    expectedTitleKeywords: ["CPU散熱", "散熱墊", "散熱膏", "散熱"],
   },
   {
     igrp: 12,
