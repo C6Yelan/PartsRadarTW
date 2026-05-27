@@ -1,7 +1,7 @@
 import type { PrismaClient } from "@partsradar/db";
 
-// This module owns the Phase 3 crawl-run skeleton only. Product, price, and
-// current price writes stay in later slices so their rules are tested separately.
+// This module owns crawl-run orchestration. Raw snapshot and product/price
+// writes stay in dedicated modules so their persistence rules are tested separately.
 export const CRAWL_TRIGGER_TYPES = {
   MANUAL: "MANUAL",
   SCHEDULED: "SCHEDULED",
