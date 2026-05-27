@@ -115,6 +115,8 @@
 
 目標：把 parser 結果安全寫入資料庫。
 
+實作切片與驗收順序見 [Phase 3 Crawler 資料寫入實作計畫](phase-03-crawler-write-plan.md)。
+
 範圍：
 
 - 建立 crawl run 流程。

@@ -13,6 +13,7 @@ docs/
     coolpc-source-analysis.md
     implementation-roadmap.md
     phase-02-coolpc-live-validation.md
+    phase-03-crawler-write-plan.md
   technical/
     tech-stack.md
     architecture.md
@@ -34,6 +35,7 @@ docs/
 - [原價屋資料來源分析](planning/coolpc-source-analysis.md)
 - [實作 Roadmap](planning/implementation-roadmap.md)
 - [Phase 2 原價屋 live validation](planning/phase-02-coolpc-live-validation.md)
+- [Phase 3 Crawler 資料寫入實作計畫](planning/phase-03-crawler-write-plan.md)
 
 ## 技術文件
 
