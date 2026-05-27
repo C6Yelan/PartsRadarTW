@@ -2,6 +2,14 @@
   "name": "@partsradar/db",
   "version": "0.1.0",
   "private": true,
+  "main": "./src/client.ts",
+  "types": "./src/client.ts",
+  "exports": {
+    ".": {
+      "types": "./src/client.ts",
+      "default": "./src/client.ts"
+    }
+  },
   "scripts": {
     "db:deploy": "prisma migrate deploy",
     "db:generate": "prisma generate",

@@ -7,6 +7,7 @@
     "validate:coolpc-live": "tsx src/scripts/validate-coolpc-live.ts"
   },
   "dependencies": {
+    "@partsradar/db": "workspace:*",
     "cheerio": "^1.2.0",
     "iconv-lite": "^0.7.2"
   },

@@ -17,6 +17,9 @@ importers:
 
   apps/crawler:
     dependencies:
+      '@partsradar/db':
+        specifier: workspace:*
+        version: link:../../packages/db
       cheerio:
         specifier: ^1.2.0
         version: 1.2.0
