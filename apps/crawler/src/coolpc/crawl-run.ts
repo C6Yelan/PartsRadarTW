@@ -50,6 +50,13 @@ export interface CrawlRunWriteClient {
       where: { enabled: true };
       orderBy: { igrp: "asc" };
     }): Promise<CrawlRunSourceCategory[]>;
+    update(args: {
+      where: { id: string };
+      data: {
+        lastCheckedAt: Date;
+        lastSuccessAt?: Date;
+      };
+    }): Promise<{ id: string }>;
   };
   crawlRun: {
     create(args: {
@@ -168,6 +175,12 @@ export async function runCoolpcCrawlOnce({
         errorMessage: result.errorMessage,
       },
     });
+    await updateSourceCategoryCheckTimestamps({
+      client,
+      sourceCategoryId: category.id,
+      status: result.status,
+      checkedAt: now(),
+    });
 
     categoryResults.push({
       sourceCategoryId: category.id,
@@ -237,6 +250,31 @@ function isSuccessStatus(status: CrawlRunCategoryResultStatusValue): boolean {
     status === CRAWL_RUN_CATEGORY_RESULT_STATUSES.SUCCESS_CHANGED ||
     status === CRAWL_RUN_CATEGORY_RESULT_STATUSES.SUCCESS_UNCHANGED
   );
+}
+
+async function updateSourceCategoryCheckTimestamps({
+  client,
+  sourceCategoryId,
+  status,
+  checkedAt,
+}: {
+  client: CrawlRunWriteClient;
+  sourceCategoryId: string;
+  status: CrawlRunCategoryResultStatusValue;
+  checkedAt: Date;
+}): Promise<void> {
+  const data: { lastCheckedAt: Date; lastSuccessAt?: Date } = { lastCheckedAt: checkedAt };
+
+  // Failed, blocked, or parser-broken categories were attempted, but they did
+  // not produce a trustworthy product list. Keep last_success_at unchanged.
+  if (isSuccessStatus(status)) {
+    data.lastSuccessAt = checkedAt;
+  }
+
+  await client.sourceCategory.update({
+    where: { id: sourceCategoryId },
+    data,
+  });
 }
 
 async function processCategorySafely({

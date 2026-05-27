@@ -43,6 +43,20 @@ describe("CoolPC crawl run writer", () => {
       "category-4",
       "category-12",
     ]);
+    expect(client.sourceCategoryUpdates).toEqual([
+      expect.objectContaining({
+        sourceCategoryId: "category-4",
+        lastCheckedAt: fixedDate(),
+        lastSuccessAt: fixedDate(),
+        updatedLastSuccessAt: true,
+      }),
+      expect.objectContaining({
+        sourceCategoryId: "category-12",
+        lastCheckedAt: fixedDate(),
+        lastSuccessAt: fixedDate(),
+        updatedLastSuccessAt: true,
+      }),
+    ]);
   });
 
   it("stops the current crawl run when a category reports suspected block", async () => {
@@ -69,6 +83,16 @@ describe("CoolPC crawl run writer", () => {
     expect(result.categoryResults.map((categoryResult) => categoryResult.igrp)).toEqual([4, 5]);
     expect(client.categoryResults).toHaveLength(2);
     expect(client.crawlRuns[0]?.status).toBe(CRAWL_RUN_STATUSES.SUSPECTED_BLOCK);
+    expect(client.sourceCategoryUpdates).toEqual([
+      expect.objectContaining({
+        sourceCategoryId: "category-4",
+        updatedLastSuccessAt: true,
+      }),
+      expect.objectContaining({
+        sourceCategoryId: "category-5",
+        updatedLastSuccessAt: false,
+      }),
+    ]);
   });
 
   it("marks a mixed success and failure run as success with errors", async () => {
@@ -103,6 +127,16 @@ describe("CoolPC crawl run writer", () => {
         errorMessage: "Fetch timed out.",
       }),
     ]);
+    expect(client.sourceCategoryUpdates).toEqual([
+      expect.objectContaining({
+        sourceCategoryId: "category-4",
+        updatedLastSuccessAt: true,
+      }),
+      expect.objectContaining({
+        sourceCategoryId: "category-5",
+        updatedLastSuccessAt: false,
+      }),
+    ]);
   });
 
   it("records an unexpected category processing error as parse failed", async () => {
@@ -126,6 +160,13 @@ describe("CoolPC crawl run writer", () => {
         errorMessage: "Parser crashed.",
       }),
     ]);
+    expect(client.sourceCategoryUpdates).toEqual([
+      expect.objectContaining({
+        sourceCategoryId: "category-4",
+        lastCheckedAt: fixedDate(),
+        updatedLastSuccessAt: false,
+      }),
+    ]);
   });
 });
 
@@ -146,9 +187,17 @@ interface FakeCategoryResult {
   errorMessage: string | null;
 }
 
+interface FakeSourceCategoryUpdate {
+  sourceCategoryId: string;
+  lastCheckedAt: Date;
+  lastSuccessAt?: Date;
+  updatedLastSuccessAt: boolean;
+}
+
 class FakeCrawlRunWriteClient implements CrawlRunWriteClient {
   readonly crawlRuns: FakeCrawlRun[] = [];
   readonly categoryResults: FakeCategoryResult[] = [];
+  readonly sourceCategoryUpdates: FakeSourceCategoryUpdate[] = [];
 
   constructor(private readonly categories: CrawlRunSourceCategory[]) {}
 
@@ -157,6 +206,16 @@ class FakeCrawlRunWriteClient implements CrawlRunWriteClient {
       [...this.categories]
         .filter((sourceCategory) => sourceCategory.enabled)
         .sort((left, right) => left.igrp - right.igrp),
+    update: async ({ where, data }: Parameters<CrawlRunWriteClient["sourceCategory"]["update"]>[0]) => {
+      this.sourceCategoryUpdates.push({
+        sourceCategoryId: where.id,
+        lastCheckedAt: data.lastCheckedAt,
+        lastSuccessAt: data.lastSuccessAt,
+        updatedLastSuccessAt: "lastSuccessAt" in data,
+      });
+
+      return { id: where.id };
+    },
   };
 
   crawlRun = {
@@ -226,5 +285,9 @@ function category({
 }
 
 function fixedClock(): () => Date {
-  return () => new Date("2026-05-27T10:30:00.000Z");
+  return fixedDate;
+}
+
+function fixedDate(): Date {
+  return new Date("2026-05-27T10:30:00.000Z");
 }

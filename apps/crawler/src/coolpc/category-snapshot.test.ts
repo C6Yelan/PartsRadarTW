@@ -313,6 +313,9 @@ class FakeCrawlerWriteClient implements CrawlRunWriteClient, CoolpcCategorySnaps
       [...this.categories]
         .filter((sourceCategory) => sourceCategory.enabled)
         .sort((left, right) => left.igrp - right.igrp),
+    update: async ({ where }: Parameters<CrawlRunWriteClient["sourceCategory"]["update"]>[0]) => ({
+      id: where.id,
+    }),
   };
 
   crawlRun = {
