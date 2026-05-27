@@ -5,6 +5,8 @@
 ## 設計原則
 
 - API 只提供網站查詢需要的讀取功能。
+- API 可讀取 SQL view / projection，例如 `product_list_view`，但 projection 不是資料真相來源。
+- API 不應要求 crawler 為查詢方便把反正規化欄位寫回核心資料表。
 - API 不負責執行 crawler。
 - API 不直接抓取原價屋頁面。
 - API 不暴露 raw snapshot、parse error 或 crawler 內部除錯資料。
@@ -13,6 +15,7 @@
 - 商品列表預設只顯示 active 商品。
 - inactive 商品不從列表主動露出，但既有商品詳情連結仍可開啟並顯示商品狀態。
 - crawler 失敗或疑似被攔截時，API 繼續回傳最後一次成功處理的有效資料。
+- 第一版只支援原價屋 CoolPC；response 中若出現 `source: "coolpc"` 或 `source.name: "coolpc"`，是 API 固定值，不是核心 DB 欄位。
 
 ## Endpoint Overview
 
@@ -73,7 +76,6 @@
     {
       "id": "category-uuid",
       "source": "coolpc",
-      "sourceCategoryKey": "igrp:4",
       "igrp": 4,
       "displayName": "CPU",
       "sourceName": "處理器 CPU",
@@ -89,6 +91,8 @@
 
 - 只回傳 `enabled = true` 的分類。
 - 排序順序以網站第一版分類順序為準。
+- `source` 是 API 固定回傳的來源名稱，不來自 DB 欄位。
+- `igrp` 是原價屋分類外部鍵。
 - `displayName` 是網站顯示名稱。
 - `sourceName` 是原價屋分類名稱，用於保留來源脈絡。
 - `lastCheckedAt` 代表最近一次檢查時間，不等於資料一定成功更新。
@@ -100,9 +104,10 @@
 
 資料來源：
 
-- `products`
-- `current_prices`
-- `source_categories`
+- 優先可讀 `product_list_view`。
+- 或直接 join `products`、`current_prices`、`price_snapshots`、`source_categories`。
+
+`product_list_view` 是普通 SQL view，由核心資料表重建而來；若 view 被刪除，可由 migration 中的 SQL 定義重新建立。
 
 ### Query Parameters
 
@@ -136,7 +141,6 @@
       "name": "Intel Core Ultra 5 225F",
       "category": {
         "id": "category-uuid",
-        "sourceCategoryKey": "igrp:4",
         "igrp": 4,
         "displayName": "CPU",
         "sourceName": "處理器 CPU"
@@ -178,10 +182,13 @@
 - 無目前價格的商品第一版不出現在商品列表。
 - `q` 應查詢 `name` 與 `normalized_name`。
 - `minPrice` 與 `maxPrice` 只針對目前價格過濾。
+- 價格金額、幣別與 `capturedAt` 從 `current_prices.price_snapshot_id -> price_snapshots` 取得。
+- 若使用 `product_list_view`，`current_price`、`currency`、`price_captured_at` 是 view 投影欄位，不是核心表上的重複欄位。
 - `source.url` 不包含 `PHPSESSID`。
+- `source.name` 是 API 固定值 `coolpc`，不來自 DB 欄位。
 - 第一版 `source.url` 指向原價屋分類頁，不保證能直接定位到單一商品。
 - 若 query 指定 `igrp`，`meta.sourceStatus` 優先回傳該分類狀態；未指定分類時回傳全域狀態。
-- API 不回傳 `source_item_key` 與 `iBuyToken`，避免把內部識別細節暴露給網站畫面。
+- API 不回傳 computed `source_item_key` 與 `iBuyToken`，避免把內部識別細節暴露給網站畫面。
 
 ## GET /api/products/{id}
 
@@ -191,6 +198,7 @@
 
 - `products`
 - `current_prices`
+- `price_snapshots`
 - `source_categories`
 
 ### Response
@@ -201,7 +209,6 @@
   "name": "Intel Core Ultra 5 225F",
   "category": {
     "id": "category-uuid",
-    "sourceCategoryKey": "igrp:4",
     "igrp": 4,
     "displayName": "CPU",
     "sourceName": "處理器 CPU"

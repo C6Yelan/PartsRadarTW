@@ -33,6 +33,17 @@
 
 商品分類第一版先保留原價屋分類脈絡。資料庫應同時保存原價屋分類名稱與 PartsRadarTW 顯示名稱，讓 crawler 可追溯來源分類，網站也能使用較簡潔的分類標籤。
 
+第一版只支援原價屋 CoolPC，不在核心資料表預留多來源抽象欄位。原價屋分類外部鍵是 `IGrp`，由 `source_categories.igrp` 唯一表示。
+
+## Truth Tables 與 Read Projection
+
+第一版資料流分成兩層：
+
+- Domain Truth tables：crawler 寫入的核心資料表，包含 `source_categories`、`products`、`price_snapshots`、`current_prices`、`crawl_runs`、`crawl_run_category_results`、`raw_snapshots`、`parse_errors`。這些表盡量維持 3NF，不為 API 查詢方便新增可由關聯推出的欄位。
+- Read Projection / View：API 或 UI 可讀取的查詢投影，例如 `product_list_view`。Projection 可反正規化 read shape，但必須能由 truth tables 重建，且不可作為 crawler 寫入真相來源。
+
+第一版先使用普通 SQL view，不使用 materialized view 或 cache。若未來普通 view 效能不足，再依實際查詢計畫評估 materialized view、refresh 策略或其他 cache。
+
 ## 整體流程
 
 ```text
@@ -45,6 +56,7 @@
   -> upsert products（新增或更新商品主檔）
   -> insert price snapshots when needed（必要時寫入價格快照）
   -> update current prices（更新目前價格）
+  -> product_list_view（商品列表查詢投影）
   -> read API（讀取 API）
   -> web UI（網站介面）
 ```
@@ -63,7 +75,7 @@
 
 Raw snapshot 至少應記錄：
 
-- 來源：固定為原價屋。
+- `source_category_id`：對應 `source_categories`，`IGrp` 與原價屋分類名稱由分類主檔取得。
 - 抓取 URL：第一版主要為 `eachview.php?IGrp={分類編號}`。
 - 抓取時間。
 - HTTP 狀態或錯誤資訊。
@@ -108,13 +120,14 @@ Parser 應把 raw snapshot 轉成網站可用的標準商品資料。
 
 第一版 parsed item 至少應包含：
 
-- 原價屋分類。
+- 原價屋分類，後續需對應到 `source_categories`。
 - 商品原始名稱。
 - 商品價格。
 - 幣別。
 - 原始頁面或商品連結。
 - 資料抓取時間。
-- `source_item_key`。
+- `iBuyToken`。
+- computed `source_item_key`，只作為 crawler / shared helper 的來源識別字串，不存入 DB。
 
 可選欄位：
 
@@ -127,14 +140,13 @@ Parser 應把 raw snapshot 轉成網站可用的標準商品資料。
 
 Product 是商品主檔，用來表示同一個原價屋商品。
 
-商品主檔應使用內部 UUID 作為資料庫主鍵，並使用 `source_item_key` 判斷 crawler 抓到的是不是同一個原價屋商品。
+商品主檔應使用內部 UUID 作為資料庫主鍵。資料庫唯一性使用 `source_category_id + ibuy_token`，crawler 需要穩定來源識別字串時可由同一組資料計算 `source_item_key`。
 
 概念欄位：
 
 - `id`：內部 UUID。
-- `source`：固定為原價屋。
-- `source_item_key`：來源商品識別鍵。
-- `category`：原價屋分類。
+- `source_category_id`：原價屋分類主檔。
+- `ibuy_token`。
 - `name`：商品原始名稱。
 - `source_url`：原始來源連結。
 - `created_at`。
@@ -167,7 +179,7 @@ Price snapshot 屬於長期價格資料，不套用 raw snapshot 的 30 / 90 天
 
 Current price 使用獨立 `current_prices` 表，讓網站商品列表、搜尋與基本詳細頁可以穩定讀取最新有效價格。
 
-`current_prices` 不取代價格歷史。價格歷史由 price snapshots 或 price history 保存；`current_prices` 只保存目前顯示與查詢用的最新有效狀態。
+`current_prices` 不取代價格歷史。價格歷史由 price snapshots 保存；`current_prices` 只保存目前 `price_snapshot` 指標與狀態時間，不重複保存價格、幣別或 `captured_at`。網站要顯示價格時，需透過 `current_prices.price_snapshot_id` 讀取對應的 `price_snapshots`。
 
 更新規則：
 
@@ -183,14 +195,29 @@ Current price 使用獨立 `current_prices` 表，讓網站商品列表、搜尋
 - `captured_at`：價格快照實際被記錄的時間。
 - `price_changed_at`：目前價格最後一次變動的時間。
 
+### Crawl Run Category Result
+
+每一輪 crawl 的分類層級結果寫入 `crawl_run_category_results`，不存入 `crawl_runs.category_results` JSONB。
+
+每筆結果代表同一輪 crawl 對某一個 `source_category_id` 的處理結果，至少包含：
+
+- `crawl_run_id`。
+- `source_category_id`。
+- `status`：`success_changed`、`success_unchanged`、`fetch_failed`、`suspected_block` 或 `parse_failed`。
+- `raw_snapshot_id`，可為空。
+- `error_message`，可為空。
+
+這張表是更新 `source_categories.last_checked_at` / `last_success_at` 與後續分類層級狀態查詢的依據。
+
 ## 商品識別
 
 商品識別採兩層設計：
 
 - 內部 UUID：給資料表關聯與 API 回傳使用。
-- `source_item_key`：給 crawler 判斷同一個原價屋商品使用。
+- `source_category_id + ibuy_token`：DB 判斷同一個原價屋商品的唯一鍵。
+- computed `source_item_key`：給 crawler、log 或 shared helper 表示來源商品使用，不存入 DB。
 
-`source_item_key` 具體格式：
+computed `source_item_key` 具體格式：
 
 ```text
 coolpc:igrp:{IGrp}:ibuy:{iBuyToken}
@@ -200,10 +227,11 @@ coolpc:igrp:{IGrp}:ibuy:{iBuyToken}
 
 1. `IGrp` 來自原價屋分類編號。
 2. `iBuyToken` 來自 `eachview.php?IGrp={分類編號}` 的商品區塊。
-3. 不使用每次新產生的 UUID 判斷商品是否相同。
-4. 不單獨依賴商品名稱，避免名稱微調造成價格歷史斷裂。
-5. 不使用價格作為商品識別依據。
-6. 不使用 `PHPSESSID` 作為商品識別或穩定來源 URL 的一部分。
+3. DB 不保存 `source_item_key` 欄位；需要字串時由 `sourceCategory.igrp + ibuyToken` 在程式層組出。
+4. 不使用每次新產生的 UUID 判斷商品是否相同。
+5. 不單獨依賴商品名稱，避免名稱微調造成價格歷史斷裂。
+6. 不使用價格作為商品識別依據。
+7. 不使用 `PHPSESSID` 作為商品識別或穩定來源 URL 的一部分。
 
 若商品沒有 `iBuyToken`，第一版不匯入正式商品資料，但應保留解析紀錄與 raw snapshot，方便後續檢查。
 
@@ -227,11 +255,13 @@ coolpc:igrp:{IGrp}:ibuy:{iBuyToken}
 4. 驗證 response content 確實是可解析的商品資料頁。
 5. 解析商品資料。
 6. 驗證 parsed item 必要欄位。
-7. 用 `source_item_key` upsert product。
+7. 用 `source_category_id + ibuy_token` upsert product；必要時同步計算 `source_item_key` 供 log 或 duplicate detection。
 8. 新商品或價格變動時寫入 price snapshot。
 9. 更新目前價格讀取口徑。
-10. 更新來源或分類層級的 `last_checked_at` 與 `last_success_at`。
-11. 網站可查詢到更新後資料。
+10. 寫入 `crawl_run_category_results` 記錄分類層級結果。
+11. 更新分類層級的 `last_checked_at` 與 `last_success_at`。
+12. `product_list_view` 透過核心表 join 反映更新後資料。
+13. 網站可查詢到更新後資料。
 
 ### 資料未變流程
 
@@ -271,7 +301,7 @@ coolpc:igrp:{IGrp}:ibuy:{iBuyToken}
 - 先記錄商品 missing 狀態，例如 `missing_since` 或 `missing_seen_count`。
 - 不立即將商品視為永久下架，避免原價屋短暫頁面異常造成誤判。
 - 連續 6 次成功 crawl 都未看到同一商品時，才將商品改為 inactive。
-- 若商品未來以相同 `source_item_key` 重新出現，應恢復 active 並延續原價格歷史。
+- 若商品未來以相同 `source_category_id + ibuy_token` 重新出現，應恢復 active 並延續原價格歷史。
 - 網站是否顯示 inactive 商品，留待網站呈現規則決定。
 
 ### 疑似被攔截
@@ -303,11 +333,13 @@ coolpc:igrp:{IGrp}:ibuy:{iBuyToken}
 
 ### 商品識別失敗
 
-若商品缺少 `iBuyToken` 或無法產生可靠的 `source_item_key`，第一版不寫入正式商品主檔，但應保留解析紀錄與 raw snapshot，方便後續檢查。
+若商品缺少 `iBuyToken`、無法對應 `source_category_id`，或無法產生可靠的 computed `source_item_key`，第一版不寫入正式商品主檔，但應保留解析紀錄與 raw snapshot，方便後續檢查。
 
 ## 網站讀取口徑
 
 網站第一版應只讀取已成功處理的商品資料。
+
+商品列表 API 可優先讀取 `product_list_view`，也可直接 join 核心表取得同樣結果。`product_list_view` 是 projection，可刪除後重建；crawler 不寫入它。
 
 網站需要的基本資料：
 

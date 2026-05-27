@@ -1,14 +1,20 @@
 # 資料模型
 
-本文件定義 PartsRadarTW 第一版的概念資料模型。實作時會使用 PostgreSQL 與 Prisma；本文件先描述資料表責任、主要欄位、關聯與唯一性規則，不直接等同最終 Prisma schema。
+本文件定義 PartsRadarTW 第一版的概念資料模型。實作使用 PostgreSQL 與 Prisma；`packages/db/prisma/schema.prisma` 是實際 schema 來源。
 
 ## 設計原則
 
 - 以內部 UUID 作為資料表關聯主鍵。
-- 以 `source_item_key` 判斷同一個原價屋商品。
-- 價格歷史與目前價格分開保存。
+- Domain Truth tables 是 crawler 寫入與資料一致性的真相來源，必須盡量符合 3NF。
+- Read Projection / View 可為 API / UI 查詢效能與 read shape 服務，可反正規化，但不可作為 crawler 寫入真相來源。
+- Projection 必須可由核心資料表重建；刪除 projection 不應造成資料遺失。
+- 第一版先使用普通 SQL view，不使用 materialized view 或 cache；若未來普通 view 效能不足，再評估 materialized view 或同步 cache。
+- 第一版只支援原價屋 CoolPC，不在核心 DB 預留多來源抽象欄位；API 若需要來源名稱，可固定回傳 `coolpc`。
+- 原價屋分類脈絡集中在 `source_categories`；`products`、`raw_snapshots`、`parse_errors` 透過 `source_category_id` 取得 `igrp` 與分類名稱，不重複保存。
+- 商品唯一性使用 `source_category_id + ibuy_token`。`source_item_key` 是 crawler / shared helper 可計算的來源識別字串，不存入 DB。
+- 價格歷史保存在 `price_snapshots`。
+- `current_prices` 只保存目前 `price_snapshot` 指標與狀態時間，不重複保存價格、幣別或 captured time。
 - 新商品或價格變動時才新增 price snapshot。
-- price snapshot 屬於長期資料，不套用 raw snapshot 的 30 / 90 天保存期限。
 - 資料未變時記錄成功檢查，但不新增重複價格歷史。
 - raw snapshot metadata 存資料庫，原始 HTML 壓縮檔存檔案。
 - raw snapshot 以內容 hash 去重，避免浪費硬碟空間。
@@ -19,15 +25,90 @@
 ```text
 source_categories
   -> products
-       -> current_prices
        -> price_snapshots
-       -> current_prices.price_snapshot_id -> price_snapshots.id
+       -> current_prices -> price_snapshots
+  -> raw_snapshots
+  -> parse_errors
+  -> crawl_run_category_results
 
 crawl_runs
+  -> crawl_run_category_results
   -> raw_snapshots
   -> price_snapshots
   -> parse_errors
+
+product_list_view
+  <- products + source_categories + current_prices + price_snapshots
 ```
+
+## Domain Truth Tables
+
+核心真相資料表：
+
+- `source_categories`
+- `products`
+- `price_snapshots`
+- `current_prices`
+- `crawl_runs`
+- `crawl_run_category_results`
+- `raw_snapshots`
+- `parse_errors`
+
+這些表不為 API 查詢方便加入可由關聯推出的欄位：
+
+- `products` 不保存 `source`、`igrp` 或 `source_item_key`。
+- `raw_snapshots` 不保存 `source` 或 `igrp`。
+- `parse_errors` 不保存 `source` 或 `igrp`。
+- `current_prices` 不保存 `price`、`currency` 或 `captured_at`。
+- `crawl_runs` 不保存 `category_results` JSONB。
+- `crawl_runs` 不保存可由 `crawl_run_category_results` 推得的分類計數或單一錯誤分類 key。
+
+## Read Projections
+
+Read projection 是 API / UI 查詢用投影，不是 crawler 寫入真相來源。
+
+第一版 migration 建立普通 SQL view：
+
+```text
+product_list_view
+```
+
+用途：
+
+- 給未來商品列表 API 使用較接近 UI 的 read shape。
+- 將分類名稱、`igrp`、目前價格、幣別與價格時間投影在同一個查詢來源。
+- 避免把這些查詢便利欄位塞回核心資料表。
+
+來源表：
+
+- `products`
+- `source_categories`
+- `current_prices`
+- `price_snapshots`
+
+投影欄位：
+
+- `product_id`
+- `product_name`
+- `normalized_name`
+- `category_display_name`
+- `source_name`
+- `igrp`
+- `current_price`
+- `currency`
+- `price_captured_at`
+- `last_seen_at`
+- `is_active`
+- `source_url`
+
+規則：
+
+- Crawler 不寫入 `product_list_view`。
+- API 可讀取 `product_list_view`，也可直接 join 核心表。
+- `source_name` 在 view 中代表原價屋分類名稱，不是資料來源名稱。
+- 若 API 需要資料來源名稱，第一版固定回傳 `coolpc`，不從 DB 欄位讀取。
+- `product_list_view` 可刪除後由 migration 或 SQL 定義重建。
+- 第一版不建立 materialized view；只有實際查詢效能不足時才評估 materialized view、refresh 策略或 cache。
 
 ## source_categories
 
@@ -36,15 +117,14 @@ crawl_runs
 用途：
 
 - 管理 crawler 要抓取的 `IGrp`。
+- 作為其他資料表取得原價屋分類資訊的唯一分類主檔。
 - 讓網站可以列出分類。
 - 保存分類層級的最後檢查時間與最後成功時間。
 
 概念欄位：
 
 - `id`：內部 UUID。
-- `source`：固定為 `coolpc`。
-- `source_category_key`：例如 `igrp:4`。
-- `igrp`：原價屋分類編號。
+- `igrp`：原價屋分類編號，唯一外部分類鍵。
 - `source_name`：原價屋分類名稱，例如 `處理器 CPU`。
 - `display_name`：PartsRadarTW 顯示名稱，例如 `CPU`。
 - `enabled`。
@@ -55,8 +135,12 @@ crawl_runs
 
 唯一性：
 
-- `source + source_category_key` 唯一。
-- `source + igrp` 唯一。
+- `igrp` 唯一。
+
+注意：
+
+- `source_name` 是原價屋分類名稱，不是資料來源 enum。
+- DB 不保存 `source` 或 `source_category_key`；第一版所有資料都來自原價屋。
 
 ## products
 
@@ -71,10 +155,7 @@ crawl_runs
 概念欄位：
 
 - `id`：內部 UUID。
-- `source`：固定為 `coolpc`。
-- `source_item_key`：例如 `coolpc:igrp:4:ibuy:{iBuyToken}`。
 - `source_category_id`。
-- `igrp`。
 - `ibuy_token`。
 - `name`：商品原始名稱。
 - `normalized_name`。
@@ -89,17 +170,18 @@ crawl_runs
 
 唯一性：
 
-- `source + source_item_key` 唯一。
+- `source_category_id + ibuy_token` 唯一。
 
 規則：
 
 - 沒有 `iBuyToken` 的商品不寫入 `products`。
 - 商品名稱可更新，但不應造成商品歷史斷裂。
-- `source_item_key` 不應使用價格、商品名稱或 `PHPSESSID`。
+- `source_item_key` 不存 DB；需要時由 `sourceCategory.igrp + ibuy_token` 在程式層組成，例如 `coolpc:igrp:4:ibuy:{iBuyToken}`。
+- 商品識別不應使用價格、商品名稱或 `PHPSESSID`。
 - 商品從來源消失時，不刪除 product，也不刪除價格歷史。
 - 商品消失應先記錄 `missing_since` 或累計 `missing_seen_count`，避免單次頁面異常造成誤判。
 - 連續 6 次成功 crawl 都未看到同一商品時，才將 `is_active` 改為 false。
-- 若商品未來以相同 `source_item_key` 重新出現，應恢復 `is_active = true` 並延續原價格歷史。
+- 若商品未來以相同 `source_category_id + ibuy_token` 重新出現，應恢復 `is_active = true` 並延續原價格歷史。
 
 ## price_snapshots
 
@@ -128,13 +210,14 @@ crawl_runs
 - 價格變動時寫入。
 - 價格未變時不新增重複 price snapshot。
 - price snapshot 第一版長期保留，不套用 raw snapshot 的 30 / 90 天保存期限。
-- `raw_snapshot_id` 若指向 raw snapshot，應使用 `ON DELETE SET NULL` 或等效策略，避免 raw snapshot metadata 清理時刪除價格歷史。
-- 若未來資料量過大，再另行規劃價格歷史彙總或封存策略。
+- `raw_snapshot_id` 使用 nullable reference，避免 raw snapshot metadata 清理時刪除價格歷史。
+- `id + product_id` 有唯一約束，讓 `current_prices` 可用 composite foreign key 保證目前價格指標沒有跨商品。
 
 建議索引：
 
 - `product_id + captured_at`。
 - `crawl_run_id`。
+- `raw_snapshot_id`。
 
 ## current_prices
 
@@ -148,16 +231,16 @@ crawl_runs
 概念欄位：
 
 - `product_id`：同時作為主鍵與外鍵。
-- `price`。
-- `currency`：第一版固定 `TWD`。
-- `captured_at`：目前價格對應的 price snapshot 時間。
-- `price_snapshot_id`。
+- `price_snapshot_id`：目前價格對應的 price snapshot。
 - `last_seen_at`。
 - `price_changed_at`。
 - `updated_at`。
 
 規則：
 
+- 價格、幣別與 `captured_at` 一律從 `price_snapshots` 透過 `price_snapshot_id` 取得。
+- `price_snapshot_id` 唯一，避免同一筆 price snapshot 被多個 current price 共用。
+- `current_prices(price_snapshot_id, product_id)` 外鍵指向 `price_snapshots(id, product_id)`，避免目前價格指標跨商品。
 - 新商品或價格變動時更新。
 - 價格未變時可只更新 `last_seen_at`。
 - 抓取失敗、疑似攔截或解析異常時不更新。
@@ -171,23 +254,28 @@ crawl_runs
 - 追蹤 crawler 是否成功。
 - 記錄 unchanged、失敗、攔截與 backoff 狀態。
 - 支援未來管理通知與除錯。
-- 作為整輪 crawl cycle 的摘要；第一版分類層級細節先存在 `category_results` JSON，等需要查詢統計或管理介面時再拆成獨立資料表。
+- 作為整輪 crawl cycle 的摘要。
 
 概念欄位：
 
 - `id`：內部 UUID。
-- `source`：固定為 `coolpc`。
 - `status`。
 - `started_at`。
 - `finished_at`。
 - `trigger_type`：例如 scheduled、manual。
-- `checked_category_count`。
-- `changed_category_count`。
-- `error_category_key`。
 - `error_message`。
-- `category_results`：JSON，記錄本輪各分類的狀態摘要。
 - `backoff_until`。
 - `created_at`。
+
+不保存的 summary / cache：
+
+- `checked_category_count`：由 `crawl_run_category_results` count 推得。
+- `changed_category_count`：由 `crawl_run_category_results.status = success_changed` count 推得。
+- `error_category_key`：由失敗分類結果 join `source_categories.igrp` 或 `source_categories.source_name` 推得。
+
+這些欄位不放在 `crawl_runs`，避免 crawler 需要同步維護 summary cache。若未來因查詢效能需要 summary cache，必須明確標示真相來源是 `crawl_run_category_results`，並補一致性測試。
+
+第一版所有 crawl run 都是原價屋 CoolPC；DB 不保存 `source` 欄位。API 或 log 若需要來源名稱，可在程式層固定使用 `coolpc`。
 
 第一版狀態概念：
 
@@ -201,31 +289,41 @@ crawl_runs
 - `skipped_overlap`。
 - `backoff`。
 
-### category_results JSON
+## crawl_run_category_results
 
-第一版不強制建立獨立分類結果資料表。多分類結果先存在 `crawl_runs.category_results`，用來保留每個分類的最小狀態摘要。
+每筆代表某一輪 crawl 對某一個分類的結果。這張表取代原本規劃的 `crawl_runs.category_results` JSONB。
 
 用途：
 
 - 支援多分類 crawl 的部分成功狀態。
 - 區分單一分類 fetch failed / parse failed 與整輪 suspected block。
 - 作為更新 `source_categories.last_checked_at` / `last_success_at` 的依據。
-- 降低第一版 migration 與關聯查詢複雜度。
+- 支援後續依分類查詢歷史成功率、管理介面或告警統計。
 
-建議 JSON item 欄位：
+概念欄位：
 
-- `igrp`。
+- `id`：內部 UUID。
+- `crawl_run_id`。
+- `source_category_id`。
 - `status`。
 - `raw_snapshot_id`，可為空。
-- `error_message`。
+- `error_message`，可為空。
+- `created_at`。
 
-第一版狀態概念：
+狀態：
 
 - `success_changed`。
 - `success_unchanged`。
 - `fetch_failed`。
 - `suspected_block`。
 - `parse_failed`。
+
+唯一性與索引：
+
+- `crawl_run_id + source_category_id` 唯一。
+- 索引 `crawl_run_id`。
+- 索引 `source_category_id`。
+- 索引 `raw_snapshot_id`。
 
 規則：
 
@@ -249,9 +347,7 @@ crawl_runs
 
 - `id`：內部 UUID。
 - `crawl_run_id`。
-- `source`：固定為 `coolpc`。
 - `source_category_id`。
-- `igrp`。
 - `url`。
 - `fetched_at`。
 - `http_status`。
@@ -266,6 +362,7 @@ crawl_runs
 規則：
 
 - 每次 fetch 都要建立 metadata。
+- `igrp` 不重複保存，透過 `source_category_id -> source_categories` 取得。
 - `content_hash` 相同時，不重複保存原始 HTML 壓縮檔。
 - 重複內容可透過 `duplicate_of_snapshot_id` 指向既有 snapshot。
 - 一般 snapshot 最長保留 30 天。
@@ -275,7 +372,7 @@ crawl_runs
 
 建議索引：
 
-- `source + igrp + fetched_at`。
+- `source_category_id + fetched_at`。
 - `content_hash`。
 - `crawl_run_id`。
 
@@ -294,8 +391,7 @@ crawl_runs
 - `id`：內部 UUID。
 - `crawl_run_id`。
 - `raw_snapshot_id`，可為空。
-- `source`。
-- `igrp`。
+- `source_category_id`。
 - `error_type`。
 - `message`。
 - `raw_name`。
@@ -303,20 +399,24 @@ crawl_runs
 - `raw_token`。
 - `created_at`。
 
+規則：
+
+- `igrp` 不重複保存，透過 `source_category_id -> source_categories` 取得。
+- `raw_snapshot_id` 可為空，但分類資訊必須由 `source_category_id` 保存。
+
 使用情境：
 
 - 缺少 `iBuyToken`。
 - 缺少商品名稱。
 - 價格無法解析。
-- 同一分類同一 snapshot 內出現重複 `source_item_key`。
+- 來源商品識別重複，例如同一分類同一 snapshot 內出現重複 `iBuyToken` / computed `source_item_key`。
 - response content validation 失敗。
 
 ## Website Read Model
 
 網站第一版主要讀取：
 
-- `products`
-- `current_prices`
+- `product_list_view`，或等價的 `products + current_prices + price_snapshots + source_categories` join。
 - `source_categories`
 
 網站不直接讀取：
@@ -335,11 +435,15 @@ crawl_runs
 - 資料更新時間。
 - 原價屋來源連結。
 
+價格、幣別與 `captured_at` 需從 `current_prices.price_snapshot_id -> price_snapshots` 取得。
+若使用 `product_list_view`，這些欄位是從核心表投影出來的 read shape，不是新的真相來源。
+
 ## Crawler Write Model
 
 Crawler 主要寫入：
 
 - `crawl_runs`
+- `crawl_run_category_results`
 - `raw_snapshots`
 - `products`
 - `price_snapshots`
@@ -356,4 +460,4 @@ Crawler 不應直接刪除既有正式商品資料。
 - 不刪除 price snapshots。
 - 先記錄 missing 狀態。
 - 連續 6 次成功 crawl 都未看到同一商品時，再改為 inactive。
-- 商品重新出現且 `source_item_key` 相同時，恢復 active 並延續原歷史。
+- 商品重新出現且 `source_category_id + ibuy_token` 相同時，恢復 active 並延續原歷史。

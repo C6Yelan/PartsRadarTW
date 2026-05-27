@@ -56,10 +56,13 @@
 - 建立 `price_snapshots`。
 - 建立 `current_prices`。
 - 建立 `crawl_runs`。
-- 在 `crawl_runs` 增加 `category_results` JSON，先記錄分類層級結果。
+- 建立 `crawl_run_category_results`，記錄每輪 crawl 的分類層級結果。
 - 建立 `raw_snapshots`。
 - 建立 `parse_errors`。
 - 建立 `source_categories.source_name` / `display_name`。
+- `products` 使用 `source_category_id + ibuy_token` 唯一，不保存 `source_item_key`。
+- `current_prices` 只保存目前 `price_snapshot` 指標，不重複保存價格值。
+- `products`、`raw_snapshots`、`parse_errors` 不重複保存 `igrp`，分類資訊由 `source_category_id` 關聯取得。
 - 設定 `price_snapshots.raw_snapshot_id` 可為空，避免 raw snapshot 清理影響價格歷史。
 - 建立必要 enum 與索引。
 - 建立基本 seed 或分類初始化資料。
@@ -88,7 +91,7 @@
 - 建立異常或缺欄位 fixture。
 - 解析 `div.w`、`div.t`、`div.x`。
 - 解析價格文字。
-- 產生 `source_item_key`。
+- 產生 computed `source_item_key`，但不寫入 DB。
 - 驗證第一版目標分類是否能穩定取得 `iBuyToken`。
 - 建立 response content validation。
 - 建立 parser / validation Vitest 測試。
@@ -115,9 +118,10 @@
 範圍：
 
 - 建立 crawl run 流程。
+- 建立 crawl run category result 寫入流程。
 - 建立 raw snapshot metadata 寫入。
 - 建立 raw HTML 壓縮檔保存與 hash 去重。
-- 建立 product upsert。
+- 建立以 `source_category_id + ibuy_token` 為唯一鍵的 product upsert。
 - 建立 new product / price changed 的 price snapshot 寫入。
 - 建立 current price 更新。
 - 建立 unchanged 流程。
@@ -170,7 +174,7 @@
 - 不合法 query 回傳 `400` 與泛用錯誤。
 - 商品不存在回傳 `404`。
 - 全域來源狀態與分類來源狀態符合 API 文件。
-- API 不暴露 `source_item_key`、`iBuyToken`、raw snapshot 或內部錯誤堆疊。
+- API 不暴露 computed `source_item_key`、`iBuyToken`、raw snapshot 或內部錯誤堆疊。
 - API 測試通過。
 
 ## Phase 5：Web UI 第一版

@@ -53,7 +53,7 @@ API 第一版需遵守：
 
 - 查詢參數做型別、範圍與長度驗證。
 - `pageSize` 設定上限。
-- 不回傳 raw HTML、raw snapshot、parse error、crawler error stack、`source_item_key`、`iBuyToken` 或 DB 連線資訊。
+- 不回傳 raw HTML、raw snapshot、parse error、crawler error stack、computed `source_item_key`、`iBuyToken` 或 DB 連線資訊。
 - 錯誤 response 使用泛用訊息，不把內部錯誤細節回傳給前端。
 - 不提供公開 crawler trigger API。
 - 不提供會修改資料的公開 API。

@@ -72,6 +72,12 @@ repo 應提供 `.env.example` 作為範本。實際本機設定使用 `.env.loca
 | 名稱 | 用途 |
 | --- | --- |
 | `DATABASE_URL` | PostgreSQL 連線字串 |
+| `POSTGRES_IMAGE` | Docker Compose 使用的 PostgreSQL image，預設 `postgres:18-alpine` |
+| `POSTGRES_DB` | 本機 PostgreSQL database 名稱，預設 `partsradar_dev` |
+| `POSTGRES_USER` | 本機 PostgreSQL 使用者，預設 `partsradar` |
+| `POSTGRES_PASSWORD` | 本機 PostgreSQL 密碼，預設 `partsradar` |
+| `POSTGRES_BIND_HOST` | 本機 PostgreSQL port 綁定位址，預設 `127.0.0.1` |
+| `POSTGRES_PORT` | 本機 PostgreSQL 對外 port，預設 `5432` |
 | `COOLPC_BASE_URL` | 原價屋來源網址，預設 `https://www.coolpc.com.tw` |
 | `SNAPSHOT_STORAGE_DIR` | raw snapshot 壓縮檔保存位置 |
 | `CRAWLER_INTERVAL_SECONDS` | crawler 週期秒數，第一版預設 `300` |
@@ -92,6 +98,9 @@ repo 應提供 `.env.example` 作為範本。實際本機設定使用 `.env.loca
 
 - 本機資料庫與正式資料庫分開。
 - 本機資料庫可重建，不視為正式資料。
+- PostgreSQL port 預設只綁定 `127.0.0.1`，避免對區網公開。
+- PostgreSQL image、帳號、密碼、database、綁定位址與 port 都可用 `.env` 覆蓋。
+- PostgreSQL 18 官方 image 的資料 volume 位置是 `/var/lib/postgresql`；本機 compose 也掛載在此位置，並讓 image 使用自己的 `PGDATA` 預設值。
 - migration 由 Prisma 管理。
 - seed data 若有需要，應使用可重跑的 script。
 
@@ -101,22 +110,22 @@ repo 應提供 `.env.example` 作為範本。實際本機設定使用 `.env.loca
 postgres
 ```
 
-正式實作時可建立開發用 compose 檔，例如：
+正式實作時可建立 compose 檔，例如：
 
 ```text
-compose.dev.yml
+compose.yml
 ```
 
-目前本機開發提供 `compose.dev.yml` 啟動 PostgreSQL：
+目前本機開發提供 `compose.yml` 啟動 PostgreSQL：
 
 ```bash
-docker compose -f compose.dev.yml up -d postgres
+docker compose up -d postgres
 ```
 
 停止本機 PostgreSQL：
 
 ```bash
-docker compose -f compose.dev.yml down
+docker compose down
 ```
 
 本機連線設定需和 `.env.example` 的 `DATABASE_URL` 保持一致：
@@ -124,6 +133,8 @@ docker compose -f compose.dev.yml down
 ```text
 postgresql://partsradar:partsradar@localhost:5432/partsradar_dev?schema=public
 ```
+
+若修改 `.env` 內的 `POSTGRES_USER`、`POSTGRES_PASSWORD`、`POSTGRES_DB` 或 `POSTGRES_PORT`，也要同步更新 `DATABASE_URL`。
 
 ## Raw Snapshot Storage
 

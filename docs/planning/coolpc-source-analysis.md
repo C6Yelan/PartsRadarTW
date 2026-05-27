@@ -51,9 +51,9 @@ HTTP 狀態碼不能作為唯一成功依據。即使狀態碼為 200，仍需�
 
 ## 商品識別建議
 
-商品主檔仍應使用內部 UUID 作為資料庫主鍵；crawler 判斷同一個原價屋商品時，應使用來源鍵 `source_item_key`。
+商品主檔仍應使用內部 UUID 作為資料庫主鍵；DB 判斷同一個原價屋商品時使用 `source_category_id + ibuy_token`。crawler、log 或 shared helper 需要字串識別時，使用 computed `source_item_key`。
 
-第一版 `source_item_key` 採用下列概念，前提是 Phase 2 fixture 驗證確認目標分類能取得穩定 `iBuy` token：
+第一版 computed `source_item_key` 採用下列概念，前提是 Phase 2 fixture 驗證確認目標分類能取得穩定 `iBuy` token：
 
 ```text
 coolpc:igrp:{IGrp}:ibuy:{iBuyToken}
@@ -66,7 +66,7 @@ coolpc:igrp:{IGrp}:ibuy:{iBuyToken}
 - 不依賴每次抓取才產生的 UUID。
 - 保留分類編號，方便避免不同分類出現相同 token 時互相衝突。
 
-若某些商品沒有 `iBuy` token，第一版不匯入正式商品資料，但應保留原始商品名稱、分類、raw snapshot 與解析紀錄，方便後續人工檢查或 parser 修正。
+`source_item_key` 不存入 DB；正式商品唯一性由分類主檔與 `iBuy` token 保證。若某些商品沒有 `iBuy` token，第一版不匯入正式商品資料，但應保留原始商品名稱、分類、raw snapshot 與解析紀錄，方便後續人工檢查或 parser 修正。
 
 ## 內容驗證建議
 

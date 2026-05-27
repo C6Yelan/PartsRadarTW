@@ -70,11 +70,11 @@ Crawler parser 測試使用 Vitest。
 - 能取得商品原始名稱。
 - 能從 `含稅：NT4880` 解析出整數價格 `4880`。
 - 能解析 `NT4,880`、`$4880`、`$4,880`。
-- 能產生 `coolpc:igrp:{IGrp}:ibuy:{iBuyToken}`。
+- 能產生 computed `source_item_key`：`coolpc:igrp:{IGrp}:ibuy:{iBuyToken}`。
 - 缺少 `iBuyToken` 時不匯入正式商品。
 - 缺少商品名稱時不匯入正式商品。
 - 缺少可解析價格時不匯入正式商品。
-- 同一分類同一 snapshot 內出現重複 `source_item_key` 時，標記為解析異常。
+- 來源商品識別重複時，例如同一分類同一 snapshot 內出現重複 `iBuyToken` / computed `source_item_key`，標記為解析異常。
 
 ## Response Validation 測試
 
@@ -99,16 +99,22 @@ HTTP status 不足以判斷成功，需測試內容驗證。
 至少測試：
 
 - 新商品第一次出現時建立 product、price snapshot 與 current price。
+- product 使用 `source_category_id + ibuy_token` 作為唯一性，不保存 `source_item_key`、`source` 或 `igrp`。
 - 價格變動時新增 price snapshot 並更新 current price。
+- current price 只保存 `price_snapshot_id`、`last_seen_at`、`price_changed_at` 與 `updated_at`，價格值需從 price snapshot 取得。
+- current price 指向的 price snapshot 必須屬於同一個 product。
+- `crawl_runs` 不保存 `checked_category_count`、`changed_category_count` 或 `error_category_key`；相關摘要需由 `crawl_run_category_results` 推得。
 - 價格未變時不新增重複 price snapshot。
 - `success_unchanged` 仍會更新分類 `last_success_at`。
+- 每個被嘗試處理的分類都會寫入 `crawl_run_category_results`，不寫入 `crawl_runs.category_results` JSON。
 - parsed result hash 相同時走 `success_unchanged` 流程。
 - raw content hash 相同時不重複保存 HTML 壓縮檔。
 - raw snapshot metadata 或檔案清理不會刪除 price snapshots。
 - 沒有 `iBuyToken` 的商品不寫入 products，但保留解析紀錄。
+- raw snapshot 與 parse error 透過 `source_category_id` 取得 `IGrp` 與原價屋分類名稱，不重複保存 `source` 或 `igrp`。
 - 商品從來源消失時不刪除 product。
 - 商品從來源消失時不刪除 price snapshots。
-- 商品重新出現且 `source_item_key` 相同時延續原商品歷史。
+- 商品重新出現且 `source_category_id + ibuy_token` 相同時延續原商品歷史。
 - fetch 失敗、疑似攔截或 parse 失敗時不覆蓋既有 current price。
 - fetch 失敗、疑似攔截或 parse 失敗會更新 `last_checked_at`，但不更新 `last_success_at`。
 - parse 失敗不累計商品 missing count。
@@ -116,6 +122,8 @@ HTTP status 不足以判斷成功，需測試內容驗證。
 ## API 測試
 
 API 測試可先以 route handler 內的查詢邏輯或資料存取函式為單位，不一定一開始就做完整 HTTP server 測試。
+
+商品列表查詢可讀 `product_list_view` 或等價 join。若測試使用 view，需確認 view 欄位由核心資料表投影而來，crawler 不直接寫入 projection。
 
 至少測試：
 
@@ -125,6 +133,7 @@ API 測試可先以 route handler 內的查詢邏輯或資料存取函式為單�
 - `GET /api/products` 可依 `q` 查詢商品。
 - `GET /api/products` 可依 `igrp` 篩選分類。
 - `GET /api/products` 可依 `minPrice`、`maxPrice` 篩選目前價格。
+- `GET /api/products` 若讀 `product_list_view`，價格、幣別與 captured time 仍以 price snapshot 為真相來源。
 - `GET /api/products` 支援 `price_asc`、`price_desc`、`name_asc`、`updated_desc`。
 - `GET /api/products` 支援分頁並限制 `pageSize` 上限。
 - 不合法 query 回傳 `400` 與泛用 `invalid_query`。
@@ -137,7 +146,7 @@ API 測試可先以 route handler 內的查詢邏輯或資料存取函式為單�
 
 API 測試不應暴露：
 
-- `source_item_key`。
+- computed `source_item_key`。
 - `iBuyToken`。
 - raw snapshot。
 - parse error。
@@ -208,6 +217,7 @@ API 測試不應暴露：
 - Prisma schema 可產生 client。
 - migration 可在本機 PostgreSQL 執行。
 - 基本 seed 或測試資料可建立。
+- SQL view / projection 可由 migration 建立，且可由核心表重建。
 
 ### Crawler 階段
 

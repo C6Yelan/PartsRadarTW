@@ -7,6 +7,7 @@
 | 決策 | 說明 |
 | --- | --- |
 | 原價屋是唯一資料來源 | 專案只整理原價屋公開商品資料，不做其他網站或通路整合。 |
+| 核心資料表不保留多來源抽象欄位 | 第一版 DB 不保存固定值 `source = coolpc`，也不保存可由 `IGrp` 推得的 `source_category_key`；API 若需要來源名稱，可固定回傳 `coolpc`。 |
 | 第一版以查詢網站為主 | 第一版先完成商品搜尋、分類瀏覽、價格排序與基本篩選。 |
 | 第一版不做個人化功能 | 使用者帳號、收藏清單、個人價格提醒會影響資料模型與權限設計，第一版先不納入。 |
 | Discord bot 延後 | Discord bot 屬於後續通知入口，需等資料流穩定後再評估。 |
@@ -14,17 +15,17 @@
 | 第一版先處理組電腦必要硬體 | 第一版優先處理組一台電腦會用到的主要硬體，後續再逐步補齊原價屋其他類別與產品。 |
 | 商品分類第一版先保留原價屋分類脈絡 | 先保存原價屋分類名稱與 `IGrp`，同時提供 PartsRadarTW 顯示名稱；若後續發現不利搜尋或篩選，再補一層更完整的分類規則。 |
 | 第一版 crawler 以 `eachview.php?IGrp={分類編號}` 為抓取入口 | 舊專案已使用分類總覽頁抓資料，且初步觀察顯示該頁面較適合按分類解析商品；第一版不使用 `evaluate.php` 抓商品資料。 |
-| 商品識別採內部 ID 與來源鍵分離 | 資料庫使用內部 UUID 作為商品主鍵；crawler 使用穩定的 `source_item_key` 判斷同一個原價屋商品。 |
-| `source_item_key` 使用 `iBuy` token | 第一版使用 `coolpc:igrp:{IGrp}:ibuy:{iBuyToken}` 作為來源商品識別鍵；沒有 `iBuyToken` 的單品不匯入正式商品但保留解析紀錄。此決策需在 Phase 2 以第一版目標分類 fixture 驗證，若某分類無法穩定取得 token，該分類先不匯入正式商品或另開決策。 |
+| 商品識別採內部 ID 與原價屋鍵分離 | 資料庫使用內部 UUID 作為商品主鍵，並以 `source_category_id + ibuy_token` 作為商品唯一鍵；`source_category_id` 對應唯一 `IGrp`，crawler 需要字串識別時使用 computed `source_item_key`。 |
+| `source_item_key` 使用 `iBuy` token | 第一版 computed `source_item_key` 使用 `coolpc:igrp:{IGrp}:ibuy:{iBuyToken}`，但不存入 DB；沒有 `iBuyToken` 的單品不匯入正式商品但保留解析紀錄。此決策需在 Phase 2 以第一版目標分類 fixture 驗證，若某分類無法穩定取得 token，該分類先不匯入正式商品或另開決策。 |
 | raw snapshot 採資料庫 metadata 加壓縮檔案 | 重要資料與狀態存資料庫，原始 HTML 使用後壓縮保存成檔案；一般 snapshot 最長保留 30 天，異常 snapshot 最長保留 90 天，未來依實際狀況調整。raw snapshot 清理不得刪除價格歷史；長期價格資料若參照 raw snapshot，關聯需允許清空或以不破壞外鍵的方式處理。 |
 | crawler 每 5 分鐘檢查是否啟動下一輪 | 原價屋資料更新時間不穩定，第一版以每 5 分鐘檢查一次為目標；若上一輪尚未完成，不重疊啟動新的 crawl cycle。 |
 | 疑似攔截時立即停止當次 crawl | 遇到疑似攔截頁時立即停止當次 crawl，不更新正式商品與價格資料；下一次依 5 分鐘循環再嘗試，若連續失敗多次則延後 1 小時並保存異常狀況。 |
-| 網站目前價格讀取 `current_prices` | 價格歷史由 price snapshots 或 price history 保存；`current_prices` 只保存網站目前顯示與查詢用的最新有效價格。 |
+| 網站目前價格讀取 `current_prices` | 價格歷史由 price snapshots 保存；`current_prices` 只保存目前 `price_snapshot` 指標與狀態時間，價格、幣別與 `captured_at` 由對應 price snapshot 取得。 |
 | HTTP 200 不代表抓取成功 | 原價屋在短時間內請求頻率過高時，可能回傳 HTTP 200 但內容為攔截頁或非商品資料頁；crawler 需做內容層驗證。 |
 | 抓取失敗時網站顯示最後有效資料 | API 不因單次 fetch 失敗、疑似攔截或解析失敗清空商品；網站透過來源狀態判斷資料是否可能過期。 |
 | 來源狀態第一版以 30 分鐘作為 stale 門檻 | 分類最近 30 分鐘內有成功處理有效資料視為 `ok`；超過 30 分鐘但仍有有效商品資料視為 `stale`；沒有任何有效商品資料視為 `unavailable`。全域狀態由 enabled 分類聚合，全部分類 `ok` 才是全域 `ok`，至少一個分類有有效資料但不是全部 `ok` 時為全域 `stale`，完全沒有有效資料時為全域 `unavailable`。 |
 | stale 狀態使用低干擾提示 | `stale` 不代表資料不可用，第一版只在列表或詳細頁用低干擾文字提示資料可能未更新。 |
-| 解析失敗資料第一版使用 `parse_errors` 追蹤 | 缺少 `iBuyToken`、價格無法解析、重複 `source_item_key` 或內容驗證失敗等，不進入正式商品資料，但寫入 parse error 與 raw snapshot 供後續檢查。 |
+| 解析失敗資料第一版使用 `parse_errors` 追蹤 | 缺少 `iBuyToken`、價格無法解析、來源商品識別重複，例如同一分類同一 snapshot 內出現重複 `iBuyToken` / computed `source_item_key`，或內容驗證失敗等，不進入正式商品資料，但寫入 parse error 與 raw snapshot 供後續檢查。 |
 | 商品連續 6 次成功 crawl 都消失才改為 inactive | 單次成功 crawl 沒看到商品不視為下架；連續 6 次成功 crawl 都未看到同一商品時，才將商品標記為 inactive。 |
 | 第一版商品詳細頁不拆規格欄位 | 電腦硬體命名不穩定，第一版商品詳細頁先完整顯示原始商品名稱、分類、價格、來源與狀態，不解析 CPU、GPU、SSD 等分類規格欄位。 |
 | 第一版改用 Biome 作為 lint / format 工具 | 第一版不使用 ESLint + Next.js config，避免 ESLint 9 EOL 與 ESLint 10 plugin 相容性問題；TypeScript typecheck 與 Next.js build 仍保留作為正式檢查。 |

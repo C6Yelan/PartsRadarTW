@@ -62,6 +62,8 @@ Crawler 是獨立 TypeScript process，以 Node.js 執行。
 - 單一分類 fetch failed 或 parse failed 時，記錄該分類結果後可繼續下一分類；疑似被攔截例外，需停止整輪。
 - 連續失敗多次時，延後 1 小時再嘗試。
 - 不在 Next.js request / API route 內執行 crawler。
+- 只寫入 domain truth tables，不寫入 SQL view / projection。
+- `product_list_view` 由核心表 join 得出，可刪除後重建，不是 crawler 寫入目標。
 
 ## Fetch 規則
 
@@ -82,8 +84,7 @@ Big5 解碼工具可在實作時依 Node.js runtime 支援度選擇；若內建 
 
 Raw snapshot metadata 至少包含：
 
-- source：固定為 `coolpc`。
-- `igrp`。
+- `source_category_id`：由本輪處理的 `IGrp` 對應到 `source_categories`。
 - URL。
 - fetched_at。
 - HTTP status 或 fetch error。
@@ -132,29 +133,34 @@ Parser 使用 `cheerio` 解析 HTML。
 3. 取得緊鄰商品區塊中的 `div.t` 作為商品原始名稱。
 4. 取得同一商品區塊中的 `div.x` 作為價格文字。
 5. 從價格文字解析整數金額。
-6. 產生 `source_item_key`。
-7. 輸出 parsed item。
+6. 使用 `sourceCategoryId + iBuyToken` 作為 DB 商品唯一性依據。
+7. 需要 log 或 duplicate detection 時，產生 computed `source_item_key`。
+8. 輸出 parsed item。
 
 Parsed item 至少包含：
 
-- source：`coolpc`。
-- `igrp`。
+- `sourceCategoryId`。
+- `igrp`，只作為來源分類輸入與 computed key 組成，不寫入 product/raw snapshot/parse error 資料表。
 - 原價屋分類名稱。
 - `iBuyToken`。
-- `source_item_key`。
+- computed `source_item_key`。
 - 商品原始名稱。
 - 價格。
 - 幣別：`TWD`。
 - source page URL。
 - fetched_at。
 
-`source_item_key` 格式：
+第一版來源在程式層固定為 `coolpc`，不寫入核心 DB 欄位。
+
+computed `source_item_key` 格式：
 
 ```text
 coolpc:igrp:{IGrp}:ibuy:{iBuyToken}
 ```
 
 `iBuyToken` 應保留原字串，不應為了商品識別而修改、截斷或重新產生。
+
+DB 不保存 `source_item_key` 欄位；正式商品 upsert 使用 `sourceCategoryId + iBuyToken`。
 
 ## Price Parsing
 
@@ -182,14 +188,15 @@ coolpc:igrp:{IGrp}:ibuy:{iBuyToken}
 - `iBuyToken` 不可為空。
 - 商品原始名稱不可為空。
 - 價格必須是大於 0 的整數。
-- `source_item_key` 可產生。
+- `sourceCategoryId + iBuyToken` 可作為 DB 唯一鍵。
+- computed `source_item_key` 可產生。
 
 若商品缺少 `iBuyToken`：
 
 - 不匯入正式商品資料。
 - 保留原始商品名稱、分類、raw snapshot 與解析紀錄。
 
-若同一分類同一 snapshot 內出現重複 `source_item_key`，該分類本次結果應標記為解析異常，不更新正式商品與價格資料。
+若來源商品識別重複，例如同一分類同一 snapshot 內出現重複 `iBuyToken` / computed `source_item_key`，該分類本次結果應標記為解析異常，不更新正式商品與價格資料。
 
 ## 資料更新規則
 
@@ -199,11 +206,12 @@ coolpc:igrp:{IGrp}:ibuy:{iBuyToken}
 
 若商品清單、商品名稱或價格有變：
 
-- upsert product。
+- 以 `sourceCategoryId + iBuyToken` upsert product。
 - 新商品或價格變動時，寫入 price snapshot。
 - 更新 `current_prices`。
 - 更新 `last_seen_at`。
 - 更新分類層級的 `last_checked_at` 與 `last_success_at`。
+- 寫入 `crawl_run_category_results`，狀態為 `success_changed`。
 - 記錄 crawl run 為成功且有變更。
 
 ### 資料未變
@@ -211,8 +219,9 @@ coolpc:igrp:{IGrp}:ibuy:{iBuyToken}
 若商品清單與價格完全沒變：
 
 - 記錄 crawl run 成功，狀態標記為 `success_unchanged`。
-- 更新來源或分類層級的 `last_checked_at`。
-- 更新來源或分類層級的 `last_success_at`。
+- 更新分類層級的 `last_checked_at`。
+- 更新分類層級的 `last_success_at`。
+- 寫入 `crawl_run_category_results`，狀態為 `success_unchanged`。
 - 不新增 price snapshot。
 - 不重複 upsert 所有商品。
 - 可依實作需要更新 `current_prices.last_seen_at`。
@@ -227,7 +236,7 @@ coolpc:igrp:{IGrp}:ibuy:{iBuyToken}
 - 記錄 missing 狀態，例如 `missing_since` 或 `missing_seen_count`。
 - 不因單次成功 crawl 缺少商品就立即改為 inactive。
 - 連續 6 次成功 crawl 都未看到同一商品時，才改為 inactive。
-- 若商品未來以相同 `source_item_key` 重新出現，恢復 active 並延續原歷史。
+- 若商品未來以相同 `sourceCategoryId + iBuyToken` 重新出現，恢復 active 並延續原歷史。
 
 ## 失敗處理
 
@@ -241,6 +250,7 @@ Fetch 失敗時：
 - 不更新 current price。
 - 更新該分類的 `last_checked_at`。
 - 不更新該分類的 `last_success_at`。
+- 寫入 `crawl_run_category_results`，狀態為 `fetch_failed`。
 - 第一版可繼續下一分類；整輪結束時若有成功分類與失敗分類，整輪狀態應標記為部分成功。
 
 ### 疑似被攔截
@@ -249,6 +259,7 @@ Fetch 失敗時：
 
 - 標記 snapshot 為 `suspected_block`。
 - 更新命中分類的 `last_checked_at`。
+- 寫入 `crawl_run_category_results`，狀態為 `suspected_block`。
 - 立即停止當次 crawl cycle。
 - 不進入 product upsert。
 - 不寫入 price snapshot。
@@ -264,6 +275,7 @@ Parse 失敗時：
 - 不更新正式商品與價格資料。
 - 更新該分類的 `last_checked_at`。
 - 不更新該分類的 `last_success_at`。
+- 寫入 `crawl_run_category_results`，狀態為 `parse_failed`。
 - 不累計該分類商品的 missing count。
 - 第一版可繼續下一分類；整輪結束時若有成功分類與失敗分類，整輪狀態應標記為部分成功。
 - 後續修正 parser 後可用 raw snapshot 重跑。
@@ -274,7 +286,9 @@ crawler 應同時記錄分類層級結果與整輪 crawl run 摘要。
 
 分類層級結果用來判斷該 `IGrp` 本次是否成功，並更新 `source_categories.last_checked_at` / `last_success_at`。整輪 crawl run 則用來觀察排程是否正常、是否進入 backoff，以及本輪是否全部成功或部分成功。
 
-第一版分類層級結果先寫在 `crawl_runs.category_results` JSON，不強制建立獨立資料表。每筆結果先只記錄 `igrp`、`status`、`raw_snapshot_id` 與 `error_message`；若後續需要查詢每個分類的歷史成功率、管理介面或告警統計，再拆成正式關聯表。
+第一版分類層級結果寫入 `crawl_run_category_results`，不放在 `crawl_runs.category_results` JSON。每筆結果記錄 `crawl_run_id`、`source_category_id`、`status`、`raw_snapshot_id` 與 `error_message`；這讓分類層級狀態可被查詢、索引與關聯到 raw snapshot。
+
+`crawl_runs` 不保存 `checked_category_count`、`changed_category_count` 或 `error_category_key`。這些 summary 可由 `crawl_run_category_results` 與 `source_categories` 推得，避免 crawler 同步維護 cache 欄位。
 
 狀態規則：
 

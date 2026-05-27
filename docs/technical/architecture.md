@@ -154,7 +154,7 @@ docs/
 
 - HTTP 200 不代表抓取成功。
 - 被判定為攔截或非預期內容時，不更新正式商品與價格資料。
-- 商品識別使用 `coolpc:igrp:{IGrp}:ibuy:{iBuyToken}`。
+- DB 商品唯一性使用 `source_category_id + ibuy_token`；需要來源識別字串時由 helper 產生 computed `source_item_key`，格式為 `coolpc:igrp:{IGrp}:ibuy:{iBuyToken}`。
 - 資料完全沒變時，記錄成功檢查、更新成功時間，但不新增重複價格歷史。
 - 網站只讀取已成功處理的資料。
 
@@ -205,7 +205,7 @@ Crawler 不做：
 
 - 商品與價格型別。
 - 原價屋分類設定。
-- `source_item_key` 組成規則。
+- computed `source_item_key` 組成規則。
 - Prisma client 與資料存取 helper。
 - 基礎驗證工具。
 
