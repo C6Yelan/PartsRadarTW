@@ -11,7 +11,11 @@ import {
   type CrawlRunStatusValue,
   type CrawlRunWriteClient,
 } from "./crawl-run";
-import { processCoolpcCategorySnapshot } from "./category-snapshot";
+import {
+  type CoolpcCategorySnapshotWriteClient,
+  type WriteCoolpcCategoryProducts,
+  processCoolpcCategorySnapshot,
+} from "./category-snapshot";
 import {
   RAW_SNAPSHOT_CONTENT_STATUSES,
   type RawSnapshotContentStatusValue,
@@ -30,6 +34,7 @@ describe("CoolPC category snapshot processor", () => {
   it("records a valid raw snapshot and returns success changed for importable content", async () => {
     const client = new FakeCrawlerWriteClient([category({ id: "category-4", igrp: 4 })]);
     const storageDir = await createTempDir(tempDirs);
+    const productWriter = createProductWriterSpy();
 
     const result = await processCoolpcCategorySnapshot({
       client,
@@ -37,6 +42,7 @@ describe("CoolPC category snapshot processor", () => {
       crawlRunId: "crawl-run-1",
       category: category({ id: "category-4", igrp: 4 }),
       snapshot: snapshot({ rawHtml: await fixture("cpu-category.normal.html") }),
+      writeProducts: productWriter.writeProducts,
     });
 
     expect(result).toEqual({
@@ -49,11 +55,102 @@ describe("CoolPC category snapshot processor", () => {
       parsedResultHash: expect.stringMatching(/^[a-f0-9]{64}$/),
       compressedHtmlPath: expect.stringMatching(/^coolpc\/[a-f0-9]{64}\.html\.gz$/),
     });
+    expect(productWriter.calls).toEqual([
+      {
+        crawlRunId: "crawl-run-1",
+        rawSnapshotId: "raw-snapshot-1",
+        sourceItemKeys: [
+          "coolpc:igrp:4:ibuy:CPU-TOKEN-001",
+          "coolpc:igrp:4:ibuy:CPU-TOKEN-002",
+        ],
+      },
+    ]);
+  });
+
+  it("returns success unchanged and skips product writes when parsed result hash is unchanged", async () => {
+    const client = new FakeCrawlerWriteClient([category({ id: "category-4", igrp: 4 })]);
+    const storageDir = await createTempDir(tempDirs);
+    const productWriter = createProductWriterSpy();
+    const rawHtml = await fixture("cpu-category.normal.html");
+
+    const firstResult = await processCoolpcCategorySnapshot({
+      client,
+      storageDir,
+      crawlRunId: "crawl-run-1",
+      category: category({ id: "category-4", igrp: 4 }),
+      snapshot: snapshot({ rawHtml, fetchedAt: new Date("2026-05-27T11:00:00.000Z") }),
+      writeProducts: productWriter.writeProducts,
+    });
+    client.recordSuccessfulCategoryResult({
+      crawlRunId: "crawl-run-1",
+      sourceCategoryId: "category-4",
+      rawSnapshotId: firstResult.rawSnapshotId ?? "",
+      status: firstResult.status,
+    });
+    const result = await processCoolpcCategorySnapshot({
+      client,
+      storageDir,
+      crawlRunId: "crawl-run-2",
+      category: category({ id: "category-4", igrp: 4 }),
+      snapshot: snapshot({ rawHtml, fetchedAt: new Date("2026-05-27T11:05:00.000Z") }),
+      writeProducts: productWriter.writeProducts,
+    });
+
+    expect(result).toEqual({
+      status: CRAWL_RUN_CATEGORY_RESULT_STATUSES.SUCCESS_UNCHANGED,
+      rawSnapshotId: "raw-snapshot-2",
+    });
+    expect(client.rawSnapshots).toHaveLength(2);
+    expect(client.rawSnapshots[1]?.parsedResultHash).toBe(client.rawSnapshots[0]?.parsedResultHash);
+    expect(productWriter.calls).toHaveLength(1);
+  });
+
+  it("returns success changed and writes products when parsed result hash changes", async () => {
+    const client = new FakeCrawlerWriteClient([category({ id: "category-4", igrp: 4 })]);
+    const storageDir = await createTempDir(tempDirs);
+    const productWriter = createProductWriterSpy();
+    const rawHtml = await fixture("cpu-category.normal.html");
+
+    const firstResult = await processCoolpcCategorySnapshot({
+      client,
+      storageDir,
+      crawlRunId: "crawl-run-1",
+      category: category({ id: "category-4", igrp: 4 }),
+      snapshot: snapshot({ rawHtml, fetchedAt: new Date("2026-05-27T11:00:00.000Z") }),
+      writeProducts: productWriter.writeProducts,
+    });
+    client.recordSuccessfulCategoryResult({
+      crawlRunId: "crawl-run-1",
+      sourceCategoryId: "category-4",
+      rawSnapshotId: firstResult.rawSnapshotId ?? "",
+      status: firstResult.status,
+    });
+    const result = await processCoolpcCategorySnapshot({
+      client,
+      storageDir,
+      crawlRunId: "crawl-run-2",
+      category: category({ id: "category-4", igrp: 4 }),
+      snapshot: snapshot({
+        rawHtml: rawHtml.replace("NT4880", "NT4990"),
+        fetchedAt: new Date("2026-05-27T11:05:00.000Z"),
+      }),
+      writeProducts: productWriter.writeProducts,
+    });
+
+    expect(result).toEqual({
+      status: CRAWL_RUN_CATEGORY_RESULT_STATUSES.SUCCESS_CHANGED,
+      rawSnapshotId: "raw-snapshot-2",
+    });
+    expect(client.rawSnapshots[1]?.parsedResultHash).not.toBe(
+      client.rawSnapshots[0]?.parsedResultHash,
+    );
+    expect(productWriter.calls).toHaveLength(2);
   });
 
   it("records invalid content as parse failed with a raw snapshot id", async () => {
     const client = new FakeCrawlerWriteClient([category({ id: "category-4", igrp: 4 })]);
     const storageDir = await createTempDir(tempDirs);
+    const productWriter = createProductWriterSpy();
 
     const result = await processCoolpcCategorySnapshot({
       client,
@@ -61,6 +158,7 @@ describe("CoolPC category snapshot processor", () => {
       crawlRunId: "crawl-run-1",
       category: category({ id: "category-4", igrp: 4 }),
       snapshot: snapshot({ rawHtml: await fixture("cpu-category.missing-token.html") }),
+      writeProducts: productWriter.writeProducts,
     });
 
     expect(result).toEqual({
@@ -69,11 +167,13 @@ describe("CoolPC category snapshot processor", () => {
       errorMessage: "missing_required_product_structure",
     });
     expect(client.rawSnapshots[0]?.contentStatus).toBe(RAW_SNAPSHOT_CONTENT_STATUSES.INVALID);
+    expect(productWriter.calls).toEqual([]);
   });
 
   it("records non-product content as suspected block", async () => {
     const client = new FakeCrawlerWriteClient([category({ id: "category-4", igrp: 4 })]);
     const storageDir = await createTempDir(tempDirs);
+    const productWriter = createProductWriterSpy();
 
     const result = await processCoolpcCategorySnapshot({
       client,
@@ -81,6 +181,7 @@ describe("CoolPC category snapshot processor", () => {
       crawlRunId: "crawl-run-1",
       category: category({ id: "category-4", igrp: 4 }),
       snapshot: snapshot({ rawHtml: await fixture("http-200.non-product.html") }),
+      writeProducts: productWriter.writeProducts,
     });
 
     expect(result).toEqual({
@@ -91,11 +192,13 @@ describe("CoolPC category snapshot processor", () => {
     expect(client.rawSnapshots[0]?.contentStatus).toBe(
       RAW_SNAPSHOT_CONTENT_STATUSES.SUSPECTED_BLOCK,
     );
+    expect(productWriter.calls).toEqual([]);
   });
 
   it("records fetch failures without requiring raw HTML", async () => {
     const client = new FakeCrawlerWriteClient([category({ id: "category-4", igrp: 4 })]);
     const storageDir = await createTempDir(tempDirs);
+    const productWriter = createProductWriterSpy();
 
     const result = await processCoolpcCategorySnapshot({
       client,
@@ -103,6 +206,7 @@ describe("CoolPC category snapshot processor", () => {
       crawlRunId: "crawl-run-1",
       category: category({ id: "category-4", igrp: 4 }),
       snapshot: snapshot({ rawHtml: null, fetchError: "Fetch timed out.", httpStatus: null }),
+      writeProducts: productWriter.writeProducts,
     });
 
     expect(result).toEqual({
@@ -115,6 +219,7 @@ describe("CoolPC category snapshot processor", () => {
       fetchError: "Fetch timed out.",
       compressedHtmlPath: null,
     });
+    expect(productWriter.calls).toEqual([]);
   });
 
   it("passes raw snapshot ids into crawl run category results and stops on suspected block", async () => {
@@ -124,6 +229,7 @@ describe("CoolPC category snapshot processor", () => {
     ]);
     const storageDir = await createTempDir(tempDirs);
     const suspectedBlockHtml = await fixture("http-200.non-product.html");
+    const productWriter = createProductWriterSpy();
 
     const result = await runCoolpcCrawlOnce({
       client,
@@ -135,6 +241,7 @@ describe("CoolPC category snapshot processor", () => {
           crawlRunId,
           category: sourceCategory,
           snapshot: snapshot({ rawHtml: suspectedBlockHtml }),
+          writeProducts: productWriter.writeProducts,
         }),
     });
 
@@ -154,6 +261,7 @@ describe("CoolPC category snapshot processor", () => {
       }),
     ]);
     expect(client.rawSnapshots).toHaveLength(1);
+    expect(productWriter.calls).toEqual([]);
   });
 });
 
@@ -192,7 +300,7 @@ interface FakeRawSnapshot {
 // The fake implements only the Prisma delegate methods touched by this slice.
 // That keeps the tests focused on the crawler write contract without requiring
 // a test database.
-class FakeCrawlerWriteClient implements CrawlRunWriteClient, RawSnapshotWriteClient {
+class FakeCrawlerWriteClient implements CrawlRunWriteClient, CoolpcCategorySnapshotWriteClient {
   readonly crawlRuns: FakeCrawlRun[] = [];
   readonly categoryResults: FakeCategoryResult[] = [];
   readonly rawSnapshots: FakeRawSnapshot[] = [];
@@ -261,6 +369,33 @@ class FakeCrawlerWriteClient implements CrawlRunWriteClient, RawSnapshotWriteCli
           snapshot.compressedHtmlPath !== null &&
           snapshot.duplicateOfSnapshotId === null,
       ) ?? null,
+    findMany: async ({
+      where,
+      take,
+    }: Parameters<CoolpcCategorySnapshotWriteClient["rawSnapshot"]["findMany"]>[0]) =>
+      this.rawSnapshots
+        .filter(
+          (snapshot) => {
+            const successfulStatuses = new Set<CrawlRunCategoryResultStatusValue>(
+              where.categoryResults.some.status.in,
+            );
+            const successfulResult = this.categoryResults.some(
+              (result) =>
+                result.rawSnapshotId === snapshot.id &&
+                successfulStatuses.has(result.status),
+            );
+
+            return (
+              snapshot.sourceCategoryId === where.sourceCategoryId &&
+              snapshot.contentStatus === where.contentStatus &&
+              snapshot.parsedResultHash !== null &&
+              successfulResult
+            );
+          },
+        )
+        .sort((left, right) => right.fetchedAt.getTime() - left.fetchedAt.getTime())
+        .slice(0, take)
+        .map((snapshot) => ({ parsedResultHash: snapshot.parsedResultHash })),
     create: async ({ data }: Parameters<RawSnapshotWriteClient["rawSnapshot"]["create"]>[0]) => {
       const rawSnapshot: FakeRawSnapshot = {
         id: `raw-snapshot-${this.rawSnapshots.length + 1}`,
@@ -282,6 +417,27 @@ class FakeCrawlerWriteClient implements CrawlRunWriteClient, RawSnapshotWriteCli
       return { id: rawSnapshot.id };
     },
   };
+
+  recordSuccessfulCategoryResult({
+    crawlRunId,
+    sourceCategoryId,
+    rawSnapshotId,
+    status,
+  }: {
+    crawlRunId: string;
+    sourceCategoryId: string;
+    rawSnapshotId: string;
+    status: CrawlRunCategoryResultStatusValue;
+  }): void {
+    this.categoryResults.push({
+      id: `category-result-${this.categoryResults.length + 1}`,
+      crawlRunId,
+      sourceCategoryId,
+      status,
+      rawSnapshotId,
+      errorMessage: null,
+    });
+  }
 }
 
 async function fixture(name: string): Promise<string> {
@@ -312,17 +468,53 @@ function snapshot({
   rawHtml,
   fetchError = null,
   httpStatus = 200,
+  fetchedAt = new Date("2026-05-27T11:00:00.000Z"),
 }: {
   rawHtml: string | null;
   fetchError?: string | null;
   httpStatus?: number | null;
+  fetchedAt?: Date;
 }) {
   return {
     url: "https://www.coolpc.com.tw/eachview.php?IGrp=4",
-    fetchedAt: new Date("2026-05-27T11:00:00.000Z"),
+    fetchedAt,
     httpStatus,
     rawHtml,
     fetchError,
+  };
+}
+
+function createProductWriterSpy(): {
+  calls: Array<{
+    crawlRunId: string;
+    rawSnapshotId: string;
+    sourceItemKeys: string[];
+  }>;
+  writeProducts: WriteCoolpcCategoryProducts;
+} {
+  const calls: Array<{
+    crawlRunId: string;
+    rawSnapshotId: string;
+    sourceItemKeys: string[];
+  }> = [];
+
+  return {
+    calls,
+    writeProducts: async ({ crawlRunId, rawSnapshotId, items }) => {
+      calls.push({
+        crawlRunId,
+        rawSnapshotId,
+        sourceItemKeys: items.map((item) => item.sourceItemKey),
+      });
+
+      return {
+        processedItemCount: items.length,
+        createdProductCount: items.length,
+        updatedProductCount: 0,
+        priceSnapshotCreatedCount: items.length,
+        priceUnchangedCount: 0,
+      };
+    },
   };
 }
 

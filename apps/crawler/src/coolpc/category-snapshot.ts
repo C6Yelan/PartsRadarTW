@@ -13,6 +13,11 @@ import {
   type SourceCategoryContext,
 } from "./parser";
 import {
+  writeCoolpcProductPrices,
+  type CoolpcProductWriteClient,
+  type WriteCoolpcProductPricesResult,
+} from "./product-write";
+import {
   RAW_SNAPSHOT_CONTENT_STATUSES,
   createParsedResultHash,
   recordRawSnapshot,
@@ -21,8 +26,8 @@ import {
 } from "./raw-snapshot";
 
 // This module is the handoff point between raw CoolPC fetches and crawl-run
-// category results. It records evidence first; product and price table writes
-// stay in later Phase 3 slices.
+// category results. It records evidence first, then lets changed valid parses
+// flow into the product/price writer.
 export interface CoolpcCategorySnapshotInput {
   url?: string;
   fetchedAt: Date;
@@ -31,18 +36,61 @@ export interface CoolpcCategorySnapshotInput {
   fetchError?: string | null;
 }
 
-export interface ProcessCoolpcCategorySnapshotOptions {
-  client: RawSnapshotWriteClient;
+interface ProcessCoolpcCategorySnapshotBaseOptions {
   storageDir: string;
   crawlRunId: string;
   category: CrawlRunSourceCategory;
   snapshot: CoolpcCategorySnapshotInput;
 }
 
-export type PrismaCoolpcCategorySnapshotClient = Pick<PrismaClient, "rawSnapshot">;
+export type ProcessCoolpcCategorySnapshotOptions =
+  | (ProcessCoolpcCategorySnapshotBaseOptions & {
+      client: CoolpcCategorySnapshotWriteClient & CoolpcProductWriteClient;
+      writeProducts?: undefined;
+    })
+  | (ProcessCoolpcCategorySnapshotBaseOptions & {
+      client: CoolpcCategorySnapshotWriteClient;
+      writeProducts: WriteCoolpcCategoryProducts;
+    });
+
+export interface CoolpcCategorySnapshotWriteClient extends RawSnapshotWriteClient {
+  rawSnapshot: RawSnapshotWriteClient["rawSnapshot"] & {
+    findMany(args: {
+      where: {
+        sourceCategoryId: string;
+        contentStatus: typeof RAW_SNAPSHOT_CONTENT_STATUSES.VALID;
+        parsedResultHash: { not: null };
+        categoryResults: {
+          some: {
+            status: {
+              in: Array<
+                | typeof CRAWL_RUN_CATEGORY_RESULT_STATUSES.SUCCESS_CHANGED
+                | typeof CRAWL_RUN_CATEGORY_RESULT_STATUSES.SUCCESS_UNCHANGED
+              >;
+            };
+          };
+        };
+      };
+      orderBy: { fetchedAt: "desc" };
+      take: 1;
+      select: { parsedResultHash: true };
+    }): Promise<Array<{ parsedResultHash: string | null }>>;
+  };
+}
+
+export type WriteCoolpcCategoryProducts = (options: {
+  crawlRunId: string;
+  rawSnapshotId: string;
+  items: ParsedCoolpcProduct[];
+}) => Promise<WriteCoolpcProductPricesResult>;
+
+export type PrismaCoolpcCategorySnapshotClient = Pick<
+  PrismaClient,
+  "rawSnapshot" | "product" | "priceSnapshot" | "currentPrice" | "$transaction"
+>;
 
 export function processCoolpcCategorySnapshotWithPrisma(
-  options: Omit<ProcessCoolpcCategorySnapshotOptions, "client"> & {
+  options: ProcessCoolpcCategorySnapshotBaseOptions & {
     client: PrismaCoolpcCategorySnapshotClient;
   },
 ): Promise<ProcessCrawlCategoryResult> {
@@ -51,13 +99,13 @@ export function processCoolpcCategorySnapshotWithPrisma(
   return processCoolpcCategorySnapshot(options);
 }
 
-export async function processCoolpcCategorySnapshot({
-  client,
-  storageDir,
-  crawlRunId,
-  category,
-  snapshot,
-}: ProcessCoolpcCategorySnapshotOptions): Promise<ProcessCrawlCategoryResult> {
+export async function processCoolpcCategorySnapshot(
+  options: ProcessCoolpcCategorySnapshotOptions,
+): Promise<ProcessCrawlCategoryResult> {
+  const { client, storageDir, crawlRunId, category, snapshot } = options;
+  const productWriter = options.writeProducts
+    ? options.writeProducts
+    : createDefaultProductWriter(options.client);
   const url = snapshot.url ?? createCoolpcCategoryUrl(category.igrp);
   const fetchError = snapshot.fetchError ?? null;
 
@@ -86,6 +134,13 @@ export async function processCoolpcCategorySnapshot({
 
   const context = createCategoryContext(category, snapshot.fetchedAt, url);
   const parseResult = parseCoolpcCategoryPage(snapshot.rawHtml, context);
+  const parsedResultHash =
+    parseResult.validation.status === "valid"
+      ? createStableParsedResultHash(parseResult.items)
+      : null;
+  const latestParsedResultHash = parsedResultHash
+    ? await findLatestSuccessfulParsedResultHash(client, category.id)
+    : null;
   // Parser validation decides the stored content status. Only valid parsed
   // products get a result hash; block/invalid pages remain inspectable as raw HTML.
   const rawSnapshot = await recordRawSnapshot({
@@ -98,10 +153,7 @@ export async function processCoolpcCategorySnapshot({
     httpStatus: snapshot.httpStatus,
     contentStatus: toRawSnapshotContentStatus(parseResult.validation.status),
     rawContent: snapshot.rawHtml,
-    parsedResultHash:
-      parseResult.validation.status === "valid"
-        ? createStableParsedResultHash(parseResult.items)
-        : null,
+    parsedResultHash,
   });
 
   // Suspected block is kept distinct from parse failure because the crawl runner
@@ -124,12 +176,36 @@ export async function processCoolpcCategorySnapshot({
     };
   }
 
-  // Phase 4 of the crawler write flow will compare parsedResultHash with the
-  // last successful snapshot. Until that is wired, importable content is changed.
+  if (latestParsedResultHash === parsedResultHash) {
+    return {
+      status: CRAWL_RUN_CATEGORY_RESULT_STATUSES.SUCCESS_UNCHANGED,
+      rawSnapshotId: rawSnapshot.id,
+    };
+  }
+
+  // Only changed content enters product/price writes. Unchanged successful
+  // crawls remain traceable through raw_snapshots and category results without
+  // duplicating product upserts or price history.
+  await productWriter({
+    crawlRunId,
+    rawSnapshotId: rawSnapshot.id,
+    items: parseResult.items,
+  });
+
   return {
     status: CRAWL_RUN_CATEGORY_RESULT_STATUSES.SUCCESS_CHANGED,
     rawSnapshotId: rawSnapshot.id,
   };
+}
+
+function createDefaultProductWriter(
+  client: CoolpcCategorySnapshotWriteClient & CoolpcProductWriteClient,
+): WriteCoolpcCategoryProducts {
+  return (options) =>
+    writeCoolpcProductPrices({
+      client,
+      ...options,
+    });
 }
 
 function createCategoryContext(
@@ -182,6 +258,34 @@ function createStableParsedResultHash(items: ParsedCoolpcProduct[]): string {
       currency: item.currency,
     })),
   );
+}
+
+async function findLatestSuccessfulParsedResultHash(
+  client: CoolpcCategorySnapshotWriteClient,
+  sourceCategoryId: string,
+): Promise<string | null> {
+  const [latestSnapshot] = await client.rawSnapshot.findMany({
+    where: {
+      sourceCategoryId,
+      contentStatus: RAW_SNAPSHOT_CONTENT_STATUSES.VALID,
+      parsedResultHash: { not: null },
+      categoryResults: {
+        some: {
+          status: {
+            in: [
+              CRAWL_RUN_CATEGORY_RESULT_STATUSES.SUCCESS_CHANGED,
+              CRAWL_RUN_CATEGORY_RESULT_STATUSES.SUCCESS_UNCHANGED,
+            ],
+          },
+        },
+      },
+    },
+    orderBy: { fetchedAt: "desc" },
+    take: 1,
+    select: { parsedResultHash: true },
+  });
+
+  return latestSnapshot?.parsedResultHash ?? null;
 }
 
 function buildParseFailureMessage(parseResult: ReturnType<typeof parseCoolpcCategoryPage>): string {
