@@ -136,6 +136,8 @@ export function validateCoolpcCategoryPage(
     };
   }
 
+  // HTTP 200 alone is not trusted. A page with neither the expected title nor
+  // product structures is treated as a possible block page, not as an empty category.
   if (!hasExpectedTitle && tokenCount === 0 && nameCount === 0 && priceTextCount === 0) {
     return {
       status: "suspected_block",
@@ -270,6 +272,8 @@ export function parseCoolpcCategoryPage(
     const existingItem = seenItemsBySourceKey.get(sourceItemKey);
 
     if (existingItem) {
+      // CoolPC can repeat the exact same row in one category page. Exact repeats
+      // are harmless, but the same token with different data would corrupt identity.
       if (existingItem.name === name && existingItem.price === price) {
         deduplicatedItemCount += 1;
         continue;
@@ -322,6 +326,8 @@ function extractCoolpcProductCandidates($: CheerioAPI): CoolpcProductCandidate[]
     .toArray()
     .map((element) => {
       const $token = $(element);
+      // Live pages place product name/price near the token, but the immediate
+      // wrapper differs between fixtures and full pages. Keep this traversal local.
       const $nextSpan = $token.nextAll("span").first();
       const $parent = $token.parent();
       const $following = $token.nextAll().slice(0, 4);
@@ -351,6 +357,7 @@ function normalizeForComparison(value: string): string {
 
 function sanitizeCoolpcSourceUrl(sourceUrl: string): string {
   const url = new URL(sourceUrl);
+  // Session IDs are request state, not a stable product or category source URL.
   url.searchParams.delete("PHPSESSID");
   return url.toString();
 }

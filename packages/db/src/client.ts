@@ -18,6 +18,8 @@ export function createPrismaClient(databaseUrl = process.env.DATABASE_URL) {
 export const prisma = globalForPrisma.prisma ?? createPrismaClient();
 
 if (process.env.NODE_ENV !== "production") {
+  // Reuse the client during dev/test reloads so Next.js or tsx does not create
+  // a new connection pool for every module evaluation.
   globalForPrisma.prisma = prisma;
 }
 

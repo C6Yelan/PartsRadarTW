@@ -1,5 +1,7 @@
 import type { PrismaClient } from "@partsradar/db";
 
+// This module owns the Phase 3 crawl-run skeleton only. Product, price, current
+// price, and raw snapshot writes stay in later slices so their rules are tested separately.
 export const CRAWL_TRIGGER_TYPES = {
   MANUAL: "MANUAL",
   SCHEDULED: "SCHEDULED",
@@ -124,6 +126,8 @@ export function runCoolpcCrawlOnceWithPrisma(
     client: PrismaCrawlRunWriteClient;
   },
 ): Promise<RunCoolpcCrawlOnceResult> {
+  // Keep the core runner dependency-injected for unit tests while still exposing
+  // a Prisma-typed entry point for real crawler wiring.
   return runCoolpcCrawlOnce(options);
 }
 
@@ -173,6 +177,8 @@ export async function runCoolpcCrawlOnce({
       errorMessage: result.errorMessage ?? null,
     });
 
+    // Suspected block means the source may be serving non-product content. Stop
+    // the current cycle before later categories can overwrite valid data.
     if (result.status === CRAWL_RUN_CATEGORY_RESULT_STATUSES.SUSPECTED_BLOCK) {
       stoppedBySuspectedBlock = true;
       break;
@@ -197,6 +203,8 @@ export async function runCoolpcCrawlOnce({
 }
 
 function resolveCrawlRunStatus(results: RecordedCrawlRunCategoryResult[]): CrawlRunStatusValue {
+  // The run table stores only the overall state. Category counts and per-category
+  // details remain derivable from crawl_run_category_results.
   if (results.some((result) => result.status === CRAWL_RUN_CATEGORY_RESULT_STATUSES.SUSPECTED_BLOCK)) {
     return CRAWL_RUN_STATUSES.SUSPECTED_BLOCK;
   }
@@ -241,6 +249,8 @@ async function processCategorySafely({
   try {
     return await processCategory({ crawlRunId, category });
   } catch (error) {
+    // Unexpected processing errors are recorded as parse failures for this
+    // category; the runner can still finish the cycle summary consistently.
     return {
       status: CRAWL_RUN_CATEGORY_RESULT_STATUSES.PARSE_FAILED,
       errorMessage: error instanceof Error ? error.message : "Unknown crawler processing error.",

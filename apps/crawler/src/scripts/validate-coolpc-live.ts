@@ -39,6 +39,8 @@ async function main() {
   const args = process.argv.slice(2);
   const fromRawDir = getStringArg(args, "--from-raw-dir");
 
+  // Live fetches are intentionally opt-in. Regular tests should use fixtures or
+  // replayed raw HTML so local validation does not repeatedly hit CoolPC.
   if (!fromRawDir && !args.includes(CONFIRM_FLAG)) {
     throw new Error(
       `Refusing live CoolPC fetch. Re-run with ${CONFIRM_FLAG} because this command contacts the source site and must stay manual-only.`,
@@ -51,6 +53,8 @@ async function main() {
     getStringArg(args, "--output-dir") ??
     join("temp", "coolpc-live-validation", timestampForPath(new Date()));
   const outputDir = resolveRelativeToWorkspace(workspaceRoot, outputDirArg);
+  // Replay paths are resolved from the workspace root to match the report
+  // commands copied into planning docs.
   const inputRawDir = fromRawDir ? resolveRelativeToWorkspace(workspaceRoot, fromRawDir) : null;
   const rawDir = join(outputDir, "raw");
   const fixtureDir = join(outputDir, "fixtures");
@@ -70,6 +74,8 @@ async function main() {
     const rawPath = join(rawDir, `igrp-${category.igrp}.html`);
     await writeFile(rawPath, html, "utf8");
 
+    // Generated fixtures keep only parser-relevant structure. Full live HTML
+    // stays ignored under temp/ for manual inspection and replay.
     if (result.items.length > 0) {
       await writeFile(
         join(fixtureDir, `igrp-${category.igrp}.sample.html`),
@@ -250,6 +256,7 @@ function countIssues(issues: CoolpcParseIssue[]): Record<string, number> {
 async function fetchLiveCategory(category: CoolpcTargetCategory, url: string) {
   console.log(`Fetching IGrp=${category.igrp} ${category.displayName}: ${url}`);
 
+  // Use a descriptive user-agent so manual validation traffic is identifiable.
   const response = await fetch(url, {
     headers: {
       accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
