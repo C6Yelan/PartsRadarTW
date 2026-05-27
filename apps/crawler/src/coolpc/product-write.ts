@@ -1,0 +1,356 @@
+import type { ParsedCoolpcProduct } from "./parser";
+
+export interface WriteCoolpcProductPricesOptions {
+  client: CoolpcProductWriteClient;
+  crawlRunId: string;
+  rawSnapshotId?: string | null;
+  items: ParsedCoolpcProduct[];
+}
+
+export interface WriteCoolpcProductPricesResult {
+  processedItemCount: number;
+  createdProductCount: number;
+  updatedProductCount: number;
+  priceSnapshotCreatedCount: number;
+  priceUnchangedCount: number;
+}
+
+// Keep this client shape limited to the delegates this slice actually writes.
+// That avoids binding the product writer to a full PrismaClient in unit tests.
+export interface CoolpcProductWriteClient extends CoolpcProductWriteDelegates {
+  $transaction<T>(operation: (client: CoolpcProductWriteDelegates) => Promise<T>): Promise<T>;
+}
+
+interface CoolpcProductWriteDelegates {
+  product: {
+    findUnique(args: {
+      where: {
+        sourceCategoryId_ibuyToken: ProductIdentity;
+      };
+      include: {
+        currentPrice: {
+          include: {
+            priceSnapshot: true;
+          };
+        };
+      };
+    }): Promise<ExistingProductForPriceWrite | null>;
+    create(args: {
+      data: ProductCreateData;
+      select: { id: true };
+    }): Promise<{ id: string }>;
+    update(args: {
+      where: { id: string };
+      data: ProductUpdateData;
+      select: { id: true };
+    }): Promise<{ id: string }>;
+  };
+  priceSnapshot: {
+    create(args: {
+      data: PriceSnapshotCreateData;
+      select: { id: true };
+    }): Promise<{ id: string }>;
+  };
+  currentPrice: {
+    create(args: {
+      data: CurrentPriceCreateData;
+      select: { productId: true };
+    }): Promise<{ productId: string }>;
+    update(args: {
+      where: { productId: string };
+      data: CurrentPriceUpdateData;
+      select: { productId: true };
+    }): Promise<{ productId: string }>;
+  };
+}
+
+interface ProductIdentity {
+  sourceCategoryId: string;
+  ibuyToken: string;
+}
+
+interface ExistingProductForPriceWrite {
+  id: string;
+  currentPrice: {
+    productId: string;
+    priceSnapshotId: string;
+    lastSeenAt: Date;
+    priceChangedAt: Date;
+    priceSnapshot: ExistingCurrentPriceSnapshot;
+  } | null;
+}
+
+interface ExistingCurrentPriceSnapshot {
+  id: string;
+  productId: string;
+  price: number;
+  currency: ParsedCoolpcProduct["currency"];
+}
+
+interface ProductCreateData {
+  sourceCategoryId: string;
+  ibuyToken: string;
+  name: string;
+  normalizedName: string;
+  sourceUrl: string;
+  isActive: true;
+  missingSince: null;
+  missingSeenCount: 0;
+  firstSeenAt: Date;
+  lastSeenAt: Date;
+}
+
+type ProductUpdateData = Omit<ProductCreateData, "sourceCategoryId" | "ibuyToken" | "firstSeenAt">;
+
+interface PriceSnapshotCreateData {
+  productId: string;
+  price: number;
+  currency: ParsedCoolpcProduct["currency"];
+  capturedAt: Date;
+  crawlRunId: string;
+  rawSnapshotId: string | null;
+}
+
+interface CurrentPriceCreateData {
+  productId: string;
+  priceSnapshotId: string;
+  lastSeenAt: Date;
+  priceChangedAt: Date;
+}
+
+interface CurrentPriceUpdateData {
+  priceSnapshotId?: string;
+  lastSeenAt: Date;
+  priceChangedAt?: Date;
+}
+
+export async function writeCoolpcProductPrices({
+  client,
+  crawlRunId,
+  rawSnapshotId = null,
+  items,
+}: WriteCoolpcProductPricesOptions): Promise<WriteCoolpcProductPricesResult> {
+  // Product, price snapshot, and current price must move together. The service
+  // keeps the transaction boundary here instead of requiring every caller to
+  // remember the same multi-table write rule.
+  return client.$transaction((transactionClient) =>
+    writeCoolpcProductPricesInTransaction({
+      client: transactionClient,
+      crawlRunId,
+      rawSnapshotId,
+      items,
+    }),
+  );
+}
+
+async function writeCoolpcProductPricesInTransaction({
+  client,
+  crawlRunId,
+  rawSnapshotId,
+  items,
+}: Omit<WriteCoolpcProductPricesOptions, "client" | "rawSnapshotId"> & {
+  client: CoolpcProductWriteDelegates;
+  rawSnapshotId: string | null;
+}): Promise<WriteCoolpcProductPricesResult> {
+  const result: WriteCoolpcProductPricesResult = {
+    processedItemCount: items.length,
+    createdProductCount: 0,
+    updatedProductCount: 0,
+    priceSnapshotCreatedCount: 0,
+    priceUnchangedCount: 0,
+  };
+
+  for (const item of items) {
+    const existingProduct = await findProduct(client, item);
+
+    if (!existingProduct) {
+      // First sighting must create the complete read path in one pass:
+      // product -> price_snapshot -> current_price.
+      await createProductWithCurrentPrice({ client, crawlRunId, rawSnapshotId, item });
+      result.createdProductCount += 1;
+      result.priceSnapshotCreatedCount += 1;
+      continue;
+    }
+
+    await updateProductSeenData(client, existingProduct.id, item);
+    result.updatedProductCount += 1;
+
+    if (hasPriceChanged(existingProduct.currentPrice?.priceSnapshot ?? null, item)) {
+      const priceSnapshot = await createPriceSnapshot({
+        client,
+        crawlRunId,
+        rawSnapshotId,
+        productId: existingProduct.id,
+        item,
+      });
+
+      if (existingProduct.currentPrice) {
+        await client.currentPrice.update({
+          where: { productId: existingProduct.id },
+          data: {
+            priceSnapshotId: priceSnapshot.id,
+            lastSeenAt: item.fetchedAt,
+            priceChangedAt: item.fetchedAt,
+          },
+          select: { productId: true },
+        });
+      } else {
+        await createCurrentPrice(client, existingProduct.id, priceSnapshot.id, item.fetchedAt);
+      }
+
+      result.priceSnapshotCreatedCount += 1;
+      continue;
+    }
+
+    // Same price means the product is still present, but price history should
+    // not grow with duplicate snapshots on every crawl.
+    await client.currentPrice.update({
+      where: { productId: existingProduct.id },
+      data: { lastSeenAt: item.fetchedAt },
+      select: { productId: true },
+    });
+    result.priceUnchangedCount += 1;
+  }
+
+  return result;
+}
+
+function findProduct(
+  client: CoolpcProductWriteDelegates,
+  item: ParsedCoolpcProduct,
+): Promise<ExistingProductForPriceWrite | null> {
+  // The current price row points to the latest price snapshot. Loading that
+  // snapshot lets us decide whether this crawl needs a new history row.
+  return client.product.findUnique({
+    where: {
+      sourceCategoryId_ibuyToken: {
+        sourceCategoryId: item.sourceCategoryId,
+        ibuyToken: item.ibuyToken,
+      },
+    },
+    include: {
+      currentPrice: {
+        include: {
+          priceSnapshot: true,
+        },
+      },
+    },
+  });
+}
+
+async function createProductWithCurrentPrice({
+  client,
+  crawlRunId,
+  rawSnapshotId,
+  item,
+}: {
+  client: CoolpcProductWriteDelegates;
+  crawlRunId: string;
+  rawSnapshotId: string | null;
+  item: ParsedCoolpcProduct;
+}): Promise<void> {
+  const product = await client.product.create({
+    data: createProductData(item),
+    select: { id: true },
+  });
+  const priceSnapshot = await createPriceSnapshot({
+    client,
+    crawlRunId,
+    rawSnapshotId,
+    productId: product.id,
+    item,
+  });
+
+  await createCurrentPrice(client, product.id, priceSnapshot.id, item.fetchedAt);
+}
+
+function updateProductSeenData(
+  client: CoolpcProductWriteDelegates,
+  productId: string,
+  item: ParsedCoolpcProduct,
+): Promise<{ id: string }> {
+  // A successfully parsed item means the product is present again. Missing /
+  // inactive accumulation is handled in the later Phase 3 missing-rule slice.
+  return client.product.update({
+    where: { id: productId },
+    data: {
+      name: item.name,
+      normalizedName: item.normalizedName,
+      sourceUrl: item.sourceUrl,
+      isActive: true,
+      missingSince: null,
+      missingSeenCount: 0,
+      lastSeenAt: item.fetchedAt,
+    },
+    select: { id: true },
+  });
+}
+
+function createPriceSnapshot({
+  client,
+  crawlRunId,
+  rawSnapshotId,
+  productId,
+  item,
+}: {
+  client: CoolpcProductWriteDelegates;
+  crawlRunId: string;
+  rawSnapshotId: string | null;
+  productId: string;
+  item: ParsedCoolpcProduct;
+}): Promise<{ id: string }> {
+  return client.priceSnapshot.create({
+    data: {
+      productId,
+      price: item.price,
+      currency: item.currency,
+      capturedAt: item.fetchedAt,
+      crawlRunId,
+      rawSnapshotId,
+    },
+    select: { id: true },
+  });
+}
+
+function createCurrentPrice(
+  client: CoolpcProductWriteDelegates,
+  productId: string,
+  priceSnapshotId: string,
+  seenAt: Date,
+): Promise<{ productId: string }> {
+  return client.currentPrice.create({
+    data: {
+      productId,
+      priceSnapshotId,
+      lastSeenAt: seenAt,
+      priceChangedAt: seenAt,
+    },
+    select: { productId: true },
+  });
+}
+
+function createProductData(item: ParsedCoolpcProduct): ProductCreateData {
+  return {
+    sourceCategoryId: item.sourceCategoryId,
+    ibuyToken: item.ibuyToken,
+    name: item.name,
+    normalizedName: item.normalizedName,
+    sourceUrl: item.sourceUrl,
+    isActive: true,
+    missingSince: null,
+    missingSeenCount: 0,
+    firstSeenAt: item.fetchedAt,
+    lastSeenAt: item.fetchedAt,
+  };
+}
+
+function hasPriceChanged(
+  currentSnapshot: ExistingCurrentPriceSnapshot | null,
+  item: ParsedCoolpcProduct,
+): boolean {
+  return (
+    !currentSnapshot ||
+    currentSnapshot.price !== item.price ||
+    currentSnapshot.currency !== item.currency
+  );
+}
