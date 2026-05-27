@@ -6,15 +6,20 @@
   "scripts": {
     "dev": "pnpm dev:web",
     "build": "pnpm build:web",
-    "typecheck": "pnpm typecheck:web",
+    "typecheck": "pnpm typecheck:web && pnpm typecheck:db",
     "lint": "biome lint .",
     "format": "biome format --write .",
     "test": "vitest run",
     "test:watch": "vitest",
     "check": "pnpm typecheck && pnpm lint && pnpm build",
+    "db:generate": "pnpm --filter @partsradar/db db:generate",
+    "db:migrate": "pnpm --filter @partsradar/db db:migrate",
+    "db:seed": "pnpm --filter @partsradar/db db:seed",
+    "db:validate": "pnpm --filter @partsradar/db db:validate",
     "dev:web": "pnpm --filter @partsradar/web dev",
     "build:web": "pnpm --filter @partsradar/web build",
-    "typecheck:web": "pnpm --filter @partsradar/web typecheck"
+    "typecheck:web": "pnpm --filter @partsradar/web typecheck",
+    "typecheck:db": "pnpm --filter @partsradar/db typecheck"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.15",

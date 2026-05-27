@@ -1,0 +1,232 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Currency {
+  TWD
+
+  @@map("currency")
+}
+
+enum CrawlRunStatus {
+  RUNNING             @map("running")
+  SUCCESS_CHANGED     @map("success_changed")
+  SUCCESS_UNCHANGED   @map("success_unchanged")
+  SUCCESS_WITH_ERRORS @map("success_with_errors")
+  FETCH_FAILED        @map("fetch_failed")
+  SUSPECTED_BLOCK     @map("suspected_block")
+  PARSE_FAILED        @map("parse_failed")
+  SKIPPED_OVERLAP     @map("skipped_overlap")
+  BACKOFF             @map("backoff")
+
+  @@map("crawl_run_status")
+}
+
+enum CrawlRunCategoryResultStatus {
+  SUCCESS_CHANGED   @map("success_changed")
+  SUCCESS_UNCHANGED @map("success_unchanged")
+  FETCH_FAILED      @map("fetch_failed")
+  SUSPECTED_BLOCK   @map("suspected_block")
+  PARSE_FAILED      @map("parse_failed")
+
+  @@map("crawl_run_category_result_status")
+}
+
+enum CrawlTriggerType {
+  SCHEDULED @map("scheduled")
+  MANUAL    @map("manual")
+
+  @@map("crawl_trigger_type")
+}
+
+enum RawSnapshotContentStatus {
+  VALID           @map("valid")
+  SUSPECTED_BLOCK @map("suspected_block")
+  INVALID         @map("invalid")
+
+  @@map("raw_snapshot_content_status")
+}
+
+enum ParseErrorType {
+  MISSING_IBUY_TOKEN        @map("missing_ibuy_token")
+  MISSING_NAME              @map("missing_name")
+  PRICE_PARSE_FAILED        @map("price_parse_failed")
+  DUPLICATE_SOURCE_IDENTITY @map("duplicate_source_identity")
+  CONTENT_VALIDATION_FAILED @map("content_validation_failed")
+
+  @@map("parse_error_type")
+}
+
+model SourceCategory {
+  id              String                   @id @default(uuid()) @db.Uuid
+  igrp            Int
+  sourceName      String                   @map("source_name")
+  displayName     String                   @map("display_name")
+  enabled         Boolean                  @default(true)
+  lastCheckedAt   DateTime?                @map("last_checked_at") @db.Timestamptz(6)
+  lastSuccessAt   DateTime?                @map("last_success_at") @db.Timestamptz(6)
+  createdAt       DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
+  products        Product[]
+  rawSnapshots    RawSnapshot[]
+  crawlRunResults CrawlRunCategoryResult[]
+  parseErrors     ParseError[]
+
+  @@unique([igrp], map: "source_categories_igrp_key")
+  @@index([enabled], map: "source_categories_enabled_idx")
+  @@map("source_categories")
+}
+
+model Product {
+  id               String          @id @default(uuid()) @db.Uuid
+  sourceCategoryId String          @map("source_category_id") @db.Uuid
+  sourceCategory   SourceCategory  @relation(fields: [sourceCategoryId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  ibuyToken        String          @map("ibuy_token")
+  name             String          @db.Text
+  normalizedName   String          @map("normalized_name") @db.Text
+  sourceUrl        String          @map("source_url") @db.Text
+  isActive         Boolean         @default(true) @map("is_active")
+  missingSince     DateTime?       @map("missing_since") @db.Timestamptz(6)
+  missingSeenCount Int             @default(0) @map("missing_seen_count")
+  firstSeenAt      DateTime        @map("first_seen_at") @db.Timestamptz(6)
+  lastSeenAt       DateTime        @map("last_seen_at") @db.Timestamptz(6)
+  createdAt        DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+  currentPrice     CurrentPrice?
+  priceSnapshots   PriceSnapshot[]
+
+  @@unique([sourceCategoryId, ibuyToken], map: "products_source_category_id_ibuy_token_key")
+  @@index([sourceCategoryId], map: "products_source_category_id_idx")
+  @@index([isActive], map: "products_is_active_idx")
+  @@index([lastSeenAt], map: "products_last_seen_at_idx")
+  @@map("products")
+}
+
+model PriceSnapshot {
+  id            String        @id @default(uuid()) @db.Uuid
+  productId     String        @map("product_id") @db.Uuid
+  product       Product       @relation(fields: [productId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  price         Int
+  currency      Currency      @default(TWD)
+  capturedAt    DateTime      @map("captured_at") @db.Timestamptz(6)
+  crawlRunId    String        @map("crawl_run_id") @db.Uuid
+  crawlRun      CrawlRun      @relation(fields: [crawlRunId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  rawSnapshotId String?       @map("raw_snapshot_id") @db.Uuid
+  rawSnapshot   RawSnapshot?  @relation(fields: [rawSnapshotId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  currentPrice  CurrentPrice? @relation("CurrentPriceSnapshot")
+
+  @@unique([id, productId], map: "price_snapshots_id_product_id_key")
+  @@index([productId, capturedAt], map: "price_snapshots_product_id_captured_at_idx")
+  @@index([crawlRunId], map: "price_snapshots_crawl_run_id_idx")
+  @@index([rawSnapshotId], map: "price_snapshots_raw_snapshot_id_idx")
+  @@map("price_snapshots")
+}
+
+model CurrentPrice {
+  productId       String        @id @map("product_id") @db.Uuid
+  product         Product       @relation(fields: [productId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  priceSnapshotId String        @unique(map: "current_prices_price_snapshot_id_key") @map("price_snapshot_id") @db.Uuid
+  priceSnapshot   PriceSnapshot @relation("CurrentPriceSnapshot", fields: [priceSnapshotId, productId], references: [id, productId], onDelete: Restrict, onUpdate: Cascade)
+  lastSeenAt      DateTime      @map("last_seen_at") @db.Timestamptz(6)
+  priceChangedAt  DateTime      @map("price_changed_at") @db.Timestamptz(6)
+  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([priceSnapshotId, productId], map: "current_prices_price_snapshot_id_product_id_key")
+  @@index([lastSeenAt], map: "current_prices_last_seen_at_idx")
+  @@map("current_prices")
+}
+
+model CrawlRun {
+  id              String                   @id @default(uuid()) @db.Uuid
+  status          CrawlRunStatus           @default(RUNNING)
+  startedAt       DateTime                 @default(now()) @map("started_at") @db.Timestamptz(6)
+  finishedAt      DateTime?                @map("finished_at") @db.Timestamptz(6)
+  triggerType     CrawlTriggerType         @map("trigger_type")
+  errorMessage    String?                  @map("error_message") @db.Text
+  backoffUntil    DateTime?                @map("backoff_until") @db.Timestamptz(6)
+  createdAt       DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  categoryResults CrawlRunCategoryResult[]
+  rawSnapshots    RawSnapshot[]
+  priceSnapshots  PriceSnapshot[]
+  parseErrors     ParseError[]
+
+  @@index([startedAt], map: "crawl_runs_started_at_idx")
+  @@index([status], map: "crawl_runs_status_idx")
+  @@index([backoffUntil], map: "crawl_runs_backoff_until_idx")
+  @@map("crawl_runs")
+}
+
+model CrawlRunCategoryResult {
+  id               String                       @id @default(uuid()) @db.Uuid
+  crawlRunId       String                       @map("crawl_run_id") @db.Uuid
+  crawlRun         CrawlRun                     @relation(fields: [crawlRunId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  sourceCategoryId String                       @map("source_category_id") @db.Uuid
+  sourceCategory   SourceCategory               @relation(fields: [sourceCategoryId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  status           CrawlRunCategoryResultStatus
+  rawSnapshotId    String?                      @map("raw_snapshot_id") @db.Uuid
+  rawSnapshot      RawSnapshot?                 @relation(fields: [rawSnapshotId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  errorMessage     String?                      @map("error_message") @db.Text
+  createdAt        DateTime                     @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([crawlRunId, sourceCategoryId], map: "crawl_run_category_results_crawl_run_id_source_category_id_key")
+  @@index([crawlRunId], map: "crawl_run_category_results_crawl_run_id_idx")
+  @@index([sourceCategoryId], map: "crawl_run_category_results_source_category_id_idx")
+  @@index([rawSnapshotId], map: "crawl_run_category_results_raw_snapshot_id_idx")
+  @@map("crawl_run_category_results")
+}
+
+model RawSnapshot {
+  id                    String                   @id @default(uuid()) @db.Uuid
+  crawlRunId            String                   @map("crawl_run_id") @db.Uuid
+  crawlRun              CrawlRun                 @relation(fields: [crawlRunId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  sourceCategoryId      String                   @map("source_category_id") @db.Uuid
+  sourceCategory        SourceCategory           @relation(fields: [sourceCategoryId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  url                   String                   @db.Text
+  fetchedAt             DateTime                 @map("fetched_at") @db.Timestamptz(6)
+  httpStatus            Int?                     @map("http_status")
+  fetchError            String?                  @map("fetch_error") @db.Text
+  contentStatus         RawSnapshotContentStatus @map("content_status")
+  contentHash           String?                  @map("content_hash")
+  parsedResultHash      String?                  @map("parsed_result_hash")
+  compressedHtmlPath    String?                  @map("compressed_html_path") @db.Text
+  duplicateOfSnapshotId String?                  @map("duplicate_of_snapshot_id") @db.Uuid
+  duplicateOfSnapshot   RawSnapshot?             @relation("RawSnapshotDuplicates", fields: [duplicateOfSnapshotId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  duplicatedSnapshots   RawSnapshot[]            @relation("RawSnapshotDuplicates")
+  createdAt             DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  categoryResults       CrawlRunCategoryResult[]
+  priceSnapshots        PriceSnapshot[]
+  parseErrors           ParseError[]
+
+  @@index([sourceCategoryId, fetchedAt], map: "raw_snapshots_source_category_id_fetched_at_idx")
+  @@index([contentHash], map: "raw_snapshots_content_hash_idx")
+  @@index([crawlRunId], map: "raw_snapshots_crawl_run_id_idx")
+  @@index([duplicateOfSnapshotId], map: "raw_snapshots_duplicate_of_snapshot_id_idx")
+  @@map("raw_snapshots")
+}
+
+model ParseError {
+  id               String         @id @default(uuid()) @db.Uuid
+  crawlRunId       String         @map("crawl_run_id") @db.Uuid
+  crawlRun         CrawlRun       @relation(fields: [crawlRunId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  rawSnapshotId    String?        @map("raw_snapshot_id") @db.Uuid
+  rawSnapshot      RawSnapshot?   @relation(fields: [rawSnapshotId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  sourceCategoryId String         @map("source_category_id") @db.Uuid
+  sourceCategory   SourceCategory @relation(fields: [sourceCategoryId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  errorType        ParseErrorType @map("error_type")
+  message          String         @db.Text
+  rawName          String?        @map("raw_name") @db.Text
+  rawPriceText     String?        @map("raw_price_text")
+  rawToken         String?        @map("raw_token")
+  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([crawlRunId], map: "parse_errors_crawl_run_id_idx")
+  @@index([rawSnapshotId], map: "parse_errors_raw_snapshot_id_idx")
+  @@index([sourceCategoryId, createdAt], map: "parse_errors_source_category_id_created_at_idx")
+  @@index([errorType], map: "parse_errors_error_type_idx")
+  @@map("parse_errors")
+}
