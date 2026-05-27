@@ -59,15 +59,14 @@ describe("CoolPC category snapshot processor", () => {
       {
         crawlRunId: "crawl-run-1",
         rawSnapshotId: "raw-snapshot-1",
-        sourceItemKeys: [
-          "coolpc:igrp:4:ibuy:CPU-TOKEN-001",
-          "coolpc:igrp:4:ibuy:CPU-TOKEN-002",
-        ],
+        sourceCategoryId: "category-4",
+        fetchedAt: new Date("2026-05-27T11:00:00.000Z"),
+        sourceItemKeys: ["coolpc:igrp:4:ibuy:CPU-TOKEN-001", "coolpc:igrp:4:ibuy:CPU-TOKEN-002"],
       },
     ]);
   });
 
-  it("returns success unchanged and skips product writes when parsed result hash is unchanged", async () => {
+  it("returns success unchanged and still refreshes product presence when parsed result hash is unchanged", async () => {
     const client = new FakeCrawlerWriteClient([category({ id: "category-4", igrp: 4 })]);
     const storageDir = await createTempDir(tempDirs);
     const productWriter = createProductWriterSpy();
@@ -102,7 +101,20 @@ describe("CoolPC category snapshot processor", () => {
     });
     expect(client.rawSnapshots).toHaveLength(2);
     expect(client.rawSnapshots[1]?.parsedResultHash).toBe(client.rawSnapshots[0]?.parsedResultHash);
-    expect(productWriter.calls).toHaveLength(1);
+    expect(productWriter.calls).toEqual([
+      expect.objectContaining({
+        crawlRunId: "crawl-run-1",
+        rawSnapshotId: "raw-snapshot-1",
+        sourceCategoryId: "category-4",
+        fetchedAt: new Date("2026-05-27T11:00:00.000Z"),
+      }),
+      expect.objectContaining({
+        crawlRunId: "crawl-run-2",
+        rawSnapshotId: "raw-snapshot-2",
+        sourceCategoryId: "category-4",
+        fetchedAt: new Date("2026-05-27T11:05:00.000Z"),
+      }),
+    ]);
   });
 
   it("returns success changed and writes products when parsed result hash changes", async () => {
@@ -365,7 +377,9 @@ class FakeCrawlerWriteClient implements CrawlRunWriteClient, CoolpcCategorySnaps
   rawSnapshot = {
     // Raw snapshot storage deduplicates by content hash while still inserting
     // one metadata row per crawl result.
-    findFirst: async ({ where }: Parameters<RawSnapshotWriteClient["rawSnapshot"]["findFirst"]>[0]) =>
+    findFirst: async ({
+      where,
+    }: Parameters<RawSnapshotWriteClient["rawSnapshot"]["findFirst"]>[0]) =>
       this.rawSnapshots.find(
         (snapshot) =>
           snapshot.contentHash === where.contentHash &&
@@ -377,25 +391,22 @@ class FakeCrawlerWriteClient implements CrawlRunWriteClient, CoolpcCategorySnaps
       take,
     }: Parameters<CoolpcCategorySnapshotWriteClient["rawSnapshot"]["findMany"]>[0]) =>
       this.rawSnapshots
-        .filter(
-          (snapshot) => {
-            const successfulStatuses = new Set<CrawlRunCategoryResultStatusValue>(
-              where.categoryResults.some.status.in,
-            );
-            const successfulResult = this.categoryResults.some(
-              (result) =>
-                result.rawSnapshotId === snapshot.id &&
-                successfulStatuses.has(result.status),
-            );
+        .filter((snapshot) => {
+          const successfulStatuses = new Set<CrawlRunCategoryResultStatusValue>(
+            where.categoryResults.some.status.in,
+          );
+          const successfulResult = this.categoryResults.some(
+            (result) =>
+              result.rawSnapshotId === snapshot.id && successfulStatuses.has(result.status),
+          );
 
-            return (
-              snapshot.sourceCategoryId === where.sourceCategoryId &&
-              snapshot.contentStatus === where.contentStatus &&
-              snapshot.parsedResultHash !== null &&
-              successfulResult
-            );
-          },
-        )
+          return (
+            snapshot.sourceCategoryId === where.sourceCategoryId &&
+            snapshot.contentStatus === where.contentStatus &&
+            snapshot.parsedResultHash !== null &&
+            successfulResult
+          );
+        })
         .sort((left, right) => right.fetchedAt.getTime() - left.fetchedAt.getTime())
         .slice(0, take)
         .map((snapshot) => ({ parsedResultHash: snapshot.parsedResultHash })),
@@ -491,6 +502,8 @@ function createProductWriterSpy(): {
   calls: Array<{
     crawlRunId: string;
     rawSnapshotId: string;
+    sourceCategoryId: string;
+    fetchedAt: Date;
     sourceItemKeys: string[];
   }>;
   writeProducts: WriteCoolpcCategoryProducts;
@@ -498,15 +511,19 @@ function createProductWriterSpy(): {
   const calls: Array<{
     crawlRunId: string;
     rawSnapshotId: string;
+    sourceCategoryId: string;
+    fetchedAt: Date;
     sourceItemKeys: string[];
   }> = [];
 
   return {
     calls,
-    writeProducts: async ({ crawlRunId, rawSnapshotId, items }) => {
+    writeProducts: async ({ crawlRunId, rawSnapshotId, sourceCategoryId, fetchedAt, items }) => {
       calls.push({
         crawlRunId,
         rawSnapshotId,
+        sourceCategoryId,
+        fetchedAt,
         sourceItemKeys: items.map((item) => item.sourceItemKey),
       });
 
@@ -516,6 +533,8 @@ function createProductWriterSpy(): {
         updatedProductCount: 0,
         priceSnapshotCreatedCount: items.length,
         priceUnchangedCount: 0,
+        missingProductUpdatedCount: 0,
+        markedInactiveProductCount: 0,
       };
     },
   };

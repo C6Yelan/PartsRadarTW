@@ -4,6 +4,8 @@ export interface WriteCoolpcProductPricesOptions {
   client: CoolpcProductWriteClient;
   crawlRunId: string;
   rawSnapshotId?: string | null;
+  sourceCategoryId: string;
+  fetchedAt: Date;
   items: ParsedCoolpcProduct[];
 }
 
@@ -13,7 +15,11 @@ export interface WriteCoolpcProductPricesResult {
   updatedProductCount: number;
   priceSnapshotCreatedCount: number;
   priceUnchangedCount: number;
+  missingProductUpdatedCount: number;
+  markedInactiveProductCount: number;
 }
+
+const MISSING_SUCCESSFUL_CRAWLS_BEFORE_INACTIVE = 6;
 
 // Keep this client shape limited to the delegates this slice actually writes.
 // That avoids binding the product writer to a full PrismaClient in unit tests.
@@ -35,10 +41,17 @@ interface CoolpcProductWriteDelegates {
         };
       };
     }): Promise<ExistingProductForPriceWrite | null>;
-    create(args: {
-      data: ProductCreateData;
-      select: { id: true };
-    }): Promise<{ id: string }>;
+    findMany(args: {
+      where: { sourceCategoryId: string };
+      select: {
+        id: true;
+        ibuyToken: true;
+        isActive: true;
+        missingSince: true;
+        missingSeenCount: true;
+      };
+    }): Promise<ExistingProductForMissingWrite[]>;
+    create(args: { data: ProductCreateData; select: { id: true } }): Promise<{ id: string }>;
     update(args: {
       where: { id: string };
       data: ProductUpdateData;
@@ -46,10 +59,7 @@ interface CoolpcProductWriteDelegates {
     }): Promise<{ id: string }>;
   };
   priceSnapshot: {
-    create(args: {
-      data: PriceSnapshotCreateData;
-      select: { id: true };
-    }): Promise<{ id: string }>;
+    create(args: { data: PriceSnapshotCreateData; select: { id: true } }): Promise<{ id: string }>;
   };
   currentPrice: {
     create(args: {
@@ -80,6 +90,14 @@ interface ExistingProductForPriceWrite {
   } | null;
 }
 
+interface ExistingProductForMissingWrite {
+  id: string;
+  ibuyToken: string;
+  isActive: boolean;
+  missingSince: Date | null;
+  missingSeenCount: number;
+}
+
 interface ExistingCurrentPriceSnapshot {
   id: string;
   productId: string;
@@ -100,7 +118,23 @@ interface ProductCreateData {
   lastSeenAt: Date;
 }
 
-type ProductUpdateData = Omit<ProductCreateData, "sourceCategoryId" | "ibuyToken" | "firstSeenAt">;
+interface ProductSeenUpdateData {
+  name: string;
+  normalizedName: string;
+  sourceUrl: string;
+  isActive: true;
+  missingSince: null;
+  missingSeenCount: 0;
+  lastSeenAt: Date;
+}
+
+interface ProductMissingUpdateData {
+  isActive: boolean;
+  missingSince: Date;
+  missingSeenCount: number;
+}
+
+type ProductUpdateData = ProductSeenUpdateData | ProductMissingUpdateData;
 
 interface PriceSnapshotCreateData {
   productId: string;
@@ -128,6 +162,8 @@ export async function writeCoolpcProductPrices({
   client,
   crawlRunId,
   rawSnapshotId = null,
+  sourceCategoryId,
+  fetchedAt,
   items,
 }: WriteCoolpcProductPricesOptions): Promise<WriteCoolpcProductPricesResult> {
   // Product, price snapshot, and current price must move together. The service
@@ -138,6 +174,8 @@ export async function writeCoolpcProductPrices({
       client: transactionClient,
       crawlRunId,
       rawSnapshotId,
+      sourceCategoryId,
+      fetchedAt,
       items,
     }),
   );
@@ -147,6 +185,8 @@ async function writeCoolpcProductPricesInTransaction({
   client,
   crawlRunId,
   rawSnapshotId,
+  sourceCategoryId,
+  fetchedAt,
   items,
 }: Omit<WriteCoolpcProductPricesOptions, "client" | "rawSnapshotId"> & {
   client: CoolpcProductWriteDelegates;
@@ -158,9 +198,19 @@ async function writeCoolpcProductPricesInTransaction({
     updatedProductCount: 0,
     priceSnapshotCreatedCount: 0,
     priceUnchangedCount: 0,
+    missingProductUpdatedCount: 0,
+    markedInactiveProductCount: 0,
   };
+  const presentIbuyTokens = new Set<string>();
 
   for (const item of items) {
+    if (item.sourceCategoryId !== sourceCategoryId) {
+      throw new Error(
+        `Product item category mismatch: expected ${sourceCategoryId}, got ${item.sourceCategoryId}.`,
+      );
+    }
+
+    presentIbuyTokens.add(item.ibuyToken);
     const existingProduct = await findProduct(client, item);
 
     if (!existingProduct) {
@@ -211,6 +261,15 @@ async function writeCoolpcProductPricesInTransaction({
     });
     result.priceUnchangedCount += 1;
   }
+
+  const missingResult = await markMissingProducts({
+    client,
+    sourceCategoryId,
+    fetchedAt,
+    presentIbuyTokens,
+  });
+  result.missingProductUpdatedCount = missingResult.missingProductUpdatedCount;
+  result.markedInactiveProductCount = missingResult.markedInactiveProductCount;
 
   return result;
 }
@@ -269,8 +328,9 @@ function updateProductSeenData(
   productId: string,
   item: ParsedCoolpcProduct,
 ): Promise<{ id: string }> {
-  // A successfully parsed item means the product is present again. Missing /
-  // inactive accumulation is handled in the later Phase 3 missing-rule slice.
+  // A successfully parsed item means the product is present again. If it had
+  // been counted as missing or marked inactive, the same source identity resumes
+  // its existing price history instead of creating a replacement product.
   return client.product.update({
     where: { id: productId },
     data: {
@@ -284,6 +344,71 @@ function updateProductSeenData(
     },
     select: { id: true },
   });
+}
+
+async function markMissingProducts({
+  client,
+  sourceCategoryId,
+  fetchedAt,
+  presentIbuyTokens,
+}: {
+  client: CoolpcProductWriteDelegates;
+  sourceCategoryId: string;
+  fetchedAt: Date;
+  presentIbuyTokens: ReadonlySet<string>;
+}): Promise<
+  Pick<WriteCoolpcProductPricesResult, "missingProductUpdatedCount" | "markedInactiveProductCount">
+> {
+  const products = await client.product.findMany({
+    where: { sourceCategoryId },
+    select: {
+      id: true,
+      ibuyToken: true,
+      isActive: true,
+      missingSince: true,
+      missingSeenCount: true,
+    },
+  });
+  const result = {
+    missingProductUpdatedCount: 0,
+    markedInactiveProductCount: 0,
+  };
+
+  for (const product of products) {
+    if (presentIbuyTokens.has(product.ibuyToken)) {
+      continue;
+    }
+
+    if (
+      !product.isActive &&
+      product.missingSeenCount >= MISSING_SUCCESSFUL_CRAWLS_BEFORE_INACTIVE
+    ) {
+      continue;
+    }
+
+    const missingSeenCount = product.missingSeenCount + 1;
+    const shouldBeInactive = missingSeenCount >= MISSING_SUCCESSFUL_CRAWLS_BEFORE_INACTIVE;
+
+    // Missing is counted only after a successful parse of this category. Failed
+    // fetches and parser errors never call this writer, so they cannot make a
+    // product look inactive because the source response was unreliable.
+    await client.product.update({
+      where: { id: product.id },
+      data: {
+        isActive: shouldBeInactive ? false : product.isActive,
+        missingSince: product.missingSince ?? fetchedAt,
+        missingSeenCount,
+      },
+      select: { id: true },
+    });
+
+    result.missingProductUpdatedCount += 1;
+    if (product.isActive && shouldBeInactive) {
+      result.markedInactiveProductCount += 1;
+    }
+  }
+
+  return result;
 }
 
 function createPriceSnapshot({

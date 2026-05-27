@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ParsedCoolpcProduct } from "./parser";
-import {
-  writeCoolpcProductPrices,
-  type CoolpcProductWriteClient,
-} from "./product-write";
+import { writeCoolpcProductPrices, type CoolpcProductWriteClient } from "./product-write";
 
 describe("CoolPC product price writer", () => {
   it("creates product, price snapshot, and current price for a new item", async () => {
@@ -14,6 +11,8 @@ describe("CoolPC product price writer", () => {
       client,
       crawlRunId: "crawl-run-1",
       rawSnapshotId: "raw-snapshot-1",
+      sourceCategoryId: item.sourceCategoryId,
+      fetchedAt: item.fetchedAt,
       items: [item],
     });
 
@@ -23,6 +22,8 @@ describe("CoolPC product price writer", () => {
       updatedProductCount: 0,
       priceSnapshotCreatedCount: 1,
       priceUnchangedCount: 0,
+      missingProductUpdatedCount: 0,
+      markedInactiveProductCount: 0,
     });
     expect(client.transactionCallCount).toBe(1);
     expect(client.products[0]).toMatchObject({
@@ -76,6 +77,8 @@ describe("CoolPC product price writer", () => {
       client,
       crawlRunId: "crawl-run-2",
       rawSnapshotId: "raw-snapshot-2",
+      sourceCategoryId: nextItem.sourceCategoryId,
+      fetchedAt: nextItem.fetchedAt,
       items: [nextItem],
     });
 
@@ -84,6 +87,8 @@ describe("CoolPC product price writer", () => {
       updatedProductCount: 1,
       priceSnapshotCreatedCount: 1,
       priceUnchangedCount: 0,
+      missingProductUpdatedCount: 0,
+      markedInactiveProductCount: 0,
     });
     expect(client.products[0]).toMatchObject({
       name: nextItem.name,
@@ -118,6 +123,8 @@ describe("CoolPC product price writer", () => {
       client,
       crawlRunId: "crawl-run-2",
       rawSnapshotId: "raw-snapshot-2",
+      sourceCategoryId: previousItem.sourceCategoryId,
+      fetchedAt: nextSeenAt,
       items: [productItem({ price: 4880, fetchedAt: nextSeenAt })],
     });
 
@@ -126,6 +133,8 @@ describe("CoolPC product price writer", () => {
       updatedProductCount: 1,
       priceSnapshotCreatedCount: 0,
       priceUnchangedCount: 1,
+      missingProductUpdatedCount: 0,
+      markedInactiveProductCount: 0,
     });
     expect(client.priceSnapshots).toHaveLength(1);
     expect(client.currentPrices[0]).toMatchObject({
@@ -139,12 +148,15 @@ describe("CoolPC product price writer", () => {
   it("recreates current price when an existing product has no current price row", async () => {
     const client = new FakeCoolpcProductWriteClient();
     client.seedProductWithoutCurrentPrice(productItem({ price: 4880 }));
+    const fetchedAt = new Date("2026-05-27T11:00:00.000Z");
 
     const result = await writeCoolpcProductPrices({
       client,
       crawlRunId: "crawl-run-2",
       rawSnapshotId: "raw-snapshot-2",
-      items: [productItem({ price: 4880, fetchedAt: new Date("2026-05-27T11:00:00.000Z") })],
+      sourceCategoryId: "category-4",
+      fetchedAt,
+      items: [productItem({ price: 4880, fetchedAt })],
     });
 
     expect(result).toMatchObject({
@@ -152,10 +164,129 @@ describe("CoolPC product price writer", () => {
       updatedProductCount: 1,
       priceSnapshotCreatedCount: 1,
       priceUnchangedCount: 0,
+      missingProductUpdatedCount: 0,
+      markedInactiveProductCount: 0,
     });
     expect(client.priceSnapshots).toHaveLength(1);
     expect(client.currentPrices).toHaveLength(1);
     expect(client.currentPrices[0]?.priceSnapshotId).toBe("price-snapshot-1");
+  });
+
+  it("marks existing products missing when they are absent from a successful category parse", async () => {
+    const client = new FakeCoolpcProductWriteClient();
+    const previousSeenAt = new Date("2026-05-27T10:00:00.000Z");
+    const nextSeenAt = new Date("2026-05-27T11:00:00.000Z");
+    const presentItem = productItem({
+      ibuyToken: "CPU-TOKEN-001",
+      price: 4880,
+      fetchedAt: previousSeenAt,
+    });
+    const missingItem = productItem({
+      ibuyToken: "CPU-TOKEN-002",
+      name: "AMD Ryzen 7 7700 old listing",
+      normalizedName: "amd ryzen 7 7700 old listing",
+      price: 7990,
+      fetchedAt: previousSeenAt,
+    });
+    client.seedProductWithCurrentPrice(presentItem);
+    client.seedProductWithCurrentPrice(missingItem);
+
+    const result = await writeCoolpcProductPrices({
+      client,
+      crawlRunId: "crawl-run-2",
+      rawSnapshotId: "raw-snapshot-2",
+      sourceCategoryId: "category-4",
+      fetchedAt: nextSeenAt,
+      items: [productItem({ ibuyToken: "CPU-TOKEN-001", price: 4880, fetchedAt: nextSeenAt })],
+    });
+
+    expect(result).toMatchObject({
+      processedItemCount: 1,
+      updatedProductCount: 1,
+      priceUnchangedCount: 1,
+      missingProductUpdatedCount: 1,
+      markedInactiveProductCount: 0,
+    });
+    expect(client.products.find((product) => product.ibuyToken === "CPU-TOKEN-002")).toMatchObject({
+      isActive: true,
+      missingSince: nextSeenAt,
+      missingSeenCount: 1,
+      lastSeenAt: previousSeenAt,
+    });
+    expect(client.products).toHaveLength(2);
+    expect(client.priceSnapshots).toHaveLength(2);
+  });
+
+  it("marks a product inactive on the sixth successful missing crawl", async () => {
+    const client = new FakeCoolpcProductWriteClient();
+    const missingSince = new Date("2026-05-27T10:00:00.000Z");
+    const fetchedAt = new Date("2026-05-27T11:00:00.000Z");
+    client.seedProductWithCurrentPrice(productItem({ price: 4880 }), {
+      missingSince,
+      missingSeenCount: 5,
+    });
+
+    const result = await writeCoolpcProductPrices({
+      client,
+      crawlRunId: "crawl-run-2",
+      rawSnapshotId: "raw-snapshot-2",
+      sourceCategoryId: "category-4",
+      fetchedAt,
+      items: [],
+    });
+
+    expect(result).toMatchObject({
+      processedItemCount: 0,
+      missingProductUpdatedCount: 1,
+      markedInactiveProductCount: 1,
+      priceSnapshotCreatedCount: 0,
+    });
+    expect(client.products[0]).toMatchObject({
+      isActive: false,
+      missingSince,
+      missingSeenCount: 6,
+    });
+    expect(client.priceSnapshots).toHaveLength(1);
+    expect(client.currentPrices).toHaveLength(1);
+  });
+
+  it("restores an inactive product when the same source identity reappears", async () => {
+    const client = new FakeCoolpcProductWriteClient();
+    const previousSeenAt = new Date("2026-05-27T10:00:00.000Z");
+    const nextSeenAt = new Date("2026-05-27T11:00:00.000Z");
+    client.seedProductWithCurrentPrice(productItem({ price: 4880, fetchedAt: previousSeenAt }), {
+      isActive: false,
+      missingSince: new Date("2026-05-27T10:30:00.000Z"),
+      missingSeenCount: 6,
+    });
+
+    const result = await writeCoolpcProductPrices({
+      client,
+      crawlRunId: "crawl-run-2",
+      rawSnapshotId: "raw-snapshot-2",
+      sourceCategoryId: "category-4",
+      fetchedAt: nextSeenAt,
+      items: [productItem({ price: 4880, fetchedAt: nextSeenAt })],
+    });
+
+    expect(result).toMatchObject({
+      updatedProductCount: 1,
+      priceSnapshotCreatedCount: 0,
+      priceUnchangedCount: 1,
+      missingProductUpdatedCount: 0,
+      markedInactiveProductCount: 0,
+    });
+    expect(client.products[0]).toMatchObject({
+      isActive: true,
+      missingSince: null,
+      missingSeenCount: 0,
+      lastSeenAt: nextSeenAt,
+    });
+    expect(client.currentPrices[0]).toMatchObject({
+      priceSnapshotId: "price-snapshot-1",
+      lastSeenAt: nextSeenAt,
+      priceChangedAt: previousSeenAt,
+    });
   });
 });
 
@@ -242,6 +373,16 @@ class FakeCoolpcProductWriteClient implements CoolpcProductWriteClient {
             : null,
       };
     },
+    findMany: async ({ where }: Parameters<CoolpcProductWriteClient["product"]["findMany"]>[0]) =>
+      this.products
+        .filter((product) => product.sourceCategoryId === where.sourceCategoryId)
+        .map((product) => ({
+          id: product.id,
+          ibuyToken: product.ibuyToken,
+          isActive: product.isActive,
+          missingSince: product.missingSince,
+          missingSeenCount: product.missingSeenCount,
+        })),
     create: async ({ data }: Parameters<CoolpcProductWriteClient["product"]["create"]>[0]) => {
       const product: FakeProduct = {
         id: `product-${this.products.length + 1}`,
@@ -295,9 +436,7 @@ class FakeCoolpcProductWriteClient implements CoolpcProductWriteClient {
   };
 
   currentPrice = {
-    create: async ({
-      data,
-    }: Parameters<CoolpcProductWriteClient["currentPrice"]["create"]>[0]) => {
+    create: async ({ data }: Parameters<CoolpcProductWriteClient["currentPrice"]["create"]>[0]) => {
       const currentPrice: FakeCurrentPrice = {
         productId: data.productId,
         priceSnapshotId: data.priceSnapshotId,
@@ -325,9 +464,12 @@ class FakeCoolpcProductWriteClient implements CoolpcProductWriteClient {
     },
   };
 
-  seedProductWithCurrentPrice(item: ParsedCoolpcProduct): void {
-    this.seedProductWithoutCurrentPrice(item);
-    const productId = this.products[0]?.id;
+  seedProductWithCurrentPrice(
+    item: ParsedCoolpcProduct,
+    overrides: Partial<Pick<FakeProduct, "isActive" | "missingSince" | "missingSeenCount">> = {},
+  ): void {
+    this.seedProductWithoutCurrentPrice(item, overrides);
+    const productId = this.products[this.products.length - 1]?.id;
 
     if (!productId) {
       throw new Error("Missing seeded product.");
@@ -350,7 +492,10 @@ class FakeCoolpcProductWriteClient implements CoolpcProductWriteClient {
     });
   }
 
-  seedProductWithoutCurrentPrice(item: ParsedCoolpcProduct): void {
+  seedProductWithoutCurrentPrice(
+    item: ParsedCoolpcProduct,
+    overrides: Partial<Pick<FakeProduct, "isActive" | "missingSince" | "missingSeenCount">> = {},
+  ): void {
     this.products.push({
       id: `product-${this.products.length + 1}`,
       sourceCategoryId: item.sourceCategoryId,
@@ -358,9 +503,9 @@ class FakeCoolpcProductWriteClient implements CoolpcProductWriteClient {
       name: item.name,
       normalizedName: item.normalizedName,
       sourceUrl: item.sourceUrl,
-      isActive: true,
-      missingSince: null,
-      missingSeenCount: 0,
+      isActive: overrides.isActive ?? true,
+      missingSince: overrides.missingSince ?? null,
+      missingSeenCount: overrides.missingSeenCount ?? 0,
       firstSeenAt: item.fetchedAt,
       lastSeenAt: item.fetchedAt,
     });

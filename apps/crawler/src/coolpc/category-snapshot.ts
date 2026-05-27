@@ -81,6 +81,8 @@ export interface CoolpcCategorySnapshotWriteClient extends RawSnapshotWriteClien
 export type WriteCoolpcCategoryProducts = (options: {
   crawlRunId: string;
   rawSnapshotId: string;
+  sourceCategoryId: string;
+  fetchedAt: Date;
   items: ParsedCoolpcProduct[];
 }) => Promise<WriteCoolpcProductPricesResult>;
 
@@ -167,7 +169,7 @@ export async function processCoolpcCategorySnapshot(
   }
 
   // Invalid or non-importable content is saved for diagnosis, but it must not
-  // flow into product/price writes in later slices.
+  // flow into product/price writes.
   if (parseResult.validation.status === "invalid" || !parseResult.canImport) {
     return {
       status: CRAWL_RUN_CATEGORY_RESULT_STATUSES.PARSE_FAILED,
@@ -176,24 +178,22 @@ export async function processCoolpcCategorySnapshot(
     };
   }
 
-  if (latestParsedResultHash === parsedResultHash) {
-    return {
-      status: CRAWL_RUN_CATEGORY_RESULT_STATUSES.SUCCESS_UNCHANGED,
-      rawSnapshotId: rawSnapshot.id,
-    };
-  }
-
-  // Only changed content enters product/price writes. Unchanged successful
-  // crawls remain traceable through raw_snapshots and category results without
-  // duplicating product upserts or price history.
+  // Every successful parse reaches the product writer. It avoids duplicate
+  // price snapshots itself, while unchanged crawls still refresh last_seen_at
+  // and advance missing counters for products absent from the parsed list.
   await productWriter({
     crawlRunId,
     rawSnapshotId: rawSnapshot.id,
+    sourceCategoryId: category.id,
+    fetchedAt: snapshot.fetchedAt,
     items: parseResult.items,
   });
 
   return {
-    status: CRAWL_RUN_CATEGORY_RESULT_STATUSES.SUCCESS_CHANGED,
+    status:
+      latestParsedResultHash === parsedResultHash
+        ? CRAWL_RUN_CATEGORY_RESULT_STATUSES.SUCCESS_UNCHANGED
+        : CRAWL_RUN_CATEGORY_RESULT_STATUSES.SUCCESS_CHANGED,
     rawSnapshotId: rawSnapshot.id,
   };
 }
