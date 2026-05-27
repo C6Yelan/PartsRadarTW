@@ -1,0 +1,154 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { describe, expect, it } from "vitest";
+import { COOLPC_TARGET_CATEGORIES } from "./categories";
+import {
+  createCoolpcCategoryUrl,
+  createSourceItemKey,
+  parseCoolpcCategoryPage,
+  parsePriceText,
+  validateCoolpcCategoryPage,
+  type SourceCategoryContext,
+} from "./parser";
+
+const fixtureDir = join(__dirname, "__fixtures__");
+
+const context: SourceCategoryContext = {
+  sourceCategoryId: "00000000-0000-0000-0000-000000000004",
+  igrp: 4,
+  sourceName: "處理器 CPU",
+  displayName: "CPU",
+  fetchedAt: new Date("2026-05-27T06:00:00.000Z"),
+  sourceUrl: "https://www.coolpc.com.tw/eachview.php?IGrp=4&PHPSESSID=local-session",
+};
+
+function fixture(name: string): string {
+  return readFileSync(join(fixtureDir, name), "utf8");
+}
+
+describe("CoolPC parser helpers", () => {
+  it("keeps the first-version target categories in code", () => {
+    expect(COOLPC_TARGET_CATEGORIES.map((category) => category.igrp)).toEqual([
+      4, 5, 6, 7, 8, 10, 12, 14, 15,
+    ]);
+  });
+
+  it("parses supported TWD price formats", () => {
+    expect(parsePriceText("含稅：NT4880")).toBe(4880);
+    expect(parsePriceText("含稅：NT4,880")).toBe(4880);
+    expect(parsePriceText("現金價 $4880")).toBe(4880);
+    expect(parsePriceText("現金價 $4,880")).toBe(4880);
+    expect(parsePriceText("請來電詢價")).toBeNull();
+  });
+
+  it("creates source item keys without persisting them", () => {
+    expect(createSourceItemKey(4, "CPU123")).toBe("coolpc:igrp:4:ibuy:CPU123");
+  });
+
+  it("creates category URLs without PHP session state", () => {
+    expect(createCoolpcCategoryUrl(4)).toBe("https://www.coolpc.com.tw/eachview.php?IGrp=4");
+  });
+});
+
+describe("CoolPC response content validation", () => {
+  it("accepts a normal category fixture", () => {
+    const result = validateCoolpcCategoryPage(fixture("cpu-category.normal.html"), context);
+
+    expect(result.status).toBe("valid");
+    expect(result.hasExpectedTitle).toBe(true);
+    expect(result.tokenCount).toBe(2);
+    expect(result.validCandidateCount).toBe(2);
+  });
+
+  it("rejects category-like content missing token structure", () => {
+    const result = validateCoolpcCategoryPage(fixture("cpu-category.missing-token.html"), context);
+
+    expect(result.status).toBe("invalid");
+    expect(result.reason).toBe("missing_required_product_structure");
+  });
+
+  it("rejects category-like content missing name structure", () => {
+    const result = validateCoolpcCategoryPage(fixture("cpu-category.missing-name.html"), context);
+
+    expect(result.status).toBe("invalid");
+    expect(result.reason).toBe("missing_required_product_structure");
+  });
+
+  it("rejects category-like content with no parseable prices", () => {
+    const result = validateCoolpcCategoryPage(fixture("cpu-category.missing-price.html"), context);
+
+    expect(result.status).toBe("invalid");
+    expect(result.reason).toBe("no_valid_product_candidates");
+  });
+
+  it("marks HTTP 200 non-product content as suspected block", () => {
+    const result = validateCoolpcCategoryPage(fixture("http-200.non-product.html"), context);
+
+    expect(result.status).toBe("suspected_block");
+    expect(result.reason).toBe("not_expected_category_page");
+  });
+});
+
+describe("CoolPC category parser", () => {
+  it("parses product token, name, price, source key, and sanitized source URL", () => {
+    const result = parseCoolpcCategoryPage(fixture("cpu-category.normal.html"), context);
+
+    expect(result.canImport).toBe(true);
+    expect(result.issues).toEqual([]);
+    expect(result.items).toHaveLength(2);
+    expect(result.items[0]).toMatchObject({
+      sourceCategoryId: context.sourceCategoryId,
+      igrp: 4,
+      sourceName: "處理器 CPU",
+      displayName: "CPU",
+      ibuyToken: "CPU-TOKEN-001",
+      sourceItemKey: "coolpc:igrp:4:ibuy:CPU-TOKEN-001",
+      name: "AMD Ryzen 5 7500F MPK【6核/12緒】3.7G",
+      normalizedName: "amd ryzen 5 7500f mpk【6核/12緒】3.7g",
+      price: 4880,
+      currency: "TWD",
+      sourceUrl: "https://www.coolpc.com.tw/eachview.php?IGrp=4",
+      fetchedAt: context.fetchedAt,
+    });
+  });
+
+  it("keeps invalid product candidates out of parsed items and reports parse issues", () => {
+    const result = parseCoolpcCategoryPage(
+      fixture("cpu-category.mixed-invalid-items.html"),
+      context,
+    );
+
+    expect(result.canImport).toBe(true);
+    expect(result.items).toHaveLength(1);
+    expect(result.issues.map((issue) => issue.type)).toEqual([
+      "missing_ibuy_token",
+      "missing_name",
+      "price_parse_failed",
+    ]);
+  });
+
+  it("blocks import when source identity is duplicated in the same snapshot", () => {
+    const result = parseCoolpcCategoryPage(fixture("cpu-category.duplicate-token.html"), context);
+
+    expect(result.canImport).toBe(false);
+    expect(result.items).toHaveLength(1);
+    expect(result.issues).toEqual([
+      expect.objectContaining({
+        type: "duplicate_source_identity",
+        sourceItemKey: "coolpc:igrp:4:ibuy:CPU-TOKEN-001",
+      }),
+    ]);
+  });
+
+  it("does not parse products when content validation fails", () => {
+    const result = parseCoolpcCategoryPage(fixture("http-200.non-product.html"), context);
+
+    expect(result.canImport).toBe(false);
+    expect(result.items).toEqual([]);
+    expect(result.issues).toEqual([
+      expect.objectContaining({
+        type: "content_validation_failed",
+      }),
+    ]);
+  });
+});
