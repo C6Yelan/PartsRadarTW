@@ -163,12 +163,25 @@
 - stale / unavailable 來源狀態。
 - `/api/source-status` 支援全域與分類層級狀態。
 
+資安限制：
+
+- API 只讀取 DB 中已處理的有效資料，不直接抓取原價屋頁面。
+- `GET` endpoint 不得修改資料。
+- `q`、`igrp`、`minPrice`、`maxPrice`、`page`、`pageSize` 需做型別、範圍與長度驗證。
+- `sort`、`status` 等列舉型 query 需使用 allowlist。
+- `pageSize` 與搜尋字串長度需有明確上限，避免昂貴查詢被濫用。
+- 商品名稱、分類名稱與來源資料視為不可信輸入；API 不回傳 raw HTML，Web UI 不用 `dangerouslySetInnerHTML` 顯示來源內容。
+- `source.url` 不得包含 `PHPSESSID` 或其他 session token。
+- 錯誤 response 使用泛用訊息，不回傳 Prisma / DB / crawler stack trace。
+- API response 不暴露 computed `source_item_key`、`iBuyToken`、raw snapshot、parse error、crawler error stack、DB 連線資訊或環境變數。
+
 不包含：
 
 - 使用者帳號 API。
 - 價格提醒 API。
 - crawler 手動觸發 API。
 - raw snapshot 或 parse error 查詢 API。
+- 任何會建立、修改或刪除資料的公開 API。
 
 完成條件：
 
@@ -177,7 +190,14 @@
 - 商品不存在回傳 `404`。
 - 全域來源狀態與分類來源狀態符合 API 文件。
 - API 不暴露 computed `source_item_key`、`iBuyToken`、raw snapshot 或內部錯誤堆疊。
+- 超出上限或不在 allowlist 的 query 會被拒絕或依 API 文件安全處理。
+- API route 不會觸發 crawler、不會直接發出來源站請求，也不會修改資料。
+- API response 與錯誤訊息不包含內部 stack trace、DB 連線資訊或環境變數。
 - API 測試通過。
+
+後續待辦：
+
+- API rate limiting / abuse protection：待 API route 實作完成後，於 middleware、反向代理或部署層評估加入，避免大量查詢與濫用。本項不屬於目前 Phase 4 API helper 基礎切片的必須完成項目。
 
 ## Phase 5：Web UI 第一版
 
