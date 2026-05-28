@@ -155,7 +155,7 @@ docs/
 - HTTP 200 不代表抓取成功。
 - 被判定為攔截或非預期內容時，不更新正式商品與價格資料。
 - DB 商品唯一性使用 `source_category_id + ibuy_token`；需要來源識別字串時由 helper 產生 computed `source_item_key`，格式為 `coolpc:igrp:{IGrp}:ibuy:{iBuyToken}`。
-- 資料完全沒變時，記錄成功檢查、更新成功時間，但不新增重複價格歷史。
+- 資料完全沒變時，記錄成功檢查並更新檢查成功時間，但不新增重複價格歷史。
 - 網站只讀取已成功處理的資料。
 
 完整資料流規則以 [data-flow.md](../planning/data-flow.md) 為準。
