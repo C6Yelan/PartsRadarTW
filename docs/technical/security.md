@@ -84,6 +84,19 @@ API 第一版需遵守：
 - 若未來需要內部 raw snapshot viewer，需另開安全設計，至少包含權限、escape、下載限制與存取紀錄。
 - 外部連結需避免保存或輸出包含 `PHPSESSID` 的 URL。
 
+## 商品圖片 URL 安全
+
+商品主要圖片由 crawler 從原價屋公開頁面解析，不接受使用者提交的任意圖片 URL。
+
+規則：
+
+- 只允許預期 CoolPC 來源網域或預期圖片路徑的圖片 URL。
+- 圖片 URL 需限制 protocol、host 與 path pattern；不接受 `javascript:`、`data:` 或其他非預期 scheme。
+- 若使用 Next.js Image 或任何 image optimizer，必須設定明確 remote allowlist。
+- 圖片 alt text 可由商品名稱產生，不需要爬取額外文字。
+- API 不回傳 raw HTML、未驗證 URL、crawler 內部錯誤或 stack trace。
+- 若後端未來會抓取、代理或快取圖片，需補 SSRF 防護：限制 protocol、host、port、redirect、private IP range 與 DNS rebinding 風險。
+
 ## CSRF
 
 第一版公開 API 只提供讀取功能，且不提供登入與狀態修改 endpoint，因此 CSRF 風險較低。

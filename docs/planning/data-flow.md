@@ -10,6 +10,7 @@
 
 - 能重複抓取原價屋商品資料。
 - 能判斷同一個原價屋商品是否已存在。
+- 能取得、驗證並保存商品主要圖片 URL。
 - 能更新商品目前價格。
 - 能保留價格更新紀錄。
 - 能讓網站查詢到目前有效的商品資料。
@@ -51,8 +52,9 @@
   -> fetch raw page（抓取原始頁面）
   -> raw snapshot（原始資料快照）
   -> validate response content（驗證回應內容）
-  -> parse product candidates（解析候選商品）
+  -> parse product candidates and image URL（解析候選商品與主要圖片 URL）
   -> validate parsed items（驗證解析結果）
+  -> normalize and validate image URL（正規化並驗證圖片 URL）
   -> upsert products（新增或更新商品主檔）
   -> insert price snapshots when needed（必要時寫入價格快照）
   -> update current prices（更新目前價格）
@@ -124,6 +126,7 @@ Parser 應把 raw snapshot 轉成網站可用的標準商品資料。
 - 商品原始名稱。
 - 商品價格。
 - 幣別。
+- 商品主要圖片 URL。
 - 原始頁面或商品連結。
 - 資料抓取時間。
 - `iBuyToken`。
@@ -131,10 +134,22 @@ Parser 應把 raw snapshot 轉成網站可用的標準商品資料。
 
 可選欄位：
 
-- 型號提示。
-- 品牌提示。
-- 初步規格資料。
 - parser 補充資訊。
+
+商品圖片資料流：
+
+```text
+CoolPC source HTML
+  -> crawler parser 擷取商品主要圖片 URL
+  -> 驗證與正規化 URL
+  -> 寫入 product presentation data
+  -> API 回傳主要商品圖片
+  -> Web UI 顯示縮圖與詳細頁圖片
+```
+
+圖片 URL 必須來自 crawler 對原價屋公開 HTML 的解析結果，不接受使用者任意輸入 URL。parser 需處理相對路徑、絕對路徑、HTML entity、空值與不合法 URL，並只接受預期 CoolPC 來源網域或預期圖片路徑。缺少圖片、圖片 URL 不合法或來源網域不符合預期時，應記錄為資料完整性問題或 validation issue；嚴重程度需在 Phase 05 前置驗證中依實際 CoolPC HTML 穩定度確認。缺圖 fallback 僅是 UI 容錯，不代表資料契約可以沒有圖片。
+
+第一版不解析品牌、腳位、容量、瓦數等結構化規格欄位。若 parser 只能取得原始商品名稱，UI 不應假裝有結構化規格；規格整理需等資料品質觀察後另開 phase 或決策。
 
 ### Product
 
@@ -148,6 +163,8 @@ Product 是商品主檔，用來表示同一個原價屋商品。
 - `source_category_id`：原價屋分類主檔。
 - `ibuy_token`。
 - `name`：商品原始名稱。
+- `primary_image_url`：主要商品圖片 URL。
+- `primary_image_checked_at`：主要商品圖片最後一次被來源資料確認的時間。
 - `source_url`：原始來源連結。
 - `created_at`。
 - `updated_at`。
@@ -343,6 +360,7 @@ coolpc:igrp:{IGrp}:ibuy:{iBuyToken}
 
 網站需要的基本資料：
 
+- 商品主要圖片。
 - 商品名稱。
 - 原價屋分類。
 - 目前價格。

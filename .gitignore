@@ -4,6 +4,7 @@ PROJECT_CONTEXT.md
 .agents/
 .codex/
 structure.txt
+style.png
 
 # Environment and secrets
 .env

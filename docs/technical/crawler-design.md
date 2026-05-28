@@ -18,6 +18,7 @@ https://www.coolpc.com.tw/eachview.php?IGrp={分類編號}
 - 商品名稱出現在同一商品區塊內的 `div.t`。
 - 價格出現在同一商品區塊內的 `div.x`，格式可見 `含稅：NT4880`。
 - 頁面中的 Buy 行為會用 `iBuy` token 組出 `evaluate.php?iBuy={token}`，但第一版 crawler 不使用 `evaluate.php` 作為抓取來源。
+- 第一版網站需要主要商品圖片；圖片 URL 是否能穩定從分類頁取得需在 Phase 05 前置驗證中確認。
 
 試抓中可見的商品區塊概念如下：
 
@@ -29,7 +30,7 @@ https://www.coolpc.com.tw/eachview.php?IGrp={分類編號}
 </span>
 ```
 
-實際 HTML 可能包含圖片、外部規格連結、Buy 按鈕或其他樣式內容；parser 不應依賴這些非必要元素。
+實際 HTML 可能包含圖片、外部規格連結、Buy 按鈕或其他樣式內容。第一版 parser 需要擷取主要商品圖片 URL，但不應依賴外部規格連結、Buy 按鈕或其他樣式內容完成商品身份與價格解析。
 
 ## 第一版抓取分類
 
@@ -133,10 +134,11 @@ Parser 使用 `cheerio` 解析 HTML。
 2. 讀取並 trim `div.w` 文字作為 `iBuyToken`。
 3. 取得緊鄰商品區塊中的 `div.t` 作為商品原始名稱。
 4. 取得同一商品區塊中的 `div.x` 作為價格文字。
-5. 從價格文字解析整數金額。
-6. 使用 `sourceCategoryId + iBuyToken` 作為 DB 商品唯一性依據。
-7. 需要 log 或 duplicate detection 時，產生 computed `source_item_key`。
-8. 輸出 parsed item。
+5. 從同一商品區塊擷取主要商品圖片 URL。
+6. 從價格文字解析整數金額。
+7. 使用 `sourceCategoryId + iBuyToken` 作為 DB 商品唯一性依據。
+8. 需要 log 或 duplicate detection 時，產生 computed `source_item_key`。
+9. 輸出 parsed item。
 
 Parsed item 至少包含：
 
@@ -146,12 +148,25 @@ Parsed item 至少包含：
 - `iBuyToken`。
 - computed `source_item_key`。
 - 商品原始名稱。
+- 主要商品圖片 URL。
 - 價格。
 - 幣別：`TWD`。
 - source page URL。
 - fetched_at。
 
 第一版來源在程式層固定為 `coolpc`，不寫入核心 DB 欄位。
+
+圖片 URL 規則：
+
+- parser 需處理相對路徑、絕對路徑、HTML entity、空值與不合法 URL。
+- 圖片 URL 需正規化為可安全顯示的絕對 URL。
+- 只允許 CoolPC 預期來源網域或預期圖片路徑，不接受任意外部圖片 URL。
+- 不保留 `PHPSESSID` 或其他 session token。
+- 缺少圖片、圖片 URL 格式不合法或來源網域不符合預期時，需記錄為 parse warning、validation issue 或對應的 parse error；實際嚴重程度需依 Phase 05 前置驗證結果決定。
+- 缺圖不可被視為第一版完成狀態的正常 happy path。
+- 第一版不下載、壓縮、轉檔、代理或快取圖片，只保存可顯示且可驗證的主要圖片 URL。
+
+第一版不解析結構化硬體規格。品牌、腳位、容量、瓦數等資訊若只存在於原始商品名稱中，UI 不應假裝有獨立規格欄位或規格篩選。
 
 computed `source_item_key` 格式：
 
@@ -188,6 +203,7 @@ DB 不保存 `source_item_key` 欄位；正式商品 upsert 使用 `sourceCatego
 
 - `iBuyToken` 不可為空。
 - 商品原始名稱不可為空。
+- 主要商品圖片 URL 必須可驗證與正規化；若來源頁無法穩定提供，需列為 Phase 05 前置驗證風險。
 - 價格必須是大於 0 的整數。
 - `sourceCategoryId + iBuyToken` 可作為 DB 唯一鍵。
 - computed `source_item_key` 可產生。

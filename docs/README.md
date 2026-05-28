@@ -14,6 +14,7 @@ docs/
     implementation-roadmap.md
     phase-02-coolpc-live-validation.md
     phase-03-crawler-write-plan.md
+    phase-05-visual-language.md
   technical/
     tech-stack.md
     architecture.md
@@ -36,6 +37,7 @@ docs/
 - [實作 Roadmap](planning/implementation-roadmap.md)
 - [Phase 2 原價屋 live validation](planning/phase-02-coolpc-live-validation.md)
 - [Phase 3 Crawler 資料寫入實作計畫](planning/phase-03-crawler-write-plan.md)
+- [Phase 05 視覺語言草案](planning/phase-05-visual-language.md)
 
 ## 技術文件
 

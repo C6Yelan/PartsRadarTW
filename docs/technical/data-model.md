@@ -19,6 +19,7 @@
 - raw snapshot metadata 存資料庫，原始 HTML 壓縮檔存檔案。
 - raw snapshot 以內容 hash 去重，避免浪費硬碟空間。
 - 網站只讀取正式商品與目前價格；crawler / debug 資料不直接暴露給使用者。
+- 商品主要圖片屬於 product presentation data，第一版需從可信來源解析結果保存，不由 projection 或使用者輸入產生。
 
 ## 關聯總覽
 
@@ -100,11 +101,14 @@ product_list_view
 - `last_seen_at`
 - `is_active`
 - `source_url`
+- `primary_image_url`
+- `primary_image_checked_at`
 
 規則：
 
 - Crawler 不寫入 `product_list_view`。
 - API 可讀取 `product_list_view`，也可直接 join 核心表。
+- `product_list_view` 可投影主要商品圖片欄位，但圖片資料真相來源仍是核心 product 資料。
 - `source_name` 在 view 中代表原價屋分類名稱，不是資料來源名稱。
 - 若 API 需要資料來源名稱，第一版固定回傳 `coolpc`，不從 DB 欄位讀取。
 - `product_list_view` 可刪除後由 migration 或 SQL 定義重建。
@@ -159,6 +163,8 @@ product_list_view
 - `ibuy_token`。
 - `name`：商品原始名稱。
 - `normalized_name`。
+- `primary_image_url`：主要商品圖片 URL，來自經驗證與正規化的原價屋公開頁面圖片。
+- `primary_image_checked_at`：主要商品圖片最後一次被來源資料確認的時間。
 - `source_url`：不包含 `PHPSESSID` 的來源分類頁 URL。
 - `is_active`。
 - `missing_since`。
@@ -178,10 +184,21 @@ product_list_view
 - 商品名稱可更新，但不應造成商品歷史斷裂。
 - `source_item_key` 不存 DB；需要時由 `sourceCategory.igrp + ibuy_token` 在程式層組成，例如 `coolpc:igrp:4:ibuy:{iBuyToken}`。
 - 商品識別不應使用價格、商品名稱或 `PHPSESSID`。
+- 商品主要圖片是第一版顯示所需資料；缺圖應被視為資料完整性問題或來源驗證風險，不是正常匯入 happy path。
+- 圖片 URL 必須來自 crawler 對可信來源 HTML 的解析結果，不接受使用者任意輸入 URL。
+- 若某次成功 crawl 沒有解析到有效圖片 URL，不應靜默清空既有主要圖片；應記錄 validation issue 並保留可追查資訊。
 - 商品從來源消失時，不刪除 product，也不刪除價格歷史。
 - 商品消失應先記錄 `missing_since` 或累計 `missing_seen_count`，避免單次頁面異常造成誤判。
 - 連續 6 次成功 crawl 都未看到同一商品時，才將 `is_active` 改為 false。
 - 若商品未來以相同 `source_category_id + ibuy_token` 重新出現，應恢復 `is_active = true` 並延續原價格歷史。
+
+### 商品圖片設計方向
+
+第一版只需要每個 product 一張主要商品圖片，因此以 `products` 上的 primary image 欄位作為設計方向最符合目前需求：商品身份、名稱與主要展示圖片同屬 product presentation data，且第一版不處理多圖、圖片快取或圖片版本管理。
+
+若未來需要多張圖片、圖片快取、server-side image proxy、圖片驗證歷史或不同來源圖片變更紀錄，應另行建立 `product_images` 或 `product_assets` 類型資料表。該擴充不應把圖片真相來源塞進 `product_list_view`；projection 只能讀取核心圖片資料，不應成為圖片資料的真相來源。
+
+目前 repo 的 Prisma schema 尚未實作上述欄位。本文件先定義第一版資料需求；實作時需另行建立 migration 與測試。
 
 ## price_snapshots
 
@@ -428,6 +445,7 @@ product_list_view
 商品列表至少需要：
 
 - product id。
+- 主要商品圖片 URL 與替代文字。
 - 商品名稱。
 - 原價屋分類。
 - 目前價格。
@@ -454,7 +472,7 @@ Crawler 主要寫入：
 
 Crawler 不應直接刪除既有正式商品資料。
 
-商品消失、停賣或下架時：
+商品未出現在來源頁或可能下架時：
 
 - 不刪除 product。
 - 不刪除 price snapshots。

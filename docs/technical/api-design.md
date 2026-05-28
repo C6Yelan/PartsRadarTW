@@ -11,6 +11,7 @@
 - API 不直接抓取原價屋頁面。
 - API 不暴露 raw snapshot、parse error 或 crawler 內部除錯資料。
 - 商品價格以整數金額保存與回傳，第一版幣別固定為 `TWD`。
+- 商品列表與商品詳細 response 需回傳主要商品圖片；圖片是第一版網站顯示所需資料，不是前端裝飾。
 - 時間欄位使用 ISO 8601 字串；前端顯示時再轉成使用者介面需要的格式。
 - 商品列表預設只顯示 active 商品。
 - inactive 商品不從列表主動露出，但既有商品詳情連結仍可開啟並顯示商品狀態。
@@ -145,6 +146,11 @@
         "displayName": "CPU",
         "sourceName": "處理器 CPU"
       },
+      "image": {
+        "url": "https://www.coolpc.com.tw/path/to/product-image.jpg",
+        "alt": "Intel Core Ultra 5 225F",
+        "capturedAt": "2026-05-25T12:00:00.000Z"
+      },
       "price": {
         "amount": 4880,
         "currency": "TWD",
@@ -180,6 +186,7 @@
 - `status=inactive` 只查詢 inactive 商品。
 - `status=all` 同時查詢 active 與 inactive 商品。
 - 無目前價格的商品第一版不出現在商品列表。
+- 無有效主要商品圖片的商品不應被視為 Phase 5 ready；若暫時回傳 fallback 所需資訊，需同時保留資料完整性問題，不可把缺圖當成正常 response contract。
 - `q` 應查詢 `name` 與 `normalized_name`。
 - `minPrice` 與 `maxPrice` 只針對目前價格過濾。
 - 價格金額、幣別與 `capturedAt` 從 `current_prices.price_snapshot_id -> price_snapshots` 取得。
@@ -189,6 +196,10 @@
 - 第一版 `source.url` 指向原價屋分類頁，不保證能直接定位到單一商品。
 - 若 query 指定 `igrp`，`meta.sourceStatus` 優先回傳該分類狀態；未指定分類時回傳全域狀態。
 - API 不回傳 computed `source_item_key` 與 `iBuyToken`，避免把內部識別細節暴露給網站畫面。
+- `image.url` 只回傳經 crawler 驗證與正規化後的 CoolPC 預期來源圖片 URL，不回傳 raw HTML 內未驗證 URL。
+- `image.alt` 可由商品名稱產生，不需要額外爬取文字。
+- `image.capturedAt` 表示主要圖片最後一次由來源資料確認的時間；若實作階段決定不公開此時間，需同步調整 API contract 與 UI 文件。
+- 若內部需要追蹤圖片來源或驗證細節，應保存在 crawler / DB 內部欄位，不作為公開 API 的 raw crawler 細節回傳。
 
 ## GET /api/products/{id}
 
@@ -213,6 +224,11 @@
     "displayName": "CPU",
     "sourceName": "處理器 CPU"
   },
+  "image": {
+    "url": "https://www.coolpc.com.tw/path/to/product-image.jpg",
+    "alt": "Intel Core Ultra 5 225F",
+    "capturedAt": "2026-05-25T12:00:00.000Z"
+  },
   "price": {
     "amount": 4880,
     "currency": "TWD",
@@ -235,16 +251,19 @@
 
 規則：
 
-- 商品存在但 `isActive = false` 時仍回傳 `200`，並由 `status.isActive` 告知網站顯示下架或暫時消失狀態。
+- 商品存在但 `isActive = false` 時仍回傳 `200`，並由 `status.isActive` 告知網站顯示商品可能暫時未出現在來源頁或已下架；此欄位不描述商品是否可購買。
 - 商品不存在時回傳 `404`。
 - 第一版 `source.url` 指向原價屋分類頁，不保證能直接定位到單一商品。
 - 第一版不回傳價格歷史清單。
 - 第一版不回傳拆解後的商品規格欄位，只回傳原始商品名稱。
 - 第一版不回傳 raw snapshot 或 parse error 細節。
+- 第一版需回傳主要商品圖片；缺圖屬於資料完整性問題或來源驗證風險，不應靜默退回無圖片詳細頁。
 
 ## GET /api/source-status
 
 提供網站判斷來源檢查狀態與最後有效資料是否可用。此 endpoint 只回傳可安全顯示給使用者的來源狀態，不回傳 crawler 內部錯誤內容。
+
+來源狀態只描述 CoolPC crawler、parser 與 source data sync 是否正常，不代表單一商品是否可購買。API consumer 與 UI 不應把 `ok`、`stale` 或 `unavailable` 顯示成商品供應承諾。
 
 資料來源：
 
@@ -274,9 +293,9 @@
 
 `status` 第一版概念：
 
-- `ok`：最近有成功檢查並處理有效資料；來源內容即使沒有變動，仍視為成功檢查。
-- `stale`：一段時間內沒有成功檢查到有效來源資料，但仍可顯示最後一次有效價格。
-- `unavailable`：尚未有任何可用資料。
+- `ok`：最近一次來源擷取、內容驗證與解析成功；來源內容即使沒有變動，仍視為成功檢查。
+- `stale`：目前使用最後一次有效資料，但來源更新可能延遲或最近擷取 / 解析失敗。
+- `unavailable`：目前沒有可用來源資料。
 
 分類狀態規則：
 
@@ -308,4 +327,5 @@
 - `pageSize` 需有上限。
 - 字串搜尋需限制最大長度。
 - 不把原始 HTML、crawler 錯誤堆疊或內部 token 回傳給前端。
+- 不回傳未驗證圖片 URL；圖片 URL 需符合來源 allowlist。
 - 不提供能觸發 crawler 或改變資料的公開 endpoint。
