@@ -198,6 +198,7 @@
 後續待辦：
 
 - API rate limiting / abuse protection：待 API route 實作完成後，於 middleware、反向代理或部署層評估加入，避免大量查詢與濫用。本項不屬於目前 Phase 4 API helper 基礎切片的必須完成項目。
+- DB query pressure / performance review：待 API route 與第一版 Web UI 查詢流程跑通，且有接近真實的資料量與查詢模式後，再檢查慢查詢、index、query plan、cache 或其他查詢壓力改善。本項不作為目前 Phase 4 繼續實作的阻擋條件。
 
 ## Phase 5：Web UI 第一版
 

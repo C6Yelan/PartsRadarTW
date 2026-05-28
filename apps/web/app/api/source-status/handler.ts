@@ -3,9 +3,9 @@ import { internalErrorResponse, jsonOk } from "../_shared/responses";
 const COOLPC_SOURCE_NAME = "coolpc";
 const SOURCE_STALE_THRESHOLD_MS = 30 * 60 * 1000;
 
-type SourceStatus = "ok" | "stale" | "unavailable";
+export type SourceStatus = "ok" | "stale" | "unavailable";
 
-interface SourceStatusCategoryRecord {
+export interface SourceStatusCategoryRecord {
   igrp: number;
   displayName: string;
   sourceName: string;
@@ -81,7 +81,7 @@ interface SourceStatusCategoryResponseItem {
   lastSuccessAt: string | null;
 }
 
-interface SourceStatusResponseBody {
+export interface SourceStatusResponseBody {
   source: typeof COOLPC_SOURCE_NAME;
   status: SourceStatus;
   lastCheckedAt: string | null;
@@ -109,7 +109,7 @@ export function createGetSourceStatusHandler(
   };
 }
 
-function buildSourceStatusResponse(
+export function buildSourceStatusResponse(
   categories: SourceStatusCategoryRecord[],
   now: Date,
 ): SourceStatusResponseBody {
