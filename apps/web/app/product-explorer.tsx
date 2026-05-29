@@ -86,7 +86,7 @@ const DEFAULT_QUERY: QueryState = {
   status: "active",
   sort: "price_asc",
   page: 1,
-  pageSize: 24,
+  pageSize: 20,
 };
 
 const SORT_OPTIONS: Array<{ value: ProductSort; label: string }> = [
@@ -102,7 +102,7 @@ const STATUS_OPTIONS: Array<{ value: ProductStatus; label: string }> = [
   { value: "inactive", label: "可能已下架" },
 ];
 
-const PAGE_SIZE_OPTIONS = [12, 24, 48, 96] as const;
+const PAGE_SIZE_OPTIONS = [10, 15, 20] as const;
 const SKELETON_ROWS = ["row-1", "row-2", "row-3", "row-4", "row-5", "row-6"];
 
 export default function ProductExplorer() {

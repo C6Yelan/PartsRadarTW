@@ -177,7 +177,7 @@ Phase 5 entry gate 的圖片 fallback 規則：
 規則：
 
 - 預設 `page=1`。
-- 預設 `pageSize=24`。
+- 預設 `pageSize=20`。
 - 使用者可前往上一頁、下一頁與指定頁碼。
 - 篩選條件改變時頁碼回到第 1 頁。
 - 第一版不做 infinite scroll。
