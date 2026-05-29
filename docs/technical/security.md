@@ -54,6 +54,7 @@ API 第一版需遵守：
 - 查詢參數做型別、範圍與長度驗證。
 - `pageSize` 設定上限。
 - 不回傳 raw HTML、raw snapshot、parse error、crawler error stack、computed `source_item_key`、`iBuyToken` 或 DB 連線資訊。
+- `parse_errors.raw_image_url` 屬於內部 validation/debug 資料，不加入商品列表、商品詳細頁或任何公開 API response。
 - 錯誤 response 使用泛用訊息，不把內部錯誤細節回傳給前端。
 - 不提供公開 crawler trigger API。
 - 不提供會修改資料的公開 API。
@@ -92,7 +93,8 @@ API 第一版需遵守：
 
 - 只允許預期 CoolPC 來源網域或預期圖片路徑的圖片 URL。
 - 圖片 URL 需限制 protocol、host 與 path pattern；不接受 `javascript:`、`data:` 或其他非預期 scheme。
-- 若使用 Next.js Image 或任何 image optimizer，必須設定明確 remote allowlist。
+- Phase 05 UI 若使用一般 `<img>` 顯示外部圖片，需設定 `referrerPolicy`，避免把站內頁面路徑透過 Referer 傳給圖片來源站。
+- 若使用 Next.js Image 或任何 image optimizer，必須設定明確 remote allowlist，只允許 `www.coolpc.com.tw` 與預期圖片路徑。
 - 圖片 alt text 可由商品名稱產生，不需要爬取額外文字。
 - API 不回傳 raw HTML、未驗證 URL、crawler 內部錯誤或 stack trace。
 - 若後端未來會抓取、代理或快取圖片，需補 SSRF 防護：限制 protocol、host、port、redirect、private IP range 與 DNS rebinding 風險。
@@ -116,7 +118,7 @@ API 第一版需遵守：
 - PostgreSQL 不開放公網。
 - crawler 不對外開 port。
 - snapshot storage 不提供公開路徑。
-- production logs、raw snapshot、parse error 僅限伺服器內部或管理者維運使用。
+- production logs、raw snapshot、parse error 與 `raw_image_url` 僅限伺服器內部或管理者維運使用。
 - 未來若加入管理功能，必須先設計 authentication、authorization、session 管理與 audit log。
 
 ## SSRF And Outbound Requests

@@ -270,6 +270,7 @@
 
 - 商品查詢頁可正常搜尋與篩選。
 - 商品列表與商品詳細頁可顯示主要商品圖片；缺圖只能顯示容錯 fallback 並保留資料完整性問題，不可視為正常完成狀態。
+- 外部商品圖片顯示需符合 security 文件：一般 `<img>` 需設定 `referrerPolicy`；Next.js Image 或 image optimizer 需設定 CoolPC remote allowlist。
 - 商品詳細頁可顯示價格、來源與資料狀態。
 - 查無商品、商品不存在、API 錯誤都有對應畫面。
 - `stale` 不會被誤顯示為查無商品。

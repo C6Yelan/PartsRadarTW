@@ -113,6 +113,7 @@ HTTP status 不足以判斷成功，需測試內容驗證。
 - raw snapshot metadata 或檔案清理不會刪除 price snapshots。
 - 沒有 `iBuyToken` 的商品不寫入 products，但保留解析紀錄。
 - raw snapshot 與 parse error 透過 `source_category_id` 取得 `IGrp` 與原價屋分類名稱，不重複保存 `source` 或 `igrp`。
+- `invalid_image_url` parse error 需保存內部用 `raw_image_url`；非圖片錯誤維持 `raw_image_url = null`。
 - 商品從來源消失時不刪除 product。
 - 商品從來源消失時不刪除 price snapshots。
 - 商品重新出現且 `source_category_id + ibuy_token` 相同時延續原商品歷史。
@@ -134,11 +135,13 @@ API 測試可先以 route handler 內的查詢邏輯或資料存取函式為單�
 - `GET /api/products` 可依 `q` 查詢商品。
 - `GET /api/products` 可依 `igrp` 篩選分類。
 - `GET /api/products` 可依 `minPrice`、`maxPrice` 篩選目前價格。
+- `GET /api/products` 回傳主要商品圖片 URL、alt text 與圖片確認時間。
 - `GET /api/products` 若讀 `product_list_view`，價格、幣別與 captured time 仍以 price snapshot 為真相來源。
 - `GET /api/products` 支援 `price_asc`、`price_desc`、`name_asc`、`updated_desc`。
 - `GET /api/products` 支援分頁並限制 `pageSize` 上限。
 - 不合法 query 回傳 `400` 與泛用 `invalid_query`。
 - 商品不存在時 `GET /api/products/{id}` 回傳 `404`。
+- 商品詳情回傳主要商品圖片 URL、alt text 與圖片確認時間。
 - inactive 商品詳情仍可回傳 `200` 並標示 inactive。
 - `GET /api/source-status` 能區分 `ok`、`stale`、`unavailable`。
 - `GET /api/source-status` 能依 enabled 分類聚合全域狀態。

@@ -198,7 +198,7 @@ product_list_view
 
 若未來需要多張圖片、圖片快取、server-side image proxy、圖片驗證歷史或不同來源圖片變更紀錄，應另行建立 `product_images` 或 `product_assets` 類型資料表。該擴充不應把圖片真相來源塞進 `product_list_view`；projection 只能讀取核心圖片資料，不應成為圖片資料的真相來源。
 
-目前 repo 的 Prisma schema 尚未實作上述欄位。本文件先定義第一版資料需求；實作時需另行建立 migration 與測試。
+目前 repo 已以 `products.primary_image_url` 與 `products.primary_image_checked_at` 實作第一版主圖資料欄位，並透過 migration 更新 `product_list_view` 投影。欄位在 DB 層保留 nullable，以便既有本機資料可 migration；crawler parser 與 product writer 仍需把有效主圖視為正式匯入資料的必要條件。
 
 ## price_snapshots
 
@@ -414,18 +414,22 @@ product_list_view
 - `raw_name`。
 - `raw_price_text`。
 - `raw_token`。
+- `raw_image_url`，僅在 `invalid_image_url` 類錯誤保存來源 HTML 中擷取到的原始圖片 URL。
 - `created_at`。
 
 規則：
 
 - `igrp` 不重複保存，透過 `source_category_id -> source_categories` 取得。
 - `raw_snapshot_id` 可為空，但分類資訊必須由 `source_category_id` 保存。
+- `raw_image_url` 只供內部 parser debug、來源資料驗證與人工檢查使用，不是商品圖片資料的正式來源，也不可暴露到公開 API 或 Web UI。
+- 非圖片 URL 錯誤不需要填入 `raw_image_url`，維持 `null`。
 
 使用情境：
 
 - 缺少 `iBuyToken`。
 - 缺少商品名稱。
 - 價格無法解析。
+- 商品圖片 URL 缺失、格式不合法或不符合 CoolPC 圖片 allowlist。
 - 來源商品識別衝突，例如同一分類同一 snapshot 內相同 `iBuyToken` / computed `source_item_key` 對應不同商品名稱或價格。相同商品名稱與價格的完全重複列可由 parser 去重，不需寫入 `parse_errors`。
 - response content validation 失敗。
 

@@ -147,7 +147,7 @@ CoolPC source HTML
   -> Web UI 顯示縮圖與詳細頁圖片
 ```
 
-圖片 URL 必須來自 crawler 對原價屋公開 HTML 的解析結果，不接受使用者任意輸入 URL。parser 需處理相對路徑、絕對路徑、HTML entity、空值與不合法 URL，並只接受預期 CoolPC 來源網域或預期圖片路徑。缺少圖片、圖片 URL 不合法或來源網域不符合預期時，應記錄為資料完整性問題或 validation issue；嚴重程度需在 Phase 05 前置驗證中依實際 CoolPC HTML 穩定度確認。缺圖 fallback 僅是 UI 容錯，不代表資料契約可以沒有圖片。
+圖片 URL 必須來自 crawler 對原價屋公開 HTML 的解析結果，不接受使用者任意輸入 URL。parser 需處理相對路徑、絕對路徑、HTML entity、空值與不合法 URL，並只接受可正規化為 `https://www.coolpc.com.tw/eval/{IGrp}/{filename}.{jpg|jpeg|png|gif|webp}` 的圖片 URL。缺少圖片、圖片 URL 不合法或來源網域不符合預期時，應記錄為 `invalid_image_url` validation issue，該候選商品不進入正式商品資料；寫入 `parse_errors` 時可在 `raw_image_url` 保存原始圖片 URL 供內部 debug 與驗證，不暴露到公開 API/UI。缺圖 fallback 僅是 UI 容錯，不代表資料契約可以沒有圖片。
 
 第一版不解析品牌、腳位、容量、瓦數等結構化規格欄位。若 parser 只能取得原始商品名稱，UI 不應假裝有結構化規格；規格整理需等資料品質觀察後另開 phase 或決策。
 

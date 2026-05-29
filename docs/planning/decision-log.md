@@ -13,6 +13,7 @@
 | Discord bot 延後 | Discord bot 屬於後續通知入口，需等資料流穩定後再評估。 |
 | 第一版需要保留原始來源脈絡 | 商品資料應顯示原價屋資料來源、更新時間，並能讓使用者回到原始頁面確認最新資訊。 |
 | 第一版商品圖片是必要資料 | 商品列表與商品詳細頁都需要主要商品圖片；圖片 URL 需由 crawler 從原價屋公開頁面解析、驗證與正規化後寫入資料庫，再由 API 回傳給 Web UI。缺圖只能作為容錯或資料完整性風險，不是第一版 happy path。 |
+| CoolPC 商品圖片 selector 與 allowlist | 2026-05-28 以 saved raw HTML 與 manual live validation 驗證，第一版目標分類的商品列附近可由 `<img src="/eval/{IGrp}/{filename}">` 取得主要圖片。實作只接受可正規化為 `https://www.coolpc.com.tw/eval/{IGrp}/{filename}.{jpg|jpeg|png|gif|webp}` 的 URL；`/eval/{IGrp}/`、缺副檔名或外部網域需記錄為 `invalid_image_url` 類 validation issue，不進入正式商品資料。`parse_errors.raw_image_url` 只保留原始圖片 URL 供內部 debug 與 validation，不暴露到公開 API/UI。 |
 | 第一版先處理組電腦必要硬體 | 第一版優先處理組一台電腦會用到的主要硬體，後續再逐步補齊原價屋其他類別與產品。 |
 | 商品分類第一版先保留原價屋分類脈絡 | 先保存原價屋分類名稱與 `IGrp`，同時提供 PartsRadarTW 顯示名稱；若後續發現不利搜尋或篩選，再補一層更完整的分類規則。 |
 | 第一版 crawler 以 `eachview.php?IGrp={分類編號}` 為抓取入口 | 舊專案已使用分類總覽頁抓資料，且初步觀察顯示該頁面較適合按分類解析商品；第一版不使用 `evaluate.php` 抓商品資料。 |
@@ -49,4 +50,4 @@
 
 | 問題 | 影響範圍 |
 | --- | --- |
-| CoolPC 主要商品圖片 URL 的穩定 selector 與 allowlist | 影響 Phase 4.5 crawler parser、資料模型、API response 與 Phase 05 UI 驗收。若來源頁無法穩定取得圖片，需回到產品決策確認處理方式；不可靜默退回無圖片版本。 |
+| 暫無 | 目前 Phase 4.5 商品圖片 selector 與 allowlist 已有可實作決策；若後續 live source 結構改變，再重新開決策。 |

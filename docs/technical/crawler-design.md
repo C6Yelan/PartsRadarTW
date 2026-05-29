@@ -160,9 +160,10 @@ Parsed item 至少包含：
 
 - parser 需處理相對路徑、絕對路徑、HTML entity、空值與不合法 URL。
 - 圖片 URL 需正規化為可安全顯示的絕對 URL。
-- 只允許 CoolPC 預期來源網域或預期圖片路徑，不接受任意外部圖片 URL。
+- 只允許可正規化為 `https://www.coolpc.com.tw/eval/{IGrp}/{filename}.{jpg|jpeg|png|gif|webp}` 的圖片 URL，不接受任意外部圖片 URL。
 - 不保留 `PHPSESSID` 或其他 session token。
-- 缺少圖片、圖片 URL 格式不合法或來源網域不符合預期時，需記錄為 parse warning、validation issue 或對應的 parse error；實際嚴重程度需依 Phase 05 前置驗證結果決定。
+- 缺少圖片、圖片 URL 格式不合法或來源網域不符合預期時，需記錄為 `invalid_image_url` validation issue，該候選商品不進入正式商品資料。
+- `invalid_image_url` 寫入 `parse_errors` 時可保留 `raw_image_url`，用於內部 debug、來源驗證與 parser 修正；此欄位不進入公開 API/UI。
 - 缺圖不可被視為第一版完成狀態的正常 happy path。
 - 第一版不下載、壓縮、轉檔、代理或快取圖片，只保存可顯示且可驗證的主要圖片 URL。
 

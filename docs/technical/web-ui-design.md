@@ -138,6 +138,8 @@ URL query 範例：
 
 主資訊順序應以商品圖片、商品名稱、分類、目前價格、最後更新或最後看到時間、來源狀態、來源連結為主。圖片縮圖需固定尺寸與比例，避免 table row 因載入狀態或缺圖而跳動。broken image、loading 或 temporary fallback 只是容錯設計，不代表第一版資料契約可以沒有商品圖片。
 
+商品圖片顯示需符合 security 文件限制：若使用一般 `<img>` 直接顯示已驗證的 CoolPC 圖片 URL，需設定 `referrerPolicy`；若使用 Next.js Image 或 image optimizer，需設定 remote allowlist，只允許 `www.coolpc.com.tw` 與預期圖片路徑。
+
 行為：
 
 - 點商品名稱進入商品詳細頁。
