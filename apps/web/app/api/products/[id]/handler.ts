@@ -11,6 +11,8 @@ const PRODUCT_DETAIL_SELECT = {
   // ibuyToken, raw snapshots, or other crawler/internal identifiers here.
   id: true,
   name: true,
+  primaryImageUrl: true,
+  primaryImageCheckedAt: true,
   isActive: true,
   missingSince: true,
   firstSeenAt: true,
@@ -58,6 +60,11 @@ interface ProductDetailResponseBody {
     displayName: string;
     sourceName: string;
   };
+  image: {
+    url: string;
+    alt: string;
+    capturedAt: string;
+  };
   price: {
     amount: number;
     currency: "TWD";
@@ -94,6 +101,12 @@ export function createGetProductHandler(
           sourceCategory: {
             enabled: true,
           },
+          primaryImageUrl: {
+            not: null,
+          },
+          primaryImageCheckedAt: {
+            not: null,
+          },
           currentPrice: {
             isNot: null,
           },
@@ -122,6 +135,9 @@ function toProductDetailResponse(product: ProductDetailRecord): ProductDetailRes
   if (!product.currentPrice) {
     throw new Error("Product detail query returned a product without current price.");
   }
+  if (!product.primaryImageUrl || !product.primaryImageCheckedAt) {
+    throw new Error("Product detail query returned a product without primary image data.");
+  }
 
   return {
     id: product.id,
@@ -131,6 +147,11 @@ function toProductDetailResponse(product: ProductDetailRecord): ProductDetailRes
       igrp: product.sourceCategory.igrp,
       displayName: product.sourceCategory.displayName,
       sourceName: product.sourceCategory.sourceName,
+    },
+    image: {
+      url: product.primaryImageUrl,
+      alt: product.name,
+      capturedAt: product.primaryImageCheckedAt.toISOString(),
     },
     price: {
       amount: product.currentPrice.priceSnapshot.price,

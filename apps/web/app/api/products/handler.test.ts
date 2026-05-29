@@ -35,6 +35,12 @@ describe("GET /api/products handler", () => {
           enabled: true,
           igrp: 12,
         },
+        primaryImageUrl: {
+          not: null,
+        },
+        primaryImageCheckedAt: {
+          not: null,
+        },
         currentPrice: {
           is: {
             priceSnapshot: {
@@ -78,6 +84,11 @@ describe("GET /api/products handler", () => {
             igrp: 12,
             displayName: "顯示卡",
             sourceName: "顯示卡 VGA",
+          },
+          image: {
+            url: "https://www.coolpc.com.tw/eval/12/gpu-rtx-4070.jpg",
+            alt: "GPU RTX 4070",
+            capturedAt: "2026-05-28T11:55:00.000Z",
           },
           price: {
             amount: 6990,
@@ -128,6 +139,12 @@ describe("GET /api/products handler", () => {
         isActive: true,
         sourceCategory: {
           enabled: true,
+        },
+        primaryImageUrl: {
+          not: null,
+        },
+        primaryImageCheckedAt: {
+          not: null,
         },
       },
       orderBy: [{ currentPrice: { priceSnapshot: { price: "asc" } } }, { id: "asc" }],
@@ -284,6 +301,8 @@ function product(overrides: Partial<ProductRecord> = {}): ProductRecord {
   return {
     id: "product-1",
     name: "GPU RTX 4070",
+    primaryImageUrl: "https://www.coolpc.com.tw/eval/12/gpu-rtx-4070.jpg",
+    primaryImageCheckedAt: new Date("2026-05-28T11:55:00.000Z"),
     isActive: true,
     missingSince: null,
     currentPrice: {

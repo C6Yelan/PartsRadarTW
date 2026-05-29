@@ -30,6 +30,8 @@ const PRODUCT_SELECT = {
   // ibuyToken, raw snapshots, or other crawler/internal identifiers here.
   id: true,
   name: true,
+  primaryImageUrl: true,
+  primaryImageCheckedAt: true,
   isActive: true,
   missingSince: true,
   currentPrice: {
@@ -85,6 +87,11 @@ interface ProductListResponseItem {
     igrp: number;
     displayName: string;
     sourceName: string;
+  };
+  image: {
+    url: string;
+    alt: string;
+    capturedAt: string;
   };
   price: {
     amount: number;
@@ -192,6 +199,12 @@ function buildProductWhere(query: ProductListQuery): Prisma.ProductWhereInput {
       enabled: true,
       ...(query.igrp !== undefined ? { igrp: query.igrp } : {}),
     },
+    primaryImageUrl: {
+      not: null,
+    },
+    primaryImageCheckedAt: {
+      not: null,
+    },
     currentPrice: {
       is: {
         priceSnapshot: {
@@ -256,6 +269,9 @@ function toProductResponseItem(product: ProductRecord): ProductListResponseItem 
   if (!product.currentPrice) {
     throw new Error("Product list query returned a product without current price.");
   }
+  if (!product.primaryImageUrl || !product.primaryImageCheckedAt) {
+    throw new Error("Product list query returned a product without primary image data.");
+  }
 
   return {
     id: product.id,
@@ -265,6 +281,11 @@ function toProductResponseItem(product: ProductRecord): ProductListResponseItem 
       igrp: product.sourceCategory.igrp,
       displayName: product.sourceCategory.displayName,
       sourceName: product.sourceCategory.sourceName,
+    },
+    image: {
+      url: product.primaryImageUrl,
+      alt: product.name,
+      capturedAt: product.primaryImageCheckedAt.toISOString(),
     },
     price: {
       amount: product.currentPrice.priceSnapshot.price,
