@@ -91,7 +91,9 @@ describe("CoolPC parser helpers", () => {
     expect(normalizeCoolpcProductImageUrl("/eval/4/amd7500f.jpg", -1)).toBeNull();
     expect(normalizeCoolpcProductImageUrl("/eval/4/amd7500f.jpg", 4.5)).toBeNull();
     expect(normalizeCoolpcProductImageUrl("/eval/4/amd7500f.jpg", Number.NaN)).toBeNull();
-    expect(normalizeCoolpcProductImageUrl("/eval/4/amd7500f.jpg", Number.POSITIVE_INFINITY)).toBeNull();
+    expect(
+      normalizeCoolpcProductImageUrl("/eval/4/amd7500f.jpg", Number.POSITIVE_INFINITY),
+    ).toBeNull();
     expect(normalizeCoolpcProductImageUrl("/eval/4/amd7500f.jpg", 4)).toBe(
       "https://www.coolpc.com.tw/eval/4/amd7500f.jpg",
     );
@@ -176,7 +178,7 @@ describe("CoolPC category parser", () => {
     }
   });
 
-  it("skips explicit non-product notice rows without dropping real accessory products", () => {
+  it("skips explicit non-product rows without dropping standalone accessory products", () => {
     const result = parseCoolpcCategoryPage(
       fixture("coolpc-live-igrp-10-notice.html"),
       contextForCategory(10),
@@ -186,7 +188,6 @@ describe("CoolPC category parser", () => {
     expect(result.canImport).toBe(true);
     expect(result.issues).toEqual([]);
     expect(result.items.map((item) => item.name)).toEqual([
-      "[加購價] 麗臺 mini-DP轉DVI-D轉接線",
       "酷碼 HTK-002 美國道康膏/導熱係數 0.8W/m-K",
     ]);
   });
