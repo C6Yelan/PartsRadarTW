@@ -305,6 +305,18 @@ export default function ProductExplorer() {
     });
   }
 
+  function updateSearchDraft(value: string) {
+    setDraft({ ...draft, q: value });
+
+    if (value === "" && query.q !== "") {
+      commitQuery({
+        ...query,
+        q: DEFAULT_QUERY.q,
+        page: 1,
+      });
+    }
+  }
+
   function resetFilters() {
     commitQuery({
       ...query,
@@ -371,7 +383,7 @@ export default function ProductExplorer() {
             placeholder="搜尋商品名稱、型號..."
             type="search"
             value={draft.q}
-            onChange={(event) => setDraft({ ...draft, q: event.target.value })}
+            onChange={(event) => updateSearchDraft(event.target.value)}
           />
           <button className="control-button primary" type="submit">
             搜尋
@@ -496,8 +508,7 @@ export default function ProductExplorer() {
           <section className="results-panel" aria-label="商品列表">
             <div className="results-toolbar">
               <div>
-                <p className="eyebrow">搜尋結果</p>
-                <h1>{formatInteger(totalItems)} 筆商品</h1>
+                <h1>搜尋結果</h1>
               </div>
               <div className="toolbar-controls">
                 <label>
