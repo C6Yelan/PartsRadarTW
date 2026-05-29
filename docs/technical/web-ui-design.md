@@ -117,7 +117,6 @@ URL query 範例：
 - 價格低到高：`price_asc`。
 - 價格高到低：`price_desc`。
 - 名稱 A 到 Z：`name_asc`。
-- 來源最後出現時間新到舊：`updated_desc`。
 
 預設排序：
 

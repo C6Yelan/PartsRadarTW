@@ -28,9 +28,7 @@ describe("API query helpers", () => {
     expect(parseOptionalIntegerQuery(params, "igrp", { min: 1 })).toBe(4);
     expect(parseOptionalIntegerQuery(params, "minPrice", { min: 0 })).toBe(0);
     expect(parseOptionalIntegerQuery(new URLSearchParams(), "page", { defaultValue: 1 })).toBe(1);
-    expect(parseOptionalIntegerQuery(params, "maxPrice", { min: 0, max: 1_000_000 })).toBe(
-      999999,
-    );
+    expect(parseOptionalIntegerQuery(params, "maxPrice", { min: 0, max: 1_000_000 })).toBe(999999);
   });
 
   it("rejects invalid integer values", () => {
@@ -74,10 +72,10 @@ describe("API query helpers", () => {
   });
 
   it("parses allowlisted enum values", () => {
-    const sorts = ["price_asc", "price_desc", "name_asc", "updated_desc"] as const;
+    const sorts = ["price_asc", "price_desc", "name_asc"] as const;
 
-    expect(parseEnumQuery(new URLSearchParams("sort=updated_desc"), "sort", sorts, "price_asc")).toBe(
-      "updated_desc",
+    expect(parseEnumQuery(new URLSearchParams("sort=price_desc"), "sort", sorts, "price_asc")).toBe(
+      "price_desc",
     );
     expect(parseEnumQuery(new URLSearchParams(), "sort", sorts, "price_asc")).toBe("price_asc");
     expect(() =>

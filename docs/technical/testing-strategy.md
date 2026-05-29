@@ -137,7 +137,7 @@ API 測試可先以 route handler 內的查詢邏輯或資料存取函式為單�
 - `GET /api/products` 可依 `minPrice`、`maxPrice` 篩選目前價格。
 - `GET /api/products` 回傳主要商品圖片 URL、alt text 與圖片確認時間。
 - `GET /api/products` 若讀 `product_list_view`，價格、幣別與 captured time 仍以 price snapshot 為真相來源。
-- `GET /api/products` 支援 `price_asc`、`price_desc`、`name_asc`、`updated_desc`。
+- `GET /api/products` 支援 `price_asc`、`price_desc`、`name_asc`。
 - `GET /api/products` 支援分頁並限制 `pageSize` 上限。
 - 不合法 query 回傳 `400` 與泛用 `invalid_query`。
 - 商品不存在時 `GET /api/products/{id}` 回傳 `404`。

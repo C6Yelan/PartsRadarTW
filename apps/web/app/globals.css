@@ -569,8 +569,8 @@ input::placeholder {
 .skeleton-row {
   display: grid;
   grid-template-columns:
-    58px minmax(180px, 2.1fr) minmax(72px, 0.55fr) minmax(118px, 0.72fr)
-    minmax(128px, 0.86fr) minmax(104px, 0.68fr) minmax(62px, 0.5fr);
+    58px minmax(240px, 2.8fr) minmax(78px, 0.58fr) minmax(118px, 0.74fr)
+    minmax(104px, 0.68fr);
   gap: 14px;
   align-items: center;
 }
@@ -675,8 +675,7 @@ input::placeholder {
   color: var(--text);
 }
 
-.table-cell span:not(.cell-label),
-.source-link {
+.table-cell span:not(.cell-label) {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -691,11 +690,6 @@ input::placeholder {
   font-size: 18px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-}
-
-.row-updated {
-  color: var(--muted);
-  font-size: 14px;
 }
 
 .row-state,
@@ -730,15 +724,6 @@ input::placeholder {
 
 .status-badge.unavailable {
   color: var(--danger);
-}
-
-.source-link {
-  color: var(--text);
-  font-size: 14px;
-}
-
-.source-link:hover {
-  color: var(--accent-strong);
 }
 
 .empty-state {
@@ -1075,9 +1060,7 @@ input::placeholder {
       "image product"
       "image price"
       "image category"
-      "image updated"
-      "image status"
-      "image source";
+      "image status";
     gap: 8px 12px;
     align-items: start;
     min-height: 0;
@@ -1091,8 +1074,7 @@ input::placeholder {
 
   .product-main a,
   .product-main span,
-  .table-cell span:not(.cell-label),
-  .source-link {
+  .table-cell span:not(.cell-label) {
     white-space: normal;
   }
 
@@ -1115,16 +1097,8 @@ input::placeholder {
     grid-area: price;
   }
 
-  .row-updated {
-    grid-area: updated;
-  }
-
   .row-status {
     grid-area: status;
-  }
-
-  .source-link {
-    grid-area: source;
   }
 
   .table-cell {

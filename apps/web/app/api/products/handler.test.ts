@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import { API_ERROR_MESSAGES } from "../_shared/responses";
-import { SOURCE_STATUS_CATEGORY_QUERY, type SourceStatusCategoryRecord } from "../source-status/handler";
+import {
+  SOURCE_STATUS_CATEGORY_QUERY,
+  type SourceStatusCategoryRecord,
+} from "../source-status/handler";
 import { createGetProductsHandler, type ProductsReadClient } from "./handler";
 
 const NOW = new Date("2026-05-28T12:00:00.000Z");
@@ -22,7 +25,7 @@ describe("GET /api/products handler", () => {
       ],
     });
     const request = new Request(
-      "https://parts.example/api/products?q=RTX&igrp=12&minPrice=4000&maxPrice=9000&status=all&sort=updated_desc&page=2&pageSize=1",
+      "https://parts.example/api/products?q=RTX&igrp=12&minPrice=4000&maxPrice=9000&status=all&sort=name_asc&page=2&pageSize=1",
     );
 
     const response = await createGetProductsHandler(client, { now: () => NOW })(request);
@@ -66,7 +69,7 @@ describe("GET /api/products handler", () => {
           },
         ],
       },
-      orderBy: [{ lastSeenAt: "desc" }, { id: "asc" }],
+      orderBy: [{ normalizedName: "asc" }, { id: "asc" }],
       skip: 1,
       take: 1,
     });
@@ -173,7 +176,7 @@ describe("GET /api/products handler", () => {
     });
 
     const response = await createGetProductsHandler(client)(
-      new Request("https://parts.example/api/products?sort=created_at&pageSize=101"),
+      new Request("https://parts.example/api/products?sort=updated_desc"),
     );
 
     expect(response.status).toBe(400);

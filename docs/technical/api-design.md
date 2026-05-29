@@ -128,7 +128,6 @@
 - `price_asc`：價格低到高。
 - `price_desc`：價格高到低。
 - `name_asc`：商品名稱 A 到 Z。
-- `updated_desc`：來源最後出現時間新到舊。
 
 `pageSize` 第一版上限為 `100`，避免單次查詢回傳過多資料。
 

@@ -19,7 +19,7 @@ import {
 const COOLPC_SOURCE_NAME = "coolpc";
 const COOLPC_CATEGORY_BASE_URL = "https://www.coolpc.com.tw/eachview.php";
 const PRODUCT_SEARCH_MAX_LENGTH = 100;
-const PRODUCT_SORT_VALUES = ["price_asc", "price_desc", "name_asc", "updated_desc"] as const;
+const PRODUCT_SORT_VALUES = ["price_asc", "price_desc", "name_asc"] as const;
 const PRODUCT_STATUS_VALUES = ["active", "inactive", "all"] as const;
 
 type ProductSort = (typeof PRODUCT_SORT_VALUES)[number];
@@ -247,8 +247,6 @@ function buildProductOrderBy(sort: ProductSort): Prisma.ProductOrderByWithRelati
       return [{ currentPrice: { priceSnapshot: { price: "desc" } } }, { id: "asc" }];
     case "name_asc":
       return [{ normalizedName: "asc" }, { id: "asc" }];
-    case "updated_desc":
-      return [{ lastSeenAt: "desc" }, { id: "asc" }];
     case "price_asc":
       return [{ currentPrice: { priceSnapshot: { price: "asc" } } }, { id: "asc" }];
   }

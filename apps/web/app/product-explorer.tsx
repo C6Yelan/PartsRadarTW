@@ -5,7 +5,7 @@ import { type SubmitEvent, useCallback, useEffect, useMemo, useState } from "rea
 
 type SourceStatus = "ok" | "stale" | "unavailable";
 type ProductStatus = "active" | "inactive" | "all";
-type ProductSort = "price_asc" | "price_desc" | "name_asc" | "updated_desc";
+type ProductSort = "price_asc" | "price_desc" | "name_asc";
 type LoadState = "idle" | "loading" | "ready" | "error";
 
 interface CategoryItem {
@@ -93,7 +93,6 @@ const SORT_OPTIONS: Array<{ value: ProductSort; label: string }> = [
   { value: "price_asc", label: "價格低到高" },
   { value: "price_desc", label: "價格高到低" },
   { value: "name_asc", label: "名稱 A 到 Z" },
-  { value: "updated_desc", label: "最近更新" },
 ];
 
 const STATUS_OPTIONS: Array<{ value: ProductStatus; label: string }> = [
@@ -338,7 +337,7 @@ export default function ProductExplorer() {
         </form>
 
         <div className="topbar-meta" aria-label="來源狀態" role="status">
-          <span>最後同步：{formatDateTime(products?.meta.lastSuccessAt, "尚無資料")}</span>
+          <span>資料最近成功更新：{formatDateTime(products?.meta.lastSuccessAt, "尚無資料")}</span>
           <StatusBadge status={sourceStatus} />
         </div>
       </header>
@@ -498,9 +497,7 @@ export default function ProductExplorer() {
                 <span>商品</span>
                 <span>分類</span>
                 <span>目前價格</span>
-                <span>價格最後確認</span>
                 <span>上架狀態</span>
-                <span>來源</span>
               </div>
 
               {productState === "loading" || productState === "idle" ? <SkeletonRows /> : null}
@@ -618,19 +615,12 @@ function ProductRow({ product }: { product: ProductListItem }) {
         <span className="cell-label">目前價格</span>
         <strong>{formatPrice(product.price.amount)}</strong>
       </div>
-      <div className="table-cell row-updated">
-        <span className="cell-label">價格最後確認</span>
-        <span>{formatDateTime(product.price.lastSeenAt, "尚無時間")}</span>
-      </div>
       <div className="table-cell row-status">
         <span className="cell-label">上架狀態</span>
         <span className={product.status.isActive ? "row-state ok" : "row-state warning"}>
           {product.status.isActive ? "目前上架" : "可能已下架"}
         </span>
       </div>
-      <a className="source-link" href={product.source.url} rel="noreferrer" target="_blank">
-        原價屋
-      </a>
     </article>
   );
 }
@@ -704,8 +694,6 @@ function SkeletonRows() {
           <span className="skeleton-box wide" />
           <span className="skeleton-box short" />
           <span className="skeleton-box short" />
-          <span className="skeleton-box medium" />
-          <span className="skeleton-box short" />
           <span className="skeleton-box short" />
         </div>
       ))}
@@ -724,7 +712,7 @@ function readQueryFromLocation(): QueryState {
     status: parseAllowedValue(params.get("status"), ["active", "inactive", "all"], "active"),
     sort: parseAllowedValue(
       params.get("sort"),
-      ["price_asc", "price_desc", "name_asc", "updated_desc"],
+      ["price_asc", "price_desc", "name_asc"],
       "price_asc",
     ),
     page: Number(parseNonNegativeIntegerParam(params.get("page")) ?? DEFAULT_QUERY.page),
