@@ -54,6 +54,7 @@ enum RawSnapshotContentStatus {
 enum ParseErrorType {
   MISSING_IBUY_TOKEN        @map("missing_ibuy_token")
   MISSING_NAME              @map("missing_name")
+  INVALID_IMAGE_URL         @map("invalid_image_url")
   PRICE_PARSE_FAILED        @map("price_parse_failed")
   DUPLICATE_SOURCE_IDENTITY @map("duplicate_source_identity")
   CONTENT_VALIDATION_FAILED @map("content_validation_failed")
@@ -82,27 +83,30 @@ model SourceCategory {
 }
 
 model Product {
-  id               String          @id @default(uuid()) @db.Uuid
-  sourceCategoryId String          @map("source_category_id") @db.Uuid
-  sourceCategory   SourceCategory  @relation(fields: [sourceCategoryId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  ibuyToken        String          @map("ibuy_token")
-  name             String          @db.Text
-  normalizedName   String          @map("normalized_name") @db.Text
-  sourceUrl        String          @map("source_url") @db.Text
-  isActive         Boolean         @default(true) @map("is_active")
-  missingSince     DateTime?       @map("missing_since") @db.Timestamptz(6)
-  missingSeenCount Int             @default(0) @map("missing_seen_count")
-  firstSeenAt      DateTime        @map("first_seen_at") @db.Timestamptz(6)
-  lastSeenAt       DateTime        @map("last_seen_at") @db.Timestamptz(6)
-  createdAt        DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt        DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
-  currentPrice     CurrentPrice?
-  priceSnapshots   PriceSnapshot[]
+  id                    String          @id @default(uuid()) @db.Uuid
+  sourceCategoryId      String          @map("source_category_id") @db.Uuid
+  sourceCategory        SourceCategory  @relation(fields: [sourceCategoryId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  ibuyToken             String          @map("ibuy_token")
+  name                  String          @db.Text
+  normalizedName        String          @map("normalized_name") @db.Text
+  primaryImageUrl       String?         @map("primary_image_url") @db.Text
+  primaryImageCheckedAt DateTime?       @map("primary_image_checked_at") @db.Timestamptz(6)
+  sourceUrl             String          @map("source_url") @db.Text
+  isActive              Boolean         @default(true) @map("is_active")
+  missingSince          DateTime?       @map("missing_since") @db.Timestamptz(6)
+  missingSeenCount      Int             @default(0) @map("missing_seen_count")
+  firstSeenAt           DateTime        @map("first_seen_at") @db.Timestamptz(6)
+  lastSeenAt            DateTime        @map("last_seen_at") @db.Timestamptz(6)
+  createdAt             DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+  currentPrice          CurrentPrice?
+  priceSnapshots        PriceSnapshot[]
 
   @@unique([sourceCategoryId, ibuyToken], map: "products_source_category_id_ibuy_token_key")
   @@index([sourceCategoryId], map: "products_source_category_id_idx")
   @@index([isActive], map: "products_is_active_idx")
   @@index([lastSeenAt], map: "products_last_seen_at_idx")
+  @@index([primaryImageCheckedAt], map: "products_primary_image_checked_at_idx")
   @@map("products")
 }
 
@@ -222,6 +226,7 @@ model ParseError {
   rawName          String?        @map("raw_name") @db.Text
   rawPriceText     String?        @map("raw_price_text")
   rawToken         String?        @map("raw_token")
+  rawImageUrl      String?        @map("raw_image_url") @db.Text
   createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@index([crawlRunId], map: "parse_errors_crawl_run_id_idx")
