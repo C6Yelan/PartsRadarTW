@@ -203,7 +203,7 @@
 
 ## Phase 4.5：商品圖片資料契約
 
-目標：在進入 Phase 5 前，補齊第一版主要商品圖片的資料契約與驗證。
+目標：在進入 Phase 5 前，補齊第一版主要商品圖片的資料契約、驗證與前端圖片呈現策略。
 
 範圍：
 
@@ -214,13 +214,13 @@
 - crawler 寫入流程保存主要商品圖片資料。
 - 商品列表與商品詳細 API 回傳主要商品圖片資料。
 - 缺圖、空 URL、不合法 URL、非預期來源網域的處理規則與測試。
+- Phase 5 前的圖片呈現方式決策與實作，不讓 Phase 5 UI 以直接 hotlink 來源圖片作為完成狀態。
 
 不包含：
 
-- 圖片下載。
-- 圖片壓縮或轉檔。
+- 大尺寸原圖保存。
 - CDN。
-- server-side image proxy 或 cache。
+- 完整 production 圖片資產平台。
 - 多張商品圖。
 - 使用者上傳圖片。
 
@@ -230,6 +230,8 @@
 - 缺圖或不合法圖片 URL 會被記錄為資料完整性問題或 validation issue。
 - API contract 已把主要商品圖片列為商品列表與商品詳細 response 的必要欄位。
 - 資安文件已定義圖片 URL allowlist 與未來 proxy / optimizer 限制。
+- Phase 5 前已完成圖片呈現方式更換：採自家小尺寸縮圖快取，或改用 placeholder / 分類圖示；直接使用 CoolPC / 原價屋圖片 URL 只保留為本機資料流驗證與小範圍測試手段。
+- 若採自家小尺寸縮圖，需先定義最小 storage、更新、失效與移除規則；若採 placeholder / 分類圖示，需明確接受商品辨識體驗下降。
 
 ## Phase 5：Web UI 第一版
 
@@ -265,17 +267,29 @@
 - 跨站比價。
 - 購物流程。
 - 規格篩選。
+- 商品圖片呈現策略重決策；此 gate 必須在 Phase 5 前完成。
 
 完成條件：
 
 - 商品查詢頁可正常搜尋與篩選。
-- 商品列表與商品詳細頁可顯示主要商品圖片；缺圖只能顯示容錯 fallback 並保留資料完整性問題，不可視為正常完成狀態。
-- 外部商品圖片顯示需符合 security 文件：一般 `<img>` 需設定 `referrerPolicy`；Next.js Image 或 image optimizer 需設定 CoolPC remote allowlist。
+- 商品列表與商品詳細頁依 Phase 4.5 決定的圖片呈現方式顯示主要圖片、縮圖或 placeholder；Phase 5 不以直接 hotlink 來源圖片作為完成狀態。
+- 圖片載入失敗時不破版；無圖片時可顯示 placeholder 或分類圖示。
+- 前端 fallback 不依賴圖片 URL 一定來自 CoolPC domain。
+- 本機驗證或臨時外部圖片顯示需符合 security 文件：一般 `<img>` 需設定 `referrerPolicy`；Next.js Image 或 image optimizer 需設定 CoolPC remote allowlist。
 - 商品詳細頁可顯示價格、來源與資料狀態。
+- 商品詳細頁或來源區塊需明確提供「前往原價屋查看／購買」。
 - 查無商品、商品不存在、API 錯誤都有對應畫面。
 - `stale` 不會被誤顯示為查無商品。
 - 來源狀態只代表 crawler / parser / source data health，不使用商品供應語意。
 - 手動 UI 驗收完成。
+
+Phase 5 entry gate：
+
+- 目前階段可暫時使用 CoolPC / 原價屋來源圖片 URL，僅限本機開發、資料流驗證與小範圍測試。
+- 進入 Phase 5 前，需完成圖片呈現方式更換，並在自家小尺寸縮圖快取或 placeholder / 分類圖示之間做明確決策與實作。
+- 公開前需加上網站 footer 或關於頁聲明：本專案非官方、非商業；資料來源為原價屋公開頁面；實際商品資訊、價格與購買以來源頁為準。
+- 公開前需規劃權利人或來源方要求移除資料 / 圖片時的處理方式；收到合理請求後應能移除。
+- 公開前需避免複製完整商品文案、完整頁面 HTML、原站排版或任何不必要的創作性內容。
 
 ## Phase 6：Docker 與部署準備
 

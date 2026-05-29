@@ -138,7 +138,13 @@ URL query 範例：
 
 主資訊順序應以商品圖片、商品名稱、分類、目前價格、價格最後確認時間、來源狀態、來源連結為主。圖片縮圖需固定尺寸與比例，避免 table row 因載入狀態或缺圖而跳動。broken image、loading 或 temporary fallback 只是容錯設計，不代表第一版資料契約可以沒有商品圖片。
 
-商品圖片顯示需符合 security 文件限制：若使用一般 `<img>` 直接顯示已驗證的 CoolPC 圖片 URL，需設定 `referrerPolicy`；若使用 Next.js Image 或 image optimizer，需設定 remote allowlist，只允許 `www.coolpc.com.tw` 與預期圖片路徑。
+商品圖片顯示需符合 security 文件限制。直接使用已驗證的 CoolPC / 原價屋圖片 URL 只限本機資料流驗證與小範圍測試；進入 Phase 5 前需更換為自家小尺寸縮圖 URL，或改用 placeholder / 分類圖示。若本機驗證期間使用一般 `<img>` 顯示外部圖片，需設定 `referrerPolicy`；若使用 Next.js Image 或 image optimizer，需設定 remote allowlist，只允許 `www.coolpc.com.tw` 與預期圖片路徑。
+
+Phase 5 entry gate 的圖片 fallback 規則：
+
+- 圖片載入失敗時不破版，縮圖區域需保留穩定尺寸。
+- 無圖片或圖片 URL 無法使用時，可顯示 placeholder 或分類圖示。
+- 前端 fallback 不應假設圖片 URL 一定來自 CoolPC domain；Phase 5 UI 應可承接自家縮圖、placeholder 或分類圖示。
 
 行為：
 
@@ -204,6 +210,7 @@ URL query 範例：
 - 商品不存在時顯示 404 頁或查無商品狀態。
 - 原價屋來源連結不包含 `PHPSESSID`。
 - 第一版來源連結指向原價屋分類頁，不保證能直接定位到單一商品。
+- 商品詳細頁或來源區塊應明確提供「前往原價屋查看／購買」。
 - 主要商品圖片需顯示在詳細頁；缺圖 fallback 只作為容錯，不是正常完成狀態。
 
 第一版不顯示：
@@ -245,6 +252,18 @@ URL query 範例：
 - 若沒有任何有效商品資料，顯示目前沒有可用資料。
 - 不顯示空商品列表讓使用者誤以為是查詢條件造成無結果。
 - 可提示稍後再試。
+
+## 公開前來源聲明
+
+Phase 5 UI 應在版面中保留低干擾聲明位置。公開宣傳或開放較大流量前，需補上完整 footer 或關於頁聲明。
+
+最低需求：
+
+- 網站 footer 或關於頁需說明 PartsRadarTW 是非官方、非商業的商品搜尋與價格整理工具。
+- 需說明資料來源為原價屋公開頁面，實際商品資訊、價格、庫存、購買與售後服務以來源頁為準。
+- 商品詳細頁或來源區塊需清楚引導使用者前往原價屋查看或購買。
+- 不應複製完整商品文案、完整頁面 HTML、原站排版或任何不必要的創作性內容。
+- 需保留未來處理權利人或來源方移除請求的入口或流程空間。
 
 ## 空狀態與錯誤狀態
 
