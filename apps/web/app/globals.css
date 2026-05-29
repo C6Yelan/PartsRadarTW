@@ -234,7 +234,7 @@ input::placeholder {
 
 .summary-strip {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -311,6 +311,10 @@ input::placeholder {
 }
 
 .filter-panel summary {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
   padding: 18px 86px 18px 20px;
   color: var(--accent-strong);
   font-weight: 800;
@@ -319,6 +323,37 @@ input::placeholder {
 
 .filter-panel summary::-webkit-details-marker {
   display: none;
+}
+
+.filter-summary-meta {
+  display: none;
+  gap: 8px;
+  align-items: center;
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.filter-applied {
+  padding: 3px 7px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--accent-surface);
+  color: var(--accent-strong);
+  line-height: 1;
+}
+
+.filter-chevron {
+  width: 8px;
+  aspect-ratio: 1;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg);
+  transition: transform 140ms ease;
+}
+
+.filter-panel details[open] .filter-chevron {
+  transform: rotate(225deg);
 }
 
 .filter-reset-button {
@@ -1050,7 +1085,17 @@ input::placeholder {
   }
 
   .filter-panel summary {
+    min-height: 54px;
+    padding: 0 16px;
     cursor: pointer;
+  }
+
+  .filter-panel:has(.filter-reset-button) summary {
+    padding-right: 78px;
+  }
+
+  .filter-summary-meta {
+    display: flex;
   }
 
   .results-toolbar {

@@ -1,7 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { type SubmitEvent, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  type MouseEvent,
+  type SubmitEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
 type SourceStatus = "ok" | "stale" | "unavailable";
 type ProductStatus = "active" | "inactive" | "all";
@@ -103,6 +110,7 @@ const STATUS_OPTIONS: Array<{ value: ProductStatus; label: string }> = [
 
 const PAGE_SIZE_OPTIONS = [10, 15, 20] as const;
 const SKELETON_ROWS = ["row-1", "row-2", "row-3", "row-4", "row-5", "row-6"];
+const DESKTOP_FILTER_MEDIA_QUERY = "(min-width: 761px)";
 
 export default function ProductExplorer() {
   const [isReady, setIsReady] = useState(false);
@@ -134,7 +142,7 @@ export default function ProductExplorer() {
   }, []);
 
   useEffect(() => {
-    const mediaQuery = window.matchMedia("(min-width: 761px)");
+    const mediaQuery = window.matchMedia(DESKTOP_FILTER_MEDIA_QUERY);
     const syncFiltersOpen = () => setFiltersOpen(mediaQuery.matches);
 
     syncFiltersOpen();
@@ -309,6 +317,21 @@ export default function ProductExplorer() {
     });
   }
 
+  function keepDesktopFiltersOpen(event: MouseEvent<HTMLElement>) {
+    if (window.matchMedia(DESKTOP_FILTER_MEDIA_QUERY).matches) {
+      event.preventDefault();
+    }
+  }
+
+  function syncFiltersOpenFromToggle(isOpen: boolean) {
+    if (!isOpen && window.matchMedia(DESKTOP_FILTER_MEDIA_QUERY).matches) {
+      setFiltersOpen(true);
+      return;
+    }
+
+    setFiltersOpen(isOpen);
+  }
+
   function jumpToPage(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -369,11 +392,6 @@ export default function ProductExplorer() {
           />
           <SummaryItem label="查詢結果" value={formatInteger(totalItems)} />
           <SummaryItem label="目前分類" value={selectedCategoryName} />
-          <SummaryItem
-            label="資料狀態"
-            value={sourceStatusLabel(sourceStatus)}
-            tone={sourceStatus}
-          />
         </section>
 
         {sourceStatus === "stale" ? (
@@ -391,9 +409,16 @@ export default function ProductExplorer() {
             ) : null}
             <details
               open={filtersOpen}
-              onToggle={(event) => setFiltersOpen(event.currentTarget.open)}
+              onToggle={(event) => syncFiltersOpenFromToggle(event.currentTarget.open)}
             >
-              <summary>搜尋與篩選</summary>
+              {/* biome-ignore lint/a11y/noStaticElementInteractions: summary is the native details control; the click handler only disables desktop collapse. */}
+              <summary onClick={keepDesktopFiltersOpen}>
+                <span>搜尋與篩選</span>
+                <span className="filter-summary-meta">
+                  {hasActiveFilters ? <span className="filter-applied">已套用</span> : null}
+                  <span className="filter-chevron" aria-hidden="true" />
+                </span>
+              </summary>
               <div className="filter-stack">
                 <div className="filter-group">
                   <span className="filter-title">分類</span>
