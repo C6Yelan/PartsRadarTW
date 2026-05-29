@@ -366,18 +366,34 @@ input::placeholder {
 }
 
 .category-option {
+  position: relative;
   display: grid;
-  grid-template-columns: 18px minmax(0, 1fr);
-  gap: 10px;
+  grid-template-columns: minmax(0, 1fr);
   align-items: center;
   min-height: 44px;
-  padding: 8px 10px;
+  padding: 9px 10px 9px 34px;
   border: 1px solid transparent;
   border-radius: 7px;
   color: var(--muted);
+  cursor: pointer;
   transition:
     background 140ms ease,
     border-color 140ms ease;
+}
+
+.category-option::before {
+  position: absolute;
+  left: 13px;
+  width: 8px;
+  aspect-ratio: 1;
+  border: 1px solid rgba(143, 180, 204, 0.42);
+  border-radius: 50%;
+  background: rgba(143, 180, 204, 0.12);
+  content: "";
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease;
 }
 
 .category-option:hover,
@@ -387,10 +403,21 @@ input::placeholder {
   color: var(--text);
 }
 
+.category-option.is-active::before {
+  border-color: var(--accent-strong);
+  background: var(--accent-strong);
+  box-shadow: 0 0 0 4px rgba(143, 180, 204, 0.12);
+}
+
+.category-option:has(input:focus-visible) {
+  outline: 2px solid rgba(166, 196, 215, 0.68);
+  outline-offset: 2px;
+}
+
 .category-option input {
-  width: 16px;
-  height: 16px;
-  accent-color: var(--accent);
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .option-copy {
@@ -611,9 +638,36 @@ input::placeholder {
 
 .product-image.fallback,
 .detail-image-fallback {
-  display: block;
+  display: grid;
+  place-items: center;
   border: 1px solid var(--border);
   background: linear-gradient(135deg, rgba(143, 180, 204, 0.11), transparent), #0a141c;
+  color: var(--muted);
+  text-align: center;
+}
+
+.image-fallback-copy {
+  display: grid;
+  max-width: 100%;
+  gap: 3px;
+  padding: 8px;
+}
+
+.image-fallback-copy strong,
+.image-fallback-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.image-fallback-copy strong {
+  color: var(--accent-strong);
+  font-size: 12px;
+}
+
+.image-fallback-copy small {
+  color: var(--faint);
+  font-size: 10px;
 }
 
 .table-cell {
@@ -1042,6 +1096,12 @@ input::placeholder {
     white-space: normal;
   }
 
+  .product-main a {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
   .product-image {
     grid-area: image;
     width: 64px;
@@ -1129,19 +1189,17 @@ input::placeholder {
     border-bottom: 0;
   }
 
-  .product-row {
-    grid-template-columns: 1fr;
-    grid-template-areas:
-      "image"
-      "product"
-      "price"
-      "category"
-      "updated"
-      "status"
-      "source";
+  .product-image {
+    width: 60px;
   }
 
-  .product-image {
-    width: 72px;
+  .product-row {
+    grid-template-columns: 60px minmax(0, 1fr);
+    gap: 7px 10px;
+    padding: 14px;
+  }
+
+  .table-cell {
+    grid-template-columns: 76px minmax(0, 1fr);
   }
 }

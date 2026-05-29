@@ -601,7 +601,11 @@ function CategoryOption({
 function ProductRow({ product }: { product: ProductListItem }) {
   return (
     <article className="product-row">
-      <ProductImage alt={product.image.alt} src={product.image.url} />
+      <ProductImage
+        alt={product.image.alt}
+        fallbackLabel={product.category.displayName}
+        src={product.image.url}
+      />
       <div className="product-main">
         <Link href={`/products/${product.id}`}>{product.name}</Link>
         <span>{product.category.sourceName}</span>
@@ -631,11 +635,30 @@ function ProductRow({ product }: { product: ProductListItem }) {
   );
 }
 
-function ProductImage({ alt, src }: { alt: string; src: string }) {
+function ProductImage({
+  alt,
+  fallbackLabel,
+  src,
+}: {
+  alt: string;
+  fallbackLabel: string;
+  src: string;
+}) {
   const [hasError, setHasError] = useState(false);
 
   if (hasError) {
-    return <div className="product-image fallback" aria-label="圖片暫時無法顯示" role="img" />;
+    return (
+      <div
+        className="product-image fallback"
+        aria-label={`${fallbackLabel}圖片暫時無法顯示`}
+        role="img"
+      >
+        <span className="image-fallback-copy">
+          <strong>無圖</strong>
+          <small>{fallbackLabel}</small>
+        </span>
+      </div>
+    );
   }
 
   return (

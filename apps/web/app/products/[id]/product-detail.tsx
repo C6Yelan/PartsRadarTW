@@ -127,7 +127,12 @@ export default function ProductDetail({ productId }: { productId: string }) {
         <section className="detail-layout">
           <div className="detail-media">
             {imageError ? (
-              <div className="detail-image-fallback" aria-label="圖片暫時無法顯示" role="img" />
+              <div className="detail-image-fallback" aria-label="圖片暫時無法顯示" role="img">
+                <span className="image-fallback-copy">
+                  <strong>圖片暫時無法顯示</strong>
+                  <small>{product.category.displayName}</small>
+                </span>
+              </div>
             ) : (
               // biome-ignore lint/performance/noImgElement: CoolPC image URLs are validated server-side; plain img keeps referrerPolicy explicit without enabling an image proxy.
               <img
@@ -188,7 +193,7 @@ export default function ProductDetail({ productId }: { productId: string }) {
               rel="noreferrer"
               target="_blank"
             >
-              前往原價屋來源頁
+              前往原價屋查看／購買
             </a>
           </div>
         </section>
