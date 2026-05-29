@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "typecheck": "tsc --noEmit",
+    "crawl:coolpc-once": "tsx src/scripts/crawl-coolpc-once.ts",
     "smoke:coolpc-image-flow": "tsx src/scripts/smoke-coolpc-image-flow.ts",
     "validate:coolpc-live": "tsx src/scripts/validate-coolpc-live.ts"
   },
