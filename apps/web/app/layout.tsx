@@ -5,6 +5,9 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "PartsRadarTW",
   description: "原價屋電腦零組件價格查詢工具",
+  icons: {
+    icon: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({

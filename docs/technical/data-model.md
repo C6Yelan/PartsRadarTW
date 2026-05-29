@@ -223,7 +223,7 @@ product_list_view
 
 規則：
 
-- 新商品第一次看到價格時寫入。
+- 新商品首次由來源資料確認價格時寫入。
 - 價格變動時寫入。
 - 價格未變時不新增重複 price snapshot。
 - price snapshot 第一版長期保留，不套用 raw snapshot 的 30 / 90 天保存期限。
