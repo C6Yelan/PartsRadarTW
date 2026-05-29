@@ -110,6 +110,8 @@ interface ProductCreateData {
   ibuyToken: string;
   name: string;
   normalizedName: string;
+  primaryImageUrl: string;
+  primaryImageCheckedAt: Date;
   sourceUrl: string;
   isActive: true;
   missingSince: null;
@@ -121,6 +123,8 @@ interface ProductCreateData {
 interface ProductSeenUpdateData {
   name: string;
   normalizedName: string;
+  primaryImageUrl: string;
+  primaryImageCheckedAt: Date;
   sourceUrl: string;
   isActive: true;
   missingSince: null;
@@ -336,6 +340,8 @@ function updateProductSeenData(
     data: {
       name: item.name,
       normalizedName: item.normalizedName,
+      primaryImageUrl: item.primaryImageUrl,
+      primaryImageCheckedAt: item.fetchedAt,
       sourceUrl: item.sourceUrl,
       isActive: true,
       missingSince: null,
@@ -460,6 +466,8 @@ function createProductData(item: ParsedCoolpcProduct): ProductCreateData {
     ibuyToken: item.ibuyToken,
     name: item.name,
     normalizedName: item.normalizedName,
+    primaryImageUrl: item.primaryImageUrl,
+    primaryImageCheckedAt: item.fetchedAt,
     sourceUrl: item.sourceUrl,
     isActive: true,
     missingSince: null,

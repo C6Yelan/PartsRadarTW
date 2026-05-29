@@ -1,7 +1,7 @@
 <!--
-Fixture: category page with identical duplicated iBuy token in the same snapshot.
+Fixture: category page with one valid image and one invalid image URL.
 Source type: eachview.php?IGrp=4 category page.
-Fixture date: 2026-05-27.
+Fixture date: 2026-05-28.
 This fixture is synthetic and intentionally small.
 -->
 <!doctype html>
@@ -20,11 +20,19 @@ This fixture is synthetic and intentionally small.
         </span>
       </div>
       <div class="item">
-        <div class="w">CPU-TOKEN-001</div>
+        <div class="w">CPU-TOKEN-002</div>
         <span>
-          <img alt="" src="/eval/4/amd7500f-alt.jpg">
-          <div class="t">AMD Ryzen 5 7500F MPK【6核/12緒】3.7G</div>
-          <div class="x">含稅：NT4880</div>
+          <img alt="" src="/eval/4/">
+          <div class="t">Invalid image product</div>
+          <div class="x">含稅：NT5990</div>
+        </span>
+      </div>
+      <div class="item">
+        <div class="w">CPU-TOKEN-003</div>
+        <span>
+          <img alt="" src="https://example.com/product.jpg">
+          <div class="t">External image product</div>
+          <div class="x">含稅：NT6990</div>
         </span>
       </div>
     </section>

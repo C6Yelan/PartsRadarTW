@@ -11,6 +11,7 @@ export type ContentValidationStatus = "valid" | "invalid" | "suspected_block";
 export type ParseErrorType =
   | "missing_ibuy_token"
   | "missing_name"
+  | "invalid_image_url"
   | "price_parse_failed"
   | "duplicate_source_identity"
   | "content_validation_failed";
@@ -29,6 +30,7 @@ export interface CoolpcProductCandidate {
   rawToken: string;
   rawName: string;
   rawPriceText: string;
+  rawImageUrl: string;
 }
 
 export interface ParsedCoolpcProduct {
@@ -40,6 +42,7 @@ export interface ParsedCoolpcProduct {
   sourceItemKey: string;
   name: string;
   normalizedName: string;
+  primaryImageUrl: string;
   price: number;
   currency: Currency;
   sourceUrl: string;
@@ -51,6 +54,7 @@ export interface CoolpcParseIssue {
   message: string;
   rawName?: string;
   rawPriceText?: string;
+  rawImageUrl?: string;
   rawToken?: string;
   sourceItemKey?: string;
 }
@@ -101,6 +105,49 @@ export function parsePriceText(rawPriceText: string): number | null {
 
 export function normalizeProductName(name: string): string {
   return name.replace(/\s+/g, " ").trim();
+}
+
+export function normalizeCoolpcProductImageUrl(
+  rawImageUrl: string,
+  igrp: number,
+  baseUrl = DEFAULT_COOLPC_BASE_URL,
+): string | null {
+  if (!Number.isInteger(igrp) || igrp <= 0) {
+    return null;
+  }
+
+  const trimmedImageUrl = rawImageUrl.trim();
+
+  if (trimmedImageUrl.length === 0) {
+    return null;
+  }
+
+  let url: URL;
+
+  try {
+    url = new URL(trimmedImageUrl, baseUrl);
+  } catch {
+    return null;
+  }
+
+  if (!["http:", "https:"].includes(url.protocol)) {
+    return null;
+  }
+
+  if (url.hostname !== "www.coolpc.com.tw") {
+    return null;
+  }
+
+  const expectedPathPattern = new RegExp(
+    `^/eval/${igrp}/[^/?#]+\\.(?:jpg|jpeg|png|gif|webp)$`,
+    "i",
+  );
+
+  if (!expectedPathPattern.test(url.pathname)) {
+    return null;
+  }
+
+  return `https://www.coolpc.com.tw${url.pathname}`;
 }
 
 export function validateCoolpcCategoryPage(
@@ -234,6 +281,7 @@ export function parseCoolpcCategoryPage(
     const ibuyToken = candidate.rawToken.trim();
     const name = normalizeProductName(candidate.rawName);
     const price = parsePriceText(candidate.rawPriceText);
+    const primaryImageUrl = normalizeCoolpcProductImageUrl(candidate.rawImageUrl, context.igrp);
 
     if (ibuyToken.length === 0) {
       issues.push({
@@ -263,6 +311,18 @@ export function parseCoolpcCategoryPage(
         message: "Product candidate price text could not be parsed.",
         rawName: name,
         rawPriceText: candidate.rawPriceText,
+        rawToken: ibuyToken,
+      });
+      continue;
+    }
+
+    if (primaryImageUrl === null) {
+      issues.push({
+        type: "invalid_image_url",
+        message: "Product candidate image URL is missing or not allowed.",
+        rawName: name,
+        rawPriceText: candidate.rawPriceText,
+        rawImageUrl: candidate.rawImageUrl,
         rawToken: ibuyToken,
       });
       continue;
@@ -300,6 +360,7 @@ export function parseCoolpcCategoryPage(
       sourceItemKey,
       name,
       normalizedName: normalizeProductName(name).toLocaleLowerCase("zh-TW"),
+      primaryImageUrl,
       price,
       currency: "TWD",
       sourceUrl: sanitizeCoolpcSourceUrl(
@@ -334,17 +395,23 @@ function extractCoolpcProductCandidates($: CheerioAPI): CoolpcProductCandidate[]
       const rawToken = $token.text().trim();
       const rawName = firstText($nextSpan, "div.t") || firstText($parent, "div.t");
       const rawPriceText = firstText($nextSpan, "div.x") || firstText($parent, "div.x");
+      const rawImageUrl = firstAttr($nextSpan, "img", "src") || firstAttr($parent, "img", "src");
 
       return {
         rawToken,
         rawName: rawName || firstText($following, "div.t"),
         rawPriceText: rawPriceText || firstText($following, "div.x"),
+        rawImageUrl: rawImageUrl || firstAttr($following, "img", "src"),
       };
     });
 }
 
 function firstText(scope: ReturnType<CheerioAPI>, selector: string): string {
   return scope.find(selector).first().text().trim();
+}
+
+function firstAttr(scope: ReturnType<CheerioAPI>, selector: string, attributeName: string): string {
+  return scope.find(selector).first().attr(attributeName)?.trim() ?? "";
 }
 
 function expectedTitleKeywords(context: SourceCategoryContext): string[] {

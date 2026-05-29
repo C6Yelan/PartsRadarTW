@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@partsradar/db";
+import type { ParseErrorType as PrismaParseErrorType, PrismaClient } from "@partsradar/db";
 import { COOLPC_TARGET_CATEGORIES, type CoolpcTargetCategory } from "./categories";
 import {
   CRAWL_RUN_CATEGORY_RESULT_STATUSES,
@@ -8,7 +8,9 @@ import {
 import {
   createCoolpcCategoryUrl,
   parseCoolpcCategoryPage,
+  type CoolpcParseIssue,
   type ContentValidationStatus,
+  type ParseErrorType as CoolpcParseErrorType,
   type ParsedCoolpcProduct,
   type SourceCategoryContext,
 } from "./parser";
@@ -54,6 +56,9 @@ export type ProcessCoolpcCategorySnapshotOptions =
     });
 
 export interface CoolpcCategorySnapshotWriteClient extends RawSnapshotWriteClient {
+  parseError: {
+    createMany(args: { data: ParseErrorCreateManyData[] }): Promise<{ count: number }>;
+  };
   rawSnapshot: RawSnapshotWriteClient["rawSnapshot"] & {
     findMany(args: {
       where: {
@@ -78,6 +83,18 @@ export interface CoolpcCategorySnapshotWriteClient extends RawSnapshotWriteClien
   };
 }
 
+interface ParseErrorCreateManyData {
+  crawlRunId: string;
+  rawSnapshotId: string | null;
+  sourceCategoryId: string;
+  errorType: PrismaParseErrorType;
+  message: string;
+  rawName: string | null;
+  rawPriceText: string | null;
+  rawToken: string | null;
+  rawImageUrl: string | null;
+}
+
 export type WriteCoolpcCategoryProducts = (options: {
   crawlRunId: string;
   rawSnapshotId: string;
@@ -88,8 +105,17 @@ export type WriteCoolpcCategoryProducts = (options: {
 
 export type PrismaCoolpcCategorySnapshotClient = Pick<
   PrismaClient,
-  "rawSnapshot" | "product" | "priceSnapshot" | "currentPrice" | "$transaction"
+  "rawSnapshot" | "parseError" | "product" | "priceSnapshot" | "currentPrice" | "$transaction"
 >;
+
+const PRISMA_PARSE_ERROR_TYPES = {
+  missing_ibuy_token: "MISSING_IBUY_TOKEN",
+  missing_name: "MISSING_NAME",
+  invalid_image_url: "INVALID_IMAGE_URL",
+  price_parse_failed: "PRICE_PARSE_FAILED",
+  duplicate_source_identity: "DUPLICATE_SOURCE_IDENTITY",
+  content_validation_failed: "CONTENT_VALIDATION_FAILED",
+} as const satisfies Record<CoolpcParseErrorType, PrismaParseErrorType>;
 
 export function processCoolpcCategorySnapshotWithPrisma(
   options: ProcessCoolpcCategorySnapshotBaseOptions & {
@@ -156,6 +182,13 @@ export async function processCoolpcCategorySnapshot(
     contentStatus: toRawSnapshotContentStatus(parseResult.validation.status),
     rawContent: snapshot.rawHtml,
     parsedResultHash,
+  });
+  await recordParseIssues({
+    client,
+    crawlRunId,
+    rawSnapshotId: rawSnapshot.id,
+    sourceCategoryId: category.id,
+    issues: parseResult.issues,
   });
 
   // Suspected block is kept distinct from parse failure because the crawl runner
@@ -254,6 +287,7 @@ function createStableParsedResultHash(items: ParsedCoolpcProduct[]): string {
       sourceItemKey: item.sourceItemKey,
       name: item.name,
       normalizedName: item.normalizedName,
+      primaryImageUrl: item.primaryImageUrl,
       price: item.price,
       currency: item.currency,
     })),
@@ -288,6 +322,38 @@ async function findLatestSuccessfulParsedResultHash(
   return latestSnapshot?.parsedResultHash ?? null;
 }
 
+async function recordParseIssues({
+  client,
+  crawlRunId,
+  rawSnapshotId,
+  sourceCategoryId,
+  issues,
+}: {
+  client: CoolpcCategorySnapshotWriteClient;
+  crawlRunId: string;
+  rawSnapshotId: string;
+  sourceCategoryId: string;
+  issues: CoolpcParseIssue[];
+}): Promise<void> {
+  if (issues.length === 0) {
+    return;
+  }
+
+  await client.parseError.createMany({
+    data: issues.map((issue) => ({
+      crawlRunId,
+      rawSnapshotId,
+      sourceCategoryId,
+      errorType: PRISMA_PARSE_ERROR_TYPES[issue.type],
+      message: issue.message,
+      rawName: issue.rawName ?? null,
+      rawPriceText: issue.rawPriceText ?? null,
+      rawToken: issue.rawToken ?? null,
+      rawImageUrl: issue.type === "invalid_image_url" ? (issue.rawImageUrl ?? null) : null,
+    })),
+  });
+}
+
 function buildParseFailureMessage(parseResult: ReturnType<typeof parseCoolpcCategoryPage>): string {
   if (parseResult.validation.status !== "valid") {
     return parseResult.validation.reason ?? "content validation failed";
@@ -295,6 +361,7 @@ function buildParseFailureMessage(parseResult: ReturnType<typeof parseCoolpcCate
 
   return (
     parseResult.issues.find((issue) => issue.type === "duplicate_source_identity")?.message ??
+    parseResult.issues[0]?.message ??
     "parsed category result cannot be imported"
   );
 }

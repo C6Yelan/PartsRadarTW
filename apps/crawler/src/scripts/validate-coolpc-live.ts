@@ -29,7 +29,9 @@ interface ValidationSummary {
   deduplicatedItemCount: number;
   issueCounts: Record<string, number>;
   canImport: boolean;
-  firstItems: Array<Pick<ParsedCoolpcProduct, "ibuyToken" | "name" | "price" | "sourceItemKey">>;
+  firstItems: Array<
+    Pick<ParsedCoolpcProduct, "ibuyToken" | "name" | "primaryImageUrl" | "price" | "sourceItemKey">
+  >;
 }
 
 const CONFIRM_FLAG = "--confirm-live-fetch";
@@ -106,6 +108,7 @@ async function main() {
       firstItems: result.items.slice(0, 3).map((item) => ({
         ibuyToken: item.ibuyToken,
         name: item.name,
+        primaryImageUrl: item.primaryImageUrl,
         price: item.price,
         sourceItemKey: item.sourceItemKey,
       })),
@@ -160,6 +163,7 @@ function createSampleFixture(
       (item) => `      <div class="item">
         <div class="w">${escapeHtml(item.ibuyToken)}</div>
         <span>
+          <img src="${escapeHtml(item.primaryImageUrl)}" alt="${escapeHtml(item.name)}">
           <div class="t">${escapeHtml(item.name)}</div>
           <div class="x">含稅：NT${formatPrice(item.price)}</div>
         </span>

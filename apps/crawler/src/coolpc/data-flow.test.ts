@@ -60,6 +60,8 @@ describe("CoolPC crawler data flow", () => {
     expect(client.currentPrices).toHaveLength(2);
     expect(productByToken(client, "CPU-TOKEN-001")).toMatchObject({
       isActive: true,
+      primaryImageUrl: "https://www.coolpc.com.tw/eval/4/amd7500f.jpg",
+      primaryImageCheckedAt: secondSeenAt,
       missingSince: null,
       missingSeenCount: 0,
       lastSeenAt: secondSeenAt,
@@ -301,12 +303,27 @@ interface FakeRawSnapshot {
   createdAt: Date;
 }
 
+interface FakeParseError {
+  id: string;
+  crawlRunId: string;
+  rawSnapshotId: string | null;
+  sourceCategoryId: string;
+  errorType: string;
+  message: string;
+  rawName: string | null;
+  rawPriceText: string | null;
+  rawToken: string | null;
+  rawImageUrl: string | null;
+}
+
 interface FakeProduct {
   id: string;
   sourceCategoryId: string;
   ibuyToken: string;
   name: string;
   normalizedName: string;
+  primaryImageUrl: string;
+  primaryImageCheckedAt: Date;
   sourceUrl: string;
   isActive: boolean;
   missingSince: Date | null;
@@ -340,6 +357,7 @@ class FakeCoolpcDataFlowClient
   readonly categoryResults: FakeCategoryResult[] = [];
   readonly sourceCategoryUpdates: FakeSourceCategoryUpdate[] = [];
   readonly rawSnapshots: FakeRawSnapshot[] = [];
+  readonly parseErrors: FakeParseError[] = [];
   readonly products: FakeProduct[] = [];
   readonly priceSnapshots: FakePriceSnapshot[] = [];
   readonly currentPrices: FakeCurrentPrice[] = [];
@@ -490,6 +508,28 @@ class FakeCoolpcDataFlowClient
     },
   };
 
+  parseError = {
+    createMany: async ({
+      data,
+    }: Parameters<CoolpcCategorySnapshotWriteClient["parseError"]["createMany"]>[0]) => {
+      const parseErrors = data.map((item, index) => ({
+        id: `parse-error-${this.parseErrors.length + index + 1}`,
+        crawlRunId: item.crawlRunId,
+        rawSnapshotId: item.rawSnapshotId,
+        sourceCategoryId: item.sourceCategoryId,
+        errorType: item.errorType,
+        message: item.message,
+        rawName: item.rawName,
+        rawPriceText: item.rawPriceText,
+        rawToken: item.rawToken,
+        rawImageUrl: item.rawImageUrl,
+      }));
+      this.parseErrors.push(...parseErrors);
+
+      return { count: parseErrors.length };
+    },
+  };
+
   product = {
     findUnique: async ({
       where,
@@ -541,6 +581,8 @@ class FakeCoolpcDataFlowClient
         ibuyToken: data.ibuyToken,
         name: data.name,
         normalizedName: data.normalizedName,
+        primaryImageUrl: data.primaryImageUrl,
+        primaryImageCheckedAt: data.primaryImageCheckedAt,
         sourceUrl: data.sourceUrl,
         isActive: data.isActive,
         missingSince: data.missingSince,
@@ -663,6 +705,7 @@ function keepOnlyFirstProduct(rawHtml: string): string {
   const secondProduct = `      <div class="item">
         <div class="w">CPU-TOKEN-002</div>
         <span>
+          <img alt="" src="/eval/4/intel14600k.jpg">
           <div class="t">Intel Core i5-14600K【14核/20緒】</div>
           <div class="x">含稅：NT9,990</div>
         </span>

@@ -5,6 +5,7 @@ import { COOLPC_TARGET_CATEGORIES, type CoolpcTargetCategory } from "./categorie
 import {
   createCoolpcCategoryUrl,
   createSourceItemKey,
+  normalizeCoolpcProductImageUrl,
   parseCoolpcCategoryPage,
   parsePriceText,
   validateCoolpcCategoryPage,
@@ -70,6 +71,31 @@ describe("CoolPC parser helpers", () => {
   it("creates category URLs without PHP session state", () => {
     expect(createCoolpcCategoryUrl(4)).toBe("https://www.coolpc.com.tw/eachview.php?IGrp=4");
   });
+
+  it("normalizes only expected CoolPC product image URLs", () => {
+    expect(normalizeCoolpcProductImageUrl("/eval/4/amd7500f.jpg", 4)).toBe(
+      "https://www.coolpc.com.tw/eval/4/amd7500f.jpg",
+    );
+    expect(normalizeCoolpcProductImageUrl("http://www.coolpc.com.tw/eval/4/amd7500f.jpg", 4)).toBe(
+      "https://www.coolpc.com.tw/eval/4/amd7500f.jpg",
+    );
+    expect(normalizeCoolpcProductImageUrl("/eval/4/", 4)).toBeNull();
+    expect(normalizeCoolpcProductImageUrl("/eval/4/amd7500fjpg", 4)).toBeNull();
+    expect(normalizeCoolpcProductImageUrl("/eval/5/amd7500f.jpg", 4)).toBeNull();
+    expect(normalizeCoolpcProductImageUrl("https://example.com/eval/4/amd7500f.jpg", 4)).toBeNull();
+    expect(normalizeCoolpcProductImageUrl("javascript:alert(1)", 4)).toBeNull();
+  });
+
+  it("rejects non-positive or non-integer CoolPC image category ids", () => {
+    expect(normalizeCoolpcProductImageUrl("/eval/4/amd7500f.jpg", 0)).toBeNull();
+    expect(normalizeCoolpcProductImageUrl("/eval/4/amd7500f.jpg", -1)).toBeNull();
+    expect(normalizeCoolpcProductImageUrl("/eval/4/amd7500f.jpg", 4.5)).toBeNull();
+    expect(normalizeCoolpcProductImageUrl("/eval/4/amd7500f.jpg", Number.NaN)).toBeNull();
+    expect(normalizeCoolpcProductImageUrl("/eval/4/amd7500f.jpg", Number.POSITIVE_INFINITY)).toBeNull();
+    expect(normalizeCoolpcProductImageUrl("/eval/4/amd7500f.jpg", 4)).toBe(
+      "https://www.coolpc.com.tw/eval/4/amd7500f.jpg",
+    );
+  });
 });
 
 describe("CoolPC response content validation", () => {
@@ -127,6 +153,7 @@ describe("CoolPC category parser", () => {
       sourceItemKey: "coolpc:igrp:4:ibuy:CPU-TOKEN-001",
       name: "AMD Ryzen 5 7500F MPK【6核/12緒】3.7G",
       normalizedName: "amd ryzen 5 7500f mpk【6核/12緒】3.7g",
+      primaryImageUrl: "https://www.coolpc.com.tw/eval/4/amd7500f.jpg",
       price: 4880,
       currency: "TWD",
       sourceUrl: "https://www.coolpc.com.tw/eachview.php?IGrp=4",
@@ -181,7 +208,27 @@ describe("CoolPC category parser", () => {
     ]);
   });
 
-  it("deduplicates identical source identity repeats in the same snapshot", () => {
+  it("keeps invalid image URL candidates out of parsed items", () => {
+    const result = parseCoolpcCategoryPage(fixture("cpu-category.invalid-image.html"), context);
+
+    expect(result.canImport).toBe(true);
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]?.primaryImageUrl).toBe("https://www.coolpc.com.tw/eval/4/amd7500f.jpg");
+    expect(result.issues).toEqual([
+      expect.objectContaining({
+        type: "invalid_image_url",
+        rawToken: "CPU-TOKEN-002",
+        rawImageUrl: "/eval/4/",
+      }),
+      expect.objectContaining({
+        type: "invalid_image_url",
+        rawToken: "CPU-TOKEN-003",
+        rawImageUrl: "https://example.com/product.jpg",
+      }),
+    ]);
+  });
+
+  it("deduplicates same source identity, name, and price repeats in the same snapshot", () => {
     const result = parseCoolpcCategoryPage(fixture("cpu-category.duplicate-token.html"), context);
 
     expect(result.canImport).toBe(true);

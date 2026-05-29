@@ -179,7 +179,63 @@ describe("CoolPC category snapshot processor", () => {
       errorMessage: "missing_required_product_structure",
     });
     expect(client.rawSnapshots[0]?.contentStatus).toBe(RAW_SNAPSHOT_CONTENT_STATUSES.INVALID);
+    expect(client.parseErrors).toEqual([
+      expect.objectContaining({
+        crawlRunId: "crawl-run-1",
+        rawSnapshotId: "raw-snapshot-1",
+        sourceCategoryId: "category-4",
+        errorType: "CONTENT_VALIDATION_FAILED",
+        message: "missing_required_product_structure",
+        rawImageUrl: null,
+      }),
+    ]);
     expect(productWriter.calls).toEqual([]);
+  });
+
+  it("records invalid image URL parse errors with their raw image URL", async () => {
+    const client = new FakeCrawlerWriteClient([category({ id: "category-4", igrp: 4 })]);
+    const storageDir = await createTempDir(tempDirs);
+    const productWriter = createProductWriterSpy();
+
+    const result = await processCoolpcCategorySnapshot({
+      client,
+      storageDir,
+      crawlRunId: "crawl-run-1",
+      category: category({ id: "category-4", igrp: 4 }),
+      snapshot: snapshot({ rawHtml: await fixture("cpu-category.invalid-image.html") }),
+      writeProducts: productWriter.writeProducts,
+    });
+
+    expect(result).toEqual({
+      status: CRAWL_RUN_CATEGORY_RESULT_STATUSES.SUCCESS_CHANGED,
+      rawSnapshotId: "raw-snapshot-1",
+    });
+    expect(client.parseErrors).toEqual([
+      expect.objectContaining({
+        crawlRunId: "crawl-run-1",
+        rawSnapshotId: "raw-snapshot-1",
+        sourceCategoryId: "category-4",
+        errorType: "INVALID_IMAGE_URL",
+        rawToken: "CPU-TOKEN-002",
+        rawImageUrl: "/eval/4/",
+      }),
+      expect.objectContaining({
+        crawlRunId: "crawl-run-1",
+        rawSnapshotId: "raw-snapshot-1",
+        sourceCategoryId: "category-4",
+        errorType: "INVALID_IMAGE_URL",
+        rawToken: "CPU-TOKEN-003",
+        rawImageUrl: "https://example.com/product.jpg",
+      }),
+    ]);
+    expect(productWriter.calls).toEqual([
+      expect.objectContaining({
+        crawlRunId: "crawl-run-1",
+        rawSnapshotId: "raw-snapshot-1",
+        sourceCategoryId: "category-4",
+        sourceItemKeys: ["coolpc:igrp:4:ibuy:CPU-TOKEN-001"],
+      }),
+    ]);
   });
 
   it("records non-product content as suspected block", async () => {
@@ -309,6 +365,19 @@ interface FakeRawSnapshot {
   createdAt: Date;
 }
 
+interface FakeParseError {
+  id: string;
+  crawlRunId: string;
+  rawSnapshotId: string | null;
+  sourceCategoryId: string;
+  errorType: string;
+  message: string;
+  rawName: string | null;
+  rawPriceText: string | null;
+  rawToken: string | null;
+  rawImageUrl: string | null;
+}
+
 // The fake implements only the Prisma delegate methods touched by this slice.
 // That keeps the tests focused on the crawler write contract without requiring
 // a test database.
@@ -316,6 +385,7 @@ class FakeCrawlerWriteClient implements CrawlRunWriteClient, CoolpcCategorySnaps
   readonly crawlRuns: FakeCrawlRun[] = [];
   readonly categoryResults: FakeCategoryResult[] = [];
   readonly rawSnapshots: FakeRawSnapshot[] = [];
+  readonly parseErrors: FakeParseError[] = [];
 
   constructor(private readonly categories: CrawlRunSourceCategory[]) {}
 
@@ -429,6 +499,28 @@ class FakeCrawlerWriteClient implements CrawlRunWriteClient, CoolpcCategorySnaps
       this.rawSnapshots.push(rawSnapshot);
 
       return { id: rawSnapshot.id };
+    },
+  };
+
+  parseError = {
+    createMany: async ({
+      data,
+    }: Parameters<CoolpcCategorySnapshotWriteClient["parseError"]["createMany"]>[0]) => {
+      const parseErrors = data.map((item, index) => ({
+        id: `parse-error-${this.parseErrors.length + index + 1}`,
+        crawlRunId: item.crawlRunId,
+        rawSnapshotId: item.rawSnapshotId,
+        sourceCategoryId: item.sourceCategoryId,
+        errorType: item.errorType,
+        message: item.message,
+        rawName: item.rawName,
+        rawPriceText: item.rawPriceText,
+        rawToken: item.rawToken,
+        rawImageUrl: item.rawImageUrl,
+      }));
+      this.parseErrors.push(...parseErrors);
+
+      return { count: parseErrors.length };
     },
   };
 

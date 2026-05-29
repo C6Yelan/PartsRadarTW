@@ -32,6 +32,8 @@ describe("CoolPC product price writer", () => {
       ibuyToken: item.ibuyToken,
       name: item.name,
       normalizedName: item.normalizedName,
+      primaryImageUrl: item.primaryImageUrl,
+      primaryImageCheckedAt: item.fetchedAt,
       firstSeenAt: item.fetchedAt,
       lastSeenAt: item.fetchedAt,
       isActive: true,
@@ -93,6 +95,8 @@ describe("CoolPC product price writer", () => {
     expect(client.products[0]).toMatchObject({
       name: nextItem.name,
       normalizedName: nextItem.normalizedName,
+      primaryImageUrl: nextItem.primaryImageUrl,
+      primaryImageCheckedAt: nextItem.fetchedAt,
       lastSeenAt: nextItem.fetchedAt,
       isActive: true,
       missingSince: null,
@@ -296,6 +300,8 @@ interface FakeProduct {
   ibuyToken: string;
   name: string;
   normalizedName: string;
+  primaryImageUrl: string;
+  primaryImageCheckedAt: Date;
   sourceUrl: string;
   isActive: boolean;
   missingSince: Date | null;
@@ -390,6 +396,8 @@ class FakeCoolpcProductWriteClient implements CoolpcProductWriteClient {
         ibuyToken: data.ibuyToken,
         name: data.name,
         normalizedName: data.normalizedName,
+        primaryImageUrl: data.primaryImageUrl,
+        primaryImageCheckedAt: data.primaryImageCheckedAt,
         sourceUrl: data.sourceUrl,
         isActive: data.isActive,
         missingSince: data.missingSince,
@@ -502,6 +510,8 @@ class FakeCoolpcProductWriteClient implements CoolpcProductWriteClient {
       ibuyToken: item.ibuyToken,
       name: item.name,
       normalizedName: item.normalizedName,
+      primaryImageUrl: item.primaryImageUrl,
+      primaryImageCheckedAt: item.fetchedAt,
       sourceUrl: item.sourceUrl,
       isActive: overrides.isActive ?? true,
       missingSince: overrides.missingSince ?? null,
@@ -517,6 +527,7 @@ function productItem({
   ibuyToken = "CPU-TOKEN-001",
   name = "AMD Ryzen 5 7500F MPK【6核/12緒】3.7G",
   normalizedName = "amd ryzen 5 7500f mpk【6核/12緒】3.7g",
+  primaryImageUrl = "https://www.coolpc.com.tw/eval/4/amd7500f.jpg",
   price,
   fetchedAt = new Date("2026-05-27T10:30:00.000Z"),
 }: {
@@ -524,6 +535,7 @@ function productItem({
   ibuyToken?: string;
   name?: string;
   normalizedName?: string;
+  primaryImageUrl?: string;
   price: number;
   fetchedAt?: Date;
 }): ParsedCoolpcProduct {
@@ -536,6 +548,7 @@ function productItem({
     sourceItemKey: `coolpc:igrp:4:ibuy:${ibuyToken}`,
     name,
     normalizedName,
+    primaryImageUrl,
     price,
     currency: "TWD",
     sourceUrl: "https://www.coolpc.com.tw/eachview.php?IGrp=4",
