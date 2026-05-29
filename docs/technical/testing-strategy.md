@@ -235,6 +235,7 @@ API 測試不應暴露：
 - API query 邏輯 tests 通過。
 - 錯誤狀態 tests 通過。
 - 不暴露內部欄位。
+- 圖片資料流可用 `pnpm smoke:coolpc-image-flow` 手動驗證 raw HTML -> crawler -> DB -> product API；此 smoke 使用 rollback transaction，不保留 DB 測試資料。
 
 ### Web UI 階段
 
