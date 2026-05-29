@@ -55,6 +55,8 @@ export default function ProductDetail({ productId }: { productId: string }) {
   useEffect(() => {
     const controller = new AbortController();
     setState("loading");
+    setImageError(false);
+    setProduct(null);
 
     Promise.all([
       fetch(`/api/products/${productId}`, { signal: controller.signal }),
