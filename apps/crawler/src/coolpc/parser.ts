@@ -167,6 +167,7 @@ export function validateCoolpcCategoryPage(
     (candidate) =>
       candidate.rawToken.length > 0 &&
       candidate.rawName.length > 0 &&
+      !isNonProductNoticeName(candidate.rawName) &&
       parsePriceText(candidate.rawPriceText) !== null,
   ).length;
 
@@ -305,6 +306,10 @@ export function parseCoolpcCategoryPage(
       continue;
     }
 
+    if (isNonProductNoticeName(name)) {
+      continue;
+    }
+
     if (price === null) {
       issues.push({
         type: "price_parse_failed",
@@ -420,6 +425,10 @@ function expectedTitleKeywords(context: SourceCategoryContext): string[] {
 
 function normalizeForComparison(value: string): string {
   return value.replace(/\s+/g, "").toLocaleLowerCase("zh-TW");
+}
+
+function isNonProductNoticeName(name: string): boolean {
+  return normalizeForComparison(normalizeProductName(name)).startsWith("【提醒】");
 }
 
 function sanitizeCoolpcSourceUrl(sourceUrl: string): string {

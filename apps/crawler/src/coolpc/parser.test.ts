@@ -176,6 +176,21 @@ describe("CoolPC category parser", () => {
     }
   });
 
+  it("skips explicit non-product notice rows without dropping real accessory products", () => {
+    const result = parseCoolpcCategoryPage(
+      fixture("coolpc-live-igrp-10-notice.html"),
+      contextForCategory(10),
+    );
+
+    expect(result.validation.status).toBe("valid");
+    expect(result.canImport).toBe(true);
+    expect(result.issues).toEqual([]);
+    expect(result.items.map((item) => item.name)).toEqual([
+      "[加購價] 麗臺 mini-DP轉DVI-D轉接線",
+      "酷碼 HTK-002 美國道康膏/導熱係數 0.8W/m-K",
+    ]);
+  });
+
   it("deduplicates exact duplicate rows from reduced live case and power supply fixtures", () => {
     const fixtures = [
       [14, "coolpc-live-igrp-14-duplicate.html"],
