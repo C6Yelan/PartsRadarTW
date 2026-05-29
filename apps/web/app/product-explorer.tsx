@@ -114,6 +114,7 @@ export default function ProductExplorer() {
   const [products, setProducts] = useState<ProductsResponse | null>(null);
   const [productState, setProductState] = useState<LoadState>("idle");
   const [filtersOpen, setFiltersOpen] = useState(true);
+  const [pageJumpValue, setPageJumpValue] = useState("");
 
   useEffect(() => {
     const initialQuery = readQueryFromLocation();
@@ -215,6 +216,7 @@ export default function ProductExplorer() {
   const totalItems = products?.pagination.totalItems ?? 0;
   const totalPages = products?.pagination.totalPages ?? 0;
   const visiblePages = getVisiblePages(query.page, totalPages);
+  const shouldShowPageJump = totalPages > 10;
   const hasActiveFilters =
     query.q !== DEFAULT_QUERY.q ||
     query.igrp !== DEFAULT_QUERY.igrp ||
@@ -305,6 +307,23 @@ export default function ProductExplorer() {
       status: DEFAULT_QUERY.status,
       page: 1,
     });
+  }
+
+  function jumpToPage(event: SubmitEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const normalizedValue = pageJumpValue.trim();
+    if (!isNonNegativeInteger(normalizedValue)) {
+      return;
+    }
+
+    const requestedPage = Number(normalizedValue);
+    if (requestedPage < 1) {
+      return;
+    }
+
+    updateQuery({ page: Math.min(requestedPage, Math.max(1, totalPages)) });
+    setPageJumpValue("");
   }
 
   return (
@@ -563,6 +582,27 @@ export default function ProductExplorer() {
               >
                 下一頁
               </button>
+              {shouldShowPageJump ? (
+                <form className="page-jump" onSubmit={jumpToPage}>
+                  <label htmlFor="page-jump-input">跳至</label>
+                  <input
+                    id="page-jump-input"
+                    inputMode="numeric"
+                    placeholder="頁碼"
+                    type="text"
+                    value={pageJumpValue}
+                    onChange={(event) => setPageJumpValue(toDigitsOnly(event.target.value))}
+                  />
+                  <span>頁</span>
+                  <button
+                    className="icon-button"
+                    disabled={productState === "loading" || pageJumpValue.trim() === ""}
+                    type="submit"
+                  >
+                    前往
+                  </button>
+                </form>
+              ) : null}
             </div>
           </section>
         </div>
@@ -796,6 +836,10 @@ function parseNonNegativeIntegerParam(value: string | null) {
 
 function isNonNegativeInteger(value: string) {
   return /^\d+$/.test(value);
+}
+
+function toDigitsOnly(value: string) {
+  return value.replace(/\D/g, "");
 }
 
 function parseAllowedValue<T extends string>(value: string | null, allowed: T[], fallback: T) {

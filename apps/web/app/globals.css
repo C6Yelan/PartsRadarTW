@@ -782,6 +782,21 @@ input::placeholder {
   color: var(--faint);
 }
 
+.page-jump {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.page-jump input {
+  width: 74px;
+  min-height: 38px;
+  padding: 0 10px;
+  text-align: center;
+}
+
 .skeleton-row {
   min-height: 78px;
   padding: 12px 22px;
@@ -1134,6 +1149,15 @@ input::placeholder {
   .page-buttons {
     order: -1;
     width: 100%;
+  }
+
+  .page-jump {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .page-jump .icon-button {
+    flex: 0 0 auto;
   }
 
   .detail-layout {
