@@ -145,7 +145,7 @@ export default function ProductDetail({ productId }: { productId: string }) {
 
             {!product.status.isActive ? (
               <div className="quiet-alert warning" role="status">
-                此商品目前可能已下架或暫時未出現在來源頁。
+                此商品目前可能已下架，或暫時沒有出現在原價屋頁面。
               </div>
             ) : null}
 
@@ -177,8 +177,8 @@ export default function ProductDetail({ productId }: { productId: string }) {
                 <dd>{formatDateTime(product.image.capturedAt)}</dd>
               </div>
               <div>
-                <dt>商品狀態</dt>
-                <dd>{product.status.isActive ? "目前出現在來源頁" : "可能未出現"}</dd>
+                <dt>上架狀態</dt>
+                <dd>{product.status.isActive ? "目前上架" : "可能已下架"}</dd>
               </div>
             </dl>
 

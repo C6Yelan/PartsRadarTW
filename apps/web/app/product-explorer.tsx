@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { type SubmitEvent, useEffect, useMemo, useState } from "react";
+import { type SubmitEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 type SourceStatus = "ok" | "stale" | "unavailable";
 type ProductStatus = "active" | "inactive" | "all";
@@ -93,13 +93,13 @@ const SORT_OPTIONS: Array<{ value: ProductSort; label: string }> = [
   { value: "price_asc", label: "價格低到高" },
   { value: "price_desc", label: "價格高到低" },
   { value: "name_asc", label: "名稱 A 到 Z" },
-  { value: "updated_desc", label: "來源資料新到舊" },
+  { value: "updated_desc", label: "最近更新" },
 ];
 
 const STATUS_OPTIONS: Array<{ value: ProductStatus; label: string }> = [
-  { value: "active", label: "目前出現" },
-  { value: "all", label: "包含未出現" },
-  { value: "inactive", label: "僅未出現" },
+  { value: "active", label: "目前上架" },
+  { value: "all", label: "全部商品" },
+  { value: "inactive", label: "可能已下架" },
 ];
 
 const PAGE_SIZE_OPTIONS = [12, 24, 48, 96] as const;
@@ -216,8 +216,14 @@ export default function ProductExplorer() {
   const totalItems = products?.pagination.totalItems ?? 0;
   const totalPages = products?.pagination.totalPages ?? 0;
   const visiblePages = getVisiblePages(query.page, totalPages);
+  const hasActiveFilters =
+    query.q !== DEFAULT_QUERY.q ||
+    query.igrp !== DEFAULT_QUERY.igrp ||
+    query.minPrice !== DEFAULT_QUERY.minPrice ||
+    query.maxPrice !== DEFAULT_QUERY.maxPrice ||
+    query.status !== DEFAULT_QUERY.status;
 
-  function commitQuery(nextQuery: QueryState) {
+  const commitQuery = useCallback((nextQuery: QueryState) => {
     const normalizedQuery = {
       ...nextQuery,
       page: Math.max(1, nextQuery.page),
@@ -231,7 +237,38 @@ export default function ProductExplorer() {
     setQuery(normalizedQuery);
     setDraft(normalizedQuery);
     setFormError(null);
-  }
+  }, []);
+
+  useEffect(() => {
+    if (!isReady) {
+      return;
+    }
+
+    const validationError = validatePriceRange(draft.minPrice, draft.maxPrice);
+    if (validationError) {
+      setFormError(validationError);
+      return;
+    }
+
+    setFormError(null);
+
+    const minPrice = draft.minPrice.trim();
+    const maxPrice = draft.maxPrice.trim();
+    if (minPrice === query.minPrice && maxPrice === query.maxPrice) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      commitQuery({
+        ...query,
+        minPrice,
+        maxPrice,
+        page: 1,
+      });
+    }, 500);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [commitQuery, draft.minPrice, draft.maxPrice, isReady, query]);
 
   function updateQuery(partial: Partial<QueryState>) {
     commitQuery({
@@ -259,8 +296,16 @@ export default function ProductExplorer() {
     });
   }
 
-  function clearFilters() {
-    commitQuery(DEFAULT_QUERY);
+  function resetFilters() {
+    commitQuery({
+      ...query,
+      q: DEFAULT_QUERY.q,
+      igrp: DEFAULT_QUERY.igrp,
+      minPrice: DEFAULT_QUERY.minPrice,
+      maxPrice: DEFAULT_QUERY.maxPrice,
+      status: DEFAULT_QUERY.status,
+      page: 1,
+    });
   }
 
   return (
@@ -321,12 +366,17 @@ export default function ProductExplorer() {
 
         <div className="workspace-grid">
           <aside className="filter-panel">
+            {hasActiveFilters ? (
+              <button className="filter-reset-button" type="button" onClick={resetFilters}>
+                重設
+              </button>
+            ) : null}
             <details
               open={filtersOpen}
               onToggle={(event) => setFiltersOpen(event.currentTarget.open)}
             >
               <summary>搜尋與篩選</summary>
-              <form className="filter-stack" onSubmit={applyTextFilters}>
+              <div className="filter-stack">
                 <div className="filter-group">
                   <span className="filter-title">分類</span>
                   <div className="category-list" role="radiogroup" aria-label="分類">
@@ -360,9 +410,8 @@ export default function ProductExplorer() {
                       <span className="sr-only">最低價格</span>
                       <input
                         inputMode="numeric"
-                        min="0"
                         placeholder="最低價格"
-                        type="number"
+                        type="text"
                         value={draft.minPrice}
                         onChange={(event) => setDraft({ ...draft, minPrice: event.target.value })}
                       />
@@ -371,9 +420,8 @@ export default function ProductExplorer() {
                       <span className="sr-only">最高價格</span>
                       <input
                         inputMode="numeric"
-                        min="0"
                         placeholder="最高價格"
-                        type="number"
+                        type="text"
                         value={draft.maxPrice}
                         onChange={(event) => setDraft({ ...draft, maxPrice: event.target.value })}
                       />
@@ -383,7 +431,7 @@ export default function ProductExplorer() {
                 </div>
 
                 <div className="filter-group">
-                  <span className="filter-title">商品狀態</span>
+                  <span className="filter-title">上架狀態</span>
                   <div className="segmented-control">
                     {STATUS_OPTIONS.map((option) => (
                       <button
@@ -398,16 +446,7 @@ export default function ProductExplorer() {
                     ))}
                   </div>
                 </div>
-
-                <div className="filter-actions">
-                  <button className="control-button primary" type="submit">
-                    套用篩選
-                  </button>
-                  <button className="control-button secondary" type="button" onClick={clearFilters}>
-                    清除
-                  </button>
-                </div>
-              </form>
+              </div>
             </details>
           </aside>
 
@@ -460,7 +499,7 @@ export default function ProductExplorer() {
                 <span>分類</span>
                 <span>目前價格</span>
                 <span>價格最後確認</span>
-                <span>來源狀態</span>
+                <span>上架狀態</span>
                 <span>來源</span>
               </div>
 
@@ -580,9 +619,9 @@ function ProductRow({ product }: { product: ProductListItem }) {
         <span>{formatDateTime(product.price.lastSeenAt, "尚無時間")}</span>
       </div>
       <div className="table-cell row-status">
-        <span className="cell-label">來源狀態</span>
+        <span className="cell-label">上架狀態</span>
         <span className={product.status.isActive ? "row-state ok" : "row-state warning"}>
-          {product.status.isActive ? "正常" : "可能未出現"}
+          {product.status.isActive ? "目前上架" : "可能已下架"}
         </span>
       </div>
       <a className="source-link" href={product.source.url} rel="noreferrer" target="_blank">

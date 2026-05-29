@@ -307,10 +307,11 @@ input::placeholder {
 .filter-panel {
   align-self: start;
   overflow: hidden;
+  position: relative;
 }
 
 .filter-panel summary {
-  padding: 18px 20px;
+  padding: 18px 86px 18px 20px;
   color: var(--accent-strong);
   font-weight: 800;
   list-style: none;
@@ -318,6 +319,31 @@ input::placeholder {
 
 .filter-panel summary::-webkit-details-marker {
   display: none;
+}
+
+.filter-reset-button {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  z-index: 1;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease;
+}
+
+.filter-reset-button:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+  color: var(--text);
 }
 
 .filter-stack {
@@ -421,12 +447,6 @@ input::placeholder {
 .segmented-control button.is-active {
   background: var(--accent-surface);
   color: var(--text-strong);
-}
-
-.filter-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
 }
 
 .control-button,
@@ -933,10 +953,6 @@ input::placeholder {
     grid-template-columns: 1fr;
   }
 
-  .filter-panel {
-    position: static;
-  }
-
   .category-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -971,7 +987,6 @@ input::placeholder {
 
   .category-list,
   .price-grid,
-  .filter-actions,
   .detail-facts {
     grid-template-columns: 1fr;
   }
