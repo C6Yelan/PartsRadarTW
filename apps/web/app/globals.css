@@ -615,10 +615,9 @@ input::placeholder {
 }
 
 .results-toolbar {
-  display: flex;
+  display: grid;
   gap: 16px;
-  align-items: center;
-  justify-content: space-between;
+  align-items: start;
   padding: 18px 22px;
   border-bottom: 1px solid var(--border);
 }
@@ -635,19 +634,57 @@ input::placeholder {
   flex-wrap: wrap;
   gap: 10px;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: flex-start;
 }
 
 .toolbar-controls label {
   display: grid;
-  grid-template-columns: auto minmax(112px, 1fr);
+  grid-template-columns: auto minmax(92px, 1fr);
   gap: 8px;
   align-items: center;
   color: var(--muted);
   font-size: 13px;
 }
 
+.toolbar-price-filter,
+.toolbar-status-filter {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.toolbar-price-filter {
+  grid-template-columns: auto 168px;
+}
+
+.toolbar-price-grid {
+  gap: 8px;
+}
+
+.toolbar-price-filter .inline-error {
+  grid-column: 1 / -1;
+  max-width: none;
+  margin: 0;
+}
+
+.toolbar-status-filter {
+  grid-template-columns: auto 286px;
+}
+
+.toolbar-segmented-control {
+  width: 286px;
+  min-width: 0;
+}
+
+.toolbar-segmented-control button {
+  white-space: nowrap;
+}
+
 .toolbar-controls select {
+  width: 100%;
   min-height: 38px;
   padding: 0 32px 0 10px;
 }
@@ -655,7 +692,7 @@ input::placeholder {
 .vendor-filter {
   position: relative;
   display: grid;
-  grid-template-columns: auto minmax(132px, 1fr);
+  grid-template-columns: auto minmax(118px, 1fr);
   gap: 8px;
   align-items: center;
   color: var(--muted);
@@ -1337,10 +1374,26 @@ input::placeholder {
   }
 
   .toolbar-controls,
-  .toolbar-controls label {
+  .toolbar-controls label,
+  .toolbar-price-filter,
+  .toolbar-status-filter {
     display: grid;
     grid-template-columns: 1fr;
     justify-content: stretch;
+  }
+
+  .toolbar-price-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .toolbar-price-filter .inline-error {
+    grid-column: 1;
+    max-width: none;
+  }
+
+  .toolbar-segmented-control {
+    width: 100%;
+    min-width: 0;
   }
 
   .vendor-filter {
@@ -1473,6 +1526,19 @@ input::placeholder {
 
   .segmented-control button:last-child {
     border-bottom: 0;
+  }
+
+  .toolbar-segmented-control {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .toolbar-segmented-control button {
+    border-right: 1px solid var(--border);
+    border-bottom: 0;
+  }
+
+  .toolbar-segmented-control button:last-child {
+    border-right: 0;
   }
 
   .product-image {

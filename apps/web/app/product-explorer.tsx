@@ -118,7 +118,7 @@ const STATUS_OPTIONS: Array<{ value: ProductStatus; label: string }> = [
   { value: "inactive", label: "可能已下架" },
 ];
 
-const PAGE_SIZE_OPTIONS = [10, 15, 20] as const;
+const PAGE_SIZE_OPTIONS = [5, 10, 15, 20, 50] as const;
 const SKELETON_ROWS = ["row-1", "row-2", "row-3", "row-4", "row-5", "row-6"];
 const DESKTOP_FILTER_MEDIA_QUERY = "(min-width: 761px)";
 
@@ -580,37 +580,41 @@ export default function ProductExplorer() {
                     <p className="inline-error">分類暫時無法載入。</p>
                   ) : null}
                 </div>
+              </div>
+            </details>
+          </aside>
 
-                <div className="filter-group">
-                  <span className="filter-title">價格範圍（NT$）</span>
-                  <div className="price-grid">
-                    <label>
-                      <span className="sr-only">最低價格</span>
-                      <input
-                        inputMode="numeric"
-                        placeholder="最低價格"
-                        type="text"
-                        value={draft.minPrice}
-                        onChange={(event) => setDraft({ ...draft, minPrice: event.target.value })}
-                      />
-                    </label>
-                    <label>
-                      <span className="sr-only">最高價格</span>
-                      <input
-                        inputMode="numeric"
-                        placeholder="最高價格"
-                        type="text"
-                        value={draft.maxPrice}
-                        onChange={(event) => setDraft({ ...draft, maxPrice: event.target.value })}
-                      />
-                    </label>
+          <section className="results-panel" ref={resultsPanelRef} aria-label="商品列表">
+            <div className="results-toolbar">
+              <div>
+                <h1>搜尋結果</h1>
+              </div>
+              <div className="toolbar-controls">
+                <div className="toolbar-price-filter">
+                  <span>價格</span>
+                  <div className="price-grid toolbar-price-grid">
+                    <input
+                      aria-label="最低價格"
+                      inputMode="numeric"
+                      placeholder="最低價格"
+                      type="text"
+                      value={draft.minPrice}
+                      onChange={(event) => setDraft({ ...draft, minPrice: event.target.value })}
+                    />
+                    <input
+                      aria-label="最高價格"
+                      inputMode="numeric"
+                      placeholder="最高價格"
+                      type="text"
+                      value={draft.maxPrice}
+                      onChange={(event) => setDraft({ ...draft, maxPrice: event.target.value })}
+                    />
                   </div>
                   {formError ? <p className="inline-error">{formError}</p> : null}
                 </div>
-
-                <div className="filter-group">
-                  <span className="filter-title">上架狀態</span>
-                  <div className="segmented-control">
+                <div className="toolbar-status-filter">
+                  <span>狀態</span>
+                  <div className="segmented-control toolbar-segmented-control">
                     {STATUS_OPTIONS.map((option) => (
                       <button
                         aria-pressed={query.status === option.value}
@@ -624,16 +628,6 @@ export default function ProductExplorer() {
                     ))}
                   </div>
                 </div>
-              </div>
-            </details>
-          </aside>
-
-          <section className="results-panel" ref={resultsPanelRef} aria-label="商品列表">
-            <div className="results-toolbar">
-              <div>
-                <h1>搜尋結果</h1>
-              </div>
-              <div className="toolbar-controls">
                 <VendorFilter
                   options={vendorOptions}
                   disabledLabel={query.igrp ? "無廠商資料" : "先選分類"}
