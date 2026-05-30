@@ -7,6 +7,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -123,6 +124,8 @@ export default function ProductExplorer() {
   const [productState, setProductState] = useState<LoadState>("idle");
   const [filtersOpen, setFiltersOpen] = useState(true);
   const [pageJumpValue, setPageJumpValue] = useState("");
+  const resultsPanelRef = useRef<HTMLElement | null>(null);
+  const pendingPageScrollRef = useRef<number | null>(null);
 
   useEffect(() => {
     const initialQuery = readQueryFromLocation();
@@ -209,6 +212,33 @@ export default function ProductExplorer() {
     return () => controller.abort();
   }, [isReady, query]);
 
+  const scrollToResultsTop = useCallback(() => {
+    window.requestAnimationFrame(() => {
+      resultsPanelRef.current?.scrollIntoView({
+        behavior: "auto",
+        block: "start",
+      });
+    });
+  }, []);
+
+  useEffect(() => {
+    const pendingPage = pendingPageScrollRef.current;
+    if (pendingPage === null) {
+      return;
+    }
+
+    if (productState === "ready" && products?.pagination.page === pendingPage) {
+      pendingPageScrollRef.current = null;
+      scrollToResultsTop();
+      return;
+    }
+
+    if (productState === "error") {
+      pendingPageScrollRef.current = null;
+      scrollToResultsTop();
+    }
+  }, [productState, products?.pagination.page, scrollToResultsTop]);
+
   const selectedCategoryName = useMemo(() => {
     if (!query.igrp) {
       return "全部分類";
@@ -287,6 +317,19 @@ export default function ProductExplorer() {
     });
   }
 
+  function goToPage(page: number) {
+    if (page === query.page) {
+      return;
+    }
+
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+
+    pendingPageScrollRef.current = page;
+    updateQuery({ page });
+  }
+
   function applyTextFilters(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -357,7 +400,7 @@ export default function ProductExplorer() {
       return;
     }
 
-    updateQuery({ page: Math.min(requestedPage, Math.max(1, totalPages)) });
+    goToPage(Math.min(requestedPage, Math.max(1, totalPages)));
     setPageJumpValue("");
   }
 
@@ -505,7 +548,7 @@ export default function ProductExplorer() {
             </details>
           </aside>
 
-          <section className="results-panel" aria-label="商品列表">
+          <section className="results-panel" ref={resultsPanelRef} aria-label="商品列表">
             <div className="results-toolbar">
               <div>
                 <h1>搜尋結果</h1>
@@ -587,7 +630,7 @@ export default function ProductExplorer() {
                 className="icon-button"
                 disabled={query.page <= 1 || productState === "loading"}
                 type="button"
-                onClick={() => updateQuery({ page: query.page - 1 })}
+                onClick={() => goToPage(query.page - 1)}
               >
                 上一頁
               </button>
@@ -601,9 +644,10 @@ export default function ProductExplorer() {
                     <button
                       aria-current={item === query.page ? "page" : undefined}
                       className={item === query.page ? "is-active" : ""}
+                      disabled={item === query.page}
                       key={item}
                       type="button"
-                      onClick={() => updateQuery({ page: item })}
+                      onClick={() => goToPage(item)}
                     >
                       {item}
                     </button>
@@ -614,7 +658,7 @@ export default function ProductExplorer() {
                 className="icon-button"
                 disabled={query.page >= Math.max(1, totalPages) || productState === "loading"}
                 type="button"
-                onClick={() => updateQuery({ page: query.page + 1 })}
+                onClick={() => goToPage(query.page + 1)}
               >
                 下一頁
               </button>

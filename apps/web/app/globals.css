@@ -813,6 +813,11 @@ input::placeholder {
   color: var(--text-strong);
 }
 
+.page-buttons button[aria-current="page"]:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
 .page-gap {
   color: var(--faint);
 }
