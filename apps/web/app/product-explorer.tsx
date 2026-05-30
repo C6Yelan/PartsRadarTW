@@ -190,7 +190,7 @@ export default function ProductExplorer() {
   }, []);
 
   useEffect(() => {
-    if (!isReady) {
+    if (!isReady || !query.igrp) {
       return;
     }
 
@@ -249,7 +249,7 @@ export default function ProductExplorer() {
 
   const selectedCategoryName = useMemo(() => {
     if (!query.igrp) {
-      return "全部分類";
+      return "選擇分類";
     }
 
     return (
@@ -271,14 +271,13 @@ export default function ProductExplorer() {
   );
   const hasActiveFilters =
     query.q !== DEFAULT_QUERY.q ||
-    query.igrp !== DEFAULT_QUERY.igrp ||
     query.minPrice !== DEFAULT_QUERY.minPrice ||
     query.maxPrice !== DEFAULT_QUERY.maxPrice ||
     query.status !== DEFAULT_QUERY.status ||
     query.vendors.length > 0;
 
   const commitQuery = useCallback(
-    (nextQuery: QueryState, options?: { draftQuery?: QueryState }) => {
+    (nextQuery: QueryState, options?: { draftQuery?: QueryState; replace?: boolean }) => {
       const normalizedQuery = {
         ...nextQuery,
         vendors: normalizeVendorValues(nextQuery.vendors, nextQuery.igrp),
@@ -291,13 +290,37 @@ export default function ProductExplorer() {
       };
       const nextUrl = toUrl(normalizedQuery);
 
-      window.history.pushState(null, "", nextUrl);
+      if (options?.replace) {
+        window.history.replaceState(null, "", nextUrl);
+      } else {
+        window.history.pushState(null, "", nextUrl);
+      }
       setQuery(normalizedQuery);
       setDraft(options?.draftQuery ?? normalizedQuery);
       setFormError(null);
     },
     [],
   );
+
+  useEffect(() => {
+    if (!isReady || categoryState !== "ready" || categories.length === 0) {
+      return;
+    }
+
+    const categoryIgrps = new Set(categories.map((category) => String(category.igrp)));
+    if (query.igrp && categoryIgrps.has(query.igrp)) {
+      return;
+    }
+
+    commitQuery({
+      ...query,
+      igrp: String(categories[0].igrp),
+      vendors: DEFAULT_QUERY.vendors,
+      page: 1,
+    }, {
+      replace: true,
+    });
+  }, [categories, categoryState, commitQuery, isReady, query]);
 
   useEffect(() => {
     if (!isReady) {
@@ -385,7 +408,6 @@ export default function ProductExplorer() {
     commitQuery({
       ...query,
       q: DEFAULT_QUERY.q,
-      igrp: DEFAULT_QUERY.igrp,
       minPrice: DEFAULT_QUERY.minPrice,
       maxPrice: DEFAULT_QUERY.maxPrice,
       status: DEFAULT_QUERY.status,
@@ -407,12 +429,20 @@ export default function ProductExplorer() {
     }
 
     event.preventDefault();
-    commitQuery(DEFAULT_QUERY, {
-      draftQuery: {
-        ...DEFAULT_QUERY,
-        q: draft.q,
+    const homeQuery = {
+      ...DEFAULT_QUERY,
+      igrp: getFallbackCategoryIgrp(categories, query.igrp),
+    };
+
+    commitQuery(
+      homeQuery,
+      {
+        draftQuery: {
+          ...homeQuery,
+          q: draft.q,
+        },
       },
-    });
+    );
   }
 
   function keepDesktopFiltersOpen(event: MouseEvent<HTMLElement>) {
@@ -534,13 +564,6 @@ export default function ProductExplorer() {
                 <div className="filter-group">
                   <span className="filter-title">分類</span>
                   <div className="category-list" role="radiogroup" aria-label="分類">
-                    <CategoryOption
-                      checked={query.igrp === ""}
-                      label="全部分類"
-                      subLabel={categoryState === "ready" ? `${categories.length} 類` : "讀取中"}
-                      value=""
-                      onChange={() => updateCategoryFilter("")}
-                    />
                     {categories.map((category) => (
                       <CategoryOption
                         checked={query.igrp === String(category.igrp)}
@@ -1146,6 +1169,10 @@ function normalizeVendorValues(vendors: string[], igrp: string | number | null |
   }
 
   return normalizedVendors;
+}
+
+function getFallbackCategoryIgrp(categories: CategoryItem[], fallback: string) {
+  return categories.length > 0 ? String(categories[0].igrp) : fallback;
 }
 
 function parseAllowedValue<T extends string>(value: string | null, allowed: T[], fallback: T) {
