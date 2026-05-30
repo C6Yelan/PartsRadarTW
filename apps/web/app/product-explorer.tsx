@@ -121,6 +121,7 @@ const STATUS_OPTIONS: Array<{ value: ProductStatus; label: string }> = [
 const PAGE_SIZE_OPTIONS = [5, 10, 15, 20, 50] as const;
 const SKELETON_ROWS = ["row-1", "row-2", "row-3", "row-4", "row-5", "row-6"];
 const DESKTOP_FILTER_MEDIA_QUERY = "(min-width: 761px)";
+const MAX_PRICE_DIGITS = 9;
 
 export default function ProductExplorer() {
   const [isReady, setIsReady] = useState(false);
@@ -591,7 +592,9 @@ export default function ProductExplorer() {
                       placeholder="最低價格"
                       type="text"
                       value={draft.minPrice}
-                      onChange={(event) => setDraft({ ...draft, minPrice: event.target.value })}
+                      onChange={(event) =>
+                        setDraft({ ...draft, minPrice: toPriceDigits(event.target.value) })
+                      }
                     />
                     <input
                       aria-label="最高價格"
@@ -599,10 +602,11 @@ export default function ProductExplorer() {
                       placeholder="最高價格"
                       type="text"
                       value={draft.maxPrice}
-                      onChange={(event) => setDraft({ ...draft, maxPrice: event.target.value })}
+                      onChange={(event) =>
+                        setDraft({ ...draft, maxPrice: toPriceDigits(event.target.value) })
+                      }
                     />
                   </div>
-                  {formError ? <p className="inline-error">{formError}</p> : null}
                 </div>
                 <div className="toolbar-status-filter">
                   <span>狀態</span>
@@ -662,13 +666,17 @@ export default function ProductExplorer() {
                   </select>
                 </label>
               </div>
+              {formError ? (
+                <p className="toolbar-error" role="alert">
+                  價格範圍錯誤：{formError}
+                </p>
+              ) : null}
             </div>
 
             <div className="product-table">
               <div className="table-header">
                 <span aria-hidden="true" />
                 <span>商品</span>
-                <span>分類</span>
                 <span>目前價格</span>
                 <span>上架狀態</span>
               </div>
@@ -917,11 +925,6 @@ function ProductRow({ detailHref, product }: { detailHref: string; product: Prod
       />
       <div className="product-main">
         <Link href={detailHref}>{product.name}</Link>
-        <span>{product.category.sourceName}</span>
-      </div>
-      <div className="table-cell row-category">
-        <span className="cell-label">分類</span>
-        <span>{product.category.displayName}</span>
       </div>
       <div className="table-cell row-price">
         <span className="cell-label">目前價格</span>
@@ -987,7 +990,6 @@ function SkeletonRows() {
           <span className="skeleton-box wide" />
           <span className="skeleton-box short" />
           <span className="skeleton-box short" />
-          <span className="skeleton-box short" />
         </div>
       ))}
     </>
@@ -1000,8 +1002,8 @@ function readQueryFromLocation(): QueryState {
   return {
     q: (params.get("q") ?? "").trim().slice(0, 100),
     igrp: parseNonNegativeIntegerParam(params.get("igrp")) ?? "",
-    minPrice: parseNonNegativeIntegerParam(params.get("minPrice")) ?? "",
-    maxPrice: parseNonNegativeIntegerParam(params.get("maxPrice")) ?? "",
+    minPrice: parsePriceParam(params.get("minPrice")) ?? "",
+    maxPrice: parsePriceParam(params.get("maxPrice")) ?? "",
     status: parseAllowedValue(params.get("status"), ["active", "inactive", "all"], "active"),
     sort: parseAllowedValue(
       params.get("sort"),
@@ -1107,12 +1109,22 @@ function parseNonNegativeIntegerParam(value: string | null) {
   return normalizedValue;
 }
 
+function parsePriceParam(value: string | null) {
+  const normalizedValue = parseNonNegativeIntegerParam(value);
+
+  return normalizedValue ? normalizedValue.slice(0, MAX_PRICE_DIGITS) : null;
+}
+
 function isNonNegativeInteger(value: string) {
   return /^\d+$/.test(value);
 }
 
 function toDigitsOnly(value: string) {
   return value.replace(/\D/g, "");
+}
+
+function toPriceDigits(value: string) {
+  return toDigitsOnly(value).slice(0, MAX_PRICE_DIGITS);
 }
 
 function parseVendorsParam(value: string | null) {
