@@ -289,47 +289,11 @@ input::placeholder {
   line-height: 1.75;
 }
 
-.summary-strip {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.summary-item {
-  min-height: 86px;
-  padding: 18px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
-}
-
-.summary-item span,
 .eyebrow {
   display: block;
   color: var(--muted);
   font-size: 13px;
   line-height: 1.4;
-}
-
-.summary-item strong {
-  display: block;
-  margin-top: 8px;
-  color: var(--text-strong);
-  font-size: clamp(20px, 2.2vw, 28px);
-  font-weight: 800;
-  line-height: 1.1;
-}
-
-.summary-item.ok strong {
-  color: var(--success);
-}
-
-.summary-item.stale strong {
-  color: var(--warning);
-}
-
-.summary-item.unavailable strong {
-  color: var(--danger);
 }
 
 .quiet-alert {
@@ -629,6 +593,19 @@ input::placeholder {
   line-height: 1.25;
 }
 
+.results-title {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: baseline;
+}
+
+.results-title span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .toolbar-controls {
   display: flex;
   flex-wrap: wrap;
@@ -736,8 +713,8 @@ input::placeholder {
   top: calc(100% + 8px);
   right: 0;
   z-index: 10;
-  width: min(320px, 84vw);
-  padding: 10px;
+  width: min(520px, calc(100vw - 48px));
+  padding: 12px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: #0d1a24;
@@ -768,9 +745,9 @@ input::placeholder {
 
 .vendor-option-list {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 7px;
-  max-height: 286px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  max-height: min(420px, 52vh);
   overflow-y: auto;
 }
 
@@ -1287,10 +1264,6 @@ input::placeholder {
     justify-content: space-between;
   }
 
-  .summary-strip {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .workspace-grid {
     grid-template-columns: 1fr;
   }
@@ -1350,10 +1323,6 @@ input::placeholder {
     grid-template-columns: 1fr;
   }
 
-  .summary-item {
-    min-height: 74px;
-  }
-
   .filter-panel summary {
     min-height: 54px;
     padding: 0 16px;
@@ -1404,6 +1373,11 @@ input::placeholder {
     position: static;
     width: 100%;
     margin-top: 8px;
+  }
+
+  .vendor-option-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-height: min(480px, 62vh);
   }
 
   .table-header {

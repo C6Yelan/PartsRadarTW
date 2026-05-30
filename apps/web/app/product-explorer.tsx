@@ -533,15 +533,6 @@ export default function ProductExplorer() {
       </header>
 
       <main className="dashboard-shell">
-        <section className="summary-strip" aria-label="資料摘要">
-          <SummaryItem
-            label="已收錄分類"
-            value={categoryState === "ready" ? categories.length : "--"}
-          />
-          <SummaryItem label="查詢結果" value={formatInteger(totalItems)} />
-          <SummaryItem label="目前分類" value={selectedCategoryName} />
-        </section>
-
         <div className="workspace-grid">
           <aside className="filter-panel">
             {hasActiveFilters ? (
@@ -586,8 +577,9 @@ export default function ProductExplorer() {
 
           <section className="results-panel" ref={resultsPanelRef} aria-label="商品列表">
             <div className="results-toolbar">
-              <div>
+              <div className="results-title">
                 <h1>搜尋結果</h1>
+                <span>{formatInteger(totalItems)} 筆商品</span>
               </div>
               <div className="toolbar-controls">
                 <div className="toolbar-price-filter">
@@ -983,23 +975,6 @@ function ProductImage({
       onContextMenu={(event) => event.preventDefault()}
       onError={() => setHasError(true)}
     />
-  );
-}
-
-function SummaryItem({
-  label,
-  tone,
-  value,
-}: {
-  label: string;
-  tone?: SourceStatus;
-  value: number | string;
-}) {
-  return (
-    <div className={tone ? `summary-item ${tone}` : "summary-item"}>
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
   );
 }
 
