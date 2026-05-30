@@ -49,6 +49,7 @@ temp/
 # Crawler generated data
 data/raw-snapshots/
 data/tmp/
+storage/product-images/
 storage/snapshots/
 storage/tmp/
 

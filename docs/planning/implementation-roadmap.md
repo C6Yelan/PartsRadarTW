@@ -230,8 +230,8 @@
 - 缺圖或不合法圖片 URL 會被記錄為資料完整性問題或 validation issue。
 - API contract 已把主要商品圖片列為商品列表與商品詳細 response 的必要欄位。
 - 資安文件已定義圖片 URL allowlist 與未來 proxy / optimizer 限制。
-- Phase 5 前已完成圖片呈現方式更換：採自家小尺寸縮圖快取，或改用 placeholder / 分類圖示；直接使用 CoolPC / 原價屋圖片 URL 只保留為本機資料流驗證與小範圍測試手段。
-- 若採自家小尺寸縮圖，需先定義最小 storage、更新、失效與移除規則；若採 placeholder / 分類圖示，需明確接受商品辨識體驗下降。
+- Phase 5 前已完成圖片呈現方式更換：採自家小尺寸縮圖快取；直接使用 CoolPC / 原價屋圖片 URL 只保留為本機資料流驗證與小範圍測試手段。
+- 自家小尺寸縮圖需先定義最小 storage、更新、失效與移除規則；placeholder / 分類圖示只作為缺圖、下載失敗或移除圖片後的 fallback。
 
 ## Phase 5：Web UI 第一版
 

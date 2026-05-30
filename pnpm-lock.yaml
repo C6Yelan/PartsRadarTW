@@ -26,6 +26,9 @@ importers:
       iconv-lite:
         specifier: ^0.7.2
         version: 0.7.2
+      sharp:
+        specifier: 0.34.5
+        version: 0.34.5
     devDependencies:
       '@types/node':
         specifier: ^25.9.1
@@ -1734,8 +1737,7 @@ snapshots:
     dependencies:
       hono: 4.12.23
 
-  '@img/colour@1.1.0':
-    optional: true
+  '@img/colour@1.1.0': {}
 
   '@img/sharp-darwin-arm64@0.34.5':
     optionalDependencies:
@@ -2663,8 +2665,7 @@ snapshots:
 
   scheduler@0.27.0: {}
 
-  semver@7.8.1:
-    optional: true
+  semver@7.8.1: {}
 
   seq-queue@0.0.5: {}
 
@@ -2698,7 +2699,6 @@ snapshots:
       '@img/sharp-win32-arm64': 0.34.5
       '@img/sharp-win32-ia32': 0.34.5
       '@img/sharp-win32-x64': 0.34.5
-    optional: true
 
   shebang-command@2.0.0:
     dependencies:
