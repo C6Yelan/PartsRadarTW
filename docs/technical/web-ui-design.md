@@ -155,7 +155,7 @@ URL query 範例：
 
 主資訊順序應以商品圖片、商品名稱、分類、目前價格、價格最後確認時間、來源狀態、來源連結為主。圖片縮圖需固定尺寸與比例，避免 table row 因載入狀態或缺圖而跳動。broken image、loading 或 temporary fallback 只是容錯設計，不代表第一版資料契約可以沒有商品圖片。
 
-商品圖片顯示需符合 security 文件限制。直接使用已驗證的 CoolPC / 原價屋圖片 URL 只限本機資料流驗證與小範圍測試；進入 Phase 5 前需更換為自家小尺寸縮圖 URL，或改用 placeholder / 分類圖示。若本機驗證期間使用一般 `<img>` 顯示外部圖片，需設定 `referrerPolicy`；若使用 Next.js Image 或 image optimizer，需設定 remote allowlist，只允許 `www.coolpc.com.tw` 與預期圖片路徑。
+商品圖片顯示需符合 security 文件限制。前端商品圖片應使用站內商品圖片 API URL，例如 `/api/product-images/{productId}.webp`；直接使用已驗證的 CoolPC / 原價屋圖片 URL 只限本機資料流驗證與小範圍測試，不作為 Phase 5 UI 完成狀態。圖片實體儲存位置由後端部署環境設定，前端不應依賴資料夾相對路徑。
 
 Phase 5 entry gate 的圖片 fallback 規則：
 

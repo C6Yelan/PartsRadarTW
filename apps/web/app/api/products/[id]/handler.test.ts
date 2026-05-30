@@ -42,7 +42,7 @@ describe("GET /api/products/{id} handler", () => {
         sourceName: "顯示卡 VGA",
       },
       image: {
-        url: "https://www.coolpc.com.tw/eval/12/gpu-rtx-4070.jpg",
+        url: `/api/product-images/${PRODUCT_ID}.webp`,
         alt: "GPU RTX 4070",
         capturedAt: "2026-05-28T11:55:00.000Z",
       },

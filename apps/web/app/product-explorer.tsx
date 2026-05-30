@@ -976,7 +976,7 @@ function ProductImage({
   }
 
   return (
-    // biome-ignore lint/performance/noImgElement: CoolPC image URLs are validated server-side; plain img keeps referrerPolicy explicit without enabling an image proxy.
+    // biome-ignore lint/performance/noImgElement: Product images are served by the local API; plain img keeps the fallback path direct.
     <img
       alt={alt}
       className="product-image"

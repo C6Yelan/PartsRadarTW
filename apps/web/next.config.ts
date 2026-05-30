@@ -15,7 +15,7 @@ const contentSecurityPolicy = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline'${isDevelopment ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' https://www.coolpc.com.tw data: blob:",
+  "img-src 'self' data: blob:",
   `connect-src 'self'${isDevelopment ? " http: ws:" : ""}`,
   "font-src 'self' data:",
   "object-src 'none'",

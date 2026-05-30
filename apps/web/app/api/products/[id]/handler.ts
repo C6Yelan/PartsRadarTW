@@ -1,6 +1,7 @@
 import type { Prisma } from "@partsradar/db";
 
 import { internalErrorResponse, jsonOk, notFoundResponse } from "../../_shared/responses";
+import { createProductImageApiUrl } from "../../product-images/handler";
 
 const COOLPC_SOURCE_NAME = "coolpc";
 const COOLPC_PURCHASE_BASE_URL = "https://www.coolpc.com.tw/evaluate.php";
@@ -150,7 +151,7 @@ function toProductDetailResponse(product: ProductDetailRecord): ProductDetailRes
       sourceName: product.sourceCategory.sourceName,
     },
     image: {
-      url: product.primaryImageUrl,
+      url: createProductImageApiUrl(product.id),
       alt: product.name,
       capturedAt: product.primaryImageCheckedAt.toISOString(),
     },

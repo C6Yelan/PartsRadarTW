@@ -8,6 +8,7 @@ import {
 import { createGetProductsHandler, type ProductsReadClient } from "./handler";
 
 const NOW = new Date("2026-05-28T12:00:00.000Z");
+const PRODUCT_ID = "11111111-1111-1111-1111-111111111111";
 
 describe("GET /api/products handler", () => {
   it("returns paginated products with public-safe fields and source status meta", async () => {
@@ -20,7 +21,7 @@ describe("GET /api/products handler", () => {
           displayName: "顯示卡",
           sourceName: "顯示卡 VGA",
           lastSuccessAt: new Date("2026-05-28T11:50:00.000Z"),
-          products: [{ id: "product-1" }],
+          products: [{ id: PRODUCT_ID }],
         }),
       ],
     });
@@ -80,7 +81,7 @@ describe("GET /api/products handler", () => {
     expect(body).toEqual({
       data: [
         {
-          id: "product-1",
+          id: PRODUCT_ID,
           name: "GPU RTX 4070",
           category: {
             id: "category-12",
@@ -89,7 +90,7 @@ describe("GET /api/products handler", () => {
             sourceName: "顯示卡 VGA",
           },
           image: {
-            url: "https://www.coolpc.com.tw/eval/12/gpu-rtx-4070.jpg",
+            url: `/api/product-images/${PRODUCT_ID}.webp`,
             alt: "GPU RTX 4070",
             capturedAt: "2026-05-28T11:55:00.000Z",
           },
@@ -398,7 +399,7 @@ function fakeProductsClient(options: FakeProductsClientOptions) {
 
 function product(overrides: Partial<ProductRecord> = {}): ProductRecord {
   return {
-    id: "product-1",
+    id: PRODUCT_ID,
     name: "GPU RTX 4070",
     primaryImageUrl: "https://www.coolpc.com.tw/eval/12/gpu-rtx-4070.jpg",
     primaryImageCheckedAt: new Date("2026-05-28T11:55:00.000Z"),
@@ -439,7 +440,7 @@ function sourceStatusCategory(
     sourceName: "顯示卡 VGA",
     lastCheckedAt: new Date("2026-05-28T11:55:00.000Z"),
     lastSuccessAt: new Date("2026-05-28T11:50:00.000Z"),
-    products: [{ id: "product-1" }],
+    products: [{ id: PRODUCT_ID }],
     ...overrides,
   };
 }

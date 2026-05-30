@@ -147,7 +147,7 @@
         "sourceName": "處理器 CPU"
       },
       "image": {
-        "url": "https://www.coolpc.com.tw/path/to/product-image.jpg",
+        "url": "/api/product-images/product-uuid.webp",
         "alt": "Intel Core Ultra 5 225F",
         "capturedAt": "2026-05-25T12:00:00.000Z"
       },
@@ -205,10 +205,10 @@
 - 第一版 `source.url` 指向原價屋分類頁，不保證能直接定位到單一商品。
 - 若 query 指定 `igrp`，`meta.sourceStatus` 優先回傳該分類狀態；未指定分類時回傳全域狀態。
 - API 不以獨立欄位回傳 computed `source_item_key` 或 `iBuyToken`；商品詳細頁只可在 `source.url` 中使用 `iBuy` query 組出原價屋購買導流。
-- `image.url` 只回傳經 crawler 驗證與正規化後的 CoolPC 預期來源圖片 URL，不回傳 raw HTML 內未驗證 URL。
+- `image.url` 回傳站內商品圖片 API URL，例如 `/api/product-images/{productId}.webp`；前端不直接 hotlink CoolPC 圖片，也不需要知道圖片實體資料夾位置。
 - `image.alt` 可由商品名稱產生，不需要額外爬取文字。
 - `image.capturedAt` 表示主要圖片最後一次由來源資料確認的時間；若實作階段決定不公開此時間，需同步調整 API contract 與 UI 文件。
-- 若內部需要追蹤圖片來源或驗證細節，應保存在 crawler / DB 內部欄位，不作為公開 API 的 raw crawler 細節回傳。
+- 來源圖片 URL、驗證細節與 raw crawler 資訊應保存在 crawler / DB 內部欄位，不作為公開 API 的圖片 URL 回傳。
 
 ## GET /api/products/{id}
 
@@ -234,7 +234,7 @@
     "sourceName": "處理器 CPU"
   },
   "image": {
-    "url": "https://www.coolpc.com.tw/path/to/product-image.jpg",
+    "url": "/api/product-images/product-uuid.webp",
     "alt": "Intel Core Ultra 5 225F",
     "capturedAt": "2026-05-25T12:00:00.000Z"
   },
@@ -267,6 +267,18 @@
 - 第一版不回傳拆解後的商品規格欄位，只回傳原始商品名稱。
 - 第一版不回傳 raw snapshot 或 parse error 細節。
 - 第一版需回傳主要商品圖片；缺圖屬於資料完整性問題或來源驗證風險，不應靜默退回無圖片詳細頁。
+
+## GET /api/product-images/{id}.webp
+
+提供站內商品縮圖 bytes，供商品列表與商品詳細頁使用。此 endpoint 讀取後端設定的縮圖儲存目錄，不要求部署時圖片資料夾與 Web app 原始碼位在固定相對位置。
+
+規則：
+
+- `{id}` 接受商品 UUID，副檔名固定為 `.webp`。
+- 實體圖片儲存位置由部署環境設定，本機預設對應 workspace 內的 `storage/product-images`；正式部署應用 `PRODUCT_IMAGE_STORAGE_DIR` 指向 mounted volume、object storage sync 目錄或其他本機可讀目錄。
+- 成功時回傳 `Content-Type: image/webp` 與 `X-Content-Type-Options: nosniff`。
+- 圖片不存在或 id 格式不合法時回傳 `404`，由前端 fallback 保持版面穩定。
+- 此 endpoint 不在訪客請求期間抓取來源站圖片；來源站圖片下載仍由手動 backfill / crawler 流程控制頻率與間隔。
 
 ## GET /api/source-status
 

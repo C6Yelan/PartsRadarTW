@@ -80,6 +80,7 @@ repo 應提供 `.env.example` 作為範本。實際本機設定使用 `.env.loca
 | `POSTGRES_PORT` | 本機 PostgreSQL 對外 port，預設 `5432` |
 | `COOLPC_BASE_URL` | 原價屋來源網址，預設 `https://www.coolpc.com.tw` |
 | `SNAPSHOT_STORAGE_DIR` | raw snapshot 壓縮檔保存位置 |
+| `PRODUCT_IMAGE_STORAGE_DIR` | 商品縮圖快取保存位置；本機 Next.js dev server 預設對應 repo root 的 `storage/product-images` |
 | `CRAWLER_INTERVAL_SECONDS` | crawler 週期秒數，第一版預設 `300` |
 | `CRAWLER_BACKOFF_SECONDS` | 連續失敗後延後秒數，第一版預設 `3600` |
 | `NODE_ENV` | Node.js 執行環境 |

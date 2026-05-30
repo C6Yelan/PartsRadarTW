@@ -21,6 +21,7 @@ import {
   createGetProductsHandler,
   type ProductsReadClient,
 } from "../../../web/app/api/products/handler";
+import { createProductImageApiUrl } from "../../../web/app/api/product-images/handler";
 
 const DEFAULT_FIXTURE_PATH = "apps/crawler/src/coolpc/__fixtures__/cpu-category.invalid-image.html";
 const DEFAULT_STORAGE_DIR = "temp/coolpc-image-flow-smoke/snapshots";
@@ -280,9 +281,10 @@ async function runSmokeInTransaction(
   );
   const listItem = listBody.data.find((item) => item.id === product.id);
   assert(listItem, "Expected product list API response to include smoke product.");
+  const expectedProductImageApiUrl = createProductImageApiUrl(product.id);
   assert(
-    listItem.image.url === product.primaryImageUrl,
-    `Expected product list image ${product.primaryImageUrl}, got ${listItem.image.url}.`,
+    listItem.image.url === expectedProductImageApiUrl,
+    `Expected product list image ${expectedProductImageApiUrl}, got ${listItem.image.url}.`,
   );
   assert(
     !JSON.stringify(listBody).includes("rawImageUrl"),
@@ -295,8 +297,8 @@ async function runSmokeInTransaction(
   );
   assert(detailBody.id === product.id, "Expected product detail API response to use product id.");
   assert(
-    detailBody.image.url === product.primaryImageUrl,
-    `Expected product detail image ${product.primaryImageUrl}, got ${detailBody.image.url}.`,
+    detailBody.image.url === expectedProductImageApiUrl,
+    `Expected product detail image ${expectedProductImageApiUrl}, got ${detailBody.image.url}.`,
   );
   assert(
     !JSON.stringify(detailBody).includes("rawImageUrl"),

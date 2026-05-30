@@ -272,10 +272,10 @@
 完成條件：
 
 - 商品查詢頁可正常搜尋與篩選。
-- 商品列表與商品詳細頁依 Phase 4.5 決定的圖片呈現方式顯示主要圖片、縮圖或 placeholder；Phase 5 不以直接 hotlink 來源圖片作為完成狀態。
+- 商品列表與商品詳細頁依 Phase 4.5 決定的圖片呈現方式顯示主要圖片、縮圖或 placeholder；Phase 5 不以直接 hotlink 來源圖片作為完成狀態，前端應使用站內商品圖片 API URL。
 - 圖片載入失敗時不破版；無圖片時可顯示 placeholder 或分類圖示。
 - 前端 fallback 不依賴圖片 URL 一定來自 CoolPC domain。
-- 本機驗證或臨時外部圖片顯示需符合 security 文件：一般 `<img>` 需設定 `referrerPolicy`；Next.js Image 或 image optimizer 需設定 CoolPC remote allowlist。
+- 圖片實體儲存位置需由後端部署環境設定；前端與公開 API response 不應依賴固定資料夾相對路徑。
 - 商品詳細頁可顯示價格、來源與資料狀態。
 - 商品詳細頁或來源區塊需明確提供「前往原價屋查看／購買」。
 - 查無商品、商品不存在、API 錯誤都有對應畫面。

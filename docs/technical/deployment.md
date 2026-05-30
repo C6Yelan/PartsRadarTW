@@ -177,6 +177,7 @@ postgres
 | `DATABASE_URL` | PostgreSQL 連線字串 |
 | `COOLPC_BASE_URL` | 原價屋來源網址 |
 | `SNAPSHOT_STORAGE_DIR` | container 內 snapshot 保存路徑 |
+| `PRODUCT_IMAGE_STORAGE_DIR` | container 內商品縮圖快取保存路徑，正式部署應設為明確 mounted path |
 | `CRAWLER_INTERVAL_SECONDS` | crawler 週期 |
 | `CRAWLER_BACKOFF_SECONDS` | 連續失敗 backoff |
 | `NODE_ENV` | production |

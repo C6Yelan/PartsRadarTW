@@ -8,6 +8,7 @@ import {
   parsePaginationQuery,
 } from "../_shared/query";
 import { internalErrorResponse, invalidQueryResponse, jsonOk } from "../_shared/responses";
+import { createProductImageApiUrl } from "../product-images/handler";
 import {
   buildSourceStatusResponse,
   SOURCE_STATUS_CATEGORY_QUERY,
@@ -420,7 +421,7 @@ function toProductResponseItem(product: ProductRecord): ProductListResponseItem 
       sourceName: product.sourceCategory.sourceName,
     },
     image: {
-      url: product.primaryImageUrl,
+      url: createProductImageApiUrl(product.id),
       alt: product.name,
       capturedAt: product.primaryImageCheckedAt.toISOString(),
     },

@@ -94,7 +94,7 @@ Web app 目前透過 Next.js headers 設定基本 Content Security Policy，作�
 - `default-src` 限制為本站。
 - `script-src` 限制為本站；目前仍保留 inline script 相容性，開發環境額外允許 Next.js dev 需要的 `unsafe-eval`。
 - `style-src` 限制為本站並保留 inline style 相容性。
-- `img-src` 允許本站、目前本機驗證用 CoolPC 圖片來源、`data:` 與 `blob:`。
+- `img-src` 允許本站、`data:` 與 `blob:`；前端商品圖片應走站內商品圖片 API，不直接 hotlink CoolPC 圖片。
 - `connect-src` 限制為本站；開發環境額外允許 local HTTP / WebSocket。
 - `object-src` 設為 `none`，`base-uri` 設為本站，`frame-ancestors` 設為 `none`，`form-action` 設為本站。
 - production 環境啟用 `upgrade-insecure-requests`。
@@ -102,7 +102,7 @@ Web app 目前透過 Next.js headers 設定基本 Content Security Policy，作�
 此 CSP 是目前階段的實用型 baseline，不是最終嚴格 CSP。公開宣傳或開放較大流量前，需在正式部署網域、圖片呈現方式與是否需要 CSP report endpoint 確認後，重新檢討 stricter CSP：
 
 - 評估使用 nonce 或 hash，移除不必要的 inline script / inline style 例外。
-- 依最終圖片策略收斂 `img-src`，例如自家縮圖網域、object storage / CDN 或 placeholder-only。
+- 依最終部署圖片策略收斂 `img-src`，例如正式站內縮圖網域、object storage / CDN 或 placeholder-only。
 - 先以 `Content-Security-Policy-Report-Only` 觀察違規報告，再切換到 enforcement。
 - 保留開發環境與 production 環境的差異，避免把 Next.js dev-only 例外帶入正式環境。
 
@@ -114,8 +114,9 @@ Web app 目前透過 Next.js headers 設定基本 Content Security Policy，作�
 
 - 只允許預期 CoolPC 來源網域或預期圖片路徑的圖片 URL。
 - 圖片 URL 需限制 protocol、host 與 path pattern；不接受 `javascript:`、`data:` 或其他非預期 scheme。
-- 本機驗證若使用一般 `<img>` 顯示外部圖片，需設定 `referrerPolicy`，避免把站內頁面路徑透過 Referer 傳給圖片來源站。
-- 若使用 Next.js Image 或任何 image optimizer，必須設定明確 remote allowlist，只允許 `www.coolpc.com.tw` 與預期圖片路徑。
+- 前端顯示商品圖片時應使用站內商品圖片 API URL，例如 `/api/product-images/{productId}.webp`。
+- 若本機驗證暫時回到一般 `<img>` 顯示外部圖片，需設定 `referrerPolicy`，避免把站內頁面路徑透過 Referer 傳給圖片來源站。
+- 若未來使用 Next.js Image 或任何 image optimizer 直接處理外部來源，必須設定明確 remote allowlist，只允許 `www.coolpc.com.tw` 與預期圖片路徑。
 - 圖片 alt text 可由商品名稱產生，不需要爬取額外文字。
 - API 不回傳 raw HTML、未驗證 URL、crawler 內部錯誤或 stack trace。
 - 若後端未來會抓取、代理或快取圖片，需補 SSRF 防護：限制 protocol、host、port、redirect、private IP range 與 DNS rebinding 風險。
@@ -130,7 +131,7 @@ Web app 目前透過 Next.js headers 設定基本 Content Security Policy，作�
 - CDN。
 - 圖片相關 DB 欄位大改。
 
-進入 Phase 5 前，必須完成圖片呈現方式更換。第一版採自家小尺寸縮圖快取，前端顯示自己的縮圖 URL，不讓每位訪客直接消耗來源站圖片流量。placeholder / 分類圖示只作為缺圖、下載失敗或移除圖片後的 fallback，不作為主要圖片策略。
+進入 Phase 5 前，必須完成圖片呈現方式更換。第一版採自家小尺寸縮圖快取，前端顯示站內商品圖片 API URL，不讓每位訪客直接消耗來源站圖片流量，也不依賴部署時圖片資料夾與 Web app 原始碼位在固定相對位置。placeholder / 分類圖示只作為缺圖、下載失敗或移除圖片後的 fallback，不作為主要圖片策略。
 
 直接 hotlink 來源圖片只保留為本機資料流驗證與小範圍測試手段，不作為 Phase 5 UI 完成狀態。自家縮圖快取初始實作以手動 backfill 為主，不在訪客請求期間抓取來源圖片；來源圖片請求需使用低頻率與浮動間隔，避免固定快速抓取。後續仍需規劃最小 storage、更新、失效與移除規則。
 
