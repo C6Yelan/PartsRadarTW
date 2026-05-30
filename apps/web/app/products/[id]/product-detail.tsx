@@ -113,8 +113,8 @@ export default function ProductDetail({
 
       {state === "not-found" ? (
         <section className="detail-empty">
-          <h1>找不到指定商品</h1>
-          <p>商品可能不存在，或目前沒有符合第一版資料契約的圖片與價格資料。</p>
+          <h1>這項商品目前無法顯示</h1>
+          <p>商品可能已下架、資料尚未同步，或連結已失效。你可以返回查詢頁重新搜尋。</p>
         </section>
       ) : null}
 

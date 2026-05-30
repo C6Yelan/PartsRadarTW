@@ -630,19 +630,19 @@ export default function ProductExplorer() {
               {productState === "error" ? (
                 <div className="empty-state" role="alert">
                   <h2>商品資料暫時無法載入</h2>
-                  <p>請稍後重新整理或檢查本機 API 與資料庫狀態。</p>
+                  <p>請稍後重新整理頁面再試一次。</p>
                 </div>
               ) : null}
 
               {productState === "ready" && products?.data.length === 0 ? (
                 <div className="empty-state">
                   <h2>
-                    {sourceStatus === "unavailable" ? "目前沒有可用商品資料" : "查無符合條件的商品"}
+                    {sourceStatus === "unavailable" ? "目前沒有可顯示的商品" : "找不到相關商品"}
                   </h2>
                   <p>
                     {sourceStatus === "unavailable"
-                      ? "來源尚未有可顯示的有效資料。"
-                      : "保留目前條件，調整關鍵字、分類或價格範圍後再查詢。"}
+                      ? "資料尚未同步完成，請稍後再試。"
+                      : "請調整關鍵字、分類或價格範圍後再試一次。"}
                   </p>
                 </div>
               ) : null}
