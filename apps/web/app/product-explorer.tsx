@@ -262,21 +262,26 @@ export default function ProductExplorer() {
     query.maxPrice !== DEFAULT_QUERY.maxPrice ||
     query.status !== DEFAULT_QUERY.status;
 
-  const commitQuery = useCallback((nextQuery: QueryState) => {
-    const normalizedQuery = {
-      ...nextQuery,
-      page: Math.max(1, nextQuery.page),
-      pageSize: PAGE_SIZE_OPTIONS.includes(nextQuery.pageSize as (typeof PAGE_SIZE_OPTIONS)[number])
-        ? nextQuery.pageSize
-        : DEFAULT_QUERY.pageSize,
-    };
-    const nextUrl = toUrl(normalizedQuery);
+  const commitQuery = useCallback(
+    (nextQuery: QueryState, options?: { draftQuery?: QueryState }) => {
+      const normalizedQuery = {
+        ...nextQuery,
+        page: Math.max(1, nextQuery.page),
+        pageSize: PAGE_SIZE_OPTIONS.includes(
+          nextQuery.pageSize as (typeof PAGE_SIZE_OPTIONS)[number],
+        )
+          ? nextQuery.pageSize
+          : DEFAULT_QUERY.pageSize,
+      };
+      const nextUrl = toUrl(normalizedQuery);
 
-    window.history.pushState(null, "", nextUrl);
-    setQuery(normalizedQuery);
-    setDraft(normalizedQuery);
-    setFormError(null);
-  }, []);
+      window.history.pushState(null, "", nextUrl);
+      setQuery(normalizedQuery);
+      setDraft(options?.draftQuery ?? normalizedQuery);
+      setFormError(null);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!isReady) {
@@ -372,6 +377,27 @@ export default function ProductExplorer() {
     });
   }
 
+  function returnHome(event: MouseEvent<HTMLAnchorElement>) {
+    if (
+      event.defaultPrevented ||
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.altKey ||
+      event.shiftKey
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    commitQuery(DEFAULT_QUERY, {
+      draftQuery: {
+        ...DEFAULT_QUERY,
+        q: draft.q,
+      },
+    });
+  }
+
   function keepDesktopFiltersOpen(event: MouseEvent<HTMLElement>) {
     if (window.matchMedia(DESKTOP_FILTER_MEDIA_QUERY).matches) {
       event.preventDefault();
@@ -407,7 +433,7 @@ export default function ProductExplorer() {
   return (
     <div className="app-shell">
       <header className="topbar">
-        <Link className="brand-lockup" href="/">
+        <Link className="brand-lockup" href="/" onClick={returnHome}>
           <span className="brand-mark" aria-hidden="true" />
           <span>
             <span className="brand-name">PartsRadarTW</span>
