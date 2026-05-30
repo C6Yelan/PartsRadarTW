@@ -6,11 +6,13 @@
     "typecheck": "tsc --noEmit",
     "crawl:coolpc-once": "tsx src/scripts/crawl-coolpc-once.ts",
     "image-cache:backfill": "tsx src/scripts/backfill-product-images.ts",
+    "product-vendors:backfill": "tsx src/scripts/backfill-product-vendors.ts",
     "smoke:coolpc-image-flow": "tsx src/scripts/smoke-coolpc-image-flow.ts",
     "validate:coolpc-live": "tsx src/scripts/validate-coolpc-live.ts"
   },
   "dependencies": {
     "@partsradar/db": "workspace:*",
+    "@partsradar/shared": "workspace:*",
     "cheerio": "^1.2.0",
     "iconv-lite": "^0.7.2",
     "sharp": "0.34.5"

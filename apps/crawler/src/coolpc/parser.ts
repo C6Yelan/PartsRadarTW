@@ -1,5 +1,6 @@
 import { load, type CheerioAPI } from "cheerio";
 import { decode } from "iconv-lite";
+import { classifyProductVendor } from "@partsradar/shared";
 
 const COOLPC_SOURCE = "coolpc";
 const DEFAULT_COOLPC_BASE_URL = "https://www.coolpc.com.tw";
@@ -42,6 +43,8 @@ export interface ParsedCoolpcProduct {
   sourceItemKey: string;
   name: string;
   normalizedName: string;
+  vendorSlug: string | null;
+  vendorName: string | null;
   primaryImageUrl: string;
   price: number;
   currency: Currency;
@@ -356,6 +359,7 @@ export function parseCoolpcCategoryPage(
       continue;
     }
 
+    const vendor = classifyProductVendor(context.igrp, name);
     const item: ParsedCoolpcProduct = {
       sourceCategoryId: context.sourceCategoryId,
       igrp: context.igrp,
@@ -365,6 +369,8 @@ export function parseCoolpcCategoryPage(
       sourceItemKey,
       name,
       normalizedName: normalizeProductName(name).toLocaleLowerCase("zh-TW"),
+      vendorSlug: vendor?.slug ?? null,
+      vendorName: vendor?.name ?? null,
       primaryImageUrl,
       price,
       currency: "TWD",

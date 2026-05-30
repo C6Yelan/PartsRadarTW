@@ -19,6 +19,8 @@ import {
 const COOLPC_SOURCE_NAME = "coolpc";
 const COOLPC_CATEGORY_BASE_URL = "https://www.coolpc.com.tw/eachview.php";
 const PRODUCT_SEARCH_MAX_LENGTH = 100;
+const PRODUCT_VENDOR_QUERY_MAX_LENGTH = 300;
+const PRODUCT_VENDOR_VALUE_PATTERN = /^[a-z0-9-]+$/;
 const PRODUCT_SORT_VALUES = ["price_asc", "price_desc", "name_asc"] as const;
 const PRODUCT_STATUS_VALUES = ["active", "inactive", "all"] as const;
 
@@ -56,14 +58,31 @@ const PRODUCT_SELECT = {
   },
 } as const satisfies Prisma.ProductSelect;
 
+const PRODUCT_VENDOR_SELECT = {
+  vendorSlug: true,
+  vendorName: true,
+} as const satisfies Prisma.ProductSelect;
+
 type ProductRecord = Prisma.ProductGetPayload<{ select: typeof PRODUCT_SELECT }>;
-type ProductFindManyArgs = Omit<Prisma.ProductFindManyArgs, "select"> & {
-  select: typeof PRODUCT_SELECT;
+type ProductVendorRecord = Prisma.ProductGetPayload<{ select: typeof PRODUCT_VENDOR_SELECT }>;
+type ProductFindManyArgs<TSelect extends Prisma.ProductSelect> = Omit<
+  Prisma.ProductFindManyArgs,
+  "select"
+> & {
+  select: TSelect;
 };
+type ProductListFindManyArgs = ProductFindManyArgs<typeof PRODUCT_SELECT>;
+type ProductVendorFindManyArgs = ProductFindManyArgs<typeof PRODUCT_VENDOR_SELECT>;
+
+interface ProductVendorOption {
+  slug: string;
+  name: string;
+}
 
 export interface ProductsReadClient extends SourceStatusReadClient {
   product: {
-    findMany(args: ProductFindManyArgs): Promise<ProductRecord[]>;
+    findProducts(args: ProductListFindManyArgs): Promise<ProductRecord[]>;
+    findVendorOptions(args: ProductVendorFindManyArgs): Promise<ProductVendorRecord[]>;
     count(args: Prisma.ProductCountArgs): Promise<number>;
   };
 }
@@ -75,6 +94,7 @@ interface ProductListQuery {
   maxPrice?: number;
   status: ProductStatus;
   sort: ProductSort;
+  vendors: string[];
   page: number;
   pageSize: number;
 }
@@ -120,6 +140,7 @@ interface ProductsResponseBody {
   meta: {
     sourceStatus: SourceStatus;
     lastSuccessAt: string | null;
+    vendors: ProductVendorOption[];
   };
 }
 
@@ -135,9 +156,22 @@ export function createGetProductsHandler(
     try {
       const now = options.now?.() ?? new Date();
       const query = parseProductListQuery(new URL(request.url).searchParams);
-      const where = buildProductWhere(query);
-      const [products, totalItems, sourceStatusCategories] = await Promise.all([
-        client.product.findMany({
+      const [vendorRecords, sourceStatusCategories] = await Promise.all([
+        query.igrp === undefined
+          ? Promise.resolve([])
+          : client.product.findVendorOptions({
+              where: buildProductVendorOptionsWhere(query.igrp),
+              orderBy: [{ vendorName: "asc" }, { vendorSlug: "asc" }],
+              distinct: ["vendorSlug"],
+              select: PRODUCT_VENDOR_SELECT,
+            }),
+        client.sourceCategory.findMany(SOURCE_STATUS_CATEGORY_QUERY),
+      ]);
+      const vendorOptions = toProductVendorOptions(vendorRecords);
+      validateVendorValues(query.vendors, vendorOptions);
+      const where = buildProductWhere(query, { includeVendors: true });
+      const [products, totalItems] = await Promise.all([
+        client.product.findProducts({
           where,
           orderBy: buildProductOrderBy(query.sort),
           skip: (query.page - 1) * query.pageSize,
@@ -145,7 +179,6 @@ export function createGetProductsHandler(
           select: PRODUCT_SELECT,
         }),
         client.product.count({ where }),
-        client.sourceCategory.findMany(SOURCE_STATUS_CATEGORY_QUERY),
       ]);
       const sourceStatus = buildProductSourceStatus(sourceStatusCategories, query.igrp, now);
 
@@ -160,6 +193,7 @@ export function createGetProductsHandler(
         meta: {
           sourceStatus: sourceStatus.status,
           lastSuccessAt: sourceStatus.lastSuccessAt,
+          vendors: vendorOptions,
         },
       });
     } catch (error) {
@@ -188,12 +222,16 @@ function parseProductListQuery(params: URLSearchParams): ProductListQuery {
     maxPrice,
     status: parseEnumQuery(params, "status", PRODUCT_STATUS_VALUES, "active"),
     sort: parseEnumQuery(params, "sort", PRODUCT_SORT_VALUES, "price_asc"),
+    vendors: parseVendorQuery(params, parseOptionalIntegerQuery(params, "igrp", { min: 1 })),
     page: pagination.page,
     pageSize: pagination.pageSize,
   };
 }
 
-function buildProductWhere(query: ProductListQuery): Prisma.ProductWhereInput {
+function buildProductWhere(
+  query: ProductListQuery,
+  options: { includeVendors: boolean },
+): Prisma.ProductWhereInput {
   const where: Prisma.ProductWhereInput = {
     sourceCategory: {
       enabled: true,
@@ -238,7 +276,108 @@ function buildProductWhere(query: ProductListQuery): Prisma.ProductWhereInput {
     ];
   }
 
+  const vendorWhere = options.includeVendors ? buildVendorWhere(query) : null;
+
+  if (vendorWhere) {
+    where.AND = [vendorWhere];
+  }
+
   return where;
+}
+
+function parseVendorQuery(params: URLSearchParams, igrp: number | undefined): string[] {
+  const rawVendors = parseOptionalTextQuery(params, "vendors", {
+    maxLength: PRODUCT_VENDOR_QUERY_MAX_LENGTH,
+  });
+
+  if (!rawVendors) {
+    return [];
+  }
+
+  if (igrp === undefined) {
+    throw new InvalidQueryError("vendors", "requires igrp");
+  }
+
+  const vendors = rawVendors
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const uniqueVendors = new Set(vendors);
+
+  if (vendors.length === 0 || vendors.length !== uniqueVendors.size) {
+    throw new InvalidQueryError("vendors", "must contain unique vendor values");
+  }
+
+  for (const vendor of vendors) {
+    if (!PRODUCT_VENDOR_VALUE_PATTERN.test(vendor)) {
+      throw new InvalidQueryError("vendors", "must contain valid vendor values");
+    }
+  }
+
+  return vendors;
+}
+
+function buildVendorWhere(query: ProductListQuery): Prisma.ProductWhereInput | null {
+  if (query.igrp === undefined || query.vendors.length === 0) {
+    return null;
+  }
+
+  return {
+    vendorSlug: {
+      in: query.vendors,
+    },
+  };
+}
+
+function buildProductVendorOptionsWhere(igrp: number): Prisma.ProductWhereInput {
+  return {
+    sourceCategory: {
+      enabled: true,
+      igrp,
+    },
+    primaryImageUrl: {
+      not: null,
+    },
+    primaryImageCheckedAt: {
+      not: null,
+    },
+    currentPrice: {
+      isNot: null,
+    },
+    vendorSlug: { not: null },
+    vendorName: { not: null },
+  };
+}
+
+function toProductVendorOptions(records: ProductVendorRecord[]): ProductVendorOption[] {
+  const options = new Map<string, ProductVendorOption>();
+
+  for (const record of records) {
+    if (!record.vendorSlug || !record.vendorName || options.has(record.vendorSlug)) {
+      continue;
+    }
+
+    options.set(record.vendorSlug, {
+      slug: record.vendorSlug,
+      name: record.vendorName,
+    });
+  }
+
+  return [...options.values()].sort((left, right) => left.name.localeCompare(right.name, "zh-TW"));
+}
+
+function validateVendorValues(vendors: string[], options: ProductVendorOption[]): void {
+  if (vendors.length === 0) {
+    return;
+  }
+
+  const allowedVendors = new Set(options.map((option) => option.slug));
+
+  for (const vendor of vendors) {
+    if (!allowedVendors.has(vendor)) {
+      throw new InvalidQueryError("vendors", "must be one of the available values");
+    }
+  }
 }
 
 function buildProductOrderBy(sort: ProductSort): Prisma.ProductOrderByWithRelationInput[] {

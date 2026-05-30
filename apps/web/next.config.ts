@@ -39,7 +39,7 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-  transpilePackages: ["@partsradar/db"],
+  transpilePackages: ["@partsradar/db", "@partsradar/shared"],
 };
 
 export default nextConfig;

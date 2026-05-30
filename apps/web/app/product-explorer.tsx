@@ -61,6 +61,11 @@ interface ProductListItem {
   };
 }
 
+interface ProductVendorOption {
+  slug: string;
+  name: string;
+}
+
 interface ProductsResponse {
   data: ProductListItem[];
   pagination: {
@@ -72,6 +77,7 @@ interface ProductsResponse {
   meta: {
     sourceStatus: SourceStatus;
     lastSuccessAt: string | null;
+    vendors: ProductVendorOption[];
   };
 }
 
@@ -82,6 +88,7 @@ interface QueryState {
   maxPrice: string;
   status: ProductStatus;
   sort: ProductSort;
+  vendors: string[];
   page: number;
   pageSize: number;
 }
@@ -93,6 +100,7 @@ const DEFAULT_QUERY: QueryState = {
   maxPrice: "",
   status: "active",
   sort: "price_asc",
+  vendors: [],
   page: 1,
   pageSize: 20,
 };
@@ -255,17 +263,25 @@ export default function ProductExplorer() {
   const visiblePages = getVisiblePages(query.page, totalPages);
   const shouldShowPageJump = totalPages > 10;
   const productListReturnTo = toUrl(query);
+  const vendorOptions =
+    productState === "ready" && query.igrp ? (products?.meta.vendors ?? []) : [];
+  const selectedVendorOptions = useMemo(
+    () => vendorOptions.filter((option) => query.vendors.includes(option.slug)),
+    [query.vendors, vendorOptions],
+  );
   const hasActiveFilters =
     query.q !== DEFAULT_QUERY.q ||
     query.igrp !== DEFAULT_QUERY.igrp ||
     query.minPrice !== DEFAULT_QUERY.minPrice ||
     query.maxPrice !== DEFAULT_QUERY.maxPrice ||
-    query.status !== DEFAULT_QUERY.status;
+    query.status !== DEFAULT_QUERY.status ||
+    query.vendors.length > 0;
 
   const commitQuery = useCallback(
     (nextQuery: QueryState, options?: { draftQuery?: QueryState }) => {
       const normalizedQuery = {
         ...nextQuery,
+        vendors: normalizeVendorValues(nextQuery.vendors, nextQuery.igrp),
         page: Math.max(1, nextQuery.page),
         pageSize: PAGE_SIZE_OPTIONS.includes(
           nextQuery.pageSize as (typeof PAGE_SIZE_OPTIONS)[number],
@@ -373,6 +389,7 @@ export default function ProductExplorer() {
       minPrice: DEFAULT_QUERY.minPrice,
       maxPrice: DEFAULT_QUERY.maxPrice,
       status: DEFAULT_QUERY.status,
+      vendors: DEFAULT_QUERY.vendors,
       page: 1,
     });
   }
@@ -428,6 +445,26 @@ export default function ProductExplorer() {
 
     goToPage(Math.min(requestedPage, Math.max(1, totalPages)));
     setPageJumpValue("");
+  }
+
+  function updateCategoryFilter(igrp: string) {
+    updateQuery({ igrp, vendors: DEFAULT_QUERY.vendors });
+  }
+
+  function toggleVendorFilter(vendor: string) {
+    const selectedVendors = new Set(query.vendors);
+
+    if (selectedVendors.has(vendor)) {
+      selectedVendors.delete(vendor);
+    } else {
+      selectedVendors.add(vendor);
+    }
+
+    const nextVendors = vendorOptions
+      .map((option) => option.slug)
+      .filter((value) => selectedVendors.has(value));
+
+    updateQuery({ vendors: nextVendors });
   }
 
   return (
@@ -502,7 +539,7 @@ export default function ProductExplorer() {
                       label="全部分類"
                       subLabel={categoryState === "ready" ? `${categories.length} 類` : "讀取中"}
                       value=""
-                      onChange={() => updateQuery({ igrp: "" })}
+                      onChange={() => updateCategoryFilter("")}
                     />
                     {categories.map((category) => (
                       <CategoryOption
@@ -511,7 +548,7 @@ export default function ProductExplorer() {
                         label={category.displayName}
                         subLabel={category.sourceName}
                         value={String(category.igrp)}
-                        onChange={() => updateQuery({ igrp: String(category.igrp) })}
+                        onChange={() => updateCategoryFilter(String(category.igrp))}
                       />
                     ))}
                   </div>
@@ -573,6 +610,15 @@ export default function ProductExplorer() {
                 <h1>搜尋結果</h1>
               </div>
               <div className="toolbar-controls">
+                <VendorFilter
+                  options={vendorOptions}
+                  disabledLabel={query.igrp ? "無廠商資料" : "先選分類"}
+                  selectedCategoryName={selectedCategoryName}
+                  selectedOptions={selectedVendorOptions}
+                  selectedValues={query.vendors}
+                  onClear={() => updateQuery({ vendors: DEFAULT_QUERY.vendors })}
+                  onToggle={toggleVendorFilter}
+                />
                 <label>
                   <span>排序</span>
                   <select
@@ -734,6 +780,122 @@ function CategoryOption({
   );
 }
 
+function VendorFilter({
+  options,
+  disabledLabel,
+  selectedCategoryName,
+  selectedOptions,
+  selectedValues,
+  onClear,
+  onToggle,
+}: {
+  options: readonly ProductVendorOption[];
+  disabledLabel: string;
+  selectedCategoryName: string;
+  selectedOptions: ProductVendorOption[];
+  selectedValues: string[];
+  onClear: () => void;
+  onToggle: (vendor: string) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const isAvailable = options.length > 0;
+  const summaryLabel =
+    selectedOptions.length === 0
+      ? "全部廠商"
+      : selectedOptions.length <= 2
+        ? selectedOptions.map((option) => option.name).join("、")
+        : `${selectedOptions.length} 個廠商`;
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    function closeOnOutsideClick(event: PointerEvent) {
+      const menu = menuRef.current;
+
+      if (menu && !menu.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setIsOpen(false);
+      }
+    }
+
+    document.addEventListener("pointerdown", closeOnOutsideClick);
+    document.addEventListener("keydown", closeOnEscape);
+
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsideClick);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isAvailable) {
+      setIsOpen(false);
+    }
+  }, [isAvailable]);
+
+  return (
+    <div className="vendor-filter">
+      <span>廠商</span>
+      {isAvailable ? (
+        <div className={isOpen ? "vendor-menu is-open" : "vendor-menu"} ref={menuRef}>
+          <button
+            aria-expanded={isOpen}
+            aria-haspopup="menu"
+            className="vendor-menu-trigger"
+            type="button"
+            onClick={() => setIsOpen((current) => !current)}
+          >
+            <span>{summaryLabel}</span>
+            <span className="filter-chevron" aria-hidden="true" />
+          </button>
+          {isOpen ? (
+            <div className="vendor-menu-popover">
+              <div className="vendor-menu-header">
+                <span>{selectedCategoryName}</span>
+                {selectedValues.length > 0 ? (
+                  <button type="button" onClick={onClear}>
+                    清除
+                  </button>
+                ) : null}
+              </div>
+              <div className="vendor-option-list">
+                {options.map((option) => {
+                  const checked = selectedValues.includes(option.slug);
+
+                  return (
+                    <label
+                      className={checked ? "vendor-option is-active" : "vendor-option"}
+                      key={option.slug}
+                    >
+                      <input
+                        checked={checked}
+                        type="checkbox"
+                        value={option.slug}
+                        onChange={() => onToggle(option.slug)}
+                      />
+                      <span>{option.name}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : (
+        <span className="vendor-filter-disabled">{disabledLabel}</span>
+      )}
+    </div>
+  );
+}
+
 function ProductRow({ detailHref, product }: { detailHref: string; product: ProductListItem }) {
   return (
     <article className="product-row">
@@ -852,6 +1014,7 @@ function readQueryFromLocation(): QueryState {
       ["price_asc", "price_desc", "name_asc"],
       "price_asc",
     ),
+    vendors: normalizeVendorValues(parseVendorsParam(params.get("vendors")), params.get("igrp")),
     page: Number(parseNonNegativeIntegerParam(params.get("page")) ?? DEFAULT_QUERY.page),
     pageSize: Number(
       parseNonNegativeIntegerParam(params.get("pageSize")) ?? DEFAULT_QUERY.pageSize,
@@ -866,6 +1029,7 @@ function toApiSearchParams(query: QueryState) {
   appendIfPresent(params, "igrp", query.igrp);
   appendIfPresent(params, "minPrice", query.minPrice);
   appendIfPresent(params, "maxPrice", query.maxPrice);
+  appendVendorsIfPresent(params, query.vendors);
   params.set("status", query.status);
   params.set("sort", query.sort);
   params.set("page", String(query.page));
@@ -881,6 +1045,7 @@ function toUrl(query: QueryState) {
   appendIfPresent(params, "igrp", query.igrp);
   appendIfPresent(params, "minPrice", query.minPrice);
   appendIfPresent(params, "maxPrice", query.maxPrice);
+  appendVendorsIfPresent(params, query.vendors);
   if (query.status !== DEFAULT_QUERY.status) {
     params.set("status", query.status);
   }
@@ -917,6 +1082,12 @@ function appendIfPresent(params: URLSearchParams, name: string, value: string) {
   }
 }
 
+function appendVendorsIfPresent(params: URLSearchParams, vendors: string[]) {
+  if (vendors.length > 0) {
+    params.set("vendors", vendors.join(","));
+  }
+}
+
 function validatePriceRange(minPrice: string, maxPrice: string) {
   const min = minPrice.trim();
   const max = maxPrice.trim();
@@ -948,6 +1119,33 @@ function isNonNegativeInteger(value: string) {
 
 function toDigitsOnly(value: string) {
   return value.replace(/\D/g, "");
+}
+
+function parseVendorsParam(value: string | null) {
+  return (value ?? "")
+    .split(",")
+    .map((vendor) => vendor.trim())
+    .filter((vendor) => /^[a-z0-9-]+$/.test(vendor));
+}
+
+function normalizeVendorValues(vendors: string[], igrp: string | number | null | undefined) {
+  if (!igrp) {
+    return [];
+  }
+
+  const selectedVendors = new Set<string>();
+  const normalizedVendors: string[] = [];
+
+  for (const vendor of vendors) {
+    if (selectedVendors.has(vendor)) {
+      continue;
+    }
+
+    selectedVendors.add(vendor);
+    normalizedVendors.push(vendor);
+  }
+
+  return normalizedVendors;
 }
 
 function parseAllowedValue<T extends string>(value: string | null, allowed: T[], fallback: T) {

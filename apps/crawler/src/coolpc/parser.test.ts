@@ -155,6 +155,8 @@ describe("CoolPC category parser", () => {
       sourceItemKey: "coolpc:igrp:4:ibuy:CPU-TOKEN-001",
       name: "AMD Ryzen 5 7500F MPK【6核/12緒】3.7G",
       normalizedName: "amd ryzen 5 7500f mpk【6核/12緒】3.7g",
+      vendorSlug: "amd",
+      vendorName: "AMD",
       primaryImageUrl: "https://www.coolpc.com.tw/eval/4/amd7500f.jpg",
       price: 4880,
       currency: "TWD",

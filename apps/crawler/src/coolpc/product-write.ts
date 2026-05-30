@@ -110,6 +110,8 @@ interface ProductCreateData {
   ibuyToken: string;
   name: string;
   normalizedName: string;
+  vendorSlug: string | null;
+  vendorName: string | null;
   primaryImageUrl: string;
   primaryImageCheckedAt: Date;
   sourceUrl: string;
@@ -123,6 +125,8 @@ interface ProductCreateData {
 interface ProductSeenUpdateData {
   name: string;
   normalizedName: string;
+  vendorSlug: string | null;
+  vendorName: string | null;
   primaryImageUrl: string;
   primaryImageCheckedAt: Date;
   sourceUrl: string;
@@ -340,6 +344,8 @@ function updateProductSeenData(
     data: {
       name: item.name,
       normalizedName: item.normalizedName,
+      vendorSlug: item.vendorSlug,
+      vendorName: item.vendorName,
       primaryImageUrl: item.primaryImageUrl,
       primaryImageCheckedAt: item.fetchedAt,
       sourceUrl: item.sourceUrl,
@@ -466,6 +472,8 @@ function createProductData(item: ParsedCoolpcProduct): ProductCreateData {
     ibuyToken: item.ibuyToken,
     name: item.name,
     normalizedName: item.normalizedName,
+    vendorSlug: item.vendorSlug,
+    vendorName: item.vendorName,
     primaryImageUrl: item.primaryImageUrl,
     primaryImageCheckedAt: item.fetchedAt,
     sourceUrl: item.sourceUrl,

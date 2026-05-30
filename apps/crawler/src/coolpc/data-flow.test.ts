@@ -60,6 +60,8 @@ describe("CoolPC crawler data flow", () => {
     expect(client.currentPrices).toHaveLength(2);
     expect(productByToken(client, "CPU-TOKEN-001")).toMatchObject({
       isActive: true,
+      vendorSlug: "amd",
+      vendorName: "AMD",
       primaryImageUrl: "https://www.coolpc.com.tw/eval/4/amd7500f.jpg",
       primaryImageCheckedAt: secondSeenAt,
       missingSince: null,
@@ -322,6 +324,8 @@ interface FakeProduct {
   ibuyToken: string;
   name: string;
   normalizedName: string;
+  vendorSlug: string | null;
+  vendorName: string | null;
   primaryImageUrl: string;
   primaryImageCheckedAt: Date;
   sourceUrl: string;
@@ -581,6 +585,8 @@ class FakeCoolpcDataFlowClient
         ibuyToken: data.ibuyToken,
         name: data.name,
         normalizedName: data.normalizedName,
+        vendorSlug: data.vendorSlug,
+        vendorName: data.vendorName,
         primaryImageUrl: data.primaryImageUrl,
         primaryImageCheckedAt: data.primaryImageCheckedAt,
         sourceUrl: data.sourceUrl,

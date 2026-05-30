@@ -116,6 +116,7 @@
 | --- | --- | --- | --- |
 | `q` | string | 無 | 商品關鍵字搜尋 |
 | `igrp` | number | 無 | 原價屋分類編號，例如 `4` |
+| `vendors` | string | 無 | 逗號分隔的廠商篩選值；需搭配 `igrp` 使用 |
 | `minPrice` | number | 無 | 最低價格，整數 TWD |
 | `maxPrice` | number | 無 | 最高價格，整數 TWD |
 | `status` | string | `active` | `active`、`inactive` 或 `all` |
@@ -174,7 +175,13 @@
   },
   "meta": {
     "sourceStatus": "ok",
-    "lastSuccessAt": "2026-05-25T12:00:00.000Z"
+    "lastSuccessAt": "2026-05-25T12:00:00.000Z",
+    "vendors": [
+      {
+        "slug": "intel",
+        "name": "Intel"
+      }
+    ]
   }
 }
 ```
@@ -187,6 +194,9 @@
 - 無目前價格的商品第一版不出現在商品列表。
 - 無有效主要商品圖片的商品不應被視為 Phase 5 ready；若暫時回傳 fallback 所需資訊，需同時保留資料完整性問題，不可把缺圖當成正常 response contract。
 - `q` 應查詢 `name` 與 `normalized_name`。
+- `vendors` 只接受該 `igrp` 目前可用的 `products.vendor_slug` 值，並以 DB 欄位做精準篩選。
+- `meta.vendors` 回傳目前分類可用的廠商選項；未指定 `igrp` 時可為空陣列。
+- 廠商欄位由 crawler/parser 依分類與商品名稱解析後寫入 `products.vendor_slug`、`products.vendor_name`，不是使用者輸入或 API 即時計算的文字搜尋條件。
 - `minPrice` 與 `maxPrice` 只針對目前價格過濾。
 - 價格金額、幣別與 `capturedAt` 從 `current_prices.price_snapshot_id -> price_snapshots` 取得。
 - 若使用 `product_list_view`，`current_price`、`currency`、`price_captured_at` 是 view 投影欄位，不是核心表上的重複欄位。

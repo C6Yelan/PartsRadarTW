@@ -14,6 +14,7 @@
     "check": "pnpm typecheck && pnpm lint && pnpm build",
     "crawl:coolpc-once": "pnpm --filter @partsradar/crawler crawl:coolpc-once",
     "image-cache:backfill": "pnpm --filter @partsradar/crawler image-cache:backfill",
+    "product-vendors:backfill": "pnpm --filter @partsradar/crawler product-vendors:backfill",
     "smoke:coolpc-image-flow": "pnpm --filter @partsradar/crawler smoke:coolpc-image-flow",
     "db:generate": "pnpm --filter @partsradar/db db:generate",
     "db:migrate": "pnpm --filter @partsradar/db db:migrate",

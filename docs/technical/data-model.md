@@ -12,6 +12,7 @@
 - 第一版只支援原價屋 CoolPC，不在核心 DB 預留多來源抽象欄位；API 若需要來源名稱，可固定回傳 `coolpc`。
 - 原價屋分類脈絡集中在 `source_categories`；`products`、`raw_snapshots`、`parse_errors` 透過 `source_category_id` 取得 `igrp` 與分類名稱，不重複保存。
 - 商品唯一性使用 `source_category_id + ibuy_token`。`source_item_key` 是 crawler / shared helper 可計算的來源識別字串，不存入 DB。
+- 商品廠商以 parser 規則從分類脈絡與商品名稱解析，寫入 `products.vendor_slug` 與 `products.vendor_name`，供 API 精準篩選；無法穩定判定時可為 `null`。
 - 價格歷史保存在 `price_snapshots`。
 - `current_prices` 只保存目前 `price_snapshot` 指標與狀態時間，不重複保存價格、幣別或 captured time。
 - 新商品或價格變動時才新增 price snapshot。
@@ -92,6 +93,8 @@ product_list_view
 - `product_id`
 - `product_name`
 - `normalized_name`
+- `vendor_slug`
+- `vendor_name`
 - `category_display_name`
 - `source_name`
 - `igrp`
@@ -163,6 +166,8 @@ product_list_view
 - `ibuy_token`。
 - `name`：商品原始名稱。
 - `normalized_name`。
+- `vendor_slug`：由 parser 規則解析出的廠商穩定值，供 API query 使用；不確定時為 `null`。
+- `vendor_name`：對使用者顯示的廠商名稱；不確定時為 `null`。
 - `primary_image_url`：主要商品圖片 URL，來自經驗證與正規化的原價屋公開頁面圖片。
 - `primary_image_checked_at`：主要商品圖片最後一次被來源資料確認的時間。
 - `source_url`：不包含 `PHPSESSID` 的來源分類頁 URL。
@@ -184,6 +189,7 @@ product_list_view
 - 商品名稱可更新，但不應造成商品歷史斷裂。
 - `source_item_key` 不存 DB；需要時由 `sourceCategory.igrp + ibuy_token` 在程式層組成，例如 `coolpc:igrp:4:ibuy:{iBuyToken}`。
 - 商品識別不應使用價格、商品名稱或 `PHPSESSID`。
+- 廠商欄位是查詢輔助資料，不是商品 identity；規則修正時可用 backfill 重新產生，不應切斷商品歷史。
 - 商品主要圖片是第一版顯示所需資料；缺圖應被視為資料完整性問題或來源驗證風險，不是正常匯入 happy path。
 - 圖片 URL 必須來自 crawler 對可信來源 HTML 的解析結果，不接受使用者任意輸入 URL。
 - 若某次成功 crawl 沒有解析到有效圖片 URL，不應靜默清空既有主要圖片；應記錄 validation issue 並保留可追查資訊。

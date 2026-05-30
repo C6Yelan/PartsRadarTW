@@ -7,7 +7,8 @@ export async function GET(request: Request): Promise<Response> {
     const { prisma } = await import("@partsradar/db");
     const client: ProductsReadClient = {
       product: {
-        findMany: (args) => prisma.product.findMany(args),
+        findProducts: (args) => prisma.product.findMany(args),
+        findVendorOptions: (args) => prisma.product.findMany(args),
         count: (args) => prisma.product.count(args),
       },
       sourceCategory: {

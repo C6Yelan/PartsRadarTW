@@ -32,7 +32,7 @@ describe("GET /api/products handler", () => {
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(client.lastProductFindManyArgs).toMatchObject({
+    expect(client.lastProductFindProductsArgs).toMatchObject({
       where: {
         sourceCategory: {
           enabled: true,
@@ -73,9 +73,9 @@ describe("GET /api/products handler", () => {
       skip: 1,
       take: 1,
     });
-    expect(client.lastProductFindManyArgs?.select).not.toHaveProperty("ibuyToken");
-    expect(client.lastProductFindManyArgs?.select).not.toHaveProperty("sourceUrl");
-    expect(client.lastProductCountArgs?.where).toEqual(client.lastProductFindManyArgs?.where);
+    expect(client.lastProductFindProductsArgs?.select).not.toHaveProperty("ibuyToken");
+    expect(client.lastProductFindProductsArgs?.select).not.toHaveProperty("sourceUrl");
+    expect(client.lastProductCountArgs?.where).toEqual(client.lastProductFindProductsArgs?.where);
     expect(client.lastSourceCategoryFindManyArgs).toEqual(SOURCE_STATUS_CATEGORY_QUERY);
     expect(body).toEqual({
       data: [
@@ -118,6 +118,7 @@ describe("GET /api/products handler", () => {
       meta: {
         sourceStatus: "ok",
         lastSuccessAt: "2026-05-28T11:50:00.000Z",
+        vendors: [],
       },
     });
     expect(JSON.stringify(body)).not.toContain("iBuyToken");
@@ -137,7 +138,7 @@ describe("GET /api/products handler", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(client.lastProductFindManyArgs).toMatchObject({
+    expect(client.lastProductFindProductsArgs).toMatchObject({
       where: {
         isActive: true,
         sourceCategory: {
@@ -164,8 +165,78 @@ describe("GET /api/products handler", () => {
       meta: {
         sourceStatus: "unavailable",
         lastSuccessAt: null,
+        vendors: [],
       },
     });
+  });
+
+  it("applies vendor filtering within the selected category", async () => {
+    const client = fakeProductsClient({
+      products: [],
+      vendorOptions: [
+        vendorOption({ vendorSlug: "asus", vendorName: "華碩" }),
+        vendorOption({ vendorSlug: "msi", vendorName: "微星" }),
+      ],
+      totalItems: 0,
+      sourceCategories: [],
+    });
+
+    const response = await createGetProductsHandler(client, { now: () => NOW })(
+      new Request("https://parts.example/api/products?igrp=12&vendors=asus,msi"),
+    );
+
+    expect(response.status).toBe(200);
+    expect(client.lastProductVendorOptionsArgs).toMatchObject({
+      where: {
+        sourceCategory: {
+          enabled: true,
+          igrp: 12,
+        },
+        primaryImageUrl: {
+          not: null,
+        },
+        primaryImageCheckedAt: {
+          not: null,
+        },
+        currentPrice: {
+          isNot: null,
+        },
+        vendorSlug: { not: null },
+        vendorName: { not: null },
+      },
+      distinct: ["vendorSlug"],
+    });
+    expect(client.lastProductFindProductsArgs).toMatchObject({
+      where: {
+        sourceCategory: {
+          enabled: true,
+          igrp: 12,
+        },
+        AND: [
+          {
+            vendorSlug: {
+              in: ["asus", "msi"],
+            },
+          },
+        ],
+      },
+    });
+  });
+
+  it("rejects vendor filtering without a selected category", async () => {
+    const client = fakeProductsClient({
+      products: [],
+      totalItems: 0,
+      sourceCategories: [],
+    });
+
+    const response = await createGetProductsHandler(client)(
+      new Request("https://parts.example/api/products?vendors=asus"),
+    );
+
+    expect(response.status).toBe(400);
+    expect(client.productFindProductsCallCount).toBe(0);
+    expect(client.productFindVendorOptionsCallCount).toBe(0);
   });
 
   it("rejects invalid query values before reading data", async () => {
@@ -186,7 +257,8 @@ describe("GET /api/products handler", () => {
         message: API_ERROR_MESSAGES.invalidQuery,
       },
     });
-    expect(client.productFindManyCallCount).toBe(0);
+    expect(client.productFindProductsCallCount).toBe(0);
+    expect(client.productFindVendorOptionsCallCount).toBe(0);
     expect(client.productCountCallCount).toBe(0);
     expect(client.sourceCategoryFindManyCallCount).toBe(0);
   });
@@ -211,9 +283,10 @@ describe("GET /api/products handler", () => {
         sourceCategories: [],
       }),
       product: {
-        findMany: async () => {
+        findProducts: async () => {
           throw new Error("Prisma stack with DATABASE_URL and iBuyToken");
         },
+        findVendorOptions: async () => [],
         count: async () => 0,
       },
     })(new Request("https://parts.example/api/products"));
@@ -228,30 +301,42 @@ describe("GET /api/products handler", () => {
   });
 });
 
-type ProductFindManyArgs = Parameters<ProductsReadClient["product"]["findMany"]>[0];
+type ProductFindProductsArgs = Parameters<ProductsReadClient["product"]["findProducts"]>[0];
+type ProductFindVendorOptionsArgs = Parameters<
+  ProductsReadClient["product"]["findVendorOptions"]
+>[0];
 type ProductCountArgs = Parameters<ProductsReadClient["product"]["count"]>[0];
 type SourceCategoryFindManyArgs = Parameters<ProductsReadClient["sourceCategory"]["findMany"]>[0];
-type ProductRecord = Awaited<ReturnType<ProductsReadClient["product"]["findMany"]>>[number];
+type ProductRecord = Awaited<ReturnType<ProductsReadClient["product"]["findProducts"]>>[number];
+type ProductVendorRecord = Awaited<
+  ReturnType<ProductsReadClient["product"]["findVendorOptions"]>
+>[number];
 
 interface FakeProductsClientOptions {
   products: ProductRecord[];
+  vendorOptions?: ProductVendorRecord[];
   totalItems: number;
   sourceCategories: SourceStatusCategoryRecord[];
 }
 
 function fakeProductsClient(options: FakeProductsClientOptions) {
   const state = {
-    lastProductFindManyArgs: undefined as ProductFindManyArgs | undefined,
+    lastProductFindProductsArgs: undefined as ProductFindProductsArgs | undefined,
+    lastProductVendorOptionsArgs: undefined as ProductFindVendorOptionsArgs | undefined,
     lastProductCountArgs: undefined as ProductCountArgs | undefined,
     lastSourceCategoryFindManyArgs: undefined as SourceCategoryFindManyArgs | undefined,
-    productFindManyCallCount: 0,
+    productFindProductsCallCount: 0,
+    productFindVendorOptionsCallCount: 0,
     productCountCallCount: 0,
     sourceCategoryFindManyCallCount: 0,
   };
 
   return {
-    get lastProductFindManyArgs() {
-      return state.lastProductFindManyArgs;
+    get lastProductFindProductsArgs() {
+      return state.lastProductFindProductsArgs;
+    },
+    get lastProductVendorOptionsArgs() {
+      return state.lastProductVendorOptionsArgs;
     },
     get lastProductCountArgs() {
       return state.lastProductCountArgs;
@@ -259,8 +344,11 @@ function fakeProductsClient(options: FakeProductsClientOptions) {
     get lastSourceCategoryFindManyArgs() {
       return state.lastSourceCategoryFindManyArgs;
     },
-    get productFindManyCallCount() {
-      return state.productFindManyCallCount;
+    get productFindProductsCallCount() {
+      return state.productFindProductsCallCount;
+    },
+    get productFindVendorOptionsCallCount() {
+      return state.productFindVendorOptionsCallCount;
     },
     get productCountCallCount() {
       return state.productCountCallCount;
@@ -269,11 +357,17 @@ function fakeProductsClient(options: FakeProductsClientOptions) {
       return state.sourceCategoryFindManyCallCount;
     },
     product: {
-      async findMany(args) {
-        state.productFindManyCallCount += 1;
-        state.lastProductFindManyArgs = args;
+      async findProducts(args) {
+        state.productFindProductsCallCount += 1;
+        state.lastProductFindProductsArgs = args;
 
         return options.products;
+      },
+      async findVendorOptions(args) {
+        state.productFindVendorOptionsCallCount += 1;
+        state.lastProductVendorOptionsArgs = args;
+
+        return options.vendorOptions ?? [];
       },
       async count(args) {
         state.productCountCallCount += 1;
@@ -291,10 +385,12 @@ function fakeProductsClient(options: FakeProductsClientOptions) {
       },
     },
   } satisfies ProductsReadClient & {
-    lastProductFindManyArgs?: ProductFindManyArgs;
+    lastProductFindProductsArgs?: ProductFindProductsArgs;
+    lastProductVendorOptionsArgs?: ProductFindVendorOptionsArgs;
     lastProductCountArgs?: ProductCountArgs;
     lastSourceCategoryFindManyArgs?: SourceCategoryFindManyArgs;
-    productFindManyCallCount: number;
+    productFindProductsCallCount: number;
+    productFindVendorOptionsCallCount: number;
     productCountCallCount: number;
     sourceCategoryFindManyCallCount: number;
   };
@@ -322,6 +418,14 @@ function product(overrides: Partial<ProductRecord> = {}): ProductRecord {
       displayName: "顯示卡",
       sourceName: "顯示卡 VGA",
     },
+    ...overrides,
+  };
+}
+
+function vendorOption(overrides: Partial<ProductVendorRecord> = {}): ProductVendorRecord {
+  return {
+    vendorSlug: "asus",
+    vendorName: "華碩",
     ...overrides,
   };
 }
