@@ -1,4 +1,5 @@
 import Link from "next/link";
+import SiteDisclaimer from "./site-disclaimer";
 
 export default function NotFound() {
   return (
@@ -18,6 +19,7 @@ export default function NotFound() {
           返回商品查詢
         </Link>
       </section>
+      <SiteDisclaimer />
     </main>
   );
 }

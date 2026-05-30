@@ -10,6 +10,7 @@ import {
   useRef,
   useState,
 } from "react";
+import SiteDisclaimer from "./site-disclaimer";
 
 type SourceStatus = "ok" | "stale" | "unavailable";
 type ProductStatus = "active" | "inactive" | "all";
@@ -775,6 +776,7 @@ export default function ProductExplorer() {
           </section>
         </div>
       </main>
+      <SiteDisclaimer />
     </div>
   );
 }

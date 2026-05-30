@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import SiteDisclaimer from "../../site-disclaimer";
 
 type LoadState = "idle" | "loading" | "ready" | "not-found" | "error";
 
@@ -178,6 +179,7 @@ export default function ProductDetail({
           </div>
         </section>
       ) : null}
+      <SiteDisclaimer />
     </main>
   );
 }
