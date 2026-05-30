@@ -53,7 +53,7 @@ API 第一版需遵守：
 
 - 查詢參數做型別、範圍與長度驗證。
 - `pageSize` 設定上限。
-- 不回傳 raw HTML、raw snapshot、parse error、crawler error stack、computed `source_item_key`、`iBuyToken` 或 DB 連線資訊。
+- 不回傳 raw HTML、raw snapshot、parse error、crawler error stack、computed `source_item_key`、`iBuyToken` 獨立欄位或 DB 連線資訊；商品詳細頁可在 `source.url` 中使用原價屋 `iBuy` query 作為外部購買導流。
 - `parse_errors.raw_image_url` 屬於內部 validation/debug 資料，不加入商品列表、商品詳細頁或任何公開 API response。
 - 錯誤 response 使用泛用訊息，不把內部錯誤細節回傳給前端。
 - 不提供公開 crawler trigger API。

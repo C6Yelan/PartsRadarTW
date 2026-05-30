@@ -30,7 +30,7 @@ describe("GET /api/products/{id} handler", () => {
         },
       },
     });
-    expect(client.lastProductFindFirstArgs?.select).not.toHaveProperty("ibuyToken");
+    expect(client.lastProductFindFirstArgs?.select).toHaveProperty("ibuyToken", true);
     expect(client.lastProductFindFirstArgs?.select).not.toHaveProperty("sourceUrl");
     expect(body).toEqual({
       id: PRODUCT_ID,
@@ -55,7 +55,7 @@ describe("GET /api/products/{id} handler", () => {
       },
       source: {
         name: "coolpc",
-        url: "https://www.coolpc.com.tw/eachview.php?IGrp=12",
+        url: "https://www.coolpc.com.tw/evaluate.php?iBuy=GPU-RTX-4070",
       },
       status: {
         isActive: true,
@@ -167,6 +167,7 @@ function fakeProductDetailClient(productResult: ProductRecord) {
 function product(overrides: Partial<NonNullable<ProductRecord>> = {}): NonNullable<ProductRecord> {
   return {
     id: PRODUCT_ID,
+    ibuyToken: "GPU-RTX-4070",
     name: "GPU RTX 4070",
     primaryImageUrl: "https://www.coolpc.com.tw/eval/12/gpu-rtx-4070.jpg",
     primaryImageCheckedAt: new Date("2026-05-28T11:55:00.000Z"),

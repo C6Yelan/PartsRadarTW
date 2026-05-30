@@ -18,14 +18,11 @@ interface ProductDetailBody {
   image: {
     url: string;
     alt: string;
-    capturedAt: string;
   };
   price: {
     amount: number;
     currency: "TWD";
     capturedAt: string;
-    lastSeenAt: string;
-    priceChangedAt: string;
   };
   source: {
     name: "coolpc";
@@ -35,7 +32,6 @@ interface ProductDetailBody {
     isActive: boolean;
     missingSince: string | null;
   };
-  firstSeenAt: string;
   lastSeenAt: string;
 }
 
@@ -166,21 +162,15 @@ export default function ProductDetail({ productId }: { productId: string }) {
                 <dd>{product.category.displayName}</dd>
               </div>
               <div>
-                <dt>價格擷取</dt>
+                <dt>價格資料更新</dt>
                 <dd>{formatDateTime(product.price.capturedAt)}</dd>
               </div>
-              <div>
-                <dt>來源最後出現</dt>
-                <dd>{formatDateTime(product.lastSeenAt)}</dd>
-              </div>
-              <div>
-                <dt>首次收錄</dt>
-                <dd>{formatDateTime(product.firstSeenAt)}</dd>
-              </div>
-              <div>
-                <dt>圖片確認</dt>
-                <dd>{formatDateTime(product.image.capturedAt)}</dd>
-              </div>
+              {!product.status.isActive ? (
+                <div>
+                  <dt>最後在來源頁看到</dt>
+                  <dd>{formatDateTime(product.lastSeenAt)}</dd>
+                </div>
+              ) : null}
               <div>
                 <dt>上架狀態</dt>
                 <dd>{product.status.isActive ? "目前上架" : "可能已下架"}</dd>

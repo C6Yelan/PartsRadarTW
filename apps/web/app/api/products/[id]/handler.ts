@@ -3,13 +3,14 @@ import type { Prisma } from "@partsradar/db";
 import { internalErrorResponse, jsonOk, notFoundResponse } from "../../_shared/responses";
 
 const COOLPC_SOURCE_NAME = "coolpc";
-const COOLPC_CATEGORY_BASE_URL = "https://www.coolpc.com.tw/eachview.php";
+const COOLPC_PURCHASE_BASE_URL = "https://www.coolpc.com.tw/evaluate.php";
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const PRODUCT_DETAIL_SELECT = {
-  // Keep the detail endpoint on public-safe fields only. Do not select sourceUrl,
-  // ibuyToken, raw snapshots, or other crawler/internal identifiers here.
+  // Keep the detail endpoint on public-safe fields only. ibuyToken is selected
+  // only to build the outbound CoolPC purchase URL; it is not returned directly.
   id: true,
+  ibuyToken: true,
   name: true,
   primaryImageUrl: true,
   primaryImageCheckedAt: true,
@@ -162,7 +163,7 @@ function toProductDetailResponse(product: ProductDetailRecord): ProductDetailRes
     },
     source: {
       name: COOLPC_SOURCE_NAME,
-      url: createCoolpcCategoryUrl(product.sourceCategory.igrp),
+      url: createCoolpcPurchaseUrl(product.ibuyToken),
     },
     status: {
       isActive: product.isActive,
@@ -173,11 +174,9 @@ function toProductDetailResponse(product: ProductDetailRecord): ProductDetailRes
   };
 }
 
-function createCoolpcCategoryUrl(igrp: number): string {
-  // Build from a fixed source URL so stored source URLs cannot leak PHPSESSID or
-  // other crawl-time tokens into the public API response.
-  const url = new URL(COOLPC_CATEGORY_BASE_URL);
-  url.searchParams.set("IGrp", String(igrp));
+function createCoolpcPurchaseUrl(ibuyToken: string): string {
+  const url = new URL(COOLPC_PURCHASE_BASE_URL);
+  url.searchParams.set("iBuy", ibuyToken);
 
   return url.toString();
 }

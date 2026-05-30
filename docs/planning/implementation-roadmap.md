@@ -174,7 +174,7 @@
 - 商品名稱、分類名稱與來源資料視為不可信輸入；API 不回傳 raw HTML，Web UI 不用 `dangerouslySetInnerHTML` 顯示來源內容。
 - `source.url` 不得包含 `PHPSESSID` 或其他 session token。
 - 錯誤 response 使用泛用訊息，不回傳 Prisma / DB / crawler stack trace。
-- API response 不暴露 computed `source_item_key`、`iBuyToken`、raw snapshot、parse error、crawler error stack、DB 連線資訊或環境變數。
+- API response 不暴露 computed `source_item_key`、`iBuyToken` 獨立欄位、raw snapshot、parse error、crawler error stack、DB 連線資訊或環境變數；商品詳細頁 `source.url` 可使用原價屋 `iBuy` query 作為外部購買導流。
 
 不包含：
 
@@ -190,7 +190,7 @@
 - 不合法 query 回傳 `400` 與泛用錯誤。
 - 商品不存在回傳 `404`。
 - 全域來源狀態與分類來源狀態符合 API 文件。
-- API 不暴露 computed `source_item_key`、`iBuyToken`、raw snapshot 或內部錯誤堆疊。
+- API 不暴露 computed `source_item_key`、`iBuyToken` 獨立欄位、raw snapshot 或內部錯誤堆疊。
 - 超出上限或不在 allowlist 的 query 會被拒絕或依 API 文件安全處理。
 - API route 不會觸發 crawler、不會直接發出來源站請求，也不會修改資料。
 - API response 與錯誤訊息不包含內部 stack trace、DB 連線資訊或環境變數。

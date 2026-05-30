@@ -194,7 +194,7 @@
 - `source.name` 是 API 固定值 `coolpc`，不來自 DB 欄位。
 - 第一版 `source.url` 指向原價屋分類頁，不保證能直接定位到單一商品。
 - 若 query 指定 `igrp`，`meta.sourceStatus` 優先回傳該分類狀態；未指定分類時回傳全域狀態。
-- API 不回傳 computed `source_item_key` 與 `iBuyToken`，避免把內部識別細節暴露給網站畫面。
+- API 不以獨立欄位回傳 computed `source_item_key` 或 `iBuyToken`；商品詳細頁只可在 `source.url` 中使用 `iBuy` query 組出原價屋購買導流。
 - `image.url` 只回傳經 crawler 驗證與正規化後的 CoolPC 預期來源圖片 URL，不回傳 raw HTML 內未驗證 URL。
 - `image.alt` 可由商品名稱產生，不需要額外爬取文字。
 - `image.capturedAt` 表示主要圖片最後一次由來源資料確認的時間；若實作階段決定不公開此時間，需同步調整 API contract 與 UI 文件。
@@ -237,7 +237,7 @@
   },
   "source": {
     "name": "coolpc",
-    "url": "https://www.coolpc.com.tw/eachview.php?IGrp=4"
+    "url": "https://www.coolpc.com.tw/evaluate.php?iBuy=product-token"
   },
   "status": {
     "isActive": true,
@@ -252,7 +252,7 @@
 
 - 商品存在但 `isActive = false` 時仍回傳 `200`，並由 `status.isActive` 告知網站顯示商品可能暫時未出現在來源頁或已下架；此欄位不描述商品是否可購買。
 - 商品不存在時回傳 `404`。
-- 第一版 `source.url` 指向原價屋分類頁，不保證能直接定位到單一商品。
+- 商品詳細頁的 `source.url` 指向原價屋 `evaluate.php?iBuy=...`，供使用者前往原價屋查看或購買該商品；不應使用分類總覽頁作為詳細頁購買導流。
 - 第一版不回傳價格歷史清單。
 - 第一版不回傳拆解後的商品規格欄位，只回傳原始商品名稱。
 - 第一版不回傳 raw snapshot 或 parse error 細節。
