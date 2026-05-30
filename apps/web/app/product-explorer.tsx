@@ -250,7 +250,6 @@ export default function ProductExplorer() {
     );
   }, [categories, query.igrp]);
 
-  const sourceStatus = products?.meta.sourceStatus ?? "unavailable";
   const totalItems = products?.pagination.totalItems ?? 0;
   const totalPages = products?.pagination.totalPages ?? 0;
   const visiblePages = getVisiblePages(query.page, totalPages);
@@ -460,9 +459,8 @@ export default function ProductExplorer() {
           </button>
         </form>
 
-        <div className="topbar-meta" aria-label="來源狀態" role="status">
-          <span>資料最近成功更新：{formatDateTime(products?.meta.lastSuccessAt, "尚無資料")}</span>
-          <StatusBadge status={sourceStatus} />
+        <div className="topbar-meta" aria-label="資料更新時間" role="status">
+          <span>資料最近更新：{formatDateTime(products?.meta.lastSuccessAt, "尚無資料")}</span>
         </div>
       </header>
 
@@ -475,12 +473,6 @@ export default function ProductExplorer() {
           <SummaryItem label="查詢結果" value={formatInteger(totalItems)} />
           <SummaryItem label="目前分類" value={selectedCategoryName} />
         </section>
-
-        {sourceStatus === "stale" ? (
-          <div className="quiet-alert" role="status">
-            最近未成功檢查來源，目前仍顯示最後一次有效資料。
-          </div>
-        ) : null}
 
         <div className="workspace-grid">
           <aside className="filter-panel">
@@ -636,14 +628,8 @@ export default function ProductExplorer() {
 
               {productState === "ready" && products?.data.length === 0 ? (
                 <div className="empty-state">
-                  <h2>
-                    {sourceStatus === "unavailable" ? "目前沒有可顯示的商品" : "找不到相關商品"}
-                  </h2>
-                  <p>
-                    {sourceStatus === "unavailable"
-                      ? "資料尚未同步完成，請稍後再試。"
-                      : "請調整關鍵字、分類或價格範圍後再試一次。"}
-                  </p>
+                  <h2>找不到相關商品</h2>
+                  <p>請調整關鍵字、分類或價格範圍後再試一次。</p>
                 </div>
               ) : null}
 
@@ -836,10 +822,6 @@ function SummaryItem({
   );
 }
 
-function StatusBadge({ status }: { status: SourceStatus }) {
-  return <span className={`status-badge ${status}`}>{sourceStatusLabel(status)}</span>;
-}
-
 function SkeletonRows() {
   return (
     <>
@@ -1015,15 +997,4 @@ function formatDateTime(value: string | null | undefined, fallback: string) {
     minute: "2-digit",
     hour12: false,
   }).format(new Date(value));
-}
-
-function sourceStatusLabel(status: SourceStatus) {
-  switch (status) {
-    case "ok":
-      return "正常";
-    case "stale":
-      return "最近未成功";
-    case "unavailable":
-      return "無可用資料";
-  }
 }

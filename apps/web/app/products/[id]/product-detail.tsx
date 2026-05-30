@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-type SourceStatus = "ok" | "stale" | "unavailable";
 type LoadState = "idle" | "loading" | "ready" | "not-found" | "error";
 
 interface ProductDetailBody {
@@ -35,13 +34,6 @@ interface ProductDetailBody {
   lastSeenAt: string;
 }
 
-interface SourceStatusBody {
-  source: "coolpc";
-  status: SourceStatus;
-  lastCheckedAt: string | null;
-  lastSuccessAt: string | null;
-}
-
 export default function ProductDetail({
   productId,
   returnHref,
@@ -51,7 +43,6 @@ export default function ProductDetail({
 }) {
   const [state, setState] = useState<LoadState>("idle");
   const [product, setProduct] = useState<ProductDetailBody | null>(null);
-  const [sourceStatus, setSourceStatus] = useState<SourceStatusBody | null>(null);
   const [imageError, setImageError] = useState(false);
 
   useEffect(() => {
@@ -60,11 +51,8 @@ export default function ProductDetail({
     setImageError(false);
     setProduct(null);
 
-    Promise.all([
-      fetch(`/api/products/${productId}`, { signal: controller.signal }),
-      fetch("/api/source-status", { signal: controller.signal }),
-    ])
-      .then(async ([productResponse, sourceStatusResponse]) => {
+    fetch(`/api/products/${productId}`, { signal: controller.signal })
+      .then(async (productResponse) => {
         if (productResponse.status === 404) {
           setState("not-found");
           return;
@@ -76,11 +64,6 @@ export default function ProductDetail({
 
         const nextProduct = (await productResponse.json()) as ProductDetailBody;
         setProduct(nextProduct);
-
-        if (sourceStatusResponse.ok) {
-          setSourceStatus((await sourceStatusResponse.json()) as SourceStatusBody);
-        }
-
         setState("ready");
       })
       .catch((error: unknown) => {
@@ -100,7 +83,6 @@ export default function ProductDetail({
         <Link className="back-link" href={returnHref}>
           返回查詢
         </Link>
-        {sourceStatus ? <StatusBadge status={sourceStatus.status} /> : null}
       </div>
 
       {state === "loading" || state === "idle" ? (
@@ -154,7 +136,7 @@ export default function ProductDetail({
 
             {!product.status.isActive ? (
               <div className="quiet-alert warning" role="status">
-                此商品目前可能已下架，或暫時沒有出現在原價屋頁面。
+                這項商品目前沒有出現在原價屋列表，可能已下架或暫時無法確認。
               </div>
             ) : null}
 
@@ -175,7 +157,7 @@ export default function ProductDetail({
               </div>
               {!product.status.isActive ? (
                 <div>
-                  <dt>最後在來源頁看到</dt>
+                  <dt>最後在原價屋看到</dt>
                   <dd>{formatDateTime(product.lastSeenAt)}</dd>
                 </div>
               ) : null}
@@ -200,10 +182,6 @@ export default function ProductDetail({
   );
 }
 
-function StatusBadge({ status }: { status: SourceStatus }) {
-  return <span className={`status-badge ${status}`}>{sourceStatusLabel(status)}</span>;
-}
-
 function formatPrice(amount: number) {
   return `NT$ ${new Intl.NumberFormat("zh-TW").format(amount)}`;
 }
@@ -217,15 +195,4 @@ function formatDateTime(value: string) {
     minute: "2-digit",
     hour12: false,
   }).format(new Date(value));
-}
-
-function sourceStatusLabel(status: SourceStatus) {
-  switch (status) {
-    case "ok":
-      return "正常";
-    case "stale":
-      return "最近未成功";
-    case "unavailable":
-      return "無可用資料";
-  }
 }
