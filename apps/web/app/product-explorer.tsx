@@ -255,6 +255,7 @@ export default function ProductExplorer() {
   const totalPages = products?.pagination.totalPages ?? 0;
   const visiblePages = getVisiblePages(query.page, totalPages);
   const shouldShowPageJump = totalPages > 10;
+  const productListReturnTo = toUrl(query);
   const hasActiveFilters =
     query.q !== DEFAULT_QUERY.q ||
     query.igrp !== DEFAULT_QUERY.igrp ||
@@ -647,7 +648,13 @@ export default function ProductExplorer() {
               ) : null}
 
               {productState === "ready"
-                ? products?.data.map((product) => <ProductRow key={product.id} product={product} />)
+                ? products?.data.map((product) => (
+                    <ProductRow
+                      detailHref={createProductDetailHref(product.id, productListReturnTo)}
+                      key={product.id}
+                      product={product}
+                    />
+                  ))
                 : null}
             </div>
 
@@ -741,7 +748,7 @@ function CategoryOption({
   );
 }
 
-function ProductRow({ product }: { product: ProductListItem }) {
+function ProductRow({ detailHref, product }: { detailHref: string; product: ProductListItem }) {
   return (
     <article className="product-row">
       <ProductImage
@@ -750,7 +757,7 @@ function ProductRow({ product }: { product: ProductListItem }) {
         src={product.image.url}
       />
       <div className="product-main">
-        <Link href={`/products/${product.id}`}>{product.name}</Link>
+        <Link href={detailHref}>{product.name}</Link>
         <span>{product.category.sourceName}</span>
       </div>
       <div className="table-cell row-category">
@@ -802,9 +809,11 @@ function ProductImage({
     <img
       alt={alt}
       className="product-image"
+      draggable={false}
       loading="lazy"
       referrerPolicy="no-referrer"
       src={src}
+      onContextMenu={(event) => event.preventDefault()}
       onError={() => setHasError(true)}
     />
   );
@@ -905,6 +914,17 @@ function toUrl(query: QueryState) {
 
   const queryString = params.toString();
   return queryString ? `/?${queryString}` : "/";
+}
+
+function createProductDetailHref(productId: string, returnTo: string) {
+  const params = new URLSearchParams();
+
+  if (returnTo !== "/") {
+    params.set("returnTo", returnTo);
+  }
+
+  const queryString = params.toString();
+  return queryString ? `/products/${productId}?${queryString}` : `/products/${productId}`;
 }
 
 function appendIfPresent(params: URLSearchParams, name: string, value: string) {

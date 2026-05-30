@@ -85,6 +85,27 @@ API 第一版需遵守：
 - 若未來需要內部 raw snapshot viewer，需另開安全設計，至少包含權限、escape、下載限制與存取紀錄。
 - 外部連結需避免保存或輸出包含 `PHPSESSID` 的 URL。
 
+## Content Security Policy
+
+Web app 目前透過 Next.js headers 設定基本 Content Security Policy，作為瀏覽器層級的額外防線。此設定目標是降低外部 script、object、frame、base URI 與非預期 form action 風險，但不取代 React escape、API allowlist、圖片 URL allowlist 與 raw HTML 不公開等資料層防護。
+
+目前基本規則：
+
+- `default-src` 限制為本站。
+- `script-src` 限制為本站；目前仍保留 inline script 相容性，開發環境額外允許 Next.js dev 需要的 `unsafe-eval`。
+- `style-src` 限制為本站並保留 inline style 相容性。
+- `img-src` 允許本站、目前本機驗證用 CoolPC 圖片來源、`data:` 與 `blob:`。
+- `connect-src` 限制為本站；開發環境額外允許 local HTTP / WebSocket。
+- `object-src` 設為 `none`，`base-uri` 設為本站，`frame-ancestors` 設為 `none`，`form-action` 設為本站。
+- production 環境啟用 `upgrade-insecure-requests`。
+
+此 CSP 是目前階段的實用型 baseline，不是最終嚴格 CSP。公開宣傳或開放較大流量前，需在正式部署網域、圖片呈現方式與是否需要 CSP report endpoint 確認後，重新檢討 stricter CSP：
+
+- 評估使用 nonce 或 hash，移除不必要的 inline script / inline style 例外。
+- 依最終圖片策略收斂 `img-src`，例如自家縮圖網域、object storage / CDN 或 placeholder-only。
+- 先以 `Content-Security-Policy-Report-Only` 觀察違規報告，再切換到 enforcement。
+- 保留開發環境與 production 環境的差異，避免把 Next.js dev-only 例外帶入正式環境。
+
 ## 商品圖片 URL 安全
 
 商品主要圖片由 crawler 從原價屋公開頁面解析，不接受使用者提交的任意圖片 URL。

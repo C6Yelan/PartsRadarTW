@@ -304,6 +304,7 @@ Phase 5 entry gate：
 - 建立 production compose 初版。
 - 建立 migration 部署流程。
 - 建立最小 smoke test。
+- 檢查 production security headers，包含將基本 CSP 收斂為公開前可接受的 stricter CSP。
 
 不包含：
 
@@ -320,6 +321,7 @@ Phase 5 entry gate：
 - `/api/source-status` 可回應。
 - snapshot storage 可寫入。
 - smoke test 完成。
+- 公開前 CSP 決策已完成：確認正式網域、圖片來源策略、是否使用 report-only 觀察期，以及是否可移除 inline script / inline style 例外。
 
 ## Phase 7：資料流穩定期
 

@@ -669,6 +669,8 @@ input::placeholder {
   border: 1px solid var(--border);
   border-radius: 7px;
   background: #0a141c;
+  user-select: none;
+  -webkit-user-drag: none;
 }
 
 .product-image.fallback,
@@ -915,6 +917,11 @@ input::placeholder {
   aspect-ratio: 1;
   object-fit: contain;
   border-radius: 8px;
+}
+
+.detail-media img {
+  user-select: none;
+  -webkit-user-drag: none;
 }
 
 .detail-content {

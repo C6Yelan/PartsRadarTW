@@ -42,7 +42,13 @@ interface SourceStatusBody {
   lastSuccessAt: string | null;
 }
 
-export default function ProductDetail({ productId }: { productId: string }) {
+export default function ProductDetail({
+  productId,
+  returnHref,
+}: {
+  productId: string;
+  returnHref: string;
+}) {
   const [state, setState] = useState<LoadState>("idle");
   const [product, setProduct] = useState<ProductDetailBody | null>(null);
   const [sourceStatus, setSourceStatus] = useState<SourceStatusBody | null>(null);
@@ -91,7 +97,7 @@ export default function ProductDetail({ productId }: { productId: string }) {
   return (
     <main className="detail-shell">
       <div className="detail-topbar">
-        <Link className="back-link" href="/">
+        <Link className="back-link" href={returnHref}>
           返回查詢
         </Link>
         {sourceStatus ? <StatusBadge status={sourceStatus.status} /> : null}
@@ -133,8 +139,10 @@ export default function ProductDetail({ productId }: { productId: string }) {
               // biome-ignore lint/performance/noImgElement: CoolPC image URLs are validated server-side; plain img keeps referrerPolicy explicit without enabling an image proxy.
               <img
                 alt={product.image.alt}
+                draggable={false}
                 referrerPolicy="no-referrer"
                 src={product.image.url}
+                onContextMenu={(event) => event.preventDefault()}
                 onError={() => setImageError(true)}
               />
             )}
