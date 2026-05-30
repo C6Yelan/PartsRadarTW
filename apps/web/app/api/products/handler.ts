@@ -260,30 +260,51 @@ function buildProductWhere(
     where.isActive = query.status === "active";
   }
 
-  if (query.q) {
-    where.OR = [
+  const andConditions = buildProductSearchWhere(query.q);
+  const vendorWhere = options.includeVendors ? buildVendorWhere(query) : null;
+
+  if (vendorWhere) {
+    andConditions.push(vendorWhere);
+  }
+
+  if (andConditions.length > 0) {
+    where.AND = andConditions;
+  }
+
+  return where;
+}
+
+function buildProductSearchWhere(searchText: string | undefined): Prisma.ProductWhereInput[] {
+  const tokens = searchText?.split(/\s+/).filter(Boolean) ?? [];
+
+  return tokens.map((token) => ({
+    OR: [
       {
         name: {
-          contains: query.q,
+          contains: token,
           mode: "insensitive",
         },
       },
       {
         normalizedName: {
-          contains: query.q,
+          contains: token,
           mode: "insensitive",
         },
       },
-    ];
-  }
-
-  const vendorWhere = options.includeVendors ? buildVendorWhere(query) : null;
-
-  if (vendorWhere) {
-    where.AND = [vendorWhere];
-  }
-
-  return where;
+      {
+        vendorSlug: {
+          contains: token,
+          mode: "insensitive",
+        },
+      },
+      {
+        vendorName: {
+          contains: token,
+          mode: "insensitive",
+        },
+      },
+    ],
+  }));
 }
 
 function parseVendorQuery(params: URLSearchParams, igrp: number | undefined): string[] {

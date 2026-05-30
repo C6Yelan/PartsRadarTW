@@ -55,20 +55,7 @@ describe("GET /api/products handler", () => {
             },
           },
         },
-        OR: [
-          {
-            name: {
-              contains: "RTX",
-              mode: "insensitive",
-            },
-          },
-          {
-            normalizedName: {
-              contains: "RTX",
-              mode: "insensitive",
-            },
-          },
-        ],
+        AND: [searchTokenWhere("RTX")],
       },
       orderBy: [{ normalizedName: "asc" }, { id: "asc" }],
       skip: 1,
@@ -220,6 +207,25 @@ describe("GET /api/products handler", () => {
             },
           },
         ],
+      },
+    });
+  });
+
+  it("splits search text into required order-independent tokens", async () => {
+    const client = fakeProductsClient({
+      products: [],
+      totalItems: 0,
+      sourceCategories: [],
+    });
+
+    const response = await createGetProductsHandler(client, { now: () => NOW })(
+      new Request("https://parts.example/api/products?q=4070%20asus"),
+    );
+
+    expect(response.status).toBe(200);
+    expect(client.lastProductFindProductsArgs).toMatchObject({
+      where: {
+        AND: [searchTokenWhere("4070"), searchTokenWhere("asus")],
       },
     });
   });
@@ -428,6 +434,37 @@ function vendorOption(overrides: Partial<ProductVendorRecord> = {}): ProductVend
     vendorSlug: "asus",
     vendorName: "華碩",
     ...overrides,
+  };
+}
+
+function searchTokenWhere(token: string) {
+  return {
+    OR: [
+      {
+        name: {
+          contains: token,
+          mode: "insensitive",
+        },
+      },
+      {
+        normalizedName: {
+          contains: token,
+          mode: "insensitive",
+        },
+      },
+      {
+        vendorSlug: {
+          contains: token,
+          mode: "insensitive",
+        },
+      },
+      {
+        vendorName: {
+          contains: token,
+          mode: "insensitive",
+        },
+      },
+    ],
   };
 }
 

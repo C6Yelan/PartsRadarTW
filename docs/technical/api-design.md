@@ -193,7 +193,7 @@
 - `status=all` 同時查詢 active 與 inactive 商品。
 - 無目前價格的商品第一版不出現在商品列表。
 - 無有效主要商品圖片的商品不應被視為 Phase 5 ready；若暫時回傳 fallback 所需資訊，需同時保留資料完整性問題，不可把缺圖當成正常 response contract。
-- `q` 應查詢 `name` 與 `normalized_name`。
+- `q` 應以空白切成多個搜尋詞；每個搜尋詞都必須命中 `name`、`normalized_name`、`vendor_slug` 或 `vendor_name`，搜尋詞順序不限。
 - `vendors` 只接受該 `igrp` 目前可用的 `products.vendor_slug` 值，並以 DB 欄位做精準篩選。
 - `meta.vendors` 回傳目前分類可用的廠商選項；未指定 `igrp` 時可為空陣列。
 - 廠商欄位由 crawler/parser 依分類與商品名稱解析後寫入 `products.vendor_slug`、`products.vendor_name`，不是使用者輸入或 API 即時計算的文字搜尋條件。
