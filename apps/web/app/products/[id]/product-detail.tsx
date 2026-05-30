@@ -96,14 +96,14 @@ export default function ProductDetail({
       {state === "not-found" ? (
         <section className="detail-empty">
           <h1>這項商品目前無法顯示</h1>
-          <p>商品可能已下架、資料尚未同步，或連結已失效。你可以返回查詢頁重新搜尋。</p>
+          <p>商品可能已下架，或連結已失效。你可以返回查詢頁重新搜尋。</p>
         </section>
       ) : null}
 
       {state === "error" ? (
         <section className="detail-empty" role="alert">
           <h1>商品資料暫時無法載入</h1>
-          <p>請稍後重新整理或檢查本機 API 與資料庫狀態。</p>
+          <p>請稍後重新整理頁面再試一次。</p>
         </section>
       ) : null}
 
