@@ -335,7 +335,9 @@ function parseOptions(args: string[]): CrawlOptions {
     fromRawDir,
     storageDir: resolveRelativeToWorkspace(
       workspaceRoot,
-      getStringArg(args, "--storage-dir") ?? DEFAULT_STORAGE_DIR,
+      getStringArg(args, "--storage-dir") ??
+        process.env.SNAPSHOT_STORAGE_DIR ??
+        DEFAULT_STORAGE_DIR,
     ),
     delayMs: getNumberArg(args, "--delay-ms", DEFAULT_DELAY_MS),
   };

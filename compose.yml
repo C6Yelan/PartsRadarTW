@@ -103,7 +103,17 @@ services:
         condition: service_healthy
       seed:
         condition: service_completed_successfully
-    command: ["pnpm", "--filter", "@partsradar/crawler", "crawl:coolpc-once", "--", "--help"]
+    command:
+      [
+        "pnpm",
+        "--filter",
+        "@partsradar/crawler",
+        "crawl:coolpc-once",
+        "--",
+        "--storage-dir",
+        "/var/lib/partsradar/snapshots",
+        "--help",
+      ]
 
 volumes:
   postgres_data:

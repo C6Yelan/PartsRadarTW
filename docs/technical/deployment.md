@@ -148,6 +148,7 @@ postgres
 - `seed` service 在 migration 後執行 root `pnpm db:seed`，以 idempotent upsert 初始化第一版 8 個 CoolPC 分類；`web` 與手動 `crawler` 都等 seed 成功後才啟動。
 - `web` 預設只綁 `127.0.0.1:${WEB_PORT:-3000}`，適合無網域時先用 SSH tunnel 或 server 內部驗證；若要直接從外部 IP 測試，需明確設定 `WEB_BIND_HOST=0.0.0.0`。
 - `crawler` 目前只作為手動 profile 與 Docker build target。production scheduled crawler daemon 尚未實作，因此預設 command 是 `--help`，避免 `docker compose up` 意外對來源站發出 live requests。
+- `crawler` 的 manual crawl script 會優先使用 `--storage-dir`，其次使用 `SNAPSHOT_STORAGE_DIR`，因此 Compose 環境下 raw snapshot 會寫入 `snapshots` volume，而不是隨 `--rm` container 消失。
 - `product_images` volume 以唯讀方式掛給 `web`，以讀寫方式掛給 `crawler`。
 - `snapshots` volume 只掛給 `crawler`，不由 `web` 公開。
 
