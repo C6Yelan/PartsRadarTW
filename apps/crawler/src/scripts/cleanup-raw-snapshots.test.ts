@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   formatStorageDirForSummary,
+  normalizeCleanupArgs,
   parseCleanupOptions,
   validateCleanupArgs,
 } from "./cleanup-raw-snapshots";
@@ -38,6 +39,26 @@ describe("raw snapshot cleanup CLI options", () => {
     expect(() => validateCleanupArgs(["--storage-dir", "--confirm-delete"])).toThrow(
       "Missing value for --storage-dir.",
     );
+  });
+
+  it("ignores standalone pnpm argument separators before validation", async () => {
+    const workspaceRoot = await createTempRoot();
+
+    expect(normalizeCleanupArgs(["--", "--normal-retention-days", "1"])).toEqual([
+      "--normal-retention-days",
+      "1",
+    ]);
+    expect(
+      parseCleanupOptions(
+        ["--", "--normal-retention-days", "1", "--abnormal-retention-days", "1"],
+        workspaceRoot,
+        {},
+      ),
+    ).toMatchObject({
+      normalRetentionDays: 1,
+      abnormalRetentionDays: 1,
+      dryRun: true,
+    });
   });
 
   it("rejects unexpected positional arguments", async () => {

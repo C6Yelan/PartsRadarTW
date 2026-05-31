@@ -430,14 +430,29 @@ Backfill 規則：
 - raw snapshot 異常資料最長保留 90 天。
 - price snapshots 不套用 raw snapshot 的 30 / 90 天保存期限。
 
-Raw snapshot cleanup 以手動維運命令執行，預設只做 dry run：
+Raw snapshot cleanup 以手動維運命令執行，預設只做 dry run。production 環境應透過 `crawler` container 執行，確保使用 container 內的 `DATABASE_URL`、`SNAPSHOT_STORAGE_DIR` 與 mounted snapshot volume：
+
+```bash
+docker compose --profile manual-crawler run --rm --no-deps crawler \
+  pnpm --filter @partsradar/crawler raw-snapshots:cleanup
+
+docker compose --profile manual-crawler run --rm --no-deps crawler \
+  pnpm --filter @partsradar/crawler raw-snapshots:cleanup -- --confirm-delete
+```
+
+本機開發環境若已有可連線的 `.env` / `DATABASE_URL` 與 snapshot storage，可直接執行：
 
 ```bash
 pnpm raw-snapshots:cleanup
-pnpm raw-snapshots:cleanup -- --confirm-delete
 ```
 
-cleanup 會依 `SNAPSHOT_STORAGE_DIR` 找到 raw snapshot 壓縮檔，刪除超過保留期限的 metadata，並只移除不再被任何保留中 snapshot metadata 參照的 gzip 檔案。執行前應確認 manual crawler、scheduled crawler 與 raw replay 沒有同時寫入 raw snapshot storage。
+cleanup 會依 `SNAPSHOT_STORAGE_DIR` 找到 raw snapshot 壓縮檔，刪除超過保留期限的 metadata，並只移除不再被任何保留中 snapshot metadata 參照的 gzip 檔案。執行前應確認 manual crawler、scheduled crawler 與 raw replay 沒有同時寫入 raw snapshot storage。若要先驗證目前資料是否會產生 candidates，可暫時用較短 retention 做 dry run，例如：
+
+```bash
+docker compose --profile manual-crawler run --rm --no-deps crawler \
+  pnpm --filter @partsradar/crawler raw-snapshots:cleanup -- \
+  --normal-retention-days 1 --abnormal-retention-days 1
+```
 
 ## Product Image Cache Storage
 

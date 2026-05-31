@@ -67,15 +67,16 @@ export function parseCleanupOptions(
   workspaceRoot: string,
   env: NodeJS.ProcessEnv = process.env,
 ): CleanupOptions {
-  validateCleanupArgs(args);
+  const normalizedArgs = normalizeCleanupArgs(args);
+  validateCleanupArgs(normalizedArgs);
 
   const normalRetentionDays = getNumberArg(
-    args,
+    normalizedArgs,
     "--normal-retention-days",
     DEFAULT_RAW_SNAPSHOT_NORMAL_RETENTION_DAYS,
   );
   const abnormalRetentionDays = getNumberArg(
-    args,
+    normalizedArgs,
     "--abnormal-retention-days",
     DEFAULT_RAW_SNAPSHOT_ABNORMAL_RETENTION_DAYS,
   );
@@ -87,13 +88,13 @@ export function parseCleanupOptions(
     workspaceRoot,
     storageDir: resolveAndValidateStorageDir(
       workspaceRoot,
-      getStringArgAllowingEmpty(args, "--storage-dir") ??
+      getStringArgAllowingEmpty(normalizedArgs, "--storage-dir") ??
         env.SNAPSHOT_STORAGE_DIR ??
         DEFAULT_STORAGE_DIR,
     ),
     normalRetentionDays,
     abnormalRetentionDays,
-    dryRun: !args.includes(CONFIRM_DELETE_FLAG),
+    dryRun: !normalizedArgs.includes(CONFIRM_DELETE_FLAG),
   };
 }
 
@@ -121,6 +122,10 @@ export function validateCleanupArgs(args: string[]): void {
 
     index += 1;
   }
+}
+
+export function normalizeCleanupArgs(args: string[]): string[] {
+  return args.filter((arg) => arg !== "--");
 }
 
 export function validateStorageDir(storageDir: string, workspaceRoot: string): string {
