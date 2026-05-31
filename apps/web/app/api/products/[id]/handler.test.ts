@@ -57,6 +57,9 @@ describe("GET /api/products/{id} handler", () => {
         name: "coolpc",
         url: "https://www.coolpc.com.tw/evaluate.php?iBuy=GPU-RTX-4070",
       },
+      discussion: {
+        url: "https://www.nvidia.com/zh-tw/geforce/graphics-cards/40-series/rtx-4070/",
+      },
       status: {
         isActive: true,
         missingSince: null,
@@ -85,6 +88,34 @@ describe("GET /api/products/{id} handler", () => {
         isActive: false,
         missingSince: "2026-05-28T12:00:00.000Z",
       },
+    });
+  });
+
+  it("omits unsafe discussion URLs", async () => {
+    const response = await createGetProductHandler(
+      fakeProductDetailClient(product({ discussionUrl: "javascript:alert(1)" })),
+    )(PRODUCT_ID);
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      discussion: null,
+    });
+  });
+
+  it.each([
+    "https://s.shopee.tw/5Ak0QFrSVB",
+    "https://shopee.tw/product/54133273/24027157445/",
+    "https://www.amd.com/content/dam/amd/en/documents/partner-hub/ryzen/guide.pdf",
+    "https://www.amd.com/zh-tw/support/downloads/previous-drivers.html/processors/ryzen.html",
+    "https://example.com/products/gpu-driver-download",
+  ])("omits low-quality discussion URLs: %s", async (discussionUrl) => {
+    const response = await createGetProductHandler(
+      fakeProductDetailClient(product({ discussionUrl })),
+    )(PRODUCT_ID);
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      discussion: null,
     });
   });
 
@@ -171,6 +202,7 @@ function product(overrides: Partial<NonNullable<ProductRecord>> = {}): NonNullab
     name: "GPU RTX 4070",
     primaryImageUrl: "https://www.coolpc.com.tw/eval/12/gpu-rtx-4070.jpg",
     primaryImageCheckedAt: new Date("2026-05-28T11:55:00.000Z"),
+    discussionUrl: "https://www.nvidia.com/zh-tw/geforce/graphics-cards/40-series/rtx-4070/",
     isActive: true,
     missingSince: null,
     firstSeenAt: new Date("2026-05-28T10:00:00.000Z"),

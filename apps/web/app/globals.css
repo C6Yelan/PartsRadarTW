@@ -115,7 +115,7 @@ input::placeholder {
 
 .topbar {
   display: grid;
-  grid-template-columns: minmax(220px, 300px) minmax(280px, 560px) minmax(260px, 1fr);
+  grid-template-columns: minmax(220px, 1fr) minmax(360px, 640px) minmax(220px, 1fr);
   gap: 22px;
   align-items: center;
   min-height: 78px;
@@ -607,18 +607,21 @@ input::placeholder {
 }
 
 .toolbar-controls {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns:
+    minmax(230px, 1.35fr) minmax(285px, 1.45fr) minmax(150px, 1fr)
+    minmax(150px, 1fr) minmax(108px, 0.65fr);
   gap: 10px;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: stretch;
 }
 
 .toolbar-controls label {
   display: grid;
-  grid-template-columns: auto minmax(92px, 1fr);
+  grid-template-columns: auto minmax(0, 1fr);
   gap: 8px;
   align-items: center;
+  min-width: 0;
   color: var(--muted);
   font-size: 13px;
 }
@@ -629,12 +632,13 @@ input::placeholder {
   grid-template-columns: auto minmax(0, 1fr);
   gap: 8px;
   align-items: center;
+  min-width: 0;
   color: var(--muted);
   font-size: 13px;
 }
 
 .toolbar-price-filter {
-  grid-template-columns: auto 168px;
+  grid-template-columns: auto minmax(0, 1fr);
 }
 
 .toolbar-price-grid {
@@ -643,11 +647,11 @@ input::placeholder {
 }
 
 .toolbar-status-filter {
-  grid-template-columns: auto 286px;
+  grid-template-columns: auto minmax(0, 1fr);
 }
 
 .toolbar-segmented-control {
-  width: 286px;
+  width: 100%;
   min-width: 0;
 }
 
@@ -672,9 +676,10 @@ input::placeholder {
 .vendor-filter {
   position: relative;
   display: grid;
-  grid-template-columns: auto minmax(118px, 1fr);
+  grid-template-columns: auto minmax(0, 1fr);
   gap: 8px;
   align-items: center;
+  min-width: 0;
   color: var(--muted);
   font-size: 13px;
 }
@@ -1195,12 +1200,25 @@ input::placeholder {
   font-weight: 700;
 }
 
+.detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
 .external-action {
   display: inline-grid;
   width: fit-content;
   min-width: 180px;
   place-items: center;
   padding: 0 18px;
+}
+
+.external-action.secondary {
+  border-color: var(--border);
+  background: transparent;
+  color: var(--muted);
 }
 
 .detail-loading,
@@ -1246,6 +1264,12 @@ input::placeholder {
     transition-duration: 0.01ms;
     animation-duration: 0.01ms;
     animation-iteration-count: 1;
+  }
+}
+
+@media (max-width: 1400px) {
+  .toolbar-controls {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -1298,7 +1322,7 @@ input::placeholder {
 
   .topbar-search {
     grid-template-columns: 18px minmax(0, 1fr);
-    padding-right: 12px;
+    padding: 0 12px 8px 15px;
   }
 
   .topbar-search .control-button {

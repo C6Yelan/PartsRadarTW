@@ -28,6 +28,9 @@ interface ProductDetailBody {
     name: "coolpc";
     url: string;
   };
+  discussion: {
+    url: string;
+  } | null;
   status: {
     isActive: boolean;
     missingSince: string | null;
@@ -168,14 +171,26 @@ export default function ProductDetail({
               </div>
             </dl>
 
-            <a
-              className="external-action"
-              href={product.source.url}
-              rel="noreferrer"
-              target="_blank"
-            >
-              前往原價屋查看／購買
-            </a>
+            <div className="detail-actions">
+              <a
+                className="external-action"
+                href={product.source.url}
+                rel="noreferrer"
+                target="_blank"
+              >
+                前往原價屋查看／購買
+              </a>
+              {product.discussion ? (
+                <a
+                  className="external-action secondary"
+                  href={product.discussion.url}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  產品介紹
+                </a>
+              ) : null}
+            </div>
           </div>
         </section>
       ) : null}

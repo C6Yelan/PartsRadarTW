@@ -18,6 +18,7 @@ import {
   createGetProductsHandler,
   type ProductsReadClient,
 } from "../../../web/app/api/products/handler";
+import { SOURCE_STATUS_CATEGORY_QUERY } from "../../../web/app/api/source-status/handler";
 
 const CONFIRM_LIVE_FETCH_FLAG = "--confirm-live-fetch";
 const DEFAULT_DELAY_MS = 5000;
@@ -220,8 +221,19 @@ async function collectDbCounts(client: PrismaClient): Promise<DbCounts> {
 }
 
 async function readProductsApiSmoke(client: PrismaClient): Promise<ProductsApiSmokeBody> {
+  const readClient: ProductsReadClient = {
+    product: {
+      findProducts: (args) => client.product.findMany(args),
+      findVendorOptions: (args) => client.product.findMany(args),
+      count: (args) => client.product.count(args),
+    },
+    sourceCategory: {
+      findMany: () => client.sourceCategory.findMany(SOURCE_STATUS_CATEGORY_QUERY),
+    },
+  };
+
   return readJsonResponse<ProductsApiSmokeBody>(
-    await createGetProductsHandler(client as unknown as ProductsReadClient)(
+    await createGetProductsHandler(readClient)(
       new Request(`http://localhost/api/products?pageSize=${DEFAULT_PAGE_SIZE}`),
     ),
     "GET /api/products",

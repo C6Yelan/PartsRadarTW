@@ -93,6 +93,7 @@ model Product {
   vendorName            String?         @map("vendor_name") @db.Text
   primaryImageUrl       String?         @map("primary_image_url") @db.Text
   primaryImageCheckedAt DateTime?       @map("primary_image_checked_at") @db.Timestamptz(6)
+  discussionUrl         String?         @map("discussion_url") @db.Text
   sourceUrl             String          @map("source_url") @db.Text
   isActive              Boolean         @default(true) @map("is_active")
   missingSince          DateTime?       @map("missing_since") @db.Timestamptz(6)

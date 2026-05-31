@@ -36,6 +36,7 @@ describe("CoolPC product price writer", () => {
       vendorName: item.vendorName,
       primaryImageUrl: item.primaryImageUrl,
       primaryImageCheckedAt: item.fetchedAt,
+      discussionUrl: item.discussionUrl,
       firstSeenAt: item.fetchedAt,
       lastSeenAt: item.fetchedAt,
       isActive: true,
@@ -101,6 +102,7 @@ describe("CoolPC product price writer", () => {
       vendorName: nextItem.vendorName,
       primaryImageUrl: nextItem.primaryImageUrl,
       primaryImageCheckedAt: nextItem.fetchedAt,
+      discussionUrl: nextItem.discussionUrl,
       lastSeenAt: nextItem.fetchedAt,
       isActive: true,
       missingSince: null,
@@ -308,6 +310,7 @@ interface FakeProduct {
   vendorName: string | null;
   primaryImageUrl: string;
   primaryImageCheckedAt: Date;
+  discussionUrl: string | null;
   sourceUrl: string;
   isActive: boolean;
   missingSince: Date | null;
@@ -406,6 +409,7 @@ class FakeCoolpcProductWriteClient implements CoolpcProductWriteClient {
         vendorName: data.vendorName,
         primaryImageUrl: data.primaryImageUrl,
         primaryImageCheckedAt: data.primaryImageCheckedAt,
+        discussionUrl: data.discussionUrl,
         sourceUrl: data.sourceUrl,
         isActive: data.isActive,
         missingSince: data.missingSince,
@@ -522,6 +526,7 @@ class FakeCoolpcProductWriteClient implements CoolpcProductWriteClient {
       vendorName: item.vendorName,
       primaryImageUrl: item.primaryImageUrl,
       primaryImageCheckedAt: item.fetchedAt,
+      discussionUrl: item.discussionUrl,
       sourceUrl: item.sourceUrl,
       isActive: overrides.isActive ?? true,
       missingSince: overrides.missingSince ?? null,
@@ -540,6 +545,7 @@ function productItem({
   vendorSlug = "amd",
   vendorName = "AMD",
   primaryImageUrl = "https://www.coolpc.com.tw/eval/4/amd7500f.jpg",
+  discussionUrl = "https://www.amd.com/zh-tw/products/processors/desktops/ryzen/7000-series/amd-ryzen-5-7500f.html",
   price,
   fetchedAt = new Date("2026-05-27T10:30:00.000Z"),
 }: {
@@ -550,6 +556,7 @@ function productItem({
   vendorSlug?: string | null;
   vendorName?: string | null;
   primaryImageUrl?: string;
+  discussionUrl?: string | null;
   price: number;
   fetchedAt?: Date;
 }): ParsedCoolpcProduct {
@@ -565,6 +572,7 @@ function productItem({
     vendorSlug,
     vendorName,
     primaryImageUrl,
+    discussionUrl,
     price,
     currency: "TWD",
     sourceUrl: "https://www.coolpc.com.tw/eachview.php?IGrp=4",

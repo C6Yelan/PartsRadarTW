@@ -114,6 +114,7 @@ interface ProductCreateData {
   vendorName: string | null;
   primaryImageUrl: string;
   primaryImageCheckedAt: Date;
+  discussionUrl: string | null;
   sourceUrl: string;
   isActive: true;
   missingSince: null;
@@ -129,6 +130,7 @@ interface ProductSeenUpdateData {
   vendorName: string | null;
   primaryImageUrl: string;
   primaryImageCheckedAt: Date;
+  discussionUrl: string | null;
   sourceUrl: string;
   isActive: true;
   missingSince: null;
@@ -348,6 +350,7 @@ function updateProductSeenData(
       vendorName: item.vendorName,
       primaryImageUrl: item.primaryImageUrl,
       primaryImageCheckedAt: item.fetchedAt,
+      discussionUrl: item.discussionUrl,
       sourceUrl: item.sourceUrl,
       isActive: true,
       missingSince: null,
@@ -476,6 +479,7 @@ function createProductData(item: ParsedCoolpcProduct): ProductCreateData {
     vendorName: item.vendorName,
     primaryImageUrl: item.primaryImageUrl,
     primaryImageCheckedAt: item.fetchedAt,
+    discussionUrl: item.discussionUrl,
     sourceUrl: item.sourceUrl,
     isActive: true,
     missingSince: null,

@@ -5,6 +5,15 @@ import { createProductImageApiUrl } from "../../product-images/handler";
 
 const COOLPC_SOURCE_NAME = "coolpc";
 const COOLPC_PURCHASE_BASE_URL = "https://www.coolpc.com.tw/evaluate.php";
+const DISALLOWED_DISCUSSION_HOST_SUFFIXES = [".shopee.tw"];
+const DISALLOWED_DISCUSSION_HOSTS = new Set(["shopee.tw"]);
+const DISALLOWED_DISCUSSION_PATH_KEYWORDS = [
+  "driver",
+  "drivers",
+  "download",
+  "downloads",
+  "previous-drivers",
+];
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const PRODUCT_DETAIL_SELECT = {
@@ -15,6 +24,7 @@ const PRODUCT_DETAIL_SELECT = {
   name: true,
   primaryImageUrl: true,
   primaryImageCheckedAt: true,
+  discussionUrl: true,
   isActive: true,
   missingSince: true,
   firstSeenAt: true,
@@ -78,6 +88,9 @@ interface ProductDetailResponseBody {
     name: typeof COOLPC_SOURCE_NAME;
     url: string;
   };
+  discussion: {
+    url: string;
+  } | null;
   status: {
     isActive: boolean;
     missingSince: string | null;
@@ -166,6 +179,7 @@ function toProductDetailResponse(product: ProductDetailRecord): ProductDetailRes
       name: COOLPC_SOURCE_NAME,
       url: createCoolpcPurchaseUrl(product.ibuyToken),
     },
+    discussion: toDiscussionResponse(product.discussionUrl),
     status: {
       isActive: product.isActive,
       missingSince: toIsoStringOrNull(product.missingSince),
@@ -173,6 +187,48 @@ function toProductDetailResponse(product: ProductDetailRecord): ProductDetailRes
     firstSeenAt: product.firstSeenAt.toISOString(),
     lastSeenAt: product.lastSeenAt.toISOString(),
   };
+}
+
+function toDiscussionResponse(
+  discussionUrl: string | null,
+): ProductDetailResponseBody["discussion"] {
+  if (!discussionUrl) {
+    return null;
+  }
+
+  try {
+    const url = new URL(discussionUrl);
+
+    if (!["http:", "https:"].includes(url.protocol)) {
+      return null;
+    }
+
+    if (!isPublicDiscussionUrl(url)) {
+      return null;
+    }
+
+    return { url: url.toString() };
+  } catch {
+    return null;
+  }
+}
+
+function isPublicDiscussionUrl(url: URL): boolean {
+  const hostname = url.hostname.toLowerCase().replace(/^www\./, "");
+  const pathname = url.pathname.toLowerCase();
+
+  if (
+    DISALLOWED_DISCUSSION_HOSTS.has(hostname) ||
+    DISALLOWED_DISCUSSION_HOST_SUFFIXES.some((suffix) => hostname.endsWith(suffix))
+  ) {
+    return false;
+  }
+
+  if (pathname.endsWith(".pdf")) {
+    return false;
+  }
+
+  return !DISALLOWED_DISCUSSION_PATH_KEYWORDS.some((keyword) => pathname.includes(keyword));
 }
 
 function createCoolpcPurchaseUrl(ibuyToken: string): string {

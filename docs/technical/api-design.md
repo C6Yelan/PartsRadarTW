@@ -249,6 +249,9 @@
     "name": "coolpc",
     "url": "https://www.coolpc.com.tw/evaluate.php?iBuy=product-token"
   },
+  "discussion": {
+    "url": "https://www.intel.com.tw/content/www/tw/zh/products/sku/example/specifications.html"
+  },
   "status": {
     "isActive": true,
     "missingSince": null
@@ -263,6 +266,8 @@
 - 商品存在但 `isActive = false` 時仍回傳 `200`，並由 `status.isActive` 告知網站顯示商品可能暫時未出現在來源頁或已下架；此欄位不描述商品是否可購買。
 - 商品不存在時回傳 `404`。
 - 商品詳細頁的 `source.url` 指向原價屋 `evaluate.php?iBuy=...`，供使用者前往原價屋查看或購買該商品；不應使用分類總覽頁作為詳細頁購買導流。
+- `discussion` 來自原價屋商品列「開箱討論」連結，前端以「產品介紹」呈現；可能指向原廠規格頁、產品介紹頁、代理商或其他外部介紹頁，沒有可用連結時回傳 `null`。
+- `discussion` 只公開較適合使用者查看的產品介紹連結；蝦皮、PDF、driver/download 類 URL 會被 API 視為低品質外部連結並回傳 `null`，DB 仍保留原始 URL 供後續稽核。
 - 第一版不回傳價格歷史清單。
 - 第一版不回傳拆解後的商品規格欄位，只回傳原始商品名稱。
 - 第一版不回傳 raw snapshot 或 parse error 細節。

@@ -32,6 +32,7 @@ export interface CoolpcProductCandidate {
   rawName: string;
   rawPriceText: string;
   rawImageUrl: string;
+  rawDiscussionUrl: string;
 }
 
 export interface ParsedCoolpcProduct {
@@ -46,6 +47,7 @@ export interface ParsedCoolpcProduct {
   vendorSlug: string | null;
   vendorName: string | null;
   primaryImageUrl: string;
+  discussionUrl: string | null;
   price: number;
   currency: Currency;
   sourceUrl: string;
@@ -151,6 +153,31 @@ export function normalizeCoolpcProductImageUrl(
   }
 
   return `https://www.coolpc.com.tw${url.pathname}`;
+}
+
+export function normalizeCoolpcDiscussionUrl(
+  rawDiscussionUrl: string,
+  baseUrl = DEFAULT_COOLPC_BASE_URL,
+): string | null {
+  const trimmedUrl = rawDiscussionUrl.trim();
+
+  if (trimmedUrl.length === 0) {
+    return null;
+  }
+
+  let url: URL;
+
+  try {
+    url = new URL(trimmedUrl, baseUrl);
+  } catch {
+    return null;
+  }
+
+  if (!["http:", "https:"].includes(url.protocol)) {
+    return null;
+  }
+
+  return url.toString();
 }
 
 export function validateCoolpcCategoryPage(
@@ -286,6 +313,7 @@ export function parseCoolpcCategoryPage(
     const name = normalizeProductName(candidate.rawName);
     const price = parsePriceText(candidate.rawPriceText);
     const primaryImageUrl = normalizeCoolpcProductImageUrl(candidate.rawImageUrl, context.igrp);
+    const discussionUrl = normalizeCoolpcDiscussionUrl(candidate.rawDiscussionUrl);
 
     if (ibuyToken.length === 0) {
       issues.push({
@@ -372,6 +400,7 @@ export function parseCoolpcCategoryPage(
       vendorSlug: vendor?.slug ?? null,
       vendorName: vendor?.name ?? null,
       primaryImageUrl,
+      discussionUrl,
       price,
       currency: "TWD",
       sourceUrl: sanitizeCoolpcSourceUrl(
@@ -407,12 +436,17 @@ function extractCoolpcProductCandidates($: CheerioAPI): CoolpcProductCandidate[]
       const rawName = firstText($nextSpan, "div.t") || firstText($parent, "div.t");
       const rawPriceText = firstText($nextSpan, "div.x") || firstText($parent, "div.x");
       const rawImageUrl = firstAttr($nextSpan, "img", "src") || firstAttr($parent, "img", "src");
+      const rawDiscussionUrl =
+        firstDiscussionUrl($, $nextSpan) ||
+        firstDiscussionUrl($, $parent) ||
+        firstDiscussionUrl($, $following);
 
       return {
         rawToken,
         rawName: rawName || firstText($following, "div.t"),
         rawPriceText: rawPriceText || firstText($following, "div.x"),
         rawImageUrl: rawImageUrl || firstAttr($following, "img", "src"),
+        rawDiscussionUrl,
       };
     });
 }
@@ -423,6 +457,15 @@ function firstText(scope: ReturnType<CheerioAPI>, selector: string): string {
 
 function firstAttr(scope: ReturnType<CheerioAPI>, selector: string, attributeName: string): string {
   return scope.find(selector).first().attr(attributeName)?.trim() ?? "";
+}
+
+function firstDiscussionUrl($: CheerioAPI, scope: ReturnType<CheerioAPI>): string {
+  const link = scope
+    .find("div.x a")
+    .toArray()
+    .find((element) => normalizeForComparison($(element).text()).includes("開箱討論"));
+
+  return link ? ($(link).attr("href")?.trim() ?? "") : "";
 }
 
 function expectedTitleKeywords(context: SourceCategoryContext): string[] {

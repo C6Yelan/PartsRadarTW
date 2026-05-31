@@ -170,6 +170,7 @@ product_list_view
 - `vendor_name`：對使用者顯示的廠商名稱；不確定時為 `null`。
 - `primary_image_url`：主要商品圖片 URL，來自經驗證與正規化的原價屋公開頁面圖片。
 - `primary_image_checked_at`：主要商品圖片最後一次被來源資料確認的時間。
+- `discussion_url`：原價屋商品列「開箱討論」連結，前端以「產品介紹」呈現；可指向原廠規格頁、產品介紹頁、代理商頁或其他外部介紹頁。不是每筆商品都有，且只接受 `http` / `https` URL。DB 保留原始 URL；公開 API 會隱藏蝦皮、PDF、driver/download 類低品質外部連結。
 - `source_url`：不包含 `PHPSESSID` 的來源分類頁 URL。
 - `is_active`。
 - `missing_since`。
