@@ -454,6 +454,14 @@ docker compose --profile manual-crawler run --rm --no-deps crawler \
   --normal-retention-days 1 --abnormal-retention-days 1
 ```
 
+Production 也會透過 `scheduled-crawler` profile 啟動 `raw-snapshot-cleanup-daemon`，預設每 24 小時執行一次正式 cleanup：
+
+```bash
+docker compose --profile scheduled-crawler up -d raw-snapshot-cleanup-daemon
+```
+
+`raw-snapshot-cleanup-daemon` 會明確帶 `--confirm-delete`，但仍沿用同一套 30 / 90 天保留規則、path 防呆與 shared gzip reference 檢查。若要調整執行頻率，可設定 `RAW_SNAPSHOT_CLEANUP_INTERVAL_SECONDS`；允許範圍是 3600 到 604800 秒。
+
 ## Product Image Cache Storage
 
 第一版 production 商品圖片策略使用站內小尺寸 WebP 縮圖快取，不在訪客請求期間抓取來源站圖片，也不直接 hotlink 原價屋圖片。
@@ -510,6 +518,7 @@ env: PRODUCT_IMAGE_STORAGE_DIR=/var/lib/partsradar/product-images
 | `PRODUCT_IMAGE_STORAGE_DIR` | container 內商品縮圖快取保存路徑，正式部署應設為明確 mounted path |
 | `CRAWLER_INTERVAL_SECONDS` | crawler 週期 |
 | `CRAWLER_BACKOFF_SECONDS` | 連續失敗 backoff |
+| `RAW_SNAPSHOT_CLEANUP_INTERVAL_SECONDS` | raw snapshot cleanup daemon 執行週期；預設 86400 秒，範圍 3600 到 604800 秒 |
 | `CLOUDFLARED_IMAGE` | 固定版本 cloudflared image；不得使用 `latest` |
 | `CLOUDFLARE_TUNNEL_TOKEN` | Cloudflare remotely-managed tunnel token；啟用 `public-tunnel` profile 時必填 |
 | `NODE_ENV` | production |

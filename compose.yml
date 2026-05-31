@@ -139,6 +139,35 @@ services:
         "/var/lib/partsradar/snapshots",
       ]
 
+  raw-snapshot-cleanup-daemon:
+    profiles:
+      - scheduled-crawler
+    build:
+      context: .
+      target: crawler
+    restart: unless-stopped
+    environment:
+      <<: *app-env
+      RAW_SNAPSHOT_CLEANUP_INTERVAL_SECONDS: "${RAW_SNAPSHOT_CLEANUP_INTERVAL_SECONDS:-86400}"
+    volumes:
+      - snapshots:/var/lib/partsradar/snapshots
+    depends_on:
+      postgres:
+        condition: service_healthy
+      seed:
+        condition: service_completed_successfully
+    command:
+      [
+        "pnpm",
+        "--filter",
+        "@partsradar/crawler",
+        "raw-snapshots:cleanup-daemon",
+        "--",
+        "--confirm-delete",
+        "--storage-dir",
+        "/var/lib/partsradar/snapshots",
+      ]
+
   cloudflared:
     profiles:
       - public-tunnel
