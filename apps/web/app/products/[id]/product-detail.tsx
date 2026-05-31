@@ -135,7 +135,6 @@ export default function ProductDetail({
           </div>
 
           <div className="detail-content">
-            <p className="eyebrow">{product.category.sourceName}</p>
             <h1>{product.name}</h1>
 
             {!product.status.isActive ? (

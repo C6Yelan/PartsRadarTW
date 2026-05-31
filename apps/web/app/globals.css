@@ -180,8 +180,9 @@ input::placeholder {
 }
 
 .topbar-search {
+  box-sizing: border-box;
   display: grid;
-  grid-template-columns: 18px minmax(0, 1fr) auto;
+  grid-template-columns: 18px minmax(0, 1fr) 32px auto;
   gap: 10px;
   align-items: center;
   min-height: 48px;
@@ -209,10 +210,54 @@ input::placeholder {
 }
 
 .topbar-search input {
+  box-sizing: border-box;
+  grid-column: 2;
   width: 100%;
   height: 38px;
   border: 0;
   background: transparent;
+}
+
+.topbar-search input::-webkit-search-cancel-button {
+  appearance: none;
+}
+
+.search-clear-button {
+  position: relative;
+  box-sizing: border-box;
+  display: grid;
+  grid-column: 3;
+  place-items: center;
+  width: 32px;
+  aspect-ratio: 1;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+}
+
+.search-clear-button::before,
+.search-clear-button::after {
+  position: absolute;
+  width: 13px;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+  content: "";
+}
+
+.search-clear-button::before {
+  transform: rotate(45deg);
+}
+
+.search-clear-button::after {
+  transform: rotate(-45deg);
+}
+
+.search-clear-button:hover {
+  border-color: var(--border);
+  background: var(--surface-hover);
+  color: var(--text);
 }
 
 .topbar-meta {
@@ -355,15 +400,6 @@ input::placeholder {
   font-size: 12px;
 }
 
-.filter-applied {
-  padding: 3px 7px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--accent-surface);
-  color: var(--accent-strong);
-  line-height: 1;
-}
-
 .filter-chevron {
   width: 8px;
   aspect-ratio: 1;
@@ -375,31 +411,6 @@ input::placeholder {
 
 .filter-panel details[open] .filter-chevron {
   transform: rotate(225deg);
-}
-
-.filter-reset-button {
-  position: absolute;
-  top: 12px;
-  right: 14px;
-  z-index: 1;
-  min-height: 30px;
-  padding: 0 10px;
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  background: transparent;
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 700;
-  transition:
-    background 140ms ease,
-    border-color 140ms ease,
-    color 140ms ease;
-}
-
-.filter-reset-button:hover {
-  border-color: var(--border-strong);
-  background: var(--surface-hover);
-  color: var(--text);
 }
 
 .filter-stack {
@@ -567,6 +578,11 @@ input::placeholder {
   color: var(--muted);
 }
 
+.topbar-search .control-button {
+  box-sizing: border-box;
+  grid-column: 4;
+}
+
 .inline-error {
   margin: 9px 0 0;
   color: var(--danger);
@@ -593,6 +609,13 @@ input::placeholder {
   line-height: 1.25;
 }
 
+.results-heading-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
 .results-title {
   display: flex;
   flex-wrap: wrap;
@@ -604,6 +627,28 @@ input::placeholder {
   color: var(--muted);
   font-size: 13px;
   font-weight: 700;
+}
+
+.results-reset-button {
+  flex: 0 0 auto;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease;
+}
+
+.results-reset-button:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+  color: var(--text);
 }
 
 .toolbar-controls {
@@ -659,10 +704,27 @@ input::placeholder {
   white-space: nowrap;
 }
 
+.toolbar-price-grid input,
 .toolbar-controls select {
+  box-sizing: border-box;
   width: 100%;
-  min-height: 38px;
+  min-height: 42px;
+}
+
+.toolbar-controls select {
+  appearance: none;
+  line-height: 40px;
   padding: 0 32px 0 10px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position:
+    calc(100% - 16px) 18px,
+    calc(100% - 11px) 18px;
+  background-repeat: no-repeat;
+  background-size:
+    5px 5px,
+    5px 5px;
 }
 
 .toolbar-error {
@@ -696,7 +758,7 @@ input::placeholder {
   justify-content: space-between;
   width: 100%;
   min-width: 0;
-  min-height: 38px;
+  min-height: 42px;
   padding: 0 10px;
   border: 1px solid var(--border);
   border-radius: 7px;
@@ -887,6 +949,7 @@ input::placeholder {
   border-radius: 7px;
   background: #0a141c;
   user-select: none;
+  -webkit-touch-callout: none;
   -webkit-user-drag: none;
 }
 
@@ -1138,6 +1201,7 @@ input::placeholder {
 
 .detail-media img {
   user-select: none;
+  -webkit-touch-callout: none;
   -webkit-user-drag: none;
 }
 
@@ -1209,7 +1273,7 @@ input::placeholder {
 
 .external-action {
   display: inline-grid;
-  width: fit-content;
+  width: min(100%, 220px);
   min-width: 180px;
   place-items: center;
   padding: 0 18px;
@@ -1321,13 +1385,32 @@ input::placeholder {
   }
 
   .topbar-search {
-    grid-template-columns: 18px minmax(0, 1fr);
-    padding: 0 12px 8px 15px;
+    grid-template-areas:
+      "icon input clear"
+      "submit submit submit";
+    grid-template-columns: 18px minmax(0, 1fr) 32px;
+    gap: 8px 10px;
+    width: 100%;
+    overflow: hidden;
+    padding: 8px 10px 10px 14px;
+  }
+
+  .topbar-search .search-glyph {
+    grid-area: icon;
+  }
+
+  .topbar-search input {
+    grid-area: input;
+  }
+
+  .topbar-search .search-clear-button {
+    grid-area: clear;
   }
 
   .topbar-search .control-button {
-    grid-column: 1 / -1;
+    grid-area: submit;
     width: 100%;
+    min-width: 0;
   }
 
   .topbar-meta {
@@ -1345,10 +1428,6 @@ input::placeholder {
     min-height: 54px;
     padding: 0 16px;
     cursor: pointer;
-  }
-
-  .filter-panel:has(.filter-reset-button) summary {
-    padding-right: 78px;
   }
 
   .filter-summary-meta {
@@ -1461,20 +1540,39 @@ input::placeholder {
   }
 
   .pagination-bar {
-    justify-content: stretch;
+    display: grid;
+    grid-template-columns: auto auto auto;
+    gap: 6px;
+    justify-content: center;
   }
 
-  .icon-button {
-    flex: 1;
+  .pagination-bar > .icon-button,
+  .pagination-bar .page-buttons button {
+    min-height: 40px;
+    min-width: 34px;
+    padding: 0 8px;
+    font-size: 14px;
+  }
+
+  .pagination-bar > .icon-button {
+    min-width: 62px;
+    flex: 0 0 auto;
   }
 
   .page-buttons {
-    order: -1;
-    width: 100%;
+    width: auto;
+    flex-wrap: nowrap;
+    gap: 4px;
+  }
+
+  .page-gap {
+    width: 10px;
+    text-align: center;
   }
 
   .page-jump {
-    width: 100%;
+    grid-column: 1 / -1;
+    width: auto;
     justify-content: center;
   }
 

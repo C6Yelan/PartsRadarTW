@@ -121,6 +121,7 @@ const STATUS_OPTIONS: Array<{ value: ProductStatus; label: string }> = [
 const PAGE_SIZE_OPTIONS = [5, 10, 15, 20, 50] as const;
 const SKELETON_ROWS = ["row-1", "row-2", "row-3", "row-4", "row-5", "row-6"];
 const DESKTOP_FILTER_MEDIA_QUERY = "(min-width: 761px)";
+const TOUCH_INPUT_MEDIA_QUERY = "(pointer: coarse)";
 const MAX_PRICE_DIGITS = 9;
 
 export default function ProductExplorer() {
@@ -314,14 +315,17 @@ export default function ProductExplorer() {
       return;
     }
 
-    commitQuery({
-      ...query,
-      igrp: String(categories[0].igrp),
-      vendors: DEFAULT_QUERY.vendors,
-      page: 1,
-    }, {
-      replace: true,
-    });
+    commitQuery(
+      {
+        ...query,
+        igrp: String(categories[0].igrp),
+        vendors: DEFAULT_QUERY.vendors,
+        page: 1,
+      },
+      {
+        replace: true,
+      },
+    );
   }, [categories, categoryState, commitQuery, isReady, query]);
 
   useEffect(() => {
@@ -385,6 +389,8 @@ export default function ProductExplorer() {
       return;
     }
 
+    blurActiveElementOnTouchInput();
+
     commitQuery({
       ...query,
       q: draft.q.trim().slice(0, 100),
@@ -404,6 +410,11 @@ export default function ProductExplorer() {
         page: 1,
       });
     }
+  }
+
+  function clearSearchDraft() {
+    updateSearchDraft(DEFAULT_QUERY.q);
+    blurActiveElementOnTouchInput();
   }
 
   function resetFilters() {
@@ -436,15 +447,12 @@ export default function ProductExplorer() {
       igrp: getFallbackCategoryIgrp(categories, query.igrp),
     };
 
-    commitQuery(
-      homeQuery,
-      {
-        draftQuery: {
-          ...homeQuery,
-          q: draft.q,
-        },
+    commitQuery(homeQuery, {
+      draftQuery: {
+        ...homeQuery,
+        q: draft.q,
       },
-    );
+    });
   }
 
   function keepDesktopFiltersOpen(event: MouseEvent<HTMLElement>) {
@@ -481,6 +489,16 @@ export default function ProductExplorer() {
 
   function updateCategoryFilter(igrp: string) {
     updateQuery({ igrp, vendors: DEFAULT_QUERY.vendors });
+  }
+
+  function blurActiveElementOnTouchInput() {
+    if (!window.matchMedia(TOUCH_INPUT_MEDIA_QUERY).matches) {
+      return;
+    }
+
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
   }
 
   function toggleVendorFilter(vendor: string) {
@@ -523,6 +541,14 @@ export default function ProductExplorer() {
             value={draft.q}
             onChange={(event) => updateSearchDraft(event.target.value)}
           />
+          {draft.q ? (
+            <button
+              aria-label="清除搜尋字詞"
+              className="search-clear-button"
+              type="button"
+              onClick={clearSearchDraft}
+            />
+          ) : null}
           <button className="control-button primary" type="submit">
             搜尋
           </button>
@@ -536,11 +562,6 @@ export default function ProductExplorer() {
       <main className="dashboard-shell">
         <div className="workspace-grid">
           <aside className="filter-panel">
-            {hasActiveFilters ? (
-              <button className="filter-reset-button" type="button" onClick={resetFilters}>
-                重設
-              </button>
-            ) : null}
             <details
               open={filtersOpen}
               onToggle={(event) => syncFiltersOpenFromToggle(event.currentTarget.open)}
@@ -549,7 +570,6 @@ export default function ProductExplorer() {
               <summary onClick={keepDesktopFiltersOpen}>
                 <span>搜尋與篩選</span>
                 <span className="filter-summary-meta">
-                  {hasActiveFilters ? <span className="filter-applied">已套用</span> : null}
                   <span className="filter-chevron" aria-hidden="true" />
                 </span>
               </summary>
@@ -578,9 +598,16 @@ export default function ProductExplorer() {
 
           <section className="results-panel" ref={resultsPanelRef} aria-label="商品列表">
             <div className="results-toolbar">
-              <div className="results-title">
-                <h1>搜尋結果</h1>
-                <span>{formatInteger(totalItems)} 筆商品</span>
+              <div className="results-heading-row">
+                <div className="results-title">
+                  <h1>搜尋結果</h1>
+                  <span>{formatInteger(totalItems)} 筆商品</span>
+                </div>
+                {hasActiveFilters ? (
+                  <button className="results-reset-button" type="button" onClick={resetFilters}>
+                    重設
+                  </button>
+                ) : null}
               </div>
               <div className="toolbar-controls">
                 <div className="toolbar-price-filter">
