@@ -1,0 +1,310 @@
+import type { PrismaClient } from "@partsradar/db";
+import {
+  CRAWL_RUN_STATUSES,
+  CRAWL_TRIGGER_TYPES,
+  type RunCoolpcCrawlOnceResult,
+} from "../coolpc/crawl-run";
+import {
+  DEFAULT_COOLPC_CATEGORY_DELAY_MS,
+  assertSeededCategories,
+  runCoolpcCategoryCrawl,
+} from "../coolpc/live-crawl";
+import {
+  getStringArg,
+  loadWorkspaceEnv,
+  resolveRelativeToWorkspace,
+  resolveWorkspaceRoot,
+} from "./script-utils";
+
+const CONFIRM_LIVE_FETCH_FLAG = "--confirm-live-fetch";
+const DEFAULT_STORAGE_DIR = "temp/coolpc-daemon/snapshots";
+const DEFAULT_INTERVAL_SECONDS = 300;
+const DEFAULT_BACKOFF_SECONDS = 3600;
+const MIN_INTERVAL_SECONDS = 60;
+const MIN_BACKOFF_SECONDS = 60;
+const MIN_CATEGORY_DELAY_MS = 3000;
+const SCHEDULED_CRAWL_USER_AGENT =
+  "PartsRadarTW scheduled crawler (+https://github.com/C6Yelan/PartsRadarTW)";
+
+export interface CoolpcDaemonOptions {
+  workspaceRoot: string;
+  storageDir: string;
+  intervalSeconds: number;
+  backoffSeconds: number;
+  categoryDelayMs: number;
+  runOnce: boolean;
+  baseUrl?: string;
+}
+
+interface ParseIntegerOption {
+  args: string[];
+  argName: string;
+  env: NodeJS.ProcessEnv;
+  envName: string;
+  fallback: number;
+  min: number;
+}
+
+interface ShutdownController {
+  readonly requested: boolean;
+  sleep(ms: number): Promise<void>;
+}
+
+export function parseDaemonOptions(
+  args: string[],
+  env: NodeJS.ProcessEnv = process.env,
+  cwd = process.cwd(),
+): CoolpcDaemonOptions {
+  if (!args.includes(CONFIRM_LIVE_FETCH_FLAG)) {
+    throw new Error(
+      `Refusing scheduled CoolPC live fetch. Re-run with ${CONFIRM_LIVE_FETCH_FLAG} because this daemon contacts the source site repeatedly.`,
+    );
+  }
+
+  const workspaceRoot = resolveWorkspaceRoot(cwd);
+
+  return {
+    workspaceRoot,
+    storageDir: resolveRelativeToWorkspace(
+      workspaceRoot,
+      getStringArg(args, "--storage-dir") ?? env.SNAPSHOT_STORAGE_DIR ?? DEFAULT_STORAGE_DIR,
+    ),
+    intervalSeconds: parseIntegerOption({
+      args,
+      argName: "--interval-seconds",
+      env,
+      envName: "CRAWLER_INTERVAL_SECONDS",
+      fallback: DEFAULT_INTERVAL_SECONDS,
+      min: MIN_INTERVAL_SECONDS,
+    }),
+    backoffSeconds: parseIntegerOption({
+      args,
+      argName: "--backoff-seconds",
+      env,
+      envName: "CRAWLER_BACKOFF_SECONDS",
+      fallback: DEFAULT_BACKOFF_SECONDS,
+      min: MIN_BACKOFF_SECONDS,
+    }),
+    categoryDelayMs: parseIntegerOption({
+      args,
+      argName: "--category-delay-ms",
+      env,
+      envName: "CRAWLER_CATEGORY_DELAY_MS",
+      fallback: DEFAULT_COOLPC_CATEGORY_DELAY_MS,
+      min: MIN_CATEGORY_DELAY_MS,
+    }),
+    runOnce: args.includes("--run-once"),
+    baseUrl: getStringArg(args, "--base-url") ?? env.COOLPC_BASE_URL,
+  };
+}
+
+async function main(): Promise<void> {
+  const args = process.argv.slice(2);
+
+  if (args.includes("--help")) {
+    printHelp();
+    return;
+  }
+
+  const workspaceRoot = resolveWorkspaceRoot();
+  await loadWorkspaceEnv(workspaceRoot);
+  const options = parseDaemonOptions(args);
+  let client: PrismaClient | null = null;
+  const shutdown = createShutdownController();
+
+  try {
+    const db = await import("@partsradar/db");
+    client = db.prisma;
+
+    await assertSeededCategories(client);
+    log(
+      `CoolPC scheduled crawler started. interval=${options.intervalSeconds}s backoff=${options.backoffSeconds}s categoryDelay=${options.categoryDelayMs}ms runOnce=${options.runOnce ? "yes" : "no"}`,
+    );
+
+    do {
+      const result = await runScheduledCycle(client, options);
+
+      if (options.runOnce || shutdown.requested) {
+        break;
+      }
+
+      const waitSeconds = result.shouldBackoff ? options.backoffSeconds : options.intervalSeconds;
+      const nextRunAt = new Date(Date.now() + waitSeconds * 1000).toISOString();
+      log(
+        `Next CoolPC scheduled crawl at ${nextRunAt} (${waitSeconds}s, ${result.shouldBackoff ? "backoff" : "normal interval"}).`,
+      );
+      await shutdown.sleep(waitSeconds * 1000);
+    } while (!shutdown.requested);
+  } finally {
+    await client?.$disconnect();
+    log("CoolPC scheduled crawler stopped.");
+  }
+}
+
+async function runScheduledCycle(
+  client: PrismaClient,
+  options: CoolpcDaemonOptions,
+): Promise<{ shouldBackoff: boolean }> {
+  log("Starting CoolPC scheduled crawl cycle.");
+
+  try {
+    const result = await runCoolpcCategoryCrawl({
+      client,
+      storageDir: options.storageDir,
+      triggerType: CRAWL_TRIGGER_TYPES.SCHEDULED,
+      delayMs: options.categoryDelayMs,
+      baseUrl: options.baseUrl,
+      fetchUserAgent: SCHEDULED_CRAWL_USER_AGENT,
+      log,
+    });
+
+    printCycleSummary(result);
+
+    return {
+      shouldBackoff: shouldBackoffAfter(result),
+    };
+  } catch (error) {
+    log(`CoolPC scheduled crawl cycle failed: ${toSafeErrorMessage(error)}`);
+
+    return {
+      shouldBackoff: true,
+    };
+  }
+}
+
+function printCycleSummary(result: RunCoolpcCrawlOnceResult): void {
+  log(
+    `CoolPC scheduled crawl finished. run=${result.crawlRunId} status=${result.status} stoppedBySuspectedBlock=${result.stoppedBySuspectedBlock ? "yes" : "no"}`,
+  );
+
+  for (const categoryResult of result.categoryResults) {
+    const errorSuffix = categoryResult.errorMessage
+      ? ` error=${sanitizeLogMessage(categoryResult.errorMessage)}`
+      : "";
+    log(`IGrp=${categoryResult.igrp} status=${categoryResult.status}${errorSuffix}`);
+  }
+}
+
+function shouldBackoffAfter(result: RunCoolpcCrawlOnceResult): boolean {
+  if (result.stoppedBySuspectedBlock) {
+    return true;
+  }
+
+  return (
+    result.status !== CRAWL_RUN_STATUSES.SUCCESS_CHANGED &&
+    result.status !== CRAWL_RUN_STATUSES.SUCCESS_UNCHANGED
+  );
+}
+
+function parseIntegerOption({
+  args,
+  argName,
+  env,
+  envName,
+  fallback,
+  min,
+}: ParseIntegerOption): number {
+  const raw = getStringArg(args, argName) ?? env[envName];
+
+  if (!raw) {
+    return fallback;
+  }
+
+  const value = Number.parseInt(raw, 10);
+
+  if (!Number.isFinite(value) || String(value) !== raw.trim()) {
+    throw new Error(`${argName}/${envName} must be an integer.`);
+  }
+
+  if (value < min) {
+    throw new Error(`${argName}/${envName} must be at least ${min}.`);
+  }
+
+  return value;
+}
+
+function createShutdownController(): ShutdownController {
+  let stopRequested = false;
+  let wakeSleeper: (() => void) | null = null;
+
+  const requestStop = (signal: NodeJS.Signals): void => {
+    if (!stopRequested) {
+      log(`Received ${signal}; stopping after the current crawler step.`);
+    }
+
+    stopRequested = true;
+    wakeSleeper?.();
+  };
+
+  process.once("SIGINT", requestStop);
+  process.once("SIGTERM", requestStop);
+
+  return {
+    get requested() {
+      return stopRequested;
+    },
+    sleep(ms: number) {
+      if (stopRequested) {
+        return Promise.resolve();
+      }
+
+      return new Promise<void>((resolve) => {
+        const timeout = setTimeout(() => {
+          wakeSleeper = null;
+          resolve();
+        }, ms);
+
+        wakeSleeper = () => {
+          clearTimeout(timeout);
+          wakeSleeper = null;
+          resolve();
+        };
+      });
+    },
+  };
+}
+
+function toSafeErrorMessage(error: unknown): string {
+  return sanitizeLogMessage(error instanceof Error ? error.message : String(error));
+}
+
+function sanitizeLogMessage(message: string): string {
+  return message
+    .replace(/postgres(?:ql)?:\/\/[^\s@]+@[^\s]+/gi, "postgresql://***")
+    .replace(/(--token\s+)[^\s]+/gi, "$1***")
+    .replace(/(CLOUDFLARE_TUNNEL_TOKEN=)[^\s]+/gi, "$1***");
+}
+
+function log(message: string): void {
+  console.log(`[${new Date().toISOString()}] ${message}`);
+}
+
+function printHelp(): void {
+  console.log(`Usage:
+  pnpm --filter @partsradar/crawler crawl:coolpc-daemon -- --confirm-live-fetch [options]
+
+Options:
+  --confirm-live-fetch       Required for scheduled CoolPC live requests.
+  --run-once                 Run one scheduled cycle, then exit.
+  --interval-seconds <sec>   Delay after a successful cycle.
+                             Default: ${DEFAULT_INTERVAL_SECONDS}, minimum: ${MIN_INTERVAL_SECONDS}
+  --backoff-seconds <sec>    Delay after fetch/parse/block failures.
+                             Default: ${DEFAULT_BACKOFF_SECONDS}, minimum: ${MIN_BACKOFF_SECONDS}
+  --category-delay-ms <ms>   Delay between live category requests.
+                             Default: ${DEFAULT_COOLPC_CATEGORY_DELAY_MS}, minimum: ${MIN_CATEGORY_DELAY_MS}
+  --storage-dir <path>       Snapshot storage directory from the workspace root.
+                             Default: ${DEFAULT_STORAGE_DIR}
+  --base-url <url>           CoolPC base URL override for controlled validation only.
+
+Environment:
+  CRAWLER_INTERVAL_SECONDS, CRAWLER_BACKOFF_SECONDS, CRAWLER_CATEGORY_DELAY_MS,
+  SNAPSHOT_STORAGE_DIR, COOLPC_BASE_URL
+`);
+}
+
+if (require.main === module) {
+  main().catch((error) => {
+    console.error(toSafeErrorMessage(error));
+    process.exitCode = 1;
+  });
+}

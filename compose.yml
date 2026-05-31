@@ -107,6 +107,38 @@ services:
         "--help",
       ]
 
+  crawler-daemon:
+    profiles:
+      - scheduled-crawler
+    build:
+      context: .
+      target: crawler
+    restart: unless-stopped
+    environment:
+      <<: *app-env
+      CRAWLER_INTERVAL_SECONDS: "${CRAWLER_INTERVAL_SECONDS:-300}"
+      CRAWLER_BACKOFF_SECONDS: "${CRAWLER_BACKOFF_SECONDS:-3600}"
+      CRAWLER_CATEGORY_DELAY_MS: "${CRAWLER_CATEGORY_DELAY_MS:-5000}"
+    volumes:
+      - snapshots:/var/lib/partsradar/snapshots
+      - product_images:/var/lib/partsradar/product-images
+    depends_on:
+      postgres:
+        condition: service_healthy
+      seed:
+        condition: service_completed_successfully
+    command:
+      [
+        "pnpm",
+        "--filter",
+        "@partsradar/crawler",
+        "crawl:coolpc-daemon",
+        "--",
+        "--confirm-live-fetch",
+        "--storage-dir",
+        "/var/lib/partsradar/snapshots",
+      ]
+
   cloudflared:
     profiles:
       - public-tunnel

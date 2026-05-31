@@ -219,6 +219,21 @@ Production 商品縮圖快取安全原則：
 - production logs、raw snapshot、parse error 與 `raw_image_url` 僅限伺服器內部或管理者維運使用。
 - 未來若加入管理功能，必須先設計 authentication、authorization、session 管理與 audit log。
 
+## Crawler Scheduling Safety
+
+定期 crawler 屬於內部維運 process，不是公開功能。
+
+規則：
+
+- `crawler-daemon` 預設不隨 `docker compose up -d` 啟動，只能透過明確的 `scheduled-crawler` profile 啟動。
+- daemon command 必須保留 `--confirm-live-fetch`，避免誤操作造成 live requests。
+- daemon 不對外開 port，不提供 HTTP trigger，不接受公開使用者輸入。
+- schedule interval 與 backoff 不得低於 `60` 秒，分類間 live request delay 不得低於 `3000` ms。
+- 單一分類 fetch 必須有 timeout，避免來源站或網路異常讓 daemon 無限卡住。
+- 疑似來源站攔截時需停止當輪 crawl 並退避，不可繼續覆蓋後續分類資料。
+- manual crawler、scheduled crawler 與 image backfill 不應同時執行，避免對來源站造成不必要負載。
+- crawler log 不應輸出 `.env`、`DATABASE_URL`、Cloudflare Tunnel token、DB 密碼或完整 stack 中的 secret。
+
 ## SSRF And Outbound Requests
 
 第一版 crawler 只允許抓取固定來源：

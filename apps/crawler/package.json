@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "typecheck": "tsc --noEmit",
+    "crawl:coolpc-daemon": "tsx src/scripts/crawl-coolpc-daemon.ts",
     "crawl:coolpc-once": "tsx src/scripts/crawl-coolpc-once.ts",
     "image-cache:backfill": "tsx src/scripts/backfill-product-images.ts",
     "product-vendors:backfill": "tsx src/scripts/backfill-product-vendors.ts",

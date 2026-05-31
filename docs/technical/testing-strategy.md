@@ -121,6 +121,20 @@ HTTP status 不足以判斷成功，需測試內容驗證。
 - fetch 失敗、疑似攔截或 parse 失敗會更新 `last_checked_at`，但不更新 `last_success_at`。
 - parse 失敗不累計商品 missing count。
 
+## Scheduled Crawler 測試
+
+定期 crawler 的測試重點是安全邊界與排程控制，不在單元測試中發出 live requests。
+
+至少測試：
+
+- daemon CLI 沒有 `--confirm-live-fetch` 時拒絕啟動。
+- daemon CLI 可從 env 讀取 interval、backoff、category delay 與 snapshot storage。
+- daemon CLI 拒絕過低的 interval、backoff 或 category delay。
+- Compose 預設 services 不包含 `crawler-daemon`。
+- Compose `scheduled-crawler` profile 才包含 `crawler-daemon`。
+- `crawler-daemon` 不宣告 host ports。
+- `crawler-daemon` command 保留 `--confirm-live-fetch`。
+
 ## API 測試
 
 API 測試可先以 route handler 內的查詢邏輯或資料存取函式為單位，不一定一開始就做完整 HTTP server 測試。

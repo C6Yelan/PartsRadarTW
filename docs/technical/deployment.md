@@ -142,12 +142,14 @@ postgres
 目前已建立第一個 production-like Compose skeleton：
 
 - `Dockerfile`：同一份檔案提供 `web`、`crawler`、`migrate` build target。
-- `compose.yml`：定義 `postgres`、`migrate`、`seed`、`web`、手動 profile 的 `crawler` service，以及 `public-tunnel` profile 的 `cloudflared` service。
+- `compose.yml`：定義 `postgres`、`migrate`、`seed`、`web`、手動 profile 的 `crawler` service、`scheduled-crawler` profile 的 `crawler-daemon` service，以及 `public-tunnel` profile 的 `cloudflared` service。
 - `.env.example`：提供本機與 private server validation 共用的非敏感環境變數模板；正式機實際使用的 `.env` 不提交 Git。
 - `migrate` service 使用 root `pnpm db:deploy`，對應 Prisma `migrate deploy`，不使用 development migration。
 - `seed` service 在 migration 後執行 root `pnpm db:seed`，以 idempotent upsert 初始化第一版 8 個 CoolPC 分類；`web` 與手動 `crawler` 都等 seed 成功後才啟動。
 - `web` 預設只綁 `127.0.0.1:${WEB_PORT:-3000}`，適合無網域時先用 SSH tunnel 或 server 內部驗證；若要直接從外部 IP 測試，需明確設定 `WEB_BIND_HOST=0.0.0.0`。
-- `crawler` 目前只作為手動 profile 與 Docker build target。production scheduled crawler daemon 尚未實作，因此預設 command 是 `--help`，避免 `docker compose up` 意外對來源站發出 live requests。
+- `crawler` 目前只作為手動 profile 與 Docker build target，預設 command 是 `--help`，避免 `docker compose up` 意外對來源站發出 live requests。
+- `crawler-daemon` 是定期 CoolPC crawl process，只在明確指定 `--profile scheduled-crawler` 時啟動。它不開任何 port，使用 `SCHEDULED` trigger，將 raw snapshot 寫入 `snapshots` volume，並用 `CRAWLER_INTERVAL_SECONDS`、`CRAWLER_BACKOFF_SECONDS` 與 `CRAWLER_CATEGORY_DELAY_MS` 控制節奏。
+- `crawler-daemon` command 仍保留 `--confirm-live-fetch`，避免單純新增 service 或 build image 就對來源站發出 live requests。
 - `crawler` 的 manual crawl script 會優先使用 `--storage-dir`，其次使用 `SNAPSHOT_STORAGE_DIR`，因此 Compose 環境下 raw snapshot 會寫入 `snapshots` volume，而不是隨 `--rm` container 消失。
 - `image-cache:backfill` 會優先使用 `--storage-dir`，其次使用 `PRODUCT_IMAGE_STORAGE_DIR`，因此 Compose 環境下商品縮圖會寫入 `product_images` volume。
 - `product_images` volume 以唯讀方式掛給 `web`，以讀寫方式掛給 `crawler`。
@@ -167,6 +169,12 @@ curl http://127.0.0.1:3000/api/source-status
 
 ```bash
 docker compose --profile manual-crawler run --rm crawler
+```
+
+檢查 scheduled crawler daemon 參數說明：
+
+```bash
+docker compose --profile scheduled-crawler run --rm crawler-daemon pnpm --filter @partsradar/crawler crawl:coolpc-daemon -- --help
 ```
 
 若要在正式機上做 IP-only private validation，先維持 `WEB_BIND_HOST=127.0.0.1` 並用 SSH tunnel 連入。公開流量、Cloudflare Tunnel、正式網域與 stricter CSP 是後續 gate，不屬於這個 slice 的完成條件。
@@ -243,7 +251,7 @@ http://127.0.0.1:3000
 - 不執行 `docker compose down --volumes`，除非已確認可以丟棄該主機資料。
 - 不設定 `WEB_BIND_HOST=0.0.0.0`，除非後續已完成公開前 gate。
 - 不啟動 Cloudflare Tunnel 或正式網域作為此 checklist 的一部分。
-- 不啟動 crawler live fetch，不做低頻手動 crawl 以外的資料抓取。
+- 不啟動 crawler live fetch，不做低頻手動 crawl 或明確排程 profile 以外的資料抓取。
 - 不提交或 push `.env`、主機 secrets、Cloudflare Tunnel token 或部署 token。
 
 ### Cloudflare Tunnel Public Entry
@@ -300,6 +308,53 @@ curl -i https://<domain>/api/source-status
 - `/api/source-status` 可回 `HTTP 200`。
 - `http://<domain>/` 會導向 `https://<domain>/`。
 - 正式網域 smoke test 完成後，再考慮 stricter CSP 與公開宣傳。
+
+### Scheduled CoolPC Crawler
+
+定期資料更新由 `crawler-daemon` service 負責。此 service 預設不啟動，必須明確指定 `scheduled-crawler` profile。
+
+啟動前條件：
+
+- 手動 `crawl:coolpc-once` 已在同一台主機成功跑過，且 `/api/source-status` 可回 `ok`。
+- `product-image-backfill` 沒在跑，避免同時對來源站產生額外負載。
+- `.env` 中的 `CRAWLER_INTERVAL_SECONDS`、`CRAWLER_BACKOFF_SECONDS` 與 `CRAWLER_CATEGORY_DELAY_MS` 已確認；預設分別為 `300`、`3600`、`5000`。
+- `WEB_BIND_HOST` 與 `POSTGRES_BIND_HOST` 仍維持 `127.0.0.1`。
+
+啟動：
+
+```bash
+docker compose --profile scheduled-crawler up -d crawler-daemon
+docker compose --profile scheduled-crawler ps crawler-daemon
+```
+
+查看 log：
+
+```bash
+docker compose --profile scheduled-crawler logs --tail=100 crawler-daemon
+```
+
+停止：
+
+```bash
+docker compose --profile scheduled-crawler stop crawler-daemon
+```
+
+安全規則：
+
+- 不提供公開 crawler trigger API。
+- 不對外開 port。
+- 低於 `60` 秒的 schedule interval / backoff 會被 daemon 拒絕。
+- 低於 `3000` ms 的 category delay 會被 daemon 拒絕。
+- 疑似被來源站攔截時，當輪 crawl 會停止並進入 backoff。
+- daemon log 不應輸出 `.env`、`DATABASE_URL`、Cloudflare token 或其他 secret。
+
+驗證：
+
+```bash
+docker compose --profile scheduled-crawler config --services
+docker compose --profile scheduled-crawler logs --tail=100 crawler-daemon
+curl -i https://<domain>/api/source-status
+```
 
 ### Product Image Cache Backfill
 
