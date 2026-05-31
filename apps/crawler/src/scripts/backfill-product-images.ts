@@ -1,15 +1,7 @@
 // This script is a manual image-cache backfill tool for local validation.
 // It downloads source product images at a low, jittered rate and writes small WebP thumbnails.
 // Do not use this as the production scheduled crawler entrypoint.
-import {
-  copyFile,
-  mkdir,
-  readFile,
-  rename,
-  stat,
-  unlink,
-  writeFile,
-} from "node:fs/promises";
+import { copyFile, mkdir, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 import type { PrismaClient } from "@partsradar/db";
 import sharp from "sharp";
@@ -205,10 +197,7 @@ async function processCandidate(
       console.log(
         `[dry-run] ${candidate.id} | ${label} | ${
           reusableImagePath ? "reuse local thumbnail" : normalizedImageUrl
-        } -> ${relative(
-          options.workspaceRoot,
-          outputPath,
-        )}`,
+        } -> ${relative(options.workspaceRoot, outputPath)}`,
       );
       return { status: "dry-run", didFetch: false };
     }
@@ -256,10 +245,7 @@ async function writeFileFromReusableImage(sourcePath: string, outputPath: string
   await copyFile(sourcePath, outputPath);
 }
 
-async function fetchSourceImageBytes(
-  url: string,
-  options: ImageBackfillOptions,
-): Promise<Buffer> {
+async function fetchSourceImageBytes(url: string, options: ImageBackfillOptions): Promise<Buffer> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), options.timeoutMs);
 
@@ -360,7 +346,9 @@ function parseOptions(args: string[]): ImageBackfillOptions {
     workspaceRoot,
     storageDir: resolveRelativeToWorkspace(
       workspaceRoot,
-      getStringArg(args, "--storage-dir") ?? DEFAULT_STORAGE_DIR,
+      getStringArg(args, "--storage-dir") ??
+        process.env.PRODUCT_IMAGE_STORAGE_DIR ??
+        DEFAULT_STORAGE_DIR,
     ),
     limit: getOptionalPositiveNumberArg(args, "--limit"),
     productId: getStringArg(args, "--product-id") ?? null,
@@ -570,8 +558,8 @@ Options:
                              Default: ${DEFAULT_TIMEOUT_MS}
   --max-source-bytes <bytes> Maximum accepted source image size.
                              Default: ${DEFAULT_MAX_SOURCE_BYTES}
-  --storage-dir <path>       Output directory from the workspace root.
-                             Default: ${DEFAULT_STORAGE_DIR}
+  --storage-dir <path>       Output directory from the workspace root, or an absolute path.
+                             Default: PRODUCT_IMAGE_STORAGE_DIR, then ${DEFAULT_STORAGE_DIR}
 `);
 }
 

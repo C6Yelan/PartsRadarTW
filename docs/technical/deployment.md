@@ -149,6 +149,7 @@ postgres
 - `web` 預設只綁 `127.0.0.1:${WEB_PORT:-3000}`，適合無網域時先用 SSH tunnel 或 server 內部驗證；若要直接從外部 IP 測試，需明確設定 `WEB_BIND_HOST=0.0.0.0`。
 - `crawler` 目前只作為手動 profile 與 Docker build target。production scheduled crawler daemon 尚未實作，因此預設 command 是 `--help`，避免 `docker compose up` 意外對來源站發出 live requests。
 - `crawler` 的 manual crawl script 會優先使用 `--storage-dir`，其次使用 `SNAPSHOT_STORAGE_DIR`，因此 Compose 環境下 raw snapshot 會寫入 `snapshots` volume，而不是隨 `--rm` container 消失。
+- `image-cache:backfill` 會優先使用 `--storage-dir`，其次使用 `PRODUCT_IMAGE_STORAGE_DIR`，因此 Compose 環境下商品縮圖會寫入 `product_images` volume。
 - `product_images` volume 以唯讀方式掛給 `web`，以讀寫方式掛給 `crawler`。
 - `snapshots` volume 只掛給 `crawler`，不由 `web` 公開。
 
@@ -231,6 +232,43 @@ http://127.0.0.1:3000
 - 不設定 reverse proxy、HTTPS 或正式網域作為此 checklist 的一部分。
 - 不啟動 crawler live fetch，不做低頻手動 crawl 以外的資料抓取。
 - 不提交或 push `.env`、主機 secrets、TLS key 或部署 token。
+
+### Product Image Cache Backfill
+
+商品資料 crawl 只會把 `primary_image_url` 寫入 DB，不會自動下載站內 WebP 縮圖。新主機或新 volume 上若只有商品、沒有圖片，需手動跑 product image cache backfill。
+
+先跑小批次 dry-run：
+
+```bash
+docker compose --profile manual-crawler run --rm crawler pnpm image-cache:backfill -- --dry-run --limit 20
+```
+
+全量 backfill 應用 `tmux` 放背景慢慢跑，避免 SSH 中斷造成流程停止：
+
+```bash
+mkdir -p logs/deployment
+tmux new-session -d -s product-image-backfill -c "$PWD" 'docker compose --profile manual-crawler run --rm crawler pnpm image-cache:backfill -- --confirm-live-fetch --min-delay-ms 3000 --max-delay-ms 5000 2>&1 | tee logs/deployment/product-image-backfill.log'
+tmux ls
+```
+
+查看進度：
+
+```bash
+tail -f logs/deployment/product-image-backfill.log
+```
+
+完成或中途檢查圖片數量：
+
+```bash
+docker compose exec -T web sh -lc 'find /var/lib/partsradar/product-images -type f -name "*.webp" | wc -l'
+```
+
+Backfill 規則：
+
+- 不使用 `--overwrite`，除非明確要重建已存在的圖片。
+- 不和 `crawl:coolpc-once` 同時執行，避免對來源站產生額外負載。
+- 中斷後可重跑；已存在的 `.webp` 會被 skipped。
+- 圖片寫入 volume 後通常不需要重啟 `web`，重新整理頁面即可讀到新檔案。
 
 ## Volumes And Storage
 
