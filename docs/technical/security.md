@@ -245,7 +245,8 @@ https://www.coolpc.com.tw/eachview.php?IGrp={分類編號}
 規則：
 
 - crawler 不接受使用者輸入的任意 URL。
-- `COOLPC_BASE_URL` 應只在環境設定中指定，不由前端或公開 API 控制。
+- `COOLPC_BASE_URL` 應只在環境設定中指定，不由前端、公開 API 或一般 CLI 參數控制。
+- production crawler 僅允許 `https://www.coolpc.com.tw`；非 CoolPC base URL 覆寫只可作為測試內部選項，不可用於正式排程。
 - 若未來支援更多來源，需使用 allowlist，不提供任意 URL fetch。
 
 ## Raw Snapshot

@@ -1,13 +1,37 @@
+import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
+
+const ENV_KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
+const NON_NEGATIVE_INTEGER_PATTERN = /^(0|[1-9][0-9]*)$/;
+const WORKSPACE_ROOT_MARKER = "pnpm-workspace.yaml";
 
 export function resolveWorkspaceRoot(cwd = process.cwd()): string {
-  return resolve(cwd, "..", "..");
+  let currentDir = resolve(cwd);
+
+  while (true) {
+    if (existsSync(join(currentDir, WORKSPACE_ROOT_MARKER))) {
+      return currentDir;
+    }
+
+    const parentDir = dirname(currentDir);
+
+    if (parentDir === currentDir) {
+      throw new Error(
+        `Unable to resolve workspace root from ${cwd}. Expected to find ${WORKSPACE_ROOT_MARKER}.`,
+      );
+    }
+
+    currentDir = parentDir;
+  }
 }
 
 export async function loadWorkspaceEnv(workspaceRoot: string): Promise<void> {
   await loadEnvFile(join(workspaceRoot, ".env"), false);
-  await loadEnvFile(join(workspaceRoot, ".env.local"), true);
+
+  if (shouldLoadLocalEnv()) {
+    await loadEnvFile(join(workspaceRoot, ".env.local"), shouldOverrideLocalEnvFile());
+  }
 }
 
 export function getStringArg(args: string[], name: string): string | undefined {
@@ -33,15 +57,22 @@ export function getNumberArg(args: string[], name: string, fallback: number): nu
     return fallback;
   }
 
-  const value = Number.parseInt(raw, 10);
+  if (!NON_NEGATIVE_INTEGER_PATTERN.test(raw)) {
+    throw new Error(`${name} must be a non-negative integer.`);
+  }
 
-  if (!Number.isFinite(value) || value < 0) {
+  const value = Number(raw);
+
+  if (!Number.isSafeInteger(value)) {
     throw new Error(`${name} must be a non-negative integer.`);
   }
 
   return value;
 }
 
+// Resolves crawler script path arguments. Relative paths are rooted at the
+// workspace; absolute paths remain absolute for Docker volume mount paths such
+// as /var/lib/partsradar/snapshots. This is not a workspace containment check.
 export function resolveRelativeToWorkspace(workspaceRoot: string, path: string): string {
   return resolve(workspaceRoot, path);
 }
@@ -69,16 +100,29 @@ async function loadEnvFile(path: string, override: boolean): Promise<void> {
     const separatorIndex = trimmed.indexOf("=");
 
     if (separatorIndex <= 0) {
-      continue;
+      throw new Error(`Invalid env assignment in ${path}: ${trimmed}`);
     }
 
     const key = trimmed.slice(0, separatorIndex).trim();
+
+    if (!ENV_KEY_PATTERN.test(key)) {
+      throw new Error(`Invalid env key "${key}" in ${path}.`);
+    }
+
     const value = unquoteEnvValue(trimmed.slice(separatorIndex + 1).trim());
 
     if (override || process.env[key] === undefined) {
       process.env[key] = value;
     }
   }
+}
+
+function shouldLoadLocalEnv(): boolean {
+  return process.env.NODE_ENV !== "production";
+}
+
+function shouldOverrideLocalEnvFile(): boolean {
+  return process.env.NODE_ENV !== "production";
 }
 
 function unquoteEnvValue(value: string): string {

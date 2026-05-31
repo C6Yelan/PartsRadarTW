@@ -8,6 +8,7 @@ import {
   DEFAULT_COOLPC_CATEGORY_DELAY_MS,
   assertSeededCategories,
   runCoolpcCategoryCrawl,
+  validateCoolpcBaseUrl,
 } from "../coolpc/live-crawl";
 import {
   getStringArg,
@@ -23,6 +24,7 @@ const DEFAULT_BACKOFF_SECONDS = 3600;
 const MIN_INTERVAL_SECONDS = 60;
 const MIN_BACKOFF_SECONDS = 60;
 const MIN_CATEGORY_DELAY_MS = 3000;
+const MAX_CATEGORY_DELAY_MS = 60000;
 const SCHEDULED_CRAWL_USER_AGENT =
   "PartsRadarTW scheduled crawler (+https://github.com/C6Yelan/PartsRadarTW)";
 
@@ -43,6 +45,7 @@ interface ParseIntegerOption {
   envName: string;
   fallback: number;
   min: number;
+  max?: number;
 }
 
 interface ShutdownController {
@@ -55,6 +58,10 @@ export function parseDaemonOptions(
   env: NodeJS.ProcessEnv = process.env,
   cwd = process.cwd(),
 ): CoolpcDaemonOptions {
+  if (args.includes("--base-url")) {
+    throw new Error("Scheduled CoolPC crawler does not accept --base-url overrides.");
+  }
+
   if (!args.includes(CONFIRM_LIVE_FETCH_FLAG)) {
     throw new Error(
       `Refusing scheduled CoolPC live fetch. Re-run with ${CONFIRM_LIVE_FETCH_FLAG} because this daemon contacts the source site repeatedly.`,
@@ -92,9 +99,10 @@ export function parseDaemonOptions(
       envName: "CRAWLER_CATEGORY_DELAY_MS",
       fallback: DEFAULT_COOLPC_CATEGORY_DELAY_MS,
       min: MIN_CATEGORY_DELAY_MS,
+      max: MAX_CATEGORY_DELAY_MS,
     }),
     runOnce: args.includes("--run-once"),
-    baseUrl: getStringArg(args, "--base-url") ?? env.COOLPC_BASE_URL,
+    baseUrl: validateCoolpcBaseUrl(env.COOLPC_BASE_URL),
   };
 }
 
@@ -203,6 +211,7 @@ function parseIntegerOption({
   envName,
   fallback,
   min,
+  max,
 }: ParseIntegerOption): number {
   const raw = getStringArg(args, argName) ?? env[envName];
 
@@ -218,6 +227,10 @@ function parseIntegerOption({
 
   if (value < min) {
     throw new Error(`${argName}/${envName} must be at least ${min}.`);
+  }
+
+  if (max !== undefined && value > max) {
+    throw new Error(`${argName}/${envName} must be at most ${max}.`);
   }
 
   return value;
@@ -291,10 +304,9 @@ Options:
   --backoff-seconds <sec>    Delay after fetch/parse/block failures.
                              Default: ${DEFAULT_BACKOFF_SECONDS}, minimum: ${MIN_BACKOFF_SECONDS}
   --category-delay-ms <ms>   Delay between live category requests.
-                             Default: ${DEFAULT_COOLPC_CATEGORY_DELAY_MS}, minimum: ${MIN_CATEGORY_DELAY_MS}
+                             Default: ${DEFAULT_COOLPC_CATEGORY_DELAY_MS}, range: ${MIN_CATEGORY_DELAY_MS}-${MAX_CATEGORY_DELAY_MS}
   --storage-dir <path>       Snapshot storage directory from the workspace root.
                              Default: ${DEFAULT_STORAGE_DIR}
-  --base-url <url>           CoolPC base URL override for controlled validation only.
 
 Environment:
   CRAWLER_INTERVAL_SECONDS, CRAWLER_BACKOFF_SECONDS, CRAWLER_CATEGORY_DELAY_MS,

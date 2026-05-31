@@ -73,12 +73,12 @@ repo 應提供 `.env.example` 作為範本。實際本機設定使用 `.env.loca
 | --- | --- |
 | `DATABASE_URL` | PostgreSQL 連線字串 |
 | `POSTGRES_IMAGE` | Docker Compose 使用的 PostgreSQL image，預設 `postgres:18-alpine` |
-| `POSTGRES_DB` | 本機 PostgreSQL database 名稱，預設 `partsradar_dev` |
-| `POSTGRES_USER` | 本機 PostgreSQL 使用者，預設 `partsradar` |
-| `POSTGRES_PASSWORD` | 本機 PostgreSQL 密碼，預設 `partsradar` |
+| `POSTGRES_DB` | 本機 PostgreSQL database 名稱；Compose 必填，需在 `.env` 內填入 |
+| `POSTGRES_USER` | 本機 PostgreSQL 使用者；Compose 必填，需在 `.env` 內填入 |
+| `POSTGRES_PASSWORD` | 本機 PostgreSQL 密碼；Compose 必填，需在 `.env` 內填入 |
 | `POSTGRES_BIND_HOST` | 本機 PostgreSQL port 綁定位址，預設 `127.0.0.1` |
 | `POSTGRES_PORT` | 本機 PostgreSQL 對外 port，預設 `5432` |
-| `COOLPC_BASE_URL` | 原價屋來源網址，預設 `https://www.coolpc.com.tw` |
+| `COOLPC_BASE_URL` | 原價屋來源網址；production Compose 固定為 `https://www.coolpc.com.tw` |
 | `SNAPSHOT_STORAGE_DIR` | raw snapshot 壓縮檔保存位置 |
 | `PRODUCT_IMAGE_STORAGE_DIR` | 商品縮圖快取保存位置；本機 Next.js dev server 預設對應 repo root 的 `storage/product-images` |
 | `CRAWLER_INTERVAL_SECONDS` | crawler 週期秒數，第一版預設 `300` |
@@ -101,6 +101,7 @@ repo 應提供 `.env.example` 作為範本。實際本機設定使用 `.env.loca
 - 本機資料庫與正式資料庫分開。
 - 本機資料庫可重建，不視為正式資料。
 - PostgreSQL port 預設只綁定 `127.0.0.1`，避免對區網公開。
+- 除非有額外防火牆與私網限制，否則不要把 PostgreSQL 綁定到 `0.0.0.0`。
 - PostgreSQL image、帳號、密碼、database、綁定位址與 port 都可用 `.env` 覆蓋。
 - PostgreSQL 18 官方 image 的資料 volume 位置是 `/var/lib/postgresql`；本機 compose 也掛載在此位置，並讓 image 使用自己的 `PGDATA` 預設值。
 - migration 由 Prisma 管理。
@@ -133,7 +134,7 @@ docker compose down
 本機連線設定需和 `.env.example` 的 `DATABASE_URL` 保持一致：
 
 ```text
-postgresql://partsradar:partsradar@localhost:5432/partsradar_dev?schema=public
+postgresql://<POSTGRES_USER>:<POSTGRES_PASSWORD>@localhost:<POSTGRES_PORT>/<POSTGRES_DB>?schema=public
 ```
 
 若修改 `.env` 內的 `POSTGRES_USER`、`POSTGRES_PASSWORD`、`POSTGRES_DB` 或 `POSTGRES_PORT`，也要同步更新 `DATABASE_URL`。

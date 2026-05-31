@@ -143,10 +143,12 @@ postgres
 
 - `Dockerfile`：同一份檔案提供 `web`、`crawler`、`migrate` build target。
 - `compose.yml`：定義 `postgres`、`migrate`、`seed`、`web`、手動 profile 的 `crawler` service、`scheduled-crawler` profile 的 `crawler-daemon` service，以及 `public-tunnel` profile 的 `cloudflared` service。
-- `.env.example`：提供本機與 private server validation 共用的非敏感環境變數模板；正式機實際使用的 `.env` 不提交 Git。
+- `.env.example`：提供本機與 private server validation 共用的非敏感環境變數模板；正式機實際使用的 `.env` 不提交 Git，且必須替換所有 `replace_with_*` placeholder。
 - `migrate` service 使用 root `pnpm db:deploy`，對應 Prisma `migrate deploy`，不使用 development migration。
 - `seed` service 在 migration 後執行 root `pnpm db:seed`，以 idempotent upsert 初始化第一版 8 個 CoolPC 分類；`web` 與手動 `crawler` 都等 seed 成功後才啟動。
+- `POSTGRES_DB`、`POSTGRES_USER` 與 `POSTGRES_PASSWORD` 在 Compose 中為必填，不再提供 development fallback。
 - `web` 預設只綁 `127.0.0.1:${WEB_PORT:-3000}`，適合無網域時先用 SSH tunnel 或 server 內部驗證；若要直接從外部 IP 測試，需明確設定 `WEB_BIND_HOST=0.0.0.0`。
+- `COOLPC_BASE_URL` 在 production Compose 中固定為 `https://www.coolpc.com.tw`，不由 `.env` 覆寫。
 - `crawler` 目前只作為手動 profile 與 Docker build target，預設 command 是 `--help`，避免 `docker compose up` 意外對來源站發出 live requests。
 - `crawler-daemon` 是定期 CoolPC crawl process，只在明確指定 `--profile scheduled-crawler` 時啟動。它不開任何 port，使用 `SCHEDULED` trigger，將 raw snapshot 寫入 `snapshots` volume，並用 `CRAWLER_INTERVAL_SECONDS`、`CRAWLER_BACKOFF_SECONDS` 與 `CRAWLER_CATEGORY_DELAY_MS` 控制節奏。
 - `crawler-daemon` command 仍保留 `--confirm-live-fetch`，避免單純新增 service 或 build image 就對來源站發出 live requests。
@@ -155,12 +157,15 @@ postgres
 - `product_images` volume 以唯讀方式掛給 `web`，以讀寫方式掛給 `crawler`。
 - `snapshots` volume 只掛給 `crawler`，不由 `web` 公開。
 - `cloudflared` 預設不啟動；只有明確指定 `--profile public-tunnel` 才會建立 Cloudflare Tunnel 對外公開入口。
+- `cloudflared` image 與 token 都必須由 `.env` 明確提供；不得使用 `latest` 或空 token。
+- Docker Compose 會先解析整份檔案再套用 profile，因此未啟用 `public-tunnel` 時也需保留非空的 `CLOUDFLARED_IMAGE` / `CLOUDFLARE_TUNNEL_TOKEN` placeholder；真正啟動 tunnel 前再換成固定版本 image 與真實 token。
 
 本機或正式機 private validation 的基本流程：
 
 ```bash
 cp .env.example .env
 chmod 600 .env
+# Edit .env and replace every replace_with_* placeholder before starting Compose.
 docker compose up -d --build --force-recreate
 curl http://127.0.0.1:3000/api/source-status
 ```
@@ -200,7 +205,9 @@ Docker build context 應透過 `.dockerignore` 排除不需要進入 runtime ima
 - repo 已在主機上 clone，且 `main` 已 fast-forward 到最新 `origin/main`。
 - Docker 與 Docker Compose 可由目前使用者執行。
 - `.env` 由 `.env.example` 複製而來，且未被 Git 追蹤。
-- `POSTGRES_PASSWORD` 已改成強密碼，不使用範例預設值。
+- `POSTGRES_DB`、`POSTGRES_USER` 與 `POSTGRES_PASSWORD` 已填入正式值，不使用 `replace_with_*` placeholder。
+- `POSTGRES_PASSWORD` 是強密碼。
+- `POSTGRES_BIND_HOST=127.0.0.1`，除非有額外防火牆與私網限制，否則不得公開 PostgreSQL。
 - `WEB_BIND_HOST=127.0.0.1`，避免尚未設定 Cloudflare Tunnel / CSP 前直接對外公開。
 
 驗證指令：
@@ -273,8 +280,11 @@ Cloudflare 端設定：
 主機端 `.env` 需加入：
 
 ```bash
+CLOUDFLARED_IMAGE=cloudflare/cloudflared:<pinned-version>
 CLOUDFLARE_TUNNEL_TOKEN=<cloudflare tunnel token>
 ```
+
+`CLOUDFLARED_IMAGE` 不使用 `latest`。若不啟用 `public-tunnel` profile，本機或 private validation 可保留 `.env.example` 內的非敏感 placeholder；真正啟動 tunnel 前必須換成固定版本 image 與真實 token。
 
 啟動 tunnel：
 
@@ -465,13 +475,19 @@ env: PRODUCT_IMAGE_STORAGE_DIR=/var/lib/partsradar/product-images
 
 | 名稱 | 用途 |
 | --- | --- |
-| `DATABASE_URL` | PostgreSQL 連線字串 |
-| `COOLPC_BASE_URL` | 原價屋來源網址 |
+| `POSTGRES_DB` | PostgreSQL database 名稱；Compose 必填 |
+| `POSTGRES_USER` | PostgreSQL 使用者；Compose 必填 |
+| `POSTGRES_PASSWORD` | PostgreSQL 密碼；Compose 必填且需使用強密碼 |
+| `POSTGRES_BIND_HOST` | PostgreSQL host 綁定位址；正式環境預設維持 `127.0.0.1` |
+| `DATABASE_URL` | 本機 host-side Prisma 指令使用的 PostgreSQL 連線字串；container 內由 Compose 依 `POSTGRES_*` 組出 |
+| `WEB_BIND_HOST` | Web host 綁定位址；Cloudflare Tunnel / reverse proxy 情境維持 `127.0.0.1` |
+| `COOLPC_BASE_URL` | 本機工具用來源網址；production Compose 固定為 `https://www.coolpc.com.tw` |
 | `SNAPSHOT_STORAGE_DIR` | container 內 snapshot 保存路徑 |
 | `PRODUCT_IMAGE_STORAGE_DIR` | container 內商品縮圖快取保存路徑，正式部署應設為明確 mounted path |
 | `CRAWLER_INTERVAL_SECONDS` | crawler 週期 |
 | `CRAWLER_BACKOFF_SECONDS` | 連續失敗 backoff |
-| `CLOUDFLARE_TUNNEL_TOKEN` | Cloudflare remotely-managed tunnel token，只在啟用 `public-tunnel` profile 時需要 |
+| `CLOUDFLARED_IMAGE` | 固定版本 cloudflared image；不得使用 `latest` |
+| `CLOUDFLARE_TUNNEL_TOKEN` | Cloudflare remotely-managed tunnel token；啟用 `public-tunnel` profile 時必填 |
 | `NODE_ENV` | production |
 
 規則：
