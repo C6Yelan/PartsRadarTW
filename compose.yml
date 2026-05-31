@@ -1,14 +1,20 @@
 name: partsradar-tw
 
+x-app-env: &app-env
+  NODE_ENV: "production"
+  DATABASE_URL: "postgresql://${POSTGRES_USER:-partsradar}:${POSTGRES_PASSWORD:-partsradar}@postgres:5432/${POSTGRES_DB:-partsradar_dev}?schema=public"
+  COOLPC_BASE_URL: "${COOLPC_BASE_URL:-https://www.coolpc.com.tw}"
+  SNAPSHOT_STORAGE_DIR: "/var/lib/partsradar/snapshots"
+  PRODUCT_IMAGE_STORAGE_DIR: "/var/lib/partsradar/product-images"
+
 services:
   postgres:
     image: ${POSTGRES_IMAGE:-postgres:18-alpine}
-    container_name: partsradar-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-partsradar_dev}
-      POSTGRES_USER: ${POSTGRES_USER:-partsradar}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-partsradar}
+      POSTGRES_DB: "${POSTGRES_DB:-partsradar_dev}"
+      POSTGRES_USER: "${POSTGRES_USER:-partsradar}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-partsradar}"
     ports:
       - "${POSTGRES_BIND_HOST:-127.0.0.1}:${POSTGRES_PORT:-5432}:5432"
     volumes:
@@ -20,5 +26,86 @@ services:
       retries: 5
       start_period: 10s
 
+  migrate:
+    profiles:
+      - app
+      - manual-crawler
+    build:
+      context: .
+      target: migrate
+    restart: "no"
+    environment:
+      <<: *app-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  seed:
+    profiles:
+      - app
+      - manual-crawler
+    build:
+      context: .
+      target: migrate
+    restart: "no"
+    command: ["pnpm", "db:seed"]
+    environment:
+      <<: *app-env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  web:
+    profiles:
+      - app
+    build:
+      context: .
+      target: web
+    restart: unless-stopped
+    environment:
+      <<: *app-env
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+    ports:
+      - "${WEB_BIND_HOST:-127.0.0.1}:${WEB_PORT:-3000}:3000"
+    volumes:
+      - product_images:/var/lib/partsradar/product-images:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      seed:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://127.0.0.1:3000/api/source-status').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  crawler:
+    profiles:
+      - manual-crawler
+    build:
+      context: .
+      target: crawler
+    restart: "no"
+    environment:
+      <<: *app-env
+    volumes:
+      - snapshots:/var/lib/partsradar/snapshots
+      - product_images:/var/lib/partsradar/product-images
+    depends_on:
+      postgres:
+        condition: service_healthy
+      seed:
+        condition: service_completed_successfully
+    command: ["pnpm", "--filter", "@partsradar/crawler", "crawl:coolpc-once", "--", "--help"]
+
 volumes:
   postgres_data:
+  snapshots:
+  product_images:

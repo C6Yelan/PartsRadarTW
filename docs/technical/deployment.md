@@ -118,11 +118,7 @@ PostgreSQL 必須使用 persistent volume 或主機掛載目錄保存資料。
 
 ## Docker Compose 方向
 
-正式部署可使用獨立 compose 檔，例如：
-
-```text
-compose.prod.yml
-```
+正式部署與本機 PostgreSQL 開發共用同一份 `compose.yml`。本機平常只啟動 `postgres`；private server validation 或 production-like 驗證再明確啟動 `migrate`、`seed`、`web` 或手動 `crawler` service。
 
 概念服務：
 
@@ -140,6 +136,39 @@ postgres
 - `postgres` 不對公網開放。
 - `web` 只透過 reverse proxy 對外。
 - `crawler` 不需要對外開 port。
+
+### Phase 6 Slice 1 Current Compose
+
+目前已建立第一個 production-like Compose skeleton：
+
+- `Dockerfile`：同一份檔案提供 `web`、`crawler`、`migrate` build target。
+- `compose.yml`：定義 `postgres`、`migrate`、`seed`、`web` 與手動 profile 的 `crawler` service。
+- `.env.example`：提供本機與 private server validation 共用的非敏感環境變數模板；正式機實際使用的 `.env.production` 不提交 Git。
+- `migrate` service 使用 root `pnpm db:deploy`，對應 Prisma `migrate deploy`，不使用 development migration。
+- `seed` service 在 migration 後執行 root `pnpm db:seed`，以 idempotent upsert 初始化第一版 8 個 CoolPC 分類；`web` 與手動 `crawler` 都等 seed 成功後才啟動。
+- `web` 預設只綁 `127.0.0.1:${WEB_PORT:-3000}`，適合無網域時先用 SSH tunnel 或 server 內部驗證；若要直接從外部 IP 測試，需明確設定 `WEB_BIND_HOST=0.0.0.0`。
+- `crawler` 目前只作為手動 profile 與 Docker build target。production scheduled crawler daemon 尚未實作，因此預設 command 是 `--help`，避免 `docker compose up` 意外對來源站發出 live requests。
+- `product_images` volume 以唯讀方式掛給 `web`，以讀寫方式掛給 `crawler`。
+- `snapshots` volume 只掛給 `crawler`，不由 `web` 公開。
+
+本機或正式機 private validation 的基本流程：
+
+```bash
+cp .env.example .env.production
+docker compose --env-file .env.production --profile app build
+docker compose --env-file .env.production --profile app up migrate
+docker compose --env-file .env.production --profile app up seed
+docker compose --env-file .env.production --profile app up -d web
+curl http://127.0.0.1:3000/api/source-status
+```
+
+手動檢查 crawler image 與參數說明：
+
+```bash
+docker compose --env-file .env.production --profile manual-crawler run --rm crawler
+```
+
+若要在正式機上做 IP-only private validation，先維持 `WEB_BIND_HOST=127.0.0.1` 並用 SSH tunnel 連入。公開流量、reverse proxy、HTTPS、正式網域與 stricter CSP 是後續 gate，不屬於這個 slice 的完成條件。
 
 ## Volumes And Storage
 
@@ -245,7 +274,7 @@ env: PRODUCT_IMAGE_STORAGE_DIR=/var/lib/partsradar/product-images
 11. 設定 reverse proxy 與 HTTPS。
 12. 檢查網站、API、商品圖片 API、crawler run 與資料更新狀態。
 
-正式指令等專案初始化與 compose 檔建立後再補。
+目前 Phase 6 Slice 1 已把 production-like services 合併進唯一的 `compose.yml`，並補上 private validation 指令。reverse proxy、HTTPS、正式網域、備份排程與 crawler daemon 指令仍待後續 slice 補齊。
 
 ## Migration
 

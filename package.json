@@ -18,6 +18,7 @@
     "smoke:coolpc-image-flow": "pnpm --filter @partsradar/crawler smoke:coolpc-image-flow",
     "db:generate": "pnpm --filter @partsradar/db db:generate",
     "db:migrate": "pnpm --filter @partsradar/db db:migrate",
+    "db:deploy": "pnpm --filter @partsradar/db db:deploy",
     "db:seed": "pnpm --filter @partsradar/db db:seed",
     "db:validate": "pnpm --filter @partsradar/db db:validate",
     "dev:web": "pnpm --filter @partsradar/web dev",
