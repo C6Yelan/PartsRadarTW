@@ -5,6 +5,13 @@ export default function SiteDisclaimer() {
         PartsRadarTW
         是非官方、非商業的商品搜尋與價格整理工具。資料來源為原價屋公開頁面；實際商品資訊、價格、庫存、購買與售後服務以原價屋來源頁為準。
       </p>
+      <p>
+        本站僅整理必要的商品查詢資訊，不複製完整商品文案、完整頁面內容或原站排版；若來源方或權利人需要更正或移除資料與圖片，請透過{" "}
+        <a href="https://github.com/C6Yelan/PartsRadarTW/issues" rel="noreferrer" target="_blank">
+          GitHub Issues
+        </a>{" "}
+        聯繫。
+      </p>
     </footer>
   );
 }

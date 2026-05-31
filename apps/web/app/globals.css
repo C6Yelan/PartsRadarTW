@@ -292,6 +292,19 @@ input::placeholder {
   margin: 0;
 }
 
+.site-disclaimer p + p {
+  margin-top: 6px;
+}
+
+.site-disclaimer a {
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+
+.site-disclaimer a:hover {
+  color: var(--text);
+}
+
 .detail-shell > .site-disclaimer,
 .not-found-shell > .site-disclaimer {
   width: 100%;
