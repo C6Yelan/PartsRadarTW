@@ -1,25 +1,53 @@
+# Git and local agent metadata
 .git
 .gitignore
 .dockerignore
-
-node_modules
-**/node_modules
-
-.next
-apps/web/.next
-coverage
-
-.env
-.env.*
-!.env.example
-
+.agents/
+.codex/
+AGENTS.md
 PROJECT_CONTEXT.md
+structure.txt
 style.png
 
-storage
-temp
-apps/crawler/temp
-apps/web/.next
+# Secrets and environment files
+.env
+.env.*
+.env.example
 
-*.log
+# Dependencies and build output
+node_modules/
+**/node_modules/
+.next/
+apps/web/.next/
+dist/
+build/
+out/
+coverage/
 *.tsbuildinfo
+**/*.tsbuildinfo
+
+# Runtime/generated data
+storage/
+temp/
+tmp/
+logs/
+apps/crawler/temp/
+data/
+*.log
+**/*.log
+
+# Deployment and repo-only files not needed in runtime images
+Dockerfile
+compose.yml
+docker-compose*.yml
+docs/
+README.md
+LICENSE
+
+# Test-only files
+vitest.config.ts
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
+**/__fixtures__/

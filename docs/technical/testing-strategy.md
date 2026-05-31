@@ -201,6 +201,7 @@ private validation 檢查：
 - `web` 只綁定 `127.0.0.1:3000`，不直接對外公開。
 - `crawler` manual profile 可顯示 help / 參數說明，但不執行 live fetch。
 - snapshot storage 與 product image cache volume 可由 crawler container 寫入。
+- `web` runtime image 不包含 repo-owned `.env` / `.env.example`、`.git`、`docs/`、`logs/`、`compose.yml`、`Dockerfile` 或 app/package `*.test.ts` 等不必要檔案；`node_modules` 內第三方套件自帶檔案另由 production runtime image optimization 處理。
 
 公開前或正式網域階段再補的 smoke test：
 

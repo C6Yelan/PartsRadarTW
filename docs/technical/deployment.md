@@ -171,6 +171,18 @@ docker compose --profile manual-crawler run --rm crawler
 
 若要在正式機上做 IP-only private validation，先維持 `WEB_BIND_HOST=127.0.0.1` 並用 SSH tunnel 連入。公開流量、Cloudflare Tunnel、正式網域與 stricter CSP 是後續 gate，不屬於這個 slice 的完成條件。
 
+### Runtime Image Hygiene
+
+Docker build context 應透過 `.dockerignore` 排除不需要進入 runtime image 的檔案：
+
+- `.env`、`.env.*`、`.env.example` 與任何部署 token 或 secret。
+- `.git`、local agent metadata、`PROJECT_CONTEXT.md`、`style.png`、`structure.txt` 等本機輔助檔。
+- `logs/`、`temp/`、`storage/`、raw snapshots、product image cache 與其他 runtime/generated data。
+- `docs/`、`README.md`、`LICENSE`、`compose.yml`、`Dockerfile` 等 repo/deployment-only 檔案。
+- `*.test.ts`、`*.spec.ts`、`vitest.config.ts`、fixtures 與測試輸出。
+
+`web` container 仍需要 `DATABASE_URL` 連線 PostgreSQL；此 env 會包含 DB credential，屬於必要 runtime secret，不應出現在 log、API response、client bundle 或文件的真實值中。
+
 ### Private Validation Checklist
 
 在沒有正式網域前，正式機只作為 private validation 環境。這個階段的目標是確認主機、Docker、資料庫、migration、seed、web service 與 volume wiring 正常，不是公開上線。
