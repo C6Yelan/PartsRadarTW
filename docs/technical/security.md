@@ -99,6 +99,14 @@ Web app 目前透過 Next.js headers 設定基本 Content Security Policy，作�
 - `object-src` 設為 `none`，`base-uri` 設為本站，`frame-ancestors` 設為 `none`，`form-action` 設為本站。
 - production 環境啟用 `upgrade-insecure-requests`。
 
+Web app 也應送出基本安全 headers：
+
+- `Referrer-Policy: strict-origin-when-cross-origin`，避免跨站請求帶出完整內部路徑。
+- `X-Content-Type-Options: nosniff`，降低錯誤 MIME sniffing 風險。
+- `X-Frame-Options: DENY`，與 CSP `frame-ancestors 'none'` 一起避免被 iframe 嵌入。
+- `Permissions-Policy` 預設關閉 camera、microphone、geolocation、payment、usb 等目前不需要的瀏覽器能力。
+- 不回傳 `X-Powered-By`。
+
 此 CSP 是目前階段的實用型 baseline，不是最終嚴格 CSP。公開宣傳或開放較大流量前，需在正式部署網域、圖片呈現方式與是否需要 CSP report endpoint 確認後，重新檢討 stricter CSP：
 
 - 評估使用 nonce 或 hash，移除不必要的 inline script / inline style 例外。

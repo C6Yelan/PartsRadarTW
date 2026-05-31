@@ -244,6 +244,11 @@ Cloudflare 端設定：
 - Public hostname 使用正式網域或子網域。
 - Service 設為 `http://web:3000`。
 - 保留 DNS proxy / Cloudflare edge TLS，由 Cloudflare 處理外部 HTTPS。
+- SSL/TLS edge certificate 確認為 active。
+- 開啟 Always Use HTTPS，讓 `http://<domain>` 導向 `https://<domain>`。
+- 開啟 Automatic HTTPS Rewrites，降低 mixed content 風險。
+- TLS 1.3 開啟，Minimum TLS Version 先設為 TLS 1.2。
+- HSTS 不在第一輪公開時直接開長期或 preload；若要啟用，先用短 max-age 驗證。
 
 主機端 `.env` 需加入：
 
@@ -268,6 +273,7 @@ docker compose --profile public-tunnel stop cloudflared
 
 ```bash
 docker compose --profile public-tunnel logs --tail=100 cloudflared
+curl -I http://<domain>/
 curl -I https://<domain>/
 curl -i https://<domain>/api/source-status
 ```
@@ -280,6 +286,7 @@ curl -i https://<domain>/api/source-status
 - `crawler` 不對外開 port，也不得提供公開 trigger API。
 - 圖片 backfill 已完成或前端 fallback 可接受。
 - `/api/source-status` 可回 `HTTP 200`。
+- `http://<domain>/` 會導向 `https://<domain>/`。
 - 正式網域 smoke test 完成後，再考慮 stricter CSP 與公開宣傳。
 
 ### Product Image Cache Backfill
