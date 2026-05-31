@@ -186,17 +186,31 @@ API 測試不應暴露：
 
 正式部署流程建立後，至少應有手動 smoke test。
 
-部署後檢查：
+Phase 6 private validation 階段的 smoke test 應先限制在 Docker / Compose / DB / web API，不公開流量也不做 live crawl。
 
-- `web` service 正常啟動。
-- `crawler` service 正常啟動。
-- `postgres` 可連線。
-- migration 已執行。
-- `/api/source-status` 可回傳狀態。
-- 首頁可載入。
-- 商品列表可查詢。
+private validation 檢查：
+
+- `docker compose --env-file .env.production config` 可解析。
+- Docker build 成功。
+- `migrate` service 可執行並以 exit code 0 結束。
+- `seed` service 可執行並以 exit code 0 結束。
+- `postgres` healthy。
+- `web` healthy。
+- `/api/source-status` 回 `HTTP 200`。
+- `/api/source-status` response 內含 8 個第一版 CoolPC 分類。
+- `web` 只綁定 `127.0.0.1:3000`，不直接對外公開。
+- `crawler` manual profile 可顯示 help / 參數說明，但不執行 live fetch。
+- snapshot storage 與 product image cache volume 可由 crawler container 寫入。
+
+公開前或正式網域階段再補的 smoke test：
+
+- reverse proxy 與 HTTPS 正常。
+- 正式網域可連線。
+- production CSP / report-only 決策已驗證。
+- 首頁可透過正式 URL 載入。
+- 商品列表可透過正式 URL 查詢。
+- 商品圖片 API 可透過正式 URL 回應。
 - crawler 成功寫入一輪有效資料，或明確記錄失敗原因。
-- snapshot storage 可寫入。
 
 若 crawler 發現疑似攔截，部署驗收應停止 crawler 並保留異常內容供檢查，不應用重試硬打來源站。
 
@@ -248,7 +262,9 @@ API 測試不應暴露：
 
 - Docker build 成功。
 - migration 可執行。
+- seed 可執行並建立第一版分類。
 - services 可啟動。
+- `/api/source-status` 回 `HTTP 200`。
 - smoke test 完成。
 
 ## Live Fetch 測試規則

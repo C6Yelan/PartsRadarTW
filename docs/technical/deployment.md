@@ -170,6 +170,71 @@ docker compose --env-file .env.production --profile manual-crawler run --rm craw
 
 若要在正式機上做 IP-only private validation，先維持 `WEB_BIND_HOST=127.0.0.1` 並用 SSH tunnel 連入。公開流量、reverse proxy、HTTPS、正式網域與 stricter CSP 是後續 gate，不屬於這個 slice 的完成條件。
 
+### Private Validation Checklist
+
+在沒有正式網域前，正式機只作為 private validation 環境。這個階段的目標是確認主機、Docker、資料庫、migration、seed、web service 與 volume wiring 正常，不是公開上線。
+
+前置條件：
+
+- repo 已在主機上 clone，且 `main` 已 fast-forward 到最新 `origin/main`。
+- Docker 與 Docker Compose 可由目前使用者執行。
+- `.env.production` 由 `.env.example` 複製而來，且未被 Git 追蹤。
+- `POSTGRES_PASSWORD` 已改成強密碼，不使用範例預設值。
+- `WEB_BIND_HOST=127.0.0.1`，避免尚未設定 reverse proxy / HTTPS / CSP 前直接對外公開。
+
+驗證指令：
+
+```bash
+git status --short --branch
+git log --oneline -1
+docker compose --env-file .env.production config
+docker compose --env-file .env.production --profile app build
+docker compose --env-file .env.production --profile app up seed
+docker compose --env-file .env.production --profile app up -d web
+docker compose --env-file .env.production --profile app ps
+curl -i http://127.0.0.1:3000/api/source-status
+docker compose --env-file .env.production --profile manual-crawler run --rm crawler
+```
+
+成功標準：
+
+- `git status --short --branch` 沒有非預期變更；`.env.production` 不出現在 Git status。
+- `docker compose config` 可解析。
+- `migrate` 與 `seed` 都以 exit code 0 結束。
+- `postgres` 狀態為 healthy。
+- `web` 狀態為 healthy，且只綁定 `127.0.0.1:3000`。
+- `/api/source-status` 回 `HTTP 200`，response 內有第一版 8 個 CoolPC 分類。
+- 手動 `crawler` command 只顯示 help / 參數說明，不發出 live fetch。
+
+本機瀏覽器測試時，從使用者電腦建立 SSH tunnel：
+
+```bash
+ssh -L 3000:127.0.0.1:3000 <user>@<server-ip>
+```
+
+然後在本機開啟：
+
+```text
+http://127.0.0.1:3000
+```
+
+失敗時優先檢查：
+
+- Docker 權限或 daemon 是否可用。
+- 3000 或 5432 是否被既有服務占用。
+- `.env.production` 是否仍使用錯誤 DB 名稱、帳號或密碼。
+- `migrate` logs 是否顯示 Prisma migration 或 `DATABASE_URL` 問題。
+- `seed` logs 是否顯示 Prisma seed 或連線問題。
+- `web` logs 是否顯示 DB 連線、Prisma Client、`PRODUCT_IMAGE_STORAGE_DIR` 或 Next.js startup 問題。
+
+禁止事項：
+
+- 不執行 `docker compose down --volumes`，除非已確認可以丟棄該主機資料。
+- 不設定 `WEB_BIND_HOST=0.0.0.0`，除非後續已完成公開前 gate。
+- 不設定 reverse proxy、HTTPS 或正式網域作為此 checklist 的一部分。
+- 不啟動 crawler live fetch，不做低頻手動 crawl 以外的資料抓取。
+- 不提交或 push `.env.production`、主機 secrets、TLS key 或部署 token。
+
 ## Volumes And Storage
 
 正式環境至少需要三類持久化資料：
