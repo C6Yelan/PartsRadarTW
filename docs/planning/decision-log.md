@@ -16,6 +16,7 @@
 | CoolPC 商品圖片 selector 與 allowlist | 2026-05-28 以 saved raw HTML 與 manual live validation 驗證，第一版目標分類的商品列附近可由 `<img src="/eval/{IGrp}/{filename}">` 取得主要圖片。實作只接受可正規化為 `https://www.coolpc.com.tw/eval/{IGrp}/{filename}.{jpg|jpeg|png|gif|webp}` 的 URL；`/eval/{IGrp}/`、缺副檔名或外部網域需記錄為 `invalid_image_url` 類 validation issue，不進入正式商品資料。`parse_errors.raw_image_url` 只保留原始圖片 URL 供內部 debug 與 validation，不暴露到公開 API/UI。 |
 | 商品圖片來源 URL 目前只限驗證用途 | 目前階段允許暫時使用 CoolPC / 原價屋來源圖片 URL，目的僅限本機開發、資料流驗證與小範圍測試。此決策不代表已取得圖片授權，也不代表一定符合合理使用。Phase 5 前必須完成圖片呈現方式更換，不讓正式 Phase 5 UI 以直接 hotlink 來源圖片作為完成狀態。 |
 | 商品圖片呈現策略採自家小尺寸縮圖快取 | Phase 5 前需完成自家小尺寸縮圖快取，前端顯示站內商品圖片 API URL，不讓每位訪客直接消耗來源站圖片流量，也不依賴部署時圖片資料夾與 Web app 原始碼位在固定相對位置。placeholder / 分類圖示只作為缺圖、下載失敗或移除圖片後的 fallback。自家縮圖初始實作採手動 backfill，不在訪客請求期間抓取來源圖片；來源圖片請求需使用低頻率與浮動間隔。 |
+| 第一版 production 圖片儲存採 persistent volume | 第一版不先導入 object storage 或 CDN。production 商品縮圖快取使用 mounted persistent volume，`web` 只讀取 `PRODUCT_IMAGE_STORAGE_DIR` 並透過站內 API 回傳圖片，`crawler` 或 backfill 流程負責建立與更新縮圖。圖片 cache 需納入備份 / 搬遷計畫，不能視為可任意丟棄的暫存。 |
 | 第一版定位為非官方、非商業查詢工具 | PartsRadarTW 第一版是非官方、非商業的商品搜尋與價格整理工具，不處理購買、付款、訂單或售後服務。商品查看與購買應導回原價屋來源頁，實際資訊以來源頁為準。 |
 | 第一版先用 GitHub Issues 作為更正 / 移除請求入口 | 第一版 footer 已保留 GitHub Issues 作為臨時入口，讓來源方或權利人可以提出資料或圖片更正 / 移除請求。此入口不是正式法務通道，也不適合要求對方公開提交敏感資料；專用 email、聯絡頁或正式網域信箱延後到第二版或正式網域確定後處理。 |
 | 第一版移除請求採人工處理流程 | 第一版不建立管理後台、自動審核系統或公開刪除 API。收到合理請求後，先以人工方式移除或停用受影響資料 / 圖片，並記錄商品 ID、來源 URL、採取動作與是否需補 crawler blocklist / parser 規則，避免後續匯入流程重新帶回已移除內容。 |
@@ -58,4 +59,4 @@
 
 | 問題 | 影響範圍 |
 | --- | --- |
-| 正式圖片儲存與移除執行細節 | 自家小尺寸縮圖快取已確認為第一版主要圖片策略，第一版移除請求處理原則也已記錄；公開前仍需決定 production storage、是否導入 CDN、縮圖失效規則、快取清理命令、DB override / blocklist 設計，以及 crawler 是否讀取移除清單。 |
+| 正式圖片移除執行細節 | 自家小尺寸縮圖快取已確認為第一版主要圖片策略，production persistent volume 策略與第一版移除請求處理原則也已記錄；公開前仍需決定快取清理命令、DB override / blocklist 設計，以及 crawler 是否讀取移除清單。 |

@@ -231,7 +231,7 @@
 - API contract 已把主要商品圖片列為商品列表與商品詳細 response 的必要欄位。
 - 資安文件已定義圖片 URL allowlist 與未來 proxy / optimizer 限制。
 - Phase 5 前已完成圖片呈現方式更換：採自家小尺寸縮圖快取；直接使用 CoolPC / 原價屋圖片 URL 只保留為本機資料流驗證與小範圍測試手段。
-- 自家小尺寸縮圖需先定義最小 storage、更新、失效與移除規則；placeholder / 分類圖示只作為缺圖、下載失敗或移除圖片後的 fallback。
+- 自家小尺寸縮圖已定義最小 production storage、更新、備份、搬遷與移除原則；placeholder / 分類圖示只作為缺圖、下載失敗或移除圖片後的 fallback。
 
 ## Phase 5：Web UI 第一版
 
@@ -288,7 +288,7 @@ Phase 5 entry gate：
 - 目前階段可暫時使用 CoolPC / 原價屋來源圖片 URL，僅限本機開發、資料流驗證與小範圍測試。
 - 進入 Phase 5 前，需完成圖片呈現方式更換，並在自家小尺寸縮圖快取或 placeholder / 分類圖示之間做明確決策與實作。
 - 已加上基本網站 footer 聲明：本專案非官方、非商業；資料來源為原價屋公開頁面；實際商品資訊、價格與購買以來源頁為準，並提供 GitHub Issues 作為第一版臨時更正 / 移除請求入口。專用 email 或完整關於頁延後到第二版或正式網域確定後處理。
-- 已在 security 文件記錄第一版人工移除請求處理流程；公開前仍需決定 production storage、快取清理、DB override / blocklist 與 crawler 防止重新匯入的具體執行方式。
+- 已在 security 與 deployment 文件記錄第一版人工移除請求處理流程與 product image cache volume 策略；公開前仍需決定快取清理命令、DB override / blocklist 與 crawler 防止重新匯入的具體執行方式。
 - 公開前需避免複製完整商品文案、完整頁面 HTML、原站排版或任何不必要的創作性內容。
 
 ## Phase 6：Docker 與部署準備
@@ -301,6 +301,7 @@ Phase 5 entry gate：
 - 建立 crawler Docker build。
 - 建立 PostgreSQL service。
 - 建立 snapshot storage volume。
+- 建立 product image cache persistent volume。
 - 建立 production compose 初版。
 - 建立 migration 部署流程。
 - 建立最小 smoke test。

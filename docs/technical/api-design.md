@@ -280,7 +280,7 @@
 規則：
 
 - `{id}` 接受商品 UUID，副檔名固定為 `.webp`。
-- 實體圖片儲存位置由部署環境設定，本機預設對應 workspace 內的 `storage/product-images`；正式部署應用 `PRODUCT_IMAGE_STORAGE_DIR` 指向 mounted volume、object storage sync 目錄或其他本機可讀目錄。
+- 實體圖片儲存位置由部署環境設定，本機預設對應 workspace 內的 `storage/product-images`；第一版正式部署應用 `PRODUCT_IMAGE_STORAGE_DIR` 指向 product image cache mounted volume。object storage 或 CDN 延後到有實際流量、容量或多機部署需求後再評估。
 - 成功時回傳 `Content-Type: image/webp` 與 `X-Content-Type-Options: nosniff`。
 - 圖片不存在或 id 格式不合法時回傳 `404`，由前端 fallback 保持版面穩定。
 - 此 endpoint 不在訪客請求期間抓取來源站圖片；來源站圖片下載仍由手動 backfill / crawler 流程控制頻率與間隔。

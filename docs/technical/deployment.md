@@ -143,18 +143,20 @@ postgres
 
 ## Volumes And Storage
 
-正式環境至少需要兩類持久化資料：
+正式環境至少需要三類持久化資料：
 
 | 類型 | 用途 |
 | --- | --- |
 | PostgreSQL data volume | 保存資料庫內容 |
 | Snapshot storage volume | 保存 raw snapshot 壓縮檔 |
+| Product image cache volume | 保存站內商品縮圖快取 |
 
 建議概念路徑：
 
 ```text
 /srv/partsradar-tw/postgres/
 /srv/partsradar-tw/snapshots/
+/srv/partsradar-tw/product-images/
 ```
 
 實際路徑等部署時依 VM 權限與磁碟規劃決定。
@@ -165,6 +167,43 @@ postgres
 - raw snapshot 一般資料最長保留 30 天。
 - raw snapshot 異常資料最長保留 90 天。
 - price snapshots 不套用 raw snapshot 的 30 / 90 天保存期限。
+
+## Product Image Cache Storage
+
+第一版 production 商品圖片策略使用站內小尺寸 WebP 縮圖快取，不在訪客請求期間抓取來源站圖片，也不直接 hotlink 原價屋圖片。
+
+建議 production path：
+
+```text
+host path: /srv/partsradar-tw/product-images/
+container path: /var/lib/partsradar/product-images/
+env: PRODUCT_IMAGE_STORAGE_DIR=/var/lib/partsradar/product-images
+```
+
+實際 host path 可依 VM 磁碟與權限調整，但 container 內應使用明確 mounted path，不依賴 repo 相對路徑。
+
+讀寫責任：
+
+- `web` 只讀取 `PRODUCT_IMAGE_STORAGE_DIR`，透過 `/api/product-images/{productId}.webp` 回傳站內縮圖。
+- `crawler` 或手動 backfill 工具負責建立、更新或覆寫縮圖檔案。
+- 訪客請求圖片時不得觸發來源站下載；來源圖片下載只能由 crawler / backfill 流程控制頻率、間隔與錯誤處理。
+- 圖片檔名第一版維持 `{productId}.webp`。目前資料量不需要先做 hash 分層目錄；若未來檔案數量或檔案系統壓力明顯增加，再評估分層。
+
+更新與清理規則：
+
+- 新商品或圖片 URL 變更後，由 crawler / backfill 產生或更新對應縮圖。
+- 缺圖、讀取失敗或檔案不存在時，前端使用既有 fallback，不重新 hotlink 來源圖片。
+- 第一版不做自動大量刪圖 job，避免資料狀態判斷錯誤造成誤刪。
+- 對 inactive 商品，可先保留縮圖，除非容量壓力或權利人 / 來源方要求移除。
+- 若收到合理移除請求，應移除或停用對應縮圖，並建立 blocklist、DB override 或其他永久紀錄，避免後續 crawler / backfill 又重新產生相同圖片。
+- 若需要保留處理證據，可先將圖片移到非公開 quarantine 目錄；quarantine 目錄不得由 web service 直接公開。
+
+備份與搬遷：
+
+- Product image cache volume 應納入 production 備份或搬遷計畫。
+- 縮圖理論上可由來源圖片重新產生，但重新抓取來源圖片有頻率、穩定性與授權風險，因此 production 不應把此目錄視為可隨意丟棄的暫存。
+- DB 備份與 product image cache 備份需保持相近時間點，避免 DB 有商品但圖片 cache 大量缺失。
+- 若部署到新機器，應先還原 DB 與 product image cache，再啟動 web，讓前端不需要在公開流量期間等待圖片重新 backfill。
 
 ## Environment And Secrets
 
@@ -196,14 +235,15 @@ postgres
 1. VM 安裝 Docker 與 Docker Compose。
 2. VM 取得 repo 或部署產物。
 3. 建立正式環境變數。
-4. 建立 PostgreSQL 與 snapshot persistent volume。
+4. 建立 PostgreSQL、snapshot 與 product image cache persistent volume。
 5. 啟動 `postgres`。
 6. 等待 PostgreSQL 可連線。
 7. 執行 Prisma migration。
-8. migration 成功後啟動 `web`。
-9. 啟動 `crawler`。
-10. 設定 reverse proxy 與 HTTPS。
-11. 檢查網站、API、crawler run 與資料更新狀態。
+8. 確認 `PRODUCT_IMAGE_STORAGE_DIR` 指向 product image cache mounted path。
+9. migration 成功後啟動 `web`。
+10. 啟動 `crawler` 或手動 backfill / crawler 流程。
+11. 設定 reverse proxy 與 HTTPS。
+12. 檢查網站、API、商品圖片 API、crawler run 與資料更新狀態。
 
 正式指令等專案初始化與 compose 檔建立後再補。
 
@@ -228,6 +268,7 @@ Prisma migration 應在部署時明確執行。
 
 - PostgreSQL。
 - raw snapshot storage。
+- product image cache storage。
 - 環境變數與部署設定，但不得把 secrets 放入公開 repo。
 
 備份原則：
@@ -235,6 +276,7 @@ Prisma migration 應在部署時明確執行。
 - DB 備份比 raw snapshot 更優先。
 - 備份需能還原，不只產生檔案。
 - raw snapshot 因有保存期限，可依容量調整備份範圍。
+- product image cache 可重建但不應視為純暫存；若沒有備份，搬遷後需安排低頻 backfill，且公開流量期間可能大量 fallback。
 - price snapshots 屬於長期資料，應保存在 DB 備份內。
 
 第一版備份頻率先不硬定；等 VM 容量、資料量與實際更新頻率明確後再決定。
@@ -249,6 +291,8 @@ Prisma migration 應在部署時明確執行。
 - 最近一次 successful crawl 時間。
 - 是否進入 backoff。
 - snapshot storage 是否接近容量上限。
+- product image cache 是否接近容量上限。
+- 商品圖片 API 是否大量回傳 404 或 fallback。
 
 第一版可先用 log 與手動檢查維運；正式監控與告警工具等資料流穩定後再選。
 
