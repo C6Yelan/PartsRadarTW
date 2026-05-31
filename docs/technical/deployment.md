@@ -430,6 +430,15 @@ Backfill 規則：
 - raw snapshot 異常資料最長保留 90 天。
 - price snapshots 不套用 raw snapshot 的 30 / 90 天保存期限。
 
+Raw snapshot cleanup 以手動維運命令執行，預設只做 dry run：
+
+```bash
+pnpm raw-snapshots:cleanup
+pnpm raw-snapshots:cleanup -- --confirm-delete
+```
+
+cleanup 會依 `SNAPSHOT_STORAGE_DIR` 找到 raw snapshot 壓縮檔，刪除超過保留期限的 metadata，並只移除不再被任何保留中 snapshot metadata 參照的 gzip 檔案。執行前應確認 manual crawler、scheduled crawler 與 raw replay 沒有同時寫入 raw snapshot storage。
+
 ## Product Image Cache Storage
 
 第一版 production 商品圖片策略使用站內小尺寸 WebP 縮圖快取，不在訪客請求期間抓取來源站圖片，也不直接 hotlink 原價屋圖片。

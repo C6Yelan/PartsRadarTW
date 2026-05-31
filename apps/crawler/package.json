@@ -8,6 +8,7 @@
     "crawl:coolpc-once": "tsx src/scripts/crawl-coolpc-once.ts",
     "image-cache:backfill": "tsx src/scripts/backfill-product-images.ts",
     "product-vendors:backfill": "tsx src/scripts/backfill-product-vendors.ts",
+    "raw-snapshots:cleanup": "tsx src/scripts/cleanup-raw-snapshots.ts",
     "smoke:coolpc-image-flow": "tsx src/scripts/smoke-coolpc-image-flow.ts",
     "validate:coolpc-live": "tsx src/scripts/validate-coolpc-live.ts"
   },
