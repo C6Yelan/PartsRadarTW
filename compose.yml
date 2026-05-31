@@ -107,6 +107,23 @@ services:
         "--help",
       ]
 
+  cloudflared:
+    profiles:
+      - public-tunnel
+    image: ${CLOUDFLARED_IMAGE:-cloudflare/cloudflared:latest}
+    restart: unless-stopped
+    depends_on:
+      web:
+        condition: service_healthy
+    command:
+      [
+        "tunnel",
+        "--no-autoupdate",
+        "run",
+        "--token",
+        "${CLOUDFLARE_TUNNEL_TOKEN:-}",
+      ]
+
 volumes:
   postgres_data:
   snapshots:

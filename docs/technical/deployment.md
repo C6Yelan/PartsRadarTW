@@ -45,7 +45,7 @@
 | `web` | 執行 Next.js 網站與查詢 API |
 | `crawler` | 執行原價屋資料抓取、解析與資料更新 |
 | `postgres` | 保存商品、價格、crawler 狀態與 snapshot metadata |
-| `reverse-proxy` | 對外提供 HTTP/HTTPS，轉發到 web service |
+| `cloudflared` | 透過 Cloudflare Tunnel 對外公開 web service |
 
 Raw snapshot 壓縮檔不作為獨立 service，而是透過 volume 或主機目錄掛載給 crawler 使用。
 
@@ -106,15 +106,15 @@ bot 應讀取資料庫，不應直接抓取原價屋。
 
 PostgreSQL 必須使用 persistent volume 或主機掛載目錄保存資料。
 
-### reverse-proxy
+### cloudflared
 
-`reverse-proxy` service 負責：
+`cloudflared` service 負責：
 
-- 對外接收 HTTP/HTTPS。
-- 管理 TLS certificate。
-- 將網站流量轉發到 `web`。
+- 建立到 Cloudflare 的 outbound tunnel。
+- 由 Cloudflare 管理 public hostname、edge TLS 與外部流量入口。
+- 將 tunnel 流量轉發到 Compose network 內的 `web:3000`。
 
-第一版可選工具包含 Nginx、Caddy 或 Traefik；正式工具等部署前依 VM 條件與維護成本決定。
+第一版公開入口採 Cloudflare Tunnel，不在主機上直接開放 HTTP/HTTPS，也不先導入 Nginx / Caddy。Tunnel token 只放在部署主機 `.env`，不提交 Git。
 
 ## Docker Compose 方向
 
@@ -123,7 +123,7 @@ PostgreSQL 必須使用 persistent volume 或主機掛載目錄保存資料。
 概念服務：
 
 ```text
-reverse-proxy
+cloudflared
 web
 crawler
 postgres
@@ -134,15 +134,15 @@ postgres
 - `web` 與 `crawler` 可以使用同一份 repo build 出不同啟動指令。
 - `crawler` 不應和 `web` 放在同一個 process。
 - `postgres` 不對公網開放。
-- `web` 只透過 reverse proxy 對外。
+- `web` 只透過 Cloudflare Tunnel 對外。
 - `crawler` 不需要對外開 port。
 
-### Phase 6 Slice 1 Current Compose
+### Phase 6 Current Compose
 
 目前已建立第一個 production-like Compose skeleton：
 
 - `Dockerfile`：同一份檔案提供 `web`、`crawler`、`migrate` build target。
-- `compose.yml`：定義 `postgres`、`migrate`、`seed`、`web` 與手動 profile 的 `crawler` service。
+- `compose.yml`：定義 `postgres`、`migrate`、`seed`、`web`、手動 profile 的 `crawler` service，以及 `public-tunnel` profile 的 `cloudflared` service。
 - `.env.example`：提供本機與 private server validation 共用的非敏感環境變數模板；正式機實際使用的 `.env` 不提交 Git。
 - `migrate` service 使用 root `pnpm db:deploy`，對應 Prisma `migrate deploy`，不使用 development migration。
 - `seed` service 在 migration 後執行 root `pnpm db:seed`，以 idempotent upsert 初始化第一版 8 個 CoolPC 分類；`web` 與手動 `crawler` 都等 seed 成功後才啟動。
@@ -152,6 +152,7 @@ postgres
 - `image-cache:backfill` 會優先使用 `--storage-dir`，其次使用 `PRODUCT_IMAGE_STORAGE_DIR`，因此 Compose 環境下商品縮圖會寫入 `product_images` volume。
 - `product_images` volume 以唯讀方式掛給 `web`，以讀寫方式掛給 `crawler`。
 - `snapshots` volume 只掛給 `crawler`，不由 `web` 公開。
+- `cloudflared` 預設不啟動；只有明確指定 `--profile public-tunnel` 才會建立 Cloudflare Tunnel 對外公開入口。
 
 本機或正式機 private validation 的基本流程：
 
@@ -168,7 +169,7 @@ curl http://127.0.0.1:3000/api/source-status
 docker compose --profile manual-crawler run --rm crawler
 ```
 
-若要在正式機上做 IP-only private validation，先維持 `WEB_BIND_HOST=127.0.0.1` 並用 SSH tunnel 連入。公開流量、reverse proxy、HTTPS、正式網域與 stricter CSP 是後續 gate，不屬於這個 slice 的完成條件。
+若要在正式機上做 IP-only private validation，先維持 `WEB_BIND_HOST=127.0.0.1` 並用 SSH tunnel 連入。公開流量、Cloudflare Tunnel、正式網域與 stricter CSP 是後續 gate，不屬於這個 slice 的完成條件。
 
 ### Private Validation Checklist
 
@@ -180,7 +181,7 @@ docker compose --profile manual-crawler run --rm crawler
 - Docker 與 Docker Compose 可由目前使用者執行。
 - `.env` 由 `.env.example` 複製而來，且未被 Git 追蹤。
 - `POSTGRES_PASSWORD` 已改成強密碼，不使用範例預設值。
-- `WEB_BIND_HOST=127.0.0.1`，避免尚未設定 reverse proxy / HTTPS / CSP 前直接對外公開。
+- `WEB_BIND_HOST=127.0.0.1`，避免尚未設定 Cloudflare Tunnel / CSP 前直接對外公開。
 
 驗證指令：
 
@@ -229,9 +230,57 @@ http://127.0.0.1:3000
 
 - 不執行 `docker compose down --volumes`，除非已確認可以丟棄該主機資料。
 - 不設定 `WEB_BIND_HOST=0.0.0.0`，除非後續已完成公開前 gate。
-- 不設定 reverse proxy、HTTPS 或正式網域作為此 checklist 的一部分。
+- 不啟動 Cloudflare Tunnel 或正式網域作為此 checklist 的一部分。
 - 不啟動 crawler live fetch，不做低頻手動 crawl 以外的資料抓取。
-- 不提交或 push `.env`、主機 secrets、TLS key 或部署 token。
+- 不提交或 push `.env`、主機 secrets、Cloudflare Tunnel token 或部署 token。
+
+### Cloudflare Tunnel Public Entry
+
+公開入口採 Cloudflare remotely-managed Tunnel。Cloudflare dashboard 負責 tunnel 設定與 public hostname；repo 只保存 `cloudflared` service 與 profile，不保存實際網域或 token。
+
+Cloudflare 端設定：
+
+- 建立 remotely-managed tunnel。
+- Public hostname 使用正式網域或子網域。
+- Service 設為 `http://web:3000`。
+- 保留 DNS proxy / Cloudflare edge TLS，由 Cloudflare 處理外部 HTTPS。
+
+主機端 `.env` 需加入：
+
+```bash
+CLOUDFLARE_TUNNEL_TOKEN=<cloudflare tunnel token>
+```
+
+啟動 tunnel：
+
+```bash
+docker compose --profile public-tunnel up -d cloudflared
+docker compose --profile public-tunnel ps cloudflared
+```
+
+關閉 tunnel：
+
+```bash
+docker compose --profile public-tunnel stop cloudflared
+```
+
+驗證：
+
+```bash
+docker compose --profile public-tunnel logs --tail=100 cloudflared
+curl -I https://<domain>/
+curl -i https://<domain>/api/source-status
+```
+
+公開前 gate：
+
+- `web` 仍綁 `127.0.0.1:${WEB_PORT:-3000}`，不得改成直接對外公開。
+- 主機不需要開放 HTTP/HTTPS inbound port；Cloudflare Tunnel 只需要 outbound 連線。
+- `postgres` 仍只綁 `127.0.0.1:5432`，不得對外公開。
+- `crawler` 不對外開 port，也不得提供公開 trigger API。
+- 圖片 backfill 已完成或前端 fallback 可接受。
+- `/api/source-status` 可回 `HTTP 200`。
+- 正式網域 smoke test 完成後，再考慮 stricter CSP 與公開宣傳。
 
 ### Product Image Cache Backfill
 
@@ -348,13 +397,14 @@ env: PRODUCT_IMAGE_STORAGE_DIR=/var/lib/partsradar/product-images
 | `PRODUCT_IMAGE_STORAGE_DIR` | container 內商品縮圖快取保存路徑，正式部署應設為明確 mounted path |
 | `CRAWLER_INTERVAL_SECONDS` | crawler 週期 |
 | `CRAWLER_BACKOFF_SECONDS` | 連續失敗 backoff |
+| `CLOUDFLARE_TUNNEL_TOKEN` | Cloudflare remotely-managed tunnel token，只在啟用 `public-tunnel` profile 時需要 |
 | `NODE_ENV` | production |
 
 規則：
 
 - `.env` 不提交。
 - DB 密碼不寫入文件範例。
-- VM SSH key、部署 token、TLS private key 不提交。
+- VM SSH key、部署 token、Cloudflare Tunnel token 不提交。
 - `.env.example` 只能放非敏感預設值與欄位名稱。
 
 ## Deployment Flow
@@ -371,10 +421,11 @@ env: PRODUCT_IMAGE_STORAGE_DIR=/var/lib/partsradar/product-images
 8. 確認 `PRODUCT_IMAGE_STORAGE_DIR` 指向 product image cache mounted path。
 9. migration 成功後啟動 `web`。
 10. 啟動 `crawler` 或手動 backfill / crawler 流程。
-11. 設定 reverse proxy 與 HTTPS。
-12. 檢查網站、API、商品圖片 API、crawler run 與資料更新狀態。
+11. 在 Cloudflare 建立 remotely-managed tunnel 與 public hostname。
+12. 主機 `.env` 加入 `CLOUDFLARE_TUNNEL_TOKEN`，並啟動 `public-tunnel` profile。
+13. 檢查網站、API、商品圖片 API、crawler run 與資料更新狀態。
 
-目前 Phase 6 Slice 1 已把 production-like services 合併進唯一的 `compose.yml`，並補上 private validation 指令。reverse proxy、HTTPS、正式網域、備份排程與 crawler daemon 指令仍待後續 slice 補齊。
+目前 Phase 6 已把 production-like services、Cloudflare Tunnel public entry profile 與 private validation 指令合併進唯一的 `compose.yml`。備份排程與 crawler daemon 指令仍待後續 slice 補齊。
 
 ## Migration
 
@@ -436,7 +487,7 @@ Prisma migration 應在部署時明確執行。
 第一版部署需符合：
 
 - PostgreSQL 不開放公網連線。
-- 只開放必要 port，例如 HTTP/HTTPS 與 SSH。
+- Cloudflare Tunnel 模式下不需要開放 HTTP/HTTPS inbound port；主機只保留必要 SSH 存取。
 - SSH 登入應避免使用弱密碼。
 - secrets 不進 Git。
 - raw snapshot 不提供公開下載。

@@ -83,12 +83,13 @@ repo 應提供 `.env.example` 作為範本。實際本機設定使用 `.env.loca
 | `PRODUCT_IMAGE_STORAGE_DIR` | 商品縮圖快取保存位置；本機 Next.js dev server 預設對應 repo root 的 `storage/product-images` |
 | `CRAWLER_INTERVAL_SECONDS` | crawler 週期秒數，第一版預設 `300` |
 | `CRAWLER_BACKOFF_SECONDS` | 連續失敗後延後秒數，第一版預設 `3600` |
+| `CLOUDFLARE_TUNNEL_TOKEN` | Cloudflare Tunnel token；只在部署主機啟用 `public-tunnel` profile 時需要 |
 | `NODE_ENV` | Node.js 執行環境 |
 
 規則：
 
 - `.env.example` 可以提交。
-- `.env.local`、`.env.production`、實際密碼與私鑰不可提交。
+- `.env`、`.env.local`、實際密碼、Cloudflare Tunnel token 與私鑰不可提交。
 - 正式環境的 env 應在 Ubuntu VM 或部署工具內管理。
 
 ## PostgreSQL
@@ -216,8 +217,8 @@ Parser 修正後，應能使用保存的 raw snapshot 或 fixture 重跑測試�
 - `node_modules/`
 - `.next/`
 - build output。
+- `.env`
 - `.env.local`
-- `.env.production`
 - raw snapshot 檔案。
 - 本機資料庫 volume。
 - IDE 或作業系統產生的暫存檔。

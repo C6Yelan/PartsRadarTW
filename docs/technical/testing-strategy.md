@@ -190,7 +190,7 @@ Phase 6 private validation 階段的 smoke test 應先限制在 Docker / Compose
 
 private validation 檢查：
 
-- `docker compose --env-file .env.production config` 可解析。
+- `docker compose config` 可解析。
 - Docker build 成功。
 - `migrate` service 可執行並以 exit code 0 結束。
 - `seed` service 可執行並以 exit code 0 結束。
@@ -204,8 +204,8 @@ private validation 檢查：
 
 公開前或正式網域階段再補的 smoke test：
 
-- reverse proxy 與 HTTPS 正常。
-- 正式網域可連線。
+- Cloudflare Tunnel `public-tunnel` profile 可啟動。
+- 正式網域 HTTPS 可連線。
 - production CSP / report-only 決策已驗證。
 - 首頁可透過正式 URL 載入。
 - 商品列表可透過正式 URL 查詢。

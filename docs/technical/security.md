@@ -40,7 +40,7 @@
 規則：
 
 - secrets 不進 Git。
-- `.env.local`、`.env.production`、DB 密碼、VM SSH key、部署 token、TLS private key 不提交。
+- `.env.local`、`.env`、DB 密碼、VM SSH key、部署 token、Cloudflare Tunnel token 不提交。
 - `.env.example` 只能放非敏感欄位名稱與安全預設值。
 - `DATABASE_URL` 不應出現在 log、API response、前端 bundle 或文件範例的真實值中。
 - 正式環境 secrets 由 VM、Docker Compose env file 或部署流程管理。
@@ -244,7 +244,7 @@ log 應協助除錯，但不能洩漏內部資料。
 
 規則：
 
-- 不記錄 DB 密碼、完整 `DATABASE_URL`、SSH key、部署 token 或 TLS private key。
+- 不記錄 DB 密碼、完整 `DATABASE_URL`、SSH key、部署 token 或 Cloudflare Tunnel token。
 - 不在公開 API response 回傳 stack trace。
 - crawler error 可記錄分類、URL、HTTP status、內容判定狀態與錯誤類型。
 - raw HTML 不直接寫入一般 application log；若需保存，使用 raw snapshot storage。
