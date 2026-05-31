@@ -273,6 +273,32 @@ log 應協助除錯，但不能洩漏內部資料。
 - crawler error 可記錄分類、URL、HTTP status、內容判定狀態與錯誤類型。
 - raw HTML 不直接寫入一般 application log；若需保存，使用 raw snapshot storage。
 
+## Post-v1 Hardening / 後續安全強化
+
+以下是 post-v1 hardening TODO，不是 v1 launch blocker。第一版目前不急著把 Cloudflare Tunnel 後方的 origin service 改成 HTTPS。
+
+目前正式部署架構由 Cloudflare HTTPS 與 Cloudflare Tunnel 對外服務，origin 不直接公開。`web:3000` 與 PostgreSQL `5432` 應維持不對外暴露，只允許 Cloudflare Tunnel、Docker network 或主機本機維運路徑存取。
+
+後續可評估在 Docker 內加入 Caddy 或 Nginx reverse proxy，讓對外路徑調整為：
+
+```text
+cloudflared -> HTTPS reverse-proxy container -> HTTP web:3000
+```
+
+此強化的目的：
+
+- 集中管理 request body size limit、timeout、security headers 與基本 rate limiting。
+- 降低 Next.js server 直接處理異常請求的風險。
+- 未來可評估 Cloudflare Tunnel origin HTTPS validation / Full strict 類似強化。
+
+目前優先順序低於：
+
+- Cloudflare WAF / Security Rules。
+- Rate Limiting。
+- Security Headers。
+- Bot / crawler 基本防護。
+- `.env`、Cloudflare Tunnel token、Docker 權限與部署穩定性檢查。
+
 ## 第一版不處理
 
 第一版不先建立：
