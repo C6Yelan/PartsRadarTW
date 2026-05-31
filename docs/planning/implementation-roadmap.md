@@ -326,8 +326,8 @@ Phase 5 entry gate：
 
 目前切片狀態：
 
-- Slice 1 已完成 Docker build foundation、單一 `compose.yml`、`migrate` / `seed` / `web` private validation profile、manual crawler profile 與 deployment 文件。
-- 下一步是正式機 IP-only private validation：clone repo、建立未追蹤 `.env.production`、維持 `WEB_BIND_HOST=127.0.0.1`、執行 build / migrate / seed / web、確認 `/api/source-status` 回 `200`，並透過 SSH tunnel 手動檢查網站。
+- Slice 1 已完成 Docker build foundation、單一 `compose.yml`、預設啟動的 `migrate` / `seed` / `web` app stack、manual crawler profile 與 deployment 文件。
+- 下一步是正式機 IP-only private validation：clone repo、建立未追蹤 `.env`、維持 `WEB_BIND_HOST=127.0.0.1`、執行 `docker compose up -d --build --force-recreate`、確認 `/api/source-status` 回 `200`，並透過 SSH tunnel 手動檢查網站。
 - private validation 不包含 reverse proxy、HTTPS、正式網域、公開流量、crawler daemon 或 live crawl。
 
 ## Phase 7：資料流穩定期

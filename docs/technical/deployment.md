@@ -118,7 +118,7 @@ PostgreSQL 必須使用 persistent volume 或主機掛載目錄保存資料。
 
 ## Docker Compose 方向
 
-正式部署與本機 PostgreSQL 開發共用同一份 `compose.yml`。本機平常只啟動 `postgres`；private server validation 或 production-like 驗證再明確啟動 `migrate`、`seed`、`web` 或手動 `crawler` service。
+正式部署與本機 PostgreSQL 開發共用同一份 `compose.yml`。預設 `docker compose up` 會啟動 app stack：`postgres`、`migrate`、`seed`、`web`。本機若只需要 PostgreSQL，可明確執行 `docker compose up -d postgres`。`crawler` 保留在手動 profile，避免一般部署指令意外對來源站發出 live requests。
 
 概念服務：
 
@@ -143,7 +143,7 @@ postgres
 
 - `Dockerfile`：同一份檔案提供 `web`、`crawler`、`migrate` build target。
 - `compose.yml`：定義 `postgres`、`migrate`、`seed`、`web` 與手動 profile 的 `crawler` service。
-- `.env.example`：提供本機與 private server validation 共用的非敏感環境變數模板；正式機實際使用的 `.env.production` 不提交 Git。
+- `.env.example`：提供本機與 private server validation 共用的非敏感環境變數模板；正式機實際使用的 `.env` 不提交 Git。
 - `migrate` service 使用 root `pnpm db:deploy`，對應 Prisma `migrate deploy`，不使用 development migration。
 - `seed` service 在 migration 後執行 root `pnpm db:seed`，以 idempotent upsert 初始化第一版 8 個 CoolPC 分類；`web` 與手動 `crawler` 都等 seed 成功後才啟動。
 - `web` 預設只綁 `127.0.0.1:${WEB_PORT:-3000}`，適合無網域時先用 SSH tunnel 或 server 內部驗證；若要直接從外部 IP 測試，需明確設定 `WEB_BIND_HOST=0.0.0.0`。
@@ -155,18 +155,16 @@ postgres
 本機或正式機 private validation 的基本流程：
 
 ```bash
-cp .env.example .env.production
-docker compose --env-file .env.production --profile app build
-docker compose --env-file .env.production --profile app up migrate
-docker compose --env-file .env.production --profile app up seed
-docker compose --env-file .env.production --profile app up -d web
+cp .env.example .env
+chmod 600 .env
+docker compose up -d --build --force-recreate
 curl http://127.0.0.1:3000/api/source-status
 ```
 
 手動檢查 crawler image 與參數說明：
 
 ```bash
-docker compose --env-file .env.production --profile manual-crawler run --rm crawler
+docker compose --profile manual-crawler run --rm crawler
 ```
 
 若要在正式機上做 IP-only private validation，先維持 `WEB_BIND_HOST=127.0.0.1` 並用 SSH tunnel 連入。公開流量、reverse proxy、HTTPS、正式網域與 stricter CSP 是後續 gate，不屬於這個 slice 的完成條件。
@@ -179,7 +177,7 @@ docker compose --env-file .env.production --profile manual-crawler run --rm craw
 
 - repo 已在主機上 clone，且 `main` 已 fast-forward 到最新 `origin/main`。
 - Docker 與 Docker Compose 可由目前使用者執行。
-- `.env.production` 由 `.env.example` 複製而來，且未被 Git 追蹤。
+- `.env` 由 `.env.example` 複製而來，且未被 Git 追蹤。
 - `POSTGRES_PASSWORD` 已改成強密碼，不使用範例預設值。
 - `WEB_BIND_HOST=127.0.0.1`，避免尚未設定 reverse proxy / HTTPS / CSP 前直接對外公開。
 
@@ -188,18 +186,16 @@ docker compose --env-file .env.production --profile manual-crawler run --rm craw
 ```bash
 git status --short --branch
 git log --oneline -1
-docker compose --env-file .env.production config
-docker compose --env-file .env.production --profile app build
-docker compose --env-file .env.production --profile app up seed
-docker compose --env-file .env.production --profile app up -d web
-docker compose --env-file .env.production --profile app ps
+docker compose config
+docker compose up -d --build --force-recreate
+docker compose ps -a
 curl -i http://127.0.0.1:3000/api/source-status
-docker compose --env-file .env.production --profile manual-crawler run --rm crawler
+docker compose --profile manual-crawler run --rm crawler
 ```
 
 成功標準：
 
-- `git status --short --branch` 沒有非預期變更；`.env.production` 不出現在 Git status。
+- `git status --short --branch` 沒有非預期變更；`.env` 不出現在 Git status。
 - `docker compose config` 可解析。
 - `migrate` 與 `seed` 都以 exit code 0 結束。
 - `postgres` 狀態為 healthy。
@@ -223,7 +219,7 @@ http://127.0.0.1:3000
 
 - Docker 權限或 daemon 是否可用。
 - 3000 或 5432 是否被既有服務占用。
-- `.env.production` 是否仍使用錯誤 DB 名稱、帳號或密碼。
+- `.env` 是否仍使用錯誤 DB 名稱、帳號或密碼。
 - `migrate` logs 是否顯示 Prisma migration 或 `DATABASE_URL` 問題。
 - `seed` logs 是否顯示 Prisma seed 或連線問題。
 - `web` logs 是否顯示 DB 連線、Prisma Client、`PRODUCT_IMAGE_STORAGE_DIR` 或 Next.js startup 問題。
@@ -234,7 +230,7 @@ http://127.0.0.1:3000
 - 不設定 `WEB_BIND_HOST=0.0.0.0`，除非後續已完成公開前 gate。
 - 不設定 reverse proxy、HTTPS 或正式網域作為此 checklist 的一部分。
 - 不啟動 crawler live fetch，不做低頻手動 crawl 以外的資料抓取。
-- 不提交或 push `.env.production`、主機 secrets、TLS key 或部署 token。
+- 不提交或 push `.env`、主機 secrets、TLS key 或部署 token。
 
 ## Volumes And Storage
 
@@ -318,7 +314,7 @@ env: PRODUCT_IMAGE_STORAGE_DIR=/var/lib/partsradar/product-images
 
 規則：
 
-- `.env.production` 不提交。
+- `.env` 不提交。
 - DB 密碼不寫入文件範例。
 - VM SSH key、部署 token、TLS private key 不提交。
 - `.env.example` 只能放非敏感預設值與欄位名稱。
