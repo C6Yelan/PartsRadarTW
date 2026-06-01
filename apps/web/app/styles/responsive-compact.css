@@ -29,6 +29,26 @@
     border-right: 0;
   }
 
+  .history-range-control,
+  .history-mode-control,
+  .history-source-control {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .history-mode-control,
+  .history-source-control {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .history-segmented button {
+    border-right: 1px solid var(--border);
+    border-bottom: 0;
+  }
+
+  .history-segmented button:last-child {
+    border-right: 0;
+  }
+
   .product-image {
     width: 60px;
   }

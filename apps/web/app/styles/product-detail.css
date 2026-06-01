@@ -185,6 +185,47 @@
   color: var(--muted);
 }
 
+.history-controls {
+  display: grid;
+  grid-template-columns: minmax(210px, 1.1fr) repeat(2, minmax(160px, 0.8fr));
+  gap: 10px;
+}
+
+.history-control-group {
+  display: grid;
+  min-width: 0;
+  gap: 7px;
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
+
+.history-control-group legend {
+  padding: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.history-segmented {
+  min-width: 0;
+}
+
+.history-range-control {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.history-mode-control,
+.history-source-control {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.history-segmented button {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .history-delta {
   display: grid;
   min-width: 150px;
@@ -241,6 +282,10 @@
   gap: 8px;
 }
 
+.history-chart-stage {
+  position: relative;
+}
+
 .history-chart {
   width: 100%;
   height: auto;
@@ -260,12 +305,74 @@
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 3;
+  transition: d 160ms ease;
 }
 
 .history-chart-point {
   fill: var(--surface-strong);
   stroke: currentColor;
   stroke-width: 2;
+  transition:
+    fill 140ms ease,
+    r 140ms ease,
+    stroke-width 140ms ease;
+}
+
+.history-chart-point.is-confirmation {
+  fill: var(--accent-surface);
+  stroke-dasharray: 2 2;
+}
+
+.history-chart-point.is-active {
+  fill: var(--accent-strong);
+  stroke: var(--text-strong);
+  stroke-width: 3;
+}
+
+.history-chart-point-button {
+  position: absolute;
+  appearance: none;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  transform: translate(-50%, -50%);
+}
+
+.history-chart-point-button:focus-visible {
+  outline: 2px solid rgba(166, 196, 215, 0.78);
+  outline-offset: 2px;
+}
+
+.history-tooltip {
+  position: absolute;
+  z-index: 1;
+  display: grid;
+  min-width: 138px;
+  gap: 3px;
+  padding: 9px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+  background: rgba(10, 20, 28, 0.96);
+  box-shadow: 0 12px 28px var(--shadow);
+  pointer-events: none;
+  transform: translate(-50%, calc(-100% - 10px));
+}
+
+.history-tooltip span,
+.history-tooltip small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.history-tooltip strong {
+  color: var(--text-strong);
+  font-size: 15px;
+  line-height: 1.2;
 }
 
 .history-chart-axis {

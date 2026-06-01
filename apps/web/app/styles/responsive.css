@@ -101,6 +101,10 @@
     text-align: left;
   }
 
+  .history-controls {
+    grid-template-columns: 1fr;
+  }
+
   .filter-panel summary {
     min-height: 54px;
     padding: 0 16px;

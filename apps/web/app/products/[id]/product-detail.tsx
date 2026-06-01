@@ -6,6 +6,7 @@ import SiteDisclaimer from "../../site-disclaimer";
 import PriceHistoryPanel, {
   type PriceHistoryLoadState,
   type ProductPriceHistoryBody,
+  type PriceHistoryRangeDays,
 } from "./price-history-panel";
 
 type LoadState = "idle" | "loading" | "ready" | "not-found" | "error";
@@ -53,6 +54,7 @@ export default function ProductDetail({
   const [product, setProduct] = useState<ProductDetailBody | null>(null);
   const [historyState, setHistoryState] = useState<PriceHistoryLoadState>("idle");
   const [priceHistory, setPriceHistory] = useState<ProductPriceHistoryBody | null>(null);
+  const [historyRangeDays, setHistoryRangeDays] = useState<PriceHistoryRangeDays>(90);
   const [imageError, setImageError] = useState(false);
 
   useEffect(() => {
@@ -62,6 +64,7 @@ export default function ProductDetail({
     setImageError(false);
     setProduct(null);
     setPriceHistory(null);
+    setHistoryRangeDays(90);
 
     async function loadProductDetail() {
       try {
@@ -81,34 +84,6 @@ export default function ProductDetail({
         const nextProduct = (await productResponse.json()) as ProductDetailBody;
         setProduct(nextProduct);
         setState("ready");
-        setHistoryState("loading");
-
-        try {
-          const historyResponse = await fetch(
-            `/api/products/${productId}/price-history?days=90`,
-            {
-              signal: controller.signal,
-            },
-          );
-
-          if (historyResponse.status === 404) {
-            setHistoryState("unavailable");
-            return;
-          }
-
-          if (!historyResponse.ok) {
-            throw new Error("Failed to load price history.");
-          }
-
-          setPriceHistory((await historyResponse.json()) as ProductPriceHistoryBody);
-          setHistoryState("ready");
-        } catch (error: unknown) {
-          if (error instanceof DOMException && error.name === "AbortError") {
-            return;
-          }
-
-          setHistoryState("error");
-        }
       } catch (error: unknown) {
         if (error instanceof DOMException && error.name === "AbortError") {
           return;
@@ -122,6 +97,49 @@ export default function ProductDetail({
 
     return () => controller.abort();
   }, [productId]);
+
+  useEffect(() => {
+    if (!product) {
+      return;
+    }
+
+    const controller = new AbortController();
+    setHistoryState("loading");
+    setPriceHistory(null);
+
+    async function loadPriceHistory() {
+      try {
+        const historyResponse = await fetch(
+          `/api/products/${productId}/price-history?days=${historyRangeDays}`,
+          {
+            signal: controller.signal,
+          },
+        );
+
+        if (historyResponse.status === 404) {
+          setHistoryState("unavailable");
+          return;
+        }
+
+        if (!historyResponse.ok) {
+          throw new Error("Failed to load price history.");
+        }
+
+        setPriceHistory((await historyResponse.json()) as ProductPriceHistoryBody);
+        setHistoryState("ready");
+      } catch (error: unknown) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
+
+        setHistoryState("error");
+      }
+    }
+
+    void loadPriceHistory();
+
+    return () => controller.abort();
+  }, [product, productId, historyRangeDays]);
 
   return (
     <main className="detail-shell">
@@ -237,7 +255,12 @@ export default function ProductDetail({
       ) : null}
 
       {state === "ready" && product ? (
-        <PriceHistoryPanel history={priceHistory} state={historyState} />
+        <PriceHistoryPanel
+          history={priceHistory}
+          selectedRangeDays={historyRangeDays}
+          state={historyState}
+          onRangeDaysChange={setHistoryRangeDays}
+        />
       ) : null}
       <SiteDisclaimer />
     </main>
