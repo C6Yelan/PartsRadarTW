@@ -49,6 +49,22 @@ services:
       migrate:
         condition: service_completed_successfully
 
+  storage-init:
+    build:
+      context: .
+      target: crawler
+    user: root
+    restart: "no"
+    command:
+      [
+        "sh",
+        "-c",
+        "mkdir -p /var/lib/partsradar/snapshots /var/lib/partsradar/product-images && chown -R node:node /var/lib/partsradar/snapshots /var/lib/partsradar/product-images",
+      ]
+    volumes:
+      - snapshots:/var/lib/partsradar/snapshots
+      - product_images:/var/lib/partsradar/product-images
+
   web:
     build:
       context: .
@@ -67,6 +83,8 @@ services:
     volumes:
       - product_images:/var/lib/partsradar/product-images:ro
     depends_on:
+      storage-init:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       seed:
@@ -95,6 +113,8 @@ services:
       - snapshots:/var/lib/partsradar/snapshots
       - product_images:/var/lib/partsradar/product-images
     depends_on:
+      storage-init:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       seed:
@@ -127,6 +147,8 @@ services:
       - snapshots:/var/lib/partsradar/snapshots
       - product_images:/var/lib/partsradar/product-images
     depends_on:
+      storage-init:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       seed:
@@ -156,6 +178,8 @@ services:
     volumes:
       - snapshots:/var/lib/partsradar/snapshots
     depends_on:
+      storage-init:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       seed:

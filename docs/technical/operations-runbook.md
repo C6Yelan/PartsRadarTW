@@ -24,6 +24,7 @@
 git status --short --branch
 git log --oneline -1
 docker compose config
+docker compose up --build --force-recreate storage-init
 docker compose up -d --build --force-recreate
 docker compose ps -a
 curl -i http://127.0.0.1:3000/api/source-status
@@ -34,6 +35,7 @@ docker compose --profile manual-crawler run --rm crawler
 
 - `git status --short --branch` 沒有非預期變更；`.env` 不出現在 Git status。
 - `docker compose config` 可解析。
+- `storage-init` 以 exit code 0 結束。
 - `migrate` 與 `seed` 都以 exit code 0 結束。
 - `postgres` 狀態為 healthy。
 - `web` 狀態為 healthy，且只綁定 `127.0.0.1:3000`。
@@ -59,6 +61,7 @@ http://127.0.0.1:3000
 - `.env` 是否仍使用錯誤 DB 名稱、帳號或密碼。
 - `migrate` logs 是否顯示 Prisma migration 或 `DATABASE_URL` 問題。
 - `seed` logs 是否顯示 Prisma seed 或連線問題。
+- `storage-init` logs 是否顯示 mounted storage path 權限初始化失敗。
 - `web` logs 是否顯示 DB 連線、Prisma Client、`PRODUCT_IMAGE_STORAGE_DIR` 或 Next.js startup 問題。
 
 禁止事項：
@@ -68,6 +71,40 @@ http://127.0.0.1:3000
 - 不啟動 Cloudflare Tunnel 或正式網域作為 private validation 的一部分。
 - 不啟動 crawler live fetch，不做低頻手動 crawl 或明確排程 profile 以外的資料抓取。
 - 不提交或 push `.env`、主機 secrets、Cloudflare Tunnel token 或部署 token。
+
+## Storage Volume Permissions
+
+`web`、`crawler` 與 scheduled daemons 都以非 root `node` user 執行。Docker image build 階段雖然會建立 `/var/lib/partsradar` 並設定 owner，但 Docker named volume 掛載後會覆蓋該 mount point；初次建立或重建 named volume 時，實際目錄可能變成 `root:root`，導致 crawler 寫 raw snapshot gzip 或 product image cache 時失敗。
+
+`storage-init` 是一次性 root service，只負責：
+
+- `mkdir -p /var/lib/partsradar/snapshots /var/lib/partsradar/product-images`
+- `chown -R node:node /var/lib/partsradar/snapshots /var/lib/partsradar/product-images`
+
+它不連 DB、不抓 CoolPC、不跑 crawler，也不長期維持 root runtime。`web`、`crawler`、`crawler-daemon` 與 `raw-snapshot-cleanup-daemon` 都會等 `storage-init` 成功完成後才啟動。
+
+初次部署、重建 volume、或懷疑 owner 錯誤時可手動重跑：
+
+```bash
+docker compose up --build --force-recreate storage-init
+docker compose ps -a storage-init
+docker compose logs --tail=100 storage-init
+```
+
+若 crawler log 出現：
+
+```text
+EACCES: permission denied, open '/var/lib/partsradar/snapshots/coolpc/<hash>.html.gz'
+```
+
+先檢查 mounted volume owner 是否為 `node:node`：
+
+```bash
+docker compose --profile manual-crawler run --rm --no-deps crawler \
+  sh -lc 'ls -ld /var/lib/partsradar/snapshots /var/lib/partsradar/product-images'
+```
+
+若不是 `node:node`，先重跑 `storage-init`，再 recreate 需要寫入 storage 的服務。不要用 `docker compose down --volumes` 修權限，除非已確認可以丟棄該主機資料。
 
 ## Cloudflare Tunnel
 

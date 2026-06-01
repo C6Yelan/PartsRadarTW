@@ -31,6 +31,7 @@
 
 | Service | 責任 |
 | --- | --- |
+| `storage-init` | 一次性初始化 snapshot / product image named volume 權限 |
 | `web` | Next.js 網站與查詢 API |
 | `crawler` | 手動 crawl / backfill / ops tools |
 | `crawler-daemon` | scheduled CoolPC crawl |
@@ -64,6 +65,9 @@
 
 規則：
 
+- `storage-init` 以 root 執行一次性 `mkdir` / `chown`，只修正 mounted storage volume 權限，不跑 crawler、不連 DB。
+- Docker named volume 會覆蓋 image build 階段對 mount point 做過的 `chown`；初次部署或重建 volume 後需讓 `storage-init` 成功完成。
+- `web`、`crawler`、`crawler-daemon` 與 `raw-snapshot-cleanup-daemon` 都等 `storage-init` 成功後才啟動；長時間 runtime 仍使用非 root user。
 - `crawler` 預設 command 是 help，避免 `docker compose up` 意外 live fetch。
 - `crawler-daemon` 只在 `scheduled-crawler` profile 啟動，且 command 保留 `--confirm-live-fetch`。
 - `cloudflared` 只在 `public-tunnel` profile 啟動。
@@ -105,6 +109,8 @@ Production 至少需要：
 規則：
 
 - volume 內容不提交 Git。
+- Docker named volume 初次建立時可能是 `root:root`，且會覆蓋 Docker image build 階段的 mount point owner。`storage-init` 必須在寫入 snapshot / product image cache 的服務啟動前完成，讓 `/var/lib/partsradar/snapshots` 與 `/var/lib/partsradar/product-images` 屬於 `node:node`。
+- 若 crawler log 出現 `EACCES` writing `/var/lib/partsradar/snapshots/...html.gz`，先檢查 mounted volume owner 是否仍為 `node:node`，再重跑 `storage-init`。
 - raw snapshot 一般 30 天、異常 90 天。
 - price snapshots 不套用 raw snapshot retention。
 - raw snapshot cleanup 指令與 daemon 見 [Operations Runbook](operations-runbook.md#raw-snapshot-cleanup)。
@@ -162,15 +168,16 @@ PRODUCT_IMAGE_STORAGE_DIR=/var/lib/partsradar/product-images
 2. 取得 repo 或部署產物。
 3. 建立 `.env` 並替換所有 placeholder。
 4. 建立 persistent volumes。
-5. 啟動 `postgres`。
-6. 執行 migration。
-7. 執行 seed。
-8. 啟動 `web`。
-9. private validation `/api/source-status`。
-10. 視需要跑 product image backfill。
-11. 建立 Cloudflare remotely-managed tunnel。
-12. 啟動 `public-tunnel` profile。
-13. 驗證正式網域、API、圖片 API、crawler 與資料狀態。
+5. 執行 `storage-init`，初始化 snapshot / product image volume 權限。
+6. 啟動 `postgres`。
+7. 執行 migration。
+8. 執行 seed。
+9. 啟動 `web`。
+10. private validation `/api/source-status`。
+11. 視需要跑 product image backfill。
+12. 建立 Cloudflare remotely-managed tunnel。
+13. 啟動 `public-tunnel` profile。
+14. 驗證正式網域、API、圖片 API、crawler 與資料狀態。
 
 ## Migration / Backup / Monitoring
 
