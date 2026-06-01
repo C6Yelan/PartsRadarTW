@@ -120,9 +120,10 @@
   }
 
   .history-panel {
-    --history-chart-grid: rgba(143, 165, 182, 0.24);
-    --history-chart-axis-line: rgba(143, 165, 182, 0.46);
-    --history-chart-axis-text: rgba(159, 180, 196, 0.82);
+    --history-chart-grid: rgba(143, 165, 182, 0.3);
+    --history-chart-axis-line: rgba(143, 165, 182, 0.52);
+    --history-chart-date-text: rgba(176, 195, 207, 0.88);
+    --history-chart-tick-text: rgba(166, 187, 201, 0.85);
   }
 
   .history-period-card,
@@ -166,10 +167,6 @@
   .history-chart-card-header {
     align-items: stretch;
     flex-direction: column;
-  }
-
-  .history-chart-controls {
-    width: 100%;
   }
 
   .history-chart-tick text {

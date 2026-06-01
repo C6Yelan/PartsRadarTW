@@ -5,7 +5,6 @@ import { useEffect, useMemo, useState } from "react";
 export type PriceHistoryLoadState = "idle" | "loading" | "ready" | "unavailable" | "error";
 export type PriceHistoryRangeDays = 7 | 30 | 90;
 
-type PriceHistorySourceMode = "all" | "changes";
 type PriceSignalTone = "low" | "high" | "middle" | "flat";
 type PriceRecordTone = "down" | "up";
 
@@ -103,11 +102,6 @@ const RANGE_OPTIONS = [
   { label: "90 天", value: 90 },
 ] as const satisfies readonly { label: string; value: PriceHistoryRangeDays }[];
 
-const SOURCE_MODE_OPTIONS = [
-  { label: "觀測", value: "all" },
-  { label: "變價", value: "changes" },
-] as const satisfies readonly { label: string; value: PriceHistorySourceMode }[];
-
 const DESKTOP_CHART_CONFIG = {
   width: 640,
   height: 196,
@@ -141,13 +135,9 @@ export default function PriceHistoryPanel({
   state: PriceHistoryLoadState;
   onRangeDaysChange(days: PriceHistoryRangeDays): void;
 }) {
-  const [sourceMode, setSourceMode] = useState<PriceHistorySourceMode>("all");
   const [activePointKey, setActivePointKey] = useState<string | null>(null);
   const chartConfig = useChartConfig();
-  const visiblePoints = useMemo(
-    () => filterHistoryPoints(history?.points ?? [], sourceMode),
-    [history, sourceMode],
-  );
+  const visiblePoints = useMemo(() => history?.points ?? [], [history]);
   const viewSummary = useMemo(() => summarizePoints(visiblePoints), [visiblePoints]);
   const chart = useMemo(
     () =>
@@ -188,20 +178,13 @@ export default function PriceHistoryPanel({
           {chart ? (
             <div className="history-insight-grid">
               <PeriodDeltaCard summary={viewSummary} />
-              <HistoryRangeCard rangeDays={history.rangeDays} sourceMode={sourceMode} summary={viewSummary} />
+              <HistoryRangeCard rangeDays={history.rangeDays} summary={viewSummary} />
             </div>
           ) : null}
 
           <div className="history-chart-wrap">
             <div className="history-chart-card-header">
               <h3>走勢圖</h3>
-              <HistorySourceControls
-                sourceMode={sourceMode}
-                onSourceModeChange={(mode) => {
-                  setActivePointKey(null);
-                  setSourceMode(mode);
-                }}
-              />
             </div>
             {chart ? (
               <>
@@ -288,7 +271,7 @@ export default function PriceHistoryPanel({
             ) : (
               <div className="history-chart-stage history-chart-stage-empty">
                 <p className="history-empty history-chart-empty-text">
-                  {getInsufficientDataMessage(sourceMode)}
+                  {getInsufficientDataMessage()}
                 </p>
               </div>
             )}
@@ -344,33 +327,6 @@ function useChartConfig() {
   return isMobile ? MOBILE_CHART_CONFIG : DESKTOP_CHART_CONFIG;
 }
 
-function HistorySourceControls({
-  sourceMode,
-  onSourceModeChange,
-}: {
-  sourceMode: PriceHistorySourceMode;
-  onSourceModeChange(mode: PriceHistorySourceMode): void;
-}) {
-  return (
-    <fieldset className="history-chart-controls">
-      <legend className="sr-only">走勢圖顯示模式</legend>
-      <div className="segmented-control history-segmented history-source-control">
-        {SOURCE_MODE_OPTIONS.map((option) => (
-          <button
-            aria-pressed={sourceMode === option.value}
-            className={sourceMode === option.value ? "is-active" : ""}
-            key={option.value}
-            type="button"
-            onClick={() => onSourceModeChange(option.value)}
-          >
-            {option.label}
-          </button>
-        ))}
-      </div>
-    </fieldset>
-  );
-}
-
 function PeriodDeltaCard({ summary }: { summary: HistoryViewSummary }) {
   return (
     <div className={`history-period-card is-${summary.signal.tone}`}>
@@ -385,11 +341,9 @@ function PeriodDeltaCard({ summary }: { summary: HistoryViewSummary }) {
 
 function HistoryRangeCard({
   rangeDays,
-  sourceMode,
   summary,
 }: {
   rangeDays: PriceHistoryRangeDays;
-  sourceMode: PriceHistorySourceMode;
   summary: HistoryViewSummary;
 }) {
   if (!summary.lowest || !summary.highest || !summary.latest) {
@@ -400,7 +354,7 @@ function HistoryRangeCard({
     <div className="history-range-card">
       <div className="history-range-heading">
         <strong>{rangeDays} 天摘要</strong>
-        <span>{formatHistoryPointCount(summary.pointCount, sourceMode)}</span>
+        <span>{formatHistoryPointCount(summary.pointCount)}</span>
       </div>
       <div className="history-range-track-wrap">
         <span className="history-range-caption">價格區間</span>
@@ -504,17 +458,6 @@ function HistoryRecordList({ records }: { records: PriceChangeRecord[] }) {
       </div>
     </div>
   );
-}
-
-function filterHistoryPoints(
-  points: PriceHistoryPoint[],
-  sourceMode: PriceHistorySourceMode,
-): PriceHistoryPoint[] {
-  if (sourceMode === "changes") {
-    return points.filter((point) => point.source === "price_snapshot");
-  }
-
-  return points;
 }
 
 function summarizePoints(points: PriceHistoryPoint[]): HistoryViewSummary {
@@ -759,17 +702,11 @@ function getRecordLabel(deltaAmount: number) {
   return "下跌";
 }
 
-function formatHistoryPointCount(pointCount: number, sourceMode: PriceHistorySourceMode) {
-  const pointLabel = sourceMode === "changes" ? "筆變價紀錄" : "筆價格觀測";
-
-  return `${pointCount} ${pointLabel}`;
+function formatHistoryPointCount(pointCount: number) {
+  return `${pointCount} 筆價格觀測`;
 }
 
-function getInsufficientDataMessage(sourceMode: PriceHistorySourceMode) {
-  if (sourceMode === "changes") {
-    return "目前只有單一變價紀錄，尚無可比較區間。";
-  }
-
+function getInsufficientDataMessage() {
   return "目前只有單一價格觀測點，尚無可比較區間。";
 }
 

@@ -164,9 +164,10 @@
   --history-card-bg: rgba(15, 28, 38, 0.78);
   --history-card-bg-strong: rgba(16, 30, 41, 0.82);
   --history-chart-line: #789bb3;
-  --history-chart-grid: rgba(143, 165, 182, 0.2);
-  --history-chart-axis-line: rgba(143, 165, 182, 0.38);
-  --history-chart-axis-text: rgba(159, 180, 196, 0.72);
+  --history-chart-grid: rgba(143, 165, 182, 0.26);
+  --history-chart-axis-line: rgba(143, 165, 182, 0.48);
+  --history-chart-date-text: rgba(170, 190, 203, 0.82);
+  --history-chart-tick-text: rgba(159, 180, 196, 0.76);
   --history-text-strong: #dce9ef;
 
   display: grid;
@@ -202,23 +203,12 @@
   justify-self: end;
 }
 
-.history-chart-controls {
-  width: min(100%, 176px);
-  padding: 0;
-  margin: 0;
-  border: 0;
-}
-
 .history-segmented {
   min-width: 0;
 }
 
 .history-range-control {
   grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.history-source-control {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .history-segmented button {
@@ -525,7 +515,7 @@
 }
 
 .history-chart-tick text {
-  fill: var(--history-chart-axis-text);
+  fill: var(--history-chart-tick-text);
   font-size: 9.5px;
   text-anchor: end;
 }
@@ -671,7 +661,7 @@
 .history-chart-axis {
   display: flex;
   justify-content: space-between;
-  color: var(--history-chart-axis-text);
+  color: var(--history-chart-date-text);
   font-size: 13px;
 }
 
