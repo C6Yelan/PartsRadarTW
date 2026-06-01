@@ -88,21 +88,109 @@
 
   .category-list,
   .price-grid,
-  .detail-facts,
-  .history-metrics {
+  .detail-facts {
     grid-template-columns: 1fr;
   }
 
-  .history-header {
-    display: grid;
+  .history-topline {
+    display: contents;
   }
 
-  .history-delta {
+  .history-topline > div {
+    order: 0;
+  }
+
+  .history-range-controls {
+    order: 1;
+    width: 100%;
+    justify-self: stretch;
+  }
+
+  .history-insight-grid {
+    order: 2;
+    grid-template-columns: 1fr;
+  }
+
+  .history-chart-wrap {
+    order: 3;
+  }
+
+  .history-records {
+    order: 4;
+  }
+
+  .history-panel {
+    --history-chart-grid: rgba(143, 165, 182, 0.24);
+    --history-chart-axis-line: rgba(143, 165, 182, 0.46);
+    --history-chart-axis-text: rgba(159, 180, 196, 0.82);
+  }
+
+  .history-period-card,
+  .history-range-card {
+    min-height: auto;
+  }
+
+  .history-range-endpoints {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .history-range-endpoint,
+  .history-range-endpoint.is-high {
+    justify-content: space-between;
     text-align: left;
   }
 
-  .history-controls {
-    grid-template-columns: 1fr;
+  .history-range-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .history-range-stat.is-high {
+    order: 2;
+  }
+
+  .history-range-stat.is-average {
+    order: 3;
+    grid-column: 1 / -1;
+  }
+
+  .history-chart-wrap,
+  .history-records {
+    padding: 14px;
+  }
+
+  .history-chart-wrap {
+    gap: 12px;
+  }
+
+  .history-chart-card-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .history-chart-controls {
+    width: 100%;
+  }
+
+  .history-chart-tick text {
+    font-size: 10px;
+  }
+
+  .history-chart-line {
+    stroke-width: 2.15;
+  }
+
+  .history-record-row {
+    grid-template-columns: 64px minmax(0, 1fr);
+    gap: 7px 10px;
+    min-height: auto;
+    padding: 10px 12px;
+  }
+
+  .history-record-row strong,
+  .history-record-badge {
+    grid-column: 2;
+    justify-self: start;
   }
 
   .filter-panel summary {

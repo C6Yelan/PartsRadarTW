@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 export type PriceHistoryLoadState = "idle" | "loading" | "ready" | "unavailable" | "error";
 export type PriceHistoryRangeDays = 7 | 30 | 90;
 
-type PriceHistoryDisplayMode = "price" | "percent";
 type PriceHistorySourceMode = "all" | "changes";
+type PriceSignalTone = "low" | "high" | "middle" | "flat";
+type PriceRecordTone = "down" | "up";
 
 export interface ProductPriceHistoryBody {
   productId: string;
@@ -45,16 +46,55 @@ interface HistoryViewSummary {
   highest: PriceHistoryPoint | null;
   first: PriceHistoryPoint | null;
   latest: PriceHistoryPoint | null;
+  averageAmount: number | null;
+  rangePositionPercent: number;
   deltaAmount: number | null;
   deltaPercent: number | null;
+  signal: {
+    label: string;
+    tone: PriceSignalTone;
+  };
+  records: PriceChangeRecord[];
+}
+
+interface PriceChangeRecord {
+  key: string;
+  observedAt: string;
+  beforeAmount: number;
+  afterAmount: number;
+  deltaAmount: number;
+  tone: PriceRecordTone;
+  label: string;
 }
 
 interface ChartPoint extends PriceHistoryPoint {
   key: string;
-  chartValue: number;
   percentChange: number;
   x: number;
   y: number;
+}
+
+interface ChartTick {
+  label: string;
+  y: number;
+}
+
+interface ChartMarker {
+  key: string;
+  label: string;
+  point: ChartPoint;
+  tone: "low" | "high";
+}
+
+interface ChartConfig {
+  width: number;
+  height: number;
+  padding: {
+    top: number;
+    right: number;
+    bottom: number;
+    left: number;
+  };
 }
 
 const RANGE_OPTIONS = [
@@ -63,15 +103,32 @@ const RANGE_OPTIONS = [
   { label: "90 天", value: 90 },
 ] as const satisfies readonly { label: string; value: PriceHistoryRangeDays }[];
 
-const DISPLAY_MODE_OPTIONS = [
-  { label: "價格", value: "price" },
-  { label: "漲跌幅", value: "percent" },
-] as const satisfies readonly { label: string; value: PriceHistoryDisplayMode }[];
-
 const SOURCE_MODE_OPTIONS = [
-  { label: "全部", value: "all" },
+  { label: "觀測", value: "all" },
   { label: "變價", value: "changes" },
 ] as const satisfies readonly { label: string; value: PriceHistorySourceMode }[];
+
+const DESKTOP_CHART_CONFIG = {
+  width: 640,
+  height: 196,
+  padding: {
+    top: 12,
+    right: 24,
+    bottom: 30,
+    left: 50,
+  },
+} as const satisfies ChartConfig;
+
+const MOBILE_CHART_CONFIG = {
+  width: 300,
+  height: 260,
+  padding: {
+    top: 20,
+    right: 22,
+    bottom: 36,
+    left: 50,
+  },
+} as const satisfies ChartConfig;
 
 export default function PriceHistoryPanel({
   history,
@@ -84,48 +141,37 @@ export default function PriceHistoryPanel({
   state: PriceHistoryLoadState;
   onRangeDaysChange(days: PriceHistoryRangeDays): void;
 }) {
-  const [displayMode, setDisplayMode] = useState<PriceHistoryDisplayMode>("price");
   const [sourceMode, setSourceMode] = useState<PriceHistorySourceMode>("all");
   const [activePointKey, setActivePointKey] = useState<string | null>(null);
+  const chartConfig = useChartConfig();
   const visiblePoints = useMemo(
     () => filterHistoryPoints(history?.points ?? [], sourceMode),
     [history, sourceMode],
   );
   const viewSummary = useMemo(() => summarizePoints(visiblePoints), [visiblePoints]);
-  const chartPoints = useMemo(
-    () => (visiblePoints.length >= 2 ? createChartPoints(visiblePoints, displayMode) : null),
-    [visiblePoints, displayMode],
+  const chart = useMemo(
+    () =>
+      visiblePoints.length >= 2 ? createChartModel(visiblePoints, viewSummary, chartConfig) : null,
+    [visiblePoints, viewSummary, chartConfig],
   );
-  const activePoint = chartPoints?.points.find((point) => point.key === activePointKey) ?? null;
+  const activePoint = chart?.points.find((point) => point.key === activePointKey) ?? null;
   const isLoading = state === "idle" || state === "loading";
   const isUnavailable = state === "error" || state === "unavailable" || !history;
 
   return (
     <section className="history-panel" aria-labelledby="price-history-title">
-      <div className="history-header">
+      <div className="history-topline">
         <div>
           <h2 id="price-history-title">價格走勢</h2>
-          <p>{getHistorySubtitle({ history, isLoading, selectedRangeDays, sourceMode, viewSummary })}</p>
         </div>
-        {viewSummary.deltaAmount !== null ? (
-          <HistoryDelta displayMode={displayMode} summary={viewSummary} />
-        ) : null}
+        <HistoryRangeControls
+          rangeDays={selectedRangeDays}
+          onRangeDaysChange={(days) => {
+            setActivePointKey(null);
+            onRangeDaysChange(days);
+          }}
+        />
       </div>
-
-      <HistoryControls
-        displayMode={displayMode}
-        rangeDays={selectedRangeDays}
-        sourceMode={sourceMode}
-        onDisplayModeChange={setDisplayMode}
-        onRangeDaysChange={(days) => {
-          setActivePointKey(null);
-          onRangeDaysChange(days);
-        }}
-        onSourceModeChange={(mode) => {
-          setActivePointKey(null);
-          setSourceMode(mode);
-        }}
-      />
 
       {isLoading ? (
         <div className="history-loading">
@@ -137,230 +183,325 @@ export default function PriceHistoryPanel({
         <p className="history-empty">價格歷史暫時無法載入。</p>
       ) : null}
 
-      {!isLoading && !isUnavailable && visiblePoints.length < 2 ? (
-        <p className="history-empty">{getInsufficientDataMessage(sourceMode)}</p>
-      ) : null}
-
-      {!isLoading && !isUnavailable && chartPoints && viewSummary.lowest && viewSummary.highest && viewSummary.latest ? (
+      {!isLoading && !isUnavailable ? (
         <>
-          <div className="history-metrics">
-            <HistoryMetric
-              displayMode={displayMode}
-              label="目前"
-              point={viewSummary.latest}
-              summary={viewSummary}
-            />
-            <HistoryMetric
-              displayMode={displayMode}
-              label="最低"
-              point={viewSummary.lowest}
-              summary={viewSummary}
-            />
-            <HistoryMetric
-              displayMode={displayMode}
-              label="最高"
-              point={viewSummary.highest}
-              summary={viewSummary}
-            />
-          </div>
+          {chart ? (
+            <div className="history-insight-grid">
+              <PeriodDeltaCard summary={viewSummary} />
+              <HistoryRangeCard rangeDays={history.rangeDays} sourceMode={sourceMode} summary={viewSummary} />
+            </div>
+          ) : null}
 
           <div className="history-chart-wrap">
-            <div className="history-chart-stage">
-              <svg
-                className="history-chart"
-                role="img"
-                aria-label={`近 ${history.rangeDays} 天價格走勢圖`}
-                viewBox="0 0 640 180"
-              >
-                <line className="history-chart-grid" x1="20" x2="620" y1="28" y2="28" />
-                <line className="history-chart-grid" x1="20" x2="620" y1="152" y2="152" />
-                <polyline className="history-chart-line" points={chartPoints.line} />
-                {chartPoints.points.map((point) => (
-                  <circle
-                    className={`history-chart-point ${
-                      point.source === "current_price_confirmation" ? "is-confirmation" : ""
-                    } ${activePointKey === point.key ? "is-active" : ""}`}
-                    key={point.key}
-                    cx={point.x}
-                    cy={point.y}
-                    r="4"
-                  />
-                ))}
-              </svg>
-              {chartPoints.points.map((point) => (
-                <button
-                  aria-label={getPointAriaLabel(point, displayMode)}
-                  className="history-chart-point-button"
-                  key={point.key}
-                  style={{
-                    left: `${(point.x / 640) * 100}%`,
-                    top: `${(point.y / 180) * 100}%`,
-                  }}
-                  type="button"
-                  onBlur={() => setActivePointKey(null)}
-                  onClick={() => setActivePointKey(point.key)}
-                  onFocus={() => setActivePointKey(point.key)}
-                  onMouseEnter={() => setActivePointKey(point.key)}
-                  onMouseLeave={() => setActivePointKey(null)}
-                />
-              ))}
-              {activePoint ? (
-                <HistoryTooltip displayMode={displayMode} point={activePoint} />
-              ) : null}
+            <div className="history-chart-card-header">
+              <h3>走勢圖</h3>
+              <HistorySourceControls
+                sourceMode={sourceMode}
+                onSourceModeChange={(mode) => {
+                  setActivePointKey(null);
+                  setSourceMode(mode);
+                }}
+              />
             </div>
-            <div className="history-chart-axis" aria-hidden="true">
-              <span>{formatCompactDate(viewSummary.startedAt)}</span>
-              <span>{formatCompactDate(viewSummary.endedAt)}</span>
-            </div>
+            {chart ? (
+              <>
+                <div className="history-chart-stage">
+                  <svg
+                    className="history-chart"
+                    role="img"
+                    aria-label={`近 ${history.rangeDays} 天價格走勢圖`}
+                    viewBox={`0 0 ${chart.config.width} ${chart.config.height}`}
+                  >
+                    {chart.ticks.map((tick, index) => (
+                      <g className="history-chart-tick" key={tick.label}>
+                        <text x={chart.config.padding.left - 8} y={tick.y + 4}>
+                          {tick.label}
+                        </text>
+                        {index < chart.ticks.length - 1 ? (
+                          <line
+                            x1={chart.config.padding.left}
+                            x2={chart.config.width - chart.config.padding.right}
+                            y1={tick.y}
+                            y2={tick.y}
+                          />
+                        ) : null}
+                      </g>
+                    ))}
+                    <line
+                      className="history-chart-axis-line"
+                      x1={chart.config.padding.left}
+                      x2={chart.config.padding.left}
+                      y1={chart.config.padding.top}
+                      y2={chart.config.height - chart.config.padding.bottom}
+                    />
+                    <line
+                      className="history-chart-axis-line history-chart-x-axis-line"
+                      x1={chart.config.padding.left}
+                      x2={chart.config.width - chart.config.padding.right}
+                      y1={chart.config.height - chart.config.padding.bottom}
+                      y2={chart.config.height - chart.config.padding.bottom}
+                    />
+                    <path className="history-chart-area" d={chart.areaPath} />
+                    <path className="history-chart-line" d={chart.linePath} />
+                    {chart.points.map((point) => (
+                      <circle
+                        className={`history-chart-point ${
+                          point.source === "current_price_confirmation" ? "is-confirmation" : ""
+                        } ${activePointKey === point.key ? "is-active" : ""}`}
+                        key={point.key}
+                        cx={point.x}
+                        cy={point.y}
+                        r="2.2"
+                      />
+                    ))}
+                  </svg>
+
+                  {chart.markers.map((marker) => (
+                    <FixedChartMarker chartConfig={chart.config} key={marker.key} marker={marker} />
+                  ))}
+
+                  {chart.points.map((point) => (
+                    <button
+                      aria-label={getPointAriaLabel(point)}
+                      className="history-chart-point-button"
+                      key={point.key}
+                      style={{
+                        left: `${(point.x / chart.config.width) * 100}%`,
+                        top: `${(point.y / chart.config.height) * 100}%`,
+                      }}
+                      type="button"
+                      onBlur={() => setActivePointKey(null)}
+                      onClick={() => setActivePointKey(point.key)}
+                      onFocus={() => setActivePointKey(point.key)}
+                      onMouseEnter={() => setActivePointKey(point.key)}
+                      onMouseLeave={() => setActivePointKey(null)}
+                    />
+                  ))}
+
+                  {activePoint ? <HistoryTooltip chartConfig={chart.config} point={activePoint} /> : null}
+                </div>
+                <div className="history-chart-axis" aria-hidden="true">
+                  <span>{formatCompactDate(viewSummary.startedAt)}</span>
+                  <span>{formatCompactDate(viewSummary.endedAt)}</span>
+                </div>
+              </>
+            ) : (
+              <div className="history-chart-stage history-chart-stage-empty">
+                <p className="history-empty history-chart-empty-text">
+                  {getInsufficientDataMessage(sourceMode)}
+                </p>
+              </div>
+            )}
           </div>
+
+          {chart ? <HistoryRecordList records={viewSummary.records} /> : null}
         </>
       ) : null}
     </section>
   );
 }
 
-function HistoryControls({
-  displayMode,
+function HistoryRangeControls({
   rangeDays,
-  sourceMode,
-  onDisplayModeChange,
   onRangeDaysChange,
+}: {
+  rangeDays: PriceHistoryRangeDays;
+  onRangeDaysChange(days: PriceHistoryRangeDays): void;
+}) {
+  return (
+    <fieldset className="history-controls history-range-controls">
+      <legend className="sr-only">價格走勢時間範圍</legend>
+      <div className="segmented-control history-segmented history-range-control">
+        {RANGE_OPTIONS.map((option) => (
+          <button
+            aria-pressed={rangeDays === option.value}
+            className={rangeDays === option.value ? "is-active" : ""}
+            key={option.value}
+            type="button"
+            onClick={() => onRangeDaysChange(option.value)}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
+function useChartConfig() {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 760px)");
+    const updateChartConfig = () => setIsMobile(mediaQuery.matches);
+
+    updateChartConfig();
+    mediaQuery.addEventListener("change", updateChartConfig);
+
+    return () => mediaQuery.removeEventListener("change", updateChartConfig);
+  }, []);
+
+  return isMobile ? MOBILE_CHART_CONFIG : DESKTOP_CHART_CONFIG;
+}
+
+function HistorySourceControls({
+  sourceMode,
   onSourceModeChange,
 }: {
-  displayMode: PriceHistoryDisplayMode;
-  rangeDays: PriceHistoryRangeDays;
   sourceMode: PriceHistorySourceMode;
-  onDisplayModeChange(mode: PriceHistoryDisplayMode): void;
-  onRangeDaysChange(days: PriceHistoryRangeDays): void;
   onSourceModeChange(mode: PriceHistorySourceMode): void;
 }) {
   return (
-    <div className="history-controls">
-      <fieldset className="history-control-group">
-        <legend>時間</legend>
-        <div className="segmented-control history-segmented history-range-control">
-          {RANGE_OPTIONS.map((option) => (
-            <button
-              aria-pressed={rangeDays === option.value}
-              className={rangeDays === option.value ? "is-active" : ""}
-              key={option.value}
-              type="button"
-              onClick={() => onRangeDaysChange(option.value)}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-      </fieldset>
+    <fieldset className="history-chart-controls">
+      <legend className="sr-only">走勢圖顯示模式</legend>
+      <div className="segmented-control history-segmented history-source-control">
+        {SOURCE_MODE_OPTIONS.map((option) => (
+          <button
+            aria-pressed={sourceMode === option.value}
+            className={sourceMode === option.value ? "is-active" : ""}
+            key={option.value}
+            type="button"
+            onClick={() => onSourceModeChange(option.value)}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
 
-      <fieldset className="history-control-group">
-        <legend>模式</legend>
-        <div className="segmented-control history-segmented history-mode-control">
-          {DISPLAY_MODE_OPTIONS.map((option) => (
-            <button
-              aria-pressed={displayMode === option.value}
-              className={displayMode === option.value ? "is-active" : ""}
-              key={option.value}
-              type="button"
-              onClick={() => onDisplayModeChange(option.value)}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-      </fieldset>
-
-      <fieldset className="history-control-group">
-        <legend>觀測點</legend>
-        <div className="segmented-control history-segmented history-source-control">
-          {SOURCE_MODE_OPTIONS.map((option) => (
-            <button
-              aria-pressed={sourceMode === option.value}
-              className={sourceMode === option.value ? "is-active" : ""}
-              key={option.value}
-              type="button"
-              onClick={() => onSourceModeChange(option.value)}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-      </fieldset>
+function PeriodDeltaCard({ summary }: { summary: HistoryViewSummary }) {
+  return (
+    <div className={`history-period-card is-${summary.signal.tone}`}>
+      <span>期間變動</span>
+      <strong>{`${formatSignedPrice(summary.deltaAmount)} / ${formatSignedPercent(
+        summary.deltaPercent,
+      )}`}</strong>
+      <small>{summary.signal.label}</small>
     </div>
   );
 }
 
-function HistoryDelta({
-  displayMode,
+function HistoryRangeCard({
+  rangeDays,
+  sourceMode,
   summary,
 }: {
-  displayMode: PriceHistoryDisplayMode;
+  rangeDays: PriceHistoryRangeDays;
+  sourceMode: PriceHistorySourceMode;
   summary: HistoryViewSummary;
 }) {
-  const deltaClass = getDeltaClass(summary.deltaAmount);
+  if (!summary.lowest || !summary.highest || !summary.latest) {
+    return null;
+  }
 
   return (
-    <div className={`history-delta ${deltaClass}`}>
-      <span>區間變化</span>
-      <strong>
-        {displayMode === "price"
-          ? formatSignedPrice(summary.deltaAmount)
-          : formatSignedPercent(summary.deltaPercent)}
-      </strong>
-      <small>
-        {displayMode === "price"
-          ? formatSignedPercent(summary.deltaPercent)
-          : formatSignedPrice(summary.deltaAmount)}
-      </small>
+    <div className="history-range-card">
+      <div className="history-range-heading">
+        <strong>{rangeDays} 天摘要</strong>
+        <span>{formatHistoryPointCount(summary.pointCount, sourceMode)}</span>
+      </div>
+      <div className="history-range-track-wrap">
+        <span className="history-range-caption">價格區間</span>
+        <div className="history-range-endpoints">
+          <span className="history-range-endpoint is-low">
+            <span>最低</span>
+            <strong>{formatPrice(summary.lowest.amount)}</strong>
+          </span>
+          <span className="history-range-endpoint is-high">
+            <span>最高</span>
+            <strong>{formatPrice(summary.highest.amount)}</strong>
+          </span>
+        </div>
+        <div className="history-range-track" aria-hidden="true">
+          <span
+            className="history-range-marker"
+            style={{ left: `${summary.rangePositionPercent}%` }}
+          />
+        </div>
+      </div>
+      <div className="history-range-stats">
+        <div className="history-range-stat is-low">
+          <span>最低</span>
+          <strong>{formatPrice(summary.lowest.amount)}</strong>
+          <small>{formatCompactDate(summary.lowest.observedAt)}</small>
+        </div>
+        <div className="history-range-stat is-high">
+          <span>最高</span>
+          <strong>{formatPrice(summary.highest.amount)}</strong>
+          <small>{formatCompactDate(summary.highest.observedAt)}</small>
+        </div>
+        <div className="history-range-stat is-average">
+          <span>均價</span>
+          <strong>{summary.averageAmount === null ? "-" : formatPrice(summary.averageAmount)}</strong>
+          <small>區間平均</small>
+        </div>
+      </div>
     </div>
   );
 }
 
-function HistoryMetric({
-  displayMode,
-  label,
-  point,
-  summary,
+function FixedChartMarker({
+  chartConfig,
+  marker,
 }: {
-  displayMode: PriceHistoryDisplayMode;
-  label: string;
-  point: PriceHistoryPoint;
-  summary: HistoryViewSummary;
+  chartConfig: ChartConfig;
+  marker: ChartMarker;
 }) {
-  const percentChange = getPointPercentChange(point, summary.first);
-
   return (
-    <div className={label === "目前" ? "is-primary" : ""}>
-      <span>{label}</span>
-      <strong>{formatPrice(point.amount)}</strong>
-      <small>
-        {displayMode === "price"
-          ? formatCompactDate(point.observedAt)
-          : `${formatSignedPercent(percentChange)} · ${formatCompactDate(point.observedAt)}`}
-      </small>
+    <div
+      className={`history-chart-marker is-${marker.tone}`}
+      style={{
+        left: `${(marker.point.x / chartConfig.width) * 100}%`,
+        top: `${(marker.point.y / chartConfig.height) * 100}%`,
+      }}
+    >
+      <span>{marker.label}</span>
+      <strong>{formatPrice(marker.point.amount)}</strong>
     </div>
   );
 }
 
 function HistoryTooltip({
-  displayMode,
+  chartConfig,
   point,
 }: {
-  displayMode: PriceHistoryDisplayMode;
+  chartConfig: ChartConfig;
   point: ChartPoint;
 }) {
-  const left = `${Math.min(Math.max((point.x / 640) * 100, 12), 88)}%`;
-  const top = `${(point.y / 180) * 100}%`;
+  const left = `${Math.min(Math.max((point.x / chartConfig.width) * 100, 12), 88)}%`;
+  const top = `${(point.y / chartConfig.height) * 100}%`;
 
   return (
     <div className="history-tooltip" style={{ left, top }}>
       <span>{formatTooltipDate(point.observedAt)}</span>
       <strong>{formatPrice(point.amount)}</strong>
-      <small>
-        {displayMode === "price"
-          ? `${formatPointSource(point.source)} · ${formatSignedPercent(point.percentChange)}`
-          : `${formatPointSource(point.source)} · ${formatSignedPercent(point.percentChange)}`}
-      </small>
+      <small>{`${formatPointSource(point.source)} · ${formatSignedPercent(point.percentChange)}`}</small>
+    </div>
+  );
+}
+
+function HistoryRecordList({ records }: { records: PriceChangeRecord[] }) {
+  if (records.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="history-records">
+      <h3>變價紀錄</h3>
+      <div className="history-record-list">
+        {records.slice(0, 5).map((record) => (
+          <div className="history-record-row" key={record.key}>
+            <time dateTime={record.observedAt}>{formatCompactDate(record.observedAt)}</time>
+            <span className="history-record-price">
+              {`${formatPrice(record.beforeAmount)} -> ${formatPrice(record.afterAmount)}`}
+            </span>
+            <strong className={`is-${record.tone}`}>{formatSignedPrice(record.deltaAmount)}</strong>
+            <span className={`history-record-badge is-${record.tone}`}>{record.label}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -381,11 +522,17 @@ function summarizePoints(points: PriceHistoryPoint[]): HistoryViewSummary {
   const latest = points.at(-1) ?? null;
   const lowest = points.length > 0 ? minByAmount(points) : null;
   const highest = points.length > 0 ? maxByAmount(points) : null;
+  const averageAmount =
+    points.length > 0
+      ? Math.round(points.reduce((total, point) => total + point.amount, 0) / points.length)
+      : null;
   const deltaAmount = first && latest && points.length >= 2 ? latest.amount - first.amount : null;
   const deltaPercent =
     deltaAmount !== null && first && first.amount !== 0
       ? Number(((deltaAmount / first.amount) * 100).toFixed(2))
       : null;
+  const rangePositionPercent = getRangePositionPercent(lowest, highest, latest);
+  const signal = getPriceSignal({ deltaAmount, highest, latest, lowest, rangePositionPercent });
 
   return {
     pointCount: points.length,
@@ -395,87 +542,227 @@ function summarizePoints(points: PriceHistoryPoint[]): HistoryViewSummary {
     highest,
     first,
     latest,
+    averageAmount,
+    rangePositionPercent,
     deltaAmount,
     deltaPercent,
+    signal,
+    records: createChangeRecords(points),
   };
 }
 
-function createChartPoints(points: PriceHistoryPoint[], displayMode: PriceHistoryDisplayMode) {
-  const width = 640;
-  const height = 180;
-  const paddingX = 20;
-  const paddingY = 28;
-  const innerWidth = width - paddingX * 2;
-  const innerHeight = height - paddingY * 2;
+function createChartModel(
+  points: PriceHistoryPoint[],
+  summary: HistoryViewSummary,
+  chartConfig: ChartConfig,
+) {
   const firstTime = new Date(points[0]?.observedAt ?? "").getTime();
   const latestTime = new Date(points.at(-1)?.observedAt ?? "").getTime();
   const timeRange = Number.isFinite(latestTime - firstTime) ? latestTime - firstTime : 0;
+  const amounts = points.map((point) => point.amount);
+  const rawMin = Math.min(...amounts);
+  const rawMax = Math.max(...amounts);
+  const padding = rawMax === rawMin ? Math.max(100, Math.round(rawMax * 0.04)) : (rawMax - rawMin) * 0.12;
+  const minValue = Math.max(0, rawMin - padding);
+  const maxValue = rawMax + padding;
+  const valueRange = maxValue - minValue || 1;
   const baseAmount = points[0]?.amount ?? 0;
-  const displayValues = points.map((point) => getChartValue(point, baseAmount, displayMode));
-  const minValue = Math.min(...displayValues);
-  const maxValue = Math.max(...displayValues);
-  const valueRange = maxValue - minValue;
-
-  const scaledPoints = points.map((point, index) => {
+  const innerWidth = chartConfig.width - chartConfig.padding.left - chartConfig.padding.right;
+  const innerHeight = chartConfig.height - chartConfig.padding.top - chartConfig.padding.bottom;
+  const bottomY = chartConfig.height - chartConfig.padding.bottom;
+  const scaledPoints: ChartPoint[] = points.map((point, index) => {
     const observedTime = new Date(point.observedAt).getTime();
     const x =
       timeRange === 0 || !Number.isFinite(observedTime)
-        ? paddingX + (index / Math.max(points.length - 1, 1)) * innerWidth
-        : paddingX + ((observedTime - firstTime) / timeRange) * innerWidth;
-    const chartValue = getChartValue(point, baseAmount, displayMode);
-    const y =
-      valueRange === 0
-        ? height / 2
-        : paddingY + ((maxValue - chartValue) / valueRange) * innerHeight;
+        ? chartConfig.padding.left + (index / Math.max(points.length - 1, 1)) * innerWidth
+        : chartConfig.padding.left + ((observedTime - firstTime) / timeRange) * innerWidth;
+    const y = chartConfig.padding.top + ((maxValue - point.amount) / valueRange) * innerHeight;
 
     return {
       ...point,
-      chartValue,
       key: getPointKey(point),
       percentChange: getPercentChange(point.amount, baseAmount),
       x: Number(x.toFixed(2)),
       y: Number(y.toFixed(2)),
     };
   });
+  const linePath = createStepPath(scaledPoints);
+  const firstPoint = scaledPoints[0];
+  const latestPoint = scaledPoints.at(-1);
+  const areaPath =
+    firstPoint && latestPoint
+      ? `${linePath} L ${latestPoint.x} ${bottomY} L ${firstPoint.x} ${bottomY} Z`
+      : "";
 
   return {
-    line: scaledPoints.map((point) => `${point.x},${point.y}`).join(" "),
+    areaPath,
+    config: chartConfig,
+    linePath,
+    markers: createChartMarkers(scaledPoints, summary),
     points: scaledPoints,
+    ticks: createChartTicks({ chartConfig, maxValue, minValue }),
   };
 }
 
-function getChartValue(
-  point: PriceHistoryPoint,
-  baseAmount: number,
-  displayMode: PriceHistoryDisplayMode,
-) {
-  if (displayMode === "percent") {
-    return getPercentChange(point.amount, baseAmount);
+function createStepPath(points: ChartPoint[]) {
+  if (points.length === 0) {
+    return "";
   }
 
-  return point.amount;
+  const [firstPoint, ...restPoints] = points;
+  let path = `M ${firstPoint.x} ${firstPoint.y}`;
+  let previousPoint = firstPoint;
+
+  for (const point of restPoints) {
+    path += ` H ${point.x} V ${point.y}`;
+    previousPoint = point;
+  }
+
+  return previousPoint ? path : "";
 }
 
-function getHistorySubtitle({
-  history,
-  isLoading,
-  selectedRangeDays,
-  sourceMode,
-  viewSummary,
+function createChartTicks({
+  chartConfig,
+  maxValue,
+  minValue,
 }: {
-  history: ProductPriceHistoryBody | null;
-  isLoading: boolean;
-  selectedRangeDays: PriceHistoryRangeDays;
-  sourceMode: PriceHistorySourceMode;
-  viewSummary: HistoryViewSummary;
-}) {
-  if (isLoading || !history) {
-    return `近 ${selectedRangeDays} 天`;
+  chartConfig: ChartConfig;
+  maxValue: number;
+  minValue: number;
+}): ChartTick[] {
+  const values = [maxValue, (maxValue + minValue) / 2, minValue];
+
+  return values.map((value) => ({
+    label: new Intl.NumberFormat("zh-TW", { maximumFractionDigits: 0 }).format(Math.round(value)),
+    y: Number(
+      (
+        chartConfig.padding.top +
+        ((maxValue - value) / (maxValue - minValue || 1)) *
+          (chartConfig.height - chartConfig.padding.top - chartConfig.padding.bottom)
+      ).toFixed(2),
+    ),
+  }));
+}
+
+function createChartMarkers(points: ChartPoint[], summary: HistoryViewSummary): ChartMarker[] {
+  const markers: ChartMarker[] = [];
+  const lowest = summary.lowest ? findChartPoint(points, summary.lowest) : null;
+  const highest = summary.highest ? findChartPoint(points, summary.highest) : null;
+  const hasRange = summary.lowest && summary.highest && summary.lowest.amount !== summary.highest.amount;
+
+  if (hasRange && lowest) {
+    markers.push({ key: `lowest-${lowest.key}`, label: "最低", point: lowest, tone: "low" });
   }
 
+  if (hasRange && highest && !markers.some((marker) => marker.point.key === highest.key)) {
+    markers.push({ key: `highest-${highest.key}`, label: "最高", point: highest, tone: "high" });
+  }
+
+  return markers;
+}
+
+function findChartPoint(points: ChartPoint[], point: PriceHistoryPoint) {
+  return points.find((candidate) => candidate.observedAt === point.observedAt && candidate.amount === point.amount);
+}
+
+function createChangeRecords(points: PriceHistoryPoint[]): PriceChangeRecord[] {
+  const records: PriceChangeRecord[] = [];
+  let previousPriceSnapshot: PriceHistoryPoint | null = null;
+
+  for (const point of points) {
+    if (point.source === "current_price_confirmation") {
+      continue;
+    }
+
+    if (!previousPriceSnapshot) {
+      previousPriceSnapshot = point;
+      continue;
+    }
+
+    const deltaAmount = point.amount - previousPriceSnapshot.amount;
+    if (deltaAmount === 0) {
+      previousPriceSnapshot = point;
+      continue;
+    }
+
+    records.push({
+      key: getPointKey(point),
+      observedAt: point.observedAt,
+      beforeAmount: previousPriceSnapshot.amount,
+      afterAmount: point.amount,
+      deltaAmount,
+      tone: getRecordTone(deltaAmount),
+      label: getRecordLabel(deltaAmount),
+    });
+    previousPriceSnapshot = point;
+  }
+
+  return records.reverse();
+}
+
+function getRangePositionPercent(
+  lowest: PriceHistoryPoint | null,
+  highest: PriceHistoryPoint | null,
+  latest: PriceHistoryPoint | null,
+) {
+  if (!lowest || !highest || !latest || lowest.amount === highest.amount) {
+    return 50;
+  }
+
+  return Math.min(
+    Math.max(Number((((latest.amount - lowest.amount) / (highest.amount - lowest.amount)) * 100).toFixed(2)), 0),
+    100,
+  );
+}
+
+function getPriceSignal({
+  deltaAmount,
+  highest,
+  latest,
+  lowest,
+  rangePositionPercent,
+}: {
+  deltaAmount: number | null;
+  highest: PriceHistoryPoint | null;
+  latest: PriceHistoryPoint | null;
+  lowest: PriceHistoryPoint | null;
+  rangePositionPercent: number;
+}): HistoryViewSummary["signal"] {
+  if (!lowest || !highest || !latest || lowest.amount === highest.amount) {
+    return { label: "持平", tone: "flat" };
+  }
+
+  if (rangePositionPercent <= 35) {
+    return { label: deltaAmount && deltaAmount < 0 ? "偏低" : "低位", tone: "low" };
+  }
+
+  if (rangePositionPercent >= 65) {
+    return { label: deltaAmount && deltaAmount > 0 ? "偏高" : "高位", tone: "high" };
+  }
+
+  return { label: "中段", tone: "middle" };
+}
+
+function getRecordTone(deltaAmount: number): PriceRecordTone {
+  if (deltaAmount > 0) {
+    return "up";
+  }
+
+  return "down";
+}
+
+function getRecordLabel(deltaAmount: number) {
+  if (deltaAmount > 0) {
+    return "上漲";
+  }
+
+  return "下跌";
+}
+
+function formatHistoryPointCount(pointCount: number, sourceMode: PriceHistorySourceMode) {
   const pointLabel = sourceMode === "changes" ? "筆變價紀錄" : "筆價格觀測";
 
-  return `近 ${history.rangeDays} 天，${viewSummary.pointCount} ${pointLabel}`;
+  return `${pointCount} ${pointLabel}`;
 }
 
 function getInsufficientDataMessage(sourceMode: PriceHistorySourceMode) {
@@ -486,19 +773,14 @@ function getInsufficientDataMessage(sourceMode: PriceHistorySourceMode) {
   return "目前只有單一價格觀測點，尚無可比較區間。";
 }
 
-function getPointAriaLabel(point: ChartPoint, displayMode: PriceHistoryDisplayMode) {
-  const value =
-    displayMode === "price" ? formatPrice(point.amount) : formatSignedPercent(point.percentChange);
-
-  return `${formatPointSource(point.source)}，${formatTooltipDate(point.observedAt)}，${value}`;
+function getPointAriaLabel(point: ChartPoint) {
+  return `${formatPointSource(point.source)}，${formatTooltipDate(point.observedAt)}，${formatPrice(
+    point.amount,
+  )}`;
 }
 
 function getPointKey(point: PriceHistoryPoint) {
   return `${point.observedAt}-${point.amount}-${point.source}`;
-}
-
-function getPointPercentChange(point: PriceHistoryPoint, first: PriceHistoryPoint | null) {
-  return getPercentChange(point.amount, first?.amount ?? 0);
 }
 
 function getPercentChange(amount: number, baseAmount: number) {
@@ -510,7 +792,7 @@ function getPercentChange(amount: number, baseAmount: number) {
 }
 
 function formatPrice(amount: number) {
-  return `NT$ ${new Intl.NumberFormat("zh-TW").format(amount)}`;
+  return `NT$${new Intl.NumberFormat("zh-TW").format(amount)}`;
 }
 
 function formatSignedPrice(amount: number | null) {
@@ -519,7 +801,7 @@ function formatSignedPrice(amount: number | null) {
   }
 
   if (amount === 0) {
-    return "NT$ 0";
+    return "NT$0";
   }
 
   return `${amount > 0 ? "+" : "-"}${formatPrice(Math.abs(amount))}`;
@@ -560,14 +842,6 @@ function formatTooltipDate(value: string) {
 
 function formatPointSource(source: PriceHistoryPoint["source"]) {
   return source === "price_snapshot" ? "價格變動" : "價格確認";
-}
-
-function getDeltaClass(amount: number | null) {
-  if (amount === null || amount === 0) {
-    return "is-flat";
-  }
-
-  return amount > 0 ? "is-up" : "is-down";
 }
 
 function minByAmount(points: PriceHistoryPoint[]): PriceHistoryPoint {
