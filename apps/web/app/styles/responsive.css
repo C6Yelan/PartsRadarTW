@@ -1,0 +1,259 @@
+
+@media (max-width: 1400px) {
+  .toolbar-controls {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1120px) {
+  .topbar {
+    grid-template-columns: 1fr;
+  }
+
+  .topbar-meta {
+    justify-content: space-between;
+  }
+
+  .workspace-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .category-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .dashboard-shell,
+  .detail-shell {
+    width: min(100% - 28px, 1600px);
+    padding-top: 14px;
+  }
+
+  .site-disclaimer {
+    width: min(100% - 28px, 1600px);
+    padding: 14px 0 24px;
+  }
+
+  .detail-shell > .site-disclaimer,
+  .not-found-shell > .site-disclaimer {
+    width: 100%;
+    padding-bottom: 0;
+  }
+
+  .not-found-shell {
+    width: min(100% - 28px, 960px);
+    gap: 52px;
+    padding-top: 20px;
+  }
+
+  .topbar {
+    min-height: auto;
+    padding: 14px;
+  }
+
+  .topbar-search {
+    grid-template-areas:
+      "icon input clear"
+      "submit submit submit";
+    grid-template-columns: 18px minmax(0, 1fr) 32px;
+    gap: 8px 10px;
+    width: 100%;
+    overflow: hidden;
+    padding: 8px 10px 10px 14px;
+  }
+
+  .topbar-search .search-glyph {
+    grid-area: icon;
+  }
+
+  .topbar-search input {
+    grid-area: input;
+  }
+
+  .topbar-search .search-clear-button {
+    grid-area: clear;
+  }
+
+  .topbar-search .control-button {
+    grid-area: submit;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .topbar-meta {
+    display: grid;
+    justify-content: stretch;
+  }
+
+  .category-list,
+  .price-grid,
+  .detail-facts {
+    grid-template-columns: 1fr;
+  }
+
+  .filter-panel summary {
+    min-height: 54px;
+    padding: 0 16px;
+    cursor: pointer;
+  }
+
+  .filter-summary-meta {
+    display: flex;
+  }
+
+  .results-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .toolbar-controls,
+  .toolbar-controls label,
+  .toolbar-price-filter,
+  .toolbar-status-filter {
+    display: grid;
+    grid-template-columns: 1fr;
+    justify-content: stretch;
+  }
+
+  .toolbar-price-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .toolbar-segmented-control {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .vendor-filter {
+    grid-template-columns: 1fr;
+  }
+
+  .vendor-menu-popover {
+    position: static;
+    width: 100%;
+    margin-top: 8px;
+  }
+
+  .vendor-option-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-height: min(480px, 62vh);
+  }
+
+  .table-header {
+    display: none;
+  }
+
+  .product-row {
+    grid-template-columns: 70px minmax(0, 1fr);
+    grid-template-areas:
+      "image product"
+      "image price"
+      "image status";
+    gap: 8px 12px;
+    align-items: start;
+    min-height: 0;
+    padding: 16px;
+  }
+
+  .product-main {
+    display: block;
+    grid-area: product;
+  }
+
+  .product-main a,
+  .table-cell span:not(.cell-label) {
+    white-space: normal;
+  }
+
+  .product-main a {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .product-image {
+    grid-area: image;
+    width: 64px;
+  }
+
+  .row-price {
+    grid-area: price;
+  }
+
+  .row-status {
+    grid-area: status;
+  }
+
+  .table-cell {
+    display: grid;
+    grid-template-columns: 76px minmax(0, 1fr);
+    gap: 8px;
+    align-items: baseline;
+    font-size: 14px;
+  }
+
+  .cell-label {
+    display: inline;
+    color: var(--faint);
+    font-size: 12px;
+  }
+
+  .skeleton-row {
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
+
+  .skeleton-row .skeleton-box:nth-child(n + 4) {
+    display: none;
+  }
+
+  .pagination-bar {
+    display: grid;
+    grid-template-columns: auto auto auto;
+    gap: 6px;
+    justify-content: center;
+  }
+
+  .pagination-bar > .icon-button,
+  .pagination-bar .page-buttons button {
+    min-height: 40px;
+    min-width: 34px;
+    padding: 0 8px;
+    font-size: 14px;
+  }
+
+  .pagination-bar > .icon-button {
+    min-width: 62px;
+    flex: 0 0 auto;
+  }
+
+  .page-buttons {
+    width: auto;
+    flex-wrap: nowrap;
+    gap: 4px;
+  }
+
+  .page-gap {
+    width: 10px;
+    text-align: center;
+  }
+
+  .page-jump {
+    grid-column: 1 / -1;
+    width: auto;
+    justify-content: center;
+  }
+
+  .page-jump .icon-button {
+    flex: 0 0 auto;
+  }
+
+  .detail-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .detail-media {
+    min-height: 300px;
+  }
+}
+

@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import * as responseExports from "./responses";
+import * as responseExports from "../../../app/api/_shared/responses";
 import {
   API_ERROR_MESSAGES,
   internalErrorResponse,
   invalidQueryResponse,
   jsonOk,
   notFoundResponse,
-} from "./responses";
+} from "../../../app/api/_shared/responses";
 
 describe("API response helpers", () => {
   it("does not export the unsafe generic error helper", () => {

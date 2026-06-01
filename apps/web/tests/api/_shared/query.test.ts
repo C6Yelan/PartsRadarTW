@@ -10,7 +10,7 @@ import {
   parseOptionalIntegerQuery,
   parseOptionalTextQuery,
   parsePaginationQuery,
-} from "./query";
+} from "../../../app/api/_shared/query";
 
 describe("API query helpers", () => {
   it("trims optional values and rejects duplicate parameters", () => {

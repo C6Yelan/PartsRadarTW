@@ -1,4 +1,5 @@
 import ProductDetail from "./product-detail";
+import { normalizeReturnHref } from "./return-href";
 
 export default async function ProductDetailPage({
   params,
@@ -12,20 +13,4 @@ export default async function ProductDetailPage({
   return (
     <ProductDetail productId={id} returnHref={normalizeReturnHref(resolvedSearchParams.returnTo)} />
   );
-}
-
-function normalizeReturnHref(value: string | string[] | undefined) {
-  const candidate = Array.isArray(value) ? value[0] : value;
-
-  if (!candidate?.startsWith("/") || candidate.startsWith("//")) {
-    return "/";
-  }
-
-  const url = new URL(candidate, "https://partsradar.local");
-
-  if (url.origin !== "https://partsradar.local" || url.pathname !== "/") {
-    return "/";
-  }
-
-  return `${url.pathname}${url.search}`;
 }

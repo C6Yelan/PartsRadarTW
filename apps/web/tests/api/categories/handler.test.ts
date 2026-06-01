@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { API_ERROR_MESSAGES } from "../_shared/responses";
-import { type CategoriesReadClient, createGetCategoriesHandler } from "./handler";
+import { API_ERROR_MESSAGES } from "../../../app/api/_shared/responses";
+import {
+  type CategoriesReadClient,
+  createGetCategoriesHandler,
+} from "../../../app/api/categories/handler";
 
 describe("GET /api/categories handler", () => {
   it("returns enabled categories in source order with public-safe fields", async () => {

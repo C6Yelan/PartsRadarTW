@@ -3,8 +3,11 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { API_ERROR_MESSAGES } from "../_shared/responses";
-import { createGetProductImageHandler, createProductImageApiUrl } from "./handler";
+import { API_ERROR_MESSAGES } from "../../../app/api/_shared/responses";
+import {
+  createGetProductImageHandler,
+  createPublicProductImagePath,
+} from "../../../app/api/product-images/handler";
 
 const PRODUCT_ID = "11111111-1111-1111-1111-111111111111";
 const IMAGE_BYTES = Uint8Array.of(82, 73, 70, 70, 0, 0, 0, 0);
@@ -17,8 +20,9 @@ afterEach(async () => {
 });
 
 describe("product image API helpers", () => {
-  it("builds a local API URL for product images", () => {
-    expect(createProductImageApiUrl(PRODUCT_ID.toUpperCase())).toBe(
+  it("builds a public API path for product images", () => {
+    // The API exposes cached images through an app route, not through raw storage paths.
+    expect(createPublicProductImagePath(PRODUCT_ID.toUpperCase())).toBe(
       `/api/product-images/${PRODUCT_ID}.webp`,
     );
   });

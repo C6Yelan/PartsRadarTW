@@ -1,6 +1,5 @@
+import { COOLPC_SOURCE_NAME } from "@partsradar/shared";
 import { internalErrorResponse, jsonOk } from "../_shared/responses";
-
-const COOLPC_SOURCE_NAME = "coolpc";
 
 interface CategoryRecord {
   id: string;

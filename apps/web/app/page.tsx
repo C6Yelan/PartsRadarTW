@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 
-import ProductExplorer from "./product-explorer";
+import ProductExplorer from "./product-explorer/ProductExplorer";
 
 export default function HomePage() {
   return (

@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { API_ERROR_MESSAGES } from "../../_shared/responses";
-import { createGetProductHandler, type ProductDetailReadClient } from "./handler";
+import { API_ERROR_MESSAGES } from "../../../../app/api/_shared/responses";
+import {
+  createGetProductHandler,
+  type ProductDetailReadClient,
+} from "../../../../app/api/products/[id]/handler";
 
 const PRODUCT_ID = "11111111-1111-1111-1111-111111111111";
 
@@ -94,6 +97,37 @@ describe("GET /api/products/{id} handler", () => {
   it("omits unsafe discussion URLs", async () => {
     const response = await createGetProductHandler(
       fakeProductDetailClient(product({ discussionUrl: "javascript:alert(1)" })),
+    )(PRODUCT_ID);
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      discussion: null,
+    });
+  });
+
+  it("sanitizes public discussion URLs before returning them", async () => {
+    const response = await createGetProductHandler(
+      fakeProductDetailClient(
+        product({
+          discussionUrl:
+            "https://example.com/products/gpu-review?utm_source=ad&PHPSESSID=secret&variant=black#reviews",
+        }),
+      ),
+    )(PRODUCT_ID);
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      discussion: {
+        url: "https://example.com/products/gpu-review?variant=black",
+      },
+    });
+  });
+
+  it("omits public discussion URLs with embedded credentials", async () => {
+    const response = await createGetProductHandler(
+      fakeProductDetailClient(
+        product({ discussionUrl: "https://user:secret@example.com/products/gpu-review" }),
+      ),
     )(PRODUCT_ID);
 
     expect(response.status).toBe(200);

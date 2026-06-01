@@ -1,19 +1,42 @@
 import type { Prisma } from "@partsradar/db";
+import {
+  COOLPC_SOURCE_NAME,
+  createCoolpcPurchaseUrl,
+  createPublicProductImagePath,
+} from "@partsradar/shared";
 
 import { internalErrorResponse, jsonOk, notFoundResponse } from "../../_shared/responses";
-import { createProductImageApiUrl } from "../../product-images/handler";
 
-const COOLPC_SOURCE_NAME = "coolpc";
-const COOLPC_PURCHASE_BASE_URL = "https://www.coolpc.com.tw/evaluate.php";
-const DISALLOWED_DISCUSSION_HOST_SUFFIXES = [".shopee.tw"];
-const DISALLOWED_DISCUSSION_HOSTS = new Set(["shopee.tw"]);
-const DISALLOWED_DISCUSSION_PATH_KEYWORDS = [
+// Discussion links are display-only references, so low-quality marketplace/download
+// targets are filtered before any stored URL reaches the public response.
+const BLOCKED_DISCUSSION_HOST_SUFFIXES = [".shopee.tw"];
+const BLOCKED_DISCUSSION_HOSTS = new Set(["shopee.tw"]);
+const BLOCKED_DISCUSSION_PATH_KEYWORDS = [
   "driver",
   "drivers",
   "download",
   "downloads",
   "previous-drivers",
 ];
+const DISCUSSION_QUERY_PARAMS_TO_STRIP = new Set([
+  "access_token",
+  "auth",
+  "authorization",
+  "fbclid",
+  "gclid",
+  "msclkid",
+  "phpsessid",
+  "session",
+  "session_id",
+  "sessionid",
+  "sid",
+  "token",
+  "utm_campaign",
+  "utm_content",
+  "utm_medium",
+  "utm_source",
+  "utm_term",
+]);
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const PRODUCT_DETAIL_SELECT = {
@@ -164,7 +187,7 @@ function toProductDetailResponse(product: ProductDetailRecord): ProductDetailRes
       sourceName: product.sourceCategory.sourceName,
     },
     image: {
-      url: createProductImageApiUrl(product.id),
+      url: createPublicProductImagePath(product.id),
       alt: product.name,
       capturedAt: product.primaryImageCheckedAt.toISOString(),
     },
@@ -177,6 +200,7 @@ function toProductDetailResponse(product: ProductDetailRecord): ProductDetailRes
     },
     source: {
       name: COOLPC_SOURCE_NAME,
+      // Build from the official source helper so the public response exposes no stored crawler URL.
       url: createCoolpcPurchaseUrl(product.ibuyToken),
     },
     discussion: toDiscussionResponse(product.discussionUrl),
@@ -203,11 +227,15 @@ function toDiscussionResponse(
       return null;
     }
 
+    if (url.username || url.password) {
+      return null;
+    }
+
     if (!isPublicDiscussionUrl(url)) {
       return null;
     }
 
-    return { url: url.toString() };
+    return { url: stripPrivateDiscussionUrlParts(url).toString() };
   } catch {
     return null;
   }
@@ -218,8 +246,8 @@ function isPublicDiscussionUrl(url: URL): boolean {
   const pathname = url.pathname.toLowerCase();
 
   if (
-    DISALLOWED_DISCUSSION_HOSTS.has(hostname) ||
-    DISALLOWED_DISCUSSION_HOST_SUFFIXES.some((suffix) => hostname.endsWith(suffix))
+    BLOCKED_DISCUSSION_HOSTS.has(hostname) ||
+    BLOCKED_DISCUSSION_HOST_SUFFIXES.some((suffix) => hostname.endsWith(suffix))
   ) {
     return false;
   }
@@ -228,14 +256,21 @@ function isPublicDiscussionUrl(url: URL): boolean {
     return false;
   }
 
-  return !DISALLOWED_DISCUSSION_PATH_KEYWORDS.some((keyword) => pathname.includes(keyword));
+  return !BLOCKED_DISCUSSION_PATH_KEYWORDS.some((keyword) => pathname.includes(keyword));
 }
 
-function createCoolpcPurchaseUrl(ibuyToken: string): string {
-  const url = new URL(COOLPC_PURCHASE_BASE_URL);
-  url.searchParams.set("iBuy", ibuyToken);
+function stripPrivateDiscussionUrlParts(url: URL): URL {
+  const sanitizedUrl = new URL(url);
+  // Fragments and common campaign/session params are not needed for attribution and may leak state.
+  sanitizedUrl.hash = "";
 
-  return url.toString();
+  for (const key of Array.from(sanitizedUrl.searchParams.keys())) {
+    if (DISCUSSION_QUERY_PARAMS_TO_STRIP.has(key.toLowerCase())) {
+      sanitizedUrl.searchParams.delete(key);
+    }
+  }
+
+  return sanitizedUrl;
 }
 
 function toIsoStringOrNull(value: Date | null): string | null {

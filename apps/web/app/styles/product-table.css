@@ -1,0 +1,265 @@
+.product-table {
+  min-width: 0;
+}
+
+.table-header,
+.product-row,
+.skeleton-row {
+  display: grid;
+  grid-template-columns: 58px minmax(260px, 1fr) minmax(118px, 0.22fr) minmax(112px, 0.2fr);
+  gap: 14px;
+  align-items: center;
+}
+
+.table-header {
+  min-height: 48px;
+  padding: 0 22px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-strong);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.product-row {
+  min-height: 78px;
+  padding: 12px 22px;
+  border-bottom: 1px solid rgba(33, 51, 64, 0.72);
+  transition: background 140ms ease;
+}
+
+.product-row:hover {
+  background: rgba(22, 42, 56, 0.68);
+}
+
+.product-row:last-child {
+  border-bottom: 0;
+}
+
+.product-main {
+  min-width: 0;
+}
+
+.product-main a {
+  display: block;
+  overflow: hidden;
+  color: var(--text-strong);
+  font-weight: 760;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.product-main a:hover {
+  color: var(--accent-strong);
+}
+
+.product-image {
+  width: 58px;
+  aspect-ratio: 1;
+  object-fit: contain;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: #0a141c;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
+}
+
+.product-image.fallback,
+.detail-image-fallback {
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  background: linear-gradient(135deg, rgba(143, 180, 204, 0.11), transparent), #0a141c;
+  color: var(--muted);
+  text-align: center;
+}
+
+.image-fallback-copy {
+  display: grid;
+  max-width: 100%;
+  gap: 3px;
+  padding: 8px;
+}
+
+.image-fallback-copy strong,
+.image-fallback-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.image-fallback-copy strong {
+  color: var(--accent-strong);
+  font-size: 12px;
+}
+
+.image-fallback-copy small {
+  color: var(--faint);
+  font-size: 10px;
+}
+
+.table-cell {
+  min-width: 0;
+  color: var(--text);
+}
+
+.table-cell span:not(.cell-label) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cell-label {
+  display: none;
+}
+
+.row-price strong {
+  color: var(--accent-strong);
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.row-state,
+.status-badge {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  width: fit-content;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.row-state::before,
+.status-badge::before {
+  display: inline-block;
+  width: 8px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: currentColor;
+  content: "";
+}
+
+.row-state.ok,
+.status-badge.ok {
+  color: var(--success);
+}
+
+.row-state.warning,
+.status-badge.stale {
+  color: var(--warning);
+}
+
+.status-badge.unavailable {
+  color: var(--danger);
+}
+
+.empty-state {
+  display: grid;
+  min-height: 260px;
+  place-items: center;
+  padding: 40px 22px;
+  text-align: center;
+}
+
+.empty-state h2,
+.detail-empty h1 {
+  margin: 0;
+  color: var(--text-strong);
+  font-size: 22px;
+}
+
+.empty-state p,
+.detail-empty p {
+  max-width: 520px;
+  margin: 10px auto 0;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.pagination-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  padding: 16px 22px;
+  border-top: 1px solid var(--border);
+}
+
+.icon-button,
+.page-buttons button {
+  padding: 0 13px;
+}
+
+.page-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  align-items: center;
+  justify-content: center;
+}
+
+.page-buttons button[aria-current="page"],
+.page-buttons button.is-active {
+  background: var(--accent-surface);
+  color: var(--text-strong);
+}
+
+.page-buttons button[aria-current="page"]:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+.page-gap {
+  color: var(--faint);
+}
+
+.page-jump {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.page-jump input {
+  width: 74px;
+  min-height: 38px;
+  padding: 0 10px;
+  text-align: center;
+}
+
+.skeleton-row {
+  min-height: 78px;
+  padding: 12px 22px;
+  border-bottom: 1px solid rgba(33, 51, 64, 0.72);
+}
+
+.skeleton-box {
+  display: block;
+  min-height: 16px;
+  border-radius: 7px;
+  background: linear-gradient(90deg, #132431, #1b3040, #132431);
+  background-size: 220% 100%;
+  animation: skeleton-shimmer 2.6s ease-in-out infinite;
+}
+
+.skeleton-box.image {
+  width: 58px;
+  aspect-ratio: 1;
+}
+
+.skeleton-box.wide {
+  width: min(100%, 360px);
+}
+
+.skeleton-box.medium {
+  width: min(100%, 150px);
+}
+
+.skeleton-box.short {
+  width: min(100%, 96px);
+}
+
