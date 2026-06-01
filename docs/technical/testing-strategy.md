@@ -1,296 +1,174 @@
 # 測試策略
 
-本文件定義 PartsRadarTW 第一版的測試方向。第一版以 Vitest、TypeScript type check、Biome、Next.js build 與手動驗收為主，先避免導入過多測試工具。
+第一版測試以 Vitest、TypeScript typecheck、Biome、Next.js build、Docker / API smoke 與必要的瀏覽器驗證為主。實際連線原價屋只能手動或明確 profile 執行，不進常規測試。
 
-## 測試目標
+## 目標
 
-第一版測試需確認：
+- parser 能穩定處理 CoolPC 分類頁。
+- HTTP 200 但內容異常時，不更新正式商品與價格。
+- 商品 identity、價格歷史、current price 與 missing / inactive 規則正確。
+- API query validation、排序、分頁、狀態與錯誤處理符合 contract。
+- Web UI 能呈現 active、inactive、stale、unavailable 與錯誤狀態。
+- 每個 phase / refactor slice 都有清楚驗收點。
 
-- crawler 能穩定解析原價屋分類頁。
-- HTTP 200 但內容異常時，不會更新正式商品與價格。
-- 商品識別與價格更新規則正確。
-- 資料未變時，不會新增重複 price snapshot。
-- API 查詢參數、分頁、排序與狀態處理符合 contract。
-- 網站能正確顯示 active、inactive、stale 與 unavailable 狀態。
-- 正式開發每個階段都有明確驗收點，避免一次累積太多未驗證變更。
-
-## 第一版測試工具
-
-第一版使用：
+## 工具
 
 | 工具 | 用途 |
 | --- | --- |
-| Vitest | parser、資料處理、API 邏輯與 shared utils 測試 |
-| TypeScript type check | 檢查型別錯誤 |
-| Biome | 檢查 lint 與執行 format |
-| Next.js build | 確認 Next.js production build 可正常編譯 |
-| 手動驗收 checklist | 檢查網站操作流程與部署後狀態 |
+| Vitest | parser、資料流、API logic、shared utils |
+| TypeScript typecheck | 型別正確性 |
+| Biome | lint / format |
+| Next.js build | production build 編譯 |
+| Docker Compose smoke | 部署與 service wiring |
+| Playwright | 影響可見 UI / route / CSS 的大型重構驗證 |
 
-第一版不先導入：
+不在第一版常規導入大型視覺回歸、壓力測試或每次打 live CoolPC 的 E2E。
 
-- 瀏覽器 E2E 測試工具。
-- 大型視覺回歸測試。
-- 壓力測試工具。
-- 每次測試都實際連線原價屋的自動化測試。
+## Fixtures
 
-若後續 UI 流程變多、回歸成本變高，再評估 Playwright 或其他 E2E 工具。
-
-## 測試資料與 Fixtures
-
-Crawler 與 parser 測試應優先使用 fixture。
+Crawler / parser 測試優先使用 `apps/crawler/tests/coolpc/fixtures` 內的 fixture。
 
 Fixture 原則：
 
-- 使用保存下來的原價屋 HTML 片段或完整頁面。
-- fixture 不應包含 `PHPSESSID`。
-- fixture 應避免放入不必要的大量原始內容。
-- fixture 需標明來源頁類型與取得日期。
-- parser 測試不可每次都實際打原價屋網站。
-- 若 fixture 來自異常頁或疑似攔截頁，應明確命名與分類。
+- 可使用保存的 CoolPC HTML 片段或完整頁。
+- 不包含 `PHPSESSID`。
+- 不放不必要的大量原始內容。
+- 命名需標明來源頁類型與日期。
+- 疑似攔截頁需明確命名與分類。
 
-建議 fixture 類型：
+建議類型：
 
-- 正常 CPU 分類頁。
-- 商品缺少 `div.w`。
-- 商品缺少 `div.t`。
-- 商品缺少可解析價格。
+- 正常分類頁。
+- 缺 `div.w`、`div.t`、`div.x`。
+- 價格不可解析。
 - HTTP 200 但內容不是商品頁。
-- 商品清單與價格完全相同。
-- 商品價格變動。
-- 商品從來源消失。
+- 商品未變、價格變動、商品消失。
 
-## Crawler Parser 測試
+## Test File Layout
 
-Crawler parser 測試使用 Vitest。
+Automated tests live outside runtime folders so deployment code is easier to scan:
 
-至少測試：
+- `apps/web/tests/api/`: web API handler/query/response tests and fake read clients.
+- `apps/crawler/tests/coolpc/`: CoolPC parser, crawl-run, snapshot, retention, and data-flow tests.
+- `apps/crawler/tests/scripts/`: crawler CLI option and daemon tests.
 
-- 能從正常 fixture 解析出 `div.w`、`div.t`、`div.x`。
-- 能取得 `iBuyToken`。
-- 能取得商品原始名稱。
-- 能從 `含稅：NT4880` 解析出整數價格 `4880`。
-- 能解析 `NT4,880`、`$4880`、`$4,880`。
-- 能產生 computed `source_item_key`：`coolpc:igrp:{IGrp}:ibuy:{iBuyToken}`。
-- 缺少 `iBuyToken` 時不匯入正式商品。
-- 缺少商品名稱時不匯入正式商品。
-- 缺少可解析價格時不匯入正式商品。
-- 同一分類同一 snapshot 內出現相同 `iBuyToken`、商品名稱與價格時，可去重後只保留一筆。
-- 同一分類同一 snapshot 內相同 `iBuyToken` 對應不同商品名稱或價格時，標記為解析異常。
+Runtime folders such as `apps/web/app/api/` and `apps/crawler/src/coolpc/` should not contain
+`.test.ts` files or fake clients. Put local fake clients under the nearest `tests/**/support/`
+folder instead of adding new `test-support/` directories inside runtime source.
 
-## Response Validation 測試
+## Crawler Tests
 
-HTTP status 不足以判斷成功，需測試內容驗證。
+Parser / validation 至少覆蓋：
 
-至少測試：
+- token、名稱、價格、圖片 URL、discussion URL。
+- `NT4880`、`NT4,880`、`$4880`、`$4,880`。
+- computed key：`coolpc:igrp:{IGrp}:ibuy:{iBuyToken}`。
+- 缺 token / 名稱 / 價格 / 圖片時不匯入正式商品。
+- 完全重複商品可去重。
+- 同 token 對應不同名稱或價格時標記解析異常。
+- validation 失敗時不進 product upsert、price snapshot 或 current price。
 
-- 正常分類頁可通過 validation。
-- 缺少 `div.w` 時標記為 `suspected_block` 或 `invalid`。
-- 缺少 `div.t` 時標記為 `suspected_block` 或 `invalid`。
-- 缺少 `div.x` 時標記為 `suspected_block` 或 `invalid`。
-- HTTP 200 但內容不是商品頁時，不進入 product upsert。
-- validation 失敗時不寫入 price snapshot。
-- validation 失敗時不更新 current price。
+Data flow 至少覆蓋：
 
-攔截頁特徵需以實際保存的異常 snapshot 補充，不憑空寫死文字。
+- 新商品建立 product、price snapshot、current price。
+- 價格變動才新增 snapshot。
+- 價格未變不新增 snapshot。
+- `success_unchanged` 更新分類 `last_success_at`。
+- `crawl_run_category_results` 是分類結果真相來源。
+- raw snapshot 去重與 cleanup 不刪價格歷史。
+- fetch failed / suspected block / parse failed 不覆蓋 current price。
+- parse failed 不累計 missing count。
+- 連續 missing 與重新出現規則。
 
-## Data Flow 測試
+Scheduled crawler 至少覆蓋：
 
-資料流測試確認 crawler 寫入規則。
+- 沒有 `--confirm-live-fetch` 時拒絕啟動。
+- interval、backoff、category delay 有下限。
+- Compose 預設不啟動 `crawler-daemon`。
+- `scheduled-crawler` profile 才包含 daemon，且不開 host ports。
 
-至少測試：
+## API Tests
 
-- 新商品第一次出現時建立 product、price snapshot 與 current price。
-- product 使用 `source_category_id + ibuy_token` 作為唯一性，不保存 `source_item_key`、`source` 或 `igrp`。
-- 價格變動時新增 price snapshot 並更新 current price。
-- current price 只保存 `price_snapshot_id`、`last_seen_at`、`price_changed_at` 與 `updated_at`，價格值需從 price snapshot 取得。
-- current price 指向的 price snapshot 必須屬於同一個 product。
-- `crawl_runs` 不保存 `checked_category_count`、`changed_category_count` 或 `error_category_key`；相關摘要需由 `crawl_run_category_results` 推得。
-- 價格未變時不新增重複 price snapshot。
-- `success_unchanged` 仍會更新分類 `last_success_at`。
-- 每個被嘗試處理的分類都會寫入 `crawl_run_category_results`，不寫入 `crawl_runs.category_results` JSON。
-- parsed result hash 相同時走 `success_unchanged` 流程。
-- raw content hash 相同時不重複保存 HTML 壓縮檔。
-- raw snapshot metadata 或檔案清理不會刪除 price snapshots。
-- 沒有 `iBuyToken` 的商品不寫入 products，但保留解析紀錄。
-- raw snapshot 與 parse error 透過 `source_category_id` 取得 `IGrp` 與原價屋分類名稱，不重複保存 `source` 或 `igrp`。
-- `invalid_image_url` parse error 需保存內部用 `raw_image_url`；非圖片錯誤維持 `raw_image_url = null`。
-- 商品從來源消失時不刪除 product。
-- 商品從來源消失時不刪除 price snapshots。
-- 商品重新出現且 `source_category_id + ibuy_token` 相同時延續原商品歷史。
-- fetch 失敗、疑似攔截或 parse 失敗時不覆蓋既有 current price。
-- fetch 失敗、疑似攔截或 parse 失敗會更新 `last_checked_at`，但不更新 `last_success_at`。
-- parse 失敗不累計商品 missing count。
+至少覆蓋：
 
-## Scheduled Crawler 測試
+- `/api/categories` 只回 enabled 分類。
+- `/api/products` 的 `q`、`igrp`、vendors、price、sort、status、pagination。
+- `pageSize` 上限與非法 query `400`。
+- 商品列表與詳細都回站內圖片 URL。
+- 商品不存在 `404`。
+- inactive 商品詳細仍可 `200`。
+- `/api/source-status` 的 `ok`、`stale`、`unavailable` 與分類聚合。
+- web runtime source 不含 `console.*`，避免 browser console 洩漏 internal state。
 
-定期 crawler 的測試重點是安全邊界與排程控制，不在單元測試中發出 live requests。
+不可暴露：
 
-至少測試：
+- computed `source_item_key`
+- 獨立 `iBuyToken`
+- raw snapshot
+- parse error
+- internal stack trace / env / DB secret
 
-- daemon CLI 沒有 `--confirm-live-fetch` 時拒絕啟動。
-- daemon CLI 可從 env 讀取 interval、backoff、category delay 與 snapshot storage。
-- daemon CLI 拒絕過低的 interval、backoff 或 category delay。
-- Compose 預設 services 不包含 `crawler-daemon`。
-- Compose `scheduled-crawler` profile 才包含 `crawler-daemon`。
-- `crawler-daemon` 不宣告 host ports。
-- `crawler-daemon` command 保留 `--confirm-live-fetch`。
+## Web UI Validation
 
-## API 測試
+一般 UI phase 可用手動 checklist；大型整理或影響可見行為的變更需用 Playwright。
 
-API 測試可先以 route handler 內的查詢邏輯或資料存取函式為單位，不一定一開始就做完整 HTTP server 測試。
+首頁：
 
-商品列表查詢可讀 `product_list_view` 或等價 join。若測試使用 view，需確認 view 欄位由核心資料表投影而來，crawler 不直接寫入 projection。
+- 預設列表可載入。
+- 搜尋、分類、廠商、價格、排序、分頁可運作並反映 URL。
+- 查無商品、stale、unavailable 顯示正確。
+- 手機版可搜尋與瀏覽。
 
-至少測試：
+商品詳細頁：
 
-- `GET /api/categories` 只回傳 enabled 分類。
-- `GET /api/categories` 回傳 `displayName` 與 `sourceName`。
-- `GET /api/products` 預設只回傳 active 商品。
-- `GET /api/products` 可依 `q` 查詢商品。
-- `GET /api/products` 可依 `igrp` 篩選分類。
-- `GET /api/products` 可依 `minPrice`、`maxPrice` 篩選目前價格。
-- `GET /api/products` 回傳主要商品圖片 URL、alt text 與圖片確認時間。
-- `GET /api/products` 若讀 `product_list_view`，價格、幣別與 captured time 仍以 price snapshot 為真相來源。
-- `GET /api/products` 支援 `price_asc`、`price_desc`、`name_asc`。
-- `GET /api/products` 支援分頁並限制 `pageSize` 上限。
-- 不合法 query 回傳 `400` 與泛用 `invalid_query`。
-- 商品不存在時 `GET /api/products/{id}` 回傳 `404`。
-- 商品詳情回傳主要商品圖片 URL、alt text 與圖片確認時間。
-- inactive 商品詳情仍可回傳 `200` 並標示 inactive。
-- `GET /api/source-status` 能區分 `ok`、`stale`、`unavailable`。
-- `GET /api/source-status` 能依 enabled 分類聚合全域狀態。
-- `GET /api/source-status` 的 `categories[]` 含分類層級狀態。
-- `GET /api/source-status` 的 top-level `lastCheckedAt` / `lastSuccessAt` 符合聚合規則。
+- active / inactive 商品可開啟。
+- 不存在商品顯示找不到。
+- 原始商品名稱、圖片、價格、來源與狀態顯示完整。
+- 來源連結不含 `PHPSESSID`。
 
-API 測試不應暴露：
+Playwright 驗證需使用可設定 base URL 或相對導覽，避免硬寫單一 localhost port。
 
-- computed `source_item_key`。
-- `iBuyToken`。
-- raw snapshot。
-- parse error。
-- 內部錯誤堆疊。
+## Deployment Smoke
 
-## Web UI 驗收
+Private validation 先限 Docker / Compose / DB / web API，不公開流量、不 live crawl。
 
-第一版 UI 先使用手動驗收 checklist，不先導入瀏覽器 E2E。
-
-首頁至少驗收：
-
-- 預設商品列表可載入。
-- 搜尋字串會反映在 URL query。
-- 分類篩選可運作。
-- 價格篩選可運作。
-- 排序可運作。
-- 分頁可運作。
-- 查無商品時顯示空狀態。
-- `stale` 時顯示最近未成功檢查來源的低干擾提示，避免暗示原價屋價格必須更頻繁更新。
-- `unavailable` 時不誤顯示為查無商品。
-- 手機版 RWD 可正常搜尋與瀏覽。
-
-商品詳細頁至少驗收：
-
-- active 商品可開啟。
-- inactive 商品可開啟並顯示狀態提示。
-- 商品不存在時顯示找不到商品。
-- 商品詳細頁完整顯示原始商品名稱，不要求拆解規格欄位。
-- 來源連結可開啟原價屋分類頁。
-- 來源連結不包含 `PHPSESSID`。
-
-## Deployment Smoke Test
-
-正式部署流程建立後，至少應有手動 smoke test。
-
-Phase 6 private validation 階段的 smoke test 應先限制在 Docker / Compose / DB / web API，不公開流量也不做 live crawl。
-
-private validation 檢查：
+至少檢查：
 
 - `docker compose config` 可解析。
 - Docker build 成功。
-- `migrate` service 可執行並以 exit code 0 結束。
-- `seed` service 可執行並以 exit code 0 結束。
+- `migrate`、`seed` exit code 0。
 - `postgres` healthy。
-- `web` healthy。
-- `/api/source-status` 回 `HTTP 200`。
-- `/api/source-status` response 內含 8 個第一版 CoolPC 分類。
-- `web` 只綁定 `127.0.0.1:3000`，不直接對外公開。
-- `crawler` manual profile 可顯示 help / 參數說明，但不執行 live fetch。
-- snapshot storage 與 product image cache volume 可由 crawler container 寫入。
-- `web` runtime image 不包含 repo-owned `.env` / `.env.example`、`.git`、`docs/`、`logs/`、`compose.yml`、`Dockerfile` 或 app/package `*.test.ts` 等不必要檔案；`node_modules` 內第三方套件自帶檔案另由 production runtime image optimization 處理。
+- `web` healthy 且只綁 `127.0.0.1`。
+- `/api/source-status` 回 `HTTP 200` 且有 8 個第一版分類。
+- manual crawler 顯示 help，不發 live request。
+- snapshot 與 product image cache volume 可寫。
+- runtime image 不包含 repo secrets、docs、tests、fixtures、local runtime data。
 
-公開前或正式網域階段再補的 smoke test：
+公開前再補：
 
-- Cloudflare Tunnel `public-tunnel` profile 可啟動。
-- 正式網域 HTTPS 可連線。
-- production CSP / report-only 決策已驗證。
-- 首頁可透過正式 URL 載入。
-- 商品列表可透過正式 URL 查詢。
-- 商品圖片 API 可透過正式 URL 回應。
-- crawler 成功寫入一輪有效資料，或明確記錄失敗原因。
+- Cloudflare Tunnel profile。
+- 正式 HTTPS URL。
+- 商品列表、商品詳細、圖片 API。
+- CSP / security headers。
+- crawler 成功資料寫入或明確失敗證據。
 
-若 crawler 發現疑似攔截，部署驗收應停止 crawler 並保留異常內容供檢查，不應用重試硬打來源站。
+## Phase Closeout
 
-## 開發階段驗收
+每個階段至少執行對應檢查：
 
-正式開發時，每個階段結束前至少做對應檢查。
+| 階段 | 最小檢查 |
+| --- | --- |
+| 文件 | `git diff --check`，索引與待決事項同步 |
+| 初始化 | `pnpm install`、`pnpm test`、`pnpm check` |
+| DB | Prisma generate / migrate / seed / view validation |
+| Crawler | parser、validation、data-flow tests |
+| API | route / query tests，不暴露內部欄位 |
+| Web UI | `pnpm check`，手動或 Playwright 驗收 |
+| 部署 | Docker build、migration、seed、service smoke |
 
-### 文件階段
+## Live Fetch 規則
 
-- `git diff --check`
-- 文件索引已更新。
-- 待決事項沒有和已確認決策互相衝突。
-
-### 專案初始化階段
-
-- `pnpm install`
-- `pnpm check`
-- `pnpm test`
-
-### 資料模型階段
-
-- Prisma schema 可產生 client。
-- migration 可在本機 PostgreSQL 執行。
-- 基本 seed 或測試資料可建立。
-- SQL view / projection 可由 migration 建立，且可由核心表重建。
-
-### Crawler 階段
-
-- parser fixture tests 通過。
-- response validation tests 通過。
-- data flow tests 通過。
-- 不使用 live 原價屋請求作為常規測試。
-
-### API 階段
-
-- API query 邏輯 tests 通過。
-- 錯誤狀態 tests 通過。
-- 不暴露內部欄位。
-- 圖片資料流可用 `pnpm smoke:coolpc-image-flow` 手動驗證 raw HTML -> crawler -> DB -> product API；此 smoke 使用 rollback transaction，不保留 DB 測試資料。
-
-### Web UI 階段
-
-- `pnpm check` 通過。
-- 商品查詢頁手動驗收完成。
-- 商品詳細頁手動驗收完成。
-- 桌面與手機版 RWD 基本檢查完成。
-
-### 部署階段
-
-- Docker build 成功。
-- migration 可執行。
-- seed 可執行並建立第一版分類。
-- services 可啟動。
-- `/api/source-status` 回 `HTTP 200`。
-- smoke test 完成。
-
-## Live Fetch 測試規則
-
-實際連線原價屋的測試只能手動執行，不放進常規自動化測試。
-
-規則：
-
-- 遵守 crawler 5 分鐘週期。
-- 不重疊啟動 crawler。
-- 疑似攔截時立即停止。
-- 保存異常 snapshot。
-- 不用快速重試硬打來源站。
-- 測試結果應轉成 fixture 或 raw snapshot，供後續離線測試使用。
+- 只能手動或明確 profile 執行。
+- 遵守 5 分鐘週期、不重疊、不快速重試。
+- 疑似攔截立即停止並保存 snapshot。
+- 測試結果應轉成 fixture 或 raw snapshot，供離線測試使用。

@@ -1,373 +1,233 @@
 # 資料流設計
 
-本文件定義 PartsRadarTW 第一版資料如何從原價屋公開頁面進入系統，並支撐網站查詢。實際資料表、API contract 與 crawler 實作細節會在後續文件或實作階段再細化。
-
-尚未定案的資料流決策統一記錄於 [decision-log.md](decision-log.md)，本文件不另外維護待決清單。
+本文件描述 CoolPC 資料從來源頁進入網站的狀態轉換。資料表欄位細節見 [資料模型](../technical/data-model.md)，crawler 行為細節見 [Crawler 設計](../technical/crawler-design.md)。
 
 ## 目標
 
-第一版資料流要先做到：
+- 網站只顯示已成功處理的有效資料。
+- HTTP 200 但內容異常時，不更新正式商品與價格。
+- 價格歷史可追溯，未變價格不重複寫入 snapshot。
+- raw snapshot 可追查、去重、保留期限明確，且清理不影響價格歷史。
+- 第一版只支援 CoolPC / 原價屋；DB 不保存固定值 `source = coolpc`。
 
-- 能重複抓取原價屋商品資料。
-- 能判斷同一個原價屋商品是否已存在。
-- 能取得、驗證並保存商品主要圖片 URL。
-- 能更新商品目前價格。
-- 能保留價格更新紀錄。
-- 能讓網站查詢到目前有效的商品資料。
-- 抓取或解析失敗時能留下可追查資訊。
-- 能辨識 HTTP 200 但內容實際為攔截頁或非商品資料頁的情況。
+## 資料範圍
 
-## 第一版資料範圍
+第一版分類：
 
-第一版先處理組一台電腦會用到的主要硬體分類，後續再逐步補齊原價屋其他類別與產品。
+| 類別 | IGrp |
+| --- | ---: |
+| CPU | 4 |
+| 主機板 | 5 |
+| 記憶體 | 6 |
+| SSD / HDD | 7 |
+| 散熱器 | 10 |
+| 顯示卡 | 12 |
+| 機殼 | 14 |
+| 電源供應器 | 15 |
 
-優先分類包含：
+不列入第一版：外接儲存 `8`、水冷 `11`、風扇 / 配件 `16` 與其他原價屋分類。
 
-- CPU。
-- 主機板。
-- 記憶體。
-- 顯示卡。
-- SSD / HDD。
-- 電源供應器。
-- 機殼。
-- 散熱器。
-
-商品分類第一版先保留原價屋分類脈絡。資料庫應同時保存原價屋分類名稱與 PartsRadarTW 顯示名稱，讓 crawler 可追溯來源分類，網站也能使用較簡潔的分類標籤。
-
-第一版只支援原價屋 CoolPC，不在核心資料表預留多來源抽象欄位。原價屋分類外部鍵是 `IGrp`，由 `source_categories.igrp` 唯一表示。
-
-## Truth Tables 與 Read Projection
-
-第一版資料流分成兩層：
-
-- Domain Truth tables：crawler 寫入的核心資料表，包含 `source_categories`、`products`、`price_snapshots`、`current_prices`、`crawl_runs`、`crawl_run_category_results`、`raw_snapshots`、`parse_errors`。這些表盡量維持 3NF，不為 API 查詢方便新增可由關聯推出的欄位。
-- Read Projection / View：API 或 UI 可讀取的查詢投影，例如 `product_list_view`。Projection 可反正規化 read shape，但必須能由 truth tables 重建，且不可作為 crawler 寫入真相來源。
-
-第一版先使用普通 SQL view，不使用 materialized view 或 cache。若未來普通 view 效能不足，再依實際查詢計畫評估 materialized view、refresh 策略或其他 cache。
-
-## 整體流程
+## 流程總覽
 
 ```text
-原價屋 `eachview.php?IGrp={分類編號}` 分類頁
-  -> fetch raw page（抓取原始頁面）
-  -> raw snapshot（原始資料快照）
-  -> validate response content（驗證回應內容）
-  -> parse product candidates and image URL（解析候選商品與主要圖片 URL）
-  -> validate parsed items（驗證解析結果）
-  -> normalize and validate image URL（正規化並驗證圖片 URL）
-  -> upsert products（新增或更新商品主檔）
-  -> insert price snapshots when needed（必要時寫入價格快照）
-  -> update current prices（更新目前價格）
-  -> product_list_view（商品列表查詢投影）
-  -> read API（讀取 API）
-  -> web UI（網站介面）
+source_categories
+  -> crawler fetch eachview.php?IGrp={igrp}
+  -> raw_snapshots metadata + compressed HTML
+  -> response content validation
+  -> parser
+  -> parsed item validation
+  -> products / price_snapshots / current_prices
+  -> product_list_view or equivalent join
+  -> API
+  -> Web UI
 ```
 
-## 資料階段
+## Truth Tables 與 Projection
 
-### Raw Snapshot
+Domain truth tables：
 
-每次抓取原價屋頁面後，應先保留原始資料快照，再進行解析。
+- `source_categories`
+- `products`
+- `price_snapshots`
+- `current_prices`
+- `crawl_runs`
+- `crawl_run_category_results`
+- `raw_snapshots`
+- `parse_errors`
 
-用途：
+Read projection：
 
-- 方便重跑 parser。
-- 方便追查原價屋頁面變動。
-- 方便比對抓取失敗或解析失敗原因。
+- `product_list_view`
 
-Raw snapshot 至少應記錄：
+Projection 只服務 API / UI 查詢，可由核心表重建；crawler 不寫 projection。
 
-- `source_category_id`：對應 `source_categories`，`IGrp` 與原價屋分類名稱由分類主檔取得。
-- 抓取 URL：第一版主要為 `eachview.php?IGrp={分類編號}`。
-- 抓取時間。
-- HTTP 狀態或錯誤資訊。
-- 內容判定狀態，例如 valid、suspected_block、invalid。
-- 內容 hash。
-- 原始 HTML 壓縮檔路徑或可重放的原始內容位置。
-- 若內容與既有 snapshot 完全相同，記錄重複來源 snapshot。
+## Raw Snapshot
 
-Raw snapshot 保存方式：
+每次 fetch 都要建立 raw snapshot metadata，無論成功、fetch failed、suspected block 或 parse failed。
 
-- 重要 metadata、內容判定狀態與錯誤資訊存入資料庫。
-- 原始 HTML 在解析使用後壓縮保存成檔案。
-- 原始 HTML 需以內容 hash 去重；內容完全相同時，不重複保存相同壓縮檔。
-- 重複內容的 snapshot metadata 應指向既有 raw snapshot 或記錄 `duplicate_of_snapshot_id`。
-- 一般 snapshot 最長保留 30 天。
-- 異常 snapshot 最長保留 90 天。
-- raw snapshot 清理不得影響長期價格歷史；若 price snapshot 參照 raw snapshot，該關聯需允許清空或以不破壞外鍵的方式處理。
-- 保存期限未來可依實際儲存空間、除錯需求與資料量調整。
+保存內容：
 
-HTTP 狀態碼不可作為唯一成功依據。過去經驗顯示，原價屋在短時間內請求頻率過快時，可能回傳 HTTP 200，但頁面內容已變成攔截或提示頁，而不是原本的商品資料頁。
+- `source_category_id`
+- URL、fetch time、HTTP status 或 fetch error
+- content status
+- raw content hash、parsed result hash
+- compressed HTML path
+- duplicate snapshot reference
+- `crawl_run_id`
 
-### Response Content Validation
+規則：
 
-Raw snapshot 進入 parser 前，應先做內容層驗證。
+- 原始 HTML 壓縮保存到檔案，metadata 存 DB。
+- raw content hash 相同時不重複保存 gzip。
+- 一般 snapshot 最長保留 30 天，異常 snapshot 最長保留 90 天。
+- 清理 raw snapshot 不得刪除 `price_snapshots`；長期資料需使用 nullable reference 或等效策略。
 
-驗證目標：
+## Response Content Validation
 
-- 判斷回應內容是否仍是預期的原價屋商品或分類頁。
-- 偵測 HTTP 200 但內容為攔截頁、提示頁或非預期頁面的情況。
-- 避免把攔截頁解析成空商品、錯誤商品或覆蓋既有有效資料。
+進 parser 前必須確認內容仍像 CoolPC 分類頁。
 
-第一版可先用保守規則：
+有效條件：
 
-- 內容必須包含商品列表可辨識的穩定結構或關鍵欄位。
-- 若內容符合已知攔截頁特徵，該 snapshot 標記為 `suspected_block`。
-- 若內容缺少商品頁必要結構，不直接進入正式商品更新流程。
-- 疑似被攔截時應記錄 crawl run 狀態，並交由後續重試或人工檢查。
+- title 包含預期分類名稱或可接受關鍵字。
+- 存在 `div.w`、`div.t`、`div.x`。
+- 至少解析到一筆具 token、名稱與價格的商品。
 
-### Parsed Item
+validation 失敗時：
 
-Parser 應把 raw snapshot 轉成網站可用的標準商品資料。
+- 標記 `suspected_block` 或 `invalid`。
+- 不進 product upsert、price snapshot 或 current price 更新。
+- 保留 raw snapshot 與錯誤資訊供人工檢查。
 
-第一版 parsed item 至少應包含：
+## Parsed Item
 
-- 原價屋分類，後續需對應到 `source_categories`。
-- 商品原始名稱。
-- 商品價格。
-- 幣別。
-- 商品主要圖片 URL。
-- 原始頁面或商品連結。
-- 資料抓取時間。
-- `iBuyToken`。
-- computed `source_item_key`，只作為 crawler / shared helper 的來源識別字串，不存入 DB。
+parser 對每筆候選商品輸出：
 
-可選欄位：
+- `sourceCategoryId`
+- `igrp`，只作輸入脈絡與 computed key，不寫入 product / raw snapshot / parse error。
+- 原價屋分類名稱。
+- `iBuyToken`
+- computed `source_item_key`
+- 原始商品名稱與 normalized name。
+- 主要商品圖片 URL。
+- discussion / 產品介紹 URL，若來源列有可用連結。
+- 價格與 `TWD`。
+- source page URL。
+- fetched time。
 
-- parser 補充資訊。
-
-商品圖片資料流：
-
-```text
-CoolPC source HTML
-  -> crawler parser 擷取商品主要圖片 URL
-  -> 驗證與正規化 URL
-  -> 寫入 product presentation data
-  -> API 回傳主要商品圖片
-  -> Web UI 顯示縮圖與詳細頁圖片
-```
-
-圖片 URL 必須來自 crawler 對原價屋公開 HTML 的解析結果，不接受使用者任意輸入 URL。parser 需處理相對路徑、絕對路徑、HTML entity、空值與不合法 URL，並只接受可正規化為 `https://www.coolpc.com.tw/eval/{IGrp}/{filename}.{jpg|jpeg|png|gif|webp}` 的圖片 URL。缺少圖片、圖片 URL 不合法或來源網域不符合預期時，應記錄為 `invalid_image_url` validation issue，該候選商品不進入正式商品資料；寫入 `parse_errors` 時可在 `raw_image_url` 保存原始圖片 URL 供內部 debug 與驗證，不暴露到公開 API/UI。缺圖 fallback 僅是 UI 容錯，不代表資料契約可以沒有圖片。
-
-第一版不解析品牌、腳位、容量、瓦數等結構化規格欄位。若 parser 只能取得原始商品名稱，UI 不應假裝有結構化規格；規格整理需等資料品質觀察後另開 phase 或決策。
-
-### Product
-
-Product 是商品主檔，用來表示同一個原價屋商品。
-
-商品主檔應使用內部 UUID 作為資料庫主鍵。資料庫唯一性使用 `source_category_id + ibuy_token`，crawler 需要穩定來源識別字串時可由同一組資料計算 `source_item_key`。
-
-概念欄位：
-
-- `id`：內部 UUID。
-- `source_category_id`：原價屋分類主檔。
-- `ibuy_token`。
-- `name`：商品原始名稱。
-- `primary_image_url`：主要商品圖片 URL。
-- `primary_image_checked_at`：主要商品圖片最後一次被來源資料確認的時間。
-- `source_url`：原始來源連結。
-- `created_at`。
-- `updated_at`。
-
-### Price Snapshot
-
-首次看到商品價格或價格變動時，應寫入一筆價格紀錄。
-
-用途：
-
-- 支撐未來價格歷史與趨勢圖。
-- 支撐未來價格提醒。
-- 保留價格變化的可追溯紀錄。
-
-概念欄位：
-
-- `product_id`。
-- `price`。
-- `currency`。
-- `captured_at`。
-- `crawl_run_id`。
-- `raw_snapshot_id`，可為空，用來追溯當時來源 snapshot。
-
-Price snapshot 屬於長期價格資料，不套用 raw snapshot 的 30 / 90 天保存期限。若對應 raw snapshot metadata 或壓縮檔因保存期限被清理，price snapshot 仍必須保留；`raw_snapshot_id` 可被清空，但 `product_id`、價格、幣別、`captured_at` 與 `crawl_run_id` 不可因此遺失。若未來資料量過大，再另行規劃價格歷史彙總或封存策略。
-
-### Current Price
-
-網站第一版主要讀取目前有效價格。
-
-Current price 使用獨立 `current_prices` 表，讓網站商品列表、搜尋與基本詳細頁可以穩定讀取最新有效價格。
-
-`current_prices` 不取代價格歷史。價格歷史由 price snapshots 保存；`current_prices` 只保存目前 `price_snapshot` 指標與狀態時間，不重複保存價格、幣別或 `captured_at`。網站要顯示價格時，需透過 `current_prices.price_snapshot_id` 讀取對應的 `price_snapshots`。
-
-更新規則：
-
-- 新商品或價格變動時，寫入 price snapshot，並更新 `current_prices`。
-- 價格未變時，可只更新 `current_prices.last_seen_at`，避免每 5 分鐘產生大量重複歷史紀錄。
-- 抓取失敗、疑似攔截或解析異常時，不更新 `current_prices`。
-
-時間欄位應區分不同意義：
-
-- `last_checked_at`：系統最後一次檢查來源頁面的時間。
-- `last_success_at`：系統最後一次成功抓取、驗證並解析有效資料的時間。
-- `last_seen_at`：商品最後一次仍在來源中被看見的時間。
-- `captured_at`：價格快照實際被記錄的時間。
-- `price_changed_at`：目前價格最後一次變動的時間。
-
-### Crawl Run Category Result
-
-每一輪 crawl 的分類層級結果寫入 `crawl_run_category_results`，不存入 `crawl_runs.category_results` JSONB。
-
-每筆結果代表同一輪 crawl 對某一個 `source_category_id` 的處理結果，至少包含：
-
-- `crawl_run_id`。
-- `source_category_id`。
-- `status`：`success_changed`、`success_unchanged`、`fetch_failed`、`suspected_block` 或 `parse_failed`。
-- `raw_snapshot_id`，可為空。
-- `error_message`，可為空。
-
-這張表是更新 `source_categories.last_checked_at` / `last_success_at` 與後續分類層級狀態查詢的依據。
-
-## 商品識別
-
-商品識別採兩層設計：
-
-- 內部 UUID：給資料表關聯與 API 回傳使用。
-- `source_category_id + ibuy_token`：DB 判斷同一個原價屋商品的唯一鍵。
-- computed `source_item_key`：給 crawler、log 或 shared helper 表示來源商品使用，不存入 DB。
-
-computed `source_item_key` 具體格式：
+computed key 格式：
 
 ```text
 coolpc:igrp:{IGrp}:ibuy:{iBuyToken}
 ```
 
-規則：
+此 key 不存 DB；正式商品唯一性使用 `source_category_id + ibuy_token`。
 
-1. `IGrp` 來自原價屋分類編號。
-2. `iBuyToken` 來自 `eachview.php?IGrp={分類編號}` 的商品區塊。
-3. DB 不保存 `source_item_key` 欄位；需要字串時由 `sourceCategory.igrp + ibuyToken` 在程式層組出。
-4. 不使用每次新產生的 UUID 判斷商品是否相同。
-5. 不單獨依賴商品名稱，避免名稱微調造成價格歷史斷裂。
-6. 不使用價格作為商品識別依據。
-7. 不使用 `PHPSESSID` 作為商品識別或穩定來源 URL 的一部分。
+## Parsed Item Validation
 
-若商品沒有 `iBuyToken`，第一版不匯入正式商品資料，但應保留解析紀錄與 raw snapshot，方便後續檢查。
+候選商品需滿足：
 
-## 更新排程
+- `iBuyToken` 不空。
+- 商品名稱不空。
+- 價格是大於 0 的整數。
+- 主要圖片 URL 可正規化並通過 CoolPC allowlist。
+- 同一分類同一 snapshot 內沒有相同 token 對應不同商品名稱或價格。
 
-第一版 crawler 以每 5 分鐘檢查一次是否可啟動下一輪 crawl cycle 為目標。
+不合格候選：
 
-排程規則：
+- 不寫入正式商品與價格。
+- 寫入 `parse_errors`，必要時保存內部 debug 用 `raw_image_url`。
+- 不把 raw HTML、raw image URL 或 validation detail 暴露給公開 API。
 
-- 若上一輪 crawl 尚未完成，不啟動新的 crawl cycle。
-- 每 5 分鐘是啟動檢查頻率，不保證每 5 分鐘完成一輪完整抓取。
-- 實際完整抓取時間需配合分類數量、請求延遲與攔截風險調整。
+完全重複列若 token、名稱與價格都相同，可去重保留一筆。
 
-## 成功流程
+## Product 與 Price 更新
 
-一次成功資料更新應符合下列流程：
+商品 identity：
 
-1. 建立 crawl run。
-2. 抓取原價屋公開頁面。
-3. 保存 raw snapshot。
-4. 驗證 response content 確實是可解析的商品資料頁。
-5. 解析商品資料。
-6. 驗證 parsed item 必要欄位。
-7. 用 `source_category_id + ibuy_token` upsert product；必要時同步計算 `source_item_key` 供 log 或 duplicate detection。
-8. 新商品或價格變動時寫入 price snapshot。
-9. 更新目前價格讀取口徑。
-10. 寫入 `crawl_run_category_results` 記錄分類層級結果。
-11. 更新分類層級的 `last_checked_at` 與 `last_success_at`。
-12. `product_list_view` 透過核心表 join 反映更新後資料。
-13. 網站可查詢到更新後資料。
+- `source_category_id + ibuy_token`
 
-### 資料未變流程
+新商品：
 
-若本次抓取、內容驗證與解析都成功，但商品清單與價格相較上一個成功結果完全沒有變化，應視為成功檢查，不視為失敗或異常。
+- upsert `products`
+- 建立第一筆 `price_snapshots`
+- 建立 `current_prices`
 
-處理規則：
+價格變動：
 
-- crawl run 記錄為成功，狀態標記為 `success_unchanged`。
-- 更新來源或分類層級的 `last_checked_at`。
-- 更新來源或分類層級的 `last_success_at`，因為 fetch、內容驗證與解析都已成功。
-- 不新增 price snapshot，避免重複價格歷史。
-- 不重複 upsert 所有商品，避免不必要的 DB 寫入。
-- 可依實作需要更新 `current_prices.last_seen_at`，表示商品仍存在於來源頁。
-- raw snapshot 以內容 hash 去重；若原始 HTML 與既有 snapshot 完全相同，不重複保存相同壓縮檔。
+- 新增 `price_snapshots`
+- 更新 `current_prices.price_snapshot_id`
+- 更新 `price_changed_at` 與 `last_seen_at`
+
+價格未變：
+
+- 不新增重複 `price_snapshots`
+- 可更新 `current_prices.last_seen_at`
+- 分類仍可記為成功檢查
+
+商品從來源消失：
+
+- 不刪 product，不刪 price snapshots。
+- 先記錄 `missing_since` / `missing_seen_count`。
+- 連續 6 次成功 crawl 都未看到同一商品才改為 inactive。
+- 相同 identity 重新出現時恢復 active 並延續歷史。
+
+## Crawl Run 狀態
+
+分類層級結果寫入 `crawl_run_category_results`：
+
+- `success_changed`
+- `success_unchanged`
+- `fetch_failed`
+- `suspected_block`
+- `parse_failed`
+
+整輪 `crawl_runs` 摘要：
+
+- 全部成功且有變更：`success_changed`
+- 全部成功且未變：`success_unchanged`
+- 成功與失敗混合：`success_with_errors`
+- 疑似攔截：`suspected_block`
+- 沒有任何分類成功：對應失敗狀態
+
+`crawl_runs` 不保存可由分類結果推得的 summary cache，例如 checked count、changed count 或 error category key。
 
 ## 失敗處理
 
-### 抓取失敗
+Fetch failed：
 
-若頁面無法抓取，應記錄：
+- 寫 raw snapshot metadata 或 fetch error。
+- 更新分類 `last_checked_at`。
+- 不更新 `last_success_at`、product、price 或 current price。
+- 可繼續下一分類。
 
-- 抓取 URL。
-- 發生時間。
-- HTTP 狀態或錯誤訊息。
-- crawl run 狀態。
+Suspected block：
 
-抓取失敗不應刪除既有商品資料。
+- 標記 snapshot。
+- 更新分類 `last_checked_at`。
+- 停止當輪 crawl。
+- 不更新正式商品與價格。
+- 進入 backoff 規則。
 
-分類層級的 fetch failed 只代表該分類本次失敗。該分類可更新 `last_checked_at`，但不得更新 `last_success_at`。第一版可繼續處理下一個分類，並將整輪 crawl 記錄為 `success_with_errors` 或對應的部分成功狀態。只有疑似被攔截、進入 backoff、或整輪都無法取得有效資料時，才停止或標記整輪失敗。
+Parse failed：
 
-### 商品從來源消失
+- 保存 raw snapshot 與 parse error。
+- 更新分類 `last_checked_at`。
+- 不更新 `last_success_at`。
+- 不累計 missing count。
+- 可繼續下一分類。
 
-若某次成功 crawl 沒有看到既有商品，不應立即刪除 product，也不應刪除 price snapshot。
+## API / Web 讀取口徑
 
-處理規則：
+網站讀取：
 
-- 先記錄商品 missing 狀態，例如 `missing_since` 或 `missing_seen_count`。
-- 不立即將商品視為永久下架，避免原價屋短暫頁面異常造成誤判。
-- 連續 6 次成功 crawl 都未看到同一商品時，才將商品改為 inactive。
-- 若商品未來以相同 `source_category_id + ibuy_token` 重新出現，應恢復 active 並延續原價格歷史。
-- 網站是否顯示 inactive 商品，留待網站呈現規則決定。
+- `product_list_view` 或等價 join。
+- `source_categories`。
+- 站內商品圖片 API。
 
-### 疑似被攔截
+網站不直接讀取：
 
-若 HTTP 狀態碼為 200，但內容判定為攔截頁、提示頁或非預期商品頁，應視為資料抓取未成功。
+- raw snapshots。
+- parse errors。
+- crawler internal error detail。
 
-應記錄：
-
-- 抓取 URL。
-- 發生時間。
-- HTTP 狀態碼。
-- 內容判定狀態。
-- 命中的攔截頁或非預期內容特徵。
-- crawl run 狀態。
-
-疑似被攔截時不應進入 product upsert 或 price snapshot 寫入流程，也不應覆蓋既有目前價格。
-
-疑似被攔截時可更新命中分類的 `last_checked_at`，但不得更新 `last_success_at`。接著應立即停止當次 crawl cycle，等待下一次 5 分鐘循環再嘗試。若連續失敗多次，下一輪應延後 1 小時。
-
-異常狀況應保留紀錄，包含命中的內容特徵、失敗分類、失敗時間與 crawl run 狀態。這些紀錄未來可作為 Discord bot 通知管理者的資料來源。
-
-### 解析失敗
-
-若 raw snapshot 存在但 parser 無法解析，應保留 raw snapshot 與錯誤資訊，方便後續修正 parser 後重跑。
-
-解析失敗不應直接覆蓋既有商品資料。
-
-分類層級的 parse failed 可更新該分類的 `last_checked_at`，但不得更新 `last_success_at`，也不應累計該分類商品的 missing count，因為本次沒有得到可靠的成功商品清單。第一版可繼續處理下一個分類，並保存該分類的錯誤結果供後續修正 parser。
-
-### 商品識別失敗
-
-若商品缺少 `iBuyToken`、無法對應 `source_category_id`，或無法產生可靠的 computed `source_item_key`，第一版不寫入正式商品主檔，但應保留解析紀錄與 raw snapshot，方便後續檢查。
-
-## 網站讀取口徑
-
-網站第一版應只讀取已成功處理的商品資料。
-
-商品列表 API 可優先讀取 `product_list_view`，也可直接 join 核心表取得同樣結果。`product_list_view` 是 projection，可刪除後重建；crawler 不寫入它。
-
-網站需要的基本資料：
-
-- 商品主要圖片。
-- 商品名稱。
-- 原價屋分類。
-- 目前價格。
-- 幣別。
-- 資料更新時間。
-- 原價屋來源連結。
-
-第一版來源連結先指向不含 `PHPSESSID` 的原價屋分類頁，不保證能直接定位到單一商品。
-
-最新一次抓取失敗、疑似攔截或解析失敗時，網站仍顯示最後一次成功處理的有效資料，並透過來源狀態呈現資料是否可能過期。來源狀態規則以 [decision-log.md](decision-log.md) 為準，API contract 與 UI 呈現分別由 API 與 Web UI 文件定義。
+使用者看到的來源狀態只描述 crawler / parser / source data sync，不代表商品是否可購買。

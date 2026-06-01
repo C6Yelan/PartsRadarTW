@@ -1,45 +1,27 @@
 # 文件目錄
 
-本目錄保存 PartsRadarTW 的專案文件。正式開發前，先以規劃文件作為產品範圍、資料流與關鍵決策的依據。
+本目錄只保留現行規格與技術契約。若文件內容衝突，優先順序為：
+
+1. 現行程式碼與 migration。
+2. `docs/planning/` 與 `docs/technical/` 的 current docs。
 
 ## 結構
 
 ```text
 docs/
-  planning/
-    product-boundary.md
-    decision-log.md
-    data-flow.md
-    coolpc-source-analysis.md
-    implementation-roadmap.md
-    phase-02-coolpc-live-validation.md
-    phase-03-crawler-write-plan.md
-    phase-05-visual-language.md
-  technical/
-    tech-stack.md
-    architecture.md
-    crawler-design.md
-    data-model.md
-    api-design.md
-    web-ui-design.md
-    development-setup.md
-    deployment.md
-    security.md
-    testing-strategy.md
+  README.md
+  planning/             # 現行產品邊界、決策、roadmap、資料流
+  technical/            # 現行架構、API、crawler、DB、部署、安全、測試契約
 ```
 
-## 規劃文件
+## 現行規劃
 
 - [產品邊界](planning/product-boundary.md)
 - [決策紀錄](planning/decision-log.md)
-- [資料流設計](planning/data-flow.md)
-- [原價屋資料來源分析](planning/coolpc-source-analysis.md)
 - [實作 Roadmap](planning/implementation-roadmap.md)
-- [Phase 2 原價屋 live validation](planning/phase-02-coolpc-live-validation.md)
-- [Phase 3 Crawler 資料寫入實作計畫](planning/phase-03-crawler-write-plan.md)
-- [Phase 05 視覺語言草案](planning/phase-05-visual-language.md)
+- [資料流設計](planning/data-flow.md)
 
-## 技術文件
+## 技術契約
 
 - [技術選型](technical/tech-stack.md)
 - [系統架構](technical/architecture.md)
@@ -49,5 +31,6 @@ docs/
 - [Web UI 設計](technical/web-ui-design.md)
 - [開發環境設定](technical/development-setup.md)
 - [部署設計](technical/deployment.md)
+- [Operations Runbook](technical/operations-runbook.md)
 - [資安基準](technical/security.md)
 - [測試策略](technical/testing-strategy.md)

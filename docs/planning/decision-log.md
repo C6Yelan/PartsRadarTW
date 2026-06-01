@@ -14,8 +14,8 @@
 | 第一版需要保留原始來源脈絡 | 商品資料應顯示原價屋資料來源、更新時間，並能讓使用者回到原始頁面確認最新資訊。 |
 | 第一版商品圖片是必要資料 | 商品列表與商品詳細頁都需要主要商品圖片；圖片 URL 需由 crawler 從原價屋公開頁面解析、驗證與正規化後寫入資料庫，再由 API 回傳給 Web UI。缺圖只能作為容錯或資料完整性風險，不是第一版 happy path。 |
 | CoolPC 商品圖片 selector 與 allowlist | 2026-05-28 以 saved raw HTML 與 manual live validation 驗證，第一版目標分類的商品列附近可由 `<img src="/eval/{IGrp}/{filename}">` 取得主要圖片。實作只接受可正規化為 `https://www.coolpc.com.tw/eval/{IGrp}/{filename}.{jpg|jpeg|png|gif|webp}` 的 URL；`/eval/{IGrp}/`、缺副檔名或外部網域需記錄為 `invalid_image_url` 類 validation issue，不進入正式商品資料。`parse_errors.raw_image_url` 只保留原始圖片 URL 供內部 debug 與 validation，不暴露到公開 API/UI。 |
-| 商品圖片來源 URL 目前只限驗證用途 | 目前階段允許暫時使用 CoolPC / 原價屋來源圖片 URL，目的僅限本機開發、資料流驗證與小範圍測試。此決策不代表已取得圖片授權，也不代表一定符合合理使用。Phase 5 前必須完成圖片呈現方式更換，不讓正式 Phase 5 UI 以直接 hotlink 來源圖片作為完成狀態。 |
-| 商品圖片呈現策略採自家小尺寸縮圖快取 | Phase 5 前需完成自家小尺寸縮圖快取，前端顯示站內商品圖片 API URL，不讓每位訪客直接消耗來源站圖片流量，也不依賴部署時圖片資料夾與 Web app 原始碼位在固定相對位置。placeholder / 分類圖示只作為缺圖、下載失敗或移除圖片後的 fallback。自家縮圖初始實作採手動 backfill，不在訪客請求期間抓取來源圖片；來源圖片請求需使用低頻率與浮動間隔。 |
+| 正式 UI 不依賴來源圖片 hotlink | CoolPC / 原價屋來源圖片 URL 僅作為 crawler 解析、驗證與縮圖建立來源；正式 UI 不能以直接 hotlink 來源圖片作為完成狀態。此決策不代表已取得圖片授權，也不代表一定符合合理使用；若來源圖片取得不穩，需標為資料完整性風險。 |
+| 商品圖片呈現策略採自家小尺寸縮圖快取 | 第一版正式 UI 顯示站內商品圖片 API URL 與自家小尺寸縮圖快取，不讓每位訪客直接消耗來源站圖片流量，也不依賴部署時圖片資料夾與 Web app 原始碼位在固定相對位置。placeholder / 分類圖示只作為缺圖、下載失敗或移除圖片後的 fallback。自家縮圖初始實作採手動 backfill，不在訪客請求期間抓取來源圖片；來源圖片請求需使用低頻率與浮動間隔。 |
 | 第一版 production 圖片儲存採 persistent volume | 第一版不先導入 object storage 或 CDN。production 商品縮圖快取使用 mounted persistent volume，`web` 只讀取 `PRODUCT_IMAGE_STORAGE_DIR` 並透過站內 API 回傳圖片，`crawler` 或 backfill 流程負責建立與更新縮圖。圖片 cache 需納入備份 / 搬遷計畫，不能視為可任意丟棄的暫存。 |
 | 第一版定位為非官方、非商業查詢工具 | PartsRadarTW 第一版是非官方、非商業的商品搜尋與價格整理工具，不處理購買、付款、訂單或售後服務。商品查看與購買應導回原價屋來源頁，實際資訊以來源頁為準。 |
 | 第一版先用 GitHub Issues 作為更正 / 移除請求入口 | 第一版 footer 已保留 GitHub Issues 作為臨時入口，讓來源方或權利人可以提出資料或圖片更正 / 移除請求。此入口不是正式法務通道，也不適合要求對方公開提交敏感資料；專用 email、聯絡頁或正式網域信箱延後到第二版或正式網域確定後處理。 |
