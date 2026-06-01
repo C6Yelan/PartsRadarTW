@@ -157,3 +157,134 @@
   height: 18px;
 }
 
+.history-panel {
+  display: grid;
+  gap: 18px;
+  padding: clamp(18px, 3vw, 28px);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-muted);
+}
+
+.history-header {
+  display: flex;
+  gap: 16px;
+  align-items: start;
+  justify-content: space-between;
+}
+
+.history-header h2 {
+  margin: 0;
+  color: var(--text-strong);
+  font-size: clamp(21px, 3vw, 30px);
+  line-height: 1.2;
+}
+
+.history-header p {
+  margin: 6px 0 0;
+  color: var(--muted);
+}
+
+.history-delta {
+  display: grid;
+  min-width: 150px;
+  gap: 3px;
+  text-align: right;
+}
+
+.history-delta span,
+.history-delta small {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.history-delta strong {
+  color: var(--text-strong);
+  font-size: 22px;
+  line-height: 1.15;
+}
+
+.history-delta.is-down strong {
+  color: #8fe0b2;
+}
+
+.history-delta.is-up strong {
+  color: #ffb08a;
+}
+
+.history-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.history-metrics div {
+  display: grid;
+  gap: 5px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.history-metrics span,
+.history-metrics small {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.history-metrics strong {
+  color: var(--text);
+  font-size: 18px;
+}
+
+.history-chart-wrap {
+  display: grid;
+  gap: 8px;
+}
+
+.history-chart {
+  width: 100%;
+  height: auto;
+  min-height: 160px;
+  color: var(--accent-strong);
+  overflow: visible;
+}
+
+.history-chart-grid {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.history-chart-line {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3;
+}
+
+.history-chart-point {
+  fill: var(--surface-strong);
+  stroke: currentColor;
+  stroke-width: 2;
+}
+
+.history-chart-axis {
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.history-empty {
+  margin: 0;
+  color: var(--muted);
+}
+
+.history-loading {
+  display: grid;
+}
+
+.history-chart-skeleton {
+  width: 100%;
+  min-height: 180px;
+}

@@ -1,6 +1,6 @@
 # API 設計
 
-第一版 API 只服務自家 Next.js 網站，不承諾第三方公開 API。所有 endpoint 都是 read-only；API 不觸發 crawler、不抓 CoolPC、不修改資料。
+API 只服務自家 Next.js 網站，不承諾第三方公開 API。所有 endpoint 都是 read-only；API 不觸發 crawler、不抓 CoolPC、不修改資料。
 
 ## 原則
 
@@ -19,10 +19,11 @@
 | GET | `/api/categories` | 分類清單 |
 | GET | `/api/products` | 商品列表、搜尋、篩選、排序、分頁 |
 | GET | `/api/products/{id}` | 商品詳細 |
+| GET | `/api/products/{id}/price-history` | 商品價格歷史 |
 | GET | `/api/product-images/{id}.webp` | 站內商品縮圖 |
 | GET | `/api/source-status` | 來源資料狀態 |
 
-第一版不提供帳號、提醒、Discord bot、購物、crawler trigger、raw snapshot 或 parse error API。
+不提供帳號、提醒、Discord bot、購物、crawler trigger、raw snapshot 或 parse error API。
 
 ## Response Format
 
@@ -135,7 +136,47 @@ Response shape：
 - 商品不存在回 `404`。
 - `source.url` 指向原價屋購買 / 查看導流，不含 session token。
 - `discussion` 來自來源列產品介紹 / 開箱討論連結；蝦皮、PDF、driver/download 類低品質 URL 回 `null`。
-- 第一版不回傳價格歷史、拆解規格、raw snapshot 或 parse error。
+- 商品詳細 endpoint 不內嵌價格歷史、拆解規格、raw snapshot 或 parse error；價格歷史由獨立 endpoint 讀取。
+
+## `GET /api/products/{id}/price-history`
+
+資料來源：`products`、`price_snapshots`、`current_prices`、`source_categories`。
+
+Query：
+
+| 參數 | 型別 | 預設 | 說明 |
+| --- | --- | --- | --- |
+| `days` | number | `90` | 僅接受 `7`、`30`、`90` |
+
+Response shape：
+
+- `productId`
+- `rangeDays`
+- `points[]`
+  - `amount`
+  - `currency`
+  - `observedAt`
+  - `source`
+- `summary`
+  - `pointCount`
+  - `startedAt`
+  - `endedAt`
+  - `lowest`
+  - `highest`
+  - `first`
+  - `latest`
+  - `deltaAmount`
+  - `deltaPercent`
+
+規則：
+
+- 只回傳 display-ready 商品的價格歷史；商品不存在、分類停用、缺圖片或無目前價格時回 `404`。
+- `days` 以目前時間回推，且只接受固定 allowlist，避免任意大型歷史查詢。
+- 價格歷史只讀 `price_snapshots` 與 `current_prices`，不觸發 crawler，也不依賴 raw snapshot 檔案。
+- `points` 依 `observedAt` 由舊到新排序。
+- `source = "price_snapshot"` 代表新商品或價格變動建立的 snapshot。
+- 若目前價格在 snapshot 後又被 crawler 看到且未變價，加入 `source = "current_price_confirmation"` 確認點，讓 UI 能畫出水平線。
+- 價格摘要只描述資料庫已記錄或確認的價格觀測點，不代表來源站更新頻率保證。
 
 ## `GET /api/product-images/{id}.webp`
 

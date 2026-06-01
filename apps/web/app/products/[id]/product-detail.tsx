@@ -3,6 +3,10 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import SiteDisclaimer from "../../site-disclaimer";
+import PriceHistoryPanel, {
+  type PriceHistoryLoadState,
+  type ProductPriceHistoryBody,
+} from "./price-history-panel";
 
 type LoadState = "idle" | "loading" | "ready" | "not-found" | "error";
 
@@ -47,16 +51,24 @@ export default function ProductDetail({
 }) {
   const [state, setState] = useState<LoadState>("idle");
   const [product, setProduct] = useState<ProductDetailBody | null>(null);
+  const [historyState, setHistoryState] = useState<PriceHistoryLoadState>("idle");
+  const [priceHistory, setPriceHistory] = useState<ProductPriceHistoryBody | null>(null);
   const [imageError, setImageError] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
     setState("loading");
+    setHistoryState("idle");
     setImageError(false);
     setProduct(null);
+    setPriceHistory(null);
 
-    fetch(`/api/products/${productId}`, { signal: controller.signal })
-      .then(async (productResponse) => {
+    async function loadProductDetail() {
+      try {
+        const productResponse = await fetch(`/api/products/${productId}`, {
+          signal: controller.signal,
+        });
+
         if (productResponse.status === 404) {
           setState("not-found");
           return;
@@ -69,14 +81,44 @@ export default function ProductDetail({
         const nextProduct = (await productResponse.json()) as ProductDetailBody;
         setProduct(nextProduct);
         setState("ready");
-      })
-      .catch((error: unknown) => {
+        setHistoryState("loading");
+
+        try {
+          const historyResponse = await fetch(
+            `/api/products/${productId}/price-history?days=90`,
+            {
+              signal: controller.signal,
+            },
+          );
+
+          if (historyResponse.status === 404) {
+            setHistoryState("unavailable");
+            return;
+          }
+
+          if (!historyResponse.ok) {
+            throw new Error("Failed to load price history.");
+          }
+
+          setPriceHistory((await historyResponse.json()) as ProductPriceHistoryBody);
+          setHistoryState("ready");
+        } catch (error: unknown) {
+          if (error instanceof DOMException && error.name === "AbortError") {
+            return;
+          }
+
+          setHistoryState("error");
+        }
+      } catch (error: unknown) {
         if (error instanceof DOMException && error.name === "AbortError") {
           return;
         }
 
         setState("error");
-      });
+      }
+    }
+
+    void loadProductDetail();
 
     return () => controller.abort();
   }, [productId]);
@@ -192,6 +234,10 @@ export default function ProductDetail({
             </div>
           </div>
         </section>
+      ) : null}
+
+      {state === "ready" && product ? (
+        <PriceHistoryPanel history={priceHistory} state={historyState} />
       ) : null}
       <SiteDisclaimer />
     </main>

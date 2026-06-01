@@ -88,8 +88,17 @@
 
   .category-list,
   .price-grid,
-  .detail-facts {
+  .detail-facts,
+  .history-metrics {
     grid-template-columns: 1fr;
+  }
+
+  .history-header {
+    display: grid;
+  }
+
+  .history-delta {
+    text-align: left;
   }
 
   .filter-panel summary {
@@ -256,4 +265,3 @@
     min-height: 300px;
   }
 }
-

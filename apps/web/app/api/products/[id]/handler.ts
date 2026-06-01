@@ -6,6 +6,7 @@ import {
 } from "@partsradar/shared";
 
 import { internalErrorResponse, jsonOk, notFoundResponse } from "../../_shared/responses";
+import { normalizeProductId } from "./product-id";
 
 // Discussion links are display-only references, so low-quality marketplace/download
 // targets are filtered before any stored URL reaches the public response.
@@ -37,8 +38,6 @@ const DISCUSSION_QUERY_PARAMS_TO_STRIP = new Set([
   "utm_source",
   "utm_term",
 ]);
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 const PRODUCT_DETAIL_SELECT = {
   // Keep the detail endpoint on public-safe fields only. ibuyToken is selected
   // only to build the outbound CoolPC purchase URL; it is not returned directly.
@@ -161,12 +160,6 @@ export function createGetProductHandler(
       return internalErrorResponse();
     }
   };
-}
-
-function normalizeProductId(productId: string): string | null {
-  const value = productId.trim().toLowerCase();
-
-  return UUID_PATTERN.test(value) ? value : null;
 }
 
 function toProductDetailResponse(product: ProductDetailRecord): ProductDetailResponseBody {
