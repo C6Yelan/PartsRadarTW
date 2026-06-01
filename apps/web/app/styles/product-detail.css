@@ -273,8 +273,14 @@
 }
 
 .history-metrics strong {
-  color: var(--text);
-  font-size: 18px;
+  color: var(--text-strong);
+  font-size: clamp(24px, 2.5vw, 34px);
+  line-height: 1.05;
+}
+
+.history-metrics div.is-primary strong {
+  color: var(--accent-strong);
+  font-size: clamp(30px, 3vw, 42px);
 }
 
 .history-chart-wrap {
@@ -342,18 +348,21 @@
   transform: translate(-50%, -50%);
 }
 
+.history-chart-point-button:focus {
+  outline: none;
+}
+
 .history-chart-point-button:focus-visible {
-  outline: 2px solid rgba(166, 196, 215, 0.78);
-  outline-offset: 2px;
+  box-shadow: 0 0 0 3px rgba(166, 196, 215, 0.34);
 }
 
 .history-tooltip {
   position: absolute;
   z-index: 1;
   display: grid;
-  min-width: 138px;
-  gap: 3px;
-  padding: 9px 10px;
+  min-width: 170px;
+  gap: 5px;
+  padding: 11px 12px;
   border: 1px solid var(--border-strong);
   border-radius: 7px;
   background: rgba(10, 20, 28, 0.96);
@@ -371,8 +380,8 @@
 
 .history-tooltip strong {
   color: var(--text-strong);
-  font-size: 15px;
-  line-height: 1.2;
+  font-size: 21px;
+  line-height: 1.05;
 }
 
 .history-chart-axis {

@@ -327,18 +327,16 @@ function HistoryMetric({
   point: PriceHistoryPoint;
   summary: HistoryViewSummary;
 }) {
+  const percentChange = getPointPercentChange(point, summary.first);
+
   return (
-    <div>
+    <div className={label === "目前" ? "is-primary" : ""}>
       <span>{label}</span>
-      <strong>
-        {displayMode === "price"
-          ? formatPrice(point.amount)
-          : formatSignedPercent(getPointPercentChange(point, summary.first))}
-      </strong>
+      <strong>{formatPrice(point.amount)}</strong>
       <small>
         {displayMode === "price"
           ? formatCompactDate(point.observedAt)
-          : `${formatPrice(point.amount)} · ${formatCompactDate(point.observedAt)}`}
+          : `${formatSignedPercent(percentChange)} · ${formatCompactDate(point.observedAt)}`}
       </small>
     </div>
   );
@@ -357,13 +355,11 @@ function HistoryTooltip({
   return (
     <div className="history-tooltip" style={{ left, top }}>
       <span>{formatTooltipDate(point.observedAt)}</span>
-      <strong>
-        {displayMode === "price" ? formatPrice(point.amount) : formatSignedPercent(point.percentChange)}
-      </strong>
+      <strong>{formatPrice(point.amount)}</strong>
       <small>
         {displayMode === "price"
           ? `${formatPointSource(point.source)} · ${formatSignedPercent(point.percentChange)}`
-          : `${formatPointSource(point.source)} · ${formatPrice(point.amount)}`}
+          : `${formatPointSource(point.source)} · ${formatSignedPercent(point.percentChange)}`}
       </small>
     </div>
   );

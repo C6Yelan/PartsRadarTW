@@ -5,6 +5,7 @@ PROJECT_CONTEXT.md
 .codex/
 structure.txt
 style.png
+price.png
 
 # Environment and secrets
 .env
