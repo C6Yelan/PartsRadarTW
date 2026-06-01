@@ -68,7 +68,7 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   })
-  .catch((error) => {
-    console.error(error);
+  .catch(() => {
+    console.error("Database seed failed. Check the database connection and Prisma schema state.");
     process.exitCode = 1;
   });
