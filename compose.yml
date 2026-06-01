@@ -18,7 +18,7 @@ services:
     ports:
       - "${POSTGRES_BIND_HOST:-127.0.0.1}:${POSTGRES_PORT:-5432}:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
       interval: 10s
@@ -100,7 +100,7 @@ services:
         "pnpm",
         "--filter",
         "@partsradar/crawler",
-        "crawl:coolpc-once",
+        "manual:crawl-coolpc-once",
         "--",
         "--storage-dir",
         "/var/lib/partsradar/snapshots",
@@ -132,7 +132,7 @@ services:
         "pnpm",
         "--filter",
         "@partsradar/crawler",
-        "crawl:coolpc-daemon",
+        "ops:crawl-coolpc-daemon",
         "--",
         "--confirm-live-fetch",
         "--storage-dir",
@@ -161,7 +161,7 @@ services:
         "pnpm",
         "--filter",
         "@partsradar/crawler",
-        "raw-snapshots:cleanup-daemon",
+        "ops:raw-snapshots:cleanup-daemon",
         "--",
         "--confirm-delete",
         "--storage-dir",
@@ -171,7 +171,7 @@ services:
   cloudflared:
     profiles:
       - public-tunnel
-    image: ${CLOUDFLARED_IMAGE:?CLOUDFLARED_IMAGE is required}
+    image: ${CLOUDFLARED_IMAGE:-cloudflare/cloudflared:replace_with_pinned_version}
     restart: unless-stopped
     depends_on:
       web:
@@ -182,7 +182,7 @@ services:
         "--no-autoupdate",
         "run",
         "--token",
-        "${CLOUDFLARE_TUNNEL_TOKEN:?CLOUDFLARE_TUNNEL_TOKEN is required}",
+        "${CLOUDFLARE_TUNNEL_TOKEN:-replace_with_cloudflare_tunnel_token}",
       ]
 
 volumes:

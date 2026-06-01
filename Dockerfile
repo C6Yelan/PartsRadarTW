@@ -14,6 +14,9 @@ RUN apt-get update \
 
 RUN corepack enable && corepack prepare pnpm@11.3.0 --activate
 
+RUN mkdir -p /var/lib/partsradar/snapshots /var/lib/partsradar/product-images \
+  && chown -R node:node /var/lib/partsradar
+
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/web/package.json apps/web/package.json
 COPY apps/crawler/package.json apps/crawler/package.json
@@ -38,6 +41,8 @@ ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
+USER node
+
 EXPOSE 3000
 
 CMD ["pnpm", "--filter", "@partsradar/web", "start"]
@@ -46,12 +51,16 @@ FROM base AS crawler
 
 ENV NODE_ENV=production
 
-# The production scheduled crawler daemon is not implemented yet. Keep this
-# target safe by default; compose can override the command for manual smoke runs.
-CMD ["pnpm", "--filter", "@partsradar/crawler", "crawl:coolpc-once", "--", "--help"]
+USER node
+
+# Keep the generic crawler image safe by default. Compose profiles provide the
+# scheduled daemon and manual tooling commands explicitly.
+CMD ["pnpm", "--filter", "@partsradar/crawler", "manual:crawl-coolpc-once", "--", "--help"]
 
 FROM base AS migrate
 
 ENV NODE_ENV=production
+
+USER node
 
 CMD ["pnpm", "db:deploy"]
