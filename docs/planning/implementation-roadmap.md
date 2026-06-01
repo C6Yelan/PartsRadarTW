@@ -93,10 +93,12 @@
 - API contract 與 [API 設計](../technical/api-design.md) 一致。
 - query validation、pagination、sort、status、vendor、price filter 都有測試。
 - API 不觸發 crawler、不修改資料、不暴露 raw HTML、token、stack trace 或 secret。
+- Public API 有 app-level in-memory rate limit 作為主機保底。
 
 後續非阻塞項：
 
-- Rate limiting / abuse protection。
+- Cloudflare WAF / rate limit 規則調校。
+- 分散式 rate limiting。
 - 有真實資料量後再做 query plan / cache 檢查。
 
 ## Phase 4.5：商品圖片資料契約

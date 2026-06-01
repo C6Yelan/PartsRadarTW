@@ -7,6 +7,7 @@ import {
   invalidQueryResponse,
   jsonOk,
   notFoundResponse,
+  rateLimitedResponse,
 } from "../../../app/api/_shared/responses";
 
 describe("API response helpers", () => {
@@ -49,6 +50,27 @@ describe("API response helpers", () => {
       error: {
         code: "internal_error",
         message: API_ERROR_MESSAGES.internalError,
+      },
+    });
+  });
+
+  it("returns public-safe rate limit errors with retry headers", async () => {
+    const response = rateLimitedResponse({
+      limit: 120,
+      remaining: 0,
+      resetEpochSeconds: 1_779_980_460,
+      retryAfterSeconds: 30,
+    });
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("Retry-After")).toBe("30");
+    expect(response.headers.get("X-RateLimit-Limit")).toBe("120");
+    expect(response.headers.get("X-RateLimit-Remaining")).toBe("0");
+    expect(response.headers.get("X-RateLimit-Reset")).toBe("1779980460");
+    expect(await response.json()).toEqual({
+      error: {
+        code: "rate_limited",
+        message: API_ERROR_MESSAGES.rateLimited,
       },
     });
   });

@@ -44,6 +44,7 @@
 - `200` 成功。
 - `400` query 不合法。
 - `404` 商品或圖片不存在。
+- `429` 同一 client 在短時間內請求過多。
 - `500` 未預期錯誤，訊息需泛用。
 
 ## `GET /api/categories`
@@ -189,3 +190,7 @@ Response shape：
 - 錯誤訊息泛用，不回傳 stack trace。
 - API 不回傳未驗證圖片 URL。
 - 不提供會觸發 crawler 或修改資料的公開 endpoint。
+- 公開 API 有 app-level in-memory rate limit 作為主機保底；大量流量仍應優先由 Cloudflare / WAF 擋在主機外。
+- 預設 `api:read` 為每 client 每 60 秒 120 次，涵蓋 categories、source-status、products list 與 product detail。
+- 預設 `api:image` 為每 client 每 60 秒 600 次，涵蓋商品縮圖 API。
+- 超限回 `429` 與 `Retry-After` / `X-RateLimit-*` headers；response 不回傳 IP、env、DB 或 internal state。

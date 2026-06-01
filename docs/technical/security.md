@@ -47,6 +47,11 @@
 - 不回傳 raw HTML、raw snapshot、parse error、crawler stack、computed `source_item_key`、獨立 `iBuyToken`、DB 連線或 env。
 - `parse_errors.raw_image_url` 只供內部 debug，不公開。
 - 不提供 crawler trigger 或 state-changing public endpoint。
+- 公開 API 使用 bounded in-memory rate limit 作為 app-level abuse guard。
+- `api:read` 預設每 client 每 60 秒 120 次；`api:image` 預設每 client 每 60 秒 600 次。
+- client identity 優先使用 Cloudflare `CF-Connecting-IP`，其次 `X-Forwarded-For` 第一個值；不把 IP 寫入公開 response。
+- 超限回 `429`，只包含泛用 `rate_limited` 錯誤與 `Retry-After` / `X-RateLimit-*` headers。
+- 這個 limiter 是單一 web container 內的保底防護；多 replica 不共享狀態，大量流量仍需 Cloudflare WAF / rate limiting 先擋。
 
 若未來 API 對第三方開放，需重新設計 auth、versioning、rate limit 與 abuse protection。
 
@@ -192,7 +197,7 @@ Logging：
 以下不是 v1 blocker：
 
 - Cloudflare WAF / Security Rules。
-- Rate limiting。
+- 分散式 Rate limiting / Redis-backed limiter。
 - 更嚴格 CSP。
 - Bot / crawler 防護。
 - Docker reverse proxy with HTTPS origin。

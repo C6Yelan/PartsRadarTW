@@ -3,16 +3,24 @@ export const API_ERROR_MESSAGES = {
   // details cannot leak through route handler exceptions.
   invalidQuery: "Invalid query parameter.",
   notFound: "Resource not found.",
+  rateLimited: "Too many requests. Please try again later.",
   internalError: "Internal server error.",
 } as const;
 
-export type ApiErrorCode = "invalid_query" | "not_found" | "internal_error";
+export type ApiErrorCode = "invalid_query" | "not_found" | "rate_limited" | "internal_error";
 
 export interface ApiErrorResponseBody {
   error: {
     code: ApiErrorCode;
     message: string;
   };
+}
+
+export interface RateLimitedResponseOptions {
+  limit: number;
+  remaining: number;
+  resetEpochSeconds: number;
+  retryAfterSeconds: number;
 }
 
 export function jsonOk<TBody>(body: TBody, init?: ResponseInit): Response {
@@ -22,7 +30,12 @@ export function jsonOk<TBody>(body: TBody, init?: ResponseInit): Response {
   });
 }
 
-function jsonError(status: 400 | 404 | 500, code: ApiErrorCode, message: string): Response {
+function jsonError(
+  status: 400 | 404 | 429 | 500,
+  code: ApiErrorCode,
+  message: string,
+  init?: ResponseInit,
+): Response {
   return Response.json(
     {
       error: {
@@ -30,7 +43,10 @@ function jsonError(status: 400 | 404 | 500, code: ApiErrorCode, message: string)
         message,
       },
     } satisfies ApiErrorResponseBody,
-    { status },
+    {
+      ...init,
+      status,
+    },
   );
 }
 
@@ -40,6 +56,17 @@ export function invalidQueryResponse(): Response {
 
 export function notFoundResponse(): Response {
   return jsonError(404, "not_found", API_ERROR_MESSAGES.notFound);
+}
+
+export function rateLimitedResponse(options: RateLimitedResponseOptions): Response {
+  return jsonError(429, "rate_limited", API_ERROR_MESSAGES.rateLimited, {
+    headers: {
+      "Retry-After": String(options.retryAfterSeconds),
+      "X-RateLimit-Limit": String(options.limit),
+      "X-RateLimit-Remaining": String(options.remaining),
+      "X-RateLimit-Reset": String(options.resetEpochSeconds),
+    },
+  });
 }
 
 export function internalErrorResponse(): Response {

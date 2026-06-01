@@ -137,6 +137,8 @@ PRODUCT_IMAGE_STORAGE_DIR=/var/lib/partsradar/product-images
 | `POSTGRES_BIND_HOST` | 正式預設 `127.0.0.1` |
 | `DATABASE_URL` | host-side Prisma 指令使用 |
 | `WEB_BIND_HOST` | Tunnel / reverse proxy 情境維持 `127.0.0.1` |
+| `API_READ_RATE_LIMIT_MAX` / `API_IMAGE_RATE_LIMIT_MAX` | Web API 每 window 的 read / image 限流額度 |
+| `API_RATE_LIMIT_WINDOW_SECONDS` / `API_RATE_LIMIT_CACHE_SIZE` | Web API 限流 window 與 bounded cache 大小 |
 | `SNAPSHOT_STORAGE_DIR` | container 內 snapshot path |
 | `PRODUCT_IMAGE_STORAGE_DIR` | container 內縮圖 path |
 | `CRAWLER_INTERVAL_SECONDS` / `CRAWLER_BACKOFF_SECONDS` / `CRAWLER_CATEGORY_DELAY_MS` | scheduled crawler 節奏 |
