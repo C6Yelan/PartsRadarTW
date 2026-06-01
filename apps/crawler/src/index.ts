@@ -4,4 +4,4 @@ export * from "./coolpc/crawl-run";
 export * from "./coolpc/live-crawl";
 export * from "./coolpc/parser";
 export * from "./coolpc/product-write";
-export * from "./coolpc/raw-snapshot";
+export * from "./coolpc/raw-snapshot-writer";

@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { PrismaClient } from "@partsradar/db";
+import { COOLPC_OFFICIAL_BASE_URL, isOfficialCoolpcBaseUrl } from "@partsradar/shared";
 import {
   processCoolpcCategorySnapshotWithPrisma,
   type CoolpcCategorySnapshotInput,
@@ -13,7 +14,7 @@ import {
 } from "./crawl-run";
 import { createCoolpcCategoryUrl, decodeCoolpcHtml } from "./parser";
 
-export const DEFAULT_COOLPC_BASE_URL = "https://www.coolpc.com.tw";
+export const DEFAULT_COOLPC_BASE_URL = COOLPC_OFFICIAL_BASE_URL;
 export const DEFAULT_COOLPC_CATEGORY_DELAY_MS = 5000;
 export const DEFAULT_COOLPC_FETCH_TIMEOUT_MS = 30000;
 export const MAX_COOLPC_RESPONSE_BODY_BYTES = 5 * 1024 * 1024;
@@ -146,7 +147,7 @@ export function validateCoolpcBaseUrl(
     return url.origin;
   }
 
-  throw new Error("CoolPC base URL must be https://www.coolpc.com.tw.");
+  throw new Error(`CoolPC base URL must be ${COOLPC_OFFICIAL_BASE_URL}.`);
 }
 
 export function validateRawReplayOptions({
@@ -297,19 +298,6 @@ async function fetchLiveCategorySnapshot(
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function isOfficialCoolpcBaseUrl(url: URL): boolean {
-  return (
-    url.protocol === "https:" &&
-    url.hostname === "www.coolpc.com.tw" &&
-    url.port === "" &&
-    url.username === "" &&
-    url.password === "" &&
-    url.pathname === "/" &&
-    url.search === "" &&
-    url.hash === ""
-  );
 }
 
 function validateIntegerRange(label: string, value: number, min: number, max: number): number {

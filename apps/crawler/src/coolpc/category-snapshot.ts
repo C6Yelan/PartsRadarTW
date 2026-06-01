@@ -25,7 +25,7 @@ import {
   recordRawSnapshot,
   type RawSnapshotContentStatusValue,
   type RawSnapshotWriteClient,
-} from "./raw-snapshot";
+} from "./raw-snapshot-writer";
 
 // This module is the handoff point between raw CoolPC fetches and crawl-run
 // category results. It records evidence first, then lets changed valid parses

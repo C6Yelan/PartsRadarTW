@@ -4,14 +4,13 @@
   "private": true,
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "crawl:coolpc-daemon": "tsx src/scripts/crawl-coolpc-daemon.ts",
-    "crawl:coolpc-once": "tsx src/scripts/crawl-coolpc-once.ts",
-    "image-cache:backfill": "tsx src/scripts/backfill-product-images.ts",
-    "product-vendors:backfill": "tsx src/scripts/backfill-product-vendors.ts",
-    "raw-snapshots:cleanup": "tsx src/scripts/cleanup-raw-snapshots.ts",
-    "raw-snapshots:cleanup-daemon": "tsx src/scripts/cleanup-raw-snapshots-daemon.ts",
-    "smoke:coolpc-image-flow": "tsx src/scripts/smoke-coolpc-image-flow.ts",
-    "validate:coolpc-live": "tsx src/scripts/validate-coolpc-live.ts"
+    "ops:crawl-coolpc-daemon": "tsx src/scripts/ops/crawl-coolpc-daemon.ts",
+    "ops:image-cache:backfill": "tsx src/scripts/ops/backfill-product-images.ts",
+    "ops:product-vendors:backfill": "tsx src/scripts/ops/backfill-product-vendors.ts",
+    "ops:raw-snapshots:cleanup": "tsx src/scripts/ops/cleanup-raw-snapshots.ts",
+    "ops:raw-snapshots:cleanup-daemon": "tsx src/scripts/ops/cleanup-raw-snapshots-daemon.ts",
+    "manual:crawl-coolpc-once": "tsx src/scripts/manual/crawl-coolpc-once.ts",
+    "manual:validate-coolpc-live": "tsx src/scripts/manual/validate-coolpc-live.ts"
   },
   "dependencies": {
     "@partsradar/db": "workspace:*",

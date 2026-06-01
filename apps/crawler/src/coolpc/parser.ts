@@ -1,282 +1,52 @@
-import { load, type CheerioAPI } from "cheerio";
+import { load } from "cheerio";
 import { decode } from "iconv-lite";
 import { classifyProductVendor } from "@partsradar/shared";
+import { extractCoolpcProductCandidates } from "./parser/candidates";
+import { validateCoolpcCategoryPage } from "./parser/content-validation";
+import {
+  isExplicitNonProductName,
+  normalizeProductName,
+  parsePriceText,
+} from "./parser/normalization";
+import type {
+  CoolpcParseIssue,
+  CoolpcParseResult,
+  ParsedCoolpcProduct,
+  SourceCategoryContext,
+} from "./parser/types";
+import {
+  createCoolpcCategoryUrl,
+  createSourceItemKey,
+  normalizeCoolpcDiscussionUrl,
+  normalizeCoolpcProductImageUrl,
+  sanitizeCoolpcSourceUrl,
+} from "./parser/urls";
 
-const COOLPC_SOURCE = "coolpc";
-const DEFAULT_COOLPC_BASE_URL = "https://www.coolpc.com.tw";
-
-export type Currency = "TWD";
-
-export type ContentValidationStatus = "valid" | "invalid" | "suspected_block";
-
-export type ParseErrorType =
-  | "missing_ibuy_token"
-  | "missing_name"
-  | "invalid_image_url"
-  | "price_parse_failed"
-  | "duplicate_source_identity"
-  | "content_validation_failed";
-
-export interface SourceCategoryContext {
-  sourceCategoryId: string;
-  igrp: number;
-  sourceName: string;
-  displayName: string;
-  fetchedAt: Date;
-  sourceUrl?: string;
-  expectedTitleKeywords?: string[];
-}
-
-export interface CoolpcProductCandidate {
-  rawToken: string;
-  rawName: string;
-  rawPriceText: string;
-  rawImageUrl: string;
-  rawDiscussionUrl: string;
-}
-
-export interface ParsedCoolpcProduct {
-  sourceCategoryId: string;
-  igrp: number;
-  sourceName: string;
-  displayName: string;
-  ibuyToken: string;
-  sourceItemKey: string;
-  name: string;
-  normalizedName: string;
-  vendorSlug: string | null;
-  vendorName: string | null;
-  primaryImageUrl: string;
-  discussionUrl: string | null;
-  price: number;
-  currency: Currency;
-  sourceUrl: string;
-  fetchedAt: Date;
-}
-
-export interface CoolpcParseIssue {
-  type: ParseErrorType;
-  message: string;
-  rawName?: string;
-  rawPriceText?: string;
-  rawImageUrl?: string;
-  rawToken?: string;
-  sourceItemKey?: string;
-}
-
-export interface ContentValidationResult {
-  status: ContentValidationStatus;
-  reason?: string;
-  title: string;
-  hasExpectedTitle: boolean;
-  tokenCount: number;
-  nameCount: number;
-  priceTextCount: number;
-  validCandidateCount: number;
-}
-
-export interface CoolpcParseResult {
-  validation: ContentValidationResult;
-  items: ParsedCoolpcProduct[];
-  issues: CoolpcParseIssue[];
-  deduplicatedItemCount: number;
-  canImport: boolean;
-}
+export type {
+  ContentValidationResult,
+  ContentValidationStatus,
+  CoolpcParseIssue,
+  CoolpcParseResult,
+  CoolpcProductCandidate,
+  Currency,
+  ParsedCoolpcProduct,
+  ParseErrorType,
+  SourceCategoryContext,
+} from "./parser/types";
+export { validateCoolpcCategoryPage } from "./parser/content-validation";
+export {
+  normalizeProductName,
+  parsePriceText,
+} from "./parser/normalization";
+export {
+  createCoolpcCategoryUrl,
+  createSourceItemKey,
+  normalizeCoolpcDiscussionUrl,
+  normalizeCoolpcProductImageUrl,
+} from "./parser/urls";
 
 export function decodeCoolpcHtml(buffer: Buffer | Uint8Array, encoding = "big5"): string {
   return decode(buffer, encoding);
-}
-
-export function createCoolpcCategoryUrl(igrp: number, baseUrl = DEFAULT_COOLPC_BASE_URL): string {
-  const url = new URL("/eachview.php", baseUrl);
-  url.searchParams.set("IGrp", String(igrp));
-  return url.toString();
-}
-
-export function createSourceItemKey(igrp: number, ibuyToken: string): string {
-  return `${COOLPC_SOURCE}:igrp:${igrp}:ibuy:${ibuyToken}`;
-}
-
-export function parsePriceText(rawPriceText: string): number | null {
-  const match = rawPriceText.match(/(?:NT|\$)\s*([0-9][0-9,]*)/i);
-
-  if (!match) {
-    return null;
-  }
-
-  const price = Number.parseInt(match[1].replaceAll(",", ""), 10);
-  return Number.isInteger(price) && price > 0 ? price : null;
-}
-
-export function normalizeProductName(name: string): string {
-  return name.replace(/\s+/g, " ").trim();
-}
-
-export function normalizeCoolpcProductImageUrl(
-  rawImageUrl: string,
-  igrp: number,
-  baseUrl = DEFAULT_COOLPC_BASE_URL,
-): string | null {
-  if (!Number.isInteger(igrp) || igrp <= 0) {
-    return null;
-  }
-
-  const trimmedImageUrl = rawImageUrl.trim();
-
-  if (trimmedImageUrl.length === 0) {
-    return null;
-  }
-
-  let url: URL;
-
-  try {
-    url = new URL(trimmedImageUrl, baseUrl);
-  } catch {
-    return null;
-  }
-
-  if (!["http:", "https:"].includes(url.protocol)) {
-    return null;
-  }
-
-  if (url.hostname !== "www.coolpc.com.tw") {
-    return null;
-  }
-
-  const expectedPathPattern = new RegExp(
-    `^/eval/${igrp}/[^/?#]+\\.(?:jpg|jpeg|png|gif|webp)$`,
-    "i",
-  );
-
-  if (!expectedPathPattern.test(url.pathname)) {
-    return null;
-  }
-
-  return `https://www.coolpc.com.tw${url.pathname}`;
-}
-
-export function normalizeCoolpcDiscussionUrl(
-  rawDiscussionUrl: string,
-  baseUrl = DEFAULT_COOLPC_BASE_URL,
-): string | null {
-  const trimmedUrl = rawDiscussionUrl.trim();
-
-  if (trimmedUrl.length === 0) {
-    return null;
-  }
-
-  let url: URL;
-
-  try {
-    url = new URL(trimmedUrl, baseUrl);
-  } catch {
-    return null;
-  }
-
-  if (!["http:", "https:"].includes(url.protocol)) {
-    return null;
-  }
-
-  return url.toString();
-}
-
-export function validateCoolpcCategoryPage(
-  html: string,
-  context: SourceCategoryContext,
-): ContentValidationResult {
-  const $ = load(html);
-  const title = $("title").first().text().trim();
-  const hasExpectedTitle = expectedTitleKeywords(context).some((keyword) =>
-    normalizeForComparison(title).includes(normalizeForComparison(keyword)),
-  );
-  const candidates = extractCoolpcProductCandidates($);
-  const tokenCount = $("div.w").length;
-  const nameCount = $("div.t").length;
-  const priceTextCount = $("div.x").length;
-  const validCandidateCount = candidates.filter(
-    (candidate) =>
-      candidate.rawToken.length > 0 &&
-      candidate.rawName.length > 0 &&
-      !isExplicitNonProductName(candidate.rawName) &&
-      parsePriceText(candidate.rawPriceText) !== null,
-  ).length;
-
-  if (html.trim().length === 0) {
-    return {
-      status: "invalid",
-      reason: "empty_content",
-      title,
-      hasExpectedTitle,
-      tokenCount,
-      nameCount,
-      priceTextCount,
-      validCandidateCount,
-    };
-  }
-
-  // HTTP 200 alone is not trusted. A page with neither the expected title nor
-  // product structures is treated as a possible block page, not as an empty category.
-  if (!hasExpectedTitle && tokenCount === 0 && nameCount === 0 && priceTextCount === 0) {
-    return {
-      status: "suspected_block",
-      reason: "not_expected_category_page",
-      title,
-      hasExpectedTitle,
-      tokenCount,
-      nameCount,
-      priceTextCount,
-      validCandidateCount,
-    };
-  }
-
-  if (!hasExpectedTitle) {
-    return {
-      status: "invalid",
-      reason: "missing_expected_title",
-      title,
-      hasExpectedTitle,
-      tokenCount,
-      nameCount,
-      priceTextCount,
-      validCandidateCount,
-    };
-  }
-
-  if (tokenCount === 0 || nameCount === 0 || priceTextCount === 0) {
-    return {
-      status: "invalid",
-      reason: "missing_required_product_structure",
-      title,
-      hasExpectedTitle,
-      tokenCount,
-      nameCount,
-      priceTextCount,
-      validCandidateCount,
-    };
-  }
-
-  if (validCandidateCount === 0) {
-    return {
-      status: "invalid",
-      reason: "no_valid_product_candidates",
-      title,
-      hasExpectedTitle,
-      tokenCount,
-      nameCount,
-      priceTextCount,
-      validCandidateCount,
-    };
-  }
-
-  return {
-    status: "valid",
-    title,
-    hasExpectedTitle,
-    tokenCount,
-    nameCount,
-    priceTextCount,
-    validCandidateCount,
-  };
 }
 
 export function parseCoolpcCategoryPage(
@@ -420,71 +190,4 @@ export function parseCoolpcCategoryPage(
     deduplicatedItemCount,
     canImport: items.length > 0 && !hasFatalIssue,
   };
-}
-
-function extractCoolpcProductCandidates($: CheerioAPI): CoolpcProductCandidate[] {
-  return $("div.w")
-    .toArray()
-    .map((element) => {
-      const $token = $(element);
-      // Live pages place product name/price near the token, but the immediate
-      // wrapper differs between fixtures and full pages. Keep this traversal local.
-      const $nextSpan = $token.nextAll("span").first();
-      const $parent = $token.parent();
-      const $following = $token.nextAll().slice(0, 4);
-      const rawToken = $token.text().trim();
-      const rawName = firstText($nextSpan, "div.t") || firstText($parent, "div.t");
-      const rawPriceText = firstText($nextSpan, "div.x") || firstText($parent, "div.x");
-      const rawImageUrl = firstAttr($nextSpan, "img", "src") || firstAttr($parent, "img", "src");
-      const rawDiscussionUrl =
-        firstDiscussionUrl($, $nextSpan) ||
-        firstDiscussionUrl($, $parent) ||
-        firstDiscussionUrl($, $following);
-
-      return {
-        rawToken,
-        rawName: rawName || firstText($following, "div.t"),
-        rawPriceText: rawPriceText || firstText($following, "div.x"),
-        rawImageUrl: rawImageUrl || firstAttr($following, "img", "src"),
-        rawDiscussionUrl,
-      };
-    });
-}
-
-function firstText(scope: ReturnType<CheerioAPI>, selector: string): string {
-  return scope.find(selector).first().text().trim();
-}
-
-function firstAttr(scope: ReturnType<CheerioAPI>, selector: string, attributeName: string): string {
-  return scope.find(selector).first().attr(attributeName)?.trim() ?? "";
-}
-
-function firstDiscussionUrl($: CheerioAPI, scope: ReturnType<CheerioAPI>): string {
-  const link = scope
-    .find("div.x a")
-    .toArray()
-    .find((element) => normalizeForComparison($(element).text()).includes("開箱討論"));
-
-  return link ? ($(link).attr("href")?.trim() ?? "") : "";
-}
-
-function expectedTitleKeywords(context: SourceCategoryContext): string[] {
-  return context.expectedTitleKeywords ?? [context.sourceName, context.displayName];
-}
-
-function normalizeForComparison(value: string): string {
-  return value.replace(/\s+/g, "").toLocaleLowerCase("zh-TW");
-}
-
-function isExplicitNonProductName(name: string): boolean {
-  const normalizedName = normalizeForComparison(normalizeProductName(name));
-
-  return normalizedName.startsWith("【提醒】") || normalizedName.startsWith("[加購價]");
-}
-
-function sanitizeCoolpcSourceUrl(sourceUrl: string): string {
-  const url = new URL(sourceUrl);
-  // Session IDs are request state, not a stable product or category source URL.
-  url.searchParams.delete("PHPSESSID");
-  return url.toString();
 }
