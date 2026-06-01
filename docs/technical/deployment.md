@@ -9,7 +9,7 @@
 - PostgreSQL、raw snapshots、product image cache 都能持久保存。
 - web、crawler、postgres、Cloudflare Tunnel 清楚分離。
 - secrets 不進 Git。
-- 未來可加 Discord bot，不重做整體架構。
+- 後續價格歷史、商品比較與營運監控可在同一部署邊界內擴充，不以帳號或使用者通知服務為前提。
 
 ## 目標環境
 
@@ -125,7 +125,8 @@ PRODUCT_IMAGE_STORAGE_DIR=/var/lib/partsradar/product-images
 - `crawler` 或 backfill 工具負責建立 / 更新縮圖。
 - 缺圖、檔案不存在或讀取失敗時，前端使用 fallback。
 - 圖片 cache 需納入備份 / 搬遷計畫，不視為可任意丟棄的暫存。
-- 合理移除請求需移除或停用縮圖，並補 blocklist、DB override 或永久紀錄，避免重新產生。
+- 合理移除請求需透過資料庫永久 override 停用商品、圖片或來源連結，並執行 idempotent 圖片快取清理命令。
+- `crawler`、image backfill 與 link checker 需讀取 removal override，避免重新產生或重新公開已停用內容。
 
 ## Environment And Secrets
 

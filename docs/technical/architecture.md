@@ -11,7 +11,7 @@
 - 商品與價格資料集中存放於 PostgreSQL。
 - raw snapshot 可保存、去重與回放。
 - 網站只讀取已成功處理的有效資料。
-- 未來可接入 Discord bot，但不影響第一版網站開發。
+- 後續功能優先支援價格歷史、價格變動探索、商品比較與營運監控，不以帳號或使用者通知為前提。
 - 未來以自架與 Docker 部署為主。
 
 ## 系統總覽
@@ -27,10 +27,6 @@ Crawler Process
   -> 原價屋 eachview.php?IGrp={分類編號}
   -> raw snapshot storage
   -> parser / validation
-  -> Shared data access / Prisma
-  -> PostgreSQL
-
-Future Discord Bot
   -> Shared data access / Prisma
   -> PostgreSQL
 ```
@@ -228,22 +224,8 @@ Crawler 不做：
 
 Docker Compose、反向代理、HTTPS、備份、監控與 CI/CD 等細節，後續在部署文件中再定。
 
-## Future Discord Bot
+## Future Operational Monitoring
 
-Discord bot 不屬於第一版網站功能，但架構應保留接入空間。
+使用者帳號、個人價格提醒、收藏清單與使用者導向 Discord bot 不屬於第二版方向。後續通知若需要，應先以管理者 / 維運者監控為主，例如 crawler 連續失敗、suspected block、parse error 激增或 production smoke 失敗。
 
-未來 bot 可作為同一 repo 內另一個獨立 TypeScript process：
-
-```text
-apps/
-  bot/
-```
-
-預期責任：
-
-- 讀取使用者提醒規則。
-- 查詢 current price。
-- 發送價格高於或低於門檻的通知。
-- 發送 crawler 異常或連續失敗通知給管理者。
-
-Discord bot 不應直接抓取原價屋資料，價格資料來源仍以 crawler 寫入的資料庫內容為準。
+營運監控可作為同一 repo 內的 ops script 或獨立 process，但不應直接抓取原價屋資料，也不應建立使用者資料模型。價格與來源狀態仍以 crawler 寫入的資料庫內容為準。

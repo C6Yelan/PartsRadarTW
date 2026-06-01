@@ -141,7 +141,10 @@
 - 圖片請求先移除 / 停用站內縮圖並顯示 fallback。
 - 商品資料請求需讓商品不再出現在列表、搜尋與詳細頁。
 - 修正 parser / DB 後需確認下次匯入不會把問題帶回。
-- 需要 blocklist、DB override 或維護紀錄，避免 crawler / backfill 重新產生。
+- 公開前最低機制採資料庫永久 override / removal table，不用公開刪除 API 或管理後台。
+- 公開 API/UI 必須依 override 排除商品、停用來源連結或回落圖片 fallback。
+- crawler、image backfill 與 link checker 必須讀取 override，略過受影響商品、圖片或來源連結，避免重新產生。
+- 圖片快取清理由 idempotent ops script 依 product ID / image key 執行；重複執行不得破壞其他商品圖片。
 - 內部紀錄保存日期、來源、商品 ID、來源 URL、採取動作與後續規則。
 
 ## CSRF And Access Control
