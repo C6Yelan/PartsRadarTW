@@ -13,6 +13,7 @@ import {
 import { PRODUCT_LINK_HEALTH_STATUSES } from "./product-link-checker/processor";
 
 const HELP_FLAG = "--help";
+const PUBLIC_ONLY_FLAG = "--public-only";
 const DEFAULT_BASE_URL = "http://127.0.0.1:3000";
 const DEFAULT_TIMEOUT_MS = 5000;
 const DEFAULT_PRODUCT_IMAGE_STORAGE_DIR = "storage/product-images";
@@ -46,6 +47,7 @@ export type SmokeStatus = "OK" | "WARN" | "FAIL";
 export interface ProductionSmokeOptions {
   workspaceRoot: string;
   baseUrl: string;
+  publicOnly: boolean;
   timeoutMs: number;
   productImageStorageDir: string;
   productImageSampleSize: number;
@@ -138,6 +140,7 @@ export function parseProductionSmokeOptions(
   return {
     workspaceRoot,
     baseUrl,
+    publicOnly: args.includes(PUBLIC_ONLY_FLAG),
     timeoutMs: parseIntegerOption({
       args,
       env,
@@ -373,6 +376,22 @@ export async function runProductionSmoke(
   };
 }
 
+export async function runProductionPublicSmoke(
+  options: ProductionSmokeOptions,
+  now = new Date(),
+): Promise<ProductionSmokeSummary> {
+  const checks: SmokeCheckResult[] = [];
+  const productsResult = await checkPublicEndpoints(options);
+  checks.push(...productsResult.checks);
+  checks.push(await checkSourceFreshness(productsResult.sourceStatus, options, now));
+
+  return {
+    checkedAt: now,
+    status: resolveSummaryStatus(checks),
+    checks,
+  };
+}
+
 export function printProductionSmokeSummary(summary: ProductionSmokeSummary): void {
   console.log("");
   console.log("PartsRadarTW production smoke");
@@ -401,6 +420,17 @@ async function main(): Promise<void> {
   let client: PrismaClient | null = null;
 
   try {
+    if (options.publicOnly) {
+      const summary = await runProductionPublicSmoke(options);
+      printProductionSmokeSummary(summary);
+
+      if (summary.status === "FAIL") {
+        process.exitCode = 1;
+      }
+
+      return;
+    }
+
     const db = await import("@partsradar/db");
     client = db.prisma;
     const summary = await runProductionSmoke(client, options);
@@ -1189,6 +1219,7 @@ function printHelp(): void {
 Options:
   --base-url <url>                         Website base URL to check.
                                            Default: SMOKE_PUBLIC_BASE_URL, then ${DEFAULT_BASE_URL}
+  --public-only                            Check public HTTP routes/APIs only; does not require DB access.
   --timeout-ms <ms>                        HTTP request timeout. Default: ${DEFAULT_TIMEOUT_MS}
   --product-image-storage-dir <path>       Product image cache directory.
                                            Default: PRODUCT_IMAGE_STORAGE_DIR, then ${DEFAULT_PRODUCT_IMAGE_STORAGE_DIR}

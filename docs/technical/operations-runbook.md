@@ -331,6 +331,12 @@ docker compose --profile scheduled-crawler run --rm smoke-daemon \
   pnpm ops:production-smoke -- --base-url http://web:3000
 ```
 
+若只要從任意機器檢查公開 HTTP routes / APIs，不需要連部署主機 DB，可使用 public-only 模式。這會檢查首頁、第二版配單 routes、source-status、商品列表 / 詳情 / 圖片 / 價格歷史 API、rate-limit headers 與 source freshness；不會檢查 DB-backed crawler freshness、parse errors、missing image count、link health 或 raw snapshot retention：
+
+```bash
+pnpm ops:production-smoke -- --public-only --base-url https://partsradar.net
+```
+
 若要確認 public tunnel / public domain，而不是只檢查 Compose internal network，可在部署機 `.env` 設定：
 
 ```dotenv

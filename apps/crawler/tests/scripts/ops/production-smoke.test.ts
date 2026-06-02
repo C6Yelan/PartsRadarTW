@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   parseProductionSmokeOptions,
+  runProductionPublicSmoke,
   runProductionSmoke,
 } from "../../../src/scripts/ops/production-smoke";
 import { parseProductionSmokeDaemonOptions } from "../../../src/scripts/ops/production-smoke-daemon";
@@ -21,6 +22,7 @@ describe("production smoke options", () => {
     expect(options).toMatchObject({
       workspaceRoot,
       baseUrl: "http://127.0.0.1:3000/",
+      publicOnly: false,
       timeoutMs: 5000,
       productImageSampleSize: 5,
       sourceWarnAfterMinutes: 60,
@@ -50,6 +52,7 @@ describe("production smoke options", () => {
         "7000",
         "--product-image-sample-size",
         "7",
+        "--public-only",
         "--source-warn-after-minutes",
         "45",
         "--missing-image-warn-count",
@@ -66,6 +69,7 @@ describe("production smoke options", () => {
     );
 
     expect(options.baseUrl).toBe("https://partsradar.net/");
+    expect(options.publicOnly).toBe(true);
     expect(options.timeoutMs).toBe(7000);
     expect(options.productImageSampleSize).toBe(7);
     expect(options.sourceWarnAfterMinutes).toBe(45);
@@ -116,6 +120,70 @@ describe("production smoke daemon options", () => {
 });
 
 describe("production smoke checks", () => {
+  it("runs public-only checks without a DB client", async () => {
+    const { crawlerCwd } = await createWorkspace();
+    stubHealthyPublicApi({ productCount: 2 });
+    const options = parseProductionSmokeOptions(["--public-only"], {}, crawlerCwd);
+    const summary = await runProductionPublicSmoke(
+      options,
+      new Date("2026-06-02T12:00:00.000Z"),
+    );
+
+    expect(summary.status).toBe("OK");
+    expect(summary.checks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "build-list page",
+          status: "OK",
+          message: "HTTP 200",
+        }),
+        expect.objectContaining({
+          name: "build-list print page",
+          status: "OK",
+          message: "HTTP 200",
+        }),
+        expect.objectContaining({
+          name: "product image api",
+          status: "OK",
+          message: "checked=2",
+        }),
+        expect.objectContaining({
+          name: "source freshness",
+          status: "OK",
+          message: "lastSuccessAt=10m ago status=ok",
+        }),
+      ]),
+    );
+    expect(summary.checks).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "crawler freshness",
+        }),
+      ]),
+    );
+  });
+
+  it("fails public-only checks when a v2 route is missing", async () => {
+    const { crawlerCwd } = await createWorkspace();
+    stubHealthyPublicApi({ buildListStatus: 404 });
+    const options = parseProductionSmokeOptions(["--public-only"], {}, crawlerCwd);
+    const summary = await runProductionPublicSmoke(
+      options,
+      new Date("2026-06-02T12:00:00.000Z"),
+    );
+
+    expect(summary.status).toBe("FAIL");
+    expect(summary.checks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "build-list page",
+          status: "FAIL",
+          message: "HTTP 404",
+        }),
+      ]),
+    );
+  });
+
   it("keeps invalid image URL issues informational below the anomaly threshold", async () => {
     const { crawlerCwd, workspaceRoot } = await createWorkspace();
     const imageDir = join(workspaceRoot, "product-images");
