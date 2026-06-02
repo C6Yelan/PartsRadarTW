@@ -1,4 +1,5 @@
 "use client";
+// apps/web/app/products/[id]/price-history/records.tsx
 
 import { useState } from "react";
 import { formatCompactDate, formatPrice, formatSignedPrice } from "./format";

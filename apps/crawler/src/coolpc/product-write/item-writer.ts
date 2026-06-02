@@ -1,3 +1,4 @@
+// apps/crawler/src/coolpc/product-write/item-writer.ts
 import type { ParsedCoolpcProduct } from "../parser";
 import type {
   CoolpcProductWriteDelegates,

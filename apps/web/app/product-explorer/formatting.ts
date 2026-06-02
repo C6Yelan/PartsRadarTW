@@ -1,3 +1,4 @@
+// apps/web/app/product-explorer/formatting.ts
 export function formatPrice(amount: number) {
   return `NT$ ${formatInteger(amount)}`;
 }

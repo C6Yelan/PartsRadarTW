@@ -1,3 +1,4 @@
+// apps/crawler/src/coolpc/product-write.ts
 import type { ParsedCoolpcProduct } from "./parser";
 import { writeProductItem } from "./product-write/item-writer";
 import { markMissingProducts } from "./product-write/missing-products";

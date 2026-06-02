@@ -1,3 +1,4 @@
+// apps/web/app/products/[id]/page.tsx
 import ProductDetail from "./product-detail";
 import { normalizeReturnHref } from "./return-href";
 

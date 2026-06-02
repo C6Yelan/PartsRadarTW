@@ -1,3 +1,4 @@
+// apps/web/app/api/product-images/handler.ts
 import { readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 export { createPublicProductImagePath } from "@partsradar/shared";

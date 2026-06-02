@@ -1,3 +1,4 @@
+// apps/web/app/product-explorer/components/ProductTable.tsx
 import { createProductDetailHref } from "../query-state";
 import type { LoadState, ProductListItem, ProductsResponse } from "../types";
 import { ProductRow } from "./ProductRow";

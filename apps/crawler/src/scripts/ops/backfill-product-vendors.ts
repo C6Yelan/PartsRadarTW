@@ -1,3 +1,4 @@
+// apps/crawler/src/scripts/ops/backfill-product-vendors.ts
 // This script is a manual local backfill tool for product vendor metadata.
 // It derives vendor fields from existing product names and category IDs.
 // Do not use this as the production scheduled crawler entrypoint.

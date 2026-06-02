@@ -1,3 +1,4 @@
+// apps/web/app/products/[id]/price-history/model.ts
 import type {
   ChartConfig,
   ChartMarker,

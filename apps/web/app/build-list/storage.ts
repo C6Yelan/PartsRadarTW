@@ -1,3 +1,4 @@
+// apps/web/app/build-list/storage.ts
 import { normalizeBuildListItems, type BuildListItem } from "./model";
 
 export const BUILD_LIST_STORAGE_KEY = "partsradartw:build-list:v1";

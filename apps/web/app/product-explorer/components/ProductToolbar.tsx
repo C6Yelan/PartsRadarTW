@@ -1,3 +1,4 @@
+// apps/web/app/product-explorer/components/ProductToolbar.tsx
 import type { ProductStatus, ProductSort, ProductVendorOption, QueryState } from "../types";
 import { formatInteger } from "../formatting";
 import {

@@ -1,3 +1,4 @@
+// packages/shared/src/coolpc-source.ts
 export const COOLPC_SOURCE_NAME = "coolpc";
 export const COOLPC_OFFICIAL_HOSTNAME = "www.coolpc.com.tw";
 export const COOLPC_OFFICIAL_BASE_URL = `https://${COOLPC_OFFICIAL_HOSTNAME}`;

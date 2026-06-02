@@ -1,3 +1,4 @@
+// apps/web/app/api/products/query.ts
 import type { Prisma } from "@partsradar/db";
 
 import {

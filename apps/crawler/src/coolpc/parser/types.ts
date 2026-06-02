@@ -1,3 +1,4 @@
+// apps/crawler/src/coolpc/parser/types.ts
 export type Currency = "TWD";
 
 export type ContentValidationStatus = "valid" | "invalid" | "suspected_block";

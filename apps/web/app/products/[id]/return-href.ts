@@ -1,3 +1,4 @@
+// apps/web/app/products/[id]/return-href.ts
 const INTERNAL_RETURN_URL_ORIGIN = "https://return.partsradar.invalid";
 
 export function normalizeReturnHref(value: string | string[] | undefined) {

@@ -1,3 +1,4 @@
+// apps/crawler/src/scripts/manual/validate-coolpc-live.ts
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { COOLPC_TARGET_CATEGORIES, type CoolpcTargetCategory } from "../../coolpc/categories";

@@ -1,3 +1,4 @@
+// apps/web/app/api/products/handler.ts
 import { InvalidQueryError } from "../_shared/query";
 import { internalErrorResponse, invalidQueryResponse, jsonOk } from "../_shared/responses";
 import { SOURCE_STATUS_CATEGORY_QUERY } from "../source-status/handler";

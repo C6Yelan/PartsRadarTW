@@ -1,3 +1,4 @@
+// apps/crawler/src/coolpc/category-snapshot.ts
 import type { ParseErrorType as PrismaParseErrorType, PrismaClient } from "@partsradar/db";
 import { COOLPC_TARGET_CATEGORIES, type CoolpcTargetCategory } from "./categories";
 import {

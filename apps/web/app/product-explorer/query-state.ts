@@ -1,3 +1,4 @@
+// apps/web/app/product-explorer/query-state.ts
 import type { CategoryItem, ProductSort, ProductStatus, QueryState } from "./types";
 
 export const DEFAULT_QUERY: QueryState = {

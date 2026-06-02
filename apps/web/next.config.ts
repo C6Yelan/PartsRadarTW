@@ -1,3 +1,4 @@
+// apps/web/next.config.ts
 import type { NextConfig } from "next";
 import { existsSync } from "node:fs";
 import { join } from "node:path";

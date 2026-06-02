@@ -1,3 +1,4 @@
+// apps/web/app/api/products/[id]/route.ts
 import { withRateLimit } from "../../_shared/rate-limit";
 import { createGetProductHandler, type ProductDetailReadClient } from "./handler";
 

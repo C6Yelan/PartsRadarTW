@@ -1,3 +1,4 @@
+// apps/crawler/tests/coolpc/support/product-write-client.ts
 import type { ParsedCoolpcProduct } from "../../../src/coolpc/parser";
 import type { CoolpcProductWriteClient } from "../../../src/coolpc/product-write";
 

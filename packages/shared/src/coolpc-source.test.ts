@@ -1,3 +1,4 @@
+// packages/shared/src/coolpc-source.test.ts
 import { describe, expect, it } from "vitest";
 import {
   COOLPC_OFFICIAL_BASE_URL,

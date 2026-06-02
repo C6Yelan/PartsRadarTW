@@ -1,3 +1,4 @@
+// apps/web/app/api/_shared/responses.ts
 export const API_ERROR_MESSAGES = {
   // Public API errors stay generic so Prisma, DB, crawler, and environment
   // details cannot leak through route handler exceptions.

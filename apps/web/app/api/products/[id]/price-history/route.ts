@@ -1,3 +1,4 @@
+// apps/web/app/api/products/[id]/price-history/route.ts
 import { withRateLimit } from "../../../_shared/rate-limit";
 import {
   createGetProductPriceHistoryHandler,

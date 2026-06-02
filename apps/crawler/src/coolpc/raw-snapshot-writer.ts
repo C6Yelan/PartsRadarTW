@@ -1,3 +1,4 @@
+// apps/crawler/src/coolpc/raw-snapshot-writer.ts
 import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";

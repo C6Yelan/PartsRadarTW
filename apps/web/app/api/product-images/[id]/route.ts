@@ -1,3 +1,4 @@
+// apps/web/app/api/product-images/[id]/route.ts
 import { withRateLimit } from "../../_shared/rate-limit";
 import { createGetProductImageHandler } from "../handler";
 

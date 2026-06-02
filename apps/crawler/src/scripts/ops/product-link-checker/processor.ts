@@ -1,3 +1,4 @@
+// apps/crawler/src/scripts/ops/product-link-checker/processor.ts
 import type { Prisma } from "@partsradar/db";
 import { createCoolpcPurchaseUrl, toPublicIntroductionUrl } from "@partsradar/shared";
 import { toSafeCliErrorMessage } from "../../shared/script-utils";

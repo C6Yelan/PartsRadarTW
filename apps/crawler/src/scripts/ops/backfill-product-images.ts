@@ -1,3 +1,4 @@
+// apps/crawler/src/scripts/ops/backfill-product-images.ts
 // This script is a manual image-cache backfill tool for local validation.
 // It downloads source product images at a low, jittered rate and writes small WebP thumbnails.
 // Do not use this as the production scheduled crawler entrypoint.

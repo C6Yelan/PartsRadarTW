@@ -1,4 +1,5 @@
 "use client";
+// apps/web/app/products/[id]/product-detail.tsx
 
 import Link from "next/link";
 import { useEffect, useState } from "react";

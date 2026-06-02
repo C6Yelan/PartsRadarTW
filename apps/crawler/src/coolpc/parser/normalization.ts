@@ -1,3 +1,4 @@
+// apps/crawler/src/coolpc/parser/normalization.ts
 export function parsePriceText(rawPriceText: string): number | null {
   const match = rawPriceText.match(/(?:NT|\$)\s*([0-9][0-9,]*)/i);
 

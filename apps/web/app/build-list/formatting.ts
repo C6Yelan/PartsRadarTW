@@ -1,3 +1,4 @@
+// apps/web/app/build-list/formatting.ts
 export function formatBuildListPrice(amount: number) {
   return `NT$ ${new Intl.NumberFormat("zh-TW").format(amount)}`;
 }

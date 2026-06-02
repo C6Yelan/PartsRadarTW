@@ -1,3 +1,4 @@
+// apps/web/app/api/products/[id]/handler.ts
 import type { Prisma } from "@partsradar/db";
 import {
   COOLPC_SOURCE_NAME,

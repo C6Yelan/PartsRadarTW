@@ -1,3 +1,4 @@
+// apps/web/app/product-explorer/types.ts
 export type SourceStatus = "ok" | "stale" | "unavailable";
 export type ProductStatus = "active" | "inactive" | "all";
 export type ProductSort =

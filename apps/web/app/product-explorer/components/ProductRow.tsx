@@ -1,3 +1,4 @@
+// apps/web/app/product-explorer/components/ProductRow.tsx
 import Link from "next/link";
 import { formatPrice, formatSignedPercent, formatSignedPrice } from "../formatting";
 import type { ProductListItem } from "../types";

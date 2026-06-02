@@ -1,3 +1,4 @@
+/* apps/web/app/styles/product-filters.css */
 .workspace-grid {
   display: grid;
   grid-template-columns: 286px minmax(0, 1fr);

@@ -1,3 +1,4 @@
+// apps/web/app/api/products/data.ts
 import type { Prisma } from "@partsradar/db";
 
 import type { SourceStatusReadClient } from "../source-status/handler";

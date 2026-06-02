@@ -1,4 +1,5 @@
 "use client";
+// apps/web/app/product-explorer/ProductExplorer.tsx
 
 import Link from "next/link";
 import { type FormEvent, type MouseEvent, useEffect, useMemo, useState } from "react";

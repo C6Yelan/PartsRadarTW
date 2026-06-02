@@ -1,3 +1,4 @@
+// apps/web/app/api/products/response.ts
 import {
   COOLPC_SOURCE_NAME,
   createCoolpcPurchaseUrl,

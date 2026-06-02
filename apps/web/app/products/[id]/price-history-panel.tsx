@@ -1,4 +1,5 @@
 "use client";
+// apps/web/app/products/[id]/price-history-panel.tsx
 
 import { useMemo, useState } from "react";
 import { PriceHistoryChart, useChartConfig } from "./price-history/chart";

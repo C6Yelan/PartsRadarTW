@@ -1,3 +1,4 @@
+// apps/web/app/product-explorer/components/CategoryOption.tsx
 interface CategoryOptionProps {
   checked: boolean;
   label: string;

@@ -1,3 +1,4 @@
+// apps/crawler/tests/coolpc/raw-snapshot-cleanup.test.ts
 import { access, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";

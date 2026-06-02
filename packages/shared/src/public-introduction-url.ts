@@ -1,3 +1,4 @@
+// packages/shared/src/public-introduction-url.ts
 // Introduction links are display-only references, so low-quality marketplace/download
 // targets are filtered before a stored URL reaches public API responses or link checks.
 const BLOCKED_INTRODUCTION_HOST_SUFFIXES = [".shopee.tw"];

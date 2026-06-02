@@ -1,3 +1,4 @@
+// apps/crawler/src/coolpc/categories.ts
 export interface CoolpcTargetCategory {
   igrp: number;
   sourceName: string;

@@ -1,3 +1,4 @@
+// apps/crawler/tests/coolpc/product-write.test.ts
 import { describe, expect, it } from "vitest";
 import { writeCoolpcProductPrices } from "../../src/coolpc/product-write";
 import { FakeCoolpcProductWriteClient, productItem } from "./support/product-write-client";

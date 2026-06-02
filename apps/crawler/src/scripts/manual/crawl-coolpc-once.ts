@@ -1,3 +1,4 @@
+// apps/crawler/src/scripts/manual/crawl-coolpc-once.ts
 // This script is a manual smoke tool for local validation.
 // Do not use this as the production scheduled crawler entrypoint.
 import { relative } from "node:path";

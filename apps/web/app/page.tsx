@@ -1,3 +1,4 @@
+// apps/web/app/page.tsx
 import { Suspense } from "react";
 
 import ProductExplorer from "./product-explorer/ProductExplorer";

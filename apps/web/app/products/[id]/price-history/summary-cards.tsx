@@ -1,3 +1,4 @@
+// apps/web/app/products/[id]/price-history/summary-cards.tsx
 import type { HistoryViewSummary, PriceHistoryRangeDays, PriceHistoryRangeKey } from "./types";
 import {
   formatCompactDate,

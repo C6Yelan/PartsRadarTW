@@ -1,3 +1,4 @@
+// apps/crawler/src/coolpc/product-write/types.ts
 import type { ParsedCoolpcProduct } from "../parser";
 
 export interface WriteCoolpcProductPricesOptions {

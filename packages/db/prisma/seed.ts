@@ -1,3 +1,4 @@
+// packages/db/prisma/seed.ts
 import { prisma } from "../src/client";
 
 const coolpcCategories = [

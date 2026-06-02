@@ -1,3 +1,4 @@
+// apps/crawler/src/scripts/ops/check-product-links.ts
 // This script is a low-frequency product link health checker.
 // It records link status for UI hints only; it does not remove or deactivate products.
 import type { PrismaClient } from "@partsradar/db";

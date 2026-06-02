@@ -1,3 +1,4 @@
+// apps/web/app/build-list/model.ts
 export const BUILD_LIST_MAX_QUANTITY = 99;
 
 export interface BuildListProduct {

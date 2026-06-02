@@ -1,3 +1,4 @@
+// apps/web/app/site-disclaimer.tsx
 export default function SiteDisclaimer() {
   return (
     <footer className="site-disclaimer">

@@ -1,3 +1,4 @@
+// apps/web/app/products/[id]/price-history/format.ts
 import type { ChartPoint, PriceHistoryPoint } from "./types";
 
 export function formatHistoryPointCount(pointCount: number) {

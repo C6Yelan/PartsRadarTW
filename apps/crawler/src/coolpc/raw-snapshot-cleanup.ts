@@ -1,3 +1,4 @@
+// apps/crawler/src/coolpc/raw-snapshot-cleanup.ts
 import { lstat, unlink } from "node:fs/promises";
 import { isAbsolute, relative, resolve } from "node:path";
 import type { PrismaClient } from "@partsradar/db";

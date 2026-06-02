@@ -1,3 +1,4 @@
+// apps/crawler/src/coolpc/parser/content-validation.ts
 import { load } from "cheerio";
 import { extractCoolpcProductCandidates } from "./candidates";
 import {

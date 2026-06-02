@@ -1,3 +1,4 @@
+// apps/crawler/tests/coolpc/support/category-snapshot-client.ts
 import type {
   CoolpcCategorySnapshotWriteClient,
   WriteCoolpcCategoryProducts,

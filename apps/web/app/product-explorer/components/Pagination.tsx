@@ -1,3 +1,4 @@
+// apps/web/app/product-explorer/components/Pagination.tsx
 import type { FormEvent } from "react";
 import type { LoadState } from "../types";
 import { toDigitsOnly } from "../query-state";

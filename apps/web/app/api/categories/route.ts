@@ -1,3 +1,4 @@
+// apps/web/app/api/categories/route.ts
 import { withRateLimit } from "../_shared/rate-limit";
 import { createGetCategoriesHandler } from "./handler";
 

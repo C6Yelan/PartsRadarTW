@@ -1,3 +1,4 @@
+// apps/web/app/api/products/route.ts
 import { withRateLimit } from "../_shared/rate-limit";
 import { createGetProductsHandler, type ProductsReadClient } from "./handler";
 import { SOURCE_STATUS_CATEGORY_QUERY } from "../source-status/handler";

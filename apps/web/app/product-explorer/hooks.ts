@@ -1,3 +1,4 @@
+// apps/web/app/product-explorer/hooks.ts
 import {
   type MouseEvent,
   useCallback,

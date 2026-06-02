@@ -1,3 +1,4 @@
+// packages/shared/src/product-vendors.ts
 export interface ProductVendorRule {
   slug: string;
   name: string;

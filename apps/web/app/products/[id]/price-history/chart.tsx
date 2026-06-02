@@ -1,4 +1,5 @@
 "use client";
+// apps/web/app/products/[id]/price-history/chart.tsx
 
 import { useEffect, useState } from "react";
 import {

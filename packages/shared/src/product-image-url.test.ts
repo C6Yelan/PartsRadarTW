@@ -1,3 +1,4 @@
+// packages/shared/src/product-image-url.test.ts
 import { describe, expect, it } from "vitest";
 import { createPublicProductImagePath } from "./product-image-url";
 

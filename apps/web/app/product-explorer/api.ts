@@ -1,3 +1,4 @@
+// apps/web/app/product-explorer/api.ts
 import { toApiSearchParams } from "./query-state";
 import type { ApiErrorCode, CategoryItem, ProductsResponse, QueryState } from "./types";
 

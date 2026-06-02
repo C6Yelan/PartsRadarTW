@@ -1,3 +1,4 @@
+// apps/web/app/product-explorer/components/ProductFilters.tsx
 import type { MouseEvent } from "react";
 import type { CategoryItem, LoadState } from "../types";
 import { CategoryOption } from "./CategoryOption";

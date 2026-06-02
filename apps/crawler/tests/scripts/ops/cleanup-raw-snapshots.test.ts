@@ -1,3 +1,4 @@
+// apps/crawler/tests/scripts/ops/cleanup-raw-snapshots.test.ts
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";

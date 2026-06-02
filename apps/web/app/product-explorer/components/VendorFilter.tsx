@@ -1,3 +1,4 @@
+// apps/web/app/product-explorer/components/VendorFilter.tsx
 import { useEffect, useRef, useState } from "react";
 import type { ProductVendorOption } from "../types";
 

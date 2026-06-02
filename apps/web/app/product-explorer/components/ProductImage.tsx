@@ -1,3 +1,4 @@
+// apps/web/app/product-explorer/components/ProductImage.tsx
 import { useState } from "react";
 
 interface ProductImageProps {

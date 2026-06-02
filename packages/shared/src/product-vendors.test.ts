@@ -1,3 +1,4 @@
+// packages/shared/src/product-vendors.test.ts
 import { describe, expect, it } from "vitest";
 import { classifyProductVendor } from "./product-vendors";
 

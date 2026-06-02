@@ -1,3 +1,4 @@
+// apps/web/app/products/[id]/price-history/types.ts
 export type PriceHistoryLoadState = "idle" | "loading" | "ready" | "unavailable" | "error";
 export type PriceHistoryRangeDays = 7 | 30 | 90;
 export type PriceHistoryRange = PriceHistoryRangeDays | "all";

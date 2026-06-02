@@ -1,4 +1,5 @@
 "use client";
+// apps/web/app/build-list/print/BuildListPrintPageClient.tsx
 
 import Link from "next/link";
 import { formatBuildListDateTime, formatBuildListPrice } from "../formatting";

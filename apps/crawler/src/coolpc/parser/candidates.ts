@@ -1,3 +1,4 @@
+// apps/crawler/src/coolpc/parser/candidates.ts
 import type { CheerioAPI } from "cheerio";
 import type { CoolpcProductCandidate } from "./types";
 import { normalizeForComparison } from "./normalization";

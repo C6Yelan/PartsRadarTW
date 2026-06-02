@@ -1,3 +1,4 @@
+// apps/crawler/src/scripts/ops/image-cache-backfill/processor.ts
 import { copyFile, mkdir, rename, stat, unlink, writeFile } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
 import type { PrismaClient } from "@partsradar/db";
