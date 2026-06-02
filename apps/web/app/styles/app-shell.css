@@ -167,7 +167,12 @@
   font-size: 14px;
 }
 
-.dashboard-shell,
+.dashboard-shell {
+  width: min(1680px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 18px 0 30px;
+}
+
 .detail-shell {
   width: min(1600px, calc(100% - 48px));
   margin: 0 auto;
@@ -264,4 +269,3 @@
 .quiet-alert.warning {
   margin: 0;
 }
-

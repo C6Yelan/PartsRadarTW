@@ -1,6 +1,6 @@
 .workspace-grid {
   display: grid;
-  grid-template-columns: 320px minmax(0, 1fr);
+  grid-template-columns: 286px minmax(0, 1fr);
   gap: 14px;
   margin-top: 16px;
 }
@@ -231,4 +231,3 @@
   color: var(--danger);
   font-size: 13px;
 }
-
