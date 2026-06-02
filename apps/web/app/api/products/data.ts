@@ -38,8 +38,20 @@ export const PRODUCT_VENDOR_SELECT = {
   vendorName: true,
 } as const satisfies Prisma.ProductSelect;
 
+export const PRODUCT_PRICE_MOVEMENT_RANGE_DAYS = 30;
+
+export const PRODUCT_PRICE_MOVEMENT_SNAPSHOT_SELECT = {
+  productId: true,
+  price: true,
+  currency: true,
+  capturedAt: true,
+} as const satisfies Prisma.PriceSnapshotSelect;
+
 export type ProductRecord = Prisma.ProductGetPayload<{ select: typeof PRODUCT_SELECT }>;
 export type ProductVendorRecord = Prisma.ProductGetPayload<{ select: typeof PRODUCT_VENDOR_SELECT }>;
+export type ProductPriceMovementSnapshotRecord = Prisma.PriceSnapshotGetPayload<{
+  select: typeof PRODUCT_PRICE_MOVEMENT_SNAPSHOT_SELECT;
+}>;
 
 type ProductFindManyArgs<TSelect extends Prisma.ProductSelect> = Omit<
   Prisma.ProductFindManyArgs,
@@ -50,11 +62,22 @@ type ProductFindManyArgs<TSelect extends Prisma.ProductSelect> = Omit<
 
 export type ProductListFindManyArgs = ProductFindManyArgs<typeof PRODUCT_SELECT>;
 export type ProductVendorFindManyArgs = ProductFindManyArgs<typeof PRODUCT_VENDOR_SELECT>;
+export type ProductPriceMovementSnapshotFindManyArgs = Omit<
+  Prisma.PriceSnapshotFindManyArgs,
+  "select"
+> & {
+  select: typeof PRODUCT_PRICE_MOVEMENT_SNAPSHOT_SELECT;
+};
 
 export interface ProductsReadClient extends SourceStatusReadClient {
   product: {
     findProducts(args: ProductListFindManyArgs): Promise<ProductRecord[]>;
     findVendorOptions(args: ProductVendorFindManyArgs): Promise<ProductVendorRecord[]>;
     count(args: Prisma.ProductCountArgs): Promise<number>;
+  };
+  priceSnapshot: {
+    findMany(
+      args: ProductPriceMovementSnapshotFindManyArgs,
+    ): Promise<ProductPriceMovementSnapshotRecord[]>;
   };
 }

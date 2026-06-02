@@ -18,6 +18,9 @@ export async function GET(request: Request): Promise<Response> {
         findVendorOptions: (args) => prisma.product.findMany(args),
         count: (args) => prisma.product.count(args),
       },
+      priceSnapshot: {
+        findMany: (args) => prisma.priceSnapshot.findMany(args),
+      },
       sourceCategory: {
         findMany: () => prisma.sourceCategory.findMany(SOURCE_STATUS_CATEGORY_QUERY),
       },

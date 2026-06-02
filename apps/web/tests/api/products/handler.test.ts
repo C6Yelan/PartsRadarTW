@@ -8,6 +8,7 @@ import {
   NOW,
   PRODUCT_ID,
   product,
+  priceSnapshot,
   searchTokenWhere,
   sourceStatusCategory,
   vendorOption,
@@ -17,6 +18,13 @@ describe("GET /api/products handler", () => {
   it("returns paginated products with public-safe fields and source status meta", async () => {
     const client = fakeProductsClient({
       products: [product()],
+      priceSnapshots: [
+        priceSnapshot(),
+        priceSnapshot({
+          price: 6990,
+          capturedAt: new Date("2026-05-28T11:45:00.000Z"),
+        }),
+      ],
       totalItems: 12,
       sourceCategories: [
         sourceStatusCategory({
@@ -67,6 +75,17 @@ describe("GET /api/products handler", () => {
     expect(client.lastProductFindProductsArgs?.select).not.toHaveProperty("ibuyToken");
     expect(client.lastProductFindProductsArgs?.select).not.toHaveProperty("sourceUrl");
     expect(client.lastProductCountArgs?.where).toEqual(client.lastProductFindProductsArgs?.where);
+    expect(client.lastPriceSnapshotFindManyArgs).toMatchObject({
+      where: {
+        productId: {
+          in: [PRODUCT_ID],
+        },
+        capturedAt: {
+          lte: NOW,
+        },
+      },
+      orderBy: [{ productId: "asc" }, { capturedAt: "asc" }],
+    });
     expect(client.lastSourceCategoryFindManyArgs).toEqual(SOURCE_STATUS_CATEGORY_QUERY);
     expect(body).toEqual({
       data: [
@@ -89,6 +108,11 @@ describe("GET /api/products handler", () => {
             currency: "TWD",
             capturedAt: "2026-05-28T11:45:00.000Z",
             lastSeenAt: "2026-05-28T11:55:00.000Z",
+          },
+          priceMovement: {
+            rangeDays: 30,
+            deltaAmount: -600,
+            deltaPercent: -7.91,
           },
           source: {
             name: "coolpc",
@@ -129,6 +153,7 @@ describe("GET /api/products handler", () => {
     );
 
     expect(response.status).toBe(200);
+    expect(client.priceSnapshotFindManyCallCount).toBe(0);
     expect(client.lastProductFindProductsArgs).toMatchObject({
       where: {
         isActive: true,
@@ -247,6 +272,7 @@ describe("GET /api/products handler", () => {
     expect(response.status).toBe(400);
     expect(client.productFindProductsCallCount).toBe(0);
     expect(client.productFindVendorOptionsCallCount).toBe(0);
+    expect(client.priceSnapshotFindManyCallCount).toBe(0);
   });
 
   it("rejects invalid query values before reading data", async () => {

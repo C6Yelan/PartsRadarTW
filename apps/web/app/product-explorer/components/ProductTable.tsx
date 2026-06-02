@@ -16,6 +16,7 @@ export function ProductTable({ productListReturnTo, products, productState }: Pr
         <span aria-hidden="true" />
         <span>商品</span>
         <span>目前價格</span>
+        <span>近 30 天</span>
         <span>上架狀態</span>
       </div>
 

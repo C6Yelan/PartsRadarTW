@@ -12,14 +12,19 @@ type ProductFindVendorOptionsArgs = Parameters<
   ProductsReadClient["product"]["findVendorOptions"]
 >[0];
 type ProductCountArgs = Parameters<ProductsReadClient["product"]["count"]>[0];
+type PriceSnapshotFindManyArgs = Parameters<ProductsReadClient["priceSnapshot"]["findMany"]>[0];
 type SourceCategoryFindManyArgs = typeof SOURCE_STATUS_CATEGORY_QUERY;
 type ProductRecord = Awaited<ReturnType<ProductsReadClient["product"]["findProducts"]>>[number];
 type ProductVendorRecord = Awaited<
   ReturnType<ProductsReadClient["product"]["findVendorOptions"]>
 >[number];
+type PriceSnapshotRecord = Awaited<
+  ReturnType<ProductsReadClient["priceSnapshot"]["findMany"]>
+>[number];
 
 interface FakeProductsClientOptions {
   products: ProductRecord[];
+  priceSnapshots?: PriceSnapshotRecord[];
   vendorOptions?: ProductVendorRecord[];
   totalItems: number;
   sourceCategories: SourceStatusCategoryRecord[];
@@ -30,10 +35,12 @@ export function fakeProductsClient(options: FakeProductsClientOptions) {
     lastProductFindProductsArgs: undefined as ProductFindProductsArgs | undefined,
     lastProductVendorOptionsArgs: undefined as ProductFindVendorOptionsArgs | undefined,
     lastProductCountArgs: undefined as ProductCountArgs | undefined,
+    lastPriceSnapshotFindManyArgs: undefined as PriceSnapshotFindManyArgs | undefined,
     lastSourceCategoryFindManyArgs: undefined as SourceCategoryFindManyArgs | undefined,
     productFindProductsCallCount: 0,
     productFindVendorOptionsCallCount: 0,
     productCountCallCount: 0,
+    priceSnapshotFindManyCallCount: 0,
     sourceCategoryFindManyCallCount: 0,
   };
 
@@ -47,6 +54,9 @@ export function fakeProductsClient(options: FakeProductsClientOptions) {
     get lastProductCountArgs() {
       return state.lastProductCountArgs;
     },
+    get lastPriceSnapshotFindManyArgs() {
+      return state.lastPriceSnapshotFindManyArgs;
+    },
     get lastSourceCategoryFindManyArgs() {
       return state.lastSourceCategoryFindManyArgs;
     },
@@ -58,6 +68,9 @@ export function fakeProductsClient(options: FakeProductsClientOptions) {
     },
     get productCountCallCount() {
       return state.productCountCallCount;
+    },
+    get priceSnapshotFindManyCallCount() {
+      return state.priceSnapshotFindManyCallCount;
     },
     get sourceCategoryFindManyCallCount() {
       return state.sourceCategoryFindManyCallCount;
@@ -82,6 +95,14 @@ export function fakeProductsClient(options: FakeProductsClientOptions) {
         return options.totalItems;
       },
     },
+    priceSnapshot: {
+      async findMany(args) {
+        state.priceSnapshotFindManyCallCount += 1;
+        state.lastPriceSnapshotFindManyArgs = args;
+
+        return options.priceSnapshots ?? [];
+      },
+    },
     sourceCategory: {
       async findMany(args) {
         state.sourceCategoryFindManyCallCount += 1;
@@ -94,11 +115,23 @@ export function fakeProductsClient(options: FakeProductsClientOptions) {
     lastProductFindProductsArgs?: ProductFindProductsArgs;
     lastProductVendorOptionsArgs?: ProductFindVendorOptionsArgs;
     lastProductCountArgs?: ProductCountArgs;
+    lastPriceSnapshotFindManyArgs?: PriceSnapshotFindManyArgs;
     lastSourceCategoryFindManyArgs?: SourceCategoryFindManyArgs;
     productFindProductsCallCount: number;
     productFindVendorOptionsCallCount: number;
     productCountCallCount: number;
+    priceSnapshotFindManyCallCount: number;
     sourceCategoryFindManyCallCount: number;
+  };
+}
+
+export function priceSnapshot(overrides: Partial<PriceSnapshotRecord> = {}): PriceSnapshotRecord {
+  return {
+    productId: PRODUCT_ID,
+    price: 7590,
+    currency: "TWD",
+    capturedAt: new Date("2026-05-01T08:00:00.000Z"),
+    ...overrides,
   };
 }
 

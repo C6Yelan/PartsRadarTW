@@ -34,6 +34,11 @@ export interface ProductListItem {
     capturedAt: string;
     lastSeenAt: string;
   };
+  priceMovement: {
+    rangeDays: 30;
+    deltaAmount: number | null;
+    deltaPercent: number | null;
+  };
   source: {
     name: "coolpc";
     url: string;

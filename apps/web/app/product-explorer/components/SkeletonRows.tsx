@@ -9,6 +9,7 @@ export function SkeletonRows() {
           <span className="skeleton-box wide" />
           <span className="skeleton-box short" />
           <span className="skeleton-box short" />
+          <span className="skeleton-box short" />
         </div>
       ))}
     </>

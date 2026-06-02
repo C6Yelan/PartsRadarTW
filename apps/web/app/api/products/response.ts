@@ -8,7 +8,11 @@ import {
   type SourceStatus,
   type SourceStatusCategoryRecord,
 } from "../source-status/handler";
-import type { ProductRecord } from "./data";
+import {
+  PRODUCT_PRICE_MOVEMENT_RANGE_DAYS,
+  type ProductPriceMovementSnapshotRecord,
+  type ProductRecord,
+} from "./data";
 import type { ProductVendorOption } from "./query";
 
 interface ProductListResponseItem {
@@ -30,6 +34,11 @@ interface ProductListResponseItem {
     currency: "TWD";
     capturedAt: string;
     lastSeenAt: string;
+  };
+  priceMovement: {
+    rangeDays: typeof PRODUCT_PRICE_MOVEMENT_RANGE_DAYS;
+    deltaAmount: number | null;
+    deltaPercent: number | null;
   };
   source: {
     name: typeof COOLPC_SOURCE_NAME;
@@ -96,6 +105,7 @@ export function toProductResponseItem(product: ProductRecord): ProductListRespon
       capturedAt: product.currentPrice.priceSnapshot.capturedAt.toISOString(),
       lastSeenAt: product.currentPrice.lastSeenAt.toISOString(),
     },
+    priceMovement: toProductPriceMovement(product, []),
     source: {
       name: COOLPC_SOURCE_NAME,
       // Build from the official source helper so stored crawler URLs cannot leak session state.
@@ -105,6 +115,91 @@ export function toProductResponseItem(product: ProductRecord): ProductListRespon
       isActive: product.isActive,
       missingSince: toIsoStringOrNull(product.missingSince),
     },
+  };
+}
+
+export function buildProductPriceMovementMap(
+  products: ProductRecord[],
+  snapshots: ProductPriceMovementSnapshotRecord[],
+  now: Date,
+) {
+  const snapshotsByProductId = new Map<string, ProductPriceMovementSnapshotRecord[]>();
+
+  for (const snapshot of snapshots) {
+    const productSnapshots = snapshotsByProductId.get(snapshot.productId) ?? [];
+    productSnapshots.push(snapshot);
+    snapshotsByProductId.set(snapshot.productId, productSnapshots);
+  }
+
+  return new Map(
+    products.map((product) => [
+      product.id,
+      toProductPriceMovement(product, snapshotsByProductId.get(product.id) ?? [], now),
+    ]),
+  );
+}
+
+export function toProductResponseItemWithMovement(
+  product: ProductRecord,
+  movement: ProductListResponseItem["priceMovement"],
+): ProductListResponseItem {
+  return {
+    ...toProductResponseItem(product),
+    priceMovement: movement,
+  };
+}
+
+function toProductPriceMovement(
+  product: ProductRecord,
+  snapshots: ProductPriceMovementSnapshotRecord[],
+  now = new Date(),
+): ProductListResponseItem["priceMovement"] {
+  if (!product.currentPrice) {
+    throw new Error("Product list query returned a product without current price.");
+  }
+
+  const since = new Date(
+    now.getTime() - PRODUCT_PRICE_MOVEMENT_RANGE_DAYS * 24 * 60 * 60 * 1000,
+  );
+  const sortedSnapshots = [...snapshots].sort(
+    (left, right) => left.capturedAt.getTime() - right.capturedAt.getTime(),
+  );
+  const snapshotsInRange = sortedSnapshots.filter(
+    (snapshot) => snapshot.capturedAt.getTime() >= since.getTime(),
+  );
+  const baselineBeforeRange = sortedSnapshots.findLast(
+    (snapshot) => snapshot.capturedAt.getTime() < since.getTime(),
+  );
+  const baseline = baselineBeforeRange ?? snapshotsInRange[0] ?? null;
+  const currentPrice = product.currentPrice.priceSnapshot.price;
+
+  if (!baseline || product.currentPrice.lastSeenAt.getTime() < since.getTime()) {
+    return {
+      rangeDays: PRODUCT_PRICE_MOVEMENT_RANGE_DAYS,
+      deltaAmount: null,
+      deltaPercent: null,
+    };
+  }
+
+  const hasOnlyInitialObservation =
+    snapshotsInRange.length === 1 &&
+    snapshotsInRange[0].capturedAt.getTime() === product.currentPrice.lastSeenAt.getTime();
+
+  if (!baselineBeforeRange && hasOnlyInitialObservation) {
+    return {
+      rangeDays: PRODUCT_PRICE_MOVEMENT_RANGE_DAYS,
+      deltaAmount: null,
+      deltaPercent: null,
+    };
+  }
+
+  const deltaAmount = currentPrice - baseline.price;
+
+  return {
+    rangeDays: PRODUCT_PRICE_MOVEMENT_RANGE_DAYS,
+    deltaAmount,
+    deltaPercent:
+      baseline.price === 0 ? null : Number(((deltaAmount / baseline.price) * 100).toFixed(2)),
   };
 }
 

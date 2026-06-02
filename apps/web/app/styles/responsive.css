@@ -247,6 +247,7 @@
     grid-template-areas:
       "image product"
       "image price"
+      "image movement"
       "image status";
     gap: 8px 12px;
     align-items: start;
@@ -279,6 +280,12 @@
     grid-area: price;
   }
 
+  .row-movement {
+    grid-area: movement;
+    justify-content: initial;
+    text-align: initial;
+  }
+
   .row-status {
     grid-area: status;
   }
@@ -297,11 +304,25 @@
     font-size: 12px;
   }
 
+  .row-movement.is-empty {
+    display: grid;
+    align-items: baseline;
+    grid-template-columns: 76px minmax(0, 1fr);
+    justify-items: stretch;
+    text-align: initial;
+  }
+
+  .row-movement.is-empty .price-movement {
+    justify-content: flex-start;
+    justify-self: start;
+    width: fit-content;
+  }
+
   .skeleton-row {
     grid-template-columns: 64px minmax(0, 1fr);
   }
 
-  .skeleton-row .skeleton-box:nth-child(n + 4) {
+  .skeleton-row .skeleton-box:nth-child(n + 5) {
     display: none;
   }
 

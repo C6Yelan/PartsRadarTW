@@ -6,7 +6,9 @@
 .product-row,
 .skeleton-row {
   display: grid;
-  grid-template-columns: 58px minmax(260px, 1fr) minmax(118px, 0.22fr) minmax(112px, 0.2fr);
+  grid-template-columns:
+    58px minmax(240px, 1fr) minmax(116px, 0.2fr) minmax(128px, 0.2fr)
+    minmax(112px, 0.18fr);
   gap: 14px;
   align-items: center;
 }
@@ -19,6 +21,10 @@
   color: var(--muted);
   font-size: 13px;
   font-weight: 800;
+}
+
+.table-header span:nth-child(4) {
+  text-align: center;
 }
 
 .product-row {
@@ -119,6 +125,48 @@
   font-size: 18px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+.row-movement {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.price-movement {
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
+  overflow: hidden;
+  align-items: center;
+  color: var(--muted);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.price-movement.is-down {
+  color: var(--success);
+}
+
+.price-movement.is-up {
+  color: var(--warning);
+}
+
+.price-movement.is-flat {
+  color: #8ea3b2;
+}
+
+.row-movement.is-empty {
+  text-align: center;
+}
+
+.row-movement.is-empty .price-movement {
+  justify-content: center;
+  width: fit-content;
 }
 
 .row-state,
@@ -262,4 +310,3 @@
 .skeleton-box.short {
   width: min(100%, 96px);
 }
-
