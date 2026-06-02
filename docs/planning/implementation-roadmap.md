@@ -116,7 +116,7 @@
 - 圖片 URL allowlist 與 `invalid_image_url` 規則已測試。
 - 商品列表與詳細 API 回傳站內圖片 API URL。
 - 前端 fallback 不依賴 CoolPC hotlink。
-- storage、備份、搬遷與移除原則已寫入部署與資安文件。
+- storage、備份與搬遷原則已寫入部署與資安文件。
 
 ## Phase 5：Web UI 第一版
 
@@ -128,7 +128,7 @@
 - `/products/{id}` 商品詳細頁。
 - active / inactive / stale / unavailable 顯示。
 - 桌面與手機 RWD。
-- 非官方、非商業、來源與更正 / 移除請求聲明。
+- 非官方、非商業與來源聲明。
 
 完成條件：
 
@@ -181,7 +181,6 @@
 - 價格歷史圖與歷史頁。
 - 價格變動探索。
 - 商品連結健康檢查。
-- 正式更正 / 移除流程。
 - 規格副標。
 - 商品比較。
 - 管理者 / 維運者 crawler 異常通知與營運監控。

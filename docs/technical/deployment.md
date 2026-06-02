@@ -133,8 +133,6 @@ PRODUCT_IMAGE_STORAGE_DIR=/var/lib/partsradar/product-images
 - `crawler` 或 backfill 工具負責建立 / 更新縮圖。
 - 缺圖、檔案不存在或讀取失敗時，前端使用 fallback。
 - 圖片 cache 需納入備份 / 搬遷計畫，不視為可任意丟棄的暫存。
-- 合理移除請求需透過資料庫永久 override 停用商品、圖片或來源連結，並執行 idempotent 圖片快取清理命令。
-- `crawler`、image backfill 與 link checker 需讀取 removal override，避免重新產生或重新公開已停用內容。
 
 ## Environment And Secrets
 

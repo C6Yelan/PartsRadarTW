@@ -117,37 +117,12 @@
 - 前端使用站內 `/api/product-images/{productId}.webp`。
 - `web` 不在訪客請求期間抓 CoolPC 圖片。
 - backfill / crawler 低頻建立或更新 WebP cache。
-- 缺圖或圖片被移除時使用 fallback，不 hotlink 來源站。
+- 缺圖時使用 fallback，不 hotlink 來源站。
 
 若未來使用 image optimizer 或 proxy：
 
 - 需明確 remote allowlist。
 - 需補 SSRF 防護：protocol、host、port、redirect、private IP range、DNS rebinding。
-
-## 來源方 / 權利人請求
-
-第一版以人工流程處理，不建立管理後台或公開刪除 API。
-
-請求入口暫用 GitHub Issues；正式網域後應改成更私密的 email 或聯絡頁。
-
-請求至少需要：
-
-- PartsRadarTW 商品頁 URL 或可識別商品名稱。
-- 請求範圍：移除圖片、修正資料、移除商品頁等。
-- 請求原因。
-- 可公開聯繫方式。GitHub Issues 不應要求敏感身分證明。
-
-處理原則：
-
-- 明確來自來源方或權利人的合理請求，優先降低公開風險。
-- 圖片請求先移除 / 停用站內縮圖並顯示 fallback。
-- 商品資料請求需讓商品不再出現在列表、搜尋與詳細頁。
-- 修正 parser / DB 後需確認下次匯入不會把問題帶回。
-- 公開前最低機制採資料庫永久 override / removal table，不用公開刪除 API 或管理後台。
-- 公開 API/UI 必須依 override 排除商品、停用來源連結或回落圖片 fallback。
-- crawler、image backfill 與 link checker 必須讀取 override，略過受影響商品、圖片或來源連結，避免重新產生。
-- 圖片快取清理由 idempotent ops script 依 product ID / image key 執行；重複執行不得破壞其他商品圖片。
-- 內部紀錄保存日期、來源、商品 ID、來源 URL、採取動作與後續規則。
 
 ## CSRF And Access Control
 
