@@ -22,6 +22,7 @@ describe("production smoke options", () => {
       workspaceRoot,
       baseUrl: "http://127.0.0.1:3000/",
       timeoutMs: 5000,
+      productImageSampleSize: 5,
       sourceWarnAfterMinutes: 60,
       sourceFailAfterMinutes: 120,
       crawlerWarnAfterMinutes: 90,
@@ -47,6 +48,8 @@ describe("production smoke options", () => {
         "https://partsradar.net",
         "--timeout-ms",
         "7000",
+        "--product-image-sample-size",
+        "7",
         "--source-warn-after-minutes",
         "45",
         "--missing-image-warn-count",
@@ -64,6 +67,7 @@ describe("production smoke options", () => {
 
     expect(options.baseUrl).toBe("https://partsradar.net/");
     expect(options.timeoutMs).toBe(7000);
+    expect(options.productImageSampleSize).toBe(7);
     expect(options.sourceWarnAfterMinutes).toBe(45);
     expect(options.crawlerFailAfterMinutes).toBe(240);
     expect(options.missingImageWarnCount).toBe(10);
@@ -155,7 +159,7 @@ describe("production smoke checks", () => {
         expect.objectContaining({
           name: "product image api",
           status: "OK",
-          message: "HTTP 200 contentType=image/webp",
+          message: "checked=1",
         }),
       ]),
     );
@@ -196,12 +200,15 @@ describe("production smoke checks", () => {
     );
   });
 
-  it("fails when the first listed product image API is unavailable", async () => {
+  it("fails when a sampled product image API is unavailable", async () => {
     const { crawlerCwd, workspaceRoot } = await createWorkspace();
     const imageDir = join(workspaceRoot, "product-images");
     await mkdir(imageDir);
     await writeFile(join(imageDir, "product-1.webp"), "webp");
-    stubHealthyPublicApi({ imageStatus: 404 });
+    stubHealthyPublicApi({
+      imageStatusByProductId: new Map([["product-2", 404]]),
+      productCount: 3,
+    });
     const options = parseProductionSmokeOptions(
       [],
       {
@@ -224,7 +231,7 @@ describe("production smoke checks", () => {
         expect.objectContaining({
           name: "product image api",
           status: "FAIL",
-          message: "HTTP 404",
+          message: "checked=3 failed=1 firstFailure=product-2: HTTP 404",
         }),
       ]),
     );
@@ -324,9 +331,13 @@ async function createWorkspace(): Promise<{
 
 function stubHealthyPublicApi({
   imageStatus = 200,
+  imageStatusByProductId = new Map<string, number>(),
+  productCount = 1,
   rateLimitClientSource = "cf",
 }: {
   imageStatus?: number;
+  imageStatusByProductId?: Map<string, number>;
+  productCount?: number;
   rateLimitClientSource?: string;
 } = {}): void {
   vi.stubGlobal(
@@ -348,14 +359,16 @@ function stubHealthyPublicApi({
       if (url.pathname === "/api/products") {
         return Response.json(
           {
-            data: [
-              {
-                id: "product-1",
+            data: Array.from({ length: productCount }, (_, index) => {
+              const id = `product-${index + 1}`;
+
+              return {
+                id,
                 image: {
-                  url: "/api/product-images/product-1.webp",
+                  url: `/api/product-images/${id}.webp`,
                 },
-              },
-            ],
+              };
+            }),
             pagination: { totalItems: 1 },
           },
           {
@@ -373,10 +386,14 @@ function stubHealthyPublicApi({
         return Response.json({ id: "product-1" });
       }
 
-      if (url.pathname === "/api/product-images/product-1.webp") {
-        return new Response(imageStatus === 200 ? "webp" : "not found", {
-          status: imageStatus,
-          headers: imageStatus === 200 ? { "content-type": "image/webp" } : undefined,
+      const productImageMatch = url.pathname.match(/^\/api\/product-images\/(product-\d+)\.webp$/);
+
+      if (productImageMatch) {
+        const status = imageStatusByProductId.get(productImageMatch[1]) ?? imageStatus;
+
+        return new Response(status === 200 ? "webp" : "not found", {
+          status,
+          headers: status === 200 ? { "content-type": "image/webp" } : undefined,
         });
       }
 

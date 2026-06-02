@@ -356,6 +356,7 @@ SMOKE_PUBLIC_BASE_URL=https://partsradar.net
 - `SMOKE_INTERVAL_SECONDS`：daemon 檢查間隔，預設 300。
 - `SMOKE_INITIAL_DELAY_SECONDS`：daemon 啟動後第一次檢查前的延遲，預設 60。
 - `SMOKE_TIMEOUT_MS`：HTTP request timeout，預設 5000。
+- `SMOKE_PRODUCT_IMAGE_SAMPLE_SIZE`：從 product list 抽查幾筆 public product image API，預設 5，最大 50。
 - `SMOKE_SOURCE_WARN_AFTER_MINUTES` / `SMOKE_SOURCE_FAIL_AFTER_MINUTES`：來源成功時間門檻，預設 60 / 120。
 - `SMOKE_CRAWLER_WARN_AFTER_MINUTES` / `SMOKE_CRAWLER_FAIL_AFTER_MINUTES`：successful scheduled crawler run 門檻，預設 90 / 180。
 - `SMOKE_RECENT_WINDOW_HOURS`：suspected block / parse error 統計窗口，預設 24。

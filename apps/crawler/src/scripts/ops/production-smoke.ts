@@ -16,6 +16,7 @@ const HELP_FLAG = "--help";
 const DEFAULT_BASE_URL = "http://127.0.0.1:3000";
 const DEFAULT_TIMEOUT_MS = 5000;
 const DEFAULT_PRODUCT_IMAGE_STORAGE_DIR = "storage/product-images";
+const DEFAULT_PRODUCT_IMAGE_SAMPLE_SIZE = 5;
 const DEFAULT_SOURCE_WARN_AFTER_MINUTES = 60;
 const DEFAULT_SOURCE_FAIL_AFTER_MINUTES = 120;
 const DEFAULT_CRAWLER_WARN_AFTER_MINUTES = 90;
@@ -47,6 +48,7 @@ export interface ProductionSmokeOptions {
   baseUrl: string;
   timeoutMs: number;
   productImageStorageDir: string;
+  productImageSampleSize: number;
   sourceWarnAfterMinutes: number;
   sourceFailAfterMinutes: number;
   crawlerWarnAfterMinutes: number;
@@ -151,6 +153,15 @@ export function parseProductionSmokeOptions(
         env.PRODUCT_IMAGE_STORAGE_DIR ??
         DEFAULT_PRODUCT_IMAGE_STORAGE_DIR,
     ),
+    productImageSampleSize: parseIntegerOption({
+      args,
+      env,
+      argName: "--product-image-sample-size",
+      envName: "SMOKE_PRODUCT_IMAGE_SAMPLE_SIZE",
+      fallback: DEFAULT_PRODUCT_IMAGE_SAMPLE_SIZE,
+      min: 1,
+      max: 50,
+    }),
     sourceWarnAfterMinutes: parseIntegerOption({
       args,
       env,
@@ -427,11 +438,10 @@ async function checkPublicEndpoints(options: ProductionSmokeOptions): Promise<{
         ),
   );
 
-  const products = await fetchJson("/api/products?pageSize=1", options);
+  const products = await fetchJson(`/api/products?pageSize=${options.productImageSampleSize}`, options);
   const productsBody = products.ok && isProductsResponse(products.body) ? products.body : null;
   const firstProduct = productsBody?.data[0] ?? null;
   const productId = firstProduct?.id ?? null;
-  const productImagePath = typeof firstProduct?.image?.url === "string" ? firstProduct.image.url : null;
   checks.push(
     products.ok && productsBody && productId
       ? ok("product list api", `totalItems=${productsBody.pagination.totalItems}`)
@@ -459,7 +469,7 @@ async function checkPublicEndpoints(options: ProductionSmokeOptions): Promise<{
       : fail("product detail api", productDetail.ok ? "response shape is invalid" : productDetail.message),
   );
 
-  checks.push(await checkProductImageEndpoint(productImagePath, options));
+  checks.push(await checkProductImageEndpoints(productsBody?.data ?? [], options));
 
   const priceHistory = await fetchJson(`/api/products/${productId}/price-history?range=90d`, options);
   checks.push(
@@ -474,25 +484,42 @@ async function checkPublicEndpoints(options: ProductionSmokeOptions): Promise<{
   };
 }
 
-async function checkProductImageEndpoint(
-  imagePath: string | null,
+async function checkProductImageEndpoints(
+  products: ProductsResponse["data"],
   options: ProductionSmokeOptions,
 ): Promise<SmokeCheckResult> {
-  if (!imagePath?.startsWith("/api/product-images/")) {
-    return fail("product image api", "product list response did not include a public product image path");
+  const failures: string[] = [];
+
+  for (const product of products.slice(0, options.productImageSampleSize)) {
+    const imagePath = typeof product.image?.url === "string" ? product.image.url : null;
+
+    if (!imagePath?.startsWith("/api/product-images/")) {
+      failures.push(`${product.id}: missing public product image path`);
+      continue;
+    }
+
+    const result = await fetchWithTimeout(imagePath, options);
+
+    if (!result.ok) {
+      failures.push(`${product.id}: ${result.message}`);
+      continue;
+    }
+
+    const contentType = result.response.headers.get("content-type") ?? "unknown";
+
+    if (!contentType.toLowerCase().startsWith("image/")) {
+      failures.push(`${product.id}: unexpected contentType=${contentType}`);
+    }
   }
 
-  const result = await fetchWithTimeout(imagePath, options);
-
-  if (!result.ok) {
-    return fail("product image api", result.message);
+  if (failures.length > 0) {
+    return fail(
+      "product image api",
+      `checked=${products.length} failed=${failures.length} firstFailure=${failures[0]}`,
+    );
   }
 
-  const contentType = result.response.headers.get("content-type") ?? "unknown";
-
-  return contentType.toLowerCase().startsWith("image/")
-    ? ok("product image api", `HTTP ${result.response.status} contentType=${contentType}`)
-    : fail("product image api", `unexpected contentType=${contentType}`);
+  return ok("product image api", `checked=${products.length}`);
 }
 
 async function checkSourceFreshness(
