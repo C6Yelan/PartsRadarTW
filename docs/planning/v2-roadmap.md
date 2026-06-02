@@ -108,7 +108,8 @@
 目前狀態：
 
 - 已完成第一輪：`product_link_health` schema / migration、`ops:product-links:check` 低頻檢查命令、dry-run / live confirmation、可選批次上限、10-20 秒 request delay、48 小時 stale window、連續 404 / 410 失敗門檻、商品詳情 API / UI 低干擾健康提示。
-- 尚未完成：主機端排程化、部署後 live check 驗證、redirect 異常細分、與正式更正 / 移除流程的略過規則整合。
+- 已完成第二輪：`maintenance-daemon` 排程入口、link checker 與缺圖 backfill sequential maintenance、shared external fetch lock，避免與 scheduled crawler 並行抓來源。
+- 尚未完成：部署後 live maintenance 驗證、redirect 異常細分、與正式更正 / 移除流程的略過規則整合。
 
 ### 4. 正式更正 / 移除流程
 
@@ -170,7 +171,7 @@
 - crawler 連續失敗、suspected block、parse error 激增通知。
 - source status 歷史摘要。
 - production smoke test script。
-- product image backfill / cleanup 檢查。
+- product image backfill / cleanup 檢查，包含 `maintenance-daemon` 缺圖補齊狀態。
 - raw snapshot retention 檢查。
 - API error 與 rate limit 觀察。
 

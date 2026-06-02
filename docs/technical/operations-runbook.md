@@ -171,8 +171,9 @@ curl -i https://<domain>/api/source-status
 啟動前條件：
 
 - 手動 `manual:crawl-coolpc-once` 已在同一台主機成功跑過，且 `/api/source-status` 可回 `ok`。
-- `product-image-backfill` 沒在跑，避免同時對來源站產生額外負載。
+- `maintenance-daemon` 沒在同一時間持有 external fetch lock；若有，`crawler-daemon` 會跳過當輪並等下一次 interval。
 - `.env` 中的 `CRAWLER_INTERVAL_SECONDS`、`CRAWLER_BACKOFF_SECONDS` 與 `CRAWLER_CATEGORY_DELAY_MS` 已確認；預設分別為 `1800`、`3600`、`8000`。
+- `.env` 中的 `EXTERNAL_FETCH_LOCK_DIR` 與 `EXTERNAL_FETCH_LOCK_STALE_SECONDS` 已確認；所有會打外部來源的 scheduled task 共用這把鎖。
 - `WEB_BIND_HOST` 與 `POSTGRES_BIND_HOST` 仍維持 `127.0.0.1`。
 
 啟動：
@@ -201,6 +202,7 @@ docker compose --profile scheduled-crawler stop crawler-daemon
 - 低於 `60` 秒的 schedule interval / backoff 會被 daemon 拒絕。
 - 低於 `3000` ms 的 category delay 會被 daemon 拒絕。
 - 疑似被來源站攔截時，當輪 crawl 會停止並進入 backoff。
+- 若 shared external fetch lock 被 maintenance task 持有，當輪 crawl 會跳過，不會並行抓來源。
 - daemon log 不應輸出 `.env`、`DATABASE_URL`、Cloudflare token 或其他 secret。
 
 驗證：
@@ -213,7 +215,7 @@ curl -i https://<domain>/api/source-status
 
 ## Product Link Health Check
 
-商品外部連結健康檢查由 crawler ops command 執行，只更新 `product_link_health` 狀態供 UI 低干擾提示使用。它不在使用者 request lifecycle 內執行，也不會刪除商品、停用商品或移除連結。
+商品外部連結健康檢查由 crawler ops command 執行，只更新 `product_link_health` 狀態供 UI 低干擾提示使用。它不在使用者 request lifecycle 內執行，也不會刪除商品、停用商品或移除連結。Production 的低頻排程由 `maintenance-daemon` 負責，手動 command 主要用於 dry-run、單次驗證或緊急補跑。
 
 先跑小批次 dry-run，確認候選數與 log 內容：
 
@@ -242,7 +244,49 @@ docker compose --profile manual-crawler run --rm crawler \
 - command log 不應輸出 `.env`、`DATABASE_URL` 或 secret。
 - 首次 404 / 410 不應直接標記 `broken`，而是先累積為暫時失敗。
 - 商品詳情頁只顯示低干擾健康提示，不應阻止使用者自行開啟外部連結。
-- 正式排程化前，先以小批次確認來源站沒有明顯攔截或異常回應。
+- 若手動 live check，應先確認 `crawler-daemon` / `maintenance-daemon` 沒在持有 external fetch lock，避免額外來源壓力。
+
+## Scheduled Maintenance Daemon
+
+`maintenance-daemon` 負責低頻外部維護任務，目前包含：
+
+- product link health check：每天跑排程，但只選超過 48 小時未確認或 URL 已變更的 due links；每輪預設最多 200 條。
+- missing product image backfill：只補本地沒有 `{productId}.webp` 的 active 商品，不 overwrite 既有圖片；每輪預設最多 150 張。
+
+此 service 只在 `scheduled-crawler` profile 啟動。它和 `crawler-daemon` 共用 `EXTERNAL_FETCH_LOCK_DIR`，避免同時抓外部來源。daemon 啟動後預設先等 900 秒，再開始第一輪，降低部署或重啟時多個 daemon 同時起跑的機率。
+
+啟動：
+
+```bash
+docker compose --profile scheduled-crawler up -d maintenance-daemon
+docker compose --profile scheduled-crawler ps maintenance-daemon
+```
+
+查看 log：
+
+```bash
+docker compose --profile scheduled-crawler logs --tail=100 maintenance-daemon
+```
+
+常用設定：
+
+- `MAINTENANCE_INTERVAL_SECONDS`：maintenance cycle 間隔，預設 86400，允許 3600 到 604800。
+- `MAINTENANCE_INITIAL_DELAY_SECONDS`：daemon 啟動後第一次執行前的延遲，預設 900。
+- `MAINTENANCE_TASK_COOLDOWN_SECONDS`：link check 有送出 live requests 後，進入 image backfill 前的 cooldown，預設 600。
+- `MAINTENANCE_LINK_LIMIT`：每輪最多 link candidates，預設 200。
+- `MAINTENANCE_LINK_STALE_AFTER_HOURS`：link health due window，預設 48。
+- `MAINTENANCE_LINK_MIN_DELAY_MS` / `MAINTENANCE_LINK_MAX_DELAY_MS`：link live request delay，預設 10000 到 20000 ms。
+- `MAINTENANCE_IMAGE_LIMIT`：每輪最多 missing images，預設 150。
+- `MAINTENANCE_IMAGE_MIN_DELAY_MS` / `MAINTENANCE_IMAGE_MAX_DELAY_MS`：image live request delay，預設 8000 到 16000 ms。
+- `EXTERNAL_FETCH_LOCK_DIR`：crawler 與 maintenance 共用的外部抓取鎖路徑。
+- `EXTERNAL_FETCH_LOCK_STALE_SECONDS`：鎖超過此秒數視為 stale，預設 43200。
+
+單次 dry-run 驗證：
+
+```bash
+docker compose --profile manual-crawler run --rm crawler \
+  pnpm ops:maintenance-daemon -- --dry-run --run-once --initial-delay-seconds 0
+```
 
 ## Raw Snapshot Cleanup
 
@@ -280,7 +324,7 @@ docker compose --profile scheduled-crawler up -d raw-snapshot-cleanup-daemon
 
 ## Product Image Cache Backfill
 
-商品資料 crawl 只會把 `primary_image_url` 寫入 DB，不會自動下載站內 WebP 縮圖。新主機或新 volume 上若只有商品、沒有圖片，需手動跑 product image cache backfill。
+商品資料 crawl 只會把 `primary_image_url` 寫入 DB，不會在價格 crawler 當輪下載站內 WebP 縮圖。Production 的缺圖補齊由 `maintenance-daemon` 低頻處理；手動 product image cache backfill 主要用於新主機、新 volume 或大量補跑。
 
 先跑小批次 dry-run：
 
@@ -311,6 +355,6 @@ docker compose exec -T web sh -lc 'find /var/lib/partsradar/product-images -type
 Backfill 規則：
 
 - 不使用 `--overwrite`，除非明確要重建已存在的圖片。
-- 不和 `manual:crawl-coolpc-once` 同時執行，避免對來源站產生額外負載。
+- 不和 `manual:crawl-coolpc-once`、`crawler-daemon` 或 `maintenance-daemon` 同時執行，避免對來源站產生額外負載。
 - 中斷後可重跑；已存在的 `.webp` 會被 skipped。
 - 圖片寫入 volume 後通常不需要重啟 `web`，重新整理頁面即可讀到新檔案。

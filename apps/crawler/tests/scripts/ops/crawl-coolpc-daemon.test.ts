@@ -27,6 +27,7 @@ describe("CoolPC scheduled crawler daemon options", () => {
         CRAWLER_BACKOFF_SECONDS: "7200",
         CRAWLER_CATEGORY_DELAY_MS: "5000",
         SNAPSHOT_STORAGE_DIR: "storage/snapshots",
+        EXTERNAL_FETCH_LOCK_STALE_SECONDS: "21600",
         COOLPC_BASE_URL: "https://www.coolpc.com.tw",
       },
       crawlerCwd,
@@ -38,6 +39,8 @@ describe("CoolPC scheduled crawler daemon options", () => {
       intervalSeconds: 600,
       backoffSeconds: 7200,
       categoryDelayMs: 5000,
+      lockDir: join(workspaceRoot, "storage", "snapshots", ".locks", "external-fetch"),
+      lockStaleSeconds: 21600,
       runOnce: false,
       baseUrl: "https://www.coolpc.com.tw",
     });

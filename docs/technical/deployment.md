@@ -35,6 +35,7 @@
 | `web` | Next.js 網站與查詢 API |
 | `crawler` | 手動 crawl / backfill / ops tools |
 | `crawler-daemon` | scheduled CoolPC crawl |
+| `maintenance-daemon` | scheduled link health check and missing image backfill |
 | `raw-snapshot-cleanup-daemon` | scheduled raw snapshot cleanup |
 | `postgres` | 商品、價格、crawler 狀態與 metadata |
 | `cloudflared` | Cloudflare Tunnel public entry |
@@ -67,9 +68,10 @@
 
 - `storage-init` 以 root 執行一次性 `mkdir` / `chown`，只修正 mounted storage volume 權限，不跑 crawler、不連 DB。
 - Docker named volume 會覆蓋 image build 階段對 mount point 做過的 `chown`；初次部署或重建 volume 後需讓 `storage-init` 成功完成。
-- `web`、`crawler`、`crawler-daemon` 與 `raw-snapshot-cleanup-daemon` 都等 `storage-init` 成功後才啟動；長時間 runtime 仍使用非 root user。
+- `web`、`crawler`、`crawler-daemon`、`maintenance-daemon` 與 `raw-snapshot-cleanup-daemon` 都等 `storage-init` 成功後才啟動；長時間 runtime 仍使用非 root user。
 - `crawler` 預設 command 是 help，避免 `docker compose up` 意外 live fetch。
-- `crawler-daemon` 只在 `scheduled-crawler` profile 啟動，且 command 保留 `--confirm-live-fetch`。
+- `crawler-daemon` 與 `maintenance-daemon` 只在 `scheduled-crawler` profile 啟動，且 command 保留 `--confirm-live-fetch`。
+- `crawler-daemon` 與 `maintenance-daemon` 共用 `EXTERNAL_FETCH_LOCK_DIR`，避免定期價格抓取、連結檢查與缺圖補齊同時打外部來源。
 - `cloudflared` 只在 `public-tunnel` profile 啟動。
 - `COOLPC_BASE_URL` 在 production Compose 固定為 `https://www.coolpc.com.tw`。
 - `web` 預設綁 `127.0.0.1:${WEB_PORT:-3000}`；公開流量走 Cloudflare Tunnel。
@@ -149,6 +151,10 @@ PRODUCT_IMAGE_STORAGE_DIR=/var/lib/partsradar/product-images
 | `SNAPSHOT_STORAGE_DIR` | container 內 snapshot path |
 | `PRODUCT_IMAGE_STORAGE_DIR` | container 內縮圖 path |
 | `CRAWLER_INTERVAL_SECONDS` / `CRAWLER_BACKOFF_SECONDS` / `CRAWLER_CATEGORY_DELAY_MS` | scheduled crawler 節奏 |
+| `MAINTENANCE_INTERVAL_SECONDS` / `MAINTENANCE_INITIAL_DELAY_SECONDS` / `MAINTENANCE_TASK_COOLDOWN_SECONDS` | scheduled maintenance 節奏 |
+| `MAINTENANCE_LINK_LIMIT` / `MAINTENANCE_LINK_STALE_AFTER_HOURS` / `MAINTENANCE_LINK_MIN_DELAY_MS` / `MAINTENANCE_LINK_MAX_DELAY_MS` | link health maintenance 節奏 |
+| `MAINTENANCE_IMAGE_LIMIT` / `MAINTENANCE_IMAGE_MIN_DELAY_MS` / `MAINTENANCE_IMAGE_MAX_DELAY_MS` | missing image backfill maintenance 節奏 |
+| `EXTERNAL_FETCH_LOCK_DIR` / `EXTERNAL_FETCH_LOCK_STALE_SECONDS` | 外部抓取 shared lock |
 | `RAW_SNAPSHOT_CLEANUP_INTERVAL_SECONDS` | cleanup daemon 節奏 |
 | `CLOUDFLARED_IMAGE` | 固定版本 cloudflared image |
 | `CLOUDFLARE_TUNNEL_TOKEN` | Tunnel token |
@@ -174,10 +180,11 @@ PRODUCT_IMAGE_STORAGE_DIR=/var/lib/partsradar/product-images
 8. 執行 seed。
 9. 啟動 `web`。
 10. private validation `/api/source-status`。
-11. 視需要跑 product image backfill。
-12. 建立 Cloudflare remotely-managed tunnel。
-13. 啟動 `public-tunnel` profile。
-14. 驗證正式網域、API、圖片 API、crawler 與資料狀態。
+11. 視需要先手動跑 product image backfill。
+12. 啟動 `scheduled-crawler` profile 中的 `crawler-daemon`、`maintenance-daemon` 與 `raw-snapshot-cleanup-daemon`。
+13. 建立 Cloudflare remotely-managed tunnel。
+14. 啟動 `public-tunnel` profile。
+15. 驗證正式網域、API、圖片 API、crawler、maintenance 與資料狀態。
 
 ## Migration / Backup / Monitoring
 
@@ -196,7 +203,7 @@ Backup：
 
 最小監控：
 
-- `web`、`crawler-daemon`、`postgres` 存活。
+- `web`、`crawler-daemon`、`maintenance-daemon`、`postgres` 存活。
 - 最近 successful crawl。
 - backoff 狀態。
 - snapshot / image cache 容量。

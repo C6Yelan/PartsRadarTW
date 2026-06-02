@@ -178,7 +178,8 @@ https://www.coolpc.com.tw/eachview.php?IGrp={分類編號}
 - 不對外開 port，不提供 HTTP trigger。
 - interval / backoff 不低於 60 秒，分類間 delay 不低於 3000 ms。
 - 疑似攔截停止當輪並 backoff。
-- manual crawler、scheduled crawler、image backfill 不應同時跑。
+- scheduled crawler 與 maintenance daemon 共用 external fetch lock，避免價格抓取、連結檢查與缺圖補齊同時打外部來源。
+- manual crawler、scheduled crawler、link checker、image backfill 不應同時跑；手動 ops 前應先檢查 scheduled daemon 狀態或暫停相關 service。
 
 ## Raw Snapshot And Logging
 

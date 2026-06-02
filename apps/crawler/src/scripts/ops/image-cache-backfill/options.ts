@@ -39,13 +39,17 @@ export interface BackfillSummary {
   liveFetches: number;
 }
 
-export function parseOptions(args: string[]): ImageBackfillOptions {
+export function parseOptions(
+  args: string[],
+  cwd = process.cwd(),
+  env: NodeJS.ProcessEnv = process.env,
+): ImageBackfillOptions {
   if (args.includes("--help")) {
     printHelp();
     process.exit(0);
   }
 
-  const workspaceRoot = resolveWorkspaceRoot();
+  const workspaceRoot = resolveWorkspaceRoot(cwd);
   const dryRun = args.includes("--dry-run");
 
   if (!dryRun && !args.includes(CONFIRM_LIVE_FETCH_FLAG)) {
@@ -66,7 +70,7 @@ export function parseOptions(args: string[]): ImageBackfillOptions {
     storageDir: resolveRelativeToWorkspace(
       workspaceRoot,
       getStringArg(args, "--storage-dir") ??
-        process.env.PRODUCT_IMAGE_STORAGE_DIR ??
+        env.PRODUCT_IMAGE_STORAGE_DIR ??
         DEFAULT_STORAGE_DIR,
     ),
     limit: getPositiveNumberArg(args, "--limit"),

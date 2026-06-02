@@ -9,7 +9,7 @@ import type { BackfillSummary, ImageBackfillOptions } from "./options";
 const THUMBNAIL_MAX_SIZE = 512;
 const WEBP_QUALITY = 74;
 
-interface ProductImageCandidate {
+export interface ProductImageCandidate {
   id: string;
   name: string;
   primaryImageUrl: string | null;
@@ -33,6 +33,7 @@ export async function readCandidates(
   return client.product.findMany({
     where: {
       ...(options.productId ? { id: options.productId } : {}),
+      isActive: true,
       primaryImageUrl: { not: null },
       sourceCategory: {
         ...(options.igrp === null ? {} : { igrp: options.igrp }),
@@ -53,6 +54,50 @@ export async function readCandidates(
     orderBy: [{ sourceCategory: { igrp: "asc" } }, { id: "asc" }],
     take: options.limit ?? undefined,
   });
+}
+
+export async function readMissingImageCandidates(
+  client: PrismaClient,
+  options: ImageBackfillOptions,
+): Promise<ProductImageCandidate[]> {
+  const candidates = await client.product.findMany({
+    where: {
+      ...(options.productId ? { id: options.productId } : {}),
+      isActive: true,
+      primaryImageUrl: { not: null },
+      sourceCategory: {
+        ...(options.igrp === null ? {} : { igrp: options.igrp }),
+        enabled: true,
+      },
+    },
+    select: {
+      id: true,
+      name: true,
+      primaryImageUrl: true,
+      sourceCategory: {
+        select: {
+          igrp: true,
+          displayName: true,
+        },
+      },
+    },
+    orderBy: [{ sourceCategory: { igrp: "asc" } }, { id: "asc" }],
+  });
+  const missingCandidates: ProductImageCandidate[] = [];
+
+  for (const candidate of candidates) {
+    if (await pathExists(join(options.storageDir, `${candidate.id}.webp`))) {
+      continue;
+    }
+
+    missingCandidates.push(candidate);
+
+    if (options.limit !== null && missingCandidates.length >= options.limit) {
+      break;
+    }
+  }
+
+  return missingCandidates;
 }
 
 export async function backfillImages(

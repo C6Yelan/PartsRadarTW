@@ -6,6 +6,7 @@ x-app-env: &app-env
   COOLPC_BASE_URL: "https://www.coolpc.com.tw"
   SNAPSHOT_STORAGE_DIR: "/var/lib/partsradar/snapshots"
   PRODUCT_IMAGE_STORAGE_DIR: "/var/lib/partsradar/product-images"
+  EXTERNAL_FETCH_LOCK_DIR: "/var/lib/partsradar/snapshots/.locks/external-fetch"
 
 services:
   postgres:
@@ -143,6 +144,7 @@ services:
       CRAWLER_INTERVAL_SECONDS: "${CRAWLER_INTERVAL_SECONDS:-1800}"
       CRAWLER_BACKOFF_SECONDS: "${CRAWLER_BACKOFF_SECONDS:-3600}"
       CRAWLER_CATEGORY_DELAY_MS: "${CRAWLER_CATEGORY_DELAY_MS:-8000}"
+      EXTERNAL_FETCH_LOCK_STALE_SECONDS: "${EXTERNAL_FETCH_LOCK_STALE_SECONDS:-43200}"
     volumes:
       - snapshots:/var/lib/partsradar/snapshots
       - product_images:/var/lib/partsradar/product-images
@@ -163,6 +165,46 @@ services:
         "--confirm-live-fetch",
         "--storage-dir",
         "/var/lib/partsradar/snapshots",
+      ]
+
+  maintenance-daemon:
+    profiles:
+      - scheduled-crawler
+    build:
+      context: .
+      target: crawler
+    restart: unless-stopped
+    environment:
+      <<: *app-env
+      MAINTENANCE_INTERVAL_SECONDS: "${MAINTENANCE_INTERVAL_SECONDS:-86400}"
+      MAINTENANCE_INITIAL_DELAY_SECONDS: "${MAINTENANCE_INITIAL_DELAY_SECONDS:-900}"
+      MAINTENANCE_TASK_COOLDOWN_SECONDS: "${MAINTENANCE_TASK_COOLDOWN_SECONDS:-600}"
+      MAINTENANCE_LINK_LIMIT: "${MAINTENANCE_LINK_LIMIT:-200}"
+      MAINTENANCE_LINK_STALE_AFTER_HOURS: "${MAINTENANCE_LINK_STALE_AFTER_HOURS:-48}"
+      MAINTENANCE_LINK_MIN_DELAY_MS: "${MAINTENANCE_LINK_MIN_DELAY_MS:-10000}"
+      MAINTENANCE_LINK_MAX_DELAY_MS: "${MAINTENANCE_LINK_MAX_DELAY_MS:-20000}"
+      MAINTENANCE_IMAGE_LIMIT: "${MAINTENANCE_IMAGE_LIMIT:-150}"
+      MAINTENANCE_IMAGE_MIN_DELAY_MS: "${MAINTENANCE_IMAGE_MIN_DELAY_MS:-8000}"
+      MAINTENANCE_IMAGE_MAX_DELAY_MS: "${MAINTENANCE_IMAGE_MAX_DELAY_MS:-16000}"
+      EXTERNAL_FETCH_LOCK_STALE_SECONDS: "${EXTERNAL_FETCH_LOCK_STALE_SECONDS:-43200}"
+    volumes:
+      - snapshots:/var/lib/partsradar/snapshots
+      - product_images:/var/lib/partsradar/product-images
+    depends_on:
+      storage-init:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      seed:
+        condition: service_completed_successfully
+    command:
+      [
+        "pnpm",
+        "--filter",
+        "@partsradar/crawler",
+        "ops:maintenance-daemon",
+        "--",
+        "--confirm-live-fetch",
       ]
 
   raw-snapshot-cleanup-daemon:

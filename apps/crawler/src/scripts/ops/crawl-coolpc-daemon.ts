@@ -17,6 +17,10 @@ import {
   resolveWorkspaceRoot,
   toSafeCliErrorMessage,
 } from "../shared/script-utils";
+import {
+  DEFAULT_EXTERNAL_FETCH_LOCK_STALE_SECONDS,
+  tryAcquireExternalFetchLock,
+} from "./external-fetch-lock";
 
 const CONFIRM_LIVE_FETCH_FLAG = "--confirm-live-fetch";
 const DEFAULT_STORAGE_DIR = "temp/coolpc-daemon/snapshots";
@@ -35,6 +39,8 @@ export interface CoolpcDaemonOptions {
   intervalSeconds: number;
   backoffSeconds: number;
   categoryDelayMs: number;
+  lockDir: string;
+  lockStaleSeconds: number;
   runOnce: boolean;
   baseUrl?: string;
 }
@@ -70,13 +76,14 @@ export function parseDaemonOptions(
   }
 
   const workspaceRoot = resolveWorkspaceRoot(cwd);
+  const storageDir = resolveRelativeToWorkspace(
+    workspaceRoot,
+    getStringArg(args, "--storage-dir") ?? env.SNAPSHOT_STORAGE_DIR ?? DEFAULT_STORAGE_DIR,
+  );
 
   return {
     workspaceRoot,
-    storageDir: resolveRelativeToWorkspace(
-      workspaceRoot,
-      getStringArg(args, "--storage-dir") ?? env.SNAPSHOT_STORAGE_DIR ?? DEFAULT_STORAGE_DIR,
-    ),
+    storageDir,
     intervalSeconds: parseIntegerOption({
       args,
       argName: "--interval-seconds",
@@ -101,6 +108,21 @@ export function parseDaemonOptions(
       fallback: DEFAULT_COOLPC_CATEGORY_DELAY_MS,
       min: MIN_CATEGORY_DELAY_MS,
       max: MAX_CATEGORY_DELAY_MS,
+    }),
+    lockDir: resolveRelativeToWorkspace(
+      workspaceRoot,
+      getStringArg(args, "--lock-dir") ??
+        env.EXTERNAL_FETCH_LOCK_DIR ??
+        `${storageDir}/.locks/external-fetch`,
+    ),
+    lockStaleSeconds: parseIntegerOption({
+      args,
+      argName: "--lock-stale-seconds",
+      env,
+      envName: "EXTERNAL_FETCH_LOCK_STALE_SECONDS",
+      fallback: DEFAULT_EXTERNAL_FETCH_LOCK_STALE_SECONDS,
+      min: 60,
+      max: 7 * 24 * 60 * 60,
     }),
     runOnce: args.includes("--run-once"),
     baseUrl: validateCoolpcBaseUrl(env.COOLPC_BASE_URL),
@@ -154,6 +176,20 @@ async function runScheduledCycle(
   client: PrismaClient,
   options: CoolpcDaemonOptions,
 ): Promise<{ shouldBackoff: boolean }> {
+  const lock = await tryAcquireExternalFetchLock({
+    lockDir: options.lockDir,
+    owner: "crawler-daemon",
+    staleSeconds: options.lockStaleSeconds,
+  });
+
+  if (!lock) {
+    log("Skipping CoolPC scheduled crawl because another external fetch task holds the lock.");
+
+    return {
+      shouldBackoff: false,
+    };
+  }
+
   log("Starting CoolPC scheduled crawl cycle.");
 
   try {
@@ -178,6 +214,8 @@ async function runScheduledCycle(
     return {
       shouldBackoff: true,
     };
+  } finally {
+    await lock.release();
   }
 }
 
@@ -299,12 +337,15 @@ Options:
                              Default: ${DEFAULT_BACKOFF_SECONDS}, minimum: ${MIN_BACKOFF_SECONDS}
   --category-delay-ms <ms>   Delay between live category requests.
                              Default: ${DEFAULT_COOLPC_CATEGORY_DELAY_MS}, range: ${MIN_CATEGORY_DELAY_MS}-${MAX_CATEGORY_DELAY_MS}
+  --lock-dir <path>          Shared external fetch lock directory.
+  --lock-stale-seconds <sec> Break stale external fetch locks after this age.
   --storage-dir <path>       Snapshot storage directory from the workspace root.
                              Default: ${DEFAULT_STORAGE_DIR}
 
 Environment:
   CRAWLER_INTERVAL_SECONDS, CRAWLER_BACKOFF_SECONDS, CRAWLER_CATEGORY_DELAY_MS,
-  SNAPSHOT_STORAGE_DIR, COOLPC_BASE_URL
+  SNAPSHOT_STORAGE_DIR, EXTERNAL_FETCH_LOCK_DIR, EXTERNAL_FETCH_LOCK_STALE_SECONDS,
+  COOLPC_BASE_URL
 `);
 }
 

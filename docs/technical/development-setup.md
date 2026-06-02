@@ -84,6 +84,11 @@ repo 應提供 `.env.example` 作為範本。實際本機設定使用 `.env.loca
 | `CRAWLER_INTERVAL_SECONDS` | crawler 週期秒數，預設 `1800` |
 | `CRAWLER_BACKOFF_SECONDS` | 連續失敗後延後秒數，第一版預設 `3600` |
 | `CRAWLER_CATEGORY_DELAY_MS` | crawler 分類頁請求間隔，預設 `8000` |
+| `MAINTENANCE_INTERVAL_SECONDS` | link health / missing image maintenance 週期秒數，預設 `86400` |
+| `MAINTENANCE_INITIAL_DELAY_SECONDS` | maintenance daemon 啟動後第一次執行前延遲，預設 `900` |
+| `MAINTENANCE_TASK_COOLDOWN_SECONDS` | maintenance 內 link check 與 image backfill 間 cooldown，預設 `600` |
+| `EXTERNAL_FETCH_LOCK_DIR` | crawler / maintenance 共用外部抓取鎖路徑 |
+| `EXTERNAL_FETCH_LOCK_STALE_SECONDS` | stale lock 判定秒數，預設 `43200` |
 | `CLOUDFLARE_TUNNEL_TOKEN` | Cloudflare Tunnel token；只在部署主機啟用 `public-tunnel` profile 時需要 |
 | `NODE_ENV` | Node.js 執行環境 |
 

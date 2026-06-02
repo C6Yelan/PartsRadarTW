@@ -86,6 +86,8 @@ Scheduled crawler 至少覆蓋：
 - interval、backoff、category delay 有下限。
 - Compose 預設不啟動 `crawler-daemon`。
 - `scheduled-crawler` profile 才包含 daemon，且不開 host ports。
+- `crawler-daemon` 與 `maintenance-daemon` 共用 external fetch lock，避免同時抓外部來源。
+- `maintenance-daemon` 沒有 `--confirm-live-fetch` 或 `--dry-run` 時拒絕啟動；run-once / loop failure behavior 需有測試。
 
 ## API Tests
 
