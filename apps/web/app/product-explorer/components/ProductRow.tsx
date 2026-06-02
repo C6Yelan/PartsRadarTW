@@ -4,11 +4,18 @@ import type { ProductListItem } from "../types";
 import { ProductImage } from "./ProductImage";
 
 interface ProductRowProps {
+  buildListQuantity: number;
   detailHref: string;
   product: ProductListItem;
+  onAddToBuildList(product: ProductListItem): void;
 }
 
-export function ProductRow({ detailHref, product }: ProductRowProps) {
+export function ProductRow({
+  buildListQuantity,
+  detailHref,
+  product,
+  onAddToBuildList,
+}: ProductRowProps) {
   const priceMovementIsEmpty = isPriceMovementEmpty(product.priceMovement);
 
   return (
@@ -36,6 +43,16 @@ export function ProductRow({ detailHref, product }: ProductRowProps) {
         <span className={product.status.isActive ? "row-state ok" : "row-state warning"}>
           {product.status.isActive ? "目前上架" : "可能已下架"}
         </span>
+      </div>
+      <div className="table-cell row-build-list">
+        <span className="cell-label">配單</span>
+        <button
+          className={`build-list-add-button${buildListQuantity > 0 ? " is-added" : ""}`}
+          type="button"
+          onClick={() => onAddToBuildList(product)}
+        >
+          {buildListQuantity > 0 ? `配單中 ${buildListQuantity}` : "加入配單"}
+        </button>
       </div>
     </article>
   );

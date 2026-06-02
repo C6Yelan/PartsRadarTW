@@ -72,7 +72,8 @@ describe("GET /api/products handler", () => {
       skip: 1,
       take: 1,
     });
-    expect(client.lastProductFindProductsArgs?.select).not.toHaveProperty("ibuyToken");
+    expect(client.lastProductFindProductsArgs?.select).toHaveProperty("ibuyToken", true);
+    expect(client.lastProductFindProductsArgs?.select).toHaveProperty("introductionUrl", true);
     expect(client.lastProductFindProductsArgs?.select).not.toHaveProperty("sourceUrl");
     expect(client.lastProductCountArgs?.where).toEqual(client.lastProductFindProductsArgs?.where);
     expect(client.lastPriceSnapshotFindManyArgs).toMatchObject({
@@ -116,7 +117,10 @@ describe("GET /api/products handler", () => {
           },
           source: {
             name: "coolpc",
-            url: "https://www.coolpc.com.tw/eachview.php?IGrp=12",
+            url: "https://www.coolpc.com.tw/evaluate.php?iBuy=GPU-RTX-4070",
+          },
+          introduction: {
+            url: "https://www.nvidia.com/zh-tw/geforce/graphics-cards/40-series/rtx-4070/",
           },
           status: {
             isActive: true,

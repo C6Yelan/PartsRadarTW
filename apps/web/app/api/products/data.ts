@@ -3,12 +3,14 @@ import type { Prisma } from "@partsradar/db";
 import type { SourceStatusReadClient } from "../source-status/handler";
 
 export const PRODUCT_SELECT = {
-  // Keep the list endpoint on public-safe fields only. Do not select sourceUrl,
-  // ibuyToken, raw snapshots, or other crawler/internal identifiers here.
+  // Keep the list endpoint on public-safe fields only. ibuyToken is selected
+  // only to build the outbound CoolPC purchase URL; it is not returned directly.
   id: true,
+  ibuyToken: true,
   name: true,
   primaryImageUrl: true,
   primaryImageCheckedAt: true,
+  introductionUrl: true,
   isActive: true,
   missingSince: true,
   currentPrice: {

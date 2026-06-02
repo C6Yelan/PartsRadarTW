@@ -1,15 +1,23 @@
 import { createProductDetailHref } from "../query-state";
-import type { LoadState, ProductsResponse } from "../types";
+import type { LoadState, ProductListItem, ProductsResponse } from "../types";
 import { ProductRow } from "./ProductRow";
 import { SkeletonRows } from "./SkeletonRows";
 
 interface ProductTableProps {
+  buildListQuantities: Map<string, number>;
   productListReturnTo: string;
   products: ProductsResponse | null;
   productState: LoadState;
+  onAddToBuildList(product: ProductListItem): void;
 }
 
-export function ProductTable({ productListReturnTo, products, productState }: ProductTableProps) {
+export function ProductTable({
+  buildListQuantities,
+  productListReturnTo,
+  products,
+  productState,
+  onAddToBuildList,
+}: ProductTableProps) {
   return (
     <div className="product-table">
       <div className="table-header">
@@ -18,6 +26,7 @@ export function ProductTable({ productListReturnTo, products, productState }: Pr
         <span>目前價格</span>
         <span>近 30 天</span>
         <span>上架狀態</span>
+        <span>配單</span>
       </div>
 
       {productState === "loading" || productState === "idle" ? <SkeletonRows /> : null}
@@ -46,9 +55,11 @@ export function ProductTable({ productListReturnTo, products, productState }: Pr
       {productState === "ready"
         ? products?.data.map((product) => (
             <ProductRow
+              buildListQuantity={buildListQuantities.get(product.id) ?? 0}
               detailHref={createProductDetailHref(product.id, productListReturnTo)}
               key={product.id}
               product={product}
+              onAddToBuildList={onAddToBuildList}
             />
           ))
         : null}

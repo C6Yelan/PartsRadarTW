@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { toBuildListProduct } from "../../build-list/model";
+import { useBuildList } from "../../build-list/use-build-list";
 import SiteDisclaimer from "../../site-disclaimer";
 import PriceHistoryPanel, {
   type PriceHistoryLoadState,
@@ -66,6 +68,7 @@ export default function ProductDetail({
   const [priceHistory, setPriceHistory] = useState<ProductPriceHistoryBody | null>(null);
   const [historyRange, setHistoryRange] = useState<PriceHistoryRange>(90);
   const [imageError, setImageError] = useState(false);
+  const { addProduct, quantityByProductId } = useBuildList();
 
   useEffect(() => {
     const controller = new AbortController();
@@ -238,6 +241,15 @@ export default function ProductDetail({
             </dl>
 
             <div className="detail-actions">
+              <button
+                className="build-list-detail-action"
+                type="button"
+                onClick={() => addProduct(toBuildListProduct(product))}
+              >
+                {(quantityByProductId.get(product.id) ?? 0) > 0
+                  ? `配單中 ${quantityByProductId.get(product.id)}`
+                  : "加入配單"}
+              </button>
               <a
                 aria-label="前往原價屋查看／購買，開新分頁"
                 className={toExternalActionClassName(product.source.health)}

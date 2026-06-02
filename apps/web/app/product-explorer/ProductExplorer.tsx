@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { type FormEvent, type MouseEvent, useEffect, useMemo, useState } from "react";
+import { toBuildListProduct } from "../build-list/model";
+import { useBuildList } from "../build-list/use-build-list";
 import SiteDisclaimer from "../site-disclaimer";
 import { Pagination } from "./components/Pagination";
 import { ProductFilters } from "./components/ProductFilters";
@@ -35,6 +37,7 @@ export default function ProductExplorer() {
   const { filtersOpen, keepDesktopFiltersOpen, syncFiltersOpenFromToggle } =
     useResponsiveFiltersOpen();
   const { resultsPanelRef, schedulePageScroll } = usePendingPageScroll(productState, products);
+  const { addProduct, quantityByProductId, summary } = useBuildList();
   const [pageJumpValue, setPageJumpValue] = useState("");
 
   const selectedCategoryName = useMemo(() => {
@@ -269,7 +272,11 @@ export default function ProductExplorer() {
           </button>
         </form>
 
-        <div className="topbar-meta" aria-label="資料更新時間" role="status">
+        <div className="topbar-meta">
+          <Link className="build-list-nav-link" href="/build-list">
+            <span>配單</span>
+            <strong>{summary.totalQuantity}</strong>
+          </Link>
           <span>資料最近更新：{formatDateTime(products?.meta.lastSuccessAt, "尚無資料")}</span>
         </div>
       </header>
@@ -306,9 +313,11 @@ export default function ProductExplorer() {
             />
 
             <ProductTable
+              buildListQuantities={quantityByProductId}
               productListReturnTo={productListReturnTo}
               products={products}
               productState={productState}
+              onAddToBuildList={(product) => addProduct(toBuildListProduct(product))}
             />
 
             <Pagination

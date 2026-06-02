@@ -49,6 +49,9 @@ export interface ProductListItem {
     name: "coolpc";
     url: string;
   };
+  introduction: {
+    url: string;
+  } | null;
   status: {
     isActive: boolean;
     missingSince: string | null;

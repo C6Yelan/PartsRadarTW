@@ -8,7 +8,7 @@
   display: grid;
   grid-template-columns:
     58px minmax(240px, 1fr) minmax(132px, 0.2fr) minmax(172px, 0.24fr)
-    minmax(112px, 0.18fr);
+    minmax(112px, 0.18fr) minmax(110px, 0.16fr);
   gap: 14px;
   align-items: center;
 }

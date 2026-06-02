@@ -261,7 +261,8 @@
       "image product"
       "image price"
       "image movement"
-      "image status";
+      "image status"
+      "image build-list";
     gap: 8px 12px;
     align-items: start;
     min-height: 0;
@@ -301,6 +302,10 @@
 
   .row-status {
     grid-area: status;
+  }
+
+  .row-build-list {
+    grid-area: build-list;
   }
 
   .table-cell {
