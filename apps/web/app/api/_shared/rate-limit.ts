@@ -1,13 +1,15 @@
+import { createHash } from "node:crypto";
 import { LRUCache } from "lru-cache";
 
-import { rateLimitedResponse } from "./responses";
+import { internalErrorResponse, rateLimitedResponse } from "./responses";
 
 export type RateLimitScope = "api:read" | "api:list" | "api:image";
+export type ClientIdentifierSource = "cf" | "xff" | "unknown";
 
 export const RATE_LIMIT_DEFAULTS = {
   readMax: 120,
   listMax: 360,
-  imageMax: 360,
+  imageMax: 1200,
   windowSeconds: 60,
   cacheSize: 5000,
 } as const;
@@ -25,10 +27,13 @@ export interface RateLimitConfig {
 
 export interface RateLimitDecision {
   allowed: boolean;
+  clientIdentifierHash: string;
+  clientIdentifierSource: ClientIdentifierSource;
   limit: number;
   remaining: number;
   resetEpochSeconds: number;
   retryAfterSeconds: number;
+  scope: RateLimitScope;
 }
 
 export interface RateLimiterOptions {
@@ -40,16 +45,47 @@ export interface RateLimiter {
   check(request: Request, scope: RateLimitScope): RateLimitDecision;
 }
 
+export interface RateLimitCheck {
+  decision: RateLimitDecision;
+  response: Response | null;
+}
+
 type RateLimitEnv = Partial<Record<string, string>>;
 
-export function checkRateLimit(request: Request, scope: RateLimitScope): Response | null {
+export async function withRateLimit(
+  request: Request,
+  scope: RateLimitScope,
+  next: () => Promise<Response>,
+): Promise<Response> {
+  const check = checkRateLimit(request, scope);
+
+  if (check.response) {
+    return check.response;
+  }
+
+  try {
+    return withRateLimitHeaders(await next(), check.decision);
+  } catch {
+    return withRateLimitHeaders(internalErrorResponse(), check.decision);
+  }
+}
+
+export function checkRateLimit(request: Request, scope: RateLimitScope): RateLimitCheck {
   const decision = getGlobalRateLimiter().check(request, scope);
 
   if (decision.allowed) {
-    return null;
+    return {
+      decision,
+      response: null,
+    };
   }
 
-  return rateLimitedResponse(decision);
+  logRateLimitedDecision(decision);
+
+  return {
+    decision,
+    response: withRateLimitHeaders(rateLimitedResponse(decision), decision),
+  };
 }
 
 export function createRateLimiter(options: RateLimiterOptions = {}): RateLimiter {
@@ -61,7 +97,9 @@ export function createRateLimiter(options: RateLimiterOptions = {}): RateLimiter
     check(request, scope) {
       const now = nowMs();
       const limit = config.limits[scope];
-      const key = `${scope}:${getClientIdentifier(request)}`;
+      const clientIdentifier = getClientIdentifierInfo(request);
+      const clientIdentifierHash = hashClientIdentifier(clientIdentifier.value);
+      const key = `${scope}:${clientIdentifier.value}`;
       const existingBucket = buckets.get(key);
       const bucket =
         existingBucket && existingBucket.resetAtMs > now
@@ -75,10 +113,13 @@ export function createRateLimiter(options: RateLimiterOptions = {}): RateLimiter
 
         return {
           allowed: false,
+          clientIdentifierHash,
+          clientIdentifierSource: clientIdentifier.source,
           limit,
           remaining: 0,
           resetEpochSeconds,
           retryAfterSeconds,
+          scope,
         };
       }
 
@@ -87,10 +128,13 @@ export function createRateLimiter(options: RateLimiterOptions = {}): RateLimiter
 
       return {
         allowed: true,
+        clientIdentifierHash,
+        clientIdentifierSource: clientIdentifier.source,
         limit,
         remaining: Math.max(0, limit - bucket.count),
         resetEpochSeconds,
         retryAfterSeconds,
+        scope,
       };
     },
   };
@@ -121,13 +165,52 @@ export function resolveRateLimitConfig(env: RateLimitEnv = process.env): RateLim
 }
 
 export function getClientIdentifier(request: Request): string {
+  return getClientIdentifierInfo(request).value;
+}
+
+export function getClientIdentifierInfo(request: Request): {
+  source: ClientIdentifierSource;
+  value: string;
+} {
   const cloudflareIp = firstHeaderValue(request.headers.get("CF-Connecting-IP"));
 
   if (cloudflareIp) {
-    return cloudflareIp;
+    return {
+      source: "cf",
+      value: cloudflareIp,
+    };
   }
 
-  return firstHeaderValue(request.headers.get("X-Forwarded-For")) ?? "unknown";
+  const forwardedForIp = firstHeaderValue(request.headers.get("X-Forwarded-For"));
+
+  if (forwardedForIp) {
+    return {
+      source: "xff",
+      value: forwardedForIp,
+    };
+  }
+
+  return {
+    source: "unknown",
+    value: "unknown",
+  };
+}
+
+export function rateLimitHeaders(decision: RateLimitDecision): Record<string, string> {
+  return {
+    "X-RateLimit-Client-Source": decision.clientIdentifierSource,
+    "X-RateLimit-Limit": String(decision.limit),
+    "X-RateLimit-Remaining": String(decision.remaining),
+    "X-RateLimit-Reset": String(decision.resetEpochSeconds),
+  };
+}
+
+export function withRateLimitHeaders(response: Response, decision: RateLimitDecision): Response {
+  for (const [name, value] of Object.entries(rateLimitHeaders(decision))) {
+    response.headers.set(name, value);
+  }
+
+  return response;
 }
 
 let globalRateLimiter: RateLimiter | null = null;
@@ -154,4 +237,23 @@ function firstHeaderValue(value: string | null): string | null {
   const firstValue = value?.split(",")[0]?.trim();
 
   return firstValue || null;
+}
+
+function hashClientIdentifier(value: string): string {
+  return createHash("sha256").update(value).digest("hex").slice(0, 16);
+}
+
+function logRateLimitedDecision(decision: RateLimitDecision): void {
+  process.stderr.write(
+    `${JSON.stringify({
+      event: "api_rate_limited",
+      scope: decision.scope,
+      limit: decision.limit,
+      remaining: decision.remaining,
+      resetEpochSeconds: decision.resetEpochSeconds,
+      retryAfterSeconds: decision.retryAfterSeconds,
+      clientIdentifierSource: decision.clientIdentifierSource,
+      clientIdentifierHash: decision.clientIdentifierHash,
+    })}\n`,
+  );
 }

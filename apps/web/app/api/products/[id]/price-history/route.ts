@@ -1,5 +1,4 @@
-import { checkRateLimit } from "../../../_shared/rate-limit";
-import { internalErrorResponse } from "../../../_shared/responses";
+import { withRateLimit } from "../../../_shared/rate-limit";
 import {
   createGetProductPriceHistoryHandler,
   type ProductPriceHistoryReadClient,
@@ -15,13 +14,7 @@ export async function GET(
   request: Request,
   context: ProductPriceHistoryRouteContext,
 ): Promise<Response> {
-  try {
-    const rateLimitResponse = checkRateLimit(request, "api:read");
-
-    if (rateLimitResponse) {
-      return rateLimitResponse;
-    }
-
+  return withRateLimit(request, "api:read", async () => {
     const { id } = await context.params;
     const { prisma } = await import("@partsradar/db");
     const client: ProductPriceHistoryReadClient = {
@@ -34,7 +27,5 @@ export async function GET(
     };
 
     return createGetProductPriceHistoryHandler(client)(id, request.url);
-  } catch {
-    return internalErrorResponse();
-  }
+  });
 }

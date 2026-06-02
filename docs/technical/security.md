@@ -50,9 +50,10 @@
 - 公開 API 使用 bounded in-memory rate limit 作為 app-level abuse guard。
 - `api:read` 預設每 client 每 60 秒 120 次，涵蓋 categories、source-status 與 product detail。
 - `api:list` 預設每 client 每 60 秒 360 次，涵蓋商品列表查詢，避免正常快速切分類、翻頁或排序時被一般 read 額度誤傷。
-- `api:image` 預設每 client 每 60 秒 360 次，涵蓋商品縮圖 API。
+- `api:image` 預設每 client 每 60 秒 1200 次，涵蓋商品縮圖 API；pageSize 50 的正常瀏覽會一次載入大量圖片，圖片額度需比 list 額度更寬。
 - 正常快速切分類、翻頁、排序與載入列表圖片不應輕易觸發 `429`；production 需確認 list / image 額度與 client identity header 實際生效。
 - client identity 優先使用 Cloudflare `CF-Connecting-IP`，其次 `X-Forwarded-For` 第一個值；不把 IP 寫入公開 response。
+- 成功與 429 response 都回傳 `X-RateLimit-*` headers；429 log 只能記錄 scope、limit、reset、client identifier 來源與雜湊，不記錄 raw IP。
 - 超限回 `429`，只包含泛用 `rate_limited` 錯誤與 `Retry-After` / `X-RateLimit-*` headers。
 - 這個 limiter 是單一 web container 內的保底防護；多 replica 不共享狀態，大量流量仍需 Cloudflare WAF / rate limiting 先擋。
 

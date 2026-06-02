@@ -1,19 +1,10 @@
-import { checkRateLimit } from "../_shared/rate-limit";
-import { internalErrorResponse } from "../_shared/responses";
+import { withRateLimit } from "../_shared/rate-limit";
 import { createGetCategoriesHandler } from "./handler";
 
 export async function GET(request: Request): Promise<Response> {
-  try {
-    const rateLimitResponse = checkRateLimit(request, "api:read");
-
-    if (rateLimitResponse) {
-      return rateLimitResponse;
-    }
-
+  return withRateLimit(request, "api:read", async () => {
     const { prisma } = await import("@partsradar/db");
 
     return createGetCategoriesHandler(prisma)();
-  } catch {
-    return internalErrorResponse();
-  }
+  });
 }

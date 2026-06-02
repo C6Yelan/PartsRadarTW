@@ -1,5 +1,4 @@
-import { checkRateLimit } from "../_shared/rate-limit";
-import { internalErrorResponse } from "../_shared/responses";
+import { withRateLimit } from "../_shared/rate-limit";
 import {
   createGetSourceStatusHandler,
   SOURCE_STATUS_CATEGORY_QUERY,
@@ -7,13 +6,7 @@ import {
 } from "./handler";
 
 export async function GET(request: Request): Promise<Response> {
-  try {
-    const rateLimitResponse = checkRateLimit(request, "api:read");
-
-    if (rateLimitResponse) {
-      return rateLimitResponse;
-    }
-
+  return withRateLimit(request, "api:read", async () => {
     const { prisma } = await import("@partsradar/db");
     const client: SourceStatusReadClient = {
       sourceCategory: {
@@ -22,7 +15,5 @@ export async function GET(request: Request): Promise<Response> {
     };
 
     return createGetSourceStatusHandler(client)();
-  } catch {
-    return internalErrorResponse();
-  }
+  });
 }

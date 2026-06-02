@@ -3,9 +3,11 @@ import { describe, expect, it } from "vitest";
 import {
   createRateLimiter,
   getClientIdentifier,
+  getClientIdentifierInfo,
   RATE_LIMIT_DEFAULTS,
   resolveRateLimitConfig,
   type RateLimitConfig,
+  withRateLimitHeaders,
 } from "../../../app/api/_shared/rate-limit";
 
 const BASE_CONFIG: RateLimitConfig = {
@@ -28,6 +30,10 @@ describe("API rate limiter", () => {
     });
 
     expect(getClientIdentifier(request)).toBe("203.0.113.10");
+    expect(getClientIdentifierInfo(request)).toEqual({
+      source: "cf",
+      value: "203.0.113.10",
+    });
   });
 
   it("uses the first x-forwarded-for value when Cloudflare IP is unavailable", () => {
@@ -38,12 +44,20 @@ describe("API rate limiter", () => {
     });
 
     expect(getClientIdentifier(request)).toBe("198.51.100.1");
+    expect(getClientIdentifierInfo(request)).toEqual({
+      source: "xff",
+      value: "198.51.100.1",
+    });
   });
 
   it("falls back to an anonymous bucket when no client address is available", () => {
     const request = new Request("https://partsradar.test/api/products");
 
     expect(getClientIdentifier(request)).toBe("unknown");
+    expect(getClientIdentifierInfo(request)).toEqual({
+      source: "unknown",
+      value: "unknown",
+    });
   });
 
   it("limits read requests per client within a fixed window", () => {
@@ -56,8 +70,10 @@ describe("API rate limiter", () => {
 
     expect(limiter.check(request, "api:read")).toMatchObject({
       allowed: true,
+      clientIdentifierSource: "cf",
       limit: 2,
       remaining: 1,
+      scope: "api:read",
     });
     expect(limiter.check(request, "api:read")).toMatchObject({
       allowed: true,
@@ -150,6 +166,17 @@ describe("API rate limiter", () => {
       },
       windowMs: RATE_LIMIT_DEFAULTS.windowSeconds * 1000,
     });
+  });
+
+  it("adds public rate limit headers to successful responses", () => {
+    const limiter = createRateLimiter({ config: BASE_CONFIG, nowMs: () => 1_000_000 });
+    const decision = limiter.check(requestFromIp("203.0.113.40"), "api:image");
+    const response = withRateLimitHeaders(Response.json({ ok: true }), decision);
+
+    expect(response.headers.get("X-RateLimit-Client-Source")).toBe("cf");
+    expect(response.headers.get("X-RateLimit-Limit")).toBe("4");
+    expect(response.headers.get("X-RateLimit-Remaining")).toBe("3");
+    expect(response.headers.get("X-RateLimit-Reset")).toBe("1001");
   });
 });
 
