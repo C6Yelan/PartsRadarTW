@@ -41,6 +41,7 @@ logs/
 tmp/
 temp/
 .cache/
+.playwright-mcp/
 
 # Local databases
 *.db
