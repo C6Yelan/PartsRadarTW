@@ -22,9 +22,19 @@ const coolpcCategories = [
     displayName: "SSD / HDD",
   },
   {
+    igrp: 8,
+    sourceName: "外接硬碟 / 隨身碟 / 記憶卡",
+    displayName: "外接儲存",
+  },
+  {
     igrp: 10,
     sourceName: "散熱器 / 散熱墊 / 散熱膏",
     displayName: "散熱器",
+  },
+  {
+    igrp: 11,
+    sourceName: "封閉式 / 開放式水冷",
+    displayName: "水冷",
   },
   {
     igrp: 12,
@@ -40,6 +50,11 @@ const coolpcCategories = [
     igrp: 15,
     sourceName: "電源供應器",
     displayName: "電源供應器",
+  },
+  {
+    igrp: 16,
+    sourceName: "機殼風扇 / 機殼配件",
+    displayName: "風扇 / 配件",
   },
 ] as const;
 

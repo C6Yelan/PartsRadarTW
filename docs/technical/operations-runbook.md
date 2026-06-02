@@ -39,7 +39,7 @@ docker compose --profile manual-crawler run --rm crawler
 - `migrate` 與 `seed` 都以 exit code 0 結束。
 - `postgres` 狀態為 healthy。
 - `web` 狀態為 healthy，且只綁定 `127.0.0.1:3000`。
-- `/api/source-status` 回 `HTTP 200`，response 內有第一版 8 個 CoolPC 分類。
+- `/api/source-status` 回 `HTTP 200`，response 內有目前已啟用 CoolPC 分類。
 - 手動 `crawler` command 只顯示 help / 參數說明，不發出 live fetch。
 
 本機瀏覽器測試時，從使用者電腦建立 SSH tunnel：

@@ -12,6 +12,8 @@
 | 第一版不做個人化功能 | 使用者帳號、收藏清單、個人價格提醒會影響資料模型與權限設計，第一版先不納入。 |
 | 第二版仍不做帳號與個人化功能 | 第二版不建立帳號、登入、收藏清單、追蹤清單、個人價格提醒或使用者導向 Discord bot；若未來真的需要，需另開產品與資安設計。 |
 | 第二版以價格洞察、配單與維運穩定性為主 | 第二版範圍聚焦價格歷史、近 30 天價格變動、商品連結健康檢查、正常瀏覽限流調整、配單與 Excel 匯出；營運監控先維持 `smoke-daemon` log 型監控。 |
+| 第二版重新盤點原價屋分類擴充 | 第一版只啟用 8 個組電腦核心分類；第二版可擴充第一版以外的原價屋公開分類，但必須先做 IGrp 盤點、manual live validation、raw snapshot replay、parser / image / link health 驗證，再分批啟用。不能未驗證就一次全開所有分類。 |
+| 第二版第一批分類擴充啟用 `IGrp=8/11/16` | 第一批先啟用外接儲存 `IGrp=8`、水冷 `IGrp=11`、風扇 / 配件 `IGrp=16`。這三類已可由 parser 取得 token、名稱、價格、來源連結與圖片欄位，並通過 manual live validation / raw snapshot replay；其他分類仍需另行盤點驗證。 |
 | 第二版配單採 accountless client-side state | 配單只作為一次性整理購買清單，不建立帳號、不保存伺服器端個人菜單、不做購物車、下單、自動購買、相容性檢查或自動推薦配單。配單可使用 localStorage 保存，匯出 Excel 時每件商品需附原價屋查看 / 購買網址。 |
 | 正常瀏覽不應被 API limiter 誤傷 | 公開 API 仍保留 app-level abuse guard，但正常使用者快速切分類、翻頁、排序與載入商品圖片時不應輕易觸發 `429`。第二版需確認 production rate limit env、client identity header、list / read / image 額度與前端多餘 request。 |
 | 服務失敗告警留到第三版 | 第二版 `smoke-daemon` 先維持 container log 型監控；Discord 管理者告警、使用者服務失敗通知、公開服務狀態頁、完整 dashboard 或多通道告警都留到第三版再重新評估。 |

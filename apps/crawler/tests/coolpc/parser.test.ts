@@ -78,9 +78,9 @@ function contextForCategory(igrp: number): SourceCategoryContext {
 }
 
 describe("CoolPC parser helpers", () => {
-  it("keeps the first-version target categories in code", () => {
+  it("keeps the current target categories in code", () => {
     expect(COOLPC_TARGET_CATEGORIES.map((category) => category.igrp)).toEqual([
-      4, 5, 6, 7, 10, 12, 14, 15,
+      4, 5, 6, 7, 8, 10, 11, 12, 14, 15, 16,
     ]);
   });
 
@@ -207,10 +207,13 @@ describe("CoolPC category parser", () => {
     });
   });
 
-  it("parses reduced live title variants for target storage and cooler categories", () => {
+  it("parses reduced live title variants for target storage and cooling categories", () => {
     const fixtures = [
       [7, "coolpc-live-igrp-7.sample.html"],
+      [8, "coolpc-live-igrp-8.sample.html"],
       [10, "coolpc-live-igrp-10.sample.html"],
+      [11, "coolpc-live-igrp-11.sample.html"],
+      [16, "coolpc-live-igrp-16.sample.html"],
     ] as const;
 
     for (const [igrp, fixtureName] of fixtures) {
@@ -218,7 +221,7 @@ describe("CoolPC category parser", () => {
 
       expect(result.validation.status).toBe("valid");
       expect(result.canImport).toBe(true);
-      expect(result.items).toHaveLength(1);
+      expect(result.items.length).toBeGreaterThan(0);
     }
   });
 

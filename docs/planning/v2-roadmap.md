@@ -9,6 +9,7 @@
 - 讓正常快速瀏覽、切分類、翻頁與載入商品圖片時不容易誤觸 `429`。
 - 在不建立帳號的前提下，提供一次性配單與 Excel 匯出。
 - 提升來源連結、圖片與商品資料的可信度。
+- 擴充第一版以外的原價屋分類，讓網站可查詢更多公開商品資料。
 - 讓公開服務有足夠的 crawler、資料流與網站監控能力；第二版先維持 log 型監控。
 
 ## 非目標
@@ -143,7 +144,30 @@
 - app-level limiter 仍保留作為主機保底防護。
 - 大量異常流量仍優先交由 Cloudflare / WAF 處理。
 
-### 5. 配單與 Excel 匯出
+### 5. 原價屋分類擴充
+
+目標：把第一版只支援組電腦核心硬體的 8 個分類，擴充到更多原價屋公開分類，讓網站能查詢更多商品。
+
+範圍：
+
+- 盤點原價屋 `eachview.php?IGrp={分類編號}` 可用分類。
+- 先補第一版曾明確排除但可能有查詢價值的分類，例如外接儲存 `IGrp=8`、水冷 `IGrp=11`、風扇 / 配件 `IGrp=16`，再評估其他分類。
+- 為每個候選分類建立 display name、source name 與必要的 title keyword validation。
+- 對候選分類做 manual live validation 與 raw snapshot replay，不通過者不啟用。
+- 分批更新 `COOLPC_TARGET_CATEGORIES` 與 DB seed，不一次全開。
+- 驗證 parser 是否能穩定取得 `iBuyToken`、商品名稱、價格、來源連結、主要圖片與產品介紹連結。
+- 針對新分類跑 image backfill、link health 與 API/UI smoke。
+
+第一輪：外接儲存 `IGrp=8`、水冷 `IGrp=11`、風扇 / 配件 `IGrp=16` 已通過 manual live validation 與 raw snapshot replay，並可作為第二版第一批分類擴充。
+
+完成條件：
+
+- 新分類不會造成 suspected block、parse error 或 invalid image URL 異常激增。
+- 新分類商品能正常出現在首頁分類篩選、列表、商品詳細頁、價格歷史、近 30 天價格變動與圖片 API。
+- 無法穩定解析或內容不適合作為商品查詢的分類不啟用。
+- 新分類加入後 scheduled crawler、maintenance daemon 與 smoke daemon 仍穩定。
+
+### 6. 配單與 Excel 匯出
 
 目標：讓使用者除了查詢商品外，也能整理一次性配單並匯出。
 
@@ -163,7 +187,7 @@
 - 匯出的價格需標示資料更新時間，避免被誤解成即時報價保證。
 - 手機版配單入口與配單頁仍可操作，不造成水平內容失控。
 
-### 6. 營運監控
+### 7. 營運監控
 
 目標：讓公開服務能被維護，而不是只靠人工偶爾查看。
 
@@ -210,7 +234,14 @@
 - 修正快速翻頁 / 切分類 / 圖片載入造成的 `429` 誤傷。
 - 確認 production rate limit env 與 client identity。
 
-### v2.2：配單與 Excel 匯出
+### v2.2：原價屋分類擴充
+
+- 盤點候選 IGrp。
+- manual live validation 與 raw snapshot replay。
+- 分批更新 target categories / seed。
+- 部署後分批 crawl、image backfill、link health 與 UI/API smoke。
+
+### v2.3：配單與 Excel 匯出
 
 - 商品列表與詳細頁加入配單入口。
 - client-side / localStorage 配單。

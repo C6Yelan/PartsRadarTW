@@ -141,7 +141,7 @@ Private validation 先限 Docker / Compose / DB / web API，不公開流量、�
 - `migrate`、`seed` exit code 0。
 - `postgres` healthy。
 - `web` healthy 且只綁 `127.0.0.1`。
-- `/api/source-status` 回 `HTTP 200` 且有 8 個第一版分類。
+- `/api/source-status` 回 `HTTP 200` 且有目前已啟用 CoolPC 分類。
 - manual crawler 顯示 help，不發 live request。
 - snapshot 與 product image cache volume 可寫。
 - runtime image 不包含 repo secrets、docs、tests、fixtures、local runtime data。

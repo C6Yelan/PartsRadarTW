@@ -66,7 +66,7 @@ API 只服務自家 Next.js 網站，不承諾第三方公開 API。所有 endpo
 規則：
 
 - 只回傳 `enabled = true`。
-- 排序依網站第一版分類順序。
+- 排序依目前啟用分類順序。
 - `lastCheckedAt` 是最近檢查，不等於成功更新。
 - `lastSuccessAt` 是最近成功處理有效資料，尚未成功時可為 `null`。
 

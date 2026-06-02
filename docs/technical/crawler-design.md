@@ -10,7 +10,7 @@ Crawler 只抓 CoolPC 分類總覽頁：
 https://www.coolpc.com.tw/eachview.php?IGrp={分類編號}
 ```
 
-第一版分類：
+目前啟用分類：
 
 | 類別 | IGrp |
 | --- | ---: |
@@ -18,10 +18,13 @@ https://www.coolpc.com.tw/eachview.php?IGrp={分類編號}
 | 主機板 | 5 |
 | 記憶體 | 6 |
 | SSD / HDD | 7 |
+| 外接儲存 | 8 |
 | 散熱器 | 10 |
+| 水冷 | 11 |
 | 顯示卡 | 12 |
 | 機殼 | 14 |
 | 電源供應器 | 15 |
+| 風扇 / 配件 | 16 |
 
 不抓 `evaluate.php` 作為商品資料來源；詳細頁導流只由 API / UI 使用。
 
@@ -29,7 +32,7 @@ https://www.coolpc.com.tw/eachview.php?IGrp={分類編號}
 
 - 每 30 分鐘檢查是否可啟動下一輪。
 - 上一輪尚未完成時不重疊啟動。
-- 每輪依第一版分類逐一抓取。
+- 每輪依目前啟用分類逐一抓取。
 - 單分類 fetch / parse failed 可記錄後繼續下一分類。
 - 疑似被攔截時立即停止當輪。
 - 連續失敗進入 1 小時 backoff。
