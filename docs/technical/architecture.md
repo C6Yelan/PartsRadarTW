@@ -11,7 +11,7 @@
 - 商品與價格資料集中存放於 PostgreSQL。
 - raw snapshot 可保存、去重與回放。
 - 網站只讀取已成功處理的有效資料。
-- 後續功能優先支援價格歷史、價格變動探索、商品比較與營運監控，不以帳號或使用者通知為前提。
+- 後續功能優先支援價格歷史、價格變動探索、配單、Excel 匯出與營運監控，不以帳號或使用者通知為前提。
 - 未來以自架與 Docker 部署為主。
 
 ## 系統總覽
@@ -226,6 +226,6 @@ Docker Compose、反向代理、HTTPS、備份、監控與 CI/CD 等細節，後
 
 ## Future Operational Monitoring
 
-使用者帳號、個人價格提醒、收藏清單與使用者導向 Discord bot 不屬於第二版方向。後續通知若需要，應先以管理者 / 維運者監控為主，例如 crawler 連續失敗、suspected block、parse error 激增或 production smoke 失敗。
+使用者帳號、個人價格提醒、收藏清單、使用者導向 Discord bot 與 Discord 管理者告警不屬於第二版方向。第二版先維持 `smoke-daemon` log 型監控；使用者可見的服務狀態頁、Discord 管理者告警或完整告警平台留到第三版再評估。
 
 營運監控可作為同一 repo 內的 ops script 或獨立 process，但不應直接抓取原價屋資料，也不應建立使用者資料模型。價格與來源狀態仍以 crawler 寫入的資料庫內容為準。

@@ -358,7 +358,8 @@ SMOKE_PUBLIC_BASE_URL=https://partsradar.net
 
 - `smoke-daemon` 的 log 可以作為第一輪內部監控呈現，不應直接公開給使用者。
 - 這不是使用者通知功能，也不建立帳號、watchlist 或價格提醒。
-- 若未來要接 Discord webhook、ntfy 或 Uptime Kuma push monitor，應從 `OK/WARN/FAIL` summary 接出，不要讓告警包含 `.env`、DB URL、token 或 raw internal error。
+- 第二版先維持 `smoke-daemon` log 型監控，不新增 Discord 管理者告警。
+- Discord 管理者告警、Uptime Kuma、Grafana、公開服務狀態頁或使用者可見告警中心留到第三版再評估。
 
 ## Raw Snapshot Cleanup
 

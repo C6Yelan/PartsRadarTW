@@ -239,4 +239,5 @@ Response shape：
 - 預設 `api:read` 為每 client 每 60 秒 120 次，涵蓋 categories、source-status 與 product detail。
 - 預設 `api:list` 為每 client 每 60 秒 360 次，涵蓋商品列表查詢，避免正常快速切分類、翻頁或排序時被一般 read 額度誤傷。
 - 預設 `api:image` 為每 client 每 60 秒 360 次，涵蓋商品縮圖 API。
+- 正常快速切分類、翻頁、排序與載入列表圖片不應輕易觸發 `429`；production 需確認 list / image 額度與 client identity header 實際生效。
 - 超限回 `429` 與 `Retry-After` / `X-RateLimit-*` headers；response 不回傳 IP、env、DB 或 internal state。

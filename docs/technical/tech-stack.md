@@ -6,7 +6,7 @@
 
 | 項目 | 決策 | 說明 |
 | --- | --- | --- |
-| Repo 型態 | 單一 repo | 第一階段網站、API、crawler、資料模型與文件都放在同一個 repo。後續價格歷史、商品比較與營運監控也先沿用單一 repo；只有在部署、權限或維護成本明顯需要時才考慮拆 repo。 |
+| Repo 型態 | 單一 repo | 第一階段網站、API、crawler、資料模型與文件都放在同一個 repo。後續價格歷史、配單、Excel 匯出與營運監控也先沿用單一 repo；只有在部署、權限或維護成本明顯需要時才考慮拆 repo。 |
 | 主要語言 | TypeScript | 第一階段網站、API、crawler 與後續營運工具都以 TypeScript 為主，讓資料型別、驗證邏輯與工具鏈能在單一 repo 內保持一致。 |
 | 網站框架 | Next.js + React | 第一版網站使用 Next.js 與 React 開發，並以 TypeScript / TSX 撰寫前端與查詢 API。 |
 | crawler 工具 | Node.js + TypeScript + cheerio | 第一版 crawler 使用獨立 Node.js process 執行，不放在 Next.js request / API route 內。HTTP client 優先使用 Node.js 內建 `fetch` 或 `undici`；HTML parser 使用 `cheerio`；Playwright 只作為後備方案，不列入第一版主線。 |

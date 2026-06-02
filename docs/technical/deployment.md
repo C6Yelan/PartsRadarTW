@@ -9,7 +9,7 @@
 - PostgreSQL、raw snapshots、product image cache 都能持久保存。
 - web、crawler、postgres、Cloudflare Tunnel 清楚分離。
 - secrets 不進 Git。
-- 後續價格歷史、商品比較與營運監控可在同一部署邊界內擴充，不以帳號或使用者通知服務為前提。
+- 後續價格歷史、配單、Excel 匯出與營運監控可在同一部署邊界內擴充，不以帳號或使用者通知服務為前提。
 
 ## 目標環境
 
