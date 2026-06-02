@@ -143,10 +143,10 @@
 .detail-facts {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 18px;
+  gap: 10px 24px;
   align-items: center;
   margin: 0;
-  padding: 12px 0;
+  padding: 16px 0;
   border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
 }
@@ -160,15 +160,18 @@
 
 .detail-facts dt {
   color: var(--muted);
-  font-size: 13px;
+  font-size: 15px;
+  font-weight: 750;
+  line-height: 1.2;
   white-space: nowrap;
 }
 
 .detail-facts dd {
   margin: 0;
   color: var(--text);
-  font-size: 15px;
-  font-weight: 700;
+  font-size: 18px;
+  font-weight: 750;
+  line-height: 1.18;
   white-space: nowrap;
 }
 
