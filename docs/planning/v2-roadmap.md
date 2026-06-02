@@ -137,6 +137,12 @@
 - 檢查首頁快速翻頁、切分類與排序時是否產生多餘 request；必要時降低前端連點造成的 pending request。
 - 保持 `429` response 與 UI 文案明確，不把正常限流誤顯示成一般資料載入失敗。
 
+目前狀態：
+
+- 已完成第一輪：公開 API limiter 分成 `api:read`、`api:list` 與 `api:image` scope，預設分別為每 client 每 60 秒 120 / 360 / 1200 次；`.env.example` 與 Compose web service 都帶入對應 env。
+- 已完成第二輪：rate-limit 測試覆蓋 pageSize 50 快速切 20 頁與 1000 張列表圖片的正常瀏覽 burst，確認 list / image / read bucket 互不拖累；production smoke 會檢查 product list API 的 `X-RateLimit-*` 與 `X-RateLimit-Client-Source` headers。
+- 部署後若 `SMOKE_PUBLIC_BASE_URL` 指向公開 HTTPS 網域但 `clientSource=unknown`，`smoke-daemon` 會輸出 `WARN`，提醒檢查 Cloudflare / tunnel 是否傳入 client identity header。
+
 完成條件：
 
 - 一般使用者以 pageSize 50 快速切數頁時，不應輕易觸發 `429`。

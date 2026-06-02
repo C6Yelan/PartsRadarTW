@@ -116,6 +116,43 @@ describe("API rate limiter", () => {
     });
   });
 
+  it("allows normal pageSize 50 browsing bursts with independent list and image budgets", () => {
+    const limiter = createRateLimiter({
+      config: resolveRateLimitConfig({}),
+      nowMs: () => 1_000_000,
+    });
+    const request = requestFromIp("203.0.113.21");
+    const listPageChanges = 20;
+    const imagesPerPage = 50;
+
+    for (let page = 0; page < listPageChanges; page += 1) {
+      expect(limiter.check(request, "api:list")).toMatchObject({
+        allowed: true,
+        limit: RATE_LIMIT_DEFAULTS.listMax,
+      });
+
+      for (let image = 0; image < imagesPerPage; image += 1) {
+        expect(limiter.check(request, "api:image")).toMatchObject({
+          allowed: true,
+          limit: RATE_LIMIT_DEFAULTS.imageMax,
+        });
+      }
+    }
+
+    expect(limiter.check(request, "api:list")).toMatchObject({
+      allowed: true,
+      remaining: RATE_LIMIT_DEFAULTS.listMax - listPageChanges - 1,
+    });
+    expect(limiter.check(request, "api:image")).toMatchObject({
+      allowed: true,
+      remaining: RATE_LIMIT_DEFAULTS.imageMax - listPageChanges * imagesPerPage - 1,
+    });
+    expect(limiter.check(request, "api:read")).toMatchObject({
+      allowed: true,
+      remaining: RATE_LIMIT_DEFAULTS.readMax - 1,
+    });
+  });
+
   it("does not share buckets across clients", () => {
     const limiter = createRateLimiter({ config: BASE_CONFIG, nowMs: () => 1_000_000 });
 

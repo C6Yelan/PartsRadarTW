@@ -147,6 +147,46 @@ describe("production smoke checks", () => {
           status: "OK",
           message: "624 invalid image URL issue(s) in 24h, warnAfter=2000",
         }),
+        expect.objectContaining({
+          name: "rate limit headers",
+          status: "OK",
+          message: "clientSource=cf limit=360 remaining=359",
+        }),
+      ]),
+    );
+  });
+
+  it("warns when public HTTPS smoke cannot observe a forwarded client identity", async () => {
+    const { crawlerCwd, workspaceRoot } = await createWorkspace();
+    const imageDir = join(workspaceRoot, "product-images");
+    await mkdir(imageDir);
+    await writeFile(join(imageDir, "product-1.webp"), "webp");
+    stubHealthyPublicApi("unknown");
+    const options = parseProductionSmokeOptions(
+      ["--base-url", "https://partsradar.net"],
+      {
+        PRODUCT_IMAGE_STORAGE_DIR: imageDir,
+      },
+      crawlerCwd,
+    );
+    const summary = await runProductionSmoke(
+      createSmokeClient({
+        invalidImageErrorCount: 0,
+        trueParseErrorCount: 0,
+      }),
+      options,
+      new Date("2026-06-02T12:00:00.000Z"),
+    );
+
+    expect(summary.status).toBe("WARN");
+    expect(summary.checks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "rate limit headers",
+          status: "WARN",
+          message:
+            "clientSource=unknown limit=360 remaining=359; public HTTPS smoke should expose client identity",
+        }),
       ]),
     );
   });
@@ -243,7 +283,7 @@ async function createWorkspace(): Promise<{
   };
 }
 
-function stubHealthyPublicApi(): void {
+function stubHealthyPublicApi(rateLimitClientSource = "cf"): void {
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: Parameters<typeof fetch>[0]) => {
@@ -261,10 +301,20 @@ function stubHealthyPublicApi(): void {
       }
 
       if (url.pathname === "/api/products") {
-        return Response.json({
-          data: [{ id: "product-1" }],
-          pagination: { totalItems: 1 },
-        });
+        return Response.json(
+          {
+            data: [{ id: "product-1" }],
+            pagination: { totalItems: 1 },
+          },
+          {
+            headers: {
+              "X-RateLimit-Client-Source": rateLimitClientSource,
+              "X-RateLimit-Limit": "360",
+              "X-RateLimit-Remaining": "359",
+              "X-RateLimit-Reset": "1780411200",
+            },
+          },
+        );
       }
 
       if (url.pathname === "/api/products/product-1") {

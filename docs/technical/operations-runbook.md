@@ -297,6 +297,7 @@ docker compose --profile manual-crawler run --rm crawler \
 - 首頁 HTTP 200。
 - `/api/source-status` 可回應，且來源成功時間沒有過舊。
 - `/api/products?pageSize=1` 可回應且至少有一筆商品。
+- product list API 回傳可解析的 `X-RateLimit-*` 與 `X-RateLimit-Client-Source` headers。
 - 商品詳細 API 可回應。
 - 商品價格歷史 API 可回應。
 - 最新 successful scheduled crawler run 沒有過舊。
@@ -333,6 +334,13 @@ docker compose --profile scheduled-crawler run --rm smoke-daemon \
 ```dotenv
 SMOKE_PUBLIC_BASE_URL=https://partsradar.net
 ```
+
+`rate limit headers` check 會讀取 product list API 的公開 `X-RateLimit-*` headers：
+
+- `OK` 代表 API 回傳可解析的 limit / remaining / reset / client source。
+- `clientSource=cf` 或 `clientSource=xff` 代表 Cloudflare / proxy identity header 已被 app-level limiter 看到。
+- `clientSource=unknown` 在內部 `http://web:3000` smoke 可接受；若 `SMOKE_PUBLIC_BASE_URL` 指向公開 HTTPS 網域仍是 `unknown`，smoke 會輸出 `WARN`，需檢查 Cloudflare Tunnel / proxy 是否傳入 `CF-Connecting-IP` 或 `X-Forwarded-For`。
+- log 不輸出 raw IP、`.env`、DB URL、token 或 internal header dump。
 
 結果判讀：
 

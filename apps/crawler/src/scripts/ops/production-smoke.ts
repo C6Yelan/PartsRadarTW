@@ -101,6 +101,13 @@ interface ProductDetailResponse {
   id: string;
 }
 
+interface RateLimitHeaderSnapshot {
+  clientSource: string;
+  limit: number;
+  remaining: number;
+  reset: number;
+}
+
 type ProductionSmokeClient = Pick<
   PrismaClient,
   "crawlRun" | "parseError" | "product" | "productLinkHealth" | "rawSnapshot"
@@ -423,6 +430,7 @@ async function checkPublicEndpoints(options: ProductionSmokeOptions): Promise<{
       ? ok("product list api", `totalItems=${productsBody.pagination.totalItems}`)
       : fail("product list api", products.ok ? "response has no product" : products.message),
   );
+  checks.push(checkRateLimitHeaders(products, options));
 
   if (!productId) {
     checks.push(fail("product detail api", "skipped because product list returned no product"));
@@ -694,6 +702,29 @@ async function checkLinkHealth(
   };
 }
 
+function checkRateLimitHeaders(
+  productsResult: Awaited<ReturnType<typeof fetchJson>>,
+  options: ProductionSmokeOptions,
+): SmokeCheckResult {
+  if (!productsResult.ok) {
+    return fail("rate limit headers", "skipped because product list API was unavailable");
+  }
+
+  const snapshot = readRateLimitHeaders(productsResult.headers);
+
+  if (!snapshot) {
+    return fail("rate limit headers", "missing or invalid X-RateLimit headers");
+  }
+
+  const message = `clientSource=${snapshot.clientSource} limit=${snapshot.limit} remaining=${snapshot.remaining}`;
+
+  if (snapshot.clientSource === "unknown" && isPublicHttpsUrl(options.baseUrl)) {
+    return warn("rate limit headers", `${message}; public HTTPS smoke should expose client identity`);
+  }
+
+  return ok("rate limit headers", message);
+}
+
 async function checkRawSnapshotRetention(
   client: ProductionSmokeClient,
   options: ProductionSmokeOptions,
@@ -786,6 +817,7 @@ async function fetchJson(
   | {
       ok: true;
       body: unknown;
+      headers: Headers;
     }
   | {
       ok: false;
@@ -802,6 +834,7 @@ async function fetchJson(
     return {
       ok: true,
       body: await response.response.json(),
+      headers: response.response.headers,
     };
   } catch (error) {
     return {
@@ -809,6 +842,53 @@ async function fetchJson(
       message: `JSON parse failed: ${toSafeCliErrorMessage(error)}`,
     };
   }
+}
+
+function readRateLimitHeaders(headers: Headers): RateLimitHeaderSnapshot | null {
+  const clientSource = headers.get("X-RateLimit-Client-Source");
+  const limit = parseNonNegativeHeaderInteger(headers.get("X-RateLimit-Limit"));
+  const remaining = parseNonNegativeHeaderInteger(headers.get("X-RateLimit-Remaining"));
+  const reset = parseNonNegativeHeaderInteger(headers.get("X-RateLimit-Reset"));
+
+  if (
+    !clientSource ||
+    !["cf", "xff", "unknown"].includes(clientSource) ||
+    limit === null ||
+    limit <= 0 ||
+    remaining === null ||
+    reset === null ||
+    reset <= 0
+  ) {
+    return null;
+  }
+
+  return {
+    clientSource,
+    limit,
+    remaining,
+    reset,
+  };
+}
+
+function parseNonNegativeHeaderInteger(value: string | null): number | null {
+  if (!value || !/^\d+$/.test(value)) {
+    return null;
+  }
+
+  const parsedValue = Number.parseInt(value, 10);
+
+  return Number.isSafeInteger(parsedValue) ? parsedValue : null;
+}
+
+function isPublicHttpsUrl(value: string): boolean {
+  const url = new URL(value);
+
+  return (
+    url.protocol === "https:" &&
+    url.hostname !== "localhost" &&
+    url.hostname !== "127.0.0.1" &&
+    url.hostname !== "::1"
+  );
 }
 
 async function fetchWithTimeout(
