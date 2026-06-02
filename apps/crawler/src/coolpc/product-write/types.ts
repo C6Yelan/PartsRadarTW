@@ -110,8 +110,8 @@ export interface ProductCreateData {
   normalizedName: string;
   vendorSlug: string | null;
   vendorName: string | null;
-  primaryImageUrl: string;
-  primaryImageCheckedAt: Date;
+  primaryImageUrl: string | null;
+  primaryImageCheckedAt: Date | null;
   introductionUrl: string | null;
   sourceUrl: string;
   isActive: true;
@@ -126,8 +126,8 @@ export interface ProductSeenUpdateData {
   normalizedName: string;
   vendorSlug: string | null;
   vendorName: string | null;
-  primaryImageUrl: string;
-  primaryImageCheckedAt: Date;
+  primaryImageUrl?: string;
+  primaryImageCheckedAt?: Date;
   introductionUrl: string | null;
   sourceUrl: string;
   isActive: true;

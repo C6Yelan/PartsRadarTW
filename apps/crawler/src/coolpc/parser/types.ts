@@ -39,7 +39,7 @@ export interface ParsedCoolpcProduct {
   normalizedName: string;
   vendorSlug: string | null;
   vendorName: string | null;
-  primaryImageUrl: string;
+  primaryImageUrl: string | null;
   introductionUrl: string | null;
   price: number;
   currency: Currency;

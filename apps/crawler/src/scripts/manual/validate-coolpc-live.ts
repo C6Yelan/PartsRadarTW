@@ -170,7 +170,7 @@ function createSampleFixture(
       (item) => `      <div class="item">
         <div class="w">${escapeHtml(item.ibuyToken)}</div>
         <span>
-          <img src="${escapeHtml(item.primaryImageUrl)}" alt="${escapeHtml(item.name)}">
+          <img src="${escapeHtml(item.primaryImageUrl ?? "")}" alt="${escapeHtml(item.name)}">
           <div class="t">${escapeHtml(item.name)}</div>
           <div class="x">含稅：NT${formatPrice(item.price)}</div>
         </span>

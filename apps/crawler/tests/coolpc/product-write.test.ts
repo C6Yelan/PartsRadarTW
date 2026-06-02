@@ -155,6 +155,45 @@ describe("CoolPC product price writer", () => {
     expect(client.products[0]?.lastSeenAt).toEqual(nextSeenAt);
   });
 
+  it("preserves an existing primary image when the latest parsed item has no valid image URL", async () => {
+    const client = new FakeCoolpcProductWriteClient();
+    const previousSeenAt = new Date("2026-05-27T10:00:00.000Z");
+    const previousImageUrl = "https://www.coolpc.com.tw/eval/4/amd7500f.jpg";
+    const previousItem = productItem({
+      price: 4880,
+      primaryImageUrl: previousImageUrl,
+      fetchedAt: previousSeenAt,
+    });
+    client.seedProductWithCurrentPrice(previousItem);
+    const nextSeenAt = new Date("2026-05-27T11:00:00.000Z");
+
+    const result = await writeCoolpcProductPrices({
+      client,
+      crawlRunId: "crawl-run-2",
+      rawSnapshotId: "raw-snapshot-2",
+      sourceCategoryId: previousItem.sourceCategoryId,
+      fetchedAt: nextSeenAt,
+      items: [
+        productItem({
+          price: 4880,
+          primaryImageUrl: null,
+          fetchedAt: nextSeenAt,
+        }),
+      ],
+    });
+
+    expect(result).toMatchObject({
+      updatedProductCount: 1,
+      priceSnapshotCreatedCount: 0,
+      priceUnchangedCount: 1,
+    });
+    expect(client.products[0]).toMatchObject({
+      primaryImageUrl: previousImageUrl,
+      primaryImageCheckedAt: previousSeenAt,
+      lastSeenAt: nextSeenAt,
+    });
+  });
+
   it("recreates current price when an existing product has no current price row", async () => {
     const client = new FakeCoolpcProductWriteClient();
     client.seedProductWithoutCurrentPrice(productItem({ price: 4880 }));

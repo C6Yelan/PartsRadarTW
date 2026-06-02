@@ -300,7 +300,7 @@ docker compose --profile manual-crawler run --rm crawler \
 - 商品詳細 API 可回應。
 - 商品價格歷史 API 可回應。
 - 最新 successful scheduled crawler run 沒有過舊。
-- 近 24 小時 suspected block / parse error 沒有異常。
+- 近 24 小時 suspected block / 真正 parser failure 沒有異常；`INVALID_IMAGE_URL` 會另列為 source image anomaly。
 - display-ready active 商品數沒有低於門檻。
 - active 商品缺圖數沒有超過門檻。
 - active 商品 link health 的 broken / temporary error 數沒有超過門檻。
@@ -336,7 +336,7 @@ SMOKE_PUBLIC_BASE_URL=https://partsradar.net
 結果判讀：
 
 - `OK`：該項目前正常。
-- `WARN`：服務仍可用，但資料流或維運狀態需要觀察，例如來源成功時間偏舊、近期有 suspected block、缺圖或壞連結超過警戒值。
+- `WARN`：服務仍可用，但資料流或維運狀態需要觀察，例如來源成功時間偏舊、近期有 suspected block、source image anomaly、缺圖或壞連結超過警戒值。
 - `FAIL`：服務或資料流有明確失敗，例如 HTTP/API 掛掉、沒有 successful scheduled crawl、最新 crawler 疑似被擋、來源成功時間超過 fail 門檻。
 
 常用設定：

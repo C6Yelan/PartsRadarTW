@@ -9,8 +9,8 @@ export interface FakeProduct {
   normalizedName: string;
   vendorSlug: string | null;
   vendorName: string | null;
-  primaryImageUrl: string;
-  primaryImageCheckedAt: Date;
+  primaryImageUrl: string | null;
+  primaryImageCheckedAt: Date | null;
   introductionUrl: string | null;
   sourceUrl: string;
   isActive: boolean;
@@ -256,7 +256,7 @@ export function productItem({
   normalizedName?: string;
   vendorSlug?: string | null;
   vendorName?: string | null;
-  primaryImageUrl?: string;
+  primaryImageUrl?: string | null;
   introductionUrl?: string | null;
   price: number;
   fetchedAt?: Date;

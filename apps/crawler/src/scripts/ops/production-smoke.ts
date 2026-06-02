@@ -322,6 +322,7 @@ export async function runProductionSmoke(
   checks.push(await checkCrawlerFreshness(client, options, now));
   checks.push(await checkRecentSuspectedBlocks(client, options, now));
   checks.push(await checkRecentParseErrors(client, options, now));
+  checks.push(await checkSourceImageAnomalies(client, options, now));
   checks.push(await checkActiveProductCount(client, options));
   checks.push(await checkMissingProductImages(client, options));
   checks.push(await checkLinkHealth(client, options));
@@ -563,6 +564,9 @@ async function checkRecentParseErrors(
   const since = new Date(now.getTime() - options.recentWindowHours * MILLISECONDS_PER_HOUR);
   const count = await client.parseError.count({
     where: {
+      errorType: {
+        not: "INVALID_IMAGE_URL",
+      },
       createdAt: {
         gte: since,
       },
@@ -570,7 +574,34 @@ async function checkRecentParseErrors(
   });
   const message = `${count} parse error(s) in ${options.recentWindowHours}h`;
 
-  return thresholdCheck("recent parse errors", count, options.parseErrorWarnCount, options.parseErrorFailCount, message);
+  return thresholdCheck(
+    "recent parse errors",
+    count,
+    options.parseErrorWarnCount,
+    options.parseErrorFailCount,
+    message,
+  );
+}
+
+async function checkSourceImageAnomalies(
+  client: ProductionSmokeClient,
+  options: ProductionSmokeOptions,
+  now: Date,
+): Promise<SmokeCheckResult> {
+  const since = new Date(now.getTime() - options.recentWindowHours * MILLISECONDS_PER_HOUR);
+  const count = await client.parseError.count({
+    where: {
+      errorType: "INVALID_IMAGE_URL",
+      createdAt: {
+        gte: since,
+      },
+    },
+  });
+  const message = `${count} invalid image URL issue(s) in ${options.recentWindowHours}h`;
+
+  return count > 0
+    ? warn("source image anomalies", message)
+    : ok("source image anomalies", message);
 }
 
 async function checkActiveProductCount(

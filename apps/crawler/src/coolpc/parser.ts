@@ -131,7 +131,6 @@ export function parseCoolpcCategoryPage(
         rawImageUrl: candidate.rawImageUrl,
         rawToken: ibuyToken,
       });
-      continue;
     }
 
     const sourceItemKey = createSourceItemKey(context.igrp, ibuyToken);

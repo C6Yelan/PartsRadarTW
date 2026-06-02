@@ -228,7 +228,11 @@ describe("CoolPC category snapshot processor", () => {
         crawlRunId: "crawl-run-1",
         rawSnapshotId: "raw-snapshot-1",
         sourceCategoryId: "category-4",
-        sourceItemKeys: ["coolpc:igrp:4:ibuy:CPU-TOKEN-001"],
+        sourceItemKeys: [
+          "coolpc:igrp:4:ibuy:CPU-TOKEN-001",
+          "coolpc:igrp:4:ibuy:CPU-TOKEN-002",
+          "coolpc:igrp:4:ibuy:CPU-TOKEN-003",
+        ],
       }),
     ]);
   });

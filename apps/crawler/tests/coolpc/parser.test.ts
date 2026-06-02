@@ -28,6 +28,33 @@ function fixture(name: string): string {
   return readFileSync(join(fixtureDir, name), "utf8");
 }
 
+function categoryHtml({
+  igrp,
+  rawImageUrl,
+}: {
+  igrp: number;
+  rawImageUrl: string;
+}): string {
+  return `<!doctype html>
+<html lang="zh-Hant-TW">
+  <head>
+    <title>原價屋${contextForCategory(igrp).sourceName}總覽</title>
+  </head>
+  <body>
+    <section class="category">
+      <div class="item">
+        <div class="w">TOKEN-${igrp}</div>
+        <span>
+          <img alt="" src="${rawImageUrl}">
+          <div class="t">Live-like invalid image product ${igrp}</div>
+          <div class="x">含稅：NT4,190</div>
+        </span>
+      </div>
+    </section>
+  </body>
+</html>`;
+}
+
 function contextForCategory(igrp: number): SourceCategoryContext {
   const category: CoolpcTargetCategory | undefined = COOLPC_TARGET_CATEGORIES.find(
     (candidate) => candidate.igrp === igrp,
@@ -241,12 +268,24 @@ describe("CoolPC category parser", () => {
     ]);
   });
 
-  it("keeps invalid image URL candidates out of parsed items", () => {
+  it("parses products with invalid image URLs and records nonfatal issues", () => {
     const result = parseCoolpcCategoryPage(fixture("cpu-category.invalid-image.html"), context);
 
     expect(result.canImport).toBe(true);
-    expect(result.items).toHaveLength(1);
+    expect(result.items).toHaveLength(3);
     expect(result.items[0]?.primaryImageUrl).toBe("https://www.coolpc.com.tw/eval/4/amd7500f.jpg");
+    expect(result.items[1]).toMatchObject({
+      ibuyToken: "CPU-TOKEN-002",
+      name: "Invalid image product",
+      primaryImageUrl: null,
+      price: 5990,
+    });
+    expect(result.items[2]).toMatchObject({
+      ibuyToken: "CPU-TOKEN-003",
+      name: "External image product",
+      primaryImageUrl: null,
+      price: 6990,
+    });
     expect(result.issues).toEqual([
       expect.objectContaining({
         type: "invalid_image_url",
@@ -259,6 +298,38 @@ describe("CoolPC category parser", () => {
         rawImageUrl: "https://example.com/product.jpg",
       }),
     ]);
+  });
+
+  it("keeps source image directory placeholders nonfatal for live-like category rows", () => {
+    const cases = [
+      [14, "/eval/14/"],
+      [15, "/eval/15/revolutioniiiwjpg"],
+    ] as const;
+
+    for (const [igrp, rawImageUrl] of cases) {
+      const result = parseCoolpcCategoryPage(
+        categoryHtml({
+          igrp,
+          rawImageUrl,
+        }),
+        contextForCategory(igrp),
+      );
+
+      expect(result.canImport).toBe(true);
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0]).toMatchObject({
+        ibuyToken: `TOKEN-${igrp}`,
+        primaryImageUrl: null,
+        price: 4190,
+      });
+      expect(result.issues).toEqual([
+        expect.objectContaining({
+          type: "invalid_image_url",
+          rawImageUrl,
+          rawToken: `TOKEN-${igrp}`,
+        }),
+      ]);
+    }
   });
 
   it("deduplicates same source identity, name, and price repeats in the same snapshot", () => {

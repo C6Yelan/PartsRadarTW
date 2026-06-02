@@ -4,6 +4,7 @@ import type {
   ExistingCurrentPriceSnapshot,
   ExistingProductForPriceWrite,
   ProductCreateData,
+  ProductSeenUpdateData,
   WriteCoolpcProductPricesResult,
 } from "./types";
 
@@ -145,22 +146,30 @@ function updateProductSeenData(
   // its existing price history instead of creating a replacement product.
   return client.product.update({
     where: { id: productId },
-    data: {
-      name: item.name,
-      normalizedName: item.normalizedName,
-      vendorSlug: item.vendorSlug,
-      vendorName: item.vendorName,
-      primaryImageUrl: item.primaryImageUrl,
-      primaryImageCheckedAt: item.fetchedAt,
-      introductionUrl: item.introductionUrl,
-      sourceUrl: item.sourceUrl,
-      isActive: true,
-      missingSince: null,
-      missingSeenCount: 0,
-      lastSeenAt: item.fetchedAt,
-    },
+    data: buildProductSeenUpdateData(item),
     select: { id: true },
   });
+}
+
+function buildProductSeenUpdateData(item: ParsedCoolpcProduct): ProductSeenUpdateData {
+  return {
+    name: item.name,
+    normalizedName: item.normalizedName,
+    vendorSlug: item.vendorSlug,
+    vendorName: item.vendorName,
+    ...(item.primaryImageUrl
+      ? {
+          primaryImageUrl: item.primaryImageUrl,
+          primaryImageCheckedAt: item.fetchedAt,
+        }
+      : {}),
+    introductionUrl: item.introductionUrl,
+    sourceUrl: item.sourceUrl,
+    isActive: true,
+    missingSince: null,
+    missingSeenCount: 0,
+    lastSeenAt: item.fetchedAt,
+  };
 }
 
 function createPriceSnapshot({
@@ -215,7 +224,7 @@ function createProductData(item: ParsedCoolpcProduct): ProductCreateData {
     vendorSlug: item.vendorSlug,
     vendorName: item.vendorName,
     primaryImageUrl: item.primaryImageUrl,
-    primaryImageCheckedAt: item.fetchedAt,
+    primaryImageCheckedAt: item.primaryImageUrl ? item.fetchedAt : null,
     introductionUrl: item.introductionUrl,
     sourceUrl: item.sourceUrl,
     isActive: true,

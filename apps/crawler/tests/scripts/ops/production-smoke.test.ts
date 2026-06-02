@@ -1,9 +1,16 @@
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { describe, expect, it } from "vitest";
-import { parseProductionSmokeOptions } from "../../../src/scripts/ops/production-smoke";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  parseProductionSmokeOptions,
+  runProductionSmoke,
+} from "../../../src/scripts/ops/production-smoke";
 import { parseProductionSmokeDaemonOptions } from "../../../src/scripts/ops/production-smoke-daemon";
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe("production smoke options", () => {
   it("uses conservative defaults", async () => {
@@ -87,6 +94,86 @@ describe("production smoke daemon options", () => {
   });
 });
 
+describe("production smoke checks", () => {
+  it("keeps invalid image URL parse issues out of the fatal parse error count", async () => {
+    const { crawlerCwd, workspaceRoot } = await createWorkspace();
+    const imageDir = join(workspaceRoot, "product-images");
+    await mkdir(imageDir);
+    await writeFile(join(imageDir, "product-1.webp"), "webp");
+    stubHealthyPublicApi();
+    const options = parseProductionSmokeOptions(
+      ["--parse-error-fail-count", "1"],
+      {
+        PRODUCT_IMAGE_STORAGE_DIR: imageDir,
+      },
+      crawlerCwd,
+    );
+    const summary = await runProductionSmoke(
+      createSmokeClient({
+        invalidImageErrorCount: 4053,
+        trueParseErrorCount: 0,
+      }),
+      options,
+      new Date("2026-06-02T12:00:00.000Z"),
+    );
+
+    expect(summary.status).toBe("WARN");
+    expect(summary.checks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "recent parse errors",
+          status: "OK",
+          message: "0 parse error(s) in 24h",
+        }),
+        expect.objectContaining({
+          name: "source image anomalies",
+          status: "WARN",
+          message: "4053 invalid image URL issue(s) in 24h",
+        }),
+      ]),
+    );
+  });
+
+  it("still fails when true parse errors exceed the configured threshold", async () => {
+    const { crawlerCwd, workspaceRoot } = await createWorkspace();
+    const imageDir = join(workspaceRoot, "product-images");
+    await mkdir(imageDir);
+    await writeFile(join(imageDir, "product-1.webp"), "webp");
+    stubHealthyPublicApi();
+    const options = parseProductionSmokeOptions(
+      ["--parse-error-fail-count", "1"],
+      {
+        PRODUCT_IMAGE_STORAGE_DIR: imageDir,
+      },
+      crawlerCwd,
+    );
+    const summary = await runProductionSmoke(
+      createSmokeClient({
+        invalidImageErrorCount: 0,
+        trueParseErrorCount: 2,
+      }),
+      options,
+      new Date("2026-06-02T12:00:00.000Z"),
+    );
+
+    expect(summary.status).toBe("FAIL");
+    expect(summary.checks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "recent parse errors",
+          status: "FAIL",
+          message: "2 parse error(s) in 24h",
+        }),
+        expect.objectContaining({
+          name: "source image anomalies",
+          status: "OK",
+          message: "0 invalid image URL issue(s) in 24h",
+        }),
+      ]),
+    );
+  });
+});
+
 async function createWorkspace(): Promise<{
   workspaceRoot: string;
   crawlerCwd: string;
@@ -98,4 +185,91 @@ async function createWorkspace(): Promise<{
     workspaceRoot,
     crawlerCwd: join(workspaceRoot, "apps", "crawler"),
   };
+}
+
+function stubHealthyPublicApi(): void {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: Parameters<typeof fetch>[0]) => {
+      const url = new URL(String(input));
+
+      if (url.pathname === "/") {
+        return new Response("<!doctype html>", { status: 200 });
+      }
+
+      if (url.pathname === "/api/source-status") {
+        return Response.json({
+          status: "ok",
+          lastSuccessAt: "2026-06-02T11:50:00.000Z",
+        });
+      }
+
+      if (url.pathname === "/api/products") {
+        return Response.json({
+          data: [{ id: "product-1" }],
+          pagination: { totalItems: 1 },
+        });
+      }
+
+      if (url.pathname === "/api/products/product-1") {
+        return Response.json({ id: "product-1" });
+      }
+
+      if (url.pathname === "/api/products/product-1/price-history") {
+        return Response.json({ points: [] });
+      }
+
+      return new Response("not found", { status: 404 });
+    }),
+  );
+}
+
+function createSmokeClient({
+  invalidImageErrorCount,
+  trueParseErrorCount,
+}: {
+  invalidImageErrorCount: number;
+  trueParseErrorCount: number;
+}) {
+  return {
+    crawlRun: {
+      findFirst: async ({ where }: { where: { status?: { in?: string[] } } }) =>
+        where.status?.in
+          ? {
+              id: "crawl-run-success",
+              status: "SUCCESS_UNCHANGED",
+              finishedAt: new Date("2026-06-02T11:45:00.000Z"),
+            }
+          : {
+              id: "crawl-run-latest",
+              status: "SUCCESS_UNCHANGED",
+              startedAt: new Date("2026-06-02T11:45:00.000Z"),
+              finishedAt: new Date("2026-06-02T11:45:00.000Z"),
+            },
+      count: async () => 0,
+    },
+    parseError: {
+      count: async ({
+        where,
+      }: {
+        where: { errorType?: "INVALID_IMAGE_URL" | { not: "INVALID_IMAGE_URL" } };
+      }) => {
+        if (where.errorType === "INVALID_IMAGE_URL") {
+          return invalidImageErrorCount;
+        }
+
+        return trueParseErrorCount;
+      },
+    },
+    product: {
+      count: async () => 1,
+      findMany: async () => [{ id: "product-1" }],
+    },
+    productLinkHealth: {
+      count: async () => 0,
+    },
+    rawSnapshot: {
+      count: async () => 0,
+    },
+  } as unknown as Parameters<typeof runProductionSmoke>[0];
 }
