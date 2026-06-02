@@ -1,4 +1,4 @@
-import type { HistoryViewSummary, PriceHistoryRangeDays } from "./types";
+import type { HistoryViewSummary, PriceHistoryRangeDays, PriceHistoryRangeKey } from "./types";
 import {
   formatCompactDate,
   formatHistoryPointCount,
@@ -20,10 +20,12 @@ export function PeriodDeltaCard({ summary }: { summary: HistoryViewSummary }) {
 }
 
 export function HistoryRangeCard({
+  range,
   rangeDays,
   summary,
 }: {
-  rangeDays: PriceHistoryRangeDays;
+  range: PriceHistoryRangeKey;
+  rangeDays: PriceHistoryRangeDays | null;
   summary: HistoryViewSummary;
 }) {
   if (!summary.lowest || !summary.highest || !summary.latest) {
@@ -33,7 +35,7 @@ export function HistoryRangeCard({
   return (
     <div className="history-range-card">
       <div className="history-range-heading">
-        <strong>{rangeDays} 天摘要</strong>
+        <strong>{formatRangeSummaryTitle(range, rangeDays)}</strong>
         <span>{formatHistoryPointCount(summary.pointCount)}</span>
       </div>
       <div className="history-range-track-wrap">
@@ -68,10 +70,19 @@ export function HistoryRangeCard({
         </div>
         <div className="history-range-stat is-average">
           <span>均價</span>
-          <strong>{summary.averageAmount === null ? "-" : formatPrice(summary.averageAmount)}</strong>
+          <strong>
+            {summary.averageAmount === null ? "-" : formatPrice(summary.averageAmount)}
+          </strong>
           <small>區間平均</small>
         </div>
       </div>
     </div>
   );
+}
+
+function formatRangeSummaryTitle(
+  range: PriceHistoryRangeKey,
+  rangeDays: PriceHistoryRangeDays | null,
+) {
+  return range === "all" ? "全部摘要" : `${rangeDays} 天摘要`;
 }

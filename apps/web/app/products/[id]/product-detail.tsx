@@ -5,8 +5,8 @@ import { useEffect, useState } from "react";
 import SiteDisclaimer from "../../site-disclaimer";
 import PriceHistoryPanel, {
   type PriceHistoryLoadState,
+  type PriceHistoryRange,
   type ProductPriceHistoryBody,
-  type PriceHistoryRangeDays,
 } from "./price-history-panel";
 
 type LoadState = "idle" | "loading" | "ready" | "not-found" | "error";
@@ -55,7 +55,7 @@ export default function ProductDetail({
   const [product, setProduct] = useState<ProductDetailBody | null>(null);
   const [historyState, setHistoryState] = useState<PriceHistoryLoadState>("idle");
   const [priceHistory, setPriceHistory] = useState<ProductPriceHistoryBody | null>(null);
-  const [historyRangeDays, setHistoryRangeDays] = useState<PriceHistoryRangeDays>(90);
+  const [historyRange, setHistoryRange] = useState<PriceHistoryRange>(90);
   const [imageError, setImageError] = useState(false);
 
   useEffect(() => {
@@ -65,7 +65,7 @@ export default function ProductDetail({
     setImageError(false);
     setProduct(null);
     setPriceHistory(null);
-    setHistoryRangeDays(90);
+    setHistoryRange(90);
 
     async function loadProductDetail() {
       try {
@@ -110,7 +110,7 @@ export default function ProductDetail({
     async function loadPriceHistory() {
       try {
         const historyResponse = await fetch(
-          `/api/products/${productId}/price-history?days=${historyRangeDays}`,
+          `/api/products/${productId}/price-history?${toPriceHistoryRangeQuery(historyRange)}`,
           {
             signal: controller.signal,
           },
@@ -139,7 +139,7 @@ export default function ProductDetail({
     void loadPriceHistory();
 
     return () => controller.abort();
-  }, [product, productId, historyRangeDays]);
+  }, [product, productId, historyRange]);
 
   return (
     <main className="detail-shell">
@@ -257,14 +257,18 @@ export default function ProductDetail({
       {state === "ready" && product ? (
         <PriceHistoryPanel
           history={priceHistory}
-          selectedRangeDays={historyRangeDays}
+          selectedRange={historyRange}
           state={historyState}
-          onRangeDaysChange={setHistoryRangeDays}
+          onRangeChange={setHistoryRange}
         />
       ) : null}
       <SiteDisclaimer />
     </main>
   );
+}
+
+function toPriceHistoryRangeQuery(range: PriceHistoryRange) {
+  return range === "all" ? "range=all" : `days=${range}`;
 }
 
 function formatPrice(amount: number) {

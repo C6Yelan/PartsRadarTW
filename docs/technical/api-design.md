@@ -146,12 +146,14 @@ Query：
 
 | 參數 | 型別 | 預設 | 說明 |
 | --- | --- | --- | --- |
-| `days` | number | `90` | 僅接受 `7`、`30`、`90` |
+| `range` | string | `90d` | 接受 `7d`、`30d`、`90d`、`all`；`all` 代表該商品保留中的全部價格歷史 |
+| `days` | number | `90` | 舊版相容參數；未提供 `range` 時生效，僅接受 `7`、`30`、`90` |
 
 Response shape：
 
 - `productId`
-- `rangeDays`
+- `range`：`7d`、`30d`、`90d`、`all`
+- `rangeDays`：`range=all` 時為 `null`；其餘為 `7`、`30`、`90`
 - `points[]`
   - `amount`
   - `currency`

@@ -17,6 +17,7 @@ import type {
   ChartPoint,
   HistoryViewSummary,
   PriceHistoryRangeDays,
+  PriceHistoryRangeKey,
 } from "./types";
 
 const DESKTOP_CHART_CONFIG = {
@@ -60,13 +61,15 @@ export function useChartConfig() {
 export function PriceHistoryChart({
   activePointKey,
   chart,
+  range,
   rangeDays,
   summary,
   onActivePointKeyChange,
 }: {
   activePointKey: string | null;
   chart: ChartModel | null;
-  rangeDays: PriceHistoryRangeDays;
+  range: PriceHistoryRangeKey;
+  rangeDays: PriceHistoryRangeDays | null;
   summary: HistoryViewSummary;
   onActivePointKeyChange(pointKey: string | null): void;
 }) {
@@ -83,7 +86,7 @@ export function PriceHistoryChart({
             <svg
               className="history-chart"
               role="img"
-              aria-label={`近 ${rangeDays} 天價格走勢圖`}
+              aria-label={formatChartAriaLabel(range, rangeDays)}
               viewBox={`0 0 ${chart.config.width} ${chart.config.height}`}
             >
               {chart.ticks.map((tick, index) => (
@@ -166,6 +169,13 @@ export function PriceHistoryChart({
       )}
     </div>
   );
+}
+
+function formatChartAriaLabel(
+  range: PriceHistoryRangeKey,
+  rangeDays: PriceHistoryRangeDays | null,
+) {
+  return range === "all" ? "全部時間價格走勢圖" : `近 ${rangeDays} 天價格走勢圖`;
 }
 
 function FixedChartMarker({

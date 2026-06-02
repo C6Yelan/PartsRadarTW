@@ -1,0 +1,84 @@
+.history-panel {
+  --history-blue: #86acc4;
+  --history-green: #91b79d;
+  --history-gold: #c0a56e;
+  --history-card-bg: rgba(15, 28, 38, 0.78);
+  --history-card-bg-strong: rgba(16, 30, 41, 0.82);
+  --history-chart-line: #789bb3;
+  --history-chart-grid: rgba(143, 165, 182, 0.26);
+  --history-chart-axis-line: rgba(143, 165, 182, 0.48);
+  --history-chart-date-text: rgba(170, 190, 203, 0.82);
+  --history-chart-tick-text: rgba(159, 180, 196, 0.76);
+  --history-text-strong: #dce9ef;
+
+  display: grid;
+  gap: 14px;
+  padding: clamp(18px, 3vw, 28px);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-muted);
+}
+
+.history-topline {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 450px);
+  gap: 16px;
+  align-items: start;
+}
+
+.history-topline h2 {
+  margin: 0;
+  color: var(--history-text-strong);
+  font-size: clamp(28px, 3vw, 40px);
+  line-height: 1.08;
+}
+
+.history-controls {
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
+
+.history-range-controls {
+  width: min(100%, 360px);
+  justify-self: end;
+}
+
+.history-segmented {
+  min-width: 0;
+}
+
+.history-range-control {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.history-segmented button {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-segmented button.is-active {
+  background: rgba(29, 58, 80, 0.72);
+  color: var(--history-text-strong);
+}
+
+.history-insight-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.9fr) minmax(420px, 1.6fr);
+  gap: 12px;
+}
+
+.history-empty {
+  margin: 0;
+  color: var(--muted);
+}
+
+.history-loading {
+  display: grid;
+}
+
+.history-chart-skeleton {
+  width: 100%;
+  min-height: 180px;
+}

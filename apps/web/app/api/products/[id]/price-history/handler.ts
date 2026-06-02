@@ -13,6 +13,7 @@ import {
 import { normalizeProductId } from "../product-id";
 
 const ALLOWED_RANGE_DAYS = new Set([7, 30, 90]);
+const ALLOWED_RANGE_VALUES = new Set(["7d", "30d", "90d", "all"]);
 const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
 
 const PRICE_HISTORY_SNAPSHOT_SELECT = {
@@ -70,7 +71,8 @@ interface PriceHistorySummaryPoint {
 
 interface ProductPriceHistoryResponseBody {
   productId: string;
-  rangeDays: 7 | 30 | 90;
+  range: "7d" | "30d" | "90d" | "all";
+  rangeDays: 7 | 30 | 90 | null;
   points: PriceHistoryPointResponse[];
   summary: {
     pointCount: number;
@@ -101,9 +103,10 @@ export function createGetProductPriceHistoryHandler(
         return notFoundResponse();
       }
 
-      const rangeDays = parseRangeDays(new URL(requestUrl).searchParams);
+      const range = parseRange(new URL(requestUrl).searchParams);
       const now = options.now ?? new Date();
-      const since = new Date(now.getTime() - rangeDays * MILLISECONDS_PER_DAY);
+      const since =
+        range.days === null ? null : new Date(now.getTime() - range.days * MILLISECONDS_PER_DAY);
       const product = await client.product.findFirst({
         where: {
           id: normalizedProductId,
@@ -130,9 +133,13 @@ export function createGetProductPriceHistoryHandler(
       const snapshots = await client.priceSnapshot.findMany({
         where: {
           productId: normalizedProductId,
-          capturedAt: {
-            gte: since,
-          },
+          ...(since
+            ? {
+                capturedAt: {
+                  gte: since,
+                },
+              }
+            : {}),
         },
         orderBy: {
           capturedAt: "asc",
@@ -141,7 +148,7 @@ export function createGetProductPriceHistoryHandler(
       });
 
       return jsonOk<ProductPriceHistoryResponseBody>(
-        toPriceHistoryResponse(normalizedProductId, rangeDays, snapshots, product, since),
+        toPriceHistoryResponse(normalizedProductId, range, snapshots, product, since),
       );
     } catch (error) {
       if (error instanceof InvalidQueryError) {
@@ -153,7 +160,25 @@ export function createGetProductPriceHistoryHandler(
   };
 }
 
-function parseRangeDays(params: URLSearchParams): 7 | 30 | 90 {
+function parseRange(params: URLSearchParams): {
+  key: "7d" | "30d" | "90d" | "all";
+  days: 7 | 30 | 90 | null;
+} {
+  const range = params.get("range");
+
+  if (range) {
+    if (!ALLOWED_RANGE_VALUES.has(range)) {
+      throw new InvalidQueryError("range", "must be one of 7d, 30d, 90d, or all");
+    }
+
+    return range === "all"
+      ? { key: "all", days: null }
+      : {
+          key: range as "7d" | "30d" | "90d",
+          days: Number.parseInt(range, 10) as 7 | 30 | 90,
+        };
+  }
+
   const days =
     parseOptionalIntegerQuery(params, "days", {
       defaultValue: 90,
@@ -165,15 +190,21 @@ function parseRangeDays(params: URLSearchParams): 7 | 30 | 90 {
     throw new InvalidQueryError("days", "must be one of 7, 30, or 90");
   }
 
-  return days as 7 | 30 | 90;
+  return {
+    key: `${days}d` as "7d" | "30d" | "90d",
+    days: days as 7 | 30 | 90,
+  };
 }
 
 function toPriceHistoryResponse(
   productId: string,
-  rangeDays: 7 | 30 | 90,
+  range: {
+    key: "7d" | "30d" | "90d" | "all";
+    days: 7 | 30 | 90 | null;
+  },
   snapshots: PriceHistorySnapshotRecord[],
   product: PriceHistoryProductRecord,
-  since: Date,
+  since: Date | null,
 ): ProductPriceHistoryResponseBody {
   const points = toPriceHistoryPoints(snapshots, product.currentPrice, since);
 
@@ -185,7 +216,8 @@ function toPriceHistoryResponse(
 
   return {
     productId,
-    rangeDays,
+    range: range.key,
+    rangeDays: range.days,
     points,
     summary: {
       pointCount: points.length,
@@ -207,7 +239,7 @@ function toPriceHistoryResponse(
 function toPriceHistoryPoints(
   snapshots: PriceHistorySnapshotRecord[],
   currentPrice: PriceHistoryProductRecord["currentPrice"],
-  since: Date,
+  since: Date | null,
 ): PriceHistoryPointResponse[] {
   const points: PriceHistoryPointResponse[] = snapshots.map((snapshot) => ({
     amount: snapshot.price,
@@ -216,7 +248,7 @@ function toPriceHistoryPoints(
     source: "price_snapshot" as const,
   }));
 
-  if (!currentPrice || currentPrice.lastSeenAt.getTime() < since.getTime()) {
+  if (!currentPrice || (since && currentPrice.lastSeenAt.getTime() < since.getTime())) {
     return points;
   }
 

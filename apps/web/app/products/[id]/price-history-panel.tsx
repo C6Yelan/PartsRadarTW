@@ -7,12 +7,13 @@ import { HistoryRecordList } from "./price-history/records";
 import { HistoryRangeCard, PeriodDeltaCard } from "./price-history/summary-cards";
 import type {
   PriceHistoryLoadState,
-  PriceHistoryRangeDays,
+  PriceHistoryRange,
   ProductPriceHistoryBody,
 } from "./price-history/types";
 
 export type {
   PriceHistoryLoadState,
+  PriceHistoryRange,
   PriceHistoryRangeDays,
   ProductPriceHistoryBody,
 } from "./price-history/types";
@@ -21,18 +22,19 @@ const RANGE_OPTIONS = [
   { label: "7 天", value: 7 },
   { label: "30 天", value: 30 },
   { label: "90 天", value: 90 },
-] as const satisfies readonly { label: string; value: PriceHistoryRangeDays }[];
+  { label: "全部", value: "all" },
+] as const satisfies readonly { label: string; value: PriceHistoryRange }[];
 
 export default function PriceHistoryPanel({
   history,
-  selectedRangeDays,
+  selectedRange,
   state,
-  onRangeDaysChange,
+  onRangeChange,
 }: {
   history: ProductPriceHistoryBody | null;
-  selectedRangeDays: PriceHistoryRangeDays;
+  selectedRange: PriceHistoryRange;
   state: PriceHistoryLoadState;
-  onRangeDaysChange(days: PriceHistoryRangeDays): void;
+  onRangeChange(range: PriceHistoryRange): void;
 }) {
   const [activePointKey, setActivePointKey] = useState<string | null>(null);
   const chartConfig = useChartConfig();
@@ -54,10 +56,10 @@ export default function PriceHistoryPanel({
           <h2 id="price-history-title">價格走勢</h2>
         </div>
         <HistoryRangeControls
-          rangeDays={selectedRangeDays}
-          onRangeDaysChange={(days) => {
+          range={selectedRange}
+          onRangeChange={(range) => {
             setActivePointKey(null);
-            onRangeDaysChange(days);
+            onRangeChange(range);
           }}
         />
       </div>
@@ -77,19 +79,24 @@ export default function PriceHistoryPanel({
           {chart ? (
             <div className="history-insight-grid">
               <PeriodDeltaCard summary={viewSummary} />
-              <HistoryRangeCard rangeDays={history.rangeDays} summary={viewSummary} />
+              <HistoryRangeCard
+                range={history.range}
+                rangeDays={history.rangeDays}
+                summary={viewSummary}
+              />
             </div>
           ) : null}
 
           <PriceHistoryChart
             activePointKey={activePointKey}
             chart={chart}
+            range={history.range}
             rangeDays={history.rangeDays}
             summary={viewSummary}
             onActivePointKeyChange={setActivePointKey}
           />
 
-          {chart ? <HistoryRecordList key={history.rangeDays} records={viewSummary.records} /> : null}
+          {chart ? <HistoryRecordList key={history.range} records={viewSummary.records} /> : null}
         </>
       ) : null}
     </section>
@@ -97,11 +104,11 @@ export default function PriceHistoryPanel({
 }
 
 function HistoryRangeControls({
-  rangeDays,
-  onRangeDaysChange,
+  range,
+  onRangeChange,
 }: {
-  rangeDays: PriceHistoryRangeDays;
-  onRangeDaysChange(days: PriceHistoryRangeDays): void;
+  range: PriceHistoryRange;
+  onRangeChange(nextRange: PriceHistoryRange): void;
 }) {
   return (
     <fieldset className="history-controls history-range-controls">
@@ -109,11 +116,11 @@ function HistoryRangeControls({
       <div className="segmented-control history-segmented history-range-control">
         {RANGE_OPTIONS.map((option) => (
           <button
-            aria-pressed={rangeDays === option.value}
-            className={rangeDays === option.value ? "is-active" : ""}
+            aria-pressed={range === option.value}
+            className={range === option.value ? "is-active" : ""}
             key={option.value}
             type="button"
-            onClick={() => onRangeDaysChange(option.value)}
+            onClick={() => onRangeChange(option.value)}
           >
             {option.label}
           </button>

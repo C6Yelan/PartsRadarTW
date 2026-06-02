@@ -61,6 +61,7 @@ describe("GET /api/products/{id}/price-history handler", () => {
     });
     expect(body).toEqual({
       productId: PRODUCT_ID,
+      range: "30d",
       rangeDays: 30,
       points: [
         {
@@ -126,6 +127,7 @@ describe("GET /api/products/{id}/price-history handler", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
       productId: PRODUCT_ID,
+      range: "90d",
       rangeDays: 90,
       points: [
         {
@@ -190,6 +192,7 @@ describe("GET /api/products/{id}/price-history handler", () => {
       },
     });
     expect(await response.json()).toMatchObject({
+      range: "90d",
       rangeDays: 90,
       points: [],
       summary: {
@@ -206,6 +209,69 @@ describe("GET /api/products/{id}/price-history handler", () => {
     });
   });
 
+  it("returns all retained price history when range is all", async () => {
+    const client = fakePriceHistoryClient({
+      productResult: productRecord({
+        price: 5400,
+        capturedAt: "2026-05-31T08:00:00.000Z",
+        lastSeenAt: "2026-06-01T05:30:00.000Z",
+      }),
+      snapshots: [
+        snapshot(6200, "2026-01-10T08:00:00.000Z"),
+        snapshot(5800, "2026-03-20T08:00:00.000Z"),
+        snapshot(5400, "2026-05-31T08:00:00.000Z"),
+      ],
+    });
+
+    const response = await createGetProductPriceHistoryHandler(client, { now: NOW })(
+      PRODUCT_ID,
+      "https://partsradar.test/api/products/11111111-1111-1111-1111-111111111111/price-history?range=all",
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(client.lastPriceSnapshotFindManyArgs).toMatchObject({
+      where: {
+        productId: PRODUCT_ID,
+      },
+      orderBy: {
+        capturedAt: "asc",
+      },
+    });
+    expect(client.lastPriceSnapshotFindManyArgs?.where).not.toHaveProperty("capturedAt");
+    expect(body).toMatchObject({
+      productId: PRODUCT_ID,
+      range: "all",
+      rangeDays: null,
+      points: [
+        {
+          amount: 6200,
+          observedAt: "2026-01-10T08:00:00.000Z",
+        },
+        {
+          amount: 5800,
+          observedAt: "2026-03-20T08:00:00.000Z",
+        },
+        {
+          amount: 5400,
+          observedAt: "2026-05-31T08:00:00.000Z",
+        },
+        {
+          amount: 5400,
+          observedAt: "2026-06-01T05:30:00.000Z",
+          source: "current_price_confirmation",
+        },
+      ],
+      summary: {
+        pointCount: 4,
+        startedAt: "2026-01-10T08:00:00.000Z",
+        endedAt: "2026-06-01T05:30:00.000Z",
+        deltaAmount: -800,
+        deltaPercent: -12.9,
+      },
+    });
+  });
+
   it("returns 400 for unsupported range days", async () => {
     const client = fakePriceHistoryClient({
       productResult: productRecord(),
@@ -215,6 +281,28 @@ describe("GET /api/products/{id}/price-history handler", () => {
     const response = await createGetProductPriceHistoryHandler(client, { now: NOW })(
       PRODUCT_ID,
       "https://partsradar.test/api/products/11111111-1111-1111-1111-111111111111/price-history?days=14",
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: {
+        code: "invalid_query",
+        message: API_ERROR_MESSAGES.invalidQuery,
+      },
+    });
+    expect(client.productFindFirstCallCount).toBe(0);
+    expect(client.priceSnapshotFindManyCallCount).toBe(0);
+  });
+
+  it("returns 400 for unsupported range values", async () => {
+    const client = fakePriceHistoryClient({
+      productResult: productRecord(),
+      snapshots: [],
+    });
+
+    const response = await createGetProductPriceHistoryHandler(client, { now: NOW })(
+      PRODUCT_ID,
+      "https://partsradar.test/api/products/11111111-1111-1111-1111-111111111111/price-history?range=365d",
     );
 
     expect(response.status).toBe(400);

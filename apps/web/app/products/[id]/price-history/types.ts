@@ -1,11 +1,14 @@
 export type PriceHistoryLoadState = "idle" | "loading" | "ready" | "unavailable" | "error";
 export type PriceHistoryRangeDays = 7 | 30 | 90;
+export type PriceHistoryRange = PriceHistoryRangeDays | "all";
+export type PriceHistoryRangeKey = "7d" | "30d" | "90d" | "all";
 export type PriceSignalTone = "low" | "high" | "middle" | "flat";
 export type PriceRecordTone = "down" | "up";
 
 export interface ProductPriceHistoryBody {
   productId: string;
-  rangeDays: PriceHistoryRangeDays;
+  range: PriceHistoryRangeKey;
+  rangeDays: PriceHistoryRangeDays | null;
   points: PriceHistoryPoint[];
   summary: {
     pointCount: number;

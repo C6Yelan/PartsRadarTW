@@ -1,0 +1,242 @@
+.history-period-card,
+.history-range-card {
+  display: grid;
+  align-content: space-between;
+  min-height: 168px;
+  padding: 17px 18px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--history-card-bg);
+}
+
+.history-period-card {
+  align-content: center;
+  gap: 12px;
+  justify-items: center;
+  background: var(--history-card-bg-strong);
+  text-align: center;
+}
+
+.history-period-card span,
+.history-period-card small,
+.history-range-card span,
+.history-range-card small {
+  color: var(--muted);
+}
+
+.history-period-card span {
+  color: #b2c5d2;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.history-period-card small {
+  width: fit-content;
+  min-height: 26px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(134, 172, 196, 0.1);
+  color: #adc0cc;
+  font-size: 15px;
+  font-weight: 750;
+  line-height: 1.2;
+}
+
+.history-period-card strong {
+  color: var(--history-blue);
+  font-size: clamp(26px, 2.8vw, 34px);
+  line-height: 1.05;
+  white-space: nowrap;
+}
+
+.history-period-card.is-low strong,
+.history-period-card.is-low small {
+  color: var(--history-green);
+}
+
+.history-period-card.is-high strong,
+.history-period-card.is-high small {
+  color: var(--history-gold);
+}
+
+.history-period-card.is-flat strong,
+.history-period-card.is-flat small {
+  color: var(--history-blue);
+}
+
+.history-range-card {
+  gap: 15px;
+}
+
+.history-range-heading {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.history-range-heading strong {
+  color: var(--history-text-strong);
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+.history-range-heading span {
+  color: #8fa5b4;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.history-range-track-wrap {
+  display: grid;
+  gap: 7px;
+}
+
+.history-range-caption {
+  color: #7f94a4;
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.2;
+}
+
+.history-range-endpoints {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  align-items: end;
+}
+
+.history-range-endpoint {
+  display: flex;
+  min-width: 0;
+  gap: 5px;
+  align-items: baseline;
+  color: #8ca2b1;
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.history-range-endpoint.is-high {
+  justify-content: flex-end;
+  text-align: right;
+}
+
+.history-range-endpoint span {
+  color: #738898;
+}
+
+.history-range-endpoint strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #9eb5c4;
+  font-size: 13px;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-range-track {
+  position: relative;
+  height: 7px;
+  border-radius: 999px;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(122, 166, 155, 0.68),
+      rgba(119, 149, 170, 0.64) 52%,
+      rgba(176, 155, 114, 0.68)
+    );
+  box-shadow:
+    inset 0 0 0 1px rgba(220, 233, 239, 0.06),
+    inset 0 -1px 1px rgba(0, 0, 0, 0.18);
+}
+
+.history-range-track::before,
+.history-range-track::after {
+  position: absolute;
+  top: 50%;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(220, 233, 239, 0.42);
+  content: "";
+  transform: translateY(-50%);
+}
+
+.history-range-track::before {
+  left: 2px;
+}
+
+.history-range-track::after {
+  right: 2px;
+}
+
+.history-range-marker {
+  position: absolute;
+  top: 50%;
+  box-sizing: border-box;
+  width: 10px;
+  height: 10px;
+  border: 2px solid rgba(146, 184, 207, 0.9);
+  border-radius: 50%;
+  background: rgba(13, 25, 34, 0.92);
+  box-shadow: 0 0 0 1px rgba(13, 25, 34, 0.8);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+.history-range-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
+}
+
+.history-range-stat {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+  justify-items: center;
+  padding: 8px 6px;
+  border-radius: 7px;
+  background: rgba(9, 19, 27, 0.24);
+  text-align: center;
+}
+
+.history-range-stat.is-low {
+  order: 1;
+}
+
+.history-range-stat.is-average {
+  order: 2;
+}
+
+.history-range-stat.is-high {
+  order: 3;
+}
+
+.history-range-stat span,
+.history-range-stat small {
+  color: #7f94a4;
+  font-size: 12.5px;
+  line-height: 1.2;
+}
+
+.history-range-stat strong {
+  color: var(--history-text-strong);
+  font-size: 23px;
+  line-height: 1.05;
+  white-space: nowrap;
+}
+
+.history-range-stat.is-low strong {
+  color: var(--history-green);
+}
+
+.history-range-stat.is-high strong {
+  color: var(--history-gold);
+}
