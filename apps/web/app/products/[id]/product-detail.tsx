@@ -105,7 +105,6 @@ export default function ProductDetail({
 
     const controller = new AbortController();
     setHistoryState("loading");
-    setPriceHistory(null);
 
     async function loadPriceHistory() {
       try {
@@ -147,6 +146,9 @@ export default function ProductDetail({
         <Link className="back-link" href={returnHref}>
           返回查詢
         </Link>
+        {state === "ready" && product ? (
+          <span className="detail-category-chip">{product.category.displayName}</span>
+        ) : null}
       </div>
 
       {state === "loading" || state === "idle" ? (
@@ -206,14 +208,9 @@ export default function ProductDetail({
             <div className="price-block">
               <span>目前價格</span>
               <strong>{formatPrice(product.price.amount)}</strong>
-              <small>{product.price.currency}</small>
             </div>
 
             <dl className="detail-facts">
-              <div>
-                <dt>分類</dt>
-                <dd>{product.category.displayName}</dd>
-              </div>
               <div>
                 <dt>價格資料更新</dt>
                 <dd>{formatDateTime(product.price.capturedAt)}</dd>
@@ -232,6 +229,7 @@ export default function ProductDetail({
 
             <div className="detail-actions">
               <a
+                aria-label="前往原價屋查看／購買，開新分頁"
                 className="external-action"
                 href={product.source.url}
                 rel="noreferrer"
@@ -241,6 +239,7 @@ export default function ProductDetail({
               </a>
               {product.discussion ? (
                 <a
+                  aria-label="產品介紹，開新分頁"
                   className="external-action secondary"
                   href={product.discussion.url}
                   rel="noreferrer"

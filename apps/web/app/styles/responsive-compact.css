@@ -42,6 +42,28 @@
     border-right: 0;
   }
 
+  .detail-actions {
+    flex-wrap: nowrap;
+    width: 100%;
+    max-width: 320px;
+    gap: 8px;
+  }
+
+  .detail-actions .external-action {
+    flex: 1.25 1 0;
+    min-width: 0;
+    padding: 0 8px;
+  }
+
+  .detail-actions .external-action.secondary {
+    flex: 0.8 1 0;
+    min-width: 0;
+  }
+
+  .detail-actions .external-action:only-child {
+    flex: 0 0 auto;
+  }
+
   .product-image {
     width: 60px;
   }

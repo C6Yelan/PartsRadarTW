@@ -351,6 +351,12 @@
   }
 
   .detail-media {
-    min-height: 300px;
+    min-height: 260px;
+    padding: 16px;
+  }
+
+  .detail-media img,
+  .detail-image-fallback {
+    width: min(100%, 250px);
   }
 }
