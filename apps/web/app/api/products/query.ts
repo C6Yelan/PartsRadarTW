@@ -12,7 +12,7 @@ import type { ProductVendorRecord } from "./data";
 const PRODUCT_SEARCH_MAX_LENGTH = 100;
 const PRODUCT_VENDOR_QUERY_MAX_LENGTH = 300;
 const PRODUCT_VENDOR_VALUE_PATTERN = /^[a-z0-9-]+$/;
-const PRODUCT_SORT_VALUES = ["price_asc", "price_desc", "name_asc"] as const;
+const PRODUCT_SORT_VALUES = ["price_asc", "price_desc", "price_drop_desc", "name_asc"] as const;
 const PRODUCT_STATUS_VALUES = ["active", "inactive", "all"] as const;
 
 type ProductSort = (typeof PRODUCT_SORT_VALUES)[number];
@@ -165,9 +165,15 @@ export function buildProductOrderBy(
       return [{ currentPrice: { priceSnapshot: { price: "desc" } } }, { id: "asc" }];
     case "name_asc":
       return [{ normalizedName: "asc" }, { id: "asc" }];
+    case "price_drop_desc":
+      return [{ currentPrice: { priceSnapshot: { price: "asc" } } }, { id: "asc" }];
     case "price_asc":
       return [{ currentPrice: { priceSnapshot: { price: "asc" } } }, { id: "asc" }];
   }
+}
+
+export function isPriceMovementSort(sort: ProductSort) {
+  return sort === "price_drop_desc";
 }
 
 function buildProductSearchWhere(searchText: string | undefined): Prisma.ProductWhereInput[] {

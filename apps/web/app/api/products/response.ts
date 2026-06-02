@@ -50,6 +50,8 @@ interface ProductListResponseItem {
   };
 }
 
+export type ProductPriceMovement = ProductListResponseItem["priceMovement"];
+
 export interface ProductsResponseBody {
   data: ProductListResponseItem[];
   pagination: {

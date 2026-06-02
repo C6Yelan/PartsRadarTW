@@ -1,6 +1,6 @@
 export type SourceStatus = "ok" | "stale" | "unavailable";
 export type ProductStatus = "active" | "inactive" | "all";
-export type ProductSort = "price_asc" | "price_desc" | "name_asc";
+export type ProductSort = "price_asc" | "price_desc" | "price_drop_desc" | "name_asc";
 export type LoadState = "idle" | "loading" | "ready" | "error";
 
 export interface CategoryItem {
