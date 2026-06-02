@@ -23,6 +23,7 @@ source_categories
   -> products
        -> price_snapshots
        -> current_prices -> price_snapshots
+       -> product_link_health
   -> raw_snapshots
   -> parse_errors
   -> crawl_run_category_results
@@ -42,9 +43,10 @@ product_list_view
 | Table | 責任 | 重要規則 |
 | --- | --- | --- |
 | `source_categories` | 第一版 CoolPC 分類主檔 | `igrp` 唯一；保存 `source_name`、`display_name`、enabled、最後檢查與成功時間。 |
-| `products` | 商品主檔 | `source_category_id + ibuy_token` 唯一；保存名稱、vendor、主要圖片、discussion URL、來源頁、active / missing 狀態與 seen timestamps。 |
+| `products` | 商品主檔 | `source_category_id + ibuy_token` 唯一；保存名稱、vendor、主要圖片、introduction URL、來源頁、active / missing 狀態與 seen timestamps。 |
 | `price_snapshots` | 價格歷史 | 新商品或價格變動才新增；長期保留；`raw_snapshot_id` nullable，避免 raw snapshot 清理破壞價格歷史。 |
 | `current_prices` | 網站目前價格指標 | `product_id` 為主鍵；指向同商品的 `price_snapshots`；價格值從 snapshot 取得。 |
+| `product_link_health` | 商品外部連結健康狀態 | 每商品每 link kind 一筆；保存目前 URL、狀態、HTTP status、檢查時間、最後成功 / 失敗時間與連續失敗次數。 |
 | `crawl_runs` | 整輪 crawler 摘要 | 保存 status、start / finish、trigger、error、backoff；不保存分類結果 JSON 或可推得的 count cache。 |
 | `crawl_run_category_results` | 單分類 crawl 結果 | `crawl_run_id + source_category_id` 唯一；保存狀態、raw snapshot、error。 |
 | `raw_snapshots` | fetch metadata | 保存 URL、fetch time、HTTP / content status、hash、gzip path、duplicate reference。 |
@@ -63,7 +65,7 @@ product_list_view
 - `vendor_name`
 - `primary_image_url`
 - `primary_image_checked_at`
-- `discussion_url`
+- `introduction_url`
 - `source_url`
 - `is_active`
 - `missing_since`
@@ -107,6 +109,29 @@ product_list_view
 - `current_prices(price_snapshot_id, product_id)` 應保證目前價格不會跨商品。
 - 價格未變時不新增 snapshot，只更新必要的 seen time。
 - fetch failed、suspected block、parse failed 不更新目前價格。
+
+## `product_link_health`
+
+`product_link_health` 保存：
+
+- `product_id`
+- `link_kind`：`source` 或 `introduction`
+- `url`
+- `status`：`ok`、`broken` 或 `temporary_error`
+- nullable `http_status`
+- `checked_at`
+- nullable `last_ok_at`
+- nullable `last_failure_at`
+- `failure_count`
+- nullable `error_message`
+
+規則：
+
+- link health 是 UI 提示與維運輔助，不是商品刪除或下架真相來源。
+- link checker 不在使用者 request lifecycle 執行。
+- 同一商品同一 link kind 只保留目前狀態；URL 改變時以新 URL 重算連續失敗次數。
+- 單次失敗不應立即判定失效；404 / 410 需達到連續失敗門檻才標記 `broken`。
+- `error_message` 只供內部維運，不公開到 API 或 UI。
 
 ## Crawler State
 

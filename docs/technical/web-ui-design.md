@@ -65,7 +65,7 @@ q, igrp, vendors, minPrice, maxPrice, sort, page, pageSize, status
 - 價格最後確認時間。
 - 來源 / 資料狀態。
 - 原價屋查看 / 購買連結。
-- 若 API 提供可公開的 `discussion.url`，以「產品介紹」呈現。
+- 若 API 提供可公開的 `introduction.url`，以「產品介紹」呈現。
 
 圖片規則：
 

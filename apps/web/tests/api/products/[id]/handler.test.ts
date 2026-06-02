@@ -59,9 +59,11 @@ describe("GET /api/products/{id} handler", () => {
       source: {
         name: "coolpc",
         url: "https://www.coolpc.com.tw/evaluate.php?iBuy=GPU-RTX-4070",
+        health: null,
       },
-      discussion: {
+      introduction: {
         url: "https://www.nvidia.com/zh-tw/geforce/graphics-cards/40-series/rtx-4070/",
+        health: null,
       },
       status: {
         isActive: true,
@@ -94,22 +96,22 @@ describe("GET /api/products/{id} handler", () => {
     });
   });
 
-  it("omits unsafe discussion URLs", async () => {
+  it("omits unsafe introduction URLs", async () => {
     const response = await createGetProductHandler(
-      fakeProductDetailClient(product({ discussionUrl: "javascript:alert(1)" })),
+      fakeProductDetailClient(product({ introductionUrl: "javascript:alert(1)" })),
     )(PRODUCT_ID);
 
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({
-      discussion: null,
+      introduction: null,
     });
   });
 
-  it("sanitizes public discussion URLs before returning them", async () => {
+  it("sanitizes public introduction URLs before returning them", async () => {
     const response = await createGetProductHandler(
       fakeProductDetailClient(
         product({
-          discussionUrl:
+          introductionUrl:
             "https://example.com/products/gpu-review?utm_source=ad&PHPSESSID=secret&variant=black#reviews",
         }),
       ),
@@ -117,22 +119,94 @@ describe("GET /api/products/{id} handler", () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({
-      discussion: {
+      introduction: {
         url: "https://example.com/products/gpu-review?variant=black",
+        health: null,
       },
     });
   });
 
-  it("omits public discussion URLs with embedded credentials", async () => {
+  it("returns public link health status for the current source and introduction URLs", async () => {
     const response = await createGetProductHandler(
       fakeProductDetailClient(
-        product({ discussionUrl: "https://user:secret@example.com/products/gpu-review" }),
+        product({
+          introductionUrl:
+            "https://example.com/products/gpu-review?utm_source=ad&variant=black#reviews",
+          linkHealthChecks: [
+            {
+              linkKind: "SOURCE",
+              url: "https://www.coolpc.com.tw/evaluate.php?iBuy=GPU-RTX-4070",
+              status: "OK",
+              httpStatus: 200,
+              checkedAt: new Date("2026-05-28T12:10:00.000Z"),
+            },
+            {
+              linkKind: "INTRODUCTION",
+              url: "https://example.com/products/gpu-review?variant=black",
+              status: "BROKEN",
+              httpStatus: 404,
+              checkedAt: new Date("2026-05-28T12:11:00.000Z"),
+            },
+          ],
+        }),
       ),
     )(PRODUCT_ID);
 
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({
-      discussion: null,
+      source: {
+        health: {
+          status: "ok",
+          httpStatus: 200,
+          checkedAt: "2026-05-28T12:10:00.000Z",
+        },
+      },
+      introduction: {
+        url: "https://example.com/products/gpu-review?variant=black",
+        health: {
+          status: "broken",
+          httpStatus: 404,
+          checkedAt: "2026-05-28T12:11:00.000Z",
+        },
+      },
+    });
+  });
+
+  it("ignores stale link health records for previous URLs", async () => {
+    const response = await createGetProductHandler(
+      fakeProductDetailClient(
+        product({
+          linkHealthChecks: [
+            {
+              linkKind: "SOURCE",
+              url: "https://www.coolpc.com.tw/evaluate.php?iBuy=OLD-TOKEN",
+              status: "BROKEN",
+              httpStatus: 404,
+              checkedAt: new Date("2026-05-28T12:10:00.000Z"),
+            },
+          ],
+        }),
+      ),
+    )(PRODUCT_ID);
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      source: {
+        health: null,
+      },
+    });
+  });
+
+  it("omits public introduction URLs with embedded credentials", async () => {
+    const response = await createGetProductHandler(
+      fakeProductDetailClient(
+        product({ introductionUrl: "https://user:secret@example.com/products/gpu-review" }),
+      ),
+    )(PRODUCT_ID);
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      introduction: null,
     });
   });
 
@@ -142,14 +216,14 @@ describe("GET /api/products/{id} handler", () => {
     "https://www.amd.com/content/dam/amd/en/documents/partner-hub/ryzen/guide.pdf",
     "https://www.amd.com/zh-tw/support/downloads/previous-drivers.html/processors/ryzen.html",
     "https://example.com/products/gpu-driver-download",
-  ])("omits low-quality discussion URLs: %s", async (discussionUrl) => {
+  ])("omits low-quality introduction URLs: %s", async (introductionUrl) => {
     const response = await createGetProductHandler(
-      fakeProductDetailClient(product({ discussionUrl })),
+      fakeProductDetailClient(product({ introductionUrl })),
     )(PRODUCT_ID);
 
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({
-      discussion: null,
+      introduction: null,
     });
   });
 
@@ -236,7 +310,7 @@ function product(overrides: Partial<NonNullable<ProductRecord>> = {}): NonNullab
     name: "GPU RTX 4070",
     primaryImageUrl: "https://www.coolpc.com.tw/eval/12/gpu-rtx-4070.jpg",
     primaryImageCheckedAt: new Date("2026-05-28T11:55:00.000Z"),
-    discussionUrl: "https://www.nvidia.com/zh-tw/geforce/graphics-cards/40-series/rtx-4070/",
+    introductionUrl: "https://www.nvidia.com/zh-tw/geforce/graphics-cards/40-series/rtx-4070/",
     isActive: true,
     missingSince: null,
     firstSeenAt: new Date("2026-05-28T10:00:00.000Z"),
@@ -250,6 +324,7 @@ function product(overrides: Partial<NonNullable<ProductRecord>> = {}): NonNullab
         capturedAt: new Date("2026-05-28T11:45:00.000Z"),
       },
     },
+    linkHealthChecks: [],
     sourceCategory: {
       id: "category-12",
       igrp: 12,

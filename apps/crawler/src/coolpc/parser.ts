@@ -17,7 +17,7 @@ import type {
 import {
   createCoolpcCategoryUrl,
   createSourceItemKey,
-  normalizeCoolpcDiscussionUrl,
+  normalizeCoolpcIntroductionUrl,
   normalizeCoolpcProductImageUrl,
   sanitizeCoolpcSourceUrl,
 } from "./parser/urls";
@@ -41,7 +41,7 @@ export {
 export {
   createCoolpcCategoryUrl,
   createSourceItemKey,
-  normalizeCoolpcDiscussionUrl,
+  normalizeCoolpcIntroductionUrl,
   normalizeCoolpcProductImageUrl,
 } from "./parser/urls";
 
@@ -83,7 +83,7 @@ export function parseCoolpcCategoryPage(
     const name = normalizeProductName(candidate.rawName);
     const price = parsePriceText(candidate.rawPriceText);
     const primaryImageUrl = normalizeCoolpcProductImageUrl(candidate.rawImageUrl, context.igrp);
-    const discussionUrl = normalizeCoolpcDiscussionUrl(candidate.rawDiscussionUrl);
+    const introductionUrl = normalizeCoolpcIntroductionUrl(candidate.rawIntroductionUrl);
 
     if (ibuyToken.length === 0) {
       issues.push({
@@ -170,7 +170,7 @@ export function parseCoolpcCategoryPage(
       vendorSlug: vendor?.slug ?? null,
       vendorName: vendor?.name ?? null,
       primaryImageUrl,
-      discussionUrl,
+      introductionUrl,
       price,
       currency: "TWD",
       sourceUrl: sanitizeCoolpcSourceUrl(

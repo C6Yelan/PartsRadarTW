@@ -25,7 +25,7 @@ export interface CoolpcProductCandidate {
   rawName: string;
   rawPriceText: string;
   rawImageUrl: string;
-  rawDiscussionUrl: string;
+  rawIntroductionUrl: string;
 }
 
 export interface ParsedCoolpcProduct {
@@ -40,7 +40,7 @@ export interface ParsedCoolpcProduct {
   vendorSlug: string | null;
   vendorName: string | null;
   primaryImageUrl: string;
-  discussionUrl: string | null;
+  introductionUrl: string | null;
   price: number;
   currency: Currency;
   sourceUrl: string;

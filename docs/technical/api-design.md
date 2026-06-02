@@ -125,7 +125,7 @@ Response shape：
 - `image`
 - `price`
 - `source`
-- `discussion`
+- `introduction`
 - `status`
 - `firstSeenAt`
 - `lastSeenAt`
@@ -135,7 +135,9 @@ Response shape：
 - 商品存在但 inactive 回 `200`，由 `status.isActive` 告知 UI。
 - 商品不存在回 `404`。
 - `source.url` 指向原價屋購買 / 查看導流，不含 session token。
-- `discussion` 來自來源列產品介紹 / 開箱討論連結；蝦皮、PDF、driver/download 類低品質 URL 回 `null`。
+- `introduction` 來自來源列產品介紹連結；蝦皮、PDF、driver/download 類低品質 URL 回 `null`。
+- `source.health` 與 `introduction.health` 來自已持久化的 link checker 結果；沒有檢查紀錄或 URL 已變更時回 `null`。
+- link health 只回傳 `status`、`checkedAt`、`httpStatus`，不回傳內部錯誤訊息。
 - 商品詳細 endpoint 不內嵌價格歷史、拆解規格、raw snapshot 或 parse error；價格歷史由獨立 endpoint 讀取。
 
 ## `GET /api/products/{id}/price-history`
@@ -212,8 +214,8 @@ Response shape：
 
 分類規則：
 
-- 最近 30 分鐘內成功檢查且有有效商品資料：`ok`。
-- 超過 30 分鐘但仍有有效商品資料：`stale`。
+- 最近 60 分鐘內成功檢查且有有效商品資料：`ok`。
+- 超過 60 分鐘但仍有有效商品資料：`stale`。
 - 沒有效商品資料：`unavailable`。
 
 全域聚合：
@@ -224,7 +226,7 @@ Response shape：
 - top-level `lastCheckedAt` 取 enabled 分類最新值。
 - top-level `lastSuccessAt` 取 enabled 分類最舊非空值。
 
-30 分鐘是 v1 健康度門檻，不代表原價屋價格應在 30 分鐘內更新。
+60 分鐘是 v1 健康度門檻，配合 30 分鐘 crawler 週期，避免排程邊界造成誤判；這不代表原價屋價格應在 60 分鐘內更新。
 
 ## Security And Limits
 

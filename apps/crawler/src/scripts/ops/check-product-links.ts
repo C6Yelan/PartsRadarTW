@@ -1,0 +1,45 @@
+// This script is a low-frequency product link health checker.
+// It records link status for UI hints only; it does not remove or deactivate products.
+import type { PrismaClient } from "@partsradar/db";
+import { loadWorkspaceEnv, toSafeCliErrorMessage } from "../shared/script-utils";
+import { parseOptions, printSummary } from "./product-link-checker/options";
+import {
+  checkProductLinks,
+  readProductLinkCandidates,
+  type ProductLinkHealthClient,
+} from "./product-link-checker/processor";
+
+async function main() {
+  const options = parseOptions(process.argv.slice(2));
+  let client: PrismaClient | null = null;
+
+  try {
+    await loadWorkspaceEnv(options.workspaceRoot);
+    const db = await import("@partsradar/db");
+    client = db.prisma;
+    const linkHealthClient = toProductLinkHealthClient(client);
+
+    const candidates = await readProductLinkCandidates(linkHealthClient, options);
+    const summary = await checkProductLinks(linkHealthClient, candidates, options);
+
+    printSummary(summary, options);
+  } finally {
+    await client?.$disconnect();
+  }
+}
+
+main().catch((error: unknown) => {
+  console.error(toSafeCliErrorMessage(error));
+  process.exitCode = 1;
+});
+
+function toProductLinkHealthClient(client: PrismaClient): ProductLinkHealthClient {
+  return {
+    product: {
+      findMany: (args) => client.product.findMany(args),
+    },
+    productLinkHealth: {
+      upsert: (args) => client.productLinkHealth.upsert(args),
+    },
+  };
+}

@@ -59,11 +59,11 @@ export function normalizeCoolpcProductImageUrl(
   return `${COOLPC_OFFICIAL_BASE_URL}${url.pathname}`;
 }
 
-export function normalizeCoolpcDiscussionUrl(
-  rawDiscussionUrl: string,
+export function normalizeCoolpcIntroductionUrl(
+  rawIntroductionUrl: string,
   baseUrl = COOLPC_OFFICIAL_BASE_URL,
 ): string | null {
-  const trimmedUrl = rawDiscussionUrl.trim();
+  const trimmedUrl = rawIntroductionUrl.trim();
 
   if (trimmedUrl.length === 0) {
     return null;

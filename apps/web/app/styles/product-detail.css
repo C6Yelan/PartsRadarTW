@@ -219,6 +219,19 @@
   color: var(--muted);
 }
 
+.detail-actions .external-action.needs-link-check {
+  border-color: rgba(245, 158, 11, 0.38);
+  color: var(--text);
+}
+
+.link-health-note {
+  margin: -8px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
 .detail-loading,
 .detail-empty {
   display: grid;

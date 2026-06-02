@@ -112,7 +112,7 @@ export interface ProductCreateData {
   vendorName: string | null;
   primaryImageUrl: string;
   primaryImageCheckedAt: Date;
-  discussionUrl: string | null;
+  introductionUrl: string | null;
   sourceUrl: string;
   isActive: true;
   missingSince: null;
@@ -128,7 +128,7 @@ export interface ProductSeenUpdateData {
   vendorName: string | null;
   primaryImageUrl: string;
   primaryImageCheckedAt: Date;
-  discussionUrl: string | null;
+  introductionUrl: string | null;
   sourceUrl: string;
   isActive: true;
   missingSince: null;

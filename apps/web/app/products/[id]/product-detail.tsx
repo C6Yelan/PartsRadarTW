@@ -10,6 +10,13 @@ import PriceHistoryPanel, {
 } from "./price-history-panel";
 
 type LoadState = "idle" | "loading" | "ready" | "not-found" | "error";
+type ProductLinkHealthStatus = "ok" | "broken" | "temporary_error";
+
+interface ProductLinkHealth {
+  status: ProductLinkHealthStatus;
+  checkedAt: string;
+  httpStatus: number | null;
+}
 
 interface ProductDetailBody {
   id: string;
@@ -33,9 +40,11 @@ interface ProductDetailBody {
   source: {
     name: "coolpc";
     url: string;
+    health: ProductLinkHealth | null;
   };
-  discussion: {
+  introduction: {
     url: string;
+    health: ProductLinkHealth | null;
   } | null;
   status: {
     isActive: boolean;
@@ -231,18 +240,18 @@ export default function ProductDetail({
             <div className="detail-actions">
               <a
                 aria-label="前往原價屋查看／購買，開新分頁"
-                className="external-action"
+                className={toExternalActionClassName(product.source.health)}
                 href={product.source.url}
                 rel="noreferrer"
                 target="_blank"
               >
                 前往原價屋查看／購買
               </a>
-              {product.discussion ? (
+              {product.introduction ? (
                 <a
                   aria-label="產品介紹，開新分頁"
-                  className="external-action secondary"
-                  href={product.discussion.url}
+                  className={toExternalActionClassName(product.introduction.health, "secondary")}
+                  href={product.introduction.url}
                   rel="noreferrer"
                   target="_blank"
                 >
@@ -250,6 +259,7 @@ export default function ProductDetail({
                 </a>
               ) : null}
             </div>
+            {renderLinkHealthNotice(product)}
           </div>
         </section>
       ) : null}
@@ -284,4 +294,46 @@ function formatDateTime(value: string) {
     minute: "2-digit",
     hour12: false,
   }).format(new Date(value));
+}
+
+function toExternalActionClassName(
+  health: ProductLinkHealth | null,
+  extraClassName?: "secondary",
+) {
+  return [
+    "external-action",
+    extraClassName,
+    health && health.status !== "ok" ? "needs-link-check" : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+function renderLinkHealthNotice(product: ProductDetailBody) {
+  const notices = [
+    toLinkHealthNotice("原價屋連結", product.source.health),
+    product.introduction
+      ? toLinkHealthNotice("產品介紹連結", product.introduction.health)
+      : null,
+  ].filter((notice): notice is string => Boolean(notice));
+
+  if (notices.length === 0) {
+    return null;
+  }
+
+  return (
+    <p className="link-health-note" role="status">
+      {notices.join("　")}
+    </p>
+  );
+}
+
+function toLinkHealthNotice(label: string, health: ProductLinkHealth | null) {
+  if (!health || health.status === "ok") {
+    return null;
+  }
+
+  return health.status === "broken"
+    ? `${label}可能已失效`
+    : `${label}暫時無法確認`;
 }

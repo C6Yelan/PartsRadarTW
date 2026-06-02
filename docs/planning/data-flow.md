@@ -109,7 +109,7 @@ parser 對每筆候選商品輸出：
 - computed `source_item_key`
 - 原始商品名稱與 normalized name。
 - 主要商品圖片 URL。
-- discussion / 產品介紹 URL，若來源列有可用連結。
+- 產品介紹 URL，若來源列有可用連結。
 - 價格與 `TWD`。
 - source page URL。
 - fetched time。

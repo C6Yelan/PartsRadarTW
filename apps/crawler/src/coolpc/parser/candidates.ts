@@ -16,17 +16,17 @@ export function extractCoolpcProductCandidates($: CheerioAPI): CoolpcProductCand
       const rawName = firstText($nextSpan, "div.t") || firstText($parent, "div.t");
       const rawPriceText = firstText($nextSpan, "div.x") || firstText($parent, "div.x");
       const rawImageUrl = firstAttr($nextSpan, "img", "src") || firstAttr($parent, "img", "src");
-      const rawDiscussionUrl =
-        firstDiscussionUrl($, $nextSpan) ||
-        firstDiscussionUrl($, $parent) ||
-        firstDiscussionUrl($, $following);
+      const rawIntroductionUrl =
+        firstIntroductionUrl($, $nextSpan) ||
+        firstIntroductionUrl($, $parent) ||
+        firstIntroductionUrl($, $following);
 
       return {
         rawToken,
         rawName: rawName || firstText($following, "div.t"),
         rawPriceText: rawPriceText || firstText($following, "div.x"),
         rawImageUrl: rawImageUrl || firstAttr($following, "img", "src"),
-        rawDiscussionUrl,
+        rawIntroductionUrl,
       };
     });
 }
@@ -39,7 +39,7 @@ function firstAttr(scope: ReturnType<CheerioAPI>, selector: string, attributeNam
   return scope.find(selector).first().attr(attributeName)?.trim() ?? "";
 }
 
-function firstDiscussionUrl($: CheerioAPI, scope: ReturnType<CheerioAPI>): string {
+function firstIntroductionUrl($: CheerioAPI, scope: ReturnType<CheerioAPI>): string {
   const link = scope
     .find("div.x a")
     .toArray()

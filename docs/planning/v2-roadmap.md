@@ -105,6 +105,11 @@
 - 單次失敗不立即移除連結。
 - 來源站異常時不造成大量重試。
 
+目前狀態：
+
+- 已完成第一輪：`product_link_health` schema / migration、`ops:product-links:check` 低頻檢查命令、dry-run / live confirmation、可選批次上限、10-20 秒 request delay、48 小時 stale window、連續 404 / 410 失敗門檻、商品詳情 API / UI 低干擾健康提示。
+- 尚未完成：主機端排程化、部署後 live check 驗證、redirect 異常細分、與正式更正 / 移除流程的略過規則整合。
+
 ### 4. 正式更正 / 移除流程
 
 目標：把第一版 GitHub Issues 臨時入口升級成可維運的人工處理流程。

@@ -3,41 +3,17 @@ import {
   COOLPC_SOURCE_NAME,
   createCoolpcPurchaseUrl,
   createPublicProductImagePath,
+  toPublicIntroductionUrl,
 } from "@partsradar/shared";
 
 import { internalErrorResponse, jsonOk, notFoundResponse } from "../../_shared/responses";
 import { normalizeProductId } from "./product-id";
 
-// Discussion links are display-only references, so low-quality marketplace/download
-// targets are filtered before any stored URL reaches the public response.
-const BLOCKED_DISCUSSION_HOST_SUFFIXES = [".shopee.tw"];
-const BLOCKED_DISCUSSION_HOSTS = new Set(["shopee.tw"]);
-const BLOCKED_DISCUSSION_PATH_KEYWORDS = [
-  "driver",
-  "drivers",
-  "download",
-  "downloads",
-  "previous-drivers",
-];
-const DISCUSSION_QUERY_PARAMS_TO_STRIP = new Set([
-  "access_token",
-  "auth",
-  "authorization",
-  "fbclid",
-  "gclid",
-  "msclkid",
-  "phpsessid",
-  "session",
-  "session_id",
-  "sessionid",
-  "sid",
-  "token",
-  "utm_campaign",
-  "utm_content",
-  "utm_medium",
-  "utm_source",
-  "utm_term",
-]);
+const PRODUCT_LINK_KINDS = {
+  SOURCE: "SOURCE",
+  INTRODUCTION: "INTRODUCTION",
+} as const;
+
 const PRODUCT_DETAIL_SELECT = {
   // Keep the detail endpoint on public-safe fields only. ibuyToken is selected
   // only to build the outbound CoolPC purchase URL; it is not returned directly.
@@ -46,7 +22,7 @@ const PRODUCT_DETAIL_SELECT = {
   name: true,
   primaryImageUrl: true,
   primaryImageCheckedAt: true,
-  discussionUrl: true,
+  introductionUrl: true,
   isActive: true,
   missingSince: true,
   firstSeenAt: true,
@@ -64,6 +40,15 @@ const PRODUCT_DETAIL_SELECT = {
       },
     },
   },
+  linkHealthChecks: {
+    select: {
+      linkKind: true,
+      url: true,
+      status: true,
+      httpStatus: true,
+      checkedAt: true,
+    },
+  },
   sourceCategory: {
     select: {
       id: true,
@@ -75,6 +60,7 @@ const PRODUCT_DETAIL_SELECT = {
 } as const satisfies Prisma.ProductSelect;
 
 type ProductDetailRecord = Prisma.ProductGetPayload<{ select: typeof PRODUCT_DETAIL_SELECT }>;
+type ProductLinkHealthRecord = ProductDetailRecord["linkHealthChecks"][number];
 type ProductDetailFindFirstArgs = Omit<Prisma.ProductFindFirstArgs, "select"> & {
   select: typeof PRODUCT_DETAIL_SELECT;
 };
@@ -109,9 +95,11 @@ interface ProductDetailResponseBody {
   source: {
     name: typeof COOLPC_SOURCE_NAME;
     url: string;
+    health: ProductLinkHealthResponse | null;
   };
-  discussion: {
+  introduction: {
     url: string;
+    health: ProductLinkHealthResponse | null;
   } | null;
   status: {
     isActive: boolean;
@@ -119,6 +107,12 @@ interface ProductDetailResponseBody {
   };
   firstSeenAt: string;
   lastSeenAt: string;
+}
+
+interface ProductLinkHealthResponse {
+  status: "ok" | "broken" | "temporary_error";
+  checkedAt: string;
+  httpStatus: number | null;
 }
 
 export function createGetProductHandler(
@@ -170,6 +164,8 @@ function toProductDetailResponse(product: ProductDetailRecord): ProductDetailRes
     throw new Error("Product detail query returned a product without primary image data.");
   }
 
+  const sourceUrl = createCoolpcPurchaseUrl(product.ibuyToken);
+
   return {
     id: product.id,
     name: product.name,
@@ -194,9 +190,14 @@ function toProductDetailResponse(product: ProductDetailRecord): ProductDetailRes
     source: {
       name: COOLPC_SOURCE_NAME,
       // Build from the official source helper so the public response exposes no stored crawler URL.
-      url: createCoolpcPurchaseUrl(product.ibuyToken),
+      url: sourceUrl,
+      health: toProductLinkHealthResponse(
+        product.linkHealthChecks,
+        PRODUCT_LINK_KINDS.SOURCE,
+        sourceUrl,
+      ),
     },
-    discussion: toDiscussionResponse(product.discussionUrl),
+    introduction: toIntroductionResponse(product.introductionUrl, product.linkHealthChecks),
     status: {
       isActive: product.isActive,
       missingSince: toIsoStringOrNull(product.missingSince),
@@ -206,64 +207,57 @@ function toProductDetailResponse(product: ProductDetailRecord): ProductDetailRes
   };
 }
 
-function toDiscussionResponse(
-  discussionUrl: string | null,
-): ProductDetailResponseBody["discussion"] {
-  if (!discussionUrl) {
+function toIntroductionResponse(
+  introductionUrl: string | null,
+  linkHealthChecks: ProductLinkHealthRecord[],
+): ProductDetailResponseBody["introduction"] {
+  const publicIntroductionUrl = toPublicIntroductionUrl(introductionUrl);
+
+  if (!publicIntroductionUrl) {
     return null;
   }
 
-  try {
-    const url = new URL(discussionUrl);
+  return {
+    url: publicIntroductionUrl,
+    health: toProductLinkHealthResponse(
+      linkHealthChecks,
+      PRODUCT_LINK_KINDS.INTRODUCTION,
+      publicIntroductionUrl,
+    ),
+  };
+}
 
-    if (!["http:", "https:"].includes(url.protocol)) {
-      return null;
-    }
+function toProductLinkHealthResponse(
+  linkHealthChecks: ProductLinkHealthRecord[],
+  linkKind: ProductLinkHealthRecord["linkKind"],
+  expectedUrl: string,
+): ProductLinkHealthResponse | null {
+  const health = linkHealthChecks.find(
+    (candidate) => candidate.linkKind === linkKind && candidate.url === expectedUrl,
+  );
 
-    if (url.username || url.password) {
-      return null;
-    }
-
-    if (!isPublicDiscussionUrl(url)) {
-      return null;
-    }
-
-    return { url: stripPrivateDiscussionUrlParts(url).toString() };
-  } catch {
+  if (!health) {
     return null;
   }
+
+  return {
+    status: toPublicProductLinkHealthStatus(health.status),
+    checkedAt: health.checkedAt.toISOString(),
+    httpStatus: health.httpStatus,
+  };
 }
 
-function isPublicDiscussionUrl(url: URL): boolean {
-  const hostname = url.hostname.toLowerCase().replace(/^www\./, "");
-  const pathname = url.pathname.toLowerCase();
-
-  if (
-    BLOCKED_DISCUSSION_HOSTS.has(hostname) ||
-    BLOCKED_DISCUSSION_HOST_SUFFIXES.some((suffix) => hostname.endsWith(suffix))
-  ) {
-    return false;
+function toPublicProductLinkHealthStatus(
+  status: ProductLinkHealthRecord["status"],
+): ProductLinkHealthResponse["status"] {
+  switch (status) {
+    case "OK":
+      return "ok";
+    case "BROKEN":
+      return "broken";
+    case "TEMPORARY_ERROR":
+      return "temporary_error";
   }
-
-  if (pathname.endsWith(".pdf")) {
-    return false;
-  }
-
-  return !BLOCKED_DISCUSSION_PATH_KEYWORDS.some((keyword) => pathname.includes(keyword));
-}
-
-function stripPrivateDiscussionUrlParts(url: URL): URL {
-  const sanitizedUrl = new URL(url);
-  // Fragments and common campaign/session params are not needed for attribution and may leak state.
-  sanitizedUrl.hash = "";
-
-  for (const key of Array.from(sanitizedUrl.searchParams.keys())) {
-    if (DISCUSSION_QUERY_PARAMS_TO_STRIP.has(key.toLowerCase())) {
-      sanitizedUrl.searchParams.delete(key);
-    }
-  }
-
-  return sanitizedUrl;
 }
 
 function toIsoStringOrNull(value: Date | null): string | null {
