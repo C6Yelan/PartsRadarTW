@@ -5,7 +5,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { fetchCategories, fetchProducts } from "./api";
+import { ApiRequestError, fetchCategories, fetchProducts } from "./api";
 import {
   DEFAULT_QUERY,
   normalizeVendorValues,
@@ -196,6 +196,11 @@ export function useProducts(isReady: boolean, query: QueryState) {
           return;
         }
 
+        if (error instanceof ApiRequestError && error.code === "rate_limited") {
+          setProductState("rate_limited");
+          return;
+        }
+
         setProductState("error");
       });
 
@@ -233,7 +238,7 @@ export function usePendingPageScroll(productState: LoadState, products: Products
       return;
     }
 
-    if (productState === "error") {
+    if (productState === "error" || productState === "rate_limited") {
       pendingPageScrollRef.current = null;
       scrollToResultsTop();
     }

@@ -2,11 +2,12 @@ import { LRUCache } from "lru-cache";
 
 import { rateLimitedResponse } from "./responses";
 
-export type RateLimitScope = "api:read" | "api:image";
+export type RateLimitScope = "api:read" | "api:list" | "api:image";
 
 export const RATE_LIMIT_DEFAULTS = {
   readMax: 120,
-  imageMax: 600,
+  listMax: 360,
+  imageMax: 360,
   windowSeconds: 60,
   cacheSize: 5000,
 } as const;
@@ -97,6 +98,7 @@ export function createRateLimiter(options: RateLimiterOptions = {}): RateLimiter
 
 export function resolveRateLimitConfig(env: RateLimitEnv = process.env): RateLimitConfig {
   const readMax = readPositiveInteger(env.API_READ_RATE_LIMIT_MAX, RATE_LIMIT_DEFAULTS.readMax);
+  const listMax = readPositiveInteger(env.API_LIST_RATE_LIMIT_MAX, RATE_LIMIT_DEFAULTS.listMax);
   const imageMax = readPositiveInteger(env.API_IMAGE_RATE_LIMIT_MAX, RATE_LIMIT_DEFAULTS.imageMax);
   const windowSeconds = readPositiveInteger(
     env.API_RATE_LIMIT_WINDOW_SECONDS,
@@ -111,6 +113,7 @@ export function resolveRateLimitConfig(env: RateLimitEnv = process.env): RateLim
     cacheSize,
     limits: {
       "api:read": readMax,
+      "api:list": listMax,
       "api:image": imageMax,
     },
     windowMs: windowSeconds * 1000,

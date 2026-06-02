@@ -5,7 +5,7 @@ import { SOURCE_STATUS_CATEGORY_QUERY } from "../source-status/handler";
 
 export async function GET(request: Request): Promise<Response> {
   try {
-    const rateLimitResponse = checkRateLimit(request, "api:read");
+    const rateLimitResponse = checkRateLimit(request, "api:list");
 
     if (rateLimitResponse) {
       return rateLimitResponse;

@@ -232,6 +232,7 @@ Response shape：
 - API 不回傳未驗證圖片 URL。
 - 不提供會觸發 crawler 或修改資料的公開 endpoint。
 - 公開 API 有 app-level in-memory rate limit 作為主機保底；大量流量仍應優先由 Cloudflare / WAF 擋在主機外。
-- 預設 `api:read` 為每 client 每 60 秒 120 次，涵蓋 categories、source-status、products list 與 product detail。
-- 預設 `api:image` 為每 client 每 60 秒 600 次，涵蓋商品縮圖 API。
+- 預設 `api:read` 為每 client 每 60 秒 120 次，涵蓋 categories、source-status 與 product detail。
+- 預設 `api:list` 為每 client 每 60 秒 360 次，涵蓋商品列表查詢，避免正常快速切分類、翻頁或排序時被一般 read 額度誤傷。
+- 預設 `api:image` 為每 client 每 60 秒 360 次，涵蓋商品縮圖 API。
 - 超限回 `429` 與 `Retry-After` / `X-RateLimit-*` headers；response 不回傳 IP、env、DB 或 internal state。

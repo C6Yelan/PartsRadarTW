@@ -12,6 +12,7 @@ const BASE_CONFIG: RateLimitConfig = {
   cacheSize: 10,
   limits: {
     "api:read": 2,
+    "api:list": 3,
     "api:image": 4,
   },
   windowMs: 1000,
@@ -79,13 +80,18 @@ describe("API rate limiter", () => {
     });
   });
 
-  it("keeps image and read scopes independent", () => {
+  it("keeps list, image, and read scopes independent", () => {
     const limiter = createRateLimiter({ config: BASE_CONFIG, nowMs: () => 1_000_000 });
     const request = requestFromIp("203.0.113.20");
 
     expect(limiter.check(request, "api:read")).toMatchObject({ allowed: true });
     expect(limiter.check(request, "api:read")).toMatchObject({ allowed: true });
     expect(limiter.check(request, "api:read")).toMatchObject({ allowed: false });
+    expect(limiter.check(request, "api:list")).toMatchObject({
+      allowed: true,
+      limit: 3,
+      remaining: 2,
+    });
     expect(limiter.check(request, "api:image")).toMatchObject({
       allowed: true,
       limit: 4,
@@ -112,6 +118,7 @@ describe("API rate limiter", () => {
     expect(
       resolveRateLimitConfig({
         API_READ_RATE_LIMIT_MAX: "250",
+        API_LIST_RATE_LIMIT_MAX: "500",
         API_IMAGE_RATE_LIMIT_MAX: "900",
         API_RATE_LIMIT_WINDOW_SECONDS: "120",
         API_RATE_LIMIT_CACHE_SIZE: "7000",
@@ -120,6 +127,7 @@ describe("API rate limiter", () => {
       cacheSize: 7000,
       limits: {
         "api:read": 250,
+        "api:list": 500,
         "api:image": 900,
       },
       windowMs: 120_000,
@@ -128,6 +136,7 @@ describe("API rate limiter", () => {
     expect(
       resolveRateLimitConfig({
         API_READ_RATE_LIMIT_MAX: "0",
+        API_LIST_RATE_LIMIT_MAX: "bad",
         API_IMAGE_RATE_LIMIT_MAX: "not-a-number",
         API_RATE_LIMIT_WINDOW_SECONDS: "-1",
         API_RATE_LIMIT_CACHE_SIZE: "",
@@ -136,6 +145,7 @@ describe("API rate limiter", () => {
       cacheSize: RATE_LIMIT_DEFAULTS.cacheSize,
       limits: {
         "api:read": RATE_LIMIT_DEFAULTS.readMax,
+        "api:list": RATE_LIMIT_DEFAULTS.listMax,
         "api:image": RATE_LIMIT_DEFAULTS.imageMax,
       },
       windowMs: RATE_LIMIT_DEFAULTS.windowSeconds * 1000,

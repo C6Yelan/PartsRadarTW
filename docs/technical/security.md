@@ -48,7 +48,9 @@
 - `parse_errors.raw_image_url` 只供內部 debug，不公開。
 - 不提供 crawler trigger 或 state-changing public endpoint。
 - 公開 API 使用 bounded in-memory rate limit 作為 app-level abuse guard。
-- `api:read` 預設每 client 每 60 秒 120 次；`api:image` 預設每 client 每 60 秒 600 次。
+- `api:read` 預設每 client 每 60 秒 120 次，涵蓋 categories、source-status 與 product detail。
+- `api:list` 預設每 client 每 60 秒 360 次，涵蓋商品列表查詢，避免正常快速切分類、翻頁或排序時被一般 read 額度誤傷。
+- `api:image` 預設每 client 每 60 秒 360 次，涵蓋商品縮圖 API。
 - client identity 優先使用 Cloudflare `CF-Connecting-IP`，其次 `X-Forwarded-For` 第一個值；不把 IP 寫入公開 response。
 - 超限回 `429`，只包含泛用 `rate_limited` 錯誤與 `Retry-After` / `X-RateLimit-*` headers。
 - 這個 limiter 是單一 web container 內的保底防護；多 replica 不共享狀態，大量流量仍需 Cloudflare WAF / rate limiting 先擋。

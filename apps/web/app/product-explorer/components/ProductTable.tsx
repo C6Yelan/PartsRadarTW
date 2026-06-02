@@ -29,6 +29,13 @@ export function ProductTable({ productListReturnTo, products, productState }: Pr
         </div>
       ) : null}
 
+      {productState === "rate_limited" ? (
+        <div className="empty-state" role="alert">
+          <h2>瀏覽速度過快</h2>
+          <p>請稍等幾秒再繼續切換分類、頁數或排序。</p>
+        </div>
+      ) : null}
+
       {productState === "ready" && products?.data.length === 0 ? (
         <div className="empty-state">
           <h2>找不到相關商品</h2>
