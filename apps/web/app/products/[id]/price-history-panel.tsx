@@ -371,7 +371,7 @@ function HistoryRangeCard({
         <div className="history-range-track" aria-hidden="true">
           <span
             className="history-range-marker"
-            style={{ left: `${summary.rangePositionPercent}%` }}
+            style={{ left: `clamp(5px, ${summary.rangePositionPercent}%, calc(100% - 5px))` }}
           />
         </div>
       </div>

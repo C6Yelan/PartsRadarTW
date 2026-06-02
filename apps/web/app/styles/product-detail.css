@@ -405,6 +405,7 @@
 .history-range-marker {
   position: absolute;
   top: 50%;
+  box-sizing: border-box;
   width: 10px;
   height: 10px;
   border: 2px solid rgba(146, 184, 207, 0.9);
