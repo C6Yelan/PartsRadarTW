@@ -382,6 +382,59 @@ SMOKE_PUBLIC_BASE_URL=https://partsradar.net
 - 第二版先維持 `smoke-daemon` log 型監控，不新增 Discord 管理者告警。
 - Discord 管理者告警、Uptime Kuma、Grafana、公開服務狀態頁或使用者可見告警中心留到第三版再評估。
 
+## Second-Version Public Closeout
+
+若第二版本地驗證已通過，但 public-only smoke 顯示 `/build-list` / `/build-list/print` 為 `HTTP 404`、`source freshness` 失敗或 `product image api` 抽樣 404，依下列順序收斂。所有指令仍假設在部署主機 repo 根目錄執行。
+
+先確認部署主機已 fast-forward 到包含第二版 routes 的目標 commit，並 recreate web stack：
+
+```bash
+git status --short --branch
+git log --oneline -1
+git pull --ff-only origin <deployment-branch>
+git log --oneline -1
+docker compose config
+docker compose up --build --force-recreate storage-init
+docker compose up -d --build --force-recreate
+curl -I http://127.0.0.1:3000/build-list
+curl -I http://127.0.0.1:3000/build-list/print
+```
+
+若本機 route 已是 `HTTP 200`，但公開網域仍是 `HTTP 404`，檢查 `cloudflared` 是否連到目前 compose network 中的 `web:3000`，並重啟 tunnel：
+
+```bash
+docker compose --profile public-tunnel logs --tail=100 cloudflared
+docker compose --profile public-tunnel up -d cloudflared
+curl -I https://partsradar.net/build-list
+curl -I https://partsradar.net/build-list/print
+```
+
+若 `source freshness` 失敗，先確認 scheduled crawler 正常啟動並查看最近 log：
+
+```bash
+docker compose --profile scheduled-crawler up -d crawler-daemon
+docker compose --profile scheduled-crawler ps crawler-daemon
+docker compose --profile scheduled-crawler logs --tail=100 crawler-daemon
+curl -i https://partsradar.net/api/source-status
+```
+
+若需要立即恢復 freshness，且確認沒有其他 live fetch 或 maintenance task 正在持有 external fetch lock，可手動跑一次低速 crawl。不要把此命令做成公開 API 或常駐入口：
+
+```bash
+docker compose --profile manual-crawler run --rm crawler \
+  pnpm manual:crawl-coolpc-once -- --confirm-live-fetch --delay-ms 8000
+```
+
+若 `product image api` 抽樣 404，先依本文件的 [Product Image Cache Backfill](#product-image-cache-backfill) 章節用 `--dry-run` 確認候選，再按分類或全量低速補圖。補圖完成後重跑 public smoke。
+
+最後同時跑 public-only 與部署主機內部 smoke；第二版正式完成前不應留下未解釋的 `FAIL`：
+
+```bash
+pnpm ops:production-smoke -- --public-only --base-url https://partsradar.net
+docker compose --profile scheduled-crawler run --rm smoke-daemon \
+  pnpm ops:production-smoke -- --base-url http://web:3000
+```
+
 ## Raw Snapshot Cleanup
 
 Raw snapshot cleanup 預設只做 dry run。Production 環境應透過 `crawler` container 執行，確保使用 container 內的 `DATABASE_URL`、`SNAPSHOT_STORAGE_DIR` 與 mounted snapshot volume：
