@@ -295,6 +295,7 @@ docker compose --profile manual-crawler run --rm crawler \
 檢查項目：
 
 - 首頁 HTTP 200。
+- 第二版 `/build-list` 與 `/build-list/print` routes 可回應。
 - `/api/source-status` 可回應，且來源成功時間沒有過舊。
 - `/api/products?pageSize=1` 可回應且至少有一筆商品。
 - product list API 回傳可解析的 `X-RateLimit-*` 與 `X-RateLimit-Client-Source` headers。

@@ -426,6 +426,20 @@ async function checkPublicEndpoints(options: ProductionSmokeOptions): Promise<{
       : fail("homepage", homepage.message),
   );
 
+  const buildListPage = await fetchText("/build-list", options);
+  checks.push(
+    buildListPage.ok
+      ? ok("build-list page", `HTTP ${buildListPage.status}`)
+      : fail("build-list page", buildListPage.message),
+  );
+
+  const buildListPrintPage = await fetchText("/build-list/print", options);
+  checks.push(
+    buildListPrintPage.ok
+      ? ok("build-list print page", `HTTP ${buildListPrintPage.status}`)
+      : fail("build-list print page", buildListPrintPage.message),
+  );
+
   const sourceStatus = await fetchJson("/api/source-status", options);
   const sourceStatusBody =
     sourceStatus.ok && isSourceStatusResponse(sourceStatus.body) ? sourceStatus.body : null;

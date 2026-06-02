@@ -157,9 +157,87 @@ describe("production smoke checks", () => {
           message: "clientSource=cf limit=360 remaining=359",
         }),
         expect.objectContaining({
+          name: "build-list page",
+          status: "OK",
+          message: "HTTP 200",
+        }),
+        expect.objectContaining({
+          name: "build-list print page",
+          status: "OK",
+          message: "HTTP 200",
+        }),
+        expect.objectContaining({
           name: "product image api",
           status: "OK",
           message: "checked=1",
+        }),
+      ]),
+    );
+  });
+
+  it("fails when the v2 build list route is not deployed", async () => {
+    const { crawlerCwd, workspaceRoot } = await createWorkspace();
+    const imageDir = join(workspaceRoot, "product-images");
+    await mkdir(imageDir);
+    await writeFile(join(imageDir, "product-1.webp"), "webp");
+    stubHealthyPublicApi({ buildListStatus: 404 });
+    const options = parseProductionSmokeOptions(
+      [],
+      {
+        PRODUCT_IMAGE_STORAGE_DIR: imageDir,
+      },
+      crawlerCwd,
+    );
+    const summary = await runProductionSmoke(
+      createSmokeClient({
+        invalidImageErrorCount: 0,
+        trueParseErrorCount: 0,
+      }),
+      options,
+      new Date("2026-06-02T12:00:00.000Z"),
+    );
+
+    expect(summary.status).toBe("FAIL");
+    expect(summary.checks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "build-list page",
+          status: "FAIL",
+          message: "HTTP 404",
+        }),
+      ]),
+    );
+  });
+
+  it("fails when the v2 build list print route is not deployed", async () => {
+    const { crawlerCwd, workspaceRoot } = await createWorkspace();
+    const imageDir = join(workspaceRoot, "product-images");
+    await mkdir(imageDir);
+    await writeFile(join(imageDir, "product-1.webp"), "webp");
+    stubHealthyPublicApi({ buildListPrintStatus: 404 });
+    const options = parseProductionSmokeOptions(
+      [],
+      {
+        PRODUCT_IMAGE_STORAGE_DIR: imageDir,
+      },
+      crawlerCwd,
+    );
+    const summary = await runProductionSmoke(
+      createSmokeClient({
+        invalidImageErrorCount: 0,
+        trueParseErrorCount: 0,
+      }),
+      options,
+      new Date("2026-06-02T12:00:00.000Z"),
+    );
+
+    expect(summary.status).toBe("FAIL");
+    expect(summary.checks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "build-list print page",
+          status: "FAIL",
+          message: "HTTP 404",
         }),
       ]),
     );
@@ -330,11 +408,15 @@ async function createWorkspace(): Promise<{
 }
 
 function stubHealthyPublicApi({
+  buildListStatus = 200,
+  buildListPrintStatus = 200,
   imageStatus = 200,
   imageStatusByProductId = new Map<string, number>(),
   productCount = 1,
   rateLimitClientSource = "cf",
 }: {
+  buildListStatus?: number;
+  buildListPrintStatus?: number;
   imageStatus?: number;
   imageStatusByProductId?: Map<string, number>;
   productCount?: number;
@@ -347,6 +429,14 @@ function stubHealthyPublicApi({
 
       if (url.pathname === "/") {
         return new Response("<!doctype html>", { status: 200 });
+      }
+
+      if (url.pathname === "/build-list") {
+        return new Response("<!doctype html>", { status: buildListStatus });
+      }
+
+      if (url.pathname === "/build-list/print") {
+        return new Response("<!doctype html>", { status: buildListPrintStatus });
       }
 
       if (url.pathname === "/api/source-status") {
