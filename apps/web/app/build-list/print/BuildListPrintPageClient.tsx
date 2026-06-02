@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { formatBuildListDateTime, formatBuildListPrice } from "../formatting";
 import {
   getBuildListLineSubtotal,
   summarizeBuildList,
@@ -40,7 +41,7 @@ export default function BuildListPrintPageClient() {
             </div>
             <div>
               <dt>總價</dt>
-              <dd>{formatPrice(summary.totalAmount)}</dd>
+              <dd>{formatBuildListPrice(summary.totalAmount)}</dd>
             </div>
           </dl>
         </header>
@@ -83,7 +84,7 @@ export default function BuildListPrintPageClient() {
                   </th>
                   <td>{summary.totalQuantity}</td>
                   <td />
-                  <td>{formatPrice(summary.totalAmount)}</td>
+                  <td>{formatBuildListPrice(summary.totalAmount)}</td>
                   <td />
                 </tr>
               </tfoot>
@@ -118,24 +119,9 @@ function PrintItemRow({ item }: { item: BuildListItem }) {
       <td>{item.category.displayName}</td>
       <td>{item.name}</td>
       <td>{item.quantity}</td>
-      <td>{formatPrice(item.price.amount)}</td>
-      <td>{formatPrice(getBuildListLineSubtotal(item))}</td>
-      <td>{formatDateTime(item.price.lastSeenAt)}</td>
+      <td>{formatBuildListPrice(item.price.amount)}</td>
+      <td>{formatBuildListPrice(getBuildListLineSubtotal(item))}</td>
+      <td>{formatBuildListDateTime(item.price.lastSeenAt)}</td>
     </tr>
   );
-}
-
-function formatPrice(amount: number) {
-  return `NT$ ${new Intl.NumberFormat("zh-TW").format(amount)}`;
-}
-
-function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat("zh-TW", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(new Date(value));
 }

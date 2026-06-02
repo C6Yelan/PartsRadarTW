@@ -1,0 +1,71 @@
+.build-list-nav-link {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: rgba(18, 34, 47, 0.72);
+  color: var(--accent-strong);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.build-list-nav-link strong {
+  display: inline-grid;
+  min-width: 24px;
+  height: 24px;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--accent-surface);
+  color: var(--text-strong);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.build-list-add-button,
+.build-list-detail-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: rgba(18, 34, 47, 0.74);
+  color: var(--accent-strong);
+  font-weight: 800;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease;
+}
+
+.build-list-add-button {
+  min-height: 34px;
+  max-width: 100%;
+  padding: 0 10px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.build-list-add-button:hover,
+.build-list-detail-action:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+  color: var(--text-strong);
+}
+
+.build-list-add-button.is-added,
+.build-list-detail-action {
+  border-color: rgba(120, 216, 149, 0.36);
+  background: rgba(120, 216, 149, 0.1);
+  color: var(--success);
+}
+
+.build-list-detail-action {
+  min-height: 40px;
+  min-width: 120px;
+  padding: 0 14px;
+  font-size: 13px;
+  white-space: nowrap;
+}

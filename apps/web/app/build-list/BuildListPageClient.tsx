@@ -7,6 +7,7 @@ import {
   buildBuildListWorkbook,
   createBuildListExcelFilename,
 } from "./excel";
+import { formatBuildListDateTime, formatBuildListPrice } from "./formatting";
 import {
   BUILD_LIST_MAX_QUANTITY,
   getBuildListLineSubtotal,
@@ -97,7 +98,7 @@ export default function BuildListPageClient() {
                 </div>
                 <div className="build-list-total-row">
                   <dt>總價</dt>
-                  <dd>{formatPrice(summary.totalAmount)}</dd>
+                  <dd>{formatBuildListPrice(summary.totalAmount)}</dd>
                 </div>
               </dl>
 
@@ -145,15 +146,15 @@ function BuildListItemRow({
         <dl className="build-list-item-facts">
           <div>
             <dt>目前價格</dt>
-            <dd>{formatPrice(item.price.amount)}</dd>
+            <dd>{formatBuildListPrice(item.price.amount)}</dd>
           </div>
           <div>
             <dt>價格更新</dt>
-            <dd>{formatDateTime(item.price.lastSeenAt)}</dd>
+            <dd>{formatBuildListDateTime(item.price.lastSeenAt)}</dd>
           </div>
           <div>
             <dt>小計</dt>
-            <dd>{formatPrice(subtotal)}</dd>
+            <dd>{formatBuildListPrice(subtotal)}</dd>
           </div>
         </dl>
         <div className="build-list-links">
@@ -203,19 +204,4 @@ function BuildListItemRow({
       </div>
     </article>
   );
-}
-
-function formatPrice(amount: number) {
-  return `NT$ ${new Intl.NumberFormat("zh-TW").format(amount)}`;
-}
-
-function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat("zh-TW", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(new Date(value));
 }
