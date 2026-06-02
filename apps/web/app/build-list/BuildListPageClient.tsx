@@ -109,6 +109,9 @@ export default function BuildListPageClient() {
                 <button className="control-button primary" type="button" onClick={downloadExcel}>
                   下載 Excel
                 </button>
+                <Link className="control-button secondary" href="/build-list/print">
+                  列印版
+                </Link>
                 <button className="control-button secondary" type="button" onClick={clearItems}>
                   清空配單
                 </button>
