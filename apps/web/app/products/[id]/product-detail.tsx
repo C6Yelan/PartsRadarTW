@@ -28,6 +28,7 @@ interface ProductDetailBody {
     amount: number;
     currency: "TWD";
     capturedAt: string;
+    lastSeenAt: string;
   };
   source: {
     name: "coolpc";
@@ -213,7 +214,7 @@ export default function ProductDetail({
             <dl className="detail-facts">
               <div>
                 <dt>價格資料更新</dt>
-                <dd>{formatDateTime(product.price.capturedAt)}</dd>
+                <dd>{formatDateTime(product.price.lastSeenAt)}</dd>
               </div>
               {!product.status.isActive ? (
                 <div>
