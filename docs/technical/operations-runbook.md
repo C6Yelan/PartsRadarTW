@@ -297,8 +297,10 @@ docker compose --profile manual-crawler run --rm crawler \
 - 首頁 HTTP 200。
 - 第二版 `/build-list` 與 `/build-list/print` routes 可回應。
 - `/api/source-status` 可回應，且來源成功時間沒有過舊。
+- `/api/categories` 包含第二版第一批分類 `IGrp=8`、`IGrp=11`、`IGrp=16`。
 - `/api/products?pageSize=1` 可回應且至少有一筆商品。
 - product list API 回傳可解析的 `X-RateLimit-*` 與 `X-RateLimit-Client-Source` headers。
+- 近 30 天降幅 / 增幅排序 API 可回應，且商品資料含 `priceMovement.rangeDays=30`。
 - 商品詳細 API 可回應。
 - 商品列表抽樣商品的 public product image API 可回應圖片內容。
 - 商品價格歷史 API 可回應。

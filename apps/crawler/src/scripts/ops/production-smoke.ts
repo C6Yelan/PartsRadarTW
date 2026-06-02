@@ -18,6 +18,7 @@ const DEFAULT_BASE_URL = "http://127.0.0.1:3000";
 const DEFAULT_TIMEOUT_MS = 5000;
 const DEFAULT_PRODUCT_IMAGE_STORAGE_DIR = "storage/product-images";
 const DEFAULT_PRODUCT_IMAGE_SAMPLE_SIZE = 5;
+const REQUIRED_V2_CATEGORY_IGRPS = [8, 11, 16] as const;
 const DEFAULT_SOURCE_WARN_AFTER_MINUTES = 60;
 const DEFAULT_SOURCE_FAIL_AFTER_MINUTES = 120;
 const DEFAULT_CRAWLER_WARN_AFTER_MINUTES = 90;
@@ -91,10 +92,21 @@ interface ProductsResponse {
     image?: {
       url?: string;
     };
+    priceMovement?: {
+      rangeDays?: number;
+      deltaAmount?: number | null;
+      deltaPercent?: number | null;
+    };
   }>;
   pagination: {
     totalItems: number;
   };
+}
+
+interface CategoriesResponse {
+  data: Array<{
+    igrp: number;
+  }>;
 }
 
 interface SourceStatusResponse {
@@ -482,6 +494,9 @@ async function checkPublicEndpoints(options: ProductionSmokeOptions): Promise<{
         ),
   );
 
+  const categories = await fetchJson("/api/categories", options);
+  checks.push(checkV2Categories(categories));
+
   const products = await fetchJson(`/api/products?pageSize=${options.productImageSampleSize}`, options);
   const productsBody = products.ok && isProductsResponse(products.body) ? products.body : null;
   const firstProduct = productsBody?.data[0] ?? null;
@@ -492,6 +507,8 @@ async function checkPublicEndpoints(options: ProductionSmokeOptions): Promise<{
       : fail("product list api", products.ok ? "response has no product" : products.message),
   );
   checks.push(checkRateLimitHeaders(products, options));
+  checks.push(await checkPriceMovementSort("price_drop_desc", options));
+  checks.push(await checkPriceMovementSort("price_rise_desc", options));
 
   if (!productId) {
     checks.push(fail("product detail api", "skipped because product list returned no product"));
@@ -526,6 +543,54 @@ async function checkPublicEndpoints(options: ProductionSmokeOptions): Promise<{
     checks,
     sourceStatus: sourceStatusBody,
   };
+}
+
+function checkV2Categories(
+  categoriesResult: Awaited<ReturnType<typeof fetchJson>>,
+): SmokeCheckResult {
+  if (!categoriesResult.ok) {
+    return fail("v2 categories api", categoriesResult.message);
+  }
+
+  if (!isCategoriesResponse(categoriesResult.body)) {
+    return fail("v2 categories api", "response shape is invalid");
+  }
+
+  const igrps = new Set(categoriesResult.body.data.map((category) => category.igrp));
+  const missingIgrps = REQUIRED_V2_CATEGORY_IGRPS.filter((igrp) => !igrps.has(igrp));
+
+  if (missingIgrps.length > 0) {
+    return fail("v2 categories api", `missing IGrp=${missingIgrps.join(",")}`);
+  }
+
+  return ok("v2 categories api", `required IGrp=${REQUIRED_V2_CATEGORY_IGRPS.join(",")}`);
+}
+
+async function checkPriceMovementSort(
+  sort: "price_drop_desc" | "price_rise_desc",
+  options: ProductionSmokeOptions,
+): Promise<SmokeCheckResult> {
+  const result = await fetchJson(`/api/products?sort=${sort}&pageSize=1`, options);
+
+  if (!result.ok) {
+    return fail(`price movement sort ${sort}`, result.message);
+  }
+
+  if (!isProductsResponse(result.body)) {
+    return fail(`price movement sort ${sort}`, "response shape is invalid");
+  }
+
+  const firstProduct = result.body.data[0] ?? null;
+
+  if (!firstProduct) {
+    return fail(`price movement sort ${sort}`, "response has no product");
+  }
+
+  if (!isV2PriceMovement(firstProduct.priceMovement)) {
+    return fail(`price movement sort ${sort}`, "missing 30-day priceMovement data");
+  }
+
+  return ok(`price movement sort ${sort}`, `rangeDays=${firstProduct.priceMovement.rangeDays}`);
 }
 
 async function checkProductImageEndpoints(
@@ -1200,12 +1265,33 @@ function isProductsResponse(value: unknown): value is ProductsResponse {
   );
 }
 
+function isCategoriesResponse(value: unknown): value is CategoriesResponse {
+  return (
+    isRecord(value) &&
+    Array.isArray(value.data) &&
+    value.data.every((category) => isRecord(category) && typeof category.igrp === "number")
+  );
+}
+
 function isProductDetailResponse(value: unknown): value is ProductDetailResponse {
   return isRecord(value) && typeof value.id === "string";
 }
 
 function isPriceHistoryResponse(value: unknown): value is PriceHistoryResponse {
   return isRecord(value) && Array.isArray(value.points);
+}
+
+function isV2PriceMovement(value: unknown): value is {
+  rangeDays: 30;
+  deltaAmount: number | null;
+  deltaPercent: number | null;
+} {
+  return (
+    isRecord(value) &&
+    value.rangeDays === 30 &&
+    (typeof value.deltaAmount === "number" || value.deltaAmount === null) &&
+    (typeof value.deltaPercent === "number" || value.deltaPercent === null)
+  );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

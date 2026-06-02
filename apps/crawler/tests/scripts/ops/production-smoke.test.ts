@@ -143,6 +143,21 @@ describe("production smoke checks", () => {
           message: "HTTP 200",
         }),
         expect.objectContaining({
+          name: "v2 categories api",
+          status: "OK",
+          message: "required IGrp=8,11,16",
+        }),
+        expect.objectContaining({
+          name: "price movement sort price_drop_desc",
+          status: "OK",
+          message: "rangeDays=30",
+        }),
+        expect.objectContaining({
+          name: "price movement sort price_rise_desc",
+          status: "OK",
+          message: "rangeDays=30",
+        }),
+        expect.objectContaining({
           name: "product image api",
           status: "OK",
           message: "checked=2",
@@ -179,6 +194,53 @@ describe("production smoke checks", () => {
           name: "build-list page",
           status: "FAIL",
           message: "HTTP 404",
+        }),
+      ]),
+    );
+  });
+
+  it("fails public-only checks when the v2 category expansion is missing", async () => {
+    const { crawlerCwd } = await createWorkspace();
+    stubHealthyPublicApi({ categoryIgrps: [4, 5, 6, 7, 10, 12, 14, 15] });
+    const options = parseProductionSmokeOptions(["--public-only"], {}, crawlerCwd);
+    const summary = await runProductionPublicSmoke(
+      options,
+      new Date("2026-06-02T12:00:00.000Z"),
+    );
+
+    expect(summary.status).toBe("FAIL");
+    expect(summary.checks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "v2 categories api",
+          status: "FAIL",
+          message: "missing IGrp=8,11,16",
+        }),
+      ]),
+    );
+  });
+
+  it("fails public-only checks when price movement sort omits v2 movement data", async () => {
+    const { crawlerCwd } = await createWorkspace();
+    stubHealthyPublicApi({ includePriceMovement: false });
+    const options = parseProductionSmokeOptions(["--public-only"], {}, crawlerCwd);
+    const summary = await runProductionPublicSmoke(
+      options,
+      new Date("2026-06-02T12:00:00.000Z"),
+    );
+
+    expect(summary.status).toBe("FAIL");
+    expect(summary.checks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "price movement sort price_drop_desc",
+          status: "FAIL",
+          message: "missing 30-day priceMovement data",
+        }),
+        expect.objectContaining({
+          name: "price movement sort price_rise_desc",
+          status: "FAIL",
+          message: "missing 30-day priceMovement data",
         }),
       ]),
     );
@@ -233,6 +295,21 @@ describe("production smoke checks", () => {
           name: "build-list print page",
           status: "OK",
           message: "HTTP 200",
+        }),
+        expect.objectContaining({
+          name: "v2 categories api",
+          status: "OK",
+          message: "required IGrp=8,11,16",
+        }),
+        expect.objectContaining({
+          name: "price movement sort price_drop_desc",
+          status: "OK",
+          message: "rangeDays=30",
+        }),
+        expect.objectContaining({
+          name: "price movement sort price_rise_desc",
+          status: "OK",
+          message: "rangeDays=30",
         }),
         expect.objectContaining({
           name: "product image api",
@@ -478,6 +555,8 @@ async function createWorkspace(): Promise<{
 function stubHealthyPublicApi({
   buildListStatus = 200,
   buildListPrintStatus = 200,
+  categoryIgrps = [4, 5, 6, 7, 8, 10, 11, 12, 14, 15, 16],
+  includePriceMovement = true,
   imageStatus = 200,
   imageStatusByProductId = new Map<string, number>(),
   productCount = 1,
@@ -485,6 +564,8 @@ function stubHealthyPublicApi({
 }: {
   buildListStatus?: number;
   buildListPrintStatus?: number;
+  categoryIgrps?: number[];
+  includePriceMovement?: boolean;
   imageStatus?: number;
   imageStatusByProductId?: Map<string, number>;
   productCount?: number;
@@ -514,6 +595,12 @@ function stubHealthyPublicApi({
         });
       }
 
+      if (url.pathname === "/api/categories") {
+        return Response.json({
+          data: categoryIgrps.map((igrp) => ({ igrp })),
+        });
+      }
+
       if (url.pathname === "/api/products") {
         return Response.json(
           {
@@ -525,6 +612,15 @@ function stubHealthyPublicApi({
                 image: {
                   url: `/api/product-images/${id}.webp`,
                 },
+                ...(includePriceMovement
+                  ? {
+                      priceMovement: {
+                        rangeDays: 30,
+                        deltaAmount: null,
+                        deltaPercent: null,
+                      },
+                    }
+                  : {}),
               };
             }),
             pagination: { totalItems: 1 },

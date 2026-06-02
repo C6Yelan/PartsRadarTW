@@ -82,7 +82,7 @@ Query：
 | `minPrice` | number | 無 | 整數 TWD |
 | `maxPrice` | number | 無 | 整數 TWD |
 | `status` | string | `active` | `active`、`inactive`、`all` |
-| `sort` | string | `price_asc` | `price_asc`、`price_desc`、`name_asc` |
+| `sort` | string | `price_asc` | `price_asc`、`price_desc`、`price_drop_desc`、`price_rise_desc`、`name_asc` |
 | `page` | number | `1` | 從 1 開始 |
 | `pageSize` | number | `24` | 上限 `100` |
 
@@ -94,6 +94,7 @@ Response shape：
   - `category`
   - `image`
   - `price`
+  - `priceMovement`
   - `source`
   - `status`
 - `pagination`
@@ -108,6 +109,8 @@ Response shape：
 - `q` 以空白切詞，每個詞都需命中名稱、normalized name 或 vendor 欄位。
 - `vendors` 只接受目前分類可用的 `products.vendor_slug`。
 - 價格篩選只看目前價格。
+- `priceMovement` 固定描述近 30 天價格變動；資料不足或沒有變動基準時 `deltaAmount` / `deltaPercent` 為 `null`。
+- `price_drop_desc` 與 `price_rise_desc` 依近 30 天變動排序，仍只回 read-only API 處理後的公開欄位。
 - `source.url` 不包含 `PHPSESSID`。
 - 列表來源連結可指向分類頁；詳細頁購買導流需指向 `evaluate.php?iBuy=...`。
 - `image.url` 使用 `/api/product-images/{productId}.webp`。
