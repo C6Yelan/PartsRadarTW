@@ -288,6 +288,76 @@ docker compose --profile manual-crawler run --rm crawler \
   pnpm ops:maintenance-daemon -- --dry-run --run-once --initial-delay-seconds 0
 ```
 
+## Production Smoke Daemon
+
+`smoke-daemon` 是第二版第一輪內部營運監控。它不抓原價屋資料、不寫入商品資料，也不公開內部監控頁；只定期檢查網站、API、crawler 資料流與本機維運狀態，並把結果輸出到 container log。
+
+檢查項目：
+
+- 首頁 HTTP 200。
+- `/api/source-status` 可回應，且來源成功時間沒有過舊。
+- `/api/products?pageSize=1` 可回應且至少有一筆商品。
+- 商品詳細 API 可回應。
+- 商品價格歷史 API 可回應。
+- 最新 successful scheduled crawler run 沒有過舊。
+- 近 24 小時 suspected block / parse error 沒有異常。
+- display-ready active 商品數沒有低於門檻。
+- active 商品缺圖數沒有超過門檻。
+- active 商品 link health 的 broken / temporary error 數沒有超過門檻。
+- raw snapshot metadata 沒有明顯超過 retention grace。
+
+啟動：
+
+```bash
+docker compose --profile scheduled-crawler up -d smoke-daemon
+docker compose --profile scheduled-crawler ps smoke-daemon
+```
+
+查看 log：
+
+```bash
+docker compose --profile scheduled-crawler logs --tail=100 smoke-daemon
+docker compose --profile scheduled-crawler logs -f smoke-daemon
+```
+
+單次驗證：
+
+```bash
+docker compose --profile scheduled-crawler run --rm smoke-daemon \
+  pnpm ops:production-smoke -- --base-url http://web:3000
+```
+
+若要確認 public tunnel / public domain，而不是只檢查 Compose internal network，可在部署機 `.env` 設定：
+
+```dotenv
+SMOKE_PUBLIC_BASE_URL=https://partsradar.net
+```
+
+結果判讀：
+
+- `OK`：該項目前正常。
+- `WARN`：服務仍可用，但資料流或維運狀態需要觀察，例如來源成功時間偏舊、近期有 suspected block、缺圖或壞連結超過警戒值。
+- `FAIL`：服務或資料流有明確失敗，例如 HTTP/API 掛掉、沒有 successful scheduled crawl、最新 crawler 疑似被擋、來源成功時間超過 fail 門檻。
+
+常用設定：
+
+- `SMOKE_INTERVAL_SECONDS`：daemon 檢查間隔，預設 300。
+- `SMOKE_INITIAL_DELAY_SECONDS`：daemon 啟動後第一次檢查前的延遲，預設 60。
+- `SMOKE_TIMEOUT_MS`：HTTP request timeout，預設 5000。
+- `SMOKE_SOURCE_WARN_AFTER_MINUTES` / `SMOKE_SOURCE_FAIL_AFTER_MINUTES`：來源成功時間門檻，預設 60 / 120。
+- `SMOKE_CRAWLER_WARN_AFTER_MINUTES` / `SMOKE_CRAWLER_FAIL_AFTER_MINUTES`：successful scheduled crawler run 門檻，預設 90 / 180。
+- `SMOKE_RECENT_WINDOW_HOURS`：suspected block / parse error 統計窗口，預設 24。
+- `SMOKE_PARSE_ERROR_WARN_COUNT` / `SMOKE_PARSE_ERROR_FAIL_COUNT`：parse error 門檻，預設 20 / 100。
+- `SMOKE_MISSING_IMAGE_WARN_COUNT` / `SMOKE_MISSING_IMAGE_FAIL_COUNT`：缺圖門檻，預設 200 / 500。
+- `SMOKE_BROKEN_LINK_WARN_COUNT` / `SMOKE_BROKEN_LINK_FAIL_COUNT`：broken link health 門檻，預設 1 / 50。
+- `SMOKE_TEMPORARY_LINK_WARN_COUNT` / `SMOKE_TEMPORARY_LINK_FAIL_COUNT`：temporary link error 門檻，預設 100 / 500。
+
+注意事項：
+
+- `smoke-daemon` 的 log 可以作為第一輪內部監控呈現，不應直接公開給使用者。
+- 這不是使用者通知功能，也不建立帳號、watchlist 或價格提醒。
+- 若未來要接 Discord webhook、ntfy 或 Uptime Kuma push monitor，應從 `OK/WARN/FAIL` summary 接出，不要讓告警包含 `.env`、DB URL、token 或 raw internal error。
+
 ## Raw Snapshot Cleanup
 
 Raw snapshot cleanup 預設只做 dry run。Production 環境應透過 `crawler` container 執行，確保使用 container 內的 `DATABASE_URL`、`SNAPSHOT_STORAGE_DIR` 與 mounted snapshot volume：

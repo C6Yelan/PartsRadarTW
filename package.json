@@ -16,6 +16,8 @@
     "ops:image-cache:backfill": "pnpm --filter @partsradar/crawler ops:image-cache:backfill",
     "ops:maintenance-daemon": "pnpm --filter @partsradar/crawler ops:maintenance-daemon",
     "ops:product-links:check": "pnpm --filter @partsradar/crawler ops:product-links:check",
+    "ops:production-smoke": "pnpm --filter @partsradar/crawler ops:production-smoke",
+    "ops:production-smoke-daemon": "pnpm --filter @partsradar/crawler ops:production-smoke-daemon",
     "ops:product-vendors:backfill": "pnpm --filter @partsradar/crawler ops:product-vendors:backfill",
     "ops:raw-snapshots:cleanup": "pnpm --filter @partsradar/crawler ops:raw-snapshots:cleanup",
     "ops:raw-snapshots:cleanup-daemon": "pnpm --filter @partsradar/crawler ops:raw-snapshots:cleanup-daemon",

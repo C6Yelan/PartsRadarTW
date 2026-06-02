@@ -8,6 +8,8 @@
     "ops:image-cache:backfill": "tsx src/scripts/ops/backfill-product-images.ts",
     "ops:maintenance-daemon": "tsx src/scripts/ops/maintenance-daemon.ts",
     "ops:product-links:check": "tsx src/scripts/ops/check-product-links.ts",
+    "ops:production-smoke": "tsx src/scripts/ops/production-smoke.ts",
+    "ops:production-smoke-daemon": "tsx src/scripts/ops/production-smoke-daemon.ts",
     "ops:product-vendors:backfill": "tsx src/scripts/ops/backfill-product-vendors.ts",
     "ops:raw-snapshots:cleanup": "tsx src/scripts/ops/cleanup-raw-snapshots.ts",
     "ops:raw-snapshots:cleanup-daemon": "tsx src/scripts/ops/cleanup-raw-snapshots-daemon.ts",
