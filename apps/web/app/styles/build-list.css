@@ -317,6 +317,16 @@
   line-height: 1.7;
 }
 
+.build-list-summary-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.build-list-summary-actions .control-button {
+  width: 100%;
+}
+
 @media (max-width: 900px) {
   .build-list-topbar,
   .build-list-layout {

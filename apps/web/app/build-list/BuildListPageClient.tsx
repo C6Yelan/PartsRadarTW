@@ -3,6 +3,11 @@
 import Link from "next/link";
 import SiteDisclaimer from "../site-disclaimer";
 import {
+  BUILD_LIST_EXCEL_MIME_TYPE,
+  buildBuildListWorkbook,
+  createBuildListExcelFilename,
+} from "./excel";
+import {
   BUILD_LIST_MAX_QUANTITY,
   getBuildListLineSubtotal,
   type BuildListItem,
@@ -11,6 +16,21 @@ import { useBuildList } from "./use-build-list";
 
 export default function BuildListPageClient() {
   const { clearItems, isReady, items, removeItem, summary, updateQuantity } = useBuildList();
+
+  function downloadExcel() {
+    const workbookBytes = buildBuildListWorkbook(items);
+    const workbookBuffer = new ArrayBuffer(workbookBytes.byteLength);
+    new Uint8Array(workbookBuffer).set(workbookBytes);
+    const workbookBlob = new Blob([workbookBuffer], {
+      type: BUILD_LIST_EXCEL_MIME_TYPE,
+    });
+    const downloadUrl = URL.createObjectURL(workbookBlob);
+    const downloadLink = document.createElement("a");
+    downloadLink.href = downloadUrl;
+    downloadLink.download = createBuildListExcelFilename();
+    downloadLink.click();
+    window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 0);
+  }
 
   return (
     <div className="app-shell build-list-shell">
@@ -85,9 +105,14 @@ export default function BuildListPageClient() {
                 價格以網站最後收錄資料為準；實際商品資訊、價格、庫存、購買與售後仍以原價屋來源頁為準。
               </p>
 
-              <button className="control-button secondary" type="button" onClick={clearItems}>
-                清空配單
-              </button>
+              <div className="build-list-summary-actions">
+                <button className="control-button primary" type="button" onClick={downloadExcel}>
+                  下載 Excel
+                </button>
+                <button className="control-button secondary" type="button" onClick={clearItems}>
+                  清空配單
+                </button>
+              </div>
             </aside>
           </section>
         ) : null}
