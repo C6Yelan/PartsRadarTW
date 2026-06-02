@@ -205,6 +205,7 @@
 - 已完成 Excel 直接匯出，內容包含分類、商品名稱、數量、目前價格、小計、價格更新時間、原價屋查看 / 購買網址、產品介紹網址、備註欄與總價。
 - 已完成 `/build-list/print` 可列印版面；第二版不做一鍵 PDF 下載。
 - 2026-06-03 本地 Playwright MCP 已驗證桌機與手機使用者流程：首頁加入配單、商品詳情頁加入配單、`localStorage` 保存、reload 後數量保留、數量調整、移除、清空、Excel artifact 內容、列印頁 PDF artifact 與無水平溢出。
+- 已新增 repo path comment policy test，讓 `apps/` 與 `packages/` 下 `.ts`、`.tsx`、`.css` 的 repo-relative path comment 規則可重跑驗證，並排除 generated / fixture / build output 檔案。
 
 完成條件：
 
