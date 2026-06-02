@@ -301,6 +301,7 @@ docker compose --profile manual-crawler run --rm crawler \
 - 商品價格歷史 API 可回應。
 - 最新 successful scheduled crawler run 沒有過舊。
 - 近 24 小時 suspected block / 真正 parser failure 沒有異常；`INVALID_IMAGE_URL` 會另列為 source image anomaly。
+- source image anomaly 是第三方來源圖片 URL 品質訊號，低於門檻只視為 OK/info，超過門檻才 WARN，不直接 FAIL。
 - display-ready active 商品數沒有低於門檻。
 - active 商品缺圖數沒有超過門檻。
 - active 商品 link health 的 broken / temporary error 數沒有超過門檻。
@@ -348,6 +349,7 @@ SMOKE_PUBLIC_BASE_URL=https://partsradar.net
 - `SMOKE_CRAWLER_WARN_AFTER_MINUTES` / `SMOKE_CRAWLER_FAIL_AFTER_MINUTES`：successful scheduled crawler run 門檻，預設 90 / 180。
 - `SMOKE_RECENT_WINDOW_HOURS`：suspected block / parse error 統計窗口，預設 24。
 - `SMOKE_PARSE_ERROR_WARN_COUNT` / `SMOKE_PARSE_ERROR_FAIL_COUNT`：parse error 門檻，預設 20 / 100。
+- `SMOKE_INVALID_IMAGE_URL_WARN_COUNT`：source image anomaly WARN 門檻，預設 2000；真正使用者可見影響仍由 active products / missing product images 判斷。
 - `SMOKE_MISSING_IMAGE_WARN_COUNT` / `SMOKE_MISSING_IMAGE_FAIL_COUNT`：缺圖門檻，預設 200 / 500。
 - `SMOKE_BROKEN_LINK_WARN_COUNT` / `SMOKE_BROKEN_LINK_FAIL_COUNT`：broken link health 門檻，預設 1 / 50。
 - `SMOKE_TEMPORARY_LINK_WARN_COUNT` / `SMOKE_TEMPORARY_LINK_FAIL_COUNT`：temporary link error 門檻，預設 100 / 500。

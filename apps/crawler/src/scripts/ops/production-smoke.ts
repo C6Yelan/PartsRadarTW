@@ -22,6 +22,7 @@ const DEFAULT_CRAWLER_FAIL_AFTER_MINUTES = 180;
 const DEFAULT_RECENT_WINDOW_HOURS = 24;
 const DEFAULT_PARSE_ERROR_WARN_COUNT = 20;
 const DEFAULT_PARSE_ERROR_FAIL_COUNT = 100;
+const DEFAULT_INVALID_IMAGE_URL_WARN_COUNT = 2000;
 const DEFAULT_MIN_ACTIVE_PRODUCTS = 1;
 const DEFAULT_MISSING_IMAGE_WARN_COUNT = 200;
 const DEFAULT_MISSING_IMAGE_FAIL_COUNT = 500;
@@ -52,6 +53,7 @@ export interface ProductionSmokeOptions {
   recentWindowHours: number;
   parseErrorWarnCount: number;
   parseErrorFailCount: number;
+  invalidImageUrlWarnCount: number;
   minActiveProducts: number;
   missingImageWarnCount: number;
   missingImageFailCount: number;
@@ -198,6 +200,18 @@ export function parseProductionSmokeOptions(
       fallback: DEFAULT_PARSE_ERROR_FAIL_COUNT,
       min: 0,
       max: 100000,
+    }),
+    invalidImageUrlWarnCount: parseIntegerOption({
+      args,
+      env,
+      argName: "--invalid-image-url-warn-count",
+      envName: "SMOKE_INVALID_IMAGE_URL_WARN_COUNT",
+      // Normal production baseline is roughly 624 invalid source image URLs
+      // per 24h. Warn at a little over 3x that baseline so fixed third-party
+      // source noise stays informational while spikes remain visible.
+      fallback: DEFAULT_INVALID_IMAGE_URL_WARN_COUNT,
+      min: 0,
+      max: 1000000,
     }),
     minActiveProducts: parseIntegerOption({
       args,
@@ -597,9 +611,9 @@ async function checkSourceImageAnomalies(
       },
     },
   });
-  const message = `${count} invalid image URL issue(s) in ${options.recentWindowHours}h`;
+  const message = `${count} invalid image URL issue(s) in ${options.recentWindowHours}h, warnAfter=${options.invalidImageUrlWarnCount}`;
 
-  return count > 0
+  return count > options.invalidImageUrlWarnCount
     ? warn("source image anomalies", message)
     : ok("source image anomalies", message);
 }
@@ -1030,6 +1044,8 @@ Options:
   --crawler-warn-after-minutes <minutes>   Warn when latest successful crawler run is older than this.
   --crawler-fail-after-minutes <minutes>   Fail when latest successful crawler run is older than this.
   --recent-window-hours <hours>            Window for suspected block and parse error checks.
+  --invalid-image-url-warn-count <count>   Warn only when source image URL anomalies exceed this.
+                                           Default: ${DEFAULT_INVALID_IMAGE_URL_WARN_COUNT}
   --help                                   Show this help message.
 `);
 }

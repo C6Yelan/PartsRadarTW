@@ -28,6 +28,7 @@ describe("production smoke options", () => {
       recentWindowHours: 24,
       parseErrorWarnCount: 20,
       parseErrorFailCount: 100,
+      invalidImageUrlWarnCount: 2000,
       minActiveProducts: 1,
       missingImageWarnCount: 200,
       missingImageFailCount: 500,
@@ -55,6 +56,7 @@ describe("production smoke options", () => {
         SMOKE_PRODUCT_IMAGE_STORAGE_DIR: "ignored",
         PRODUCT_IMAGE_STORAGE_DIR: "custom-images",
         SMOKE_CRAWLER_FAIL_AFTER_MINUTES: "240",
+        SMOKE_INVALID_IMAGE_URL_WARN_COUNT: "3000",
       },
       crawlerCwd,
     );
@@ -64,7 +66,21 @@ describe("production smoke options", () => {
     expect(options.sourceWarnAfterMinutes).toBe(45);
     expect(options.crawlerFailAfterMinutes).toBe(240);
     expect(options.missingImageWarnCount).toBe(10);
+    expect(options.invalidImageUrlWarnCount).toBe(3000);
     expect(options.productImageStorageDir).toBe(join(workspaceRoot, "custom-images"));
+  });
+
+  it("accepts a CLI source image anomaly threshold override", async () => {
+    const { crawlerCwd } = await createWorkspace();
+    const options = parseProductionSmokeOptions(
+      ["--invalid-image-url-warn-count", "1500"],
+      {
+        SMOKE_INVALID_IMAGE_URL_WARN_COUNT: "3000",
+      },
+      crawlerCwd,
+    );
+
+    expect(options.invalidImageUrlWarnCount).toBe(1500);
   });
 
   it("rejects invalid URLs and invalid integer ranges", async () => {
@@ -95,7 +111,7 @@ describe("production smoke daemon options", () => {
 });
 
 describe("production smoke checks", () => {
-  it("keeps invalid image URL parse issues out of the fatal parse error count", async () => {
+  it("keeps invalid image URL issues informational below the anomaly threshold", async () => {
     const { crawlerCwd, workspaceRoot } = await createWorkspace();
     const imageDir = join(workspaceRoot, "product-images");
     await mkdir(imageDir);
@@ -110,7 +126,46 @@ describe("production smoke checks", () => {
     );
     const summary = await runProductionSmoke(
       createSmokeClient({
-        invalidImageErrorCount: 4053,
+        invalidImageErrorCount: 624,
+        trueParseErrorCount: 0,
+      }),
+      options,
+      new Date("2026-06-02T12:00:00.000Z"),
+    );
+
+    expect(summary.status).toBe("OK");
+    expect(summary.checks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "recent parse errors",
+          status: "OK",
+          message: "0 parse error(s) in 24h",
+        }),
+        expect.objectContaining({
+          name: "source image anomalies",
+          status: "OK",
+          message: "624 invalid image URL issue(s) in 24h, warnAfter=2000",
+        }),
+      ]),
+    );
+  });
+
+  it("warns when invalid image URL issues exceed the anomaly threshold", async () => {
+    const { crawlerCwd, workspaceRoot } = await createWorkspace();
+    const imageDir = join(workspaceRoot, "product-images");
+    await mkdir(imageDir);
+    await writeFile(join(imageDir, "product-1.webp"), "webp");
+    stubHealthyPublicApi();
+    const options = parseProductionSmokeOptions(
+      ["--invalid-image-url-warn-count", "2000"],
+      {
+        PRODUCT_IMAGE_STORAGE_DIR: imageDir,
+      },
+      crawlerCwd,
+    );
+    const summary = await runProductionSmoke(
+      createSmokeClient({
+        invalidImageErrorCount: 2001,
         trueParseErrorCount: 0,
       }),
       options,
@@ -128,7 +183,7 @@ describe("production smoke checks", () => {
         expect.objectContaining({
           name: "source image anomalies",
           status: "WARN",
-          message: "4053 invalid image URL issue(s) in 24h",
+          message: "2001 invalid image URL issue(s) in 24h, warnAfter=2000",
         }),
       ]),
     );
@@ -167,7 +222,7 @@ describe("production smoke checks", () => {
         expect.objectContaining({
           name: "source image anomalies",
           status: "OK",
-          message: "0 invalid image URL issue(s) in 24h",
+          message: "0 invalid image URL issue(s) in 24h, warnAfter=2000",
         }),
       ]),
     );
