@@ -42,6 +42,19 @@
 
 ## 第二版範圍
 
+## 公開驗收狀態
+
+第二版功能目前以本地實作與測試為主，尚未完成公開站驗收。2026-06-03 的 `--public-only` smoke 顯示：
+
+- 第二版第一批分類 `IGrp=8`、`IGrp=11`、`IGrp=16` 已出現在公開 API。
+- 近 30 天降幅 / 增幅排序 API 已可在公開站回應。
+- 公開 product list API 已回傳可解析的 rate-limit headers，且 client source 為 `cf`。
+- `/build-list` 與 `/build-list/print` 在公開站仍回 `HTTP 404`，表示包含配單 routes 的版本尚未完成公開部署。
+- 抽樣 product image API 仍有 `HTTP 404`，需要部署主機的 image cache backfill / maintenance 補齊後重驗。
+- source freshness 已超過 fail 門檻，部署主機 scheduled crawler / source-status 需要恢復到 smoke 可接受狀態。
+
+第二版正式完成前，公開站需至少通過 `pnpm ops:production-smoke -- --public-only --base-url https://partsradar.net`，且部署主機上的 `smoke-daemon` 需能觀察 crawler freshness、product image cache、link health 與 raw snapshot retention 沒有未解釋的 `FAIL`。
+
 ### 1. 價格歷史
 
 目標：讓商品詳細頁可以呈現價格走勢。
