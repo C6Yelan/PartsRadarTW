@@ -416,6 +416,31 @@ docker compose --profile scheduled-crawler up -d raw-snapshot-cleanup-daemon
 docker compose --profile manual-crawler run --rm crawler pnpm ops:image-cache:backfill -- --dry-run --limit 20
 ```
 
+若 public smoke 的 `product image api` 失敗，且失敗商品集中在第二版新增分類，先用分類限縮補圖，避免一開始就全量抓取。第二版第一批新增分類是 `IGrp=8`、`IGrp=11`、`IGrp=16`：
+
+```bash
+docker compose --profile manual-crawler run --rm crawler pnpm ops:image-cache:backfill -- --dry-run --igrp 16 --limit 20
+docker compose --profile manual-crawler run --rm crawler pnpm ops:image-cache:backfill -- --dry-run --igrp 11 --limit 20
+docker compose --profile manual-crawler run --rm crawler pnpm ops:image-cache:backfill -- --dry-run --igrp 8 --limit 20
+```
+
+確認候選與 storage path 正常後，再用低速 live fetch 分類補跑。每次只跑一個分類，確認 tmux session 結束與 log summary 後，再換下一個分類，避免同時對來源站送出多批 image requests：
+
+```bash
+mkdir -p logs/deployment
+tmux new-session -d -s product-image-backfill-igrp16 -c "$PWD" 'docker compose --profile manual-crawler run --rm crawler pnpm ops:image-cache:backfill -- --confirm-live-fetch --igrp 16 --min-delay-ms 5000 --max-delay-ms 12000 2>&1 | tee logs/deployment/product-image-backfill-igrp16.log'
+tmux ls
+```
+
+`IGrp=16` 完成後，將 session name、`--igrp` 與 log filename 改成 `11` 或 `8` 再重跑。
+
+每個分類完成後，重跑 public smoke 或至少抽查列表圖片 API；`product image api` 不應再是 `HTTP 404`：
+
+```bash
+docker compose --profile scheduled-crawler run --rm smoke-daemon \
+  pnpm ops:production-smoke -- --base-url https://partsradar.net
+```
+
 全量 backfill 應用 `tmux` 放背景慢慢跑，避免 SSH 中斷造成流程停止：
 
 ```bash
