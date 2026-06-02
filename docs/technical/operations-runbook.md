@@ -299,7 +299,7 @@ docker compose --profile manual-crawler run --rm crawler \
 - `/api/products?pageSize=1` 可回應且至少有一筆商品。
 - product list API 回傳可解析的 `X-RateLimit-*` 與 `X-RateLimit-Client-Source` headers。
 - 商品詳細 API 可回應。
-- 商品列表第一筆商品的 public product image API 可回應圖片內容。
+- 商品列表抽樣商品的 public product image API 可回應圖片內容。
 - 商品價格歷史 API 可回應。
 - 最新 successful scheduled crawler run 沒有過舊。
 - 近 24 小時 suspected block / 真正 parser failure 沒有異常；`INVALID_IMAGE_URL` 會另列為 source image anomaly。
