@@ -207,6 +207,7 @@
 目前狀態：
 
 - 已完成第一輪：production smoke command 與 `smoke-daemon`，目前以 container log 呈現 `OK` / `WARN` / `FAIL`。
+- 已完成第二輪：production smoke 會直接檢查 product list 第一筆商品的 public product image API，避免 DB 已有 `primary_image_url` 但 mounted image cache 缺檔時只靠較寬鬆的缺圖總數門檻才被發現。
 - 第二版先維持 log 型監控，不新增告警通道。
 
 不列入第二版：

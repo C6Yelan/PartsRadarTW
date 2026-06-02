@@ -82,7 +82,12 @@ export interface ProductionSmokeSummary {
 }
 
 interface ProductsResponse {
-  data: Array<{ id: string }>;
+  data: Array<{
+    id: string;
+    image?: {
+      url?: string;
+    };
+  }>;
   pagination: {
     totalItems: number;
   };
@@ -424,7 +429,9 @@ async function checkPublicEndpoints(options: ProductionSmokeOptions): Promise<{
 
   const products = await fetchJson("/api/products?pageSize=1", options);
   const productsBody = products.ok && isProductsResponse(products.body) ? products.body : null;
-  const productId = productsBody?.data[0]?.id ?? null;
+  const firstProduct = productsBody?.data[0] ?? null;
+  const productId = firstProduct?.id ?? null;
+  const productImagePath = typeof firstProduct?.image?.url === "string" ? firstProduct.image.url : null;
   checks.push(
     products.ok && productsBody && productId
       ? ok("product list api", `totalItems=${productsBody.pagination.totalItems}`)
@@ -434,6 +441,7 @@ async function checkPublicEndpoints(options: ProductionSmokeOptions): Promise<{
 
   if (!productId) {
     checks.push(fail("product detail api", "skipped because product list returned no product"));
+    checks.push(fail("product image api", "skipped because product list returned no product"));
     checks.push(fail("price-history api", "skipped because product list returned no product"));
 
     return {
@@ -451,6 +459,8 @@ async function checkPublicEndpoints(options: ProductionSmokeOptions): Promise<{
       : fail("product detail api", productDetail.ok ? "response shape is invalid" : productDetail.message),
   );
 
+  checks.push(await checkProductImageEndpoint(productImagePath, options));
+
   const priceHistory = await fetchJson(`/api/products/${productId}/price-history?range=90d`, options);
   checks.push(
     priceHistory.ok && isPriceHistoryResponse(priceHistory.body)
@@ -462,6 +472,27 @@ async function checkPublicEndpoints(options: ProductionSmokeOptions): Promise<{
     checks,
     sourceStatus: sourceStatusBody,
   };
+}
+
+async function checkProductImageEndpoint(
+  imagePath: string | null,
+  options: ProductionSmokeOptions,
+): Promise<SmokeCheckResult> {
+  if (!imagePath?.startsWith("/api/product-images/")) {
+    return fail("product image api", "product list response did not include a public product image path");
+  }
+
+  const result = await fetchWithTimeout(imagePath, options);
+
+  if (!result.ok) {
+    return fail("product image api", result.message);
+  }
+
+  const contentType = result.response.headers.get("content-type") ?? "unknown";
+
+  return contentType.toLowerCase().startsWith("image/")
+    ? ok("product image api", `HTTP ${result.response.status} contentType=${contentType}`)
+    : fail("product image api", `unexpected contentType=${contentType}`);
 }
 
 async function checkSourceFreshness(

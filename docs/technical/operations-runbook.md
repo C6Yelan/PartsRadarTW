@@ -299,6 +299,7 @@ docker compose --profile manual-crawler run --rm crawler \
 - `/api/products?pageSize=1` 可回應且至少有一筆商品。
 - product list API 回傳可解析的 `X-RateLimit-*` 與 `X-RateLimit-Client-Source` headers。
 - 商品詳細 API 可回應。
+- 商品列表第一筆商品的 public product image API 可回應圖片內容。
 - 商品價格歷史 API 可回應。
 - 最新 successful scheduled crawler run 沒有過舊。
 - 近 24 小時 suspected block / 真正 parser failure 沒有異常；`INVALID_IMAGE_URL` 會另列為 source image anomaly。
@@ -347,6 +348,8 @@ SMOKE_PUBLIC_BASE_URL=https://partsradar.net
 - `OK`：該項目前正常。
 - `WARN`：服務仍可用，但資料流或維運狀態需要觀察，例如來源成功時間偏舊、近期有 suspected block、source image anomaly、缺圖或壞連結超過警戒值。
 - `FAIL`：服務或資料流有明確失敗，例如 HTTP/API 掛掉、沒有 successful scheduled crawl、最新 crawler 疑似被擋、來源成功時間超過 fail 門檻。
+
+若 `product image api` 是 `FAIL`，代表商品列表已導出 `/api/product-images/...webp`，但公開圖片 API 無法回應圖片內容。優先檢查 `product_images` volume 是否有檔案、`PRODUCT_IMAGE_STORAGE_DIR` 是否正確、`storage-init` 是否已修權限，以及 `maintenance-daemon` 或手動 image backfill 是否實際補過缺圖。
 
 常用設定：
 

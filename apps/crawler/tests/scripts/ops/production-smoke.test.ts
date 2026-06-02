@@ -152,6 +152,11 @@ describe("production smoke checks", () => {
           status: "OK",
           message: "clientSource=cf limit=360 remaining=359",
         }),
+        expect.objectContaining({
+          name: "product image api",
+          status: "OK",
+          message: "HTTP 200 contentType=image/webp",
+        }),
       ]),
     );
   });
@@ -161,7 +166,7 @@ describe("production smoke checks", () => {
     const imageDir = join(workspaceRoot, "product-images");
     await mkdir(imageDir);
     await writeFile(join(imageDir, "product-1.webp"), "webp");
-    stubHealthyPublicApi("unknown");
+    stubHealthyPublicApi({ rateLimitClientSource: "unknown" });
     const options = parseProductionSmokeOptions(
       ["--base-url", "https://partsradar.net"],
       {
@@ -186,6 +191,40 @@ describe("production smoke checks", () => {
           status: "WARN",
           message:
             "clientSource=unknown limit=360 remaining=359; public HTTPS smoke should expose client identity",
+        }),
+      ]),
+    );
+  });
+
+  it("fails when the first listed product image API is unavailable", async () => {
+    const { crawlerCwd, workspaceRoot } = await createWorkspace();
+    const imageDir = join(workspaceRoot, "product-images");
+    await mkdir(imageDir);
+    await writeFile(join(imageDir, "product-1.webp"), "webp");
+    stubHealthyPublicApi({ imageStatus: 404 });
+    const options = parseProductionSmokeOptions(
+      [],
+      {
+        PRODUCT_IMAGE_STORAGE_DIR: imageDir,
+      },
+      crawlerCwd,
+    );
+    const summary = await runProductionSmoke(
+      createSmokeClient({
+        invalidImageErrorCount: 0,
+        trueParseErrorCount: 0,
+      }),
+      options,
+      new Date("2026-06-02T12:00:00.000Z"),
+    );
+
+    expect(summary.status).toBe("FAIL");
+    expect(summary.checks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "product image api",
+          status: "FAIL",
+          message: "HTTP 404",
         }),
       ]),
     );
@@ -283,7 +322,13 @@ async function createWorkspace(): Promise<{
   };
 }
 
-function stubHealthyPublicApi(rateLimitClientSource = "cf"): void {
+function stubHealthyPublicApi({
+  imageStatus = 200,
+  rateLimitClientSource = "cf",
+}: {
+  imageStatus?: number;
+  rateLimitClientSource?: string;
+} = {}): void {
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: Parameters<typeof fetch>[0]) => {
@@ -303,7 +348,14 @@ function stubHealthyPublicApi(rateLimitClientSource = "cf"): void {
       if (url.pathname === "/api/products") {
         return Response.json(
           {
-            data: [{ id: "product-1" }],
+            data: [
+              {
+                id: "product-1",
+                image: {
+                  url: "/api/product-images/product-1.webp",
+                },
+              },
+            ],
             pagination: { totalItems: 1 },
           },
           {
@@ -319,6 +371,13 @@ function stubHealthyPublicApi(rateLimitClientSource = "cf"): void {
 
       if (url.pathname === "/api/products/product-1") {
         return Response.json({ id: "product-1" });
+      }
+
+      if (url.pathname === "/api/product-images/product-1.webp") {
+        return new Response(imageStatus === 200 ? "webp" : "not found", {
+          status: imageStatus,
+          headers: imageStatus === 200 ? { "content-type": "image/webp" } : undefined,
+        });
       }
 
       if (url.pathname === "/api/products/product-1/price-history") {
