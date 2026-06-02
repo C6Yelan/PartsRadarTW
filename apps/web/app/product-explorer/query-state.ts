@@ -16,6 +16,7 @@ export const SORT_OPTIONS: Array<{ value: ProductSort; label: string }> = [
   { value: "price_asc", label: "價格低到高" },
   { value: "price_desc", label: "價格高到低" },
   { value: "price_drop_desc", label: "近 30 天降幅最大" },
+  { value: "price_rise_desc", label: "近 30 天增幅最大" },
   { value: "name_asc", label: "名稱 A 到 Z" },
 ];
 
@@ -39,7 +40,7 @@ export function readQueryFromLocation(): QueryState {
     status: parseAllowedValue(params.get("status"), ["active", "inactive", "all"], "active"),
     sort: parseAllowedValue(
       params.get("sort"),
-      ["price_asc", "price_desc", "price_drop_desc", "name_asc"],
+      ["price_asc", "price_desc", "price_drop_desc", "price_rise_desc", "name_asc"],
       "price_asc",
     ),
     vendors: normalizeVendorValues(parseVendorsParam(params.get("vendors")), params.get("igrp")),

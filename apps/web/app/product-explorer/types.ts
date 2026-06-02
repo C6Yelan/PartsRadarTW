@@ -1,6 +1,11 @@
 export type SourceStatus = "ok" | "stale" | "unavailable";
 export type ProductStatus = "active" | "inactive" | "all";
-export type ProductSort = "price_asc" | "price_desc" | "price_drop_desc" | "name_asc";
+export type ProductSort =
+  | "price_asc"
+  | "price_desc"
+  | "price_drop_desc"
+  | "price_rise_desc"
+  | "name_asc";
 export type LoadState = "idle" | "loading" | "ready" | "error" | "rate_limited";
 export type ApiErrorCode = "invalid_query" | "not_found" | "rate_limited" | "internal_error";
 
