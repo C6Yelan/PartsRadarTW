@@ -86,7 +86,7 @@ describe("GET /api/source-status handler", () => {
       category({
         igrp: 4,
         lastCheckedAt: new Date("2026-05-28T11:59:00.000Z"),
-        lastSuccessAt: new Date("2026-05-28T11:20:00.000Z"),
+        lastSuccessAt: new Date("2026-05-28T10:50:00.000Z"),
         products: [{ id: "product-1" }],
       }),
       category({

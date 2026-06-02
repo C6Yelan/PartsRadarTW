@@ -60,7 +60,7 @@ folder instead of adding new `test-support/` directories inside runtime source.
 
 Parser / validation 至少覆蓋：
 
-- token、名稱、價格、圖片 URL、discussion URL。
+- token、名稱、價格、圖片 URL、產品介紹 URL。
 - `NT4880`、`NT4,880`、`$4880`、`$4,880`。
 - computed key：`coolpc:igrp:{IGrp}:ibuy:{iBuyToken}`。
 - 缺 token / 名稱 / 價格 / 圖片時不匯入正式商品。
@@ -169,6 +169,6 @@ Private validation 先限 Docker / Compose / DB / web API，不公開流量、�
 ## Live Fetch 規則
 
 - 只能手動或明確 profile 執行。
-- 遵守 5 分鐘週期、不重疊、不快速重試。
+- 遵守 30 分鐘週期、不重疊、不快速重試。
 - 疑似攔截立即停止並保存 snapshot。
 - 測試結果應轉成 fixture 或 raw snapshot，供離線測試使用。

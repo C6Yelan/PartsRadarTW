@@ -66,7 +66,7 @@ Crawler 是同一 repo 內的獨立 TypeScript process，以 Node.js 執行。
 
 責任：
 
-- 每 5 分鐘檢查是否可啟動下一輪 crawl cycle。
+- 每 30 分鐘檢查是否可啟動下一輪 crawl cycle。
 - 抓取原價屋 `eachview.php?IGrp={分類編號}` 分類頁。
 - 保存與去重 raw snapshot。
 - 驗證 HTTP 200 回應內容是否真的是商品頁。

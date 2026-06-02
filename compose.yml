@@ -140,9 +140,9 @@ services:
     restart: unless-stopped
     environment:
       <<: *app-env
-      CRAWLER_INTERVAL_SECONDS: "${CRAWLER_INTERVAL_SECONDS:-300}"
+      CRAWLER_INTERVAL_SECONDS: "${CRAWLER_INTERVAL_SECONDS:-1800}"
       CRAWLER_BACKOFF_SECONDS: "${CRAWLER_BACKOFF_SECONDS:-3600}"
-      CRAWLER_CATEGORY_DELAY_MS: "${CRAWLER_CATEGORY_DELAY_MS:-5000}"
+      CRAWLER_CATEGORY_DELAY_MS: "${CRAWLER_CATEGORY_DELAY_MS:-8000}"
     volumes:
       - snapshots:/var/lib/partsradar/snapshots
       - product_images:/var/lib/partsradar/product-images

@@ -172,7 +172,7 @@ curl -i https://<domain>/api/source-status
 
 - 手動 `manual:crawl-coolpc-once` 已在同一台主機成功跑過，且 `/api/source-status` 可回 `ok`。
 - `product-image-backfill` 沒在跑，避免同時對來源站產生額外負載。
-- `.env` 中的 `CRAWLER_INTERVAL_SECONDS`、`CRAWLER_BACKOFF_SECONDS` 與 `CRAWLER_CATEGORY_DELAY_MS` 已確認；預設分別為 `300`、`3600`、`5000`。
+- `.env` 中的 `CRAWLER_INTERVAL_SECONDS`、`CRAWLER_BACKOFF_SECONDS` 與 `CRAWLER_CATEGORY_DELAY_MS` 已確認；預設分別為 `1800`、`3600`、`8000`。
 - `WEB_BIND_HOST` 與 `POSTGRES_BIND_HOST` 仍維持 `127.0.0.1`。
 
 啟動：
@@ -210,6 +210,39 @@ docker compose --profile scheduled-crawler config --services
 docker compose --profile scheduled-crawler logs --tail=100 crawler-daemon
 curl -i https://<domain>/api/source-status
 ```
+
+## Product Link Health Check
+
+商品外部連結健康檢查由 crawler ops command 執行，只更新 `product_link_health` 狀態供 UI 低干擾提示使用。它不在使用者 request lifecycle 內執行，也不會刪除商品、停用商品或移除連結。
+
+先跑小批次 dry-run，確認候選數與 log 內容：
+
+```bash
+docker compose --profile manual-crawler run --rm crawler \
+  pnpm ops:product-links:check -- --dry-run --limit 25
+```
+
+確認後再跑 live check。live 模式必須明確加 `--confirm-live-fetch`，並保留 request delay。正式跑預設會檢查所有超過 48 小時未確認或 URL 已變更的候選連結，`--limit` 只作為小批次測試或緊急限量使用：
+
+```bash
+docker compose --profile manual-crawler run --rm crawler \
+  pnpm ops:product-links:check -- --confirm-live-fetch
+```
+
+常用選項：
+
+- `--kinds source,introduction`：檢查原價屋購買連結與產品介紹連結，預設兩者都檢查。
+- `--igrp <number>`：限制單一分類。
+- `--stale-after-hours <hours>`：只重查超過指定時間的既有紀錄，預設 48。
+- `--failure-threshold <count>`：連續 404 / 410 達門檻才標記 broken，預設 3。
+- `--min-delay-ms` / `--max-delay-ms`：控制 live request 間隔，預設 10000 到 20000 ms，避免對來源站或第三方介紹頁造成壓力。
+
+驗證重點：
+
+- command log 不應輸出 `.env`、`DATABASE_URL` 或 secret。
+- 首次 404 / 410 不應直接標記 `broken`，而是先累積為暫時失敗。
+- 商品詳情頁只顯示低干擾健康提示，不應阻止使用者自行開啟外部連結。
+- 正式排程化前，先以小批次確認來源站沒有明顯攔截或異常回應。
 
 ## Raw Snapshot Cleanup
 

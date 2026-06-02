@@ -15,7 +15,7 @@ import {
 import { createCoolpcCategoryUrl, decodeCoolpcHtml } from "./parser";
 
 export const DEFAULT_COOLPC_BASE_URL = COOLPC_OFFICIAL_BASE_URL;
-export const DEFAULT_COOLPC_CATEGORY_DELAY_MS = 5000;
+export const DEFAULT_COOLPC_CATEGORY_DELAY_MS = 8000;
 export const DEFAULT_COOLPC_FETCH_TIMEOUT_MS = 30000;
 export const MAX_COOLPC_RESPONSE_BODY_BYTES = 5 * 1024 * 1024;
 

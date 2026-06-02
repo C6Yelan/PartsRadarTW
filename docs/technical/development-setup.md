@@ -81,8 +81,9 @@ repo 應提供 `.env.example` 作為範本。實際本機設定使用 `.env.loca
 | `COOLPC_BASE_URL` | 原價屋來源網址；production Compose 固定為 `https://www.coolpc.com.tw` |
 | `SNAPSHOT_STORAGE_DIR` | raw snapshot 壓縮檔保存位置 |
 | `PRODUCT_IMAGE_STORAGE_DIR` | 商品縮圖快取保存位置；本機 Next.js dev server 預設對應 repo root 的 `storage/product-images` |
-| `CRAWLER_INTERVAL_SECONDS` | crawler 週期秒數，第一版預設 `300` |
+| `CRAWLER_INTERVAL_SECONDS` | crawler 週期秒數，預設 `1800` |
 | `CRAWLER_BACKOFF_SECONDS` | 連續失敗後延後秒數，第一版預設 `3600` |
+| `CRAWLER_CATEGORY_DELAY_MS` | crawler 分類頁請求間隔，預設 `8000` |
 | `CLOUDFLARE_TUNNEL_TOKEN` | Cloudflare Tunnel token；只在部署主機啟用 `public-tunnel` profile 時需要 |
 | `NODE_ENV` | Node.js 執行環境 |
 
@@ -205,7 +206,7 @@ Crawler 開發時應遵守：
 
 - 優先使用 fixture 測試 parser。
 - 需要實際抓取原價屋時才手動執行 crawler。
-- 實際抓取需遵守 5 分鐘週期與 backoff 規則。
+- 實際抓取需遵守 30 分鐘週期與 backoff 規則。
 - 疑似攔截時立即停止當次流程。
 - 不因本機測試失敗清空正式商品資料。
 

@@ -20,7 +20,7 @@ import {
 
 const CONFIRM_LIVE_FETCH_FLAG = "--confirm-live-fetch";
 const DEFAULT_STORAGE_DIR = "temp/coolpc-daemon/snapshots";
-const DEFAULT_INTERVAL_SECONDS = 300;
+const DEFAULT_INTERVAL_SECONDS = 1800;
 const DEFAULT_BACKOFF_SECONDS = 3600;
 const MIN_INTERVAL_SECONDS = 60;
 const MIN_BACKOFF_SECONDS = 60;

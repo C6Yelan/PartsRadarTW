@@ -1,6 +1,6 @@
 import { COOLPC_SOURCE_NAME } from "@partsradar/shared";
 import { internalErrorResponse, jsonOk } from "../_shared/responses";
-const SOURCE_STALE_THRESHOLD_MS = 30 * 60 * 1000;
+const SOURCE_STALE_THRESHOLD_MS = 60 * 60 * 1000;
 
 export type SourceStatus = "ok" | "stale" | "unavailable";
 
