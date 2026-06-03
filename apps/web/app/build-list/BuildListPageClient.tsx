@@ -4,11 +4,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import SiteDisclaimer from "../site-disclaimer";
-import {
-  BUILD_LIST_EXCEL_MIME_TYPE,
-  buildBuildListWorkbook,
-  createBuildListExcelFilename,
-} from "./excel";
+import { downloadBuildListExcel } from "./download";
 import { formatBuildListDateTime, formatBuildListPrice } from "./formatting";
 import {
   BUILD_LIST_MAX_QUANTITY,
@@ -51,18 +47,7 @@ export default function BuildListPageClient() {
   }, [removedItemNotice]);
 
   function downloadExcel() {
-    const workbookBytes = buildBuildListWorkbook(items);
-    const workbookBuffer = new ArrayBuffer(workbookBytes.byteLength);
-    new Uint8Array(workbookBuffer).set(workbookBytes);
-    const workbookBlob = new Blob([workbookBuffer], {
-      type: BUILD_LIST_EXCEL_MIME_TYPE,
-    });
-    const downloadUrl = URL.createObjectURL(workbookBlob);
-    const downloadLink = document.createElement("a");
-    downloadLink.href = downloadUrl;
-    downloadLink.download = createBuildListExcelFilename();
-    downloadLink.click();
-    window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 0);
+    downloadBuildListExcel(items);
   }
 
   function handleRemoveBuildListItem(item: BuildListItem) {
@@ -173,9 +158,6 @@ export default function BuildListPageClient() {
                   >
                     下載 Excel
                   </button>
-                  <Link className="control-button secondary" href="/build-list/print">
-                    開啟列印 / PDF
-                  </Link>
                 </div>
                 <button
                   className="control-button secondary"

@@ -295,7 +295,7 @@ docker compose --profile manual-crawler run --rm crawler \
 檢查項目：
 
 - 首頁 HTTP 200。
-- 第二版 `/build-list` 與 `/build-list/print` routes 可回應。
+- 第二版 `/build-list` route 可回應。
 - `/api/source-status` 可回應，且來源成功時間沒有過舊。
 - `/api/categories` 包含第二版第一批分類 `IGrp=8`、`IGrp=11`、`IGrp=16`。
 - `/api/products?pageSize=1` 可回應且至少有一筆商品。
@@ -396,7 +396,6 @@ fix(web): remove unstable coolpc import tool
 - `storage-init` / `migrate` / `seed` exit 0。
 - `crawler-daemon` / `maintenance-daemon` / `smoke-daemon` / `raw-snapshot-cleanup-daemon` 持續執行。
 - `/build-list` local / public 都回 `HTTP 200`。
-- `/build-list/print` local / public 都回 `HTTP 200`。
 - `/tools/coolpc-import` local / public 都回 `HTTP 404`。
 - `/tools/coolpc-import.user.js` local / public 都回 `HTTP 404`。
 - `/api/source-status` public 回 `HTTP 200`。
@@ -408,7 +407,7 @@ fix(web): remove unstable coolpc import tool
 - `link health: broken=0 temporary=111`：來源連結 temporary 狀態觀察，broken 為 0，不阻擋第二版完成。
 - `missing product images: 8/3000`：仍在 smoke `OK` 範圍內。
 
-若未來 public-only smoke 又顯示 `/build-list` / `/build-list/print` 為 `HTTP 404`、`source freshness` 失敗或 `product image api` 抽樣 404，依下列順序收斂。所有指令仍假設在部署主機 repo 根目錄執行。
+若未來 public-only smoke 又顯示 `/build-list` 為 `HTTP 404`、`source freshness` 失敗或 `product image api` 抽樣 404，依下列順序收斂。所有指令仍假設在部署主機 repo 根目錄執行。
 
 先確認部署主機已 fast-forward 到包含第二版 routes 的目標 commit，並 recreate web stack：
 
@@ -421,7 +420,6 @@ docker compose config
 docker compose up --build --force-recreate storage-init
 docker compose up -d --build --force-recreate
 curl -I http://127.0.0.1:3000/build-list
-curl -I http://127.0.0.1:3000/build-list/print
 ```
 
 若本機 route 已是 `HTTP 200`，但公開網域仍是 `HTTP 404`，檢查 `cloudflared` 是否連到目前 compose network 中的 `web:3000`，並重啟 tunnel：
@@ -430,7 +428,6 @@ curl -I http://127.0.0.1:3000/build-list/print
 docker compose --profile public-tunnel logs --tail=100 cloudflared
 docker compose --profile public-tunnel up -d cloudflared
 curl -I https://partsradar.net/build-list
-curl -I https://partsradar.net/build-list/print
 ```
 
 若 `source freshness` 失敗，先確認 scheduled crawler 正常啟動並查看最近 log：

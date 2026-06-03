@@ -138,11 +138,6 @@ describe("production smoke checks", () => {
           message: "HTTP 200",
         }),
         expect.objectContaining({
-          name: "build-list print page",
-          status: "OK",
-          message: "HTTP 200",
-        }),
-        expect.objectContaining({
           name: "v2 categories api",
           status: "OK",
           message: "required IGrp=8,11,16",
@@ -292,11 +287,6 @@ describe("production smoke checks", () => {
           message: "HTTP 200",
         }),
         expect.objectContaining({
-          name: "build-list print page",
-          status: "OK",
-          message: "HTTP 200",
-        }),
-        expect.objectContaining({
           name: "v2 categories api",
           status: "OK",
           message: "required IGrp=8,11,16",
@@ -347,40 +337,6 @@ describe("production smoke checks", () => {
       expect.arrayContaining([
         expect.objectContaining({
           name: "build-list page",
-          status: "FAIL",
-          message: "HTTP 404",
-        }),
-      ]),
-    );
-  });
-
-  it("fails when the v2 build list print route is not deployed", async () => {
-    const { crawlerCwd, workspaceRoot } = await createWorkspace();
-    const imageDir = join(workspaceRoot, "product-images");
-    await mkdir(imageDir);
-    await writeFile(join(imageDir, "product-1.webp"), "webp");
-    stubHealthyPublicApi({ buildListPrintStatus: 404 });
-    const options = parseProductionSmokeOptions(
-      [],
-      {
-        PRODUCT_IMAGE_STORAGE_DIR: imageDir,
-      },
-      crawlerCwd,
-    );
-    const summary = await runProductionSmoke(
-      createSmokeClient({
-        invalidImageErrorCount: 0,
-        trueParseErrorCount: 0,
-      }),
-      options,
-      new Date("2026-06-02T12:00:00.000Z"),
-    );
-
-    expect(summary.status).toBe("FAIL");
-    expect(summary.checks).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          name: "build-list print page",
           status: "FAIL",
           message: "HTTP 404",
         }),
@@ -554,7 +510,6 @@ async function createWorkspace(): Promise<{
 
 function stubHealthyPublicApi({
   buildListStatus = 200,
-  buildListPrintStatus = 200,
   categoryIgrps = [4, 5, 6, 7, 8, 10, 11, 12, 14, 15, 16],
   includePriceMovement = true,
   imageStatus = 200,
@@ -563,7 +518,6 @@ function stubHealthyPublicApi({
   rateLimitClientSource = "cf",
 }: {
   buildListStatus?: number;
-  buildListPrintStatus?: number;
   categoryIgrps?: number[];
   includePriceMovement?: boolean;
   imageStatus?: number;
@@ -582,10 +536,6 @@ function stubHealthyPublicApi({
 
       if (url.pathname === "/build-list") {
         return new Response("<!doctype html>", { status: buildListStatus });
-      }
-
-      if (url.pathname === "/build-list/print") {
-        return new Response("<!doctype html>", { status: buildListPrintStatus });
       }
 
       if (url.pathname === "/api/source-status") {

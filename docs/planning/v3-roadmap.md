@@ -41,7 +41,7 @@
 
 - 第二版部署 closeout 已完成，且沒有未解釋的 production smoke `FAIL`。
 - `smoke-daemon`、`maintenance-daemon`、`crawler-daemon` 與 `raw-snapshot-cleanup-daemon` 已能穩定執行。
-- `/build-list` 與 `/build-list/print` 已可在 local / public route 回 `HTTP 200`。
+- `/build-list` 已可在 local / public route 回 `HTTP 200`。
 - `link health` temporary count 與 missing product images 仍只是來源 / 資料健康度觀察，沒有造成主要使用者流程失效。
 - 文件、部署設定與實作狀態沒有明顯脫節。
 

@@ -15,11 +15,11 @@ const PRODUCT_METADATA_SELECT = {
   name: true,
   currentPrice: {
     select: {
+      lastSeenAt: true,
       priceSnapshot: {
         select: {
           price: true,
           currency: true,
-          capturedAt: true,
         },
       },
     },
@@ -105,7 +105,7 @@ export function buildProductDetailMetadata(
   const description = [
     product.sourceCategory.displayName,
     price,
-    `原價屋資料更新：${formatTaipeiDateTime(product.currentPrice.priceSnapshot.capturedAt)}`,
+    `價格資料更新：${formatTaipeiDateTime(product.currentPrice.lastSeenAt)}`,
   ].join(" | ");
 
   return {

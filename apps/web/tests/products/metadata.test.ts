@@ -17,11 +17,11 @@ describe("product detail metadata", () => {
     const metadata = buildProductDetailMetadata(product(), PUBLIC_SITE_URL);
 
     expect(metadata.title).toBe("GPU RTX 4070 - NT$ 6,990 | PartsRadarTW");
-    expect(metadata.description).toBe("顯示卡 | NT$ 6,990 | 原價屋資料更新：2026-05-28 19:45");
+    expect(metadata.description).toBe("顯示卡 | NT$ 6,990 | 價格資料更新：2026-05-28 19:55");
     expect(metadata.alternates?.canonical).toBe(`https://partsradar.net/products/${PRODUCT_ID}`);
     expect(metadata.openGraph).toMatchObject({
       title: "GPU RTX 4070 - NT$ 6,990 | PartsRadarTW",
-      description: "顯示卡 | NT$ 6,990 | 原價屋資料更新：2026-05-28 19:45",
+      description: "顯示卡 | NT$ 6,990 | 價格資料更新：2026-05-28 19:55",
       type: "website",
       siteName: "PartsRadarTW",
       locale: "zh_TW",
@@ -37,7 +37,7 @@ describe("product detail metadata", () => {
     expect(metadata.twitter).toMatchObject({
       card: "summary_large_image",
       title: "GPU RTX 4070 - NT$ 6,990 | PartsRadarTW",
-      description: "顯示卡 | NT$ 6,990 | 原價屋資料更新：2026-05-28 19:45",
+      description: "顯示卡 | NT$ 6,990 | 價格資料更新：2026-05-28 19:55",
       images: [`https://partsradar.net/api/product-images/${PRODUCT_ID}.webp`],
     });
     expect(JSON.stringify(metadata)).not.toContain("iBuyToken");
@@ -70,6 +70,10 @@ describe("product detail metadata", () => {
     });
     expect(client.lastProductFindFirstArgs?.select).not.toHaveProperty("ibuyToken");
     expect(client.lastProductFindFirstArgs?.select).not.toHaveProperty("sourceUrl");
+    expect(client.lastProductFindFirstArgs?.select.currentPrice.select.lastSeenAt).toBe(true);
+    expect(client.lastProductFindFirstArgs?.select.currentPrice.select.priceSnapshot.select).not.toHaveProperty(
+      "capturedAt",
+    );
     expect(metadata.alternates?.canonical).toBe(`https://partsradar.net/products/${PRODUCT_ID}`);
   });
 
@@ -153,10 +157,10 @@ function product(overrides: Partial<ProductMetadataRecord> = {}): ProductMetadat
     id: PRODUCT_ID,
     name: "GPU RTX 4070",
     currentPrice: {
+      lastSeenAt: new Date("2026-05-28T11:55:00.000Z"),
       priceSnapshot: {
         price: 6990,
         currency: "TWD",
-        capturedAt: new Date("2026-05-28T11:45:00.000Z"),
       },
     },
     sourceCategory: {

@@ -55,7 +55,6 @@ fix(web): remove unstable coolpc import tool
 - `storage-init` / `migrate` / `seed` exit 0。
 - `crawler-daemon` / `maintenance-daemon` / `smoke-daemon` / `raw-snapshot-cleanup-daemon` 持續執行。
 - `/build-list` local / public 都回 `HTTP 200`。
-- `/build-list/print` local / public 都回 `HTTP 200`。
 - 已移除的不穩定 CoolPC import tool routes 都回 `HTTP 404`：`/tools/coolpc-import` 與 `/tools/coolpc-import.user.js`。
 - `/api/source-status` public 回 `HTTP 200`。
 - `/api/products?pageSize=1` public 回 `HTTP 200`。
@@ -221,10 +220,9 @@ fix(web): remove unstable coolpc import tool
 
 - 已完成第一輪：商品列表與商品詳情頁加入配單入口，配單使用 client-side state / `localStorage`，支援品項數量、移除、清空、品項小計、總價、配單品項數量顯示與 reload 保存。
 - 已完成 Excel 直接匯出，內容包含分類、商品名稱、數量、目前價格、小計、價格更新時間、原價屋查看 / 購買網址、產品介紹網址、備註欄與總價。
-- 已完成 `/build-list/print` 可列印版面；第二版不做一鍵 PDF 下載。
-- 2026-06-03 本地 Playwright MCP 已驗證電腦與手機使用者流程：首頁加入配單、商品詳情頁加入配單、`localStorage` 保存、reload 後數量保留、數量調整、移除、清空、Excel artifact 內容、列印頁 PDF artifact 與無水平溢出。
+- 2026-06-03 本地 Playwright MCP 已驗證電腦與手機使用者流程：首頁加入配單、商品詳情頁加入配單、`localStorage` 保存、reload 後數量保留、數量調整、移除、清空、Excel artifact 內容與無水平溢出。
 - 已新增 repo path comment policy test，讓 `apps/` 與 `packages/` 下 `.ts`、`.tsx`、`.css` 的 repo-relative path comment 規則可重跑驗證，並排除 generated / fixture / build output 檔案。
-- 已完成部署驗收：`/build-list` 與 `/build-list/print` local / public 都回 `HTTP 200`。
+- 已完成部署驗收：`/build-list` local / public 都回 `HTTP 200`。
 - 已移除不穩定的 CoolPC import tool；第二版不提供 userscript 帶入原價屋估價頁，不做購物車、下單、自動購買或代購流程。
 
 完成條件：
@@ -292,7 +290,6 @@ fix(web): remove unstable coolpc import tool
 - 已完成 client-side / localStorage 配單。
 - 已完成配單總價、數量、移除與清空。
 - 已完成 Excel 匯出，每件商品附原價屋購買網址。
-- 已完成 `/build-list/print` 可列印 PDF 版面。
 - 已完成部署驗收，並移除不穩定的 userscript 匯入工具。
 
 ## 第三版方向
