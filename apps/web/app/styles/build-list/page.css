@@ -67,6 +67,12 @@
   line-height: 1.7;
 }
 
+.build-list-empty .control-button {
+  min-width: 132px;
+  min-height: 44px;
+  padding: 0 22px;
+}
+
 .build-list-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
@@ -82,10 +88,30 @@
 
 .build-list-item {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(178px, auto);
+  grid-template-columns: 84px minmax(0, 1fr) minmax(178px, auto);
   gap: 18px;
   align-items: center;
   padding: 18px;
+}
+
+.build-list-item-image {
+  width: 84px;
+  aspect-ratio: 1;
+  object-fit: contain;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: #0a141c;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
+}
+
+.build-list-item-image.fallback {
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, rgba(143, 180, 204, 0.11), transparent), #0a141c;
+  color: var(--muted);
+  text-align: center;
 }
 
 .build-list-item-main {
@@ -135,6 +161,7 @@
 
 .build-list-links a {
   display: inline-flex;
+  gap: 6px;
   align-items: center;
   min-height: 32px;
   padding: 0 10px;
@@ -149,6 +176,23 @@
   border-color: var(--border-strong);
   background: var(--surface-hover);
   color: var(--text-strong);
+}
+
+.build-list-link-icon {
+  color: currentColor;
+  font-size: 11px;
+  line-height: 1;
+  opacity: 0.68;
+  transform: translateY(-1px);
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease;
+}
+
+.build-list-links a:hover .build-list-link-icon,
+.build-list-links a:focus-visible .build-list-link-icon {
+  opacity: 1;
+  transform: translate(1px, -2px);
 }
 
 .build-list-item-controls {
@@ -183,9 +227,20 @@
 }
 
 .quantity-stepper input {
+  width: 100%;
+  padding: 0;
   border-right: 1px solid var(--border);
   border-left: 1px solid var(--border);
+  appearance: textfield;
   font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 38px;
+}
+
+.quantity-stepper input::-webkit-inner-spin-button,
+.quantity-stepper input::-webkit-outer-spin-button {
+  margin: 0;
+  appearance: none;
 }
 
 .build-list-remove-button {
@@ -248,16 +303,122 @@
 
 .build-list-summary-actions {
   display: grid;
-  grid-template-columns: 1fr;
   gap: 8px;
 }
 
-.build-list-summary-actions .control-button {
+.build-list-export-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.build-list-summary-actions .control-button,
+.build-list-export-actions .control-button {
   width: 100%;
+  min-width: 0;
+}
+
+.build-list-undo-toast {
+  position: fixed;
+  bottom: max(18px, env(safe-area-inset-bottom));
+  left: 50%;
+  z-index: 45;
+  display: flex;
+  width: min(430px, calc(100% - 28px));
+  min-height: 54px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 12px 10px 16px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: #0e202c;
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.34);
+  color: var(--text);
+  transform: translateX(-50%);
+  animation: build-list-toast-in 160ms ease-out;
+}
+
+.build-list-undo-toast-text {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+  font-size: 13px;
+  font-weight: 760;
+  line-height: 1.35;
+}
+
+.build-list-undo-toast-text span {
+  color: var(--muted);
+}
+
+.build-list-undo-toast-text strong {
+  overflow: hidden;
+  color: var(--text-strong);
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.build-list-undo-toast button {
+  flex: 0 0 auto;
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid rgba(143, 180, 204, 0.44);
+  border-radius: 7px;
+  background: rgba(143, 180, 204, 0.12);
+  color: var(--accent-strong);
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.build-list-undo-toast button:hover,
+.build-list-undo-toast button:focus-visible {
+  border-color: var(--border-strong);
+  background: rgba(143, 180, 204, 0.18);
+  color: var(--text-strong);
+}
+
+@keyframes build-list-toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .build-list-undo-toast {
+    animation: none;
+  }
 }
 
 @media (max-width: 900px) {
-  .build-list-topbar,
+  .topbar.build-list-topbar {
+    grid-template-areas:
+      "brand brand"
+      "title back";
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px 12px;
+  }
+
+  .build-list-topbar .brand-lockup {
+    grid-area: brand;
+  }
+
+  .build-list-topbar .build-list-title {
+    grid-area: title;
+    min-width: 0;
+  }
+
+  .build-list-topbar .build-list-back-link {
+    grid-area: back;
+  }
+
   .build-list-layout {
     grid-template-columns: 1fr;
   }
@@ -268,7 +429,9 @@
   }
 
   .build-list-back-link {
-    justify-self: start;
+    justify-self: end;
+    align-self: center;
+    white-space: nowrap;
   }
 
   .build-list-summary {
@@ -277,26 +440,57 @@
   }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 760px) {
   .build-list-page {
     width: min(100% - 28px, 1600px);
     padding-top: 14px;
   }
 
   .build-list-item {
-    grid-template-columns: 1fr;
+    grid-template-columns: 64px minmax(0, 1fr);
+    grid-template-areas:
+      "image main"
+      "controls controls";
+    align-items: start;
+    gap: 12px 14px;
     padding: 14px;
   }
 
+  .build-list-item-image {
+    grid-area: image;
+    width: 64px;
+  }
+
+  .build-list-item-main {
+    grid-area: main;
+  }
+
   .build-list-item-controls {
-    justify-items: stretch;
+    grid-area: controls;
+    display: flex;
+    width: 100%;
+    gap: 6px;
+    align-items: center;
+    justify-content: center;
   }
 
   .quantity-stepper {
-    grid-template-columns: 40px minmax(0, 1fr) 40px;
+    flex: 0 0 122px;
+    grid-template-columns: 32px minmax(0, 1fr) 32px;
+  }
+
+  .quantity-stepper button,
+  .quantity-stepper input {
+    min-height: 36px;
+  }
+
+  .quantity-stepper input {
+    line-height: 36px;
   }
 
   .build-list-remove-button {
-    width: 100%;
+    flex: 0 0 auto;
+    min-height: 36px;
+    padding: 0 10px;
   }
 }

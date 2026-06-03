@@ -10,6 +10,7 @@ interface ProductTableProps {
   products: ProductsResponse | null;
   productState: LoadState;
   onAddToBuildList(product: ProductListItem): void;
+  onDecreaseBuildListQuantity(product: ProductListItem): void;
 }
 
 export function ProductTable({
@@ -18,6 +19,7 @@ export function ProductTable({
   products,
   productState,
   onAddToBuildList,
+  onDecreaseBuildListQuantity,
 }: ProductTableProps) {
   return (
     <div className="product-table">
@@ -61,6 +63,7 @@ export function ProductTable({
               key={product.id}
               product={product}
               onAddToBuildList={onAddToBuildList}
+              onDecreaseBuildListQuantity={onDecreaseBuildListQuantity}
             />
           ))
         : null}

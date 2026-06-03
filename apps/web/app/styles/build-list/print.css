@@ -2,17 +2,23 @@
 .build-list-print-shell {
   min-height: 100svh;
   padding: 18px;
-  background: #e8edf1;
+  background: var(--bg);
   color: #17212b;
 }
 
 .print-toolbar {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
-  justify-content: space-between;
   width: min(1120px, 100%);
   margin: 0 auto 14px;
+}
+
+.print-toolbar .back-link,
+.print-toolbar .control-button {
+  width: 100%;
+  min-width: 0;
+  justify-content: center;
 }
 
 .print-document {
@@ -28,17 +34,12 @@
 }
 
 .print-document-header {
-  display: flex;
-  gap: 18px;
-  align-items: flex-start;
-  justify-content: space-between;
   padding-bottom: 16px;
   border-bottom: 2px solid #17212b;
 }
 
 .print-document-header p,
-.print-document-header h1,
-.print-document-header dl {
+.print-document-header h1 {
   margin: 0;
 }
 
@@ -56,28 +57,6 @@
   line-height: 1.15;
 }
 
-.print-document-header dl {
-  display: grid;
-  min-width: 240px;
-  gap: 7px;
-}
-
-.print-document-header dl div {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.print-document-header dt {
-  color: #536474;
-  font-weight: 760;
-}
-
-.print-document-header dd {
-  margin: 0;
-  font-weight: 850;
-}
-
 .print-items-table {
   width: 100%;
   border-collapse: collapse;
@@ -87,17 +66,29 @@
 
 .print-items-table th,
 .print-items-table td {
-  padding: 8px 7px;
+  padding: 0;
   border: 1px solid #cbd5df;
-  vertical-align: top;
+  text-align: center;
+  vertical-align: middle;
   word-break: break-word;
+}
+
+.print-cell-content {
+  display: inline-grid;
+  min-height: 44px;
+  width: 100%;
+  box-sizing: border-box;
+  place-items: center;
+  padding: 8px 7px;
+  line-height: 1.35;
+  text-align: center;
+  overflow-wrap: anywhere;
 }
 
 .print-items-table th {
   background: #eef3f7;
   color: #273746;
   font-weight: 850;
-  text-align: left;
 }
 
 .print-items-table th:nth-child(1) {
@@ -159,7 +150,7 @@
 }
 
 .print-link-list strong,
-.print-link-list span {
+.print-link-list a {
   display: block;
   overflow-wrap: anywhere;
 }
@@ -168,10 +159,13 @@
   margin-bottom: 3px;
 }
 
-.print-link-list span {
+.print-link-list a {
   color: #32485c;
   font-size: 11px;
   line-height: 1.45;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
 }
 
 .print-empty {
@@ -199,6 +193,10 @@
     padding: 12px;
   }
 
+  .print-toolbar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .print-document {
     padding: 16px;
   }
@@ -215,8 +213,8 @@
     font-size: 11px;
   }
 
-  .print-items-table th,
-  .print-items-table td {
+  .print-cell-content {
+    min-height: 40px;
     padding: 6px 5px;
   }
 }

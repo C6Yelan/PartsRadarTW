@@ -4,6 +4,10 @@ export const BUILD_LIST_MAX_QUANTITY = 99;
 export interface BuildListProduct {
   id: string;
   name: string;
+  image?: {
+    url: string;
+    alt: string;
+  };
   category: {
     id: string;
     igrp: number;
@@ -43,9 +47,14 @@ interface BuildListProductInput extends Omit<BuildListProduct, "introductionUrl"
 }
 
 export function toBuildListProduct(product: BuildListProductInput): BuildListProduct {
+  const image =
+    normalizeBuildListImage(product.image, product.name) ??
+    createBuildListProductImage(product.id, product.name);
+
   return {
     id: product.id,
     name: product.name,
+    image,
     category: product.category,
     price: product.price,
     source: product.source,
@@ -108,6 +117,19 @@ export function updateBuildListItemQuantity(
 
 export function removeBuildListItem(items: BuildListItem[], productId: string): BuildListItem[] {
   return items.filter((item) => item.id !== productId);
+}
+
+export function restoreBuildListItem(
+  items: BuildListItem[],
+  restoredItem: BuildListItem,
+): BuildListItem[] {
+  const hasItem = items.some((item) => item.id === restoredItem.id);
+
+  if (!hasItem) {
+    return [...items, restoredItem];
+  }
+
+  return items.map((item) => (item.id === restoredItem.id ? restoredItem : item));
 }
 
 export function summarizeBuildList(items: BuildListItem[]): BuildListSummary {
@@ -197,6 +219,7 @@ function normalizeBuildListProduct(value: Record<string, unknown>): BuildListPro
   const sourceName = value.source.name;
   const sourceUrl = toHttpUrl(value.source.url);
   const introductionUrl = value.introductionUrl === null ? null : toHttpUrl(value.introductionUrl);
+  const storedImage = normalizeBuildListImage(value.image, name ?? categoryDisplayName ?? "商品圖片");
 
   if (
     !id ||
@@ -220,6 +243,7 @@ function normalizeBuildListProduct(value: Record<string, unknown>): BuildListPro
   return {
     id,
     name,
+    image: storedImage ?? createBuildListProductImage(id, name),
     category: {
       id: categoryId,
       igrp: categoryIgrp,
@@ -237,6 +261,30 @@ function normalizeBuildListProduct(value: Record<string, unknown>): BuildListPro
       url: sourceUrl,
     },
     introductionUrl,
+  };
+}
+
+function createBuildListProductImage(productId: string, alt: string) {
+  return {
+    url: `/api/product-images/${encodeURIComponent(productId)}.webp`,
+    alt,
+  };
+}
+
+function normalizeBuildListImage(value: unknown, fallbackAlt: string) {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const url = toImageUrl(value.url);
+
+  if (!url) {
+    return null;
+  }
+
+  return {
+    url,
+    alt: typeof value.alt === "string" && value.alt.trim() ? value.alt.trim() : fallbackAlt,
   };
 }
 
@@ -267,11 +315,27 @@ function toHttpUrl(value: unknown) {
     return null;
   }
 
+  const trimmedValue = value.trim();
+
   try {
-    const url = new URL(value);
+    const url = new URL(trimmedValue);
 
     return url.protocol === "http:" || url.protocol === "https:" ? url.toString() : null;
   } catch {
     return null;
   }
+}
+
+function toImageUrl(value: unknown) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmedValue = value.trim();
+
+  if (trimmedValue.startsWith("/") && !trimmedValue.startsWith("//")) {
+    return trimmedValue;
+  }
+
+  return toHttpUrl(trimmedValue);
 }

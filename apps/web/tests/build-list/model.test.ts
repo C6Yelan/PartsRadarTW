@@ -7,6 +7,7 @@ import {
   getBuildListLineSubtotal,
   normalizeBuildListItems,
   removeBuildListItem,
+  restoreBuildListItem,
   summarizeBuildList,
   toBuildListProduct,
   updateBuildListItemQuantity,
@@ -60,6 +61,14 @@ describe("build list model", () => {
     expect(removeBuildListItem(updatedItems, "product-1")).toHaveLength(1);
   });
 
+  it("restores a removed item without creating duplicates", () => {
+    const removedItem = item({ quantity: 4 });
+    const existingItem = item({ id: "product-2", quantity: 1 });
+
+    expect(restoreBuildListItem([existingItem], removedItem)).toEqual([existingItem, removedItem]);
+    expect(restoreBuildListItem([item({ quantity: 1 })], removedItem)).toEqual([removedItem]);
+  });
+
   it("normalizes persisted localStorage data and drops invalid entries", () => {
     const normalizedItems = normalizeBuildListItems([
       item({ quantity: 120 }),
@@ -76,13 +85,32 @@ describe("build list model", () => {
     expect(
       toBuildListProduct({
         ...product(),
+        image: {
+          url: "/api/product-images/product-1.webp",
+          alt: "GPU image",
+        },
         introduction: {
           url: "https://example.com/gpu",
         },
       }),
     ).toMatchObject({
       id: "product-1",
+      image: {
+        url: "/api/product-images/product-1.webp",
+        alt: "GPU image",
+      },
       introductionUrl: "https://example.com/gpu",
+    });
+  });
+
+  it("backfills legacy persisted items with product image URLs", () => {
+    const { image: _image, ...legacyItem } = item();
+    const normalizedItems = normalizeBuildListItems([legacyItem]);
+
+    expect(normalizedItems).toHaveLength(1);
+    expect(normalizedItems[0].image).toEqual({
+      url: "/api/product-images/product-1.webp",
+      alt: "GPU RTX 4070",
     });
   });
 });
@@ -91,6 +119,10 @@ function product(overrides: Partial<BuildListProduct> = {}): BuildListProduct {
   return {
     id: "product-1",
     name: "GPU RTX 4070",
+    image: {
+      url: "/api/product-images/product-1.webp",
+      alt: "GPU RTX 4070",
+    },
     category: {
       id: "category-12",
       igrp: 12,

@@ -10,7 +10,7 @@ import { Pagination } from "./components/Pagination";
 import { ProductFilters } from "./components/ProductFilters";
 import { ProductTable } from "./components/ProductTable";
 import { ProductToolbar } from "./components/ProductToolbar";
-import { formatDateTime } from "./formatting";
+import { formatDateTime, formatPrice } from "./formatting";
 import {
   useCategories,
   usePendingPageScroll,
@@ -26,7 +26,7 @@ import {
   toUrl,
   validatePriceRange,
 } from "./query-state";
-import type { QueryState } from "./types";
+import type { ProductListItem, QueryState } from "./types";
 
 const TOUCH_INPUT_MEDIA_QUERY = "(pointer: coarse)";
 
@@ -38,7 +38,7 @@ export default function ProductExplorer() {
   const { filtersOpen, keepDesktopFiltersOpen, syncFiltersOpenFromToggle } =
     useResponsiveFiltersOpen();
   const { resultsPanelRef, schedulePageScroll } = usePendingPageScroll(productState, products);
-  const { addProduct, quantityByProductId, summary } = useBuildList();
+  const { addProduct, quantityByProductId, removeItem, summary, updateQuantity } = useBuildList();
   const [pageJumpValue, setPageJumpValue] = useState("");
 
   const selectedCategoryName = useMemo(() => {
@@ -236,6 +236,21 @@ export default function ProductExplorer() {
     updateQuery({ vendors: nextVendors });
   }
 
+  function addProductToCurrentBuildList(product: ProductListItem) {
+    addProduct(toBuildListProduct(product));
+  }
+
+  function decreaseBuildListProductQuantity(productId: string) {
+    const currentQuantity = quantityByProductId.get(productId) ?? 0;
+
+    if (currentQuantity <= 1) {
+      removeItem(productId);
+      return;
+    }
+
+    updateQuantity(productId, currentQuantity - 1);
+  }
+
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -274,10 +289,6 @@ export default function ProductExplorer() {
         </form>
 
         <div className="topbar-meta">
-          <Link className="build-list-nav-link" href="/build-list">
-            <span>配單</span>
-            <strong>{summary.totalQuantity}</strong>
-          </Link>
           <span>資料最近更新：{formatDateTime(products?.meta.lastSuccessAt, "尚無資料")}</span>
         </div>
       </header>
@@ -318,7 +329,10 @@ export default function ProductExplorer() {
               productListReturnTo={productListReturnTo}
               products={products}
               productState={productState}
-              onAddToBuildList={(product) => addProduct(toBuildListProduct(product))}
+              onAddToBuildList={addProductToCurrentBuildList}
+              onDecreaseBuildListQuantity={(product) =>
+                decreaseBuildListProductQuantity(product.id)
+              }
             />
 
             <Pagination
@@ -335,6 +349,27 @@ export default function ProductExplorer() {
           </section>
         </div>
       </main>
+      <Link
+        aria-label={`開啟配單，目前 ${summary.totalQuantity} 件，總價 ${formatPrice(summary.totalAmount)}`}
+        className="build-list-floating-link"
+        href="/build-list"
+        title="開啟配單"
+      >
+        <svg
+          className="build-list-floating-icon"
+          aria-hidden="true"
+          fill="none"
+          focusable="false"
+          viewBox="0 0 24 24"
+        >
+          <path d="M4 5h2l2.1 10.2a2 2 0 0 0 2 1.6h6.4a2 2 0 0 0 1.9-1.4L20 9H7.2" />
+          <path d="M10 20h.01M17 20h.01" />
+        </svg>
+        <span className="build-list-floating-badge" aria-hidden="true">
+          {summary.totalQuantity}
+        </span>
+        <span className="sr-only">{formatPrice(summary.totalAmount)}</span>
+      </Link>
       <SiteDisclaimer />
     </div>
   );

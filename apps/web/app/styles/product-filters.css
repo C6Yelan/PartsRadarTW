@@ -191,12 +191,16 @@
 .icon-button,
 .page-buttons button,
 .external-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-height: 38px;
   border: 1px solid var(--border-strong);
   border-radius: 7px;
   background: transparent;
   color: var(--text);
   font-weight: 700;
+  text-align: center;
   transition:
     background 140ms ease,
     border-color 140ms ease,

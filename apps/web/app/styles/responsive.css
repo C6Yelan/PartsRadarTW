@@ -273,6 +273,7 @@
   .product-main {
     display: block;
     grid-area: product;
+    text-align: initial;
   }
 
   .product-main a,
@@ -293,6 +294,8 @@
 
   .row-price {
     grid-area: price;
+    justify-content: stretch;
+    text-align: initial;
   }
 
   .row-movement {
@@ -303,10 +306,14 @@
 
   .row-status {
     grid-area: status;
+    justify-content: stretch;
+    text-align: initial;
   }
 
   .row-build-list {
     grid-area: build-list;
+    justify-content: stretch;
+    text-align: initial;
   }
 
   .table-cell {
@@ -314,6 +321,31 @@
     grid-template-columns: 76px minmax(0, 1fr);
     gap: 8px;
     align-items: baseline;
+    font-size: 14px;
+  }
+
+  .build-list-add-button {
+    min-width: 116px;
+    min-height: 44px;
+    padding: 0 14px;
+    font-size: 13px;
+  }
+
+  .build-list-quantity-control {
+    grid-template-columns: 40px minmax(36px, 1fr) 40px;
+    width: min(100%, 136px);
+    min-height: 40px;
+  }
+
+  .build-list-step-button {
+    width: 40px;
+    min-height: 40px;
+    font-size: 17px;
+  }
+
+  .build-list-quantity-value {
+    min-width: 36px;
+    min-height: 40px;
     font-size: 14px;
   }
 

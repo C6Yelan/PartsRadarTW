@@ -76,6 +76,19 @@
   }
 
   .table-cell {
-    grid-template-columns: 76px minmax(0, 1fr);
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
+
+  .row-movement.is-empty {
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
+
+  .build-list-quantity-control {
+    grid-template-columns: 38px minmax(32px, 1fr) 38px;
+    width: min(100%, 126px);
+  }
+
+  .build-list-step-button {
+    width: 38px;
   }
 }

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   addProductToBuildList,
   removeBuildListItem,
+  restoreBuildListItem,
   summarizeBuildList,
   type BuildListItem,
   type BuildListProduct,
@@ -72,6 +73,13 @@ export function useBuildList() {
     [commitItems],
   );
 
+  const restoreItem = useCallback(
+    (item: BuildListItem) => {
+      commitItems((currentItems) => restoreBuildListItem(currentItems, item));
+    },
+    [commitItems],
+  );
+
   const clearItems = useCallback(() => {
     commitItems(() => []);
   }, [commitItems]);
@@ -90,6 +98,7 @@ export function useBuildList() {
     addProduct,
     updateQuantity,
     removeItem,
+    restoreItem,
     clearItems,
   };
 }

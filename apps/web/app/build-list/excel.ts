@@ -4,12 +4,19 @@ import {
   summarizeBuildList,
   type BuildListItem,
 } from "./model";
+import { formatBuildListExportDateTime } from "./formatting";
 import { createStoredZipArchive } from "./xlsx-zip";
 
 export const BUILD_LIST_EXCEL_MIME_TYPE =
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
 type CellValue = number | string | null;
+
+interface WorksheetHyperlink {
+  cellRef: string;
+  relationshipId: string;
+  target: string;
+}
 
 export function createBuildListExcelFilename(now = new Date()) {
   const timestamp = [
@@ -25,6 +32,9 @@ export function createBuildListExcelFilename(now = new Date()) {
 }
 
 export function buildBuildListWorkbook(items: BuildListItem[]): Uint8Array {
+  const worksheetRows = createBuildListWorksheetRows(items);
+  const worksheetHyperlinks = createBuildListWorksheetHyperlinks(items);
+
   return createStoredZipArchive([
     {
       path: "[Content_Types].xml",
@@ -61,8 +71,16 @@ export function buildBuildListWorkbook(items: BuildListItem[]): Uint8Array {
     },
     {
       path: "xl/worksheets/sheet1.xml",
-      content: buildWorksheetXml(createBuildListWorksheetRows(items)),
+      content: buildWorksheetXml(worksheetRows, worksheetHyperlinks),
     },
+    ...(worksheetHyperlinks.length > 0
+      ? [
+          {
+            path: "xl/worksheets/_rels/sheet1.xml.rels",
+            content: buildWorksheetRelationshipsXml(worksheetHyperlinks),
+          },
+        ]
+      : []),
   ]);
 }
 
@@ -87,7 +105,7 @@ export function createBuildListWorksheetRows(items: BuildListItem[]): CellValue[
       item.quantity,
       item.price.amount,
       getBuildListLineSubtotal(item),
-      formatExportDateTime(item.price.lastSeenAt),
+      formatBuildListExportDateTime(item.price.lastSeenAt),
       item.source.url,
       item.introductionUrl ?? "",
       "",
@@ -96,12 +114,38 @@ export function createBuildListWorksheetRows(items: BuildListItem[]): CellValue[
   ];
 }
 
-function buildWorksheetXml(rows: CellValue[][]) {
+function createBuildListWorksheetHyperlinks(items: BuildListItem[]): WorksheetHyperlink[] {
+  const links = items.flatMap((item, itemIndex) => {
+    const rowIndex = itemIndex + 2;
+    const itemLinks = [
+      {
+        cellRef: `G${rowIndex}`,
+        target: item.source.url,
+      },
+    ];
+
+    if (item.introductionUrl) {
+      itemLinks.push({
+        cellRef: `H${rowIndex}`,
+        target: item.introductionUrl,
+      });
+    }
+
+    return itemLinks;
+  });
+
+  return links.map((link, linkIndex) => ({
+    ...link,
+    relationshipId: `rId${linkIndex + 1}`,
+  }));
+}
+
+function buildWorksheetXml(rows: CellValue[][], hyperlinks: WorksheetHyperlink[]) {
   const columnCount = Math.max(...rows.map((row) => row.length));
   const lastCellRef = `${toColumnName(columnCount)}${rows.length}`;
 
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
   <dimension ref="A1:${lastCellRef}"/>
   <sheetViews>
     <sheetView workbookViewId="0"/>
@@ -118,7 +162,41 @@ function buildWorksheetXml(rows: CellValue[][]) {
   <sheetData>
 ${rows.map((row, index) => buildRowXml(row, index + 1)).join("\n")}
   </sheetData>
+${buildWorksheetHyperlinksXml(hyperlinks)}
 </worksheet>`;
+}
+
+function buildWorksheetHyperlinksXml(hyperlinks: WorksheetHyperlink[]) {
+  if (hyperlinks.length === 0) {
+    return "";
+  }
+
+  return `  <hyperlinks>
+${hyperlinks
+  .map(
+    (hyperlink) =>
+      `    <hyperlink ref="${escapeXml(hyperlink.cellRef)}" r:id="${escapeXml(
+        hyperlink.relationshipId,
+      )}"/>`,
+  )
+  .join("\n")}
+  </hyperlinks>`;
+}
+
+function buildWorksheetRelationshipsXml(hyperlinks: WorksheetHyperlink[]) {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+${hyperlinks
+  .map(
+    (hyperlink) =>
+      `  <Relationship Id="${escapeXml(
+        hyperlink.relationshipId,
+      )}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="${escapeXml(
+        hyperlink.target,
+      )}" TargetMode="External"/>`,
+  )
+  .join("\n")}
+</Relationships>`;
 }
 
 function buildRowXml(row: CellValue[], rowIndex: number) {
@@ -139,20 +217,6 @@ function buildCellXml(value: CellValue, cellRef: string) {
   }
 
   return `<c r="${cellRef}" t="inlineStr"><is><t>${escapeXml(value)}</t></is></c>`;
-}
-
-function formatExportDateTime(value: string) {
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  const taipeiDate = new Date(date.getTime() + 8 * 60 * 60 * 1000);
-
-  return `${taipeiDate.getUTCFullYear()}-${pad2(taipeiDate.getUTCMonth() + 1)}-${pad2(
-    taipeiDate.getUTCDate(),
-  )} ${pad2(taipeiDate.getUTCHours())}:${pad2(taipeiDate.getUTCMinutes())} UTC+8`;
 }
 
 function toColumnName(index: number) {

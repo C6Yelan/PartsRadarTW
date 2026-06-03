@@ -2,7 +2,7 @@
 // apps/web/app/build-list/print/BuildListPrintPageClient.tsx
 
 import Link from "next/link";
-import { formatBuildListDateTime, formatBuildListPrice } from "../formatting";
+import { formatBuildListExportDateTime, formatBuildListPrice } from "../formatting";
 import {
   getBuildListLineSubtotal,
   summarizeBuildList,
@@ -31,20 +31,6 @@ export default function BuildListPrintPageClient() {
             <p>PartsRadarTW</p>
             <h1>配單列印版</h1>
           </div>
-          <dl>
-            <div>
-              <dt>品項</dt>
-              <dd>{summary.itemCount}</dd>
-            </div>
-            <div>
-              <dt>數量</dt>
-              <dd>{summary.totalQuantity}</dd>
-            </div>
-            <div>
-              <dt>總價</dt>
-              <dd>{formatBuildListPrice(summary.totalAmount)}</dd>
-            </div>
-          </dl>
         </header>
 
         {!isReady ? (
@@ -65,12 +51,24 @@ export default function BuildListPrintPageClient() {
             <table className="print-items-table">
               <thead>
                 <tr>
-                  <th scope="col">分類</th>
-                  <th scope="col">商品名稱</th>
-                  <th scope="col">數量</th>
-                  <th scope="col">目前價格</th>
-                  <th scope="col">小計</th>
-                  <th scope="col">價格更新時間</th>
+                  <th scope="col">
+                    <span className="print-cell-content">分類</span>
+                  </th>
+                  <th scope="col">
+                    <span className="print-cell-content">商品名稱</span>
+                  </th>
+                  <th scope="col">
+                    <span className="print-cell-content">數量</span>
+                  </th>
+                  <th scope="col">
+                    <span className="print-cell-content">目前價格</span>
+                  </th>
+                  <th scope="col">
+                    <span className="print-cell-content">小計</span>
+                  </th>
+                  <th scope="col">
+                    <span className="print-cell-content">價格更新時間</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -81,12 +79,22 @@ export default function BuildListPrintPageClient() {
               <tfoot>
                 <tr>
                   <th colSpan={2} scope="row">
-                    總計
+                    <span className="print-cell-content">總計</span>
                   </th>
-                  <td>{summary.totalQuantity}</td>
-                  <td />
-                  <td>{formatBuildListPrice(summary.totalAmount)}</td>
-                  <td />
+                  <td>
+                    <span className="print-cell-content">{summary.totalQuantity}</span>
+                  </td>
+                  <td>
+                    <span className="print-cell-content" aria-hidden="true" />
+                  </td>
+                  <td>
+                    <span className="print-cell-content">
+                      {formatBuildListPrice(summary.totalAmount)}
+                    </span>
+                  </td>
+                  <td>
+                    <span className="print-cell-content" aria-hidden="true" />
+                  </td>
                 </tr>
               </tfoot>
             </table>
@@ -97,8 +105,10 @@ export default function BuildListPrintPageClient() {
                 {items.map((item) => (
                   <li key={item.id}>
                     <strong>{item.name}</strong>
-                    <span>{item.source.url}</span>
-                    {item.introductionUrl ? <span>{item.introductionUrl}</span> : null}
+                    <a href={item.source.url}>{item.source.url}</a>
+                    {item.introductionUrl ? (
+                      <a href={item.introductionUrl}>{item.introductionUrl}</a>
+                    ) : null}
                   </li>
                 ))}
               </ol>
@@ -117,12 +127,28 @@ export default function BuildListPrintPageClient() {
 function PrintItemRow({ item }: { item: BuildListItem }) {
   return (
     <tr>
-      <td>{item.category.displayName}</td>
-      <td>{item.name}</td>
-      <td>{item.quantity}</td>
-      <td>{formatBuildListPrice(item.price.amount)}</td>
-      <td>{formatBuildListPrice(getBuildListLineSubtotal(item))}</td>
-      <td>{formatBuildListDateTime(item.price.lastSeenAt)}</td>
+      <td>
+        <span className="print-cell-content">{item.category.displayName}</span>
+      </td>
+      <td>
+        <span className="print-cell-content">{item.name}</span>
+      </td>
+      <td>
+        <span className="print-cell-content">{item.quantity}</span>
+      </td>
+      <td>
+        <span className="print-cell-content">{formatBuildListPrice(item.price.amount)}</span>
+      </td>
+      <td>
+        <span className="print-cell-content">
+          {formatBuildListPrice(getBuildListLineSubtotal(item))}
+        </span>
+      </td>
+      <td>
+        <span className="print-cell-content">
+          {formatBuildListExportDateTime(item.price.lastSeenAt)}
+        </span>
+      </td>
     </tr>
   );
 }

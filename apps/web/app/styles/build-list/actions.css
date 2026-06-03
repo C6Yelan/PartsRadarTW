@@ -1,27 +1,62 @@
 /* apps/web/app/styles/build-list/actions.css */
-.build-list-nav-link {
-  display: inline-flex;
-  gap: 8px;
-  align-items: center;
-  min-height: 34px;
-  padding: 0 10px;
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  background: rgba(18, 34, 47, 0.72);
-  color: var(--accent-strong);
-  font-size: 13px;
-  font-weight: 800;
+.build-list-floating-link {
+  position: fixed;
+  right: max(18px, env(safe-area-inset-right));
+  bottom: max(18px, env(safe-area-inset-bottom));
+  z-index: 30;
+  display: grid;
+  width: 58px;
+  height: 58px;
+  place-items: center;
+  border: 1px solid rgba(143, 180, 204, 0.44);
+  border-radius: 50%;
+  background: #1d4058;
+  color: var(--text-strong);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.36);
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    transform 140ms ease;
 }
 
-.build-list-nav-link strong {
+.build-list-floating-link:hover,
+.build-list-floating-link:focus-visible {
+  border-color: rgba(166, 196, 215, 0.78);
+  background: #26516d;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.44);
+  transform: translateY(-2px);
+}
+
+.build-list-floating-link:focus-visible {
+  outline: 2px solid rgba(166, 196, 215, 0.78);
+  outline-offset: 3px;
+}
+
+.build-list-floating-icon {
+  width: 27px;
+  height: 27px;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.build-list-floating-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
   display: inline-grid;
   min-width: 24px;
   height: 24px;
   place-items: center;
+  padding: 0 6px;
+  border: 2px solid var(--bg);
   border-radius: 999px;
-  background: var(--accent-surface);
+  background: var(--success);
   color: var(--text-strong);
   font-size: 12px;
+  font-weight: 900;
   font-variant-numeric: tabular-nums;
 }
 
@@ -42,7 +77,8 @@
 }
 
 .build-list-add-button {
-  min-height: 34px;
+  min-width: 74px;
+  min-height: 36px;
   max-width: 100%;
   padding: 0 10px;
   font-size: 12px;
@@ -56,7 +92,6 @@
   color: var(--text-strong);
 }
 
-.build-list-add-button.is-added,
 .build-list-detail-action {
   border-color: rgba(120, 216, 149, 0.36);
   background: rgba(120, 216, 149, 0.1);
@@ -69,4 +104,62 @@
   padding: 0 14px;
   font-size: 13px;
   white-space: nowrap;
+}
+
+.build-list-quantity-control {
+  display: inline-grid;
+  grid-template-columns: 36px minmax(36px, auto) 36px;
+  overflow: hidden;
+  align-items: stretch;
+  max-width: 100%;
+  min-height: 36px;
+  min-inline-size: 0;
+  padding: 0;
+  margin: 0;
+  border: 1px solid rgba(120, 216, 149, 0.36);
+  border-radius: 7px;
+  background: rgba(120, 216, 149, 0.1);
+  color: var(--success);
+}
+
+.build-list-step-button {
+  display: grid;
+  width: 36px;
+  min-height: 36px;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: currentColor;
+  font-size: 16px;
+  font-weight: 900;
+  line-height: 1;
+  transition:
+    background 140ms ease,
+    color 140ms ease,
+    opacity 140ms ease;
+}
+
+.build-list-step-button:hover:not(:disabled) {
+  background: rgba(120, 216, 149, 0.14);
+  color: var(--text-strong);
+}
+
+.build-list-step-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+.build-list-quantity-value {
+  display: grid;
+  min-width: 36px;
+  min-height: 36px;
+  place-items: center;
+  padding: 0 8px;
+  border-right: 1px solid rgba(120, 216, 149, 0.22);
+  border-left: 1px solid rgba(120, 216, 149, 0.22);
+  color: var(--text-strong);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 850;
+  line-height: 1;
 }

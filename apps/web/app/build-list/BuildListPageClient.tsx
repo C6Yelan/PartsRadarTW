@@ -2,6 +2,7 @@
 // apps/web/app/build-list/BuildListPageClient.tsx
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import SiteDisclaimer from "../site-disclaimer";
 import {
   BUILD_LIST_EXCEL_MIME_TYPE,
@@ -16,8 +17,31 @@ import {
 } from "./model";
 import { useBuildList } from "./use-build-list";
 
+const UNDO_TOAST_DURATION_MS = 7000;
+
+interface RemovedItemNotice {
+  id: number;
+  item: BuildListItem;
+}
+
 export default function BuildListPageClient() {
-  const { clearItems, isReady, items, removeItem, summary, updateQuantity } = useBuildList();
+  const { clearItems, isReady, items, removeItem, restoreItem, summary, updateQuantity } =
+    useBuildList();
+  const [removedItemNotice, setRemovedItemNotice] = useState<RemovedItemNotice | null>(null);
+
+  useEffect(() => {
+    if (!removedItemNotice) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setRemovedItemNotice((currentNotice) =>
+        currentNotice?.id === removedItemNotice.id ? null : currentNotice,
+      );
+    }, UNDO_TOAST_DURATION_MS);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [removedItemNotice]);
 
   function downloadExcel() {
     const workbookBytes = buildBuildListWorkbook(items);
@@ -32,6 +56,32 @@ export default function BuildListPageClient() {
     downloadLink.download = createBuildListExcelFilename();
     downloadLink.click();
     window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 0);
+  }
+
+  function handleRemoveItem(item: BuildListItem) {
+    removeItem(item.id);
+    setRemovedItemNotice({
+      id: Date.now(),
+      item,
+    });
+  }
+
+  function handleUndoRemove() {
+    if (!removedItemNotice) {
+      return;
+    }
+
+    restoreItem(removedItemNotice.item);
+    setRemovedItemNotice(null);
+  }
+
+  function handleClearItems() {
+    if (!window.confirm("確定要清空整份配單嗎？這會移除所有品項。")) {
+      return;
+    }
+
+    clearItems();
+    setRemovedItemNotice(null);
   }
 
   return (
@@ -82,7 +132,7 @@ export default function BuildListPageClient() {
                   item={item}
                   key={item.id}
                   onQuantityChange={updateQuantity}
-                  onRemove={removeItem}
+                  onRemove={handleRemoveItem}
                 />
               ))}
             </section>
@@ -108,13 +158,23 @@ export default function BuildListPageClient() {
               </p>
 
               <div className="build-list-summary-actions">
-                <button className="control-button primary" type="button" onClick={downloadExcel}>
-                  下載 Excel
-                </button>
-                <Link className="control-button secondary" href="/build-list/print">
-                  列印版
-                </Link>
-                <button className="control-button secondary" type="button" onClick={clearItems}>
+                <div className="build-list-export-actions">
+                  <button
+                    className="control-button primary"
+                    type="button"
+                    onClick={downloadExcel}
+                  >
+                    下載 Excel
+                  </button>
+                  <Link className="control-button secondary" href="/build-list/print">
+                    開啟列印 / PDF
+                  </Link>
+                </div>
+                <button
+                  className="control-button secondary"
+                  type="button"
+                  onClick={handleClearItems}
+                >
                   清空配單
                 </button>
               </div>
@@ -122,6 +182,18 @@ export default function BuildListPageClient() {
           </section>
         ) : null}
       </main>
+
+      {removedItemNotice ? (
+        <div className="build-list-undo-toast" role="status" aria-live="polite">
+          <span className="build-list-undo-toast-text">
+            <span>已從配單移除</span>
+            <strong>{removedItemNotice.item.name}</strong>
+          </span>
+          <button type="button" onClick={handleUndoRemove}>
+            復原
+          </button>
+        </div>
+      ) : null}
 
       <SiteDisclaimer />
     </div>
@@ -135,12 +207,13 @@ function BuildListItemRow({
 }: {
   item: BuildListItem;
   onQuantityChange: (productId: string, quantity: number) => void;
-  onRemove: (productId: string) => void;
+  onRemove: (item: BuildListItem) => void;
 }) {
   const subtotal = getBuildListLineSubtotal(item);
 
   return (
     <article className="build-list-item">
+      <BuildListItemImage item={item} />
       <div className="build-list-item-main">
         <span className="detail-category-chip">{item.category.displayName}</span>
         <h2>{item.name}</h2>
@@ -161,10 +234,16 @@ function BuildListItemRow({
         <div className="build-list-links">
           <a href={item.source.url} rel="noreferrer" target="_blank">
             原價屋查看／購買
+            <span className="build-list-link-icon" aria-hidden="true">
+              ↗
+            </span>
           </a>
           {item.introductionUrl ? (
             <a href={item.introductionUrl} rel="noreferrer" target="_blank">
               產品介紹
+              <span className="build-list-link-icon" aria-hidden="true">
+                ↗
+              </span>
             </a>
           ) : null}
         </div>
@@ -199,10 +278,43 @@ function BuildListItemRow({
             +
           </button>
         </fieldset>
-        <button className="build-list-remove-button" type="button" onClick={() => onRemove(item.id)}>
+        <button className="build-list-remove-button" type="button" onClick={() => onRemove(item)}>
           移除
         </button>
       </div>
     </article>
+  );
+}
+
+function BuildListItemImage({ item }: { item: BuildListItem }) {
+  const [hasError, setHasError] = useState(false);
+
+  if (!item.image || hasError) {
+    return (
+      <div
+        className="build-list-item-image fallback"
+        aria-label={`${item.category.displayName}圖片暫時無法顯示`}
+        role="img"
+      >
+        <span className="image-fallback-copy">
+          <strong>無圖</strong>
+          <small>{item.category.displayName}</small>
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    // biome-ignore lint/performance/noImgElement: Product images are served by the local API; plain img keeps the fallback path direct.
+    <img
+      alt={item.image.alt}
+      className="build-list-item-image"
+      draggable={false}
+      loading="lazy"
+      referrerPolicy="no-referrer"
+      src={item.image.url}
+      onContextMenu={(event) => event.preventDefault()}
+      onError={() => setHasError(true)}
+    />
   );
 }
