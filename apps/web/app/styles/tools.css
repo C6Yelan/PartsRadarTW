@@ -1,0 +1,278 @@
+/* apps/web/app/styles/tools.css */
+.tool-install-shell {
+  min-height: 100svh;
+}
+
+.tool-install-topbar {
+  grid-template-columns: minmax(220px, 1fr) minmax(260px, auto) minmax(160px, 1fr);
+}
+
+.tool-install-title {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  text-align: center;
+}
+
+.tool-install-title h1 {
+  margin: 0;
+  color: var(--text-strong);
+  font-size: 20px;
+  line-height: 1.15;
+}
+
+.tool-install-title span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.tool-install-back-link {
+  justify-self: end;
+}
+
+.tool-install-page {
+  display: grid;
+  width: min(1120px, calc(100% - 48px));
+  gap: 14px;
+  margin: 0 auto;
+  padding: 18px 0 30px;
+}
+
+.tool-install-intro,
+.tool-install-actions,
+.tool-install-steps,
+.tool-install-fallback {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-muted);
+}
+
+.tool-install-intro {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 0.78fr);
+  gap: 18px;
+  align-items: center;
+  padding: 18px;
+}
+
+.tool-install-intro h2 {
+  max-width: 700px;
+  margin: 0;
+  color: var(--text-strong);
+  font-size: 25px;
+  line-height: 1.25;
+}
+
+.tool-install-intro p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.75;
+}
+
+.tool-install-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+  grid-template-rows: auto auto;
+  gap: 14px;
+  align-items: start;
+}
+
+.tool-install-actions {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.tool-install-steps {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: start;
+}
+
+.tool-install-fallback {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.tool-install-actions,
+.tool-install-steps,
+.tool-install-fallback {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+
+.tool-install-actions h2,
+.tool-install-fallback h2 {
+  margin: 0;
+  color: var(--text-strong);
+  font-size: 18px;
+}
+
+.tool-install-actions p,
+.tool-install-fallback p {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.tool-install-action-grid,
+.tool-install-fallback-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.tool-install-action-grid .control-button,
+.tool-install-fallback-actions .control-button {
+  width: 100%;
+  min-width: 0;
+}
+
+.tool-install-steps ol {
+  display: grid;
+  gap: 10px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+  counter-reset: install-step;
+}
+
+.tool-install-steps li {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 10px 12px;
+  align-items: start;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(143, 180, 204, 0.16);
+  counter-increment: install-step;
+}
+
+.tool-install-steps li:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.tool-install-steps li::before {
+  display: grid;
+  grid-row: 1 / span 2;
+  width: 30px;
+  aspect-ratio: 1;
+  place-items: center;
+  border: 1px solid rgba(143, 180, 204, 0.42);
+  border-radius: 50%;
+  color: var(--accent-strong);
+  content: counter(install-step);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.tool-install-steps strong {
+  display: block;
+  grid-column: 2;
+  color: var(--text-strong);
+  font-size: 14px;
+}
+
+.tool-install-steps span {
+  display: block;
+  grid-column: 2;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.tool-install-status {
+  padding: 9px 10px;
+  border: 1px solid rgba(143, 180, 204, 0.22);
+  border-radius: 7px;
+  background: rgba(11, 23, 32, 0.62);
+}
+
+.tool-install-status.copied,
+.tool-install-status.shown {
+  color: var(--success);
+}
+
+.tool-install-status.error {
+  color: var(--danger);
+}
+
+.tool-install-script {
+  width: 100%;
+  min-height: 220px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: #08121a;
+  color: var(--text);
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  resize: vertical;
+}
+
+@media (max-width: 900px) {
+  .tool-install-topbar {
+    grid-template-areas:
+      "brand brand"
+      "title back";
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px 12px;
+  }
+
+  .tool-install-topbar .brand-lockup {
+    grid-area: brand;
+  }
+
+  .tool-install-title {
+    grid-area: title;
+    justify-items: start;
+    text-align: left;
+  }
+
+  .tool-install-back-link {
+    grid-area: back;
+    align-self: center;
+    justify-self: end;
+    white-space: nowrap;
+  }
+
+  .tool-install-intro,
+  .tool-install-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .tool-install-actions,
+  .tool-install-steps,
+  .tool-install-fallback {
+    grid-column: auto;
+    grid-row: auto;
+  }
+}
+
+@media (max-width: 760px) {
+  .tool-install-page {
+    width: min(100% - 28px, 1120px);
+    padding-top: 12px;
+  }
+
+  .tool-install-intro,
+  .tool-install-actions,
+  .tool-install-steps,
+  .tool-install-fallback {
+    padding: 14px;
+  }
+
+  .tool-install-intro h2 {
+    font-size: 21px;
+  }
+
+  .tool-install-action-grid,
+  .tool-install-fallback-actions {
+    grid-template-columns: 1fr;
+  }
+}
