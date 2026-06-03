@@ -78,6 +78,7 @@ repo 應提供 `.env.example` 作為範本。實際本機設定使用 `.env.loca
 | `POSTGRES_PASSWORD` | 本機 PostgreSQL 密碼；Compose 必填，需在 `.env` 內填入 |
 | `POSTGRES_BIND_HOST` | 本機 PostgreSQL port 綁定位址，預設 `127.0.0.1` |
 | `POSTGRES_PORT` | 本機 PostgreSQL 對外 port，預設 `5432` |
+| `PARTSRADAR_PUBLIC_BASE_URL` | 公開網址，用於 Open Graph / Discord link preview 的 canonical URL 與圖片 URL；預設 `https://partsradar.net` |
 | `COOLPC_BASE_URL` | 原價屋來源網址；production Compose 固定為 `https://www.coolpc.com.tw` |
 | `SNAPSHOT_STORAGE_DIR` | raw snapshot 壓縮檔保存位置 |
 | `PRODUCT_IMAGE_STORAGE_DIR` | 商品縮圖快取保存位置；本機 Next.js dev server 預設對應 repo root 的 `storage/product-images` |

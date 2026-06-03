@@ -7,6 +7,7 @@ x-app-env: &app-env
   SNAPSHOT_STORAGE_DIR: "/var/lib/partsradar/snapshots"
   PRODUCT_IMAGE_STORAGE_DIR: "/var/lib/partsradar/product-images"
   EXTERNAL_FETCH_LOCK_DIR: "/var/lib/partsradar/snapshots/.locks/external-fetch"
+  PARTSRADAR_PUBLIC_BASE_URL: "${PARTSRADAR_PUBLIC_BASE_URL:-https://partsradar.net}"
 
 services:
   postgres:
