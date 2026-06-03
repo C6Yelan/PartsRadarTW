@@ -70,7 +70,13 @@ export default function ProductDetail({
   const [priceHistory, setPriceHistory] = useState<ProductPriceHistoryBody | null>(null);
   const [historyRange, setHistoryRange] = useState<PriceHistoryRange>(90);
   const [imageError, setImageError] = useState(false);
-  const { addProduct, quantityByProductId, removeItem, summary, updateQuantity } = useBuildList();
+  const {
+    addBuildListProduct,
+    quantityByProductId,
+    removeBuildListItem,
+    summary,
+    setBuildListItemQuantity,
+  } = useBuildList();
   const currentBuildListQuantity = product ? (quantityByProductId.get(product.id) ?? 0) : 0;
   const canIncreaseBuildListQuantity = currentBuildListQuantity < BUILD_LIST_MAX_QUANTITY;
 
@@ -162,7 +168,7 @@ export default function ProductDetail({
       return;
     }
 
-    addProduct(toBuildListProduct(product));
+    addBuildListProduct(toBuildListProduct(product));
   }
 
   function decreaseCurrentProductBuildListQuantity() {
@@ -171,11 +177,11 @@ export default function ProductDetail({
     }
 
     if (currentBuildListQuantity === 1) {
-      removeItem(product.id);
+      removeBuildListItem(product.id);
       return;
     }
 
-    updateQuantity(product.id, currentBuildListQuantity - 1);
+    setBuildListItemQuantity(product.id, currentBuildListQuantity - 1);
   }
 
   return (

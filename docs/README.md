@@ -26,6 +26,7 @@ docs/
 
 - [技術選型](technical/tech-stack.md)
 - [系統架構](technical/architecture.md)
+- [命名約定](technical/naming-conventions.md)
 - [Crawler 設計](technical/crawler-design.md)
 - [資料模型](technical/data-model.md)
 - [API 設計](technical/api-design.md)

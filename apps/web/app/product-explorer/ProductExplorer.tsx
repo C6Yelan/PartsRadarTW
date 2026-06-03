@@ -39,7 +39,13 @@ export default function ProductExplorer() {
   const { filtersOpen, keepDesktopFiltersOpen, syncFiltersOpenFromToggle } =
     useResponsiveFiltersOpen();
   const { resultsPanelRef, schedulePageScroll } = usePendingPageScroll(productState, products);
-  const { addProduct, quantityByProductId, removeItem, summary, updateQuantity } = useBuildList();
+  const {
+    addBuildListProduct,
+    quantityByProductId,
+    removeBuildListItem,
+    summary,
+    setBuildListItemQuantity,
+  } = useBuildList();
   const [pageJumpValue, setPageJumpValue] = useState("");
 
   const selectedCategoryName = useMemo(() => {
@@ -237,19 +243,19 @@ export default function ProductExplorer() {
     updateQuery({ vendors: nextVendors });
   }
 
-  function addProductToCurrentBuildList(product: ProductListItem) {
-    addProduct(toBuildListProduct(product));
+  function addProductToBuildList(product: ProductListItem) {
+    addBuildListProduct(toBuildListProduct(product));
   }
 
-  function decreaseBuildListProductQuantity(productId: string) {
+  function decreaseBuildListItemQuantity(productId: string) {
     const currentQuantity = quantityByProductId.get(productId) ?? 0;
 
     if (currentQuantity <= 1) {
-      removeItem(productId);
+      removeBuildListItem(productId);
       return;
     }
 
-    updateQuantity(productId, currentQuantity - 1);
+    setBuildListItemQuantity(productId, currentQuantity - 1);
   }
 
   return (
@@ -330,9 +336,9 @@ export default function ProductExplorer() {
               productListReturnTo={productListReturnTo}
               products={products}
               productState={productState}
-              onAddToBuildList={addProductToCurrentBuildList}
+              onAddToBuildList={addProductToBuildList}
               onDecreaseBuildListQuantity={(product) =>
-                decreaseBuildListProductQuantity(product.id)
+                decreaseBuildListItemQuantity(product.id)
               }
             />
 

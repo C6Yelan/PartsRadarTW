@@ -4,12 +4,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   addProductToBuildList,
-  removeBuildListItem,
-  restoreBuildListItem,
+  removeBuildListItem as removeBuildListItemFromCollection,
+  restoreBuildListItem as restoreBuildListItemToCollection,
   summarizeBuildList,
   type BuildListItem,
   type BuildListProduct,
-  updateBuildListItemQuantity,
+  updateBuildListItemQuantity as updateBuildListItemQuantityInCollection,
 } from "./model";
 import {
   BUILD_LIST_STORAGE_KEY,
@@ -52,35 +52,37 @@ export function useBuildList() {
     dispatchBuildListUpdated();
   }, []);
 
-  const addProduct = useCallback(
+  const addBuildListProduct = useCallback(
     (product: BuildListProduct) => {
       commitItems((currentItems) => addProductToBuildList(currentItems, product));
     },
     [commitItems],
   );
 
-  const updateQuantity = useCallback(
+  const setBuildListItemQuantity = useCallback(
     (productId: string, quantity: number) => {
-      commitItems((currentItems) => updateBuildListItemQuantity(currentItems, productId, quantity));
+      commitItems((currentItems) =>
+        updateBuildListItemQuantityInCollection(currentItems, productId, quantity),
+      );
     },
     [commitItems],
   );
 
-  const removeItem = useCallback(
+  const removeBuildListItem = useCallback(
     (productId: string) => {
-      commitItems((currentItems) => removeBuildListItem(currentItems, productId));
+      commitItems((currentItems) => removeBuildListItemFromCollection(currentItems, productId));
     },
     [commitItems],
   );
 
-  const restoreItem = useCallback(
+  const restoreBuildListItem = useCallback(
     (item: BuildListItem) => {
-      commitItems((currentItems) => restoreBuildListItem(currentItems, item));
+      commitItems((currentItems) => restoreBuildListItemToCollection(currentItems, item));
     },
     [commitItems],
   );
 
-  const clearItems = useCallback(() => {
+  const clearBuildListItems = useCallback(() => {
     commitItems(() => []);
   }, [commitItems]);
 
@@ -95,10 +97,10 @@ export function useBuildList() {
     isReady,
     quantityByProductId,
     summary,
-    addProduct,
-    updateQuantity,
-    removeItem,
-    restoreItem,
-    clearItems,
+    addBuildListProduct,
+    setBuildListItemQuantity,
+    removeBuildListItem,
+    restoreBuildListItem,
+    clearBuildListItems,
   };
 }

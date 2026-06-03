@@ -6,6 +6,7 @@ import type { ProductLinkCheckerOptions, ProductLinkCheckerSummary } from "./opt
 import { toSummaryKey } from "./options";
 
 export const PRODUCT_LINK_KINDS = {
+  // SOURCE matches the public API source.url purchase link, not products.source_url.
   SOURCE: "SOURCE",
   INTRODUCTION: "INTRODUCTION",
 } as const;

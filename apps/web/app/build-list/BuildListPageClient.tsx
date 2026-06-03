@@ -25,8 +25,15 @@ interface RemovedItemNotice {
 }
 
 export default function BuildListPageClient() {
-  const { clearItems, isReady, items, removeItem, restoreItem, summary, updateQuantity } =
-    useBuildList();
+  const {
+    clearBuildListItems,
+    isReady,
+    items,
+    removeBuildListItem,
+    restoreBuildListItem,
+    summary,
+    setBuildListItemQuantity,
+  } = useBuildList();
   const [removedItemNotice, setRemovedItemNotice] = useState<RemovedItemNotice | null>(null);
 
   useEffect(() => {
@@ -58,29 +65,29 @@ export default function BuildListPageClient() {
     window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 0);
   }
 
-  function handleRemoveItem(item: BuildListItem) {
-    removeItem(item.id);
+  function handleRemoveBuildListItem(item: BuildListItem) {
+    removeBuildListItem(item.id);
     setRemovedItemNotice({
       id: Date.now(),
       item,
     });
   }
 
-  function handleUndoRemove() {
+  function handleUndoRemoveBuildListItem() {
     if (!removedItemNotice) {
       return;
     }
 
-    restoreItem(removedItemNotice.item);
+    restoreBuildListItem(removedItemNotice.item);
     setRemovedItemNotice(null);
   }
 
-  function handleClearItems() {
+  function handleClearBuildListItems() {
     if (!window.confirm("確定要清空整份配單嗎？這會移除所有品項。")) {
       return;
     }
 
-    clearItems();
+    clearBuildListItems();
     setRemovedItemNotice(null);
   }
 
@@ -131,8 +138,8 @@ export default function BuildListPageClient() {
                 <BuildListItemRow
                   item={item}
                   key={item.id}
-                  onQuantityChange={updateQuantity}
-                  onRemove={handleRemoveItem}
+                  onQuantityChange={setBuildListItemQuantity}
+                  onRemove={handleRemoveBuildListItem}
                 />
               ))}
             </section>
@@ -173,7 +180,7 @@ export default function BuildListPageClient() {
                 <button
                   className="control-button secondary"
                   type="button"
-                  onClick={handleClearItems}
+                  onClick={handleClearBuildListItems}
                 >
                   清空配單
                 </button>
@@ -189,7 +196,7 @@ export default function BuildListPageClient() {
             <span>已從配單移除</span>
             <strong>{removedItemNotice.item.name}</strong>
           </span>
-          <button type="button" onClick={handleUndoRemove}>
+          <button type="button" onClick={handleUndoRemoveBuildListItem}>
             復原
           </button>
         </div>

@@ -111,8 +111,7 @@ Response shape：
 - 價格篩選只看目前價格。
 - `priceMovement` 固定描述近 30 天價格變動；資料不足或沒有變動基準時 `deltaAmount` / `deltaPercent` 為 `null`。
 - `price_drop_desc` 與 `price_rise_desc` 依近 30 天變動排序，仍只回 read-only API 處理後的公開欄位。
-- `source.url` 不包含 `PHPSESSID`。
-- 列表來源連結可指向分類頁；詳細頁購買導流需指向 `evaluate.php?iBuy=...`。
+- `source.url` 指向原價屋查看 / 購買導流，使用 `evaluate.php?iBuy=...` 且不包含 `PHPSESSID`。
 - `image.url` 使用 `/api/product-images/{productId}.webp`。
 - 若指定 `igrp`，`meta.sourceStatus` 優先回傳該分類狀態。
 

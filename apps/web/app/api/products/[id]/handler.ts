@@ -165,7 +165,7 @@ function toProductDetailResponse(product: ProductDetailRecord): ProductDetailRes
     throw new Error("Product detail query returned a product without primary image data.");
   }
 
-  const sourceUrl = createCoolpcPurchaseUrl(product.ibuyToken);
+  const purchaseUrl = createCoolpcPurchaseUrl(product.ibuyToken);
 
   return {
     id: product.id,
@@ -190,12 +190,12 @@ function toProductDetailResponse(product: ProductDetailRecord): ProductDetailRes
     },
     source: {
       name: COOLPC_SOURCE_NAME,
-      // Build from the official source helper so the public response exposes no stored crawler URL.
-      url: sourceUrl,
+      // Build the public purchase URL directly so stored crawler source URLs cannot leak.
+      url: purchaseUrl,
       health: toProductLinkHealthResponse(
         product.linkHealthChecks,
         PRODUCT_LINK_KINDS.SOURCE,
-        sourceUrl,
+        purchaseUrl,
       ),
     },
     introduction: toIntroductionResponse(product.introductionUrl, product.linkHealthChecks),

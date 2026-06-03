@@ -115,7 +115,7 @@ export function toProductResponseItem(product: ProductRecord): ProductListRespon
     priceMovement: toProductPriceMovement(product, []),
     source: {
       name: COOLPC_SOURCE_NAME,
-      // Build from the official source helper so stored crawler URLs cannot leak session state.
+      // Build the public purchase URL directly so stored crawler source URLs cannot leak.
       url: createCoolpcPurchaseUrl(product.ibuyToken),
     },
     introduction: toIntroductionResponse(product.introductionUrl),
