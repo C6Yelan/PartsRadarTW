@@ -2,14 +2,8 @@
 // apps/web/app/build-list/BuildListPageClient.tsx
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import SiteDisclaimer from "../site-disclaimer";
-import {
-  COOLPC_ESTIMATE_MAX_QUANTITY,
-  COOLPC_IMPORT_INSTALL_PATH,
-  type CoolpcEstimateImportPlan,
-  createCoolpcEstimateImportPlan,
-} from "./coolpc-import";
 import {
   BUILD_LIST_EXCEL_MIME_TYPE,
   buildBuildListWorkbook,
@@ -34,7 +28,6 @@ export default function BuildListPageClient() {
   const { clearItems, isReady, items, removeItem, restoreItem, summary, updateQuantity } =
     useBuildList();
   const [removedItemNotice, setRemovedItemNotice] = useState<RemovedItemNotice | null>(null);
-  const coolpcImportPlan = useMemo(() => createCoolpcEstimateImportPlan(items), [items]);
 
   useEffect(() => {
     if (!removedItemNotice) {
@@ -164,8 +157,6 @@ export default function BuildListPageClient() {
                 價格以網站最後收錄資料為準；實際商品資訊、價格、庫存、購買與售後仍以原價屋來源頁為準。
               </p>
 
-              <CoolpcImportPanel plan={coolpcImportPlan} />
-
               <div className="build-list-summary-actions">
                 <div className="build-list-export-actions">
                   <button
@@ -206,71 +197,6 @@ export default function BuildListPageClient() {
 
       <SiteDisclaimer />
     </div>
-  );
-}
-
-function CoolpcImportPanel({ plan }: { plan: CoolpcEstimateImportPlan }) {
-  return (
-    <section className="coolpc-import-panel" aria-label="原價屋估價頁帶入">
-      <div className="coolpc-import-heading">
-        <strong>帶入原價屋估價頁</strong>
-        <span>僅支援電腦</span>
-      </div>
-
-      <p className="coolpc-import-desktop-copy">
-        先安裝一次瀏覽器匯入工具，之後可把配單帶到原價屋官方估價頁；送出前請自行確認商品、數量與價格。
-      </p>
-      <p className="coolpc-import-mobile-copy">
-        自動帶入原價屋估價頁目前僅支援電腦瀏覽器。
-      </p>
-
-      <div className="coolpc-import-actions">
-        <a
-          className="control-button secondary"
-          href={COOLPC_IMPORT_INSTALL_PATH}
-        >
-          安裝匯入工具
-        </a>
-        <a
-          aria-disabled={!plan.canImport}
-          className={`control-button primary${plan.canImport ? "" : " is-disabled"}`}
-          href={plan.importUrl ?? undefined}
-          rel="noreferrer"
-          tabIndex={plan.canImport ? undefined : -1}
-          target="_blank"
-        >
-          帶入原價屋估價頁
-        </a>
-      </div>
-
-      <CoolpcImportWarnings plan={plan} />
-    </section>
-  );
-}
-
-function CoolpcImportWarnings({ plan }: { plan: CoolpcEstimateImportPlan }) {
-  const warnings = [
-    plan.duplicateCategoryItems.length > 0
-      ? `同分類多品項 ${plan.duplicateCategoryItems.length} 筆需在原價屋手動補上。`
-      : null,
-    plan.quantityClippedItems.length > 0
-      ? `原價屋數量欄位最高 ${COOLPC_ESTIMATE_MAX_QUANTITY}，${plan.quantityClippedItems.length} 筆已先帶入上限。`
-      : null,
-    plan.unsupportedItems.length > 0
-      ? `${plan.unsupportedItems.length} 筆商品缺少可辨識的原價屋估價代碼，需手動確認。`
-      : null,
-  ].filter((warning): warning is string => Boolean(warning));
-
-  if (warnings.length === 0) {
-    return null;
-  }
-
-  return (
-    <ul className="coolpc-import-warnings" aria-label="帶入限制">
-      {warnings.map((warning) => (
-        <li key={warning}>{warning}</li>
-      ))}
-    </ul>
   );
 }
 

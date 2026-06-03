@@ -3,6 +3,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import FloatingBuildListLink from "../../build-list/FloatingBuildListLink";
 import { toBuildListProduct } from "../../build-list/model";
 import { useBuildList } from "../../build-list/use-build-list";
 import SiteDisclaimer from "../../site-disclaimer";
@@ -69,7 +70,7 @@ export default function ProductDetail({
   const [priceHistory, setPriceHistory] = useState<ProductPriceHistoryBody | null>(null);
   const [historyRange, setHistoryRange] = useState<PriceHistoryRange>(90);
   const [imageError, setImageError] = useState(false);
-  const { addProduct, quantityByProductId } = useBuildList();
+  const { addProduct, quantityByProductId, summary } = useBuildList();
 
   useEffect(() => {
     const controller = new AbortController();
@@ -285,6 +286,7 @@ export default function ProductDetail({
           onRangeChange={setHistoryRange}
         />
       ) : null}
+      <FloatingBuildListLink summary={summary} />
       <SiteDisclaimer />
     </main>
   );

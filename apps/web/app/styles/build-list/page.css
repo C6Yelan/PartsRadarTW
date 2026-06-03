@@ -301,77 +301,6 @@
   line-height: 1.7;
 }
 
-.coolpc-import-panel {
-  display: grid;
-  gap: 10px;
-  padding: 12px;
-  border: 1px solid rgba(143, 180, 204, 0.28);
-  border-radius: 8px;
-  background: rgba(11, 23, 32, 0.58);
-}
-
-.coolpc-import-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.coolpc-import-heading strong {
-  color: var(--text-strong);
-  font-size: 14px;
-}
-
-.coolpc-import-heading span {
-  flex: 0 0 auto;
-  padding: 3px 7px;
-  border: 1px solid rgba(143, 180, 204, 0.3);
-  border-radius: 999px;
-  color: var(--accent-strong);
-  font-size: 11px;
-  font-weight: 850;
-}
-
-.coolpc-import-desktop-copy,
-.coolpc-import-mobile-copy {
-  margin: 0;
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.65;
-}
-
-.coolpc-import-mobile-copy {
-  display: none;
-}
-
-.coolpc-import-actions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.coolpc-import-actions .control-button {
-  width: 100%;
-  min-width: 0;
-}
-
-.control-button.is-disabled {
-  cursor: not-allowed;
-  opacity: 0.52;
-  pointer-events: none;
-}
-
-.coolpc-import-warnings {
-  display: grid;
-  gap: 5px;
-  padding: 8px 0 0 18px;
-  margin: 0;
-  border-top: 1px solid rgba(143, 180, 204, 0.18);
-  color: var(--warning);
-  font-size: 12px;
-  line-height: 1.55;
-}
-
 .build-list-summary-actions {
   display: grid;
   gap: 8px;
@@ -565,13 +494,4 @@
     padding: 0 10px;
   }
 
-  .coolpc-import-desktop-copy,
-  .coolpc-import-actions,
-  .coolpc-import-warnings {
-    display: none;
-  }
-
-  .coolpc-import-mobile-copy {
-    display: block;
-  }
 }

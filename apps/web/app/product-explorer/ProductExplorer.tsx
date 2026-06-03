@@ -3,6 +3,7 @@
 
 import Link from "next/link";
 import { type FormEvent, type MouseEvent, useEffect, useMemo, useState } from "react";
+import FloatingBuildListLink from "../build-list/FloatingBuildListLink";
 import { toBuildListProduct } from "../build-list/model";
 import { useBuildList } from "../build-list/use-build-list";
 import SiteDisclaimer from "../site-disclaimer";
@@ -10,7 +11,7 @@ import { Pagination } from "./components/Pagination";
 import { ProductFilters } from "./components/ProductFilters";
 import { ProductTable } from "./components/ProductTable";
 import { ProductToolbar } from "./components/ProductToolbar";
-import { formatDateTime, formatPrice } from "./formatting";
+import { formatDateTime } from "./formatting";
 import {
   useCategories,
   usePendingPageScroll,
@@ -349,27 +350,7 @@ export default function ProductExplorer() {
           </section>
         </div>
       </main>
-      <Link
-        aria-label={`開啟配單，目前 ${summary.totalQuantity} 件，總價 ${formatPrice(summary.totalAmount)}`}
-        className="build-list-floating-link"
-        href="/build-list"
-        title="開啟配單"
-      >
-        <svg
-          className="build-list-floating-icon"
-          aria-hidden="true"
-          fill="none"
-          focusable="false"
-          viewBox="0 0 24 24"
-        >
-          <path d="M4 5h2l2.1 10.2a2 2 0 0 0 2 1.6h6.4a2 2 0 0 0 1.9-1.4L20 9H7.2" />
-          <path d="M10 20h.01M17 20h.01" />
-        </svg>
-        <span className="build-list-floating-badge" aria-hidden="true">
-          {summary.totalQuantity}
-        </span>
-        <span className="sr-only">{formatPrice(summary.totalAmount)}</span>
-      </Link>
+      <FloatingBuildListLink summary={summary} />
       <SiteDisclaimer />
     </div>
   );
