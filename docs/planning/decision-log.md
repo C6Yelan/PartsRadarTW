@@ -12,11 +12,13 @@
 | 第一版不做個人化功能 | 使用者帳號、收藏清單、個人價格提醒會影響資料模型與權限設計，第一版先不納入。 |
 | 第二版仍不做帳號與個人化功能 | 第二版不建立帳號、登入、收藏清單、追蹤清單、個人價格提醒或使用者導向 Discord bot；若未來真的需要，需另開產品與資安設計。 |
 | 第二版以價格洞察、配單與維運穩定性為主 | 第二版範圍聚焦價格歷史、近 30 天價格變動、商品連結健康檢查、正常瀏覽限流調整、配單與 Excel 匯出；營運監控先維持 `smoke-daemon` log 型監控。 |
+| 價格歷史有使用者價值，但不等於個人化價格追蹤 | 價格歷史、近期漲跌與分享配單中的價格變動提示可作為決策輔助；使用者訂閱商品、watchlist、到價提醒或個人價格通知會引入身份、通知通道、偏好保存、退訂、防濫用與資料新鮮度承諾，第三版不自然延伸這些功能。 |
+| 使用者向 Discord 限定為公開廣播與分享輔助 | 第三版可做公開服務狀態推播、資料更新摘要、配單分享預覽與公開公告；不做 Discord 查詢指令、私訊通知、帳號綁定、Discord 內保存配單、個人商品追蹤、到價提醒或購買建議。 |
 | 第二版重新盤點原價屋分類擴充 | 第一版只啟用 8 個組電腦核心分類；第二版可擴充第一版以外的原價屋公開分類，但必須先做 IGrp 盤點、manual live validation、raw snapshot replay、parser / image / link health 驗證，再分批啟用。不能未驗證就一次全開所有分類。 |
 | 第二版第一批分類擴充啟用 `IGrp=8/11/16` | 第一批先啟用外接儲存 `IGrp=8`、水冷 `IGrp=11`、風扇 / 配件 `IGrp=16`。這三類已可由 parser 取得 token、名稱、價格、來源連結與圖片欄位，並通過 manual live validation / raw snapshot replay；其他分類仍需另行盤點驗證。 |
 | 第二版配單採 accountless client-side state | 配單只作為一次性整理購買清單，不建立帳號、不保存伺服器端個人菜單、不做購物車、下單、自動購買、相容性檢查或自動推薦配單。配單可使用 localStorage 保存，匯出 Excel 時每件商品需附原價屋查看 / 購買網址。 |
 | 正常瀏覽不應被 API limiter 誤傷 | 公開 API 仍保留 app-level abuse guard，但正常使用者快速切分類、翻頁、排序與載入商品圖片時不應輕易觸發 `429`。第二版需確認 production rate limit env、client identity header、list / read / image 額度與前端多餘 request。 |
-| 第三版範圍已確認 | 第三版聚焦維運通知、狀態可視化、外部監控、分享配單、資料品質檢視與公開流量硬化；詳細範圍、非目標與待決定事項以 [第三版 Roadmap](v3-roadmap.md) 為準。 |
+| 第三版範圍與順序已確認 | 第三版先做使用者可感知的分享配單、公開服務狀態、Discord 公開推播 / 配單預覽與最低限度公開防護，再做 Discord 管理者告警、外部監控、資料品質檢視與公開流量硬化；詳細範圍、非目標與待決定事項以 [第三版 Roadmap](v3-roadmap.md) 為準。 |
 | 第一版需要保留原始來源脈絡 | 商品資料應顯示原價屋資料來源、更新時間，並能讓使用者回到原始頁面確認最新資訊。 |
 | 第一版商品圖片是必要資料 | 商品列表與商品詳細頁都需要主要商品圖片；圖片 URL 需由 crawler 從原價屋公開頁面解析、驗證與正規化後寫入資料庫，再由 API 回傳給 Web UI。缺圖只能作為容錯或資料完整性風險，不是第一版 happy path。 |
 | CoolPC 商品圖片 selector 與 allowlist | 2026-05-28 以 saved raw HTML 與 manual live validation 驗證，第一版目標分類的商品列附近可由 `<img src="/eval/{IGrp}/{filename}">` 取得主要圖片。實作只接受可正規化為 `https://www.coolpc.com.tw/eval/{IGrp}/{filename}.{jpg|jpeg|png|gif|webp}` 的 URL；`/eval/{IGrp}/`、缺副檔名或外部網域需記錄為 `invalid_image_url` 類 validation issue，不進入正式商品資料。`parse_errors.raw_image_url` 只保留原始圖片 URL 供內部 debug 與 validation，不暴露到公開 API/UI。 |
@@ -50,7 +52,7 @@
 
 | 項目 | 延後原因 |
 | --- | --- |
-| 第三版非目標群 | 使用者帳號、個人提醒、使用者導向 Discord bot、帳號保存菜單、分類缺漏提示、規格資料、相容性檢查與自動推薦配單均不納入第三版；詳見 [第三版 Roadmap](v3-roadmap.md)。 |
+| 第三版非目標群 | 使用者帳號、個人化價格追蹤、個人提醒、商品訂閱、watchlist、互動式 Discord 查詢 / 私訊 / 帳號綁定、帳號保存菜單、分類缺漏提示、規格資料、相容性檢查與自動推薦配單均不納入第三版；詳見 [第三版 Roadmap](v3-roadmap.md)。 |
 | 原價屋商品分類與規格整理規則優化 | 需等資料擷取與第一批商品資料觀察後再細化。 |
 | 解析失敗資料管理介面 | 第一版不做後台管理介面；parse error 先只作為 crawler 除錯與人工檢查資料。 |
 
