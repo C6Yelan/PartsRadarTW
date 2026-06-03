@@ -1,6 +1,6 @@
-# 隔夜 Goal：配單、匯出與維護整理
+# 已完成 Goal：配單、匯出與維護整理
 
-本文件保存下一個大型隔夜 `/goal` 的具體範圍、限制與驗收方式。這不是新的產品方向擴張；它是第二版 `v2.3` 配單與匯出的完整實作計畫，並搭配一次有邊界的維護整理。
+本文件保存第二版 `v2.3` 配單與匯出 goal 的原始範圍、限制、驗收方式與完成狀態。這不是新的產品方向擴張；此 goal 已完成，後續第二版整體狀態以 [第二版 Roadmap](v2-roadmap.md) 為準。
 
 ## 目標
 
@@ -8,6 +8,31 @@
 2. 配單可匯出 Excel，並提供可列印 PDF 版面。
 3. 針對專案進行 audit-first 維護整理，處理明顯重複、過大或過度耦合的文件與程式碼。
 4. 程式檔案補上路徑註解，方便大型 repo 中定位檔案用途與位置。
+
+## 完成狀態
+
+第二版配單與匯出 goal 已於 2026-06-03 完成部署驗收。最終 closeout commit：
+
+```text
+bd0b5646c4595c77d4cdbbb8c2f7a2187d54e735
+fix(web): remove unstable coolpc import tool
+```
+
+完成項目：
+
+- 商品列表與商品詳情頁都可加入配單。
+- 配單使用 client-side state / `localStorage`，不寫入伺服器端個人資料。
+- 配單頁支援數量調整、單品移除、清空、品項小計、總價與 reload 保存。
+- Excel 匯出包含分類、商品名稱、數量、目前價格、小計、價格更新時間、原價屋查看 / 購買網址、產品介紹網址、備註欄與總價。
+- `/build-list/print` 提供瀏覽器列印 / PDF 版面。
+- 電腦與手機流程已用 Playwright MCP 驗證，包含 Excel artifact 與 PDF artifact 檢查。
+- `/build-list` 與 `/build-list/print` local / public 部署驗收皆為 `HTTP 200`。
+- 不穩定的 CoolPC userscript 匯入工具已移除；`/tools/coolpc-import` 與 `/tools/coolpc-import.user.js` local / public 皆為 `HTTP 404`。
+
+剩餘觀察項：
+
+- `link health: broken=0 temporary=111` 屬於來源連結 temporary 狀態觀察，不阻擋第二版 closeout。
+- `missing product images: 8/3000` 仍在 smoke `OK` 範圍內，由 maintenance / image backfill 持續觀察。
 
 ## 非目標
 
@@ -209,7 +234,9 @@ git diff --check
 - 沒有引入不必要的 server-side service。
 - build output 沒有異常膨脹。
 
-## 隔夜 `/goal` Prompt 草案
+## 歷史 `/goal` Prompt
+
+以下 prompt 是當時執行 goal 的歷史參考，不代表仍需再次執行。
 
 ```text
 完整實作 PartsRadarTW 第二版 accountless 配單、Excel 匯出、可列印 PDF 版面，並做一次有邊界的維護整理。請依可驗收 slice 分批 commit；不要 push，除非使用者明確要求。

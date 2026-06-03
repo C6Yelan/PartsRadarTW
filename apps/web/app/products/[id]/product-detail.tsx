@@ -4,7 +4,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import FloatingBuildListLink from "../../build-list/FloatingBuildListLink";
-import { toBuildListProduct } from "../../build-list/model";
+import { BUILD_LIST_MAX_QUANTITY, toBuildListProduct } from "../../build-list/model";
 import { useBuildList } from "../../build-list/use-build-list";
 import SiteDisclaimer from "../../site-disclaimer";
 import PriceHistoryPanel, {
@@ -70,7 +70,9 @@ export default function ProductDetail({
   const [priceHistory, setPriceHistory] = useState<ProductPriceHistoryBody | null>(null);
   const [historyRange, setHistoryRange] = useState<PriceHistoryRange>(90);
   const [imageError, setImageError] = useState(false);
-  const { addProduct, quantityByProductId, summary } = useBuildList();
+  const { addProduct, quantityByProductId, removeItem, summary, updateQuantity } = useBuildList();
+  const currentBuildListQuantity = product ? (quantityByProductId.get(product.id) ?? 0) : 0;
+  const canIncreaseBuildListQuantity = currentBuildListQuantity < BUILD_LIST_MAX_QUANTITY;
 
   useEffect(() => {
     const controller = new AbortController();
@@ -154,6 +156,27 @@ export default function ProductDetail({
 
     return () => controller.abort();
   }, [product, productId, historyRange]);
+
+  function addCurrentProductToBuildList() {
+    if (!product) {
+      return;
+    }
+
+    addProduct(toBuildListProduct(product));
+  }
+
+  function decreaseCurrentProductBuildListQuantity() {
+    if (!product || currentBuildListQuantity <= 0) {
+      return;
+    }
+
+    if (currentBuildListQuantity === 1) {
+      removeItem(product.id);
+      return;
+    }
+
+    updateQuantity(product.id, currentBuildListQuantity - 1);
+  }
 
   return (
     <main className="detail-shell">
@@ -243,15 +266,47 @@ export default function ProductDetail({
             </dl>
 
             <div className="detail-actions">
-              <button
-                className="build-list-detail-action"
-                type="button"
-                onClick={() => addProduct(toBuildListProduct(product))}
-              >
-                {(quantityByProductId.get(product.id) ?? 0) > 0
-                  ? `配單中 ${quantityByProductId.get(product.id)}`
-                  : "加入配單"}
-              </button>
+              {currentBuildListQuantity > 0 ? (
+                <fieldset className="build-list-quantity-control build-list-detail-quantity">
+                  <legend className="sr-only">{product.name} 配單數量</legend>
+                  <button
+                    aria-label={
+                      currentBuildListQuantity === 1
+                        ? `從配單移除 ${product.name}`
+                        : `減少 ${product.name} 的配單數量`
+                    }
+                    className="build-list-step-button"
+                    title={currentBuildListQuantity === 1 ? "移除配單" : "減少數量"}
+                    type="button"
+                    onClick={decreaseCurrentProductBuildListQuantity}
+                  >
+                    −
+                  </button>
+                  <span className="build-list-quantity-value">{currentBuildListQuantity}</span>
+                  <button
+                    aria-label={`增加 ${product.name} 的配單數量`}
+                    className="build-list-step-button"
+                    disabled={!canIncreaseBuildListQuantity}
+                    title={
+                      canIncreaseBuildListQuantity
+                        ? "增加數量"
+                        : `最多 ${BUILD_LIST_MAX_QUANTITY} 件`
+                    }
+                    type="button"
+                    onClick={addCurrentProductToBuildList}
+                  >
+                    +
+                  </button>
+                </fieldset>
+              ) : (
+                <button
+                  className="build-list-detail-action"
+                  type="button"
+                  onClick={addCurrentProductToBuildList}
+                >
+                  加入配單
+                </button>
+              )}
               <a
                 aria-label="前往原價屋查看／購買，開新分頁"
                 className={toExternalActionClassName(product.source.health)}

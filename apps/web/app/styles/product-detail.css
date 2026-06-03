@@ -183,6 +183,11 @@
   align-items: center;
 }
 
+.detail-actions .build-list-detail-action,
+.detail-actions .build-list-detail-quantity {
+  flex: 0 0 auto;
+}
+
 .detail-actions .external-action {
   display: inline-flex;
   width: auto;

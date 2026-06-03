@@ -1,6 +1,6 @@
 # Operations Runbook
 
-本文件保存 PartsRadarTW 第一版部署後的操作步驟。部署邊界、服務拆分、storage 與 security 原則仍以 [deployment.md](deployment.md) 為主；本文件只放可執行的維運流程與驗證 checklist。
+本文件保存 PartsRadarTW production 部署後的操作步驟。部署邊界、服務拆分、storage 與 security 原則仍以 [deployment.md](deployment.md) 為主；本文件只放可執行的維運流程與驗證 checklist。
 
 所有指令都假設在部署主機的 repo 根目錄執行。正式 `.env` 不提交 Git，且所有 `replace_with_*` placeholder 都必須先替換成主機專用值。
 
@@ -384,7 +384,32 @@ SMOKE_PUBLIC_BASE_URL=https://partsradar.net
 
 ## Second-Version Public Closeout
 
-若第二版本地驗證已通過，但 public-only smoke 顯示 `/build-list` / `/build-list/print` 為 `HTTP 404`、`source freshness` 失敗或 `product image api` 抽樣 404，依下列順序收斂。所有指令仍假設在部署主機 repo 根目錄執行。
+2026-06-03 第二版部署 closeout 基準：
+
+```text
+bd0b5646c4595c77d4cdbbb8c2f7a2187d54e735
+fix(web): remove unstable coolpc import tool
+```
+
+已驗收：
+
+- `web` / `postgres` healthy。
+- `storage-init` / `migrate` / `seed` exit 0。
+- `crawler-daemon` / `maintenance-daemon` / `smoke-daemon` / `raw-snapshot-cleanup-daemon` 持續執行。
+- `/build-list` local / public 都回 `HTTP 200`。
+- `/build-list/print` local / public 都回 `HTTP 200`。
+- `/tools/coolpc-import` local / public 都回 `HTTP 404`。
+- `/tools/coolpc-import.user.js` local / public 都回 `HTTP 404`。
+- `/api/source-status` public 回 `HTTP 200`。
+- `/api/products?pageSize=1` public 回 `HTTP 200`。
+- `smoke-daemon` 最近檢查沒有未解釋的 `FAIL`。
+
+目前可接受的觀察項：
+
+- `link health: broken=0 temporary=111`：來源連結 temporary 狀態觀察，broken 為 0，不阻擋第二版完成。
+- `missing product images: 8/3000`：仍在 smoke `OK` 範圍內。
+
+若未來 public-only smoke 又顯示 `/build-list` / `/build-list/print` 為 `HTTP 404`、`source freshness` 失敗或 `product image api` 抽樣 404，依下列順序收斂。所有指令仍假設在部署主機 repo 根目錄執行。
 
 先確認部署主機已 fast-forward 到包含第二版 routes 的目標 commit，並 recreate web stack：
 

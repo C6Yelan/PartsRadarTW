@@ -40,20 +40,33 @@
 - Production smoke、source status 與基本安全 headers 已可驗證。
 - 文件、部署設定與實作狀態沒有明顯脫節。
 
-## 第二版範圍
+## 完成與公開驗收狀態
 
-## 公開驗收狀態
+第二版已於 2026-06-03 完成部署端 closeout。驗收 commit：
 
-第二版功能目前以本地實作與測試為主，尚未完成公開站驗收。2026-06-03 的 `--public-only` smoke 顯示：
+```text
+bd0b5646c4595c77d4cdbbb8c2f7a2187d54e735
+fix(web): remove unstable coolpc import tool
+```
 
-- 第二版第一批分類 `IGrp=8`、`IGrp=11`、`IGrp=16` 已出現在公開 API。
-- 近 30 天降幅 / 增幅排序 API 已可在公開站回應。
-- 公開 product list API 已回傳可解析的 rate-limit headers，且 client source 為 `cf`。
-- `/build-list` 與 `/build-list/print` 在公開站仍回 `HTTP 404`，表示包含配單 routes 的版本尚未完成公開部署。
-- 抽樣 product image API 仍有 `HTTP 404`，需要部署主機的 image cache backfill / maintenance 補齊後重驗。
-- source freshness 已超過 fail 門檻，部署主機 scheduled crawler / source-status 需要恢復到 smoke 可接受狀態。
+部署驗收結果：
 
-第二版正式完成前，公開站需至少通過 `pnpm ops:production-smoke -- --public-only --base-url https://partsradar.net`，且部署主機上的 `smoke-daemon` 需能觀察 crawler freshness、product image cache、link health 與 raw snapshot retention 沒有未解釋的 `FAIL`。
+- `web` / `postgres` healthy。
+- `storage-init` / `migrate` / `seed` exit 0。
+- `crawler-daemon` / `maintenance-daemon` / `smoke-daemon` / `raw-snapshot-cleanup-daemon` 持續執行。
+- `/build-list` local / public 都回 `HTTP 200`。
+- `/build-list/print` local / public 都回 `HTTP 200`。
+- 已移除的不穩定 CoolPC import tool routes 都回 `HTTP 404`：`/tools/coolpc-import` 與 `/tools/coolpc-import.user.js`。
+- `/api/source-status` public 回 `HTTP 200`。
+- `/api/products?pageSize=1` public 回 `HTTP 200`。
+- `smoke-daemon` 最近檢查沒有未解釋的 `FAIL`。
+
+目前剩餘 `WARN`：
+
+- `link health: broken=0 temporary=111`。這是來源連結健康檢查的暫時狀態觀察，broken 為 0，不阻擋第二版完成。
+- `missing product images: 8/3000` 仍在 smoke `OK` 範圍內，由 maintenance / image backfill 流程持續觀察。
+
+結論：第二版功能已完成並通過部署驗收；剩餘事項是來源站資料健康度觀察，不是第二版 web UI、配單、分類擴充、rate limit 或 smoke 部署阻塞。
 
 ### 1. 價格歷史
 
@@ -100,6 +113,7 @@
 目前狀態：
 
 - 已完成第一輪：首頁商品列表顯示近 30 天價格變動欄位，支援近 30 天降幅最大與近 30 天增幅最大排序。
+- 已完成部署驗收：公開商品列表 API 可回應近 30 天降幅 / 增幅排序。
 
 不列入第二版：
 
@@ -177,7 +191,10 @@
 - 驗證 parser 是否能穩定取得 `iBuyToken`、商品名稱、價格、來源連結、主要圖片與產品介紹連結。
 - 針對新分類跑 image backfill、link health 與 API/UI smoke。
 
-第一輪：外接儲存 `IGrp=8`、水冷 `IGrp=11`、風扇 / 配件 `IGrp=16` 已通過 manual live validation 與 raw snapshot replay，並可作為第二版第一批分類擴充。
+目前狀態：
+
+- 第一輪：外接儲存 `IGrp=8`、水冷 `IGrp=11`、風扇 / 配件 `IGrp=16` 已通過 manual live validation 與 raw snapshot replay，並作為第二版第一批分類擴充。
+- 已完成部署驗收：公開 API 可查詢第二版第一批分類。
 
 完成條件：
 
@@ -206,6 +223,8 @@
 - 已完成 `/build-list/print` 可列印版面；第二版不做一鍵 PDF 下載。
 - 2026-06-03 本地 Playwright MCP 已驗證電腦與手機使用者流程：首頁加入配單、商品詳情頁加入配單、`localStorage` 保存、reload 後數量保留、數量調整、移除、清空、Excel artifact 內容、列印頁 PDF artifact 與無水平溢出。
 - 已新增 repo path comment policy test，讓 `apps/` 與 `packages/` 下 `.ts`、`.tsx`、`.css` 的 repo-relative path comment 規則可重跑驗證，並排除 generated / fixture / build output 檔案。
+- 已完成部署驗收：`/build-list` 與 `/build-list/print` local / public 都回 `HTTP 200`。
+- 已移除不穩定的 CoolPC import tool；第二版不提供 userscript 帶入原價屋估價頁，不做購物車、下單、自動購買或代購流程。
 
 完成條件：
 
@@ -231,6 +250,7 @@
 - 已完成第二輪：production smoke 會直接抽查 product list 的 public product image API，避免 DB 已有 `primary_image_url` 但 mounted image cache 缺檔時只靠較寬鬆的缺圖總數門檻才被發現。
 - 已完成第三輪：production smoke 會檢查第二版配單 routes、第二版第一批分類、近 30 天價格變動排序 API；`--public-only` 模式可在沒有部署主機 DB access 時驗證公開 HTTP routes / APIs 與 source freshness。
 - 第二版先維持 log 型監控，不新增告警通道。
+- 已完成部署驗收：`smoke-daemon` 最近檢查沒有未解釋的 `FAIL`；目前唯一 `WARN` 是來源連結 temporary 狀態觀察，不阻擋第二版 closeout。
 
 不列入第二版：
 
@@ -248,34 +268,36 @@
 - log 不包含 `.env`、DB URL、token、raw HTML、stack trace 或其他內部敏感資訊。
 - 不把監控資料公開成使用者可查詢的內部細節頁。
 
-## 建議切片
+## 完成切片
 
 ### v2.0：資料可信度與價格歷史
 
-- 價格歷史 API 與詳細頁圖表。
-- 近 30 天價格變動欄位與排序。
-- 商品連結健康檢查。
-- maintenance daemon。
-- production smoke daemon。
+- 已完成價格歷史 API 與詳細頁圖表。
+- 已完成近 30 天價格變動欄位與排序。
+- 已完成商品連結健康檢查。
+- 已完成 maintenance daemon。
+- 已完成 production smoke daemon。
 
 ### v2.1：正常瀏覽穩定性
 
-- 修正快速翻頁 / 切分類 / 圖片載入造成的 `429` 誤傷。
-- 確認 production rate limit env 與 client identity。
+- 已完成 list / read / image rate limit 分流與正常瀏覽 burst 測試。
+- 已完成 production rate limit headers smoke 檢查。
 
 ### v2.2：原價屋分類擴充
 
-- 盤點候選 IGrp。
-- manual live validation 與 raw snapshot replay。
-- 分批更新 target categories / seed。
-- 部署後分批 crawl、image backfill、link health 與 UI/API smoke。
+- 已完成第一批候選 IGrp 盤點。
+- 已完成 `IGrp=8`、`IGrp=11`、`IGrp=16` manual live validation 與 raw snapshot replay。
+- 已完成 target categories / seed 更新。
+- 已完成部署後 API / smoke 驗收；圖片與 link health 由 maintenance 持續觀察。
 
 ### v2.3：配單與 Excel 匯出
 
-- 商品列表與詳細頁加入配單入口。
-- client-side / localStorage 配單。
-- 配單總價、數量、移除與清空。
-- Excel 匯出，每件商品附原價屋購買網址。
+- 已完成商品列表與詳細頁加入配單入口。
+- 已完成 client-side / localStorage 配單。
+- 已完成配單總價、數量、移除與清空。
+- 已完成 Excel 匯出，每件商品附原價屋購買網址。
+- 已完成 `/build-list/print` 可列印 PDF 版面。
+- 已完成部署驗收，並移除不穩定的 userscript 匯入工具。
 
 ## 第三版候選
 
@@ -295,7 +317,7 @@
 網站型專案不需要每次部署都建立 GitHub Release。Release 應只標記可回溯的公開里程碑：
 
 - 第一版公開穩定後建立 `v1.0.0`。
-- 第二版正式上線後建立 `v2.0.0`。
+- 第二版已完成部署驗收；若要建立正式公開里程碑，可從 `bd0b5646c4595c77d4cdbbb8c2f7a2187d54e735` 建立 `v2.0.0`。
 - 重大修補再使用 patch version，例如 `v2.0.1`。
 
 Release notes 應包含主要功能、migration / deployment 注意事項、驗證過的 commit SHA、已知限制與 production 網址；不包含 `.env`、資料庫 dump、raw snapshot、商品圖片快取或任何私有資料。
