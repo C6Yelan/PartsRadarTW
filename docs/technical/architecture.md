@@ -226,6 +226,6 @@ Docker Compose、反向代理、HTTPS、備份、監控與 CI/CD 等細節，後
 
 ## Future Operational Monitoring
 
-使用者帳號、個人價格提醒、收藏清單、使用者導向 Discord bot 與 Discord 管理者告警不屬於第二版方向。第二版先維持 `smoke-daemon` log 型監控；使用者可見的服務狀態頁、Discord 管理者告警或完整告警平台留到第三版再評估。
+第二版先維持 `smoke-daemon` log 型監控；後續維運通知、服務狀態與外部監控方向以 [第三版 Roadmap](../planning/v3-roadmap.md) 為準。
 
 營運監控可作為同一 repo 內的 ops script 或獨立 process，但不應直接抓取原價屋資料，也不應建立使用者資料模型。價格與來源狀態仍以 crawler 寫入的資料庫內容為準。

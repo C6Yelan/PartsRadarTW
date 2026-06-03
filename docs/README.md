@@ -20,6 +20,7 @@ docs/
 - [決策紀錄](planning/decision-log.md)
 - [實作 Roadmap](planning/implementation-roadmap.md)
 - [第二版 Roadmap](planning/v2-roadmap.md)
+- [第三版 Roadmap](planning/v3-roadmap.md)
 - [資料流設計](planning/data-flow.md)
 
 ## 技術契約

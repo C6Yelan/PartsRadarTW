@@ -16,8 +16,7 @@
 | 第二版第一批分類擴充啟用 `IGrp=8/11/16` | 第一批先啟用外接儲存 `IGrp=8`、水冷 `IGrp=11`、風扇 / 配件 `IGrp=16`。這三類已可由 parser 取得 token、名稱、價格、來源連結與圖片欄位，並通過 manual live validation / raw snapshot replay；其他分類仍需另行盤點驗證。 |
 | 第二版配單採 accountless client-side state | 配單只作為一次性整理購買清單，不建立帳號、不保存伺服器端個人菜單、不做購物車、下單、自動購買、相容性檢查或自動推薦配單。配單可使用 localStorage 保存，匯出 Excel 時每件商品需附原價屋查看 / 購買網址。 |
 | 正常瀏覽不應被 API limiter 誤傷 | 公開 API 仍保留 app-level abuse guard，但正常使用者快速切分類、翻頁、排序與載入商品圖片時不應輕易觸發 `429`。第二版需確認 production rate limit env、client identity header、list / read / image 額度與前端多餘 request。 |
-| 服務失敗告警留到第三版 | 第二版 `smoke-daemon` 先維持 container log 型監控；Discord 管理者告警、使用者服務失敗通知、公開服務狀態頁、完整 dashboard 或多通道告警都留到第三版再重新評估。 |
-| Discord bot 不列入第二版 | 第二版不做使用者價格通知 bot，也不做 Discord 管理者告警；若未來要做，第三版再重新評估。 |
+| 第三版範圍已確認 | 第三版聚焦維運通知、狀態可視化、外部監控、分享配單、資料品質檢視與公開流量硬化；詳細範圍、非目標與待決定事項以 [第三版 Roadmap](v3-roadmap.md) 為準。 |
 | 第一版需要保留原始來源脈絡 | 商品資料應顯示原價屋資料來源、更新時間，並能讓使用者回到原始頁面確認最新資訊。 |
 | 第一版商品圖片是必要資料 | 商品列表與商品詳細頁都需要主要商品圖片；圖片 URL 需由 crawler 從原價屋公開頁面解析、驗證與正規化後寫入資料庫，再由 API 回傳給 Web UI。缺圖只能作為容錯或資料完整性風險，不是第一版 happy path。 |
 | CoolPC 商品圖片 selector 與 allowlist | 2026-05-28 以 saved raw HTML 與 manual live validation 驗證，第一版目標分類的商品列附近可由 `<img src="/eval/{IGrp}/{filename}">` 取得主要圖片。實作只接受可正規化為 `https://www.coolpc.com.tw/eval/{IGrp}/{filename}.{jpg|jpeg|png|gif|webp}` 的 URL；`/eval/{IGrp}/`、缺副檔名或外部網域需記錄為 `invalid_image_url` 類 validation issue，不進入正式商品資料。`parse_errors.raw_image_url` 只保留原始圖片 URL 供內部 debug 與 validation，不暴露到公開 API/UI。 |
@@ -51,12 +50,10 @@
 
 | 項目 | 延後原因 |
 | --- | --- |
-| 使用者自訂價格提醒 | 第二版不做帳號或使用者通知；若未來真的需要，需另行建立產品與資安設計。 |
-| Discord bot 與 Discord 管理者告警 | 第二版不做使用者導向 Discord bot，也不做 Discord 管理者告警；第三版再視維運需求重新評估。 |
-| 使用者服務狀態頁與完整告警平台 | 第二版只保留 `smoke-daemon` log 型監控；公開服務狀態頁、使用者服務失敗警告中心、Uptime Kuma / Grafana 等完整監控平台整合留到第三版再評估。 |
+| 第三版非目標群 | 使用者帳號、個人提醒、使用者導向 Discord bot、帳號保存菜單、分類缺漏提示、規格資料、相容性檢查與自動推薦配單均不納入第三版；詳見 [第三版 Roadmap](v3-roadmap.md)。 |
 | 原價屋商品分類與規格整理規則優化 | 需等資料擷取與第一批商品資料觀察後再細化。 |
 | 解析失敗資料管理介面 | 第一版不做後台管理介面；parse error 先只作為 crawler 除錯與人工檢查資料。 |
 
 ## 待決定
 
-目前沒有已知會阻塞第二版 closeout 的產品決策。新增待決定事項前，應先確認是否已由第二版 Roadmap、產品邊界或技術文件吸收。
+目前沒有已知會阻塞第二版 closeout 的產品決策。第三版待決定事項以 [第三版 Roadmap](v3-roadmap.md) 的「待決定」章節為準。新增待決定事項前，應先確認是否已由 Roadmap、產品邊界或技術文件吸收。
