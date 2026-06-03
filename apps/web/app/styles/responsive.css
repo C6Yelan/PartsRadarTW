@@ -106,6 +106,32 @@
     font-size: 16px;
   }
 
+  .detail-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .detail-actions.has-introduction {
+    grid-template-columns: minmax(112px, 0.95fr) minmax(0, 1.05fr) minmax(78px, 0.74fr);
+  }
+
+  .detail-actions.without-introduction {
+    grid-template-columns: minmax(112px, 0.95fr) minmax(0, 1.05fr);
+  }
+
+  .detail-actions .build-list-detail-action,
+  .detail-actions .build-list-detail-quantity,
+  .detail-actions .external-action {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .detail-actions .external-action {
+    gap: 5px;
+    padding: 0 8px;
+    font-size: 12px;
+  }
+
   .history-topline {
     display: contents;
   }

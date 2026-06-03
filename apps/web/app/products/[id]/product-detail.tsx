@@ -272,7 +272,11 @@ export default function ProductDetail({
               </div>
             </dl>
 
-            <div className="detail-actions">
+            <div
+              className={`detail-actions ${
+                product.introduction ? "has-introduction" : "without-introduction"
+              }`}
+            >
               {currentBuildListQuantity > 0 ? (
                 <fieldset className="build-list-quantity-control build-list-detail-quantity">
                   <legend className="sr-only">{product.name} 配單數量</legend>
@@ -321,7 +325,7 @@ export default function ProductDetail({
                 rel="noreferrer"
                 target="_blank"
               >
-                前往原價屋查看／購買
+                前往購買
               </a>
               {product.introduction ? (
                 <a
