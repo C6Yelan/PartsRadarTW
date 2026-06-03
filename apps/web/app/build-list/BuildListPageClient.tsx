@@ -150,15 +150,13 @@ export default function BuildListPageClient() {
               </p>
 
               <div className="build-list-summary-actions">
-                <div className="build-list-export-actions">
-                  <button
-                    className="control-button primary"
-                    type="button"
-                    onClick={downloadExcel}
-                  >
-                    下載 Excel
-                  </button>
-                </div>
+                <button
+                  className="control-button primary"
+                  type="button"
+                  onClick={downloadExcel}
+                >
+                  下載 Excel
+                </button>
                 <button
                   className="control-button secondary"
                   type="button"
@@ -199,13 +197,24 @@ function BuildListItemRow({
   onRemove: (item: BuildListItem) => void;
 }) {
   const subtotal = getBuildListLineSubtotal(item);
+  const detailHref = createBuildListProductDetailHref(item.id);
 
   return (
     <article className="build-list-item">
-      <BuildListItemImage item={item} />
+      <Link
+        aria-label={`查看 ${item.name} 商品詳細`}
+        className="build-list-item-image-link"
+        href={detailHref}
+      >
+        <BuildListItemImage item={item} />
+      </Link>
       <div className="build-list-item-main">
         <span className="detail-category-chip">{item.category.displayName}</span>
-        <h2>{item.name}</h2>
+        <h2>
+          <Link className="build-list-item-title-link" href={detailHref} title={item.name}>
+            {item.name}
+          </Link>
+        </h2>
         <dl className="build-list-item-facts">
           <div>
             <dt>目前價格</dt>
@@ -273,6 +282,14 @@ function BuildListItemRow({
       </div>
     </article>
   );
+}
+
+function createBuildListProductDetailHref(productId: string) {
+  const params = new URLSearchParams({
+    returnTo: "/build-list",
+  });
+
+  return `/products/${productId}?${params.toString()}`;
 }
 
 function BuildListItemImage({ item }: { item: BuildListItem }) {

@@ -79,6 +79,7 @@ export default function ProductDetail({
   } = useBuildList();
   const currentBuildListQuantity = product ? (quantityByProductId.get(product.id) ?? 0) : 0;
   const canIncreaseBuildListQuantity = currentBuildListQuantity < BUILD_LIST_MAX_QUANTITY;
+  const returnLabel = returnHref.startsWith("/build-list") ? "返回配單" : "返回查詢";
 
   useEffect(() => {
     const controller = new AbortController();
@@ -188,7 +189,7 @@ export default function ProductDetail({
     <main className="detail-shell">
       <div className="detail-topbar">
         <Link className="back-link" href={returnHref}>
-          返回查詢
+          {returnLabel}
         </Link>
         {state === "ready" && product ? (
           <span className="detail-category-chip">{product.category.displayName}</span>
