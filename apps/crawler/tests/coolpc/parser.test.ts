@@ -29,13 +29,7 @@ function fixture(name: string): string {
   return readFileSync(join(fixtureDir, name), "utf8");
 }
 
-function categoryHtml({
-  igrp,
-  rawImageUrl,
-}: {
-  igrp: number;
-  rawImageUrl: string;
-}): string {
+function categoryHtml({ igrp, rawImageUrl }: { igrp: number; rawImageUrl: string }): string {
   return `<!doctype html>
 <html lang="zh-Hant-TW">
   <head>
@@ -223,6 +217,46 @@ describe("CoolPC category parser", () => {
       expect(result.validation.status).toBe("valid");
       expect(result.canImport).toBe(true);
       expect(result.items.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("derives vendor metadata for added external storage, water cooling, and fan categories", () => {
+    const fixtures = [
+      [
+        8,
+        "coolpc-live-igrp-8.sample.html",
+        [
+          { vendorSlug: "toshiba", vendorName: "Toshiba" },
+          { vendorSlug: "toshiba", vendorName: "Toshiba" },
+          { vendorSlug: "toshiba", vendorName: "Toshiba" },
+        ],
+      ],
+      [
+        11,
+        "coolpc-live-igrp-11.sample.html",
+        [
+          { vendorSlug: "asus", vendorName: "華碩" },
+          { vendorSlug: "asus", vendorName: "華碩" },
+          { vendorSlug: "asus", vendorName: "華碩" },
+        ],
+      ],
+      [
+        16,
+        "coolpc-live-igrp-16.sample.html",
+        [
+          { vendorSlug: "delta", vendorName: "台達" },
+          { vendorSlug: "acer", vendorName: "宏碁" },
+          { vendorSlug: "msi", vendorName: "微星" },
+        ],
+      ],
+    ] as const;
+
+    for (const [igrp, fixtureName, expectedVendors] of fixtures) {
+      const result = parseCoolpcCategoryPage(fixture(fixtureName), contextForCategory(igrp));
+
+      expect(
+        result.items.map(({ vendorSlug, vendorName }) => ({ vendorSlug, vendorName })),
+      ).toEqual(expectedVendors);
     }
   });
 
