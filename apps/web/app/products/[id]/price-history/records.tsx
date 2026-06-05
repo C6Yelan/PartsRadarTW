@@ -2,7 +2,7 @@
 // apps/web/app/products/[id]/price-history/records.tsx
 
 import { useState } from "react";
-import { formatCompactDate, formatPrice, formatSignedPrice } from "./format";
+import { formatPrice, formatRecordDateTime, formatSignedPrice } from "./format";
 import type { PriceChangeRecord } from "./types";
 
 const HISTORY_RECORD_PAGE_SIZE = 5;
@@ -29,7 +29,7 @@ export function HistoryRecordList({ records }: { records: PriceChangeRecord[] })
       <div className="history-record-list">
         {visibleRecords.map((record) => (
           <div className="history-record-row" key={record.key}>
-            <time dateTime={record.observedAt}>{formatCompactDate(record.observedAt)}</time>
+            <time dateTime={record.observedAt}>{formatRecordDateTime(record.observedAt)}</time>
             <span className="history-record-price">
               {`${formatPrice(record.beforeAmount)} ➙ ${formatPrice(record.afterAmount)}`}
             </span>

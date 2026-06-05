@@ -218,16 +218,34 @@
   }
 
   .history-record-row {
-    grid-template-columns: 64px minmax(0, 1fr);
-    gap: 7px 10px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px 10px;
     min-height: auto;
     padding: 10px 12px;
   }
 
-  .history-record-row strong,
+  .history-record-row time {
+    grid-column: 1;
+  }
+
   .history-record-badge {
     grid-column: 2;
+    grid-row: 1;
+    justify-self: end;
+  }
+
+  .history-record-price,
+  .history-record-row strong {
+    grid-column: 1 / -1;
     justify-self: start;
+  }
+
+  .history-record-price {
+    white-space: normal;
+  }
+
+  .history-record-row strong {
+    text-align: left;
   }
 
   .filter-panel summary {

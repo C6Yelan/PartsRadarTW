@@ -54,6 +54,21 @@ export function formatCompactDate(value: string | null) {
   }).format(new Date(value));
 }
 
+export function formatRecordDateTime(value: string) {
+  const parts = new Intl.DateTimeFormat("zh-TW", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    timeZone: "Asia/Taipei",
+  }).formatToParts(new Date(value));
+  const partValue = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? "";
+
+  return `${partValue("month")}/${partValue("day")} ${partValue("hour")}:${partValue("minute")}`;
+}
+
 export function formatTooltipDate(value: string) {
   return new Intl.DateTimeFormat("zh-TW", {
     month: "2-digit",

@@ -36,8 +36,8 @@
 
 .history-record-row {
   display: grid;
-  grid-template-columns: 90px minmax(0, 1fr) 150px 86px;
-  gap: 14px;
+  grid-template-columns: 112px minmax(180px, 1fr) 150px 72px;
+  gap: 12px;
   align-items: center;
   min-height: 42px;
   padding: 0 14px;
@@ -51,7 +51,13 @@
 .history-record-row time,
 .history-record-price {
   color: var(--muted);
+  min-width: 0;
   white-space: nowrap;
+}
+
+.history-record-row time {
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
 }
 
 .history-record-row strong {
