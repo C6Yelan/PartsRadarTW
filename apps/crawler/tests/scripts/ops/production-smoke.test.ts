@@ -8,10 +8,20 @@ import {
   runProductionPublicSmoke,
   runProductionSmoke,
 } from "../../../src/scripts/ops/production-smoke";
-import { parseProductionSmokeDaemonOptions } from "../../../src/scripts/ops/production-smoke-daemon";
+import {
+  parseProductionSmokeDaemonOptions,
+  runProductionSmokeDaemon,
+} from "../../../src/scripts/ops/production-smoke-daemon";
+import { readSmokeDiscordNotificationState } from "../../../src/scripts/ops/smoke-discord-notification";
+
+const DISCORD_ADMIN_WEBHOOK_URL = "https://discord.com/api/webhooks/1234567890/token_ABC.def-ghi";
+type SendDiscordWebhook = NonNullable<
+  Parameters<typeof runProductionSmokeDaemon>[0]["sendDiscordWebhook"]
+>;
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 
 describe("production smoke options", () => {
@@ -98,9 +108,9 @@ describe("production smoke options", () => {
     expect(() => parseProductionSmokeOptions(["--base-url", "not a url"], {}, crawlerCwd)).toThrow(
       "must be a valid HTTP(S) URL",
     );
-    expect(() =>
-      parseProductionSmokeOptions(["--timeout-ms", "999"], {}, crawlerCwd),
-    ).toThrow("--timeout-ms/SMOKE_TIMEOUT_MS must be an integer");
+    expect(() => parseProductionSmokeOptions(["--timeout-ms", "999"], {}, crawlerCwd)).toThrow(
+      "--timeout-ms/SMOKE_TIMEOUT_MS must be an integer",
+    );
   });
 });
 
@@ -117,6 +127,171 @@ describe("production smoke daemon options", () => {
     expect(options.intervalSeconds).toBe(600);
     expect(options.initialDelaySeconds).toBe(0);
   });
+
+  it("adds smoke Discord notification options", async () => {
+    const { crawlerCwd, workspaceRoot } = await createWorkspace();
+    const options = parseProductionSmokeDaemonOptions(
+      [
+        "--run-once",
+        "--smoke-discord-state-file",
+        "custom/smoke-state.json",
+        "--smoke-discord-cooldown-seconds",
+        "120",
+      ],
+      {
+        DISCORD_ADMIN_WEBHOOK_URL,
+        SMOKE_DISCORD_STATE_FILE: "ignored/state.json",
+        SMOKE_DISCORD_COOLDOWN_SECONDS: "999",
+      },
+      crawlerCwd,
+    );
+
+    expect(options.smokeDiscordNotification).toEqual({
+      adminWebhookUrl: DISCORD_ADMIN_WEBHOOK_URL,
+      stateFilePath: join(workspaceRoot, "custom", "smoke-state.json"),
+      cooldownSeconds: 120,
+    });
+  });
+});
+
+describe("production smoke daemon Discord notifications", () => {
+  it("sends a WARN notification and writes state after a smoke summary", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-02T12:00:00.000Z"));
+    const { crawlerCwd, workspaceRoot } = await createWorkspace();
+    const imageDir = join(workspaceRoot, "product-images");
+    const stateFilePath = join(workspaceRoot, "storage", "ops", "smoke-discord-state.json");
+    await mkdir(imageDir);
+    await writeFile(join(imageDir, "product-1.webp"), "webp");
+    stubHealthyPublicApi({ rateLimitClientSource: "unknown" });
+    const sendDiscordWebhook = vi.fn<SendDiscordWebhook>(
+      async () => ({ status: "sent", httpStatus: 204 }) as const,
+    );
+    const logMessage = vi.fn();
+    const options = parseProductionSmokeDaemonOptions(
+      ["--run-once", "--initial-delay-seconds", "0", "--base-url", "https://partsradar.net"],
+      {
+        PRODUCT_IMAGE_STORAGE_DIR: imageDir,
+        DISCORD_ADMIN_WEBHOOK_URL,
+        SMOKE_DISCORD_STATE_FILE: stateFilePath,
+      },
+      crawlerCwd,
+    );
+
+    await runProductionSmokeDaemon({
+      client: createSmokeClient({
+        invalidImageErrorCount: 0,
+        trueParseErrorCount: 0,
+      }) as unknown as Parameters<typeof runProductionSmokeDaemon>[0]["client"],
+      options,
+      shutdown: idleShutdown(),
+      logMessage,
+      sendDiscordWebhook,
+    });
+
+    expect(sendDiscordWebhook).toHaveBeenCalledWith(
+      expect.objectContaining({
+        webhookUrl: DISCORD_ADMIN_WEBHOOK_URL,
+        message: expect.objectContaining({
+          content: expect.stringContaining("PartsRadarTW smoke WARN"),
+        }),
+      }),
+    );
+    const webhookCall = sendDiscordWebhook.mock.calls[0]?.[0];
+    if (!webhookCall) {
+      throw new Error("Expected Discord webhook sender call.");
+    }
+    expect(webhookCall.message.content).toContain("Affected checks: WARN rate limit headers");
+    expect(logMessage).toHaveBeenCalledWith(
+      "Smoke Discord notification sent. kind=WARN httpStatus=204",
+    );
+    await expect(readSmokeDiscordNotificationState(stateFilePath)).resolves.toMatchObject({
+      lastObservedStatus: "WARN",
+      lastNotificationKind: "WARN",
+      lastNotificationKey: "WARN:WARN:rate limit headers",
+    });
+  });
+
+  it("does not send or write state when the admin webhook is not configured", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-02T12:00:00.000Z"));
+    const { crawlerCwd, workspaceRoot } = await createWorkspace();
+    const imageDir = join(workspaceRoot, "product-images");
+    const stateFilePath = join(workspaceRoot, "storage", "ops", "smoke-discord-state.json");
+    await mkdir(imageDir);
+    await writeFile(join(imageDir, "product-1.webp"), "webp");
+    stubHealthyPublicApi({ rateLimitClientSource: "unknown" });
+    const sendDiscordWebhook = vi.fn<SendDiscordWebhook>(
+      async () => ({ status: "sent", httpStatus: 204 }) as const,
+    );
+    const options = parseProductionSmokeDaemonOptions(
+      ["--run-once", "--initial-delay-seconds", "0", "--base-url", "https://partsradar.net"],
+      {
+        PRODUCT_IMAGE_STORAGE_DIR: imageDir,
+        SMOKE_DISCORD_STATE_FILE: stateFilePath,
+      },
+      crawlerCwd,
+    );
+
+    await runProductionSmokeDaemon({
+      client: createSmokeClient({
+        invalidImageErrorCount: 0,
+        trueParseErrorCount: 0,
+      }) as unknown as Parameters<typeof runProductionSmokeDaemon>[0]["client"],
+      options,
+      shutdown: idleShutdown(),
+      logMessage: vi.fn(),
+      sendDiscordWebhook,
+    });
+
+    expect(sendDiscordWebhook).not.toHaveBeenCalled();
+    await expect(readSmokeDiscordNotificationState(stateFilePath)).resolves.toBeNull();
+  });
+
+  it("logs Discord send failures without writing notification state", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-02T12:00:00.000Z"));
+    const { crawlerCwd, workspaceRoot } = await createWorkspace();
+    const imageDir = join(workspaceRoot, "product-images");
+    const stateFilePath = join(workspaceRoot, "storage", "ops", "smoke-discord-state.json");
+    await mkdir(imageDir);
+    await writeFile(join(imageDir, "product-1.webp"), "webp");
+    stubHealthyPublicApi({ rateLimitClientSource: "unknown" });
+    const sendDiscordWebhook = vi.fn<SendDiscordWebhook>(
+      async () =>
+        ({
+          status: "failed",
+          httpStatus: 500,
+          message: "Discord webhook returned HTTP 500.",
+        }) as const,
+    );
+    const logMessage = vi.fn();
+    const options = parseProductionSmokeDaemonOptions(
+      ["--run-once", "--initial-delay-seconds", "0", "--base-url", "https://partsradar.net"],
+      {
+        PRODUCT_IMAGE_STORAGE_DIR: imageDir,
+        DISCORD_ADMIN_WEBHOOK_URL,
+        SMOKE_DISCORD_STATE_FILE: stateFilePath,
+      },
+      crawlerCwd,
+    );
+
+    await runProductionSmokeDaemon({
+      client: createSmokeClient({
+        invalidImageErrorCount: 0,
+        trueParseErrorCount: 0,
+      }) as unknown as Parameters<typeof runProductionSmokeDaemon>[0]["client"],
+      options,
+      shutdown: idleShutdown(),
+      logMessage,
+      sendDiscordWebhook,
+    });
+
+    expect(logMessage).toHaveBeenCalledWith(
+      "Smoke Discord notification failed. httpStatus=500 message=Discord webhook returned HTTP 500.",
+    );
+    await expect(readSmokeDiscordNotificationState(stateFilePath)).resolves.toBeNull();
+  });
 });
 
 describe("production smoke checks", () => {
@@ -124,10 +299,7 @@ describe("production smoke checks", () => {
     const { crawlerCwd } = await createWorkspace();
     stubHealthyPublicApi({ productCount: 2 });
     const options = parseProductionSmokeOptions(["--public-only"], {}, crawlerCwd);
-    const summary = await runProductionPublicSmoke(
-      options,
-      new Date("2026-06-02T12:00:00.000Z"),
-    );
+    const summary = await runProductionPublicSmoke(options, new Date("2026-06-02T12:00:00.000Z"));
 
     expect(summary.status).toBe("OK");
     expect(summary.checks).toEqual(
@@ -177,10 +349,7 @@ describe("production smoke checks", () => {
     const { crawlerCwd } = await createWorkspace();
     stubHealthyPublicApi({ buildListStatus: 404 });
     const options = parseProductionSmokeOptions(["--public-only"], {}, crawlerCwd);
-    const summary = await runProductionPublicSmoke(
-      options,
-      new Date("2026-06-02T12:00:00.000Z"),
-    );
+    const summary = await runProductionPublicSmoke(options, new Date("2026-06-02T12:00:00.000Z"));
 
     expect(summary.status).toBe("FAIL");
     expect(summary.checks).toEqual(
@@ -198,10 +367,7 @@ describe("production smoke checks", () => {
     const { crawlerCwd } = await createWorkspace();
     stubHealthyPublicApi({ categoryIgrps: [4, 5, 6, 7, 10, 12, 14, 15] });
     const options = parseProductionSmokeOptions(["--public-only"], {}, crawlerCwd);
-    const summary = await runProductionPublicSmoke(
-      options,
-      new Date("2026-06-02T12:00:00.000Z"),
-    );
+    const summary = await runProductionPublicSmoke(options, new Date("2026-06-02T12:00:00.000Z"));
 
     expect(summary.status).toBe("FAIL");
     expect(summary.checks).toEqual(
@@ -219,10 +385,7 @@ describe("production smoke checks", () => {
     const { crawlerCwd } = await createWorkspace();
     stubHealthyPublicApi({ includePriceMovement: false });
     const options = parseProductionSmokeOptions(["--public-only"], {}, crawlerCwd);
-    const summary = await runProductionPublicSmoke(
-      options,
-      new Date("2026-06-02T12:00:00.000Z"),
-    );
+    const summary = await runProductionPublicSmoke(options, new Date("2026-06-02T12:00:00.000Z"));
 
     expect(summary.status).toBe("FAIL");
     expect(summary.checks).toEqual(
@@ -658,4 +821,11 @@ function createSmokeClient({
       count: async () => 0,
     },
   } as unknown as Parameters<typeof runProductionSmoke>[0];
+}
+
+function idleShutdown() {
+  return {
+    requested: false,
+    sleep: async () => {},
+  };
 }

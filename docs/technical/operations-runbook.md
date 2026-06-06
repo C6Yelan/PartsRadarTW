@@ -383,7 +383,7 @@ SMOKE_PUBLIC_BASE_URL=https://partsradar.net
 
 ## Discord Webhook Notification Foundation
 
-第三版 Discord 通知第一輪使用 incoming webhook，不使用互動式 Discord bot。這個基礎 sender 只負責安全送出訊息；`smoke-daemon` 告警策略、cooldown / 去重與 recovered 通知已先以可測 policy 實作，實際接入 daemon runtime 留到後續 slice。
+第三版 Discord 通知第一輪使用 incoming webhook，不使用互動式 Discord bot。`smoke-daemon` 已可在每輪 production smoke summary 後，依 notification policy 對管理者頻道送出 `WARN` / `FAIL` / `RECOVERED` 通知。
 
 可選 secret：
 
@@ -410,7 +410,8 @@ smoke Discord notification policy 行為：
 - 相同 `WARN` / `FAIL` 在 cooldown 內不重複送；超過 cooldown 可再次提醒。
 - `WARN -> OK` 或 `FAIL -> OK` 送 `RECOVERED` 一次。
 - policy message 只列出高層級 smoke status、檢查名稱與 runbook 方向，不包含個別 check message。
-- 此 policy 目前尚未接進 `smoke-daemon` runtime；下一個 slice 才會在 daemon 每輪 summary 後呼叫它。
+- Discord 發送失敗、rate limit 或 state file 寫入失敗只會寫入安全 log，不會讓 `smoke-daemon` 崩潰或停止後續檢查。
+- `--run-once` 也會走相同 policy，可用於主機端單次驗證。
 
 ## Second-Version Public Closeout
 

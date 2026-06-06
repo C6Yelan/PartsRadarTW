@@ -7,6 +7,18 @@ import {
   type ProductionSmokeOptions,
 } from "./production-smoke";
 import {
+  sendDiscordWebhookMessage,
+  type DiscordWebhookSendOptions,
+  type DiscordWebhookSendResult,
+} from "./discord-webhook";
+import {
+  createSmokeDiscordNotificationDecision,
+  parseSmokeDiscordNotificationOptions,
+  readSmokeDiscordNotificationState,
+  type SmokeDiscordNotificationOptions,
+  writeSmokeDiscordNotificationState,
+} from "./smoke-discord-notification";
+import {
   getStringArg,
   loadWorkspaceEnv,
   resolveWorkspaceRoot,
@@ -26,6 +38,7 @@ export interface ProductionSmokeDaemonOptions extends ProductionSmokeOptions {
   intervalSeconds: number;
   initialDelaySeconds: number;
   runOnce: boolean;
+  smokeDiscordNotification: SmokeDiscordNotificationOptions;
 }
 
 export interface ShutdownController {
@@ -38,6 +51,7 @@ interface RunProductionSmokeDaemonOptions {
   options: ProductionSmokeDaemonOptions;
   shutdown: ShutdownController;
   logMessage?: (message: string) => void;
+  sendDiscordWebhook?: (options: DiscordWebhookSendOptions) => Promise<DiscordWebhookSendResult>;
 }
 
 export function parseProductionSmokeDaemonOptions(
@@ -50,8 +64,10 @@ export function parseProductionSmokeDaemonOptions(
     process.exit(0);
   }
 
+  const smokeOptions = parseProductionSmokeOptions(args, env, cwd);
+
   return {
-    ...parseProductionSmokeOptions(args, env, cwd),
+    ...smokeOptions,
     intervalSeconds: parseIntegerOption({
       args,
       env,
@@ -71,6 +87,11 @@ export function parseProductionSmokeDaemonOptions(
       max: MAX_INITIAL_DELAY_SECONDS,
     }),
     runOnce: args.includes(RUN_ONCE_FLAG),
+    smokeDiscordNotification: parseSmokeDiscordNotificationOptions(
+      args,
+      env,
+      smokeOptions.workspaceRoot,
+    ),
   };
 }
 
@@ -107,6 +128,7 @@ export async function runProductionSmokeDaemon({
   options,
   shutdown,
   logMessage = log,
+  sendDiscordWebhook = sendDiscordWebhookMessage,
 }: RunProductionSmokeDaemonOptions): Promise<void> {
   if (!options.runOnce && options.initialDelaySeconds > 0) {
     logMessage(`Waiting ${options.initialDelaySeconds}s before first production smoke check.`);
@@ -117,6 +139,12 @@ export async function runProductionSmokeDaemon({
     try {
       const summary = await runProductionSmoke(client, options);
       printProductionSmokeSummary(summary);
+      await handleSmokeDiscordNotification({
+        summary,
+        options: options.smokeDiscordNotification,
+        logMessage,
+        sendDiscordWebhook,
+      });
     } catch (error) {
       logMessage(`Production smoke check failed before summary: ${toSafeCliErrorMessage(error)}`);
 
@@ -133,6 +161,105 @@ export async function runProductionSmokeDaemon({
     logMessage(`Next production smoke check at ${nextRunAt} (${options.intervalSeconds}s).`);
     await shutdown.sleep(options.intervalSeconds * 1000);
   } while (!shutdown.requested);
+}
+
+async function handleSmokeDiscordNotification({
+  summary,
+  options,
+  logMessage,
+  sendDiscordWebhook,
+}: {
+  summary: Awaited<ReturnType<typeof runProductionSmoke>>;
+  options: SmokeDiscordNotificationOptions;
+  logMessage: (message: string) => void;
+  sendDiscordWebhook: (options: DiscordWebhookSendOptions) => Promise<DiscordWebhookSendResult>;
+}): Promise<void> {
+  if (!options.adminWebhookUrl) {
+    return;
+  }
+
+  let previousState = null;
+
+  try {
+    previousState = await readSmokeDiscordNotificationState(options.stateFilePath);
+  } catch (error) {
+    logMessage(
+      `Smoke Discord notification state could not be read; treating as empty state: ${toSafeCliErrorMessage(error)}`,
+    );
+  }
+
+  const decision = createSmokeDiscordNotificationDecision({
+    summary,
+    previousState,
+    options,
+  });
+
+  if (decision.action === "skip") {
+    if (decision.nextState) {
+      await writeSmokeDiscordNotificationStateSafely({
+        path: options.stateFilePath,
+        state: decision.nextState,
+        logMessage,
+      });
+    }
+
+    return;
+  }
+
+  const result = await sendDiscordWebhook({
+    webhookUrl: options.adminWebhookUrl,
+    message: decision.message,
+  });
+
+  if (result.status === "sent") {
+    await writeSmokeDiscordNotificationStateSafely({
+      path: options.stateFilePath,
+      state: decision.nextState,
+      logMessage,
+    });
+    logMessage(
+      `Smoke Discord notification sent. kind=${decision.kind} httpStatus=${result.httpStatus}`,
+    );
+    return;
+  }
+
+  if (result.status === "rate_limited") {
+    logMessage(
+      `Smoke Discord notification rate limited. retryAfterMs=${result.retryAfterMs} global=${result.global ? "yes" : "no"}`,
+    );
+    return;
+  }
+
+  if (result.status === "failed") {
+    logMessage(
+      `Smoke Discord notification failed. httpStatus=${result.httpStatus ?? "none"} message=${toSafeCliErrorMessage(result.message)}`,
+    );
+    return;
+  }
+
+  logMessage(`Smoke Discord notification skipped by sender. reason=${result.reason}`);
+}
+
+async function writeSmokeDiscordNotificationStateSafely({
+  path,
+  state,
+  logMessage,
+}: {
+  path: string;
+  state: Awaited<ReturnType<typeof readSmokeDiscordNotificationState>>;
+  logMessage: (message: string) => void;
+}): Promise<void> {
+  if (!state) {
+    return;
+  }
+
+  try {
+    await writeSmokeDiscordNotificationState(path, state);
+  } catch (error) {
+    logMessage(
+      `Smoke Discord notification state could not be written: ${toSafeCliErrorMessage(error)}`,
+    );
+  }
 }
 
 function createShutdownController(): ShutdownController {
@@ -220,6 +347,9 @@ Options:
                                      Default: ${DEFAULT_SMOKE_INTERVAL_SECONDS}
   --initial-delay-seconds <sec>      Delay before the first daemon check.
                                      Default: ${DEFAULT_SMOKE_INITIAL_DELAY_SECONDS}
+  --smoke-discord-state-file <path>  State file for Discord smoke notification dedupe.
+  --smoke-discord-cooldown-seconds <sec>
+                                     Delay before repeating unchanged Discord alerts.
 
 The daemon also accepts production smoke options such as --base-url and --timeout-ms.
 `);
