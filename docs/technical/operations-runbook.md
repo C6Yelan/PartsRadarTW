@@ -383,12 +383,14 @@ SMOKE_PUBLIC_BASE_URL=https://partsradar.net
 
 ## Discord Webhook Notification Foundation
 
-第三版 Discord 通知第一輪使用 incoming webhook，不使用互動式 Discord bot。這個基礎 sender 只負責安全送出訊息；正式 `smoke-daemon` 告警策略、cooldown / 去重與 recovered 通知會在後續 slice 接上。
+第三版 Discord 通知第一輪使用 incoming webhook，不使用互動式 Discord bot。這個基礎 sender 只負責安全送出訊息；`smoke-daemon` 告警策略、cooldown / 去重與 recovered 通知已先以可測 policy 實作，實際接入 daemon runtime 留到後續 slice。
 
 可選 secret：
 
 - `DISCORD_PUBLIC_WEBHOOK_URL`：公開頻道 webhook，只能用於低細節公開狀態、資料更新摘要、公告或分享輔助訊息。
 - `DISCORD_ADMIN_WEBHOOK_URL`：管理者頻道 webhook，可用於維運告警，但仍不得包含 secret、raw HTML、stack trace、raw IP、internal header dump 或完整 DB URL。
+- `SMOKE_DISCORD_STATE_FILE`：smoke Discord notification policy 狀態檔，預設 `storage/ops/smoke-discord-state.json`。
+- `SMOKE_DISCORD_COOLDOWN_SECONDS`：相同 smoke 異常通知的再次提醒間隔，預設 3600 秒。
 
 安全邊界：
 
@@ -399,6 +401,16 @@ SMOKE_PUBLIC_BASE_URL=https://partsradar.net
 - sender 只做 Discord payload 格式限制、mention 防呆與 transport error message 的最小清理，避免 sender 自身回傳的錯誤文字帶出 webhook URL、DB URL、URL credentials 或常見 secret env assignment。
 - notifier policy 不得把 secret、raw HTML、stack trace、raw IP、internal header dump、完整 DB URL 或未整理的第三方來源內容傳給 sender。
 - Discord rate limit 不硬寫固定限制；sender 會回傳 `Retry-After` / `retry_after` 解析出的等待時間，後續 notifier policy 再決定何時重試。
+
+smoke Discord notification policy 行為：
+
+- 未設定 `DISCORD_ADMIN_WEBHOOK_URL` 時略過通知，且不更新 notification state。
+- `OK -> OK` 不送 Discord。
+- `OK -> WARN`、`OK -> FAIL`、`WARN -> FAIL` 或異常 fingerprint 改變時送一次。
+- 相同 `WARN` / `FAIL` 在 cooldown 內不重複送；超過 cooldown 可再次提醒。
+- `WARN -> OK` 或 `FAIL -> OK` 送 `RECOVERED` 一次。
+- policy message 只列出高層級 smoke status、檢查名稱與 runbook 方向，不包含個別 check message。
+- 此 policy 目前尚未接進 `smoke-daemon` runtime；下一個 slice 才會在 daemon 每輪 summary 後呼叫它。
 
 ## Second-Version Public Closeout
 
