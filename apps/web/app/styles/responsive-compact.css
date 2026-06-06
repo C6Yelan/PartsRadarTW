@@ -47,8 +47,22 @@
     gap: 6px;
   }
 
+  .detail-actions.has-introduction,
+  .detail-actions.without-introduction {
+    grid-template-columns: 1fr;
+  }
+
   .detail-actions.has-introduction {
-    grid-template-columns: minmax(108px, 0.94fr) minmax(0, 1fr) minmax(72px, 0.72fr);
+    grid-template-areas:
+      "build"
+      "source"
+      "intro";
+  }
+
+  .detail-actions.without-introduction {
+    grid-template-areas:
+      "build"
+      "source";
   }
 
   .detail-actions .external-action {

@@ -88,35 +88,65 @@
   }
 
   .category-list,
-  .price-grid,
-  .detail-facts {
+  .price-grid {
     grid-template-columns: 1fr;
   }
 
   .detail-facts {
-    gap: 8px 16px;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
     padding: 12px 0;
+  }
+
+  .detail-facts div {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 4px;
+    align-items: start;
   }
 
   .detail-facts dt {
     font-size: 14px;
+    white-space: normal;
   }
 
   .detail-facts dd {
     font-size: 16px;
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 
   .detail-actions {
     width: 100%;
+    grid-template-columns: 1fr;
+    grid-template-areas: "build";
     justify-content: stretch;
   }
 
   .detail-actions.has-introduction {
-    grid-template-columns: minmax(112px, 0.95fr) minmax(0, 1.05fr) minmax(78px, 0.74fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-areas:
+      "build build"
+      "source intro";
   }
 
   .detail-actions.without-introduction {
-    grid-template-columns: minmax(112px, 0.95fr) minmax(0, 1.05fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-areas: "build source";
+  }
+
+  .detail-actions .build-list-detail-action,
+  .detail-actions .build-list-detail-quantity {
+    grid-area: build;
+  }
+
+  .detail-actions .external-action {
+    grid-area: source;
+  }
+
+  .detail-actions .external-action.secondary {
+    grid-area: intro;
   }
 
   .detail-actions .build-list-detail-action,
