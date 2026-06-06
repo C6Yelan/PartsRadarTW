@@ -381,6 +381,25 @@ SMOKE_PUBLIC_BASE_URL=https://partsradar.net
 - 這不是使用者通知功能，也不建立帳號、watchlist 或價格提醒。
 - 第二版先維持 `smoke-daemon` log 型監控；第三版維運通知、狀態頁與外部監控方向以 [第三版 Roadmap](../planning/v3-roadmap.md) 為準。
 
+## Discord Webhook Notification Foundation
+
+第三版 Discord 通知第一輪使用 incoming webhook，不使用互動式 Discord bot。這個基礎 sender 只負責安全送出訊息；正式 `smoke-daemon` 告警策略、cooldown / 去重與 recovered 通知會在後續 slice 接上。
+
+可選 secret：
+
+- `DISCORD_PUBLIC_WEBHOOK_URL`：公開頻道 webhook，只能用於低細節公開狀態、資料更新摘要、公告或分享輔助訊息。
+- `DISCORD_ADMIN_WEBHOOK_URL`：管理者頻道 webhook，可用於維運告警，但仍不得包含 secret、raw HTML、stack trace、raw IP、internal header dump 或完整 DB URL。
+
+安全邊界：
+
+- `.env.example` 只保留 placeholder；真實 webhook URL 只能放在 untracked `.env` 或部署 secret。
+- 未設定或仍是 `replace_with_*` placeholder 時，sender 視為 disabled 並略過送出。
+- sender 會預設 `allowed_mentions.parse = []`，避免內容中的 `@everyone` / `@here` 觸發非預期 mention。
+- sender 不負責判斷通知內容是否可外送；呼叫端與後續 notifier policy 必須先保證只傳送已整理過的安全摘要。
+- sender 只做 Discord payload 格式限制、mention 防呆與 transport error message 的最小清理，避免 sender 自身回傳的錯誤文字帶出 webhook URL、DB URL、URL credentials 或常見 secret env assignment。
+- notifier policy 不得把 secret、raw HTML、stack trace、raw IP、internal header dump、完整 DB URL 或未整理的第三方來源內容傳給 sender。
+- Discord rate limit 不硬寫固定限制；sender 會回傳 `Retry-After` / `retry_after` 解析出的等待時間，後續 notifier policy 再決定何時重試。
+
 ## Second-Version Public Closeout
 
 2026-06-03 第二版部署 closeout 基準：
