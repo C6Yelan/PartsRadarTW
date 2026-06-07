@@ -217,6 +217,18 @@ curl -i https://<domain>/api/source-status
 
 商品外部連結健康檢查由 crawler ops command 執行，只更新 `product_link_health` 狀態供 UI 低干擾提示使用。它不在使用者 request lifecycle 內執行，也不會刪除商品、停用商品或移除連結。Production 的低頻排程由 `maintenance-daemon` 負責，手動 command 主要用於 dry-run、單次驗證或緊急補跑。
 
+先看 persisted link health 診斷報表。這個 report 只讀 DB，不發送外部 request，也不列出原始 URL 或產品明細；它用來把 `source` / `introduction` 的狀態、HTTP status 與 `failure_count` 分布分開判讀：
+
+```bash
+docker compose --profile manual-crawler run --rm crawler \
+  pnpm ops:product-links:report
+```
+
+常用 report 選項：
+
+- `--kinds source,introduction`：只看指定連結種類，預設兩者都列。
+- `--include-inactive`：包含 inactive 商品；預設只看 active 商品，和 production smoke 的 link health scope 一致。
+
 先跑小批次 dry-run，確認候選數與 log 內容：
 
 ```bash
