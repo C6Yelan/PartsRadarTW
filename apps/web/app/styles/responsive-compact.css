@@ -47,25 +47,13 @@
     gap: 6px;
   }
 
-  .detail-actions.has-introduction,
-  .detail-actions.without-introduction {
+  .detail-primary-actions,
+  .detail-link-actions {
     grid-template-columns: 1fr;
   }
 
-  .detail-actions.has-introduction {
-    grid-template-areas:
-      "build"
-      "source"
-      "intro";
-  }
-
-  .detail-actions.without-introduction {
-    grid-template-areas:
-      "build"
-      "source";
-  }
-
-  .detail-actions .external-action {
+  .detail-actions .external-action,
+  .detail-share-action {
     padding: 0 6px;
     font-size: 12px;
   }

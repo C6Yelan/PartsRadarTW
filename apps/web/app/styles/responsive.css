@@ -119,44 +119,30 @@
 
   .detail-actions {
     width: 100%;
-    grid-template-columns: 1fr;
-    grid-template-areas: "build";
     justify-content: stretch;
   }
 
-  .detail-actions.has-introduction {
+  .detail-primary-actions,
+  .detail-link-actions {
+    display: grid;
+    width: 100%;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-template-areas:
-      "build build"
-      "source intro";
   }
 
-  .detail-actions.without-introduction {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-template-areas: "build source";
-  }
-
-  .detail-actions .build-list-detail-action,
-  .detail-actions .build-list-detail-quantity {
-    grid-area: build;
-  }
-
-  .detail-actions .external-action {
-    grid-area: source;
-  }
-
-  .detail-actions .external-action.secondary {
-    grid-area: intro;
+  .detail-primary-actions {
+    grid-template-columns: 1fr;
   }
 
   .detail-actions .build-list-detail-action,
   .detail-actions .build-list-detail-quantity,
-  .detail-actions .external-action {
+  .detail-actions .external-action,
+  .detail-share-action {
     width: 100%;
     min-width: 0;
   }
 
-  .detail-actions .external-action {
+  .detail-actions .external-action,
+  .detail-share-action {
     gap: 5px;
     padding: 0 8px;
     font-size: 12px;

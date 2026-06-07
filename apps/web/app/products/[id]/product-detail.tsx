@@ -12,9 +12,11 @@ import PriceHistoryPanel, {
   type PriceHistoryRange,
   type ProductPriceHistoryBody,
 } from "./price-history-panel";
+import { shareProductUrl, type ProductShareResult } from "./product-share";
 
 type LoadState = "idle" | "loading" | "ready" | "not-found" | "error";
 type ProductLinkHealthStatus = "ok" | "broken" | "temporary_error";
+type ShareStatus = Extract<ProductShareResult, "shared" | "copied" | "failed"> | null;
 
 interface ProductLinkHealth {
   status: ProductLinkHealthStatus;
@@ -70,6 +72,7 @@ export default function ProductDetail({
   const [priceHistory, setPriceHistory] = useState<ProductPriceHistoryBody | null>(null);
   const [historyRange, setHistoryRange] = useState<PriceHistoryRange>(90);
   const [imageError, setImageError] = useState(false);
+  const [shareStatus, setShareStatus] = useState<ShareStatus>(null);
   const {
     addBuildListProduct,
     quantityByProductId,
@@ -86,6 +89,7 @@ export default function ProductDetail({
     setState("loading");
     setHistoryState("idle");
     setImageError(false);
+    setShareStatus(null);
     setProduct(null);
     setPriceHistory(null);
     setHistoryRange(90);
@@ -185,6 +189,23 @@ export default function ProductDetail({
     setBuildListItemQuantity(product.id, currentBuildListQuantity - 1);
   }
 
+  async function shareCurrentProduct() {
+    if (!product) {
+      return;
+    }
+
+    const result = await shareProductUrl({
+      navigatorRef: navigator,
+      title: product.name,
+      text: `${product.name} - ${formatPrice(product.price.amount)}`,
+      url: window.location.href,
+    });
+
+    if (result !== "cancelled") {
+      setShareStatus(result);
+    }
+  }
+
   return (
     <main className="detail-shell">
       <div className="detail-topbar">
@@ -272,72 +293,83 @@ export default function ProductDetail({
               </div>
             </dl>
 
-            <div
-              className={`detail-actions ${
-                product.introduction ? "has-introduction" : "without-introduction"
-              }`}
-            >
-              {currentBuildListQuantity > 0 ? (
-                <fieldset className="build-list-quantity-control build-list-detail-quantity">
-                  <legend className="sr-only">{product.name} 配單數量</legend>
+            <div className="detail-actions">
+              <div className="detail-primary-actions">
+                {currentBuildListQuantity > 0 ? (
+                  <fieldset className="build-list-quantity-control build-list-detail-quantity">
+                    <legend className="sr-only">{product.name} 配單數量</legend>
+                    <button
+                      aria-label={
+                        currentBuildListQuantity === 1
+                          ? `從配單移除 ${product.name}`
+                          : `減少 ${product.name} 的配單數量`
+                      }
+                      className="build-list-step-button"
+                      title={currentBuildListQuantity === 1 ? "移除配單" : "減少數量"}
+                      type="button"
+                      onClick={decreaseCurrentProductBuildListQuantity}
+                    >
+                      −
+                    </button>
+                    <span className="build-list-quantity-value">{currentBuildListQuantity}</span>
+                    <button
+                      aria-label={`增加 ${product.name} 的配單數量`}
+                      className="build-list-step-button"
+                      disabled={!canIncreaseBuildListQuantity}
+                      title={
+                        canIncreaseBuildListQuantity
+                          ? "增加數量"
+                          : `最多 ${BUILD_LIST_MAX_QUANTITY} 件`
+                      }
+                      type="button"
+                      onClick={addCurrentProductToBuildList}
+                    >
+                      +
+                    </button>
+                  </fieldset>
+                ) : (
                   <button
-                    aria-label={
-                      currentBuildListQuantity === 1
-                        ? `從配單移除 ${product.name}`
-                        : `減少 ${product.name} 的配單數量`
-                    }
-                    className="build-list-step-button"
-                    title={currentBuildListQuantity === 1 ? "移除配單" : "減少數量"}
-                    type="button"
-                    onClick={decreaseCurrentProductBuildListQuantity}
-                  >
-                    −
-                  </button>
-                  <span className="build-list-quantity-value">{currentBuildListQuantity}</span>
-                  <button
-                    aria-label={`增加 ${product.name} 的配單數量`}
-                    className="build-list-step-button"
-                    disabled={!canIncreaseBuildListQuantity}
-                    title={
-                      canIncreaseBuildListQuantity
-                        ? "增加數量"
-                        : `最多 ${BUILD_LIST_MAX_QUANTITY} 件`
-                    }
+                    className="build-list-detail-action"
                     type="button"
                     onClick={addCurrentProductToBuildList}
                   >
-                    +
+                    加入配單
                   </button>
-                </fieldset>
-              ) : (
-                <button
-                  className="build-list-detail-action"
-                  type="button"
-                  onClick={addCurrentProductToBuildList}
-                >
-                  加入配單
-                </button>
-              )}
-              <a
-                aria-label="前往原價屋查看／購買，開新分頁"
-                className={toExternalActionClassName(product.source.health)}
-                href={product.source.url}
-                rel="noreferrer"
-                target="_blank"
-              >
-                前往購買
-              </a>
-              {product.introduction ? (
+                )}
+              </div>
+              <div className="detail-link-actions">
                 <a
-                  aria-label="產品介紹，開新分頁"
-                  className={toExternalActionClassName(product.introduction.health, "secondary")}
-                  href={product.introduction.url}
+                  aria-label="前往原價屋查看／購買，開新分頁"
+                  className={toExternalActionClassName(product.source.health)}
+                  href={product.source.url}
                   rel="noreferrer"
                   target="_blank"
                 >
-                  產品介紹
+                  前往購買
                 </a>
-              ) : null}
+                <button
+                  aria-label="分享商品連結"
+                  className="detail-share-action"
+                  type="button"
+                  onClick={shareCurrentProduct}
+                >
+                  分享
+                </button>
+                {product.introduction ? (
+                  <a
+                    aria-label="產品介紹，開新分頁"
+                    className={toExternalActionClassName(product.introduction.health, "secondary")}
+                    href={product.introduction.url}
+                    rel="noreferrer"
+                    target="_blank"
+                  >
+                    產品介紹
+                  </a>
+                ) : null}
+              </div>
+              <p className="detail-share-status" aria-live="polite">
+                {formatShareStatus(shareStatus)}
+              </p>
             </div>
             {renderLinkHealthNotice(product)}
           </div>
@@ -407,6 +439,22 @@ function renderLinkHealthNotice(product: ProductDetailBody) {
       {notices.join("　")}
     </p>
   );
+}
+
+function formatShareStatus(status: ShareStatus): string {
+  if (status === "shared") {
+    return "已開啟分享";
+  }
+
+  if (status === "copied") {
+    return "已複製連結";
+  }
+
+  if (status === "failed") {
+    return "目前無法分享";
+  }
+
+  return "";
 }
 
 function toLinkHealthNotice(label: string, health: ProductLinkHealth | null) {
