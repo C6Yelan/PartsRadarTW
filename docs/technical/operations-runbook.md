@@ -309,8 +309,23 @@ docker compose --profile manual-crawler run --rm crawler \
 - source image anomaly 是第三方來源圖片 URL 品質訊號，低於門檻只視為 OK/info，超過門檻才 WARN，不直接 FAIL。
 - display-ready active 商品數沒有低於門檻。
 - active 商品缺圖數沒有超過門檻。
-- active 商品 link health 的 broken / temporary error 數沒有超過門檻。
+- active 商品 link health 的 source / introduction broken 與 temporary error 數沒有超過各自門檻。
 - raw snapshot metadata 沒有明顯超過 retention grace。
+
+Link health smoke 會分開統計 `source` 與 `introduction`。`source` 代表 public `source.url` 的原價屋購買 / 查看連結，門檻應維持較嚴格；`introduction` 代表產品介紹頁，403 / 429 / timeout 這類 temporary error 對主瀏覽流程影響較低，預設採較高的 temporary 門檻。`SMOKE_BROKEN_LINK_*` 與 `SMOKE_TEMPORARY_LINK_*` 舊變數仍可作為 local CLI / script fallback；Compose 新部署使用 `SMOKE_SOURCE_*_LINK_*` 與 `SMOKE_INTRODUCTION_*_LINK_*`。
+
+建議預設：
+
+```env
+SMOKE_SOURCE_BROKEN_LINK_WARN_COUNT=1
+SMOKE_SOURCE_BROKEN_LINK_FAIL_COUNT=50
+SMOKE_SOURCE_TEMPORARY_LINK_WARN_COUNT=100
+SMOKE_SOURCE_TEMPORARY_LINK_FAIL_COUNT=500
+SMOKE_INTRODUCTION_BROKEN_LINK_WARN_COUNT=1
+SMOKE_INTRODUCTION_BROKEN_LINK_FAIL_COUNT=50
+SMOKE_INTRODUCTION_TEMPORARY_LINK_WARN_COUNT=500
+SMOKE_INTRODUCTION_TEMPORARY_LINK_FAIL_COUNT=1000
+```
 
 啟動：
 
@@ -372,8 +387,10 @@ SMOKE_PUBLIC_BASE_URL=https://partsradar.net
 - `SMOKE_PARSE_ERROR_WARN_COUNT` / `SMOKE_PARSE_ERROR_FAIL_COUNT`：parse error 門檻，預設 20 / 100。
 - `SMOKE_INVALID_IMAGE_URL_WARN_COUNT`：source image anomaly WARN 門檻，預設 2000；真正使用者可見影響仍由 active products / missing product images 判斷。
 - `SMOKE_MISSING_IMAGE_WARN_COUNT` / `SMOKE_MISSING_IMAGE_FAIL_COUNT`：缺圖門檻，預設 200 / 500。
-- `SMOKE_BROKEN_LINK_WARN_COUNT` / `SMOKE_BROKEN_LINK_FAIL_COUNT`：broken link health 門檻，預設 1 / 50。
-- `SMOKE_TEMPORARY_LINK_WARN_COUNT` / `SMOKE_TEMPORARY_LINK_FAIL_COUNT`：temporary link error 門檻，預設 100 / 500。
+- `SMOKE_SOURCE_BROKEN_LINK_WARN_COUNT` / `SMOKE_SOURCE_BROKEN_LINK_FAIL_COUNT`：source 購買 / 查看連結 broken 門檻，預設 1 / 50。
+- `SMOKE_SOURCE_TEMPORARY_LINK_WARN_COUNT` / `SMOKE_SOURCE_TEMPORARY_LINK_FAIL_COUNT`：source 購買 / 查看連結 temporary error 門檻，預設 100 / 500。
+- `SMOKE_INTRODUCTION_BROKEN_LINK_WARN_COUNT` / `SMOKE_INTRODUCTION_BROKEN_LINK_FAIL_COUNT`：產品介紹連結 broken 門檻，預設 1 / 50。
+- `SMOKE_INTRODUCTION_TEMPORARY_LINK_WARN_COUNT` / `SMOKE_INTRODUCTION_TEMPORARY_LINK_FAIL_COUNT`：產品介紹連結 temporary error 門檻，預設 500 / 1000。
 
 注意事項：
 
@@ -389,7 +406,7 @@ SMOKE_PUBLIC_BASE_URL=https://partsradar.net
 
 - `DISCORD_PUBLIC_WEBHOOK_URL`：公開頻道 webhook，只能用於低細節公開狀態、資料更新摘要、公告或分享輔助訊息。
 - `DISCORD_ADMIN_WEBHOOK_URL`：管理者頻道 webhook，可用於維運告警，但仍不得包含 secret、raw HTML、stack trace、raw IP、internal header dump 或完整 DB URL。
-- `SMOKE_DISCORD_STATE_FILE`：smoke Discord notification policy 狀態檔，預設 `storage/ops/smoke-discord-state.json`。
+- `SMOKE_DISCORD_STATE_FILE`：smoke Discord notification policy 狀態檔；local script 預設 `storage/ops/smoke-discord-state.json`，Compose `smoke-daemon` 預設 `/var/lib/partsradar/snapshots/ops/smoke-discord-state.json`，讓 dedupe state 留在 named volume。部署主機若曾設定 `SMOKE_DISCORD_STATE_FILE=storage/ops/smoke-discord-state.json`，建議移除該行或改成 container absolute path，避免 state 寫在 ephemeral container filesystem。
 - `SMOKE_DISCORD_COOLDOWN_SECONDS`：相同 smoke 異常通知的再次提醒間隔，預設 3600 秒。
 
 安全邊界：
