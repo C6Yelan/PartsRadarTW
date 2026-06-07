@@ -81,6 +81,7 @@ services:
       API_IMAGE_RATE_LIMIT_MAX: "${API_IMAGE_RATE_LIMIT_MAX:-1200}"
       API_RATE_LIMIT_WINDOW_SECONDS: "${API_RATE_LIMIT_WINDOW_SECONDS:-60}"
       API_RATE_LIMIT_CACHE_SIZE: "${API_RATE_LIMIT_CACHE_SIZE:-5000}"
+      OPS_STATUS_ENABLED: "false"
     ports:
       - "${WEB_BIND_HOST:-127.0.0.1}:${WEB_PORT:-3000}:3000"
     volumes:
@@ -97,6 +98,65 @@ services:
         [
           "CMD-SHELL",
           "node -e \"fetch('http://127.0.0.1:3000/api/source-status').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  ops-web:
+    profiles:
+      - ops
+    build:
+      context: .
+      target: web
+    restart: unless-stopped
+    environment:
+      <<: *app-env
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+      OPS_STATUS_ENABLED: "true"
+      OPS_STATUS_TOKEN: "${OPS_STATUS_TOKEN:-replace_with_ops_status_token}"
+      SMOKE_SOURCE_WARN_AFTER_MINUTES: "${SMOKE_SOURCE_WARN_AFTER_MINUTES:-60}"
+      SMOKE_SOURCE_FAIL_AFTER_MINUTES: "${SMOKE_SOURCE_FAIL_AFTER_MINUTES:-120}"
+      SMOKE_CRAWLER_WARN_AFTER_MINUTES: "${SMOKE_CRAWLER_WARN_AFTER_MINUTES:-90}"
+      SMOKE_CRAWLER_FAIL_AFTER_MINUTES: "${SMOKE_CRAWLER_FAIL_AFTER_MINUTES:-180}"
+      SMOKE_RECENT_WINDOW_HOURS: "${SMOKE_RECENT_WINDOW_HOURS:-24}"
+      SMOKE_PARSE_ERROR_WARN_COUNT: "${SMOKE_PARSE_ERROR_WARN_COUNT:-20}"
+      SMOKE_PARSE_ERROR_FAIL_COUNT: "${SMOKE_PARSE_ERROR_FAIL_COUNT:-100}"
+      SMOKE_INVALID_IMAGE_URL_WARN_COUNT: "${SMOKE_INVALID_IMAGE_URL_WARN_COUNT:-2000}"
+      SMOKE_MIN_ACTIVE_PRODUCTS: "${SMOKE_MIN_ACTIVE_PRODUCTS:-1}"
+      SMOKE_MISSING_IMAGE_WARN_COUNT: "${SMOKE_MISSING_IMAGE_WARN_COUNT:-200}"
+      SMOKE_MISSING_IMAGE_FAIL_COUNT: "${SMOKE_MISSING_IMAGE_FAIL_COUNT:-500}"
+      SMOKE_SOURCE_BROKEN_LINK_WARN_COUNT: "${SMOKE_SOURCE_BROKEN_LINK_WARN_COUNT:-1}"
+      SMOKE_SOURCE_BROKEN_LINK_FAIL_COUNT: "${SMOKE_SOURCE_BROKEN_LINK_FAIL_COUNT:-50}"
+      SMOKE_SOURCE_TEMPORARY_LINK_WARN_COUNT: "${SMOKE_SOURCE_TEMPORARY_LINK_WARN_COUNT:-100}"
+      SMOKE_SOURCE_TEMPORARY_LINK_FAIL_COUNT: "${SMOKE_SOURCE_TEMPORARY_LINK_FAIL_COUNT:-500}"
+      SMOKE_INTRODUCTION_BROKEN_LINK_WARN_COUNT: "${SMOKE_INTRODUCTION_BROKEN_LINK_WARN_COUNT:-1}"
+      SMOKE_INTRODUCTION_BROKEN_LINK_FAIL_COUNT: "${SMOKE_INTRODUCTION_BROKEN_LINK_FAIL_COUNT:-50}"
+      SMOKE_INTRODUCTION_TEMPORARY_LINK_WARN_COUNT: "${SMOKE_INTRODUCTION_TEMPORARY_LINK_WARN_COUNT:-500}"
+      SMOKE_INTRODUCTION_TEMPORARY_LINK_FAIL_COUNT: "${SMOKE_INTRODUCTION_TEMPORARY_LINK_FAIL_COUNT:-1000}"
+      SMOKE_RAW_SNAPSHOT_NORMAL_RETENTION_DAYS: "${SMOKE_RAW_SNAPSHOT_NORMAL_RETENTION_DAYS:-30}"
+      SMOKE_RAW_SNAPSHOT_ABNORMAL_RETENTION_DAYS: "${SMOKE_RAW_SNAPSHOT_ABNORMAL_RETENTION_DAYS:-90}"
+      SMOKE_RAW_SNAPSHOT_RETENTION_GRACE_DAYS: "${SMOKE_RAW_SNAPSHOT_RETENTION_GRACE_DAYS:-2}"
+      SMOKE_RAW_SNAPSHOT_WARN_COUNT: "${SMOKE_RAW_SNAPSHOT_WARN_COUNT:-1}"
+      SMOKE_RAW_SNAPSHOT_FAIL_COUNT: "${SMOKE_RAW_SNAPSHOT_FAIL_COUNT:-100}"
+    ports:
+      - "${OPS_WEB_BIND_HOST:-127.0.0.1}:${OPS_WEB_PORT:-3001}:3000"
+    volumes:
+      - product_images:/var/lib/partsradar/product-images:ro
+    depends_on:
+      storage-init:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      seed:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"const t=process.env.OPS_STATUS_TOKEN||''; if(!t||t.startsWith('replace_with_')) process.exit(1); fetch('http://127.0.0.1:3000/ops/status',{headers:{'x-ops-status-token':t}}).then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"",
         ]
       interval: 30s
       timeout: 5s

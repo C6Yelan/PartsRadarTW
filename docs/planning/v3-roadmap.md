@@ -1,15 +1,14 @@
 # 第三版 Roadmap
 
-本文件是第三版規劃的主要來源。第三版把第二版完成的公開網站、配單與 log 型維運能力，先升級成更容易分享、能讓使用者理解服務狀態的版本，再分階段補上管理者告警、外部監控與公開流量成長硬化。
+本文件是第三版規劃的主要來源。第三版目前先收斂在低成本、高直接價值的分享、通知與內部維運能力：商品頁分享 / Open Graph preview、public Discord 價格變動清單、管理者 Discord 告警，以及受保護的內網 ops status page。分享配單、公開服務狀態推播與公開服務狀態頁暫不作為近期主線；若未來需求明確，再另開較小設計 slice。
 
 ## 目標
 
-- 讓第二版的 accountless 配單可以分享給其他人查看。
-- 讓公開服務有使用者可理解的服務狀態頁，但不公開內部 crawler、DB、raw snapshot 或 parse error 細節。
-- 讓 Discord 作為公開廣播與分享輔助入口，提供服務狀態、資料更新摘要、配單分享預覽與公開公告。
+- 讓商品詳細頁更容易分享，並讓外部平台透過 Open Graph 取得乾淨商品預覽。
+- 讓 Discord public webhook 提供有參考價值的公開價格變動清單，而不是低價值服務狀態噪音。
 - 保留價格歷史與近期價格變動作為使用者決策輔助，但不升級成個人化價格追蹤或通知系統。
 - 讓維運者可以在服務異常時更快收到通知，而不是只能人工查看 container log。
-- 讓維運者能更有效檢視資料品質、缺圖、連結健康與 crawler 狀態。
+- 讓維運者能更有效檢視資料品質、缺圖、連結健康與 crawler 狀態；第一輪採內網 ops status page / admin webhook，不做公開狀態頁。
 - 補齊公開流量成長前需要的安全、監控、備份與驗證基礎。
 
 ## 非目標
@@ -24,16 +23,14 @@
 - 暫不適合第三版：使用者訂閱單一商品、watchlist、到價提醒、Discord / 私訊 / email 價格通知、以帳號保存個人追蹤清單。
 - 原因：個人化價格追蹤需要身份或通知通道、偏好保存、退訂 / 停用流程、防濫用、通知頻率控制與資料新鮮度承諾；相對於目前 accountless 產品邊界，成本與風險高於第三版使用者價值。
 
-因此第三版可以在分享配單中顯示價格是否已變動，但不主動追蹤使用者關注商品，也不發送使用者價格通知。
+因此第三版保留公開價格變動清單與商品頁價格歷史，但不主動追蹤使用者關注商品，也不發送使用者個人價格通知。分享配單若未來重啟，才再討論分享當下價格與目前價格差異提示。
 
 ## 使用者向 Discord 判斷
 
-第三版可做的使用者向 Discord 功能限於公開廣播與分享輔助，不建立個人化互動入口。
+第三版使用者向 Discord 功能限於公開廣播與分享輔助，不建立個人化互動入口。第一輪只保留 public 價格變動 webhook；公開服務狀態推播與一般公告暫不做，避免把維運訊息推給一般使用者。
 
-- 公開服務狀態推播：網站、查詢 API、圖片 API、配單頁、價格歷史 API 或資料 freshness 異常時，在公開頻道提供低細節狀態。
 - 資料更新摘要：第一輪改為 `crawler-daemon` 在有商品價格變動時，用公開 webhook 列出本輪變價商品、舊價、新價與差額；不針對單一使用者或單一商品訂閱。
-- 分享入口：使用者貼上商品或分享配單連結時，提供安全摘要或 link preview；商品連結顯示商品名稱、價格、分類、商品圖與資料更新時間，配單連結顯示品項數、總價、分享時間與資料更新時間。
-- 公開公告：新增分類、功能更新、部署維護、來源資料異常或服務恢復公告。
+- 分享入口：使用者貼上商品連結時，透過商品頁 Open Graph / canonical URL 提供安全摘要；目前不做分享配單 link preview 或 Discord bot 事件。
 
 暫不做 Discord 查詢指令、私訊通知、帳號綁定、在 Discord 內保存配單、個人商品追蹤、到價提醒或購買建議。能用網站頁面與 Open Graph / link preview 解決的分享體驗，優先不要做成互動式 Discord bot。
 
@@ -58,21 +55,21 @@
 - 第三版會做、暫不做與需另開產品 / 資安設計的項目已寫清楚。
 - 後續第三版實作都能用本文件判斷是否超出範圍。
 
-### 2. Discord 公開推播與管理者告警
+### 2. Discord public 價格變動與管理者告警
 
-目標：讓使用者可透過公開 Discord 頻道看到低噪音服務與資料更新資訊，並讓維運者在 production smoke 或資料流出現異常時收到管理者通知。
+目標：讓使用者可透過公開 Discord 頻道看到有參考價值的價格變動資訊，並讓維運者在 production smoke 或資料流出現異常時收到管理者通知。
 
 範圍：
 
-- 使用者向 Discord 只做公開服務狀態推播、資料更新摘要、配單分享預覽與公開公告；資料更新摘要第一輪是公開價格變動清單，不是個人化到價提醒。
+- 使用者向 Discord 第一輪只做公開價格變動清單，不做公開服務狀態推播、分享配單預覽或一般公告。
 - 從現有 `production-smoke` / `smoke-daemon` 結果產生管理者告警，告警對象是維運者。
 - 支援 `FAIL`、需要人工注意的 `WARN`、恢復正常通知與 cooldown / 去重。
-- 公開推播內容只能包含安全摘要；管理者告警可包含檢查名稱、狀態、簡短原因、時間與 runbook 方向。
+- public webhook 內容只能包含安全摘要；管理者告警可包含檢查名稱、狀態、簡短原因、時間與 runbook 方向。
 - Discord webhook / bot token 只放在 untracked `.env` 或部署 secret，不提交 Git。
 
 完成條件：
 
-- 公開服務狀態、資料更新摘要、配單分享預覽與公告不包含 secret、raw HTML、DB URL、internal headers、crawler stack trace、parse error raw content 或 raw IP。
+- public 價格變動清單不包含 secret、raw HTML、DB URL、internal headers、crawler stack trace、parse error raw content 或 raw IP。
 - 公開價格變動清單只列出本輪變價商品名稱、站內商品連結、舊價、新價與差額，並受 `PRICE_CHANGE_DISCORD_MAX_ITEMS` 上限控制。
 - 使用者向 Discord 不需要登入、不保存使用者身份、不提供私訊或個人商品訂閱。
 - 單次 smoke 與 daemon 模式都能在測試設定下送出告警。
@@ -80,9 +77,11 @@
 - log 與 Discord message 不包含 `.env`、DB URL、Cloudflare token、raw HTML、stack trace、raw IP 或 internal header dump。
 - 這不是個人化或互動式使用者 Discord bot，也不提供使用者價格通知。
 
-### 3. 服務狀態頁
+### 3. 服務狀態頁（暫緩）
 
 目標：提供使用者可理解的公開服務狀態，不讓一般使用者只能從查詢頁猜測服務是否異常。
+
+目前狀態：暫緩。第二版既有來源狀態、production smoke、admin webhook 與 runbook 已足以支援目前流量；公開服務狀態頁對一般使用者價值有限，且容易把維運訊號誤解成商品資料或來源承諾。若未來有穩定公開流量或外部監控需求，再以獨立 slice 重啟。
 
 範圍：
 
@@ -104,7 +103,7 @@
 範圍：
 
 - 評估並擇一或分階段導入 Uptime Kuma、Cloudflare monitoring、Grafana / Prometheus 或等價外部監控。
-- 監控公開首頁、主要 API、圖片 API、狀態頁與 public-only smoke。
+- 監控公開首頁、主要 API、圖片 API、配單頁與 public-only smoke；不監控內網 `ops-web`。
 - 保留內部 `smoke-daemon` 作為 DB-backed / deployment-internal 檢查來源。
 - 建立監控設定、告警門檻與回復流程文件。
 
@@ -114,9 +113,11 @@
 - 外部監控不需要 DB access、不讀 `.env`，也不接觸 raw snapshot storage。
 - 監控告警與 Discord 管理者告警不互相洗版。
 
-### 5. 分享配單連結
+### 5. 分享配單連結（暫緩）
 
 目標：讓第二版 accountless 配單可以產生唯讀分享連結，但不引入帳號保存菜單。
+
+目前狀態：暫緩。使用者可用 Excel 匯出或截圖分享配單，直接建立 server-side share token / retention / snapshot / abuse guard 的成本高於近期價值。第三版已改優先完成商品詳細頁分享按鈕與商品 Open Graph preview。
 
 範圍：
 
@@ -139,15 +140,16 @@
 
 範圍：
 
-- 建立管理者用 CLI 報表或內部維運檢視，用於查看 source freshness、crawl result、parse error count、suspected block、缺圖、link health temporary / broken count、raw snapshot retention 與 active product count。
-- 優先支援 CLI / private ops output；若要做 web dashboard，需先定義 auth 或只允許內部網路 / tunnel 保護後使用。
+- 建立管理者用內部維運檢視，用於查看 source freshness、crawl result、parse error count、suspected block、缺圖、link health temporary / broken count、raw snapshot retention 與 active product count。
+- 第一輪使用 `ops-web` 內網 service 與 `/ops/status` page，公開 `web` 服務預設回 `404`。
+- `ops-web` 需維持 localhost / private tunnel 邊界，並要求 token；不得接到 public tunnel。
 - 保持資料品質檢視與使用者公開狀態頁分離。
 
 完成條件：
 
 - 維運檢視能指出需要人工處理的資料類型與建議 runbook 方向。
 - 不公開 raw HTML、parse error raw content、DB URL、token 或 secret-bearing error。
-- 若做 web dashboard，必須先完成 access control / auth / network boundary 設計。
+- web dashboard 必須完成 access control / auth / network boundary 設計，且 public `web` 不能看到頁面內容。
 
 ### 8. 公開流量成長硬化
 
@@ -164,9 +166,9 @@
 
 完成條件：
 
-- public route / API / image API / build-list / status page 都有基本 smoke 或 E2E 驗證。
+- public route / API / image API / build-list 都有基本 smoke 或 E2E 驗證。
 - 備份與還原流程有可執行 runbook，且不包含真實 secret。
-- 硬化措施不破壞正常瀏覽、圖片載入、配單與分享配單流程。
+- 硬化措施不破壞正常瀏覽、圖片載入、配單、商品分享與 public price-change webhook。
 
 ## 建議切片
 
@@ -174,35 +176,23 @@
 
 - 第三版規劃文件。
 - 商品頁 Open Graph / Discord link preview。
+- 商品詳細頁分享按鈕與 canonical share URL。
 - Discord 公開價格變動 webhook。
-- 分享配單資料模型與 API。
-- 分享配單頁面。
-- 分享 payload / token / retention / rate limit。
-- 服務狀態頁。
-- Discord 公開服務狀態推播。
-- 配單分享 Discord link preview / 安全摘要。
-- 分享頁與狀態頁的最低限度公開 route smoke / rate limit 防護。
 
 ### v3.1：管理者告警與外部監控
 
-- Discord 公開服務狀態推播與公開公告。
 - Discord 管理者告警。
 - 外部監控整合第一輪。
 - 告警 cooldown / 去重、回復通知與 runbook 文件。
 
 ### v3.2：維運檢視與公開流量硬化
 
-- 資料品質與維運檢視。
+- 受保護的內網 ops status page 與資料品質維運檢視。
 - 更嚴格 CSP、Cloudflare / rate limit 調校、備份還原演練、Playwright CI、dependency / vulnerability baseline。
 
 ## 待決定
 
-- 服務狀態頁是否完全公開，或只以低調 public route / Cloudflare Access 保護。
-- 分享配單保留期限與最大品項數。
-- 分享配單是否保存分享當下價格 snapshot，或每次讀取時對照目前價格。
-- Discord 使用者向功能使用純 webhook / announcement channel，或需要 bot；第一輪優先避免互動式 bot。
-- Discord 其他公開公告與服務狀態推播的頻率與內容粒度。
-- 配單分享預覽優先使用 Open Graph metadata 還是 Discord bot 事件。
-- Discord 告警使用 webhook 還是 bot token；第一輪優先考慮 webhook，除非需要互動式命令。
+- 分享配單是否重啟；若重啟，需先確認使用者價值是否高於 Excel / 截圖分享。
+- 公開服務狀態頁或公開狀態推播是否重啟；若重啟，需先確認一般使用者是否真的需要，而不是只服務維運者。
 - 外部監控工具選型與部署位置。
-- 維運檢視是否只做 CLI，或需要受保護的 web dashboard。
+- 內網 ops status page 是否已足夠，或是否還需要額外 CLI 報表。

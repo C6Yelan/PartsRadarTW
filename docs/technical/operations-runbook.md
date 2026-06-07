@@ -408,7 +408,65 @@ SMOKE_PUBLIC_BASE_URL=https://partsradar.net
 
 - `smoke-daemon` 的 log 可以作為第一輪內部監控呈現，不應直接公開給使用者。
 - 這不是使用者通知功能，也不建立帳號、watchlist 或價格提醒。
-- 第二版先維持 `smoke-daemon` log 型監控；第三版維運通知、狀態頁與外部監控方向以 [第三版 Roadmap](../planning/v3-roadmap.md) 為準。
+- 第三版維運通知、內部狀態頁與外部監控方向以 [第三版 Roadmap](../planning/v3-roadmap.md) 為準。
+
+## Internal Ops Status Page
+
+`ops-web` 是內部維運狀態頁服務，使用同一個 `web` image，但獨立 Compose profile 與 port。公開 `web` service 會固定設定 `OPS_STATUS_ENABLED=false`，因此公開入口請求 `/ops/status` 應回 `HTTP 404`；只有 `ops-web` 會設定 `OPS_STATUS_ENABLED=true`。
+
+狀態頁目前顯示：
+
+- overall `OK` / `WARN` / `FAIL`。
+- source freshness、crawler freshness、recent suspected block、parse error、source image anomaly。
+- display-ready active product count、product image cache missing count。
+- `source` / `introduction` link health 的 `ok`、`temporary_error`、`broken` 聚合。
+- raw snapshot retention drift。
+- 最近 crawl runs 與 enabled source categories 的高層級時間資訊。
+
+狀態頁不顯示 raw HTML、parse error raw content、crawler stack trace、DB URL、token、raw IP 或 internal header dump。
+
+啟用前先在部署主機 `.env` 設定：
+
+```env
+OPS_STATUS_TOKEN=replace_with_random_ops_status_token
+# OPS_WEB_BIND_HOST=127.0.0.1
+# OPS_WEB_PORT=3001
+```
+
+啟動：
+
+```bash
+docker compose --profile ops up -d ops-web
+docker compose --profile ops ps ops-web
+```
+
+驗證 public `web` 沒有公開狀態頁：
+
+```bash
+curl -i http://127.0.0.1:3000/ops/status
+```
+
+預期結果是 `HTTP 404`。
+
+驗證內部 `ops-web`：
+
+```bash
+curl -i -H "x-ops-status-token: <OPS_STATUS_TOKEN>" \
+  http://127.0.0.1:3001/ops/status
+```
+
+預期結果是 `HTTP 200`。若用瀏覽器開啟，可使用：
+
+```text
+http://127.0.0.1:3001/ops/status?token=<OPS_STATUS_TOKEN>
+```
+
+外部可見性邊界：
+
+- `OPS_WEB_BIND_HOST` 預設必須維持 `127.0.0.1`。
+- `cloudflared` / public reverse proxy 只能導向 `web:3000`，不得導向 `ops-web:3000`。
+- 若需要遠端查看，優先用 SSH tunnel 或內網 VPN，不把 `ops-web` 暴露到 public tunnel。
+- `OPS_STATUS_TOKEN` 不得提交 Git，也不得放入公開文件、Discord 或 issue。
 
 ## Discord Webhook Notification Foundation
 
