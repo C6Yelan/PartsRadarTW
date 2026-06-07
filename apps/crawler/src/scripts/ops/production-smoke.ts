@@ -10,7 +10,7 @@ import {
   resolveWorkspaceRoot,
   toSafeCliErrorMessage,
 } from "../shared/script-utils";
-import { PRODUCT_LINK_HEALTH_STATUSES } from "./product-link-checker/processor";
+import { PRODUCT_LINK_HEALTH_STATUSES, PRODUCT_LINK_KINDS } from "./product-link-checker/processor";
 
 const HELP_FLAG = "--help";
 const PUBLIC_ONLY_FLAG = "--public-only";
@@ -34,6 +34,8 @@ const DEFAULT_BROKEN_LINK_WARN_COUNT = 1;
 const DEFAULT_BROKEN_LINK_FAIL_COUNT = 50;
 const DEFAULT_TEMPORARY_LINK_WARN_COUNT = 100;
 const DEFAULT_TEMPORARY_LINK_FAIL_COUNT = 500;
+const DEFAULT_INTRODUCTION_TEMPORARY_LINK_WARN_COUNT = 500;
+const DEFAULT_INTRODUCTION_TEMPORARY_LINK_FAIL_COUNT = 1000;
 const DEFAULT_RAW_SNAPSHOT_NORMAL_RETENTION_DAYS = 30;
 const DEFAULT_RAW_SNAPSHOT_ABNORMAL_RETENTION_DAYS = 90;
 const DEFAULT_RAW_SNAPSHOT_RETENTION_GRACE_DAYS = 2;
@@ -63,10 +65,14 @@ export interface ProductionSmokeOptions {
   minActiveProducts: number;
   missingImageWarnCount: number;
   missingImageFailCount: number;
-  brokenLinkWarnCount: number;
-  brokenLinkFailCount: number;
-  temporaryLinkWarnCount: number;
-  temporaryLinkFailCount: number;
+  sourceBrokenLinkWarnCount: number;
+  sourceBrokenLinkFailCount: number;
+  sourceTemporaryLinkWarnCount: number;
+  sourceTemporaryLinkFailCount: number;
+  introductionBrokenLinkWarnCount: number;
+  introductionBrokenLinkFailCount: number;
+  introductionTemporaryLinkWarnCount: number;
+  introductionTemporaryLinkFailCount: number;
   rawSnapshotNormalRetentionDays: number;
   rawSnapshotAbnormalRetentionDays: number;
   rawSnapshotRetentionGraceDays: number;
@@ -279,39 +285,83 @@ export function parseProductionSmokeOptions(
       min: 0,
       max: 1000000,
     }),
-    brokenLinkWarnCount: parseIntegerOption({
+    sourceBrokenLinkWarnCount: parseIntegerOption({
       args,
       env,
-      argName: "--broken-link-warn-count",
-      envName: "SMOKE_BROKEN_LINK_WARN_COUNT",
+      argName: "--source-broken-link-warn-count",
+      envName: "SMOKE_SOURCE_BROKEN_LINK_WARN_COUNT",
+      fallbackArgName: "--broken-link-warn-count",
+      fallbackEnvName: "SMOKE_BROKEN_LINK_WARN_COUNT",
       fallback: DEFAULT_BROKEN_LINK_WARN_COUNT,
       min: 0,
       max: 1000000,
     }),
-    brokenLinkFailCount: parseIntegerOption({
+    sourceBrokenLinkFailCount: parseIntegerOption({
       args,
       env,
-      argName: "--broken-link-fail-count",
-      envName: "SMOKE_BROKEN_LINK_FAIL_COUNT",
+      argName: "--source-broken-link-fail-count",
+      envName: "SMOKE_SOURCE_BROKEN_LINK_FAIL_COUNT",
+      fallbackArgName: "--broken-link-fail-count",
+      fallbackEnvName: "SMOKE_BROKEN_LINK_FAIL_COUNT",
       fallback: DEFAULT_BROKEN_LINK_FAIL_COUNT,
       min: 0,
       max: 1000000,
     }),
-    temporaryLinkWarnCount: parseIntegerOption({
+    sourceTemporaryLinkWarnCount: parseIntegerOption({
       args,
       env,
-      argName: "--temporary-link-warn-count",
-      envName: "SMOKE_TEMPORARY_LINK_WARN_COUNT",
+      argName: "--source-temporary-link-warn-count",
+      envName: "SMOKE_SOURCE_TEMPORARY_LINK_WARN_COUNT",
+      fallbackArgName: "--temporary-link-warn-count",
+      fallbackEnvName: "SMOKE_TEMPORARY_LINK_WARN_COUNT",
       fallback: DEFAULT_TEMPORARY_LINK_WARN_COUNT,
       min: 0,
       max: 1000000,
     }),
-    temporaryLinkFailCount: parseIntegerOption({
+    sourceTemporaryLinkFailCount: parseIntegerOption({
       args,
       env,
-      argName: "--temporary-link-fail-count",
-      envName: "SMOKE_TEMPORARY_LINK_FAIL_COUNT",
+      argName: "--source-temporary-link-fail-count",
+      envName: "SMOKE_SOURCE_TEMPORARY_LINK_FAIL_COUNT",
+      fallbackArgName: "--temporary-link-fail-count",
+      fallbackEnvName: "SMOKE_TEMPORARY_LINK_FAIL_COUNT",
       fallback: DEFAULT_TEMPORARY_LINK_FAIL_COUNT,
+      min: 0,
+      max: 1000000,
+    }),
+    introductionBrokenLinkWarnCount: parseIntegerOption({
+      args,
+      env,
+      argName: "--introduction-broken-link-warn-count",
+      envName: "SMOKE_INTRODUCTION_BROKEN_LINK_WARN_COUNT",
+      fallback: DEFAULT_BROKEN_LINK_WARN_COUNT,
+      min: 0,
+      max: 1000000,
+    }),
+    introductionBrokenLinkFailCount: parseIntegerOption({
+      args,
+      env,
+      argName: "--introduction-broken-link-fail-count",
+      envName: "SMOKE_INTRODUCTION_BROKEN_LINK_FAIL_COUNT",
+      fallback: DEFAULT_BROKEN_LINK_FAIL_COUNT,
+      min: 0,
+      max: 1000000,
+    }),
+    introductionTemporaryLinkWarnCount: parseIntegerOption({
+      args,
+      env,
+      argName: "--introduction-temporary-link-warn-count",
+      envName: "SMOKE_INTRODUCTION_TEMPORARY_LINK_WARN_COUNT",
+      fallback: DEFAULT_INTRODUCTION_TEMPORARY_LINK_WARN_COUNT,
+      min: 0,
+      max: 1000000,
+    }),
+    introductionTemporaryLinkFailCount: parseIntegerOption({
+      args,
+      env,
+      argName: "--introduction-temporary-link-fail-count",
+      envName: "SMOKE_INTRODUCTION_TEMPORARY_LINK_FAIL_COUNT",
+      fallback: DEFAULT_INTRODUCTION_TEMPORARY_LINK_FAIL_COUNT,
       min: 0,
       max: 1000000,
     }),
@@ -834,32 +884,73 @@ async function checkLinkHealth(
   client: ProductionSmokeClient,
   options: ProductionSmokeOptions,
 ): Promise<SmokeCheckResult> {
-  const brokenCount = await client.productLinkHealth.count({
-    where: {
-      status: PRODUCT_LINK_HEALTH_STATUSES.BROKEN,
-      product: {
-        isActive: true,
-      },
-    },
-  });
-  const temporaryCount = await client.productLinkHealth.count({
-    where: {
-      status: PRODUCT_LINK_HEALTH_STATUSES.TEMPORARY_ERROR,
-      product: {
-        isActive: true,
-      },
-    },
-  });
-  const status = worseStatus(
-    countStatus(brokenCount, options.brokenLinkWarnCount, options.brokenLinkFailCount),
-    countStatus(temporaryCount, options.temporaryLinkWarnCount, options.temporaryLinkFailCount),
-  );
+  const [
+    sourceBrokenCount,
+    sourceTemporaryCount,
+    introductionBrokenCount,
+    introductionTemporaryCount,
+  ] = await Promise.all([
+    countActiveProductLinks(client, PRODUCT_LINK_KINDS.SOURCE, PRODUCT_LINK_HEALTH_STATUSES.BROKEN),
+    countActiveProductLinks(
+      client,
+      PRODUCT_LINK_KINDS.SOURCE,
+      PRODUCT_LINK_HEALTH_STATUSES.TEMPORARY_ERROR,
+    ),
+    countActiveProductLinks(
+      client,
+      PRODUCT_LINK_KINDS.INTRODUCTION,
+      PRODUCT_LINK_HEALTH_STATUSES.BROKEN,
+    ),
+    countActiveProductLinks(
+      client,
+      PRODUCT_LINK_KINDS.INTRODUCTION,
+      PRODUCT_LINK_HEALTH_STATUSES.TEMPORARY_ERROR,
+    ),
+  ]);
+  const status = [
+    countStatus(
+      sourceBrokenCount,
+      options.sourceBrokenLinkWarnCount,
+      options.sourceBrokenLinkFailCount,
+    ),
+    countStatus(
+      sourceTemporaryCount,
+      options.sourceTemporaryLinkWarnCount,
+      options.sourceTemporaryLinkFailCount,
+    ),
+    countStatus(
+      introductionBrokenCount,
+      options.introductionBrokenLinkWarnCount,
+      options.introductionBrokenLinkFailCount,
+    ),
+    countStatus(
+      introductionTemporaryCount,
+      options.introductionTemporaryLinkWarnCount,
+      options.introductionTemporaryLinkFailCount,
+    ),
+  ].reduce<SmokeStatus>((currentStatus, nextStatus) => worseStatus(currentStatus, nextStatus), "OK");
 
   return {
     name: "link health",
     status,
-    message: `broken=${brokenCount} temporary=${temporaryCount}`,
+    message: `source broken=${sourceBrokenCount} temporary=${sourceTemporaryCount}, introduction broken=${introductionBrokenCount} temporary=${introductionTemporaryCount}`,
   };
+}
+
+async function countActiveProductLinks(
+  client: ProductionSmokeClient,
+  linkKind: (typeof PRODUCT_LINK_KINDS)[keyof typeof PRODUCT_LINK_KINDS],
+  status: (typeof PRODUCT_LINK_HEALTH_STATUSES)[keyof typeof PRODUCT_LINK_HEALTH_STATUSES],
+): Promise<number> {
+  return client.productLinkHealth.count({
+    where: {
+      linkKind,
+      status,
+      product: {
+        isActive: true,
+      },
+    },
+  });
 }
 
 function checkRateLimitHeaders(
@@ -1213,6 +1304,8 @@ function parseIntegerOption({
   env,
   argName,
   envName,
+  fallbackArgName,
+  fallbackEnvName,
   fallback,
   min,
   max,
@@ -1221,12 +1314,20 @@ function parseIntegerOption({
   env: NodeJS.ProcessEnv;
   argName: string;
   envName: string;
+  fallbackArgName?: string;
+  fallbackEnvName?: string;
   fallback: number;
   min: number;
   max: number;
 }): number {
-  const raw = getStringArg(args, argName) ?? env[envName] ?? String(fallback);
-  const message = `${argName}/${envName} must be an integer between ${min} and ${max}.`;
+  const raw =
+    getStringArg(args, argName) ??
+    (fallbackArgName ? getStringArg(args, fallbackArgName) : undefined) ??
+    env[envName] ??
+    (fallbackEnvName ? env[fallbackEnvName] : undefined) ??
+    String(fallback);
+  const aliases = [argName, envName, fallbackArgName, fallbackEnvName].filter(Boolean).join("/");
+  const message = `${aliases} must be an integer between ${min} and ${max}.`;
 
   if (!/^(0|[1-9][0-9]*)$/.test(raw)) {
     throw new Error(message);
@@ -1309,6 +1410,11 @@ Options:
   --recent-window-hours <hours>            Window for suspected block and parse error checks.
   --invalid-image-url-warn-count <count>   Warn only when source image URL anomalies exceed this.
                                            Default: ${DEFAULT_INVALID_IMAGE_URL_WARN_COUNT}
+  --source-temporary-link-warn-count <n>   Warn when source.url temporary link errors exceed this.
+                                           Default: ${DEFAULT_TEMPORARY_LINK_WARN_COUNT}
+  --introduction-temporary-link-warn-count <n>
+                                           Warn when introduction temporary link errors exceed this.
+                                           Default: ${DEFAULT_INTRODUCTION_TEMPORARY_LINK_WARN_COUNT}
   --help                                   Show this help message.
 `);
 }

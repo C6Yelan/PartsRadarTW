@@ -46,8 +46,14 @@ describe("production smoke options", () => {
       minActiveProducts: 1,
       missingImageWarnCount: 200,
       missingImageFailCount: 500,
-      brokenLinkWarnCount: 1,
-      brokenLinkFailCount: 50,
+      sourceBrokenLinkWarnCount: 1,
+      sourceBrokenLinkFailCount: 50,
+      sourceTemporaryLinkWarnCount: 100,
+      sourceTemporaryLinkFailCount: 500,
+      introductionBrokenLinkWarnCount: 1,
+      introductionBrokenLinkFailCount: 50,
+      introductionTemporaryLinkWarnCount: 500,
+      introductionTemporaryLinkFailCount: 1000,
     });
     expect(options.productImageStorageDir).toBe(join(workspaceRoot, "storage", "product-images"));
   });
@@ -67,6 +73,8 @@ describe("production smoke options", () => {
         "45",
         "--missing-image-warn-count",
         "10",
+        "--introduction-temporary-link-warn-count",
+        "900",
       ],
       {
         SMOKE_TIMEOUT_MS: "9000",
@@ -74,6 +82,8 @@ describe("production smoke options", () => {
         PRODUCT_IMAGE_STORAGE_DIR: "custom-images",
         SMOKE_CRAWLER_FAIL_AFTER_MINUTES: "240",
         SMOKE_INVALID_IMAGE_URL_WARN_COUNT: "3000",
+        SMOKE_TEMPORARY_LINK_WARN_COUNT: "77",
+        SMOKE_SOURCE_TEMPORARY_LINK_FAIL_COUNT: "123",
       },
       crawlerCwd,
     );
@@ -86,6 +96,9 @@ describe("production smoke options", () => {
     expect(options.crawlerFailAfterMinutes).toBe(240);
     expect(options.missingImageWarnCount).toBe(10);
     expect(options.invalidImageUrlWarnCount).toBe(3000);
+    expect(options.sourceTemporaryLinkWarnCount).toBe(77);
+    expect(options.sourceTemporaryLinkFailCount).toBe(123);
+    expect(options.introductionTemporaryLinkWarnCount).toBe(900);
     expect(options.productImageStorageDir).toBe(join(workspaceRoot, "custom-images"));
   });
 
@@ -618,6 +631,82 @@ describe("production smoke checks", () => {
     );
   });
 
+  it("keeps introduction temporary link errors on the introduction threshold", async () => {
+    const { crawlerCwd, workspaceRoot } = await createWorkspace();
+    const imageDir = join(workspaceRoot, "product-images");
+    await mkdir(imageDir);
+    await writeFile(join(imageDir, "product-1.webp"), "webp");
+    stubHealthyPublicApi();
+    const options = parseProductionSmokeOptions(
+      [],
+      {
+        PRODUCT_IMAGE_STORAGE_DIR: imageDir,
+      },
+      crawlerCwd,
+    );
+    const summary = await runProductionSmoke(
+      createSmokeClient({
+        invalidImageErrorCount: 0,
+        trueParseErrorCount: 0,
+        linkHealthCounts: {
+          introductionTemporary: 407,
+        },
+      }),
+      options,
+      new Date("2026-06-02T12:00:00.000Z"),
+    );
+
+    expect(summary.status).toBe("OK");
+    expect(summary.checks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "link health",
+          status: "OK",
+          message: "source broken=0 temporary=0, introduction broken=0 temporary=407",
+        }),
+      ]),
+    );
+  });
+
+  it("warns when source temporary link errors exceed the source threshold", async () => {
+    const { crawlerCwd, workspaceRoot } = await createWorkspace();
+    const imageDir = join(workspaceRoot, "product-images");
+    await mkdir(imageDir);
+    await writeFile(join(imageDir, "product-1.webp"), "webp");
+    stubHealthyPublicApi();
+    const options = parseProductionSmokeOptions(
+      [],
+      {
+        PRODUCT_IMAGE_STORAGE_DIR: imageDir,
+        SMOKE_TEMPORARY_LINK_WARN_COUNT: "100",
+      },
+      crawlerCwd,
+    );
+    const summary = await runProductionSmoke(
+      createSmokeClient({
+        invalidImageErrorCount: 0,
+        trueParseErrorCount: 0,
+        linkHealthCounts: {
+          sourceTemporary: 101,
+          introductionTemporary: 407,
+        },
+      }),
+      options,
+      new Date("2026-06-02T12:00:00.000Z"),
+    );
+
+    expect(summary.status).toBe("WARN");
+    expect(summary.checks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "link health",
+          status: "WARN",
+          message: "source broken=0 temporary=101, introduction broken=0 temporary=407",
+        }),
+      ]),
+    );
+  });
+
   it("still fails when true parse errors exceed the configured threshold", async () => {
     const { crawlerCwd, workspaceRoot } = await createWorkspace();
     const imageDir = join(workspaceRoot, "product-images");
@@ -776,9 +865,16 @@ function stubHealthyPublicApi({
 function createSmokeClient({
   invalidImageErrorCount,
   trueParseErrorCount,
+  linkHealthCounts = {},
 }: {
   invalidImageErrorCount: number;
   trueParseErrorCount: number;
+  linkHealthCounts?: {
+    sourceBroken?: number;
+    sourceTemporary?: number;
+    introductionBroken?: number;
+    introductionTemporary?: number;
+  };
 }) {
   return {
     crawlRun: {
@@ -815,7 +911,26 @@ function createSmokeClient({
       findMany: async () => [{ id: "product-1" }],
     },
     productLinkHealth: {
-      count: async () => 0,
+      count: async ({
+        where,
+      }: {
+        where: { linkKind?: "SOURCE" | "INTRODUCTION"; status?: "BROKEN" | "TEMPORARY_ERROR" };
+      }) => {
+        if (where.linkKind === "SOURCE" && where.status === "BROKEN") {
+          return linkHealthCounts.sourceBroken ?? 0;
+        }
+        if (where.linkKind === "SOURCE" && where.status === "TEMPORARY_ERROR") {
+          return linkHealthCounts.sourceTemporary ?? 0;
+        }
+        if (where.linkKind === "INTRODUCTION" && where.status === "BROKEN") {
+          return linkHealthCounts.introductionBroken ?? 0;
+        }
+        if (where.linkKind === "INTRODUCTION" && where.status === "TEMPORARY_ERROR") {
+          return linkHealthCounts.introductionTemporary ?? 0;
+        }
+
+        return 0;
+      },
     },
     rawSnapshot: {
       count: async () => 0,
