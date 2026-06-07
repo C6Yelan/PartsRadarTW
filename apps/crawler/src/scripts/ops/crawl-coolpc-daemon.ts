@@ -22,6 +22,13 @@ import {
   DEFAULT_EXTERNAL_FETCH_LOCK_STALE_SECONDS,
   tryAcquireExternalFetchLock,
 } from "./external-fetch-lock";
+import {
+  DEFAULT_PRICE_CHANGE_DISCORD_MAX_ITEMS,
+  MAX_PRICE_CHANGE_DISCORD_ITEMS,
+  parsePriceChangeDiscordNotificationOptions,
+  sendCrawlRunPriceChangeDiscordNotification,
+  type PriceChangeDiscordNotificationOptions,
+} from "./price-change-discord-notification";
 
 const CONFIRM_LIVE_FETCH_FLAG = "--confirm-live-fetch";
 const DEFAULT_STORAGE_DIR = "temp/coolpc-daemon/snapshots";
@@ -44,6 +51,7 @@ export interface CoolpcDaemonOptions {
   lockStaleSeconds: number;
   runOnce: boolean;
   baseUrl?: string;
+  priceChangeDiscordNotification: PriceChangeDiscordNotificationOptions;
 }
 
 interface ParseIntegerOption {
@@ -127,6 +135,7 @@ export function parseDaemonOptions(
     }),
     runOnce: args.includes("--run-once"),
     baseUrl: validateCoolpcBaseUrl(env.COOLPC_BASE_URL),
+    priceChangeDiscordNotification: parsePriceChangeDiscordNotificationOptions(args, env),
   };
 }
 
@@ -205,6 +214,11 @@ async function runScheduledCycle(
     });
 
     printCycleSummary(result);
+    await handlePriceChangeDiscordNotification({
+      client,
+      crawlRunId: result.crawlRunId,
+      options: options.priceChangeDiscordNotification,
+    });
 
     return {
       shouldBackoff: shouldBackoffAfter(result),
@@ -217,6 +231,54 @@ async function runScheduledCycle(
     };
   } finally {
     await lock.release();
+  }
+}
+
+async function handlePriceChangeDiscordNotification({
+  client,
+  crawlRunId,
+  options,
+}: {
+  client: PrismaClient;
+  crawlRunId: string;
+  options: PriceChangeDiscordNotificationOptions;
+}): Promise<void> {
+  try {
+    const result = await sendCrawlRunPriceChangeDiscordNotification({
+      client,
+      crawlRunId,
+      options,
+    });
+
+    if (result.status === "sent") {
+      log(
+        `Price change Discord notification sent. changes=${result.changeCount} listed=${result.listedCount} messages=${result.messageCount}`,
+      );
+      return;
+    }
+
+    if (result.status === "rate_limited") {
+      log(
+        `Price change Discord notification rate limited. changes=${result.changeCount} listed=${result.listedCount} sentMessages=${result.sentMessageCount}/${result.messageCount} retryAfterMs=${result.retryAfterMs} global=${result.global ? "yes" : "no"}`,
+      );
+      return;
+    }
+
+    if (result.status === "failed") {
+      log(
+        `Price change Discord notification failed. changes=${result.changeCount} listed=${result.listedCount} sentMessages=${result.sentMessageCount}/${result.messageCount} httpStatus=${result.httpStatus ?? "none"} message=${toSafeCliErrorMessage(result.message)}`,
+      );
+      return;
+    }
+
+    if (result.reason === "no_price_changes") {
+      log("Price change Discord notification skipped. reason=no_price_changes");
+      return;
+    }
+  } catch (error) {
+    log(
+      `Price change Discord notification failed before completion: ${toSafeErrorMessage(error)}`,
+    );
   }
 }
 
@@ -340,13 +402,17 @@ Options:
                              Default: ${DEFAULT_COOLPC_CATEGORY_DELAY_MS}, range: ${MIN_CATEGORY_DELAY_MS}-${MAX_CATEGORY_DELAY_MS}
   --lock-dir <path>          Shared external fetch lock directory.
   --lock-stale-seconds <sec> Break stale external fetch locks after this age.
+  --price-change-discord-max-items <n>
+                             Public Discord price-change rows per crawl.
+                             Default: ${DEFAULT_PRICE_CHANGE_DISCORD_MAX_ITEMS}, range: 1-${MAX_PRICE_CHANGE_DISCORD_ITEMS}
   --storage-dir <path>       Snapshot storage directory from the workspace root.
                              Default: ${DEFAULT_STORAGE_DIR}
 
 Environment:
   CRAWLER_INTERVAL_SECONDS, CRAWLER_BACKOFF_SECONDS, CRAWLER_CATEGORY_DELAY_MS,
   SNAPSHOT_STORAGE_DIR, EXTERNAL_FETCH_LOCK_DIR, EXTERNAL_FETCH_LOCK_STALE_SECONDS,
-  COOLPC_BASE_URL
+  COOLPC_BASE_URL, DISCORD_PUBLIC_WEBHOOK_URL, PARTSRADAR_PUBLIC_BASE_URL,
+  PRICE_CHANGE_DISCORD_MAX_ITEMS
 `);
 }
 

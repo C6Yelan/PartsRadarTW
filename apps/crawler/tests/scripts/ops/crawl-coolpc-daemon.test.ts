@@ -44,6 +44,11 @@ describe("CoolPC scheduled crawler daemon options", () => {
       lockStaleSeconds: 21600,
       runOnce: false,
       baseUrl: "https://www.coolpc.com.tw",
+      priceChangeDiscordNotification: {
+        publicWebhookUrl: null,
+        publicBaseUrl: "https://partsradar.net/",
+        maxItems: 50,
+      },
     });
   });
 

@@ -147,6 +147,8 @@ services:
       CRAWLER_BACKOFF_SECONDS: "${CRAWLER_BACKOFF_SECONDS:-3600}"
       CRAWLER_CATEGORY_DELAY_MS: "${CRAWLER_CATEGORY_DELAY_MS:-8000}"
       EXTERNAL_FETCH_LOCK_STALE_SECONDS: "${EXTERNAL_FETCH_LOCK_STALE_SECONDS:-43200}"
+      DISCORD_PUBLIC_WEBHOOK_URL: "${DISCORD_PUBLIC_WEBHOOK_URL:-replace_with_discord_public_webhook_url}"
+      PRICE_CHANGE_DISCORD_MAX_ITEMS: "${PRICE_CHANGE_DISCORD_MAX_ITEMS:-50}"
     volumes:
       - snapshots:/var/lib/partsradar/snapshots
       - product_images:/var/lib/partsradar/product-images

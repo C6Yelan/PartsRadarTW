@@ -31,7 +31,7 @@
 第三版可做的使用者向 Discord 功能限於公開廣播與分享輔助，不建立個人化互動入口。
 
 - 公開服務狀態推播：網站、查詢 API、圖片 API、配單頁、價格歷史 API 或資料 freshness 異常時，在公開頻道提供低細節狀態。
-- 資料更新摘要：定期摘要資料更新狀況、分類更新、近期價格波動較大的分類或資料延遲；不針對單一使用者或單一商品訂閱。
+- 資料更新摘要：第一輪改為 `crawler-daemon` 在有商品價格變動時，用公開 webhook 列出本輪變價商品、舊價、新價與差額；不針對單一使用者或單一商品訂閱。
 - 分享入口：使用者貼上商品或分享配單連結時，提供安全摘要或 link preview；商品連結顯示商品名稱、價格、分類、商品圖與資料更新時間，配單連結顯示品項數、總價、分享時間與資料更新時間。
 - 公開公告：新增分類、功能更新、部署維護、來源資料異常或服務恢復公告。
 
@@ -64,7 +64,7 @@
 
 範圍：
 
-- 使用者向 Discord 只做公開服務狀態推播、資料更新摘要、配單分享預覽與公開公告。
+- 使用者向 Discord 只做公開服務狀態推播、資料更新摘要、配單分享預覽與公開公告；資料更新摘要第一輪是公開價格變動清單，不是個人化到價提醒。
 - 從現有 `production-smoke` / `smoke-daemon` 結果產生管理者告警，告警對象是維運者。
 - 支援 `FAIL`、需要人工注意的 `WARN`、恢復正常通知與 cooldown / 去重。
 - 公開推播內容只能包含安全摘要；管理者告警可包含檢查名稱、狀態、簡短原因、時間與 runbook 方向。
@@ -73,6 +73,7 @@
 完成條件：
 
 - 公開服務狀態、資料更新摘要、配單分享預覽與公告不包含 secret、raw HTML、DB URL、internal headers、crawler stack trace、parse error raw content 或 raw IP。
+- 公開價格變動清單只列出本輪變價商品名稱、站內商品連結、舊價、新價與差額，並受 `PRICE_CHANGE_DISCORD_MAX_ITEMS` 上限控制。
 - 使用者向 Discord 不需要登入、不保存使用者身份、不提供私訊或個人商品訂閱。
 - 單次 smoke 與 daemon 模式都能在測試設定下送出告警。
 - 重複 `WARN` / `FAIL` 不會造成通知洗版。
@@ -173,6 +174,7 @@
 
 - 第三版規劃文件。
 - 商品頁 Open Graph / Discord link preview。
+- Discord 公開價格變動 webhook。
 - 分享配單資料模型與 API。
 - 分享配單頁面。
 - 分享 payload / token / retention / rate limit。
@@ -183,7 +185,7 @@
 
 ### v3.1：管理者告警與外部監控
 
-- Discord 資料更新摘要與公開公告。
+- Discord 公開服務狀態推播與公開公告。
 - Discord 管理者告警。
 - 外部監控整合第一輪。
 - 告警 cooldown / 去重、回復通知與 runbook 文件。
@@ -199,7 +201,7 @@
 - 分享配單保留期限與最大品項數。
 - 分享配單是否保存分享當下價格 snapshot，或每次讀取時對照目前價格。
 - Discord 使用者向功能使用純 webhook / announcement channel，或需要 bot；第一輪優先避免互動式 bot。
-- Discord 資料更新摘要的頻率、內容粒度與是否只做分類層級摘要。
+- Discord 其他公開公告與服務狀態推播的頻率與內容粒度。
 - 配單分享預覽優先使用 Open Graph metadata 還是 Discord bot 事件。
 - Discord 告警使用 webhook 還是 bot token；第一輪優先考慮 webhook，除非需要互動式命令。
 - 外部監控工具選型與部署位置。

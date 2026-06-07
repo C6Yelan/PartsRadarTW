@@ -412,12 +412,13 @@ SMOKE_PUBLIC_BASE_URL=https://partsradar.net
 
 ## Discord Webhook Notification Foundation
 
-第三版 Discord 通知第一輪使用 incoming webhook，不使用互動式 Discord bot。`smoke-daemon` 已可在每輪 production smoke summary 後，依 notification policy 對管理者頻道送出 `WARN` / `FAIL` / `RECOVERED` 通知。
+第三版 Discord 通知第一輪使用 incoming webhook，不使用互動式 Discord bot。`crawler-daemon` 會在每輪 scheduled crawl 成功寫入價格變動後，對公開頻道列出本輪變價商品與金額差；`smoke-daemon` 則在每輪 production smoke summary 後，依 notification policy 對管理者頻道送出 `WARN` / `FAIL` / `RECOVERED` 通知。
 
 可選 secret：
 
 - `DISCORD_PUBLIC_WEBHOOK_URL`：公開頻道 webhook，只能用於低細節公開狀態、資料更新摘要、公告或分享輔助訊息。
 - `DISCORD_ADMIN_WEBHOOK_URL`：管理者頻道 webhook，可用於維運告警，但仍不得包含 secret、raw HTML、stack trace、raw IP、internal header dump 或完整 DB URL。
+- `PRICE_CHANGE_DISCORD_MAX_ITEMS`：單輪 crawler public Discord 變價通知最多列出的商品數，預設 50，可調高到 200。超過上限時只列出前 N 筆，訊息會標示被上限隱藏的筆數。
 - `SMOKE_DISCORD_STATE_FILE`：smoke Discord notification policy 狀態檔；local script 預設 `storage/ops/smoke-discord-state.json`，Compose `smoke-daemon` 預設 `/var/lib/partsradar/snapshots/ops/smoke-discord-state.json`，讓 dedupe state 留在 named volume。部署主機若曾設定 `SMOKE_DISCORD_STATE_FILE=storage/ops/smoke-discord-state.json`，建議移除該行或改成 container absolute path，避免 state 寫在 ephemeral container filesystem。
 - `SMOKE_DISCORD_COOLDOWN_SECONDS`：相同 smoke 異常通知的再次提醒間隔，預設 3600 秒。
 
@@ -430,6 +431,14 @@ SMOKE_PUBLIC_BASE_URL=https://partsradar.net
 - sender 只做 Discord payload 格式限制、mention 防呆與 transport error message 的最小清理，避免 sender 自身回傳的錯誤文字帶出 webhook URL、DB URL、URL credentials 或常見 secret env assignment。
 - notifier policy 不得把 secret、raw HTML、stack trace、raw IP、internal header dump、完整 DB URL 或未整理的第三方來源內容傳給 sender。
 - Discord rate limit 不硬寫固定限制；sender 會回傳 `Retry-After` / `retry_after` 解析出的等待時間，後續 notifier policy 再決定何時重試。
+
+public price-change notification 行為：
+
+- `crawler-daemon` 每輪 scheduled crawl 結束後，用該輪 `crawlRunId` 讀取新建立的 `price_snapshots`，並和同商品上一筆 snapshot 比對。
+- 只有已有舊價且價格真的改變的商品會送到公開 Discord；第一批新品、沒有舊價的商品、同價更新不會送出。
+- 訊息列出商品名稱、站內商品連結、舊價、新價與差額，時間以 Asia/Taipei 的 `MM/DD HH:MM GMT+8` 顯示。
+- 公開訊息不包含 iBuy token、來源購買 URL、raw HTML、crawler error detail、DB/internal URL 或維運 link-health/smoke 明細。
+- 沒有變價或未設定 `DISCORD_PUBLIC_WEBHOOK_URL` 時不送 Discord；public webhook 發送失敗或 rate limit 只寫安全 log，不會讓 crawler daemon 停止。
 
 smoke Discord notification policy 行為：
 
