@@ -178,9 +178,10 @@
 }
 
 .detail-actions {
-  display: grid;
+  display: flex;
   gap: 8px;
   align-items: stretch;
+  flex-wrap: wrap;
   justify-content: start;
 }
 
@@ -197,7 +198,7 @@
 .detail-actions .build-list-detail-quantity {
   width: 100%;
   min-height: 42px;
-  min-width: 0;
+  min-width: 120px;
 }
 
 .detail-actions .external-action,
@@ -265,6 +266,7 @@
 }
 
 .detail-share-status {
+  flex-basis: 100%;
   min-height: 18px;
   margin: 0;
   color: var(--muted);

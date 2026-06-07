@@ -119,18 +119,18 @@
 
   .detail-actions {
     width: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     justify-content: stretch;
   }
 
   .detail-primary-actions,
   .detail-link-actions {
-    display: grid;
-    width: 100%;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    display: contents;
   }
 
-  .detail-primary-actions {
-    grid-template-columns: 1fr;
+  .detail-share-status {
+    grid-column: 1 / -1;
   }
 
   .detail-actions .build-list-detail-action,
