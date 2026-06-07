@@ -470,11 +470,11 @@ http://127.0.0.1:3001/ops/status?token=<OPS_STATUS_TOKEN>
 
 ## Discord Webhook Notification Foundation
 
-第三版 Discord 通知第一輪使用 incoming webhook，不使用互動式 Discord bot。`crawler-daemon` 會在每輪 scheduled crawl 成功寫入價格變動後，對公開頻道列出本輪變價商品與金額差；`smoke-daemon` 則在每輪 production smoke summary 後，依 notification policy 對管理者頻道送出 `WARN` / `FAIL` / `RECOVERED` 通知。
+目前已實作的 Discord 通知基礎使用 incoming webhook。`crawler-daemon` 會在每輪 scheduled crawl 成功寫入價格變動後，對公開頻道列出本輪變價商品與金額差；`smoke-daemon` 則在每輪 production smoke summary 後，依 notification policy 對管理者頻道送出 `WARN` / `FAIL` / `RECOVERED` 通知。Discord bot 個人化通知已納入第三版規劃，但尚未在本節的 webhook foundation 中實作。
 
 可選 secret：
 
-- `DISCORD_PUBLIC_WEBHOOK_URL`：公開頻道 webhook，只能用於低細節公開狀態、資料更新摘要、公告或分享輔助訊息。
+- `DISCORD_PUBLIC_WEBHOOK_URL`：公開頻道 webhook，第一輪只用於公開價格變動清單。
 - `DISCORD_ADMIN_WEBHOOK_URL`：管理者頻道 webhook，可用於維運告警，但仍不得包含 secret、raw HTML、stack trace、raw IP、internal header dump 或完整 DB URL。
 - `PRICE_CHANGE_DISCORD_MAX_ITEMS`：單輪 crawler public Discord 變價通知最多列出的商品數，預設 50，可調高到 200。超過上限時只列出前 N 筆，訊息會標示被上限隱藏的筆數。
 - `SMOKE_DISCORD_STATE_FILE`：smoke Discord notification policy 狀態檔；local script 預設 `storage/ops/smoke-discord-state.json`，Compose `smoke-daemon` 預設 `/var/lib/partsradar/snapshots/ops/smoke-discord-state.json`，讓 dedupe state 留在 named volume。部署主機若曾設定 `SMOKE_DISCORD_STATE_FILE=storage/ops/smoke-discord-state.json`，建議移除該行或改成 container absolute path，避免 state 寫在 ephemeral container filesystem。
@@ -508,6 +508,43 @@ smoke Discord notification policy 行為：
 - policy message 只列出高層級 smoke status、檢查名稱與 runbook 方向，不包含個別 check message。
 - Discord 發送失敗、rate limit 或 state file 寫入失敗只會寫入安全 log，不會讓 `smoke-daemon` 崩潰或停止後續檢查。
 - `--run-once` 也會走相同 policy，可用於主機端單次驗證。
+
+## Planned Discord Bot Personalized Notifications
+
+Discord bot 尚未實作；本節先記錄已定案的第三版方向，避免把 webhook 誤當成個人化通知方案。
+
+Bot 目標：
+
+- 個人目標價提醒：使用者追蹤單一商品，價格小於等於目標價時收到 DM。
+- 個人價格變動摘要：使用者設定固定 interval / window / scope，定期收到特定時間段內實際變價商品摘要。
+
+第一輪指令：
+
+- `/digest enable <interval> <window> [scope]`
+- `/digest disable`
+- `/digest settings`
+- `/digest now`
+- `/watch <商品連結或商品ID> <目標價格>`
+- `/watchlist`
+- `/unwatch <watch_id>`
+
+第一輪限制：
+
+- `interval` 只支援 `daily`、`every_12h`、`every_6h`。
+- `window` 只支援 `24h`、`12h`、`6h`。
+- `scope` 支援 `all` 與 `watchlist`，預設 `all`。
+- 時區固定 `Asia/Taipei`。
+- Digest 每次最多列 50 筆，超過上限時顯示另有幾筆未列出。
+- `/watch` 第一版支援 PartsRadarTW 商品 URL 或站內商品 ID，不以原價屋 iBuy URL 作為主流程。
+- 同一 watch 達標後預設只通知一次；使用者修改目標價或重新建立 watch 才重新啟用。
+
+安全邊界：
+
+- 個人通知只走 DM，不在公開頻道暴露個人追蹤。
+- Bot 只保存 Discord user id 與必要偏好，不建立網站帳號。
+- Bot token 只能放在 untracked `.env` 或部署 secret。
+- Bot 訊息不得包含 iBuy token、來源購買 URL、raw HTML、crawler error detail、DB/internal URL、raw IP 或 internal headers。
+- Bot commands 需有簡單 cooldown / rate limit。
 
 ## Second-Version Public Closeout
 

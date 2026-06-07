@@ -23,7 +23,7 @@ API 只服務自家 Next.js 網站，不承諾第三方公開 API。所有 endpo
 | GET | `/api/product-images/{id}.webp` | 站內商品縮圖 |
 | GET | `/api/source-status` | 來源資料狀態 |
 
-不提供帳號、個人提醒、互動式 Discord 查詢 / 私訊 bot、購物、crawler trigger、raw snapshot 或 parse error API。第三版可另行提供公開狀態推播、資料摘要、配單分享預覽與公告，但不能把商品查詢 API 擴成第三方或個人化通知 API。
+公開網站 API 不提供帳號、個人提醒、購物、crawler trigger、raw snapshot 或 parse error API。第三版 Discord bot 個人通知應由 bot daemon / internal worker 直接使用受控的 DB 存取與專用資料表，不把網站商品查詢 API 擴成第三方 API 或個人化通知 API。
 
 ## Response Format
 
