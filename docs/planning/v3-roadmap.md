@@ -1,13 +1,13 @@
 # 第三版 Roadmap
 
-本文件是第三版規劃的主要來源。第三版目前收斂成兩條產品主線與一條維運主線：商品頁分享 / Open Graph preview、Discord 通知能力，以及受保護的內網 ops status page / 管理者告警。Discord 通知分工為 webhook 做公開價格變動廣播與管理者告警，Discord bot 做個人化目標價提醒與個人價格變動摘要。分享配單、公開服務狀態推播與公開服務狀態頁暫不作為近期主線；若未來需求明確，再另開較小設計 slice。
+本文件是第三版規劃的主要來源。第三版目前收斂成兩條產品主線與一條維運主線：商品頁分享 / Open Graph preview、Discord 通知能力，以及受保護的內網 ops status page / 管理者告警。Discord 通知分工為 webhook 做公開價格變動廣播與管理者告警，Discord bot 做個人化目標價提醒與個人價格變動報告。分享配單、公開服務狀態推播與公開服務狀態頁暫不作為近期主線；若未來需求明確，再另開較小設計 slice。
 
 ## 目標
 
 - 讓商品詳細頁更容易分享，並讓外部平台透過 Open Graph 取得乾淨商品預覽。
 - 讓 Discord public webhook 提供有參考價值的公開價格變動清單，而不是低價值服務狀態噪音。
 - 讓使用者可透過 Discord bot 設定個人目標價提醒，並在達標時收到 DM。
-- 讓使用者可透過 Discord bot 開啟固定時間個人價格變動摘要，列出特定時間段內實際變價的商品，降低一直開網站追蹤的需求。
+- 讓使用者可透過 Discord bot 開啟固定時間個人價格變動報告，列出特定時間段內實際變價的商品，降低一直開網站追蹤的需求。
 - 保留網站 accountless；Discord 個人化通知只使用 Discord user id，不建立網站帳號或跨平台帳號綁定。
 - 讓維運者可以在服務異常時更快收到通知，而不是只能人工查看 container log。
 - 讓維運者能更有效檢視資料品質、缺圖、連結健康與 crawler 狀態；第一輪採內網 ops status page / admin webhook，不做公開狀態頁。
@@ -15,14 +15,14 @@
 
 ## 非目標
 
-第三版不做網站帳號、登入、網站端 watchlist、帳號保存菜單、Discord 帳號綁網站帳號、公開頻道個人通知、Discord 內保存配單、庫存 / 到貨通知、配單分類缺漏提示、規格資料、相容性檢查、自動推薦配單、購物 / 下單 / 自動購買、跨網站比價或多資料來源整合。Discord bot 第一輪只做個人目標價提醒與個人價格變動摘要，不做完整商品搜尋 bot、購買建議或複雜條件訂閱。
+第三版不做網站帳號、登入、網站端 watchlist、帳號保存菜單、Discord 帳號綁網站帳號、公開頻道個人通知、Discord 內保存配單、庫存 / 到貨通知、配單分類缺漏提示、規格資料、相容性檢查、自動推薦配單、購物 / 下單 / 自動購買、跨網站比價或多資料來源整合。Discord bot 第一輪只做個人目標價提醒與個人價格變動報告，不做完整商品搜尋 bot、購買建議或複雜條件訂閱。
 
 ## 價格追蹤判斷
 
 價格資料對使用者有意義，但第三版要區分「網站上的價格變化理解」與「Discord bot 個人化通知」。
 
 - 有價值且已適合保留：商品價格歷史、近期漲跌、區間最低 / 最高 / 均價、配單或分享頁上的分享當下價格與目前價格差異提示。
-- 第三版納入：Discord bot 個人目標價提醒、Discord bot 個人價格變動摘要。
+- 第三版納入：Discord bot 個人目標價提醒、Discord bot 個人價格變動報告。
 - 仍暫不適合第三版：網站帳號、email 通知、跨平台帳號綁定、網站端 watchlist、複雜條件例如跌幅百分比 / 區間低點 / 分類批量訂閱。
 - 原因：Discord bot 可以用 Discord user id 與 DM 建立低成本個人化通知，不必先建立網站帳號；但仍需要退訂、通知頻率、防濫用、去重與資料新鮮度邊界。
 
@@ -34,20 +34,20 @@
 
 - Public webhook：`crawler-daemon` 在有商品價格變動時，用公開 webhook 列出本輪變價商品、舊價、新價與差額；這是公開廣播，不是個人化訂閱。
 - Admin webhook：`smoke-daemon` 對管理者 Discord 頻道送出 `WARN` / `FAIL` / `RECOVERED`，不推給一般使用者。
-- Discord bot：處理個人化 slash commands、DM 目標價提醒與 DM 價格變動摘要。
+- Discord bot：處理個人化 slash commands、DM 目標價提醒與 DM 價格變動報告。
 - 分享入口：使用者貼上商品連結時，透過商品頁 Open Graph / canonical URL 提供安全摘要；目前不做分享配單 link preview。
 
 Discord bot 第一輪指令：
 
-- `/digest enable <interval> <window> [scope]`：開啟固定時間價格變動摘要。
-- `/digest disable`：關閉價格變動摘要。
-- `/digest settings`：查看目前摘要設定。
-- `/digest now`：立即產生一次摘要，用於驗證設定與手動查看。
+- `/price-report enable <interval> <window> [scope]`：開啟固定時間價格變動報告。
+- `/price-report disable`：關閉價格變動報告。
+- `/price-report settings`：查看目前報告設定。
+- `/price-report now`：立即產生一次報告，用於驗證設定與手動查看。
 - `/watch <商品連結或商品ID> <目標價格>`：追蹤單一商品目標價。
 - `/watchlist`：顯示自己的追蹤商品、目前價格、目標價格、是否已觸發與站內連結。
 - `/unwatch <watch_id>`：取消追蹤；`watch_id` 使用 bot 產生的短 ID，不暴露 DB UUID。
 
-價格變動摘要第一版限制：
+價格變動報告第一版限制：
 
 - `interval` 只支援 `daily`、`every_12h`、`every_6h`。
 - `window` 只支援 `24h`、`12h`、`6h`。
@@ -99,17 +99,17 @@ Discord bot 第一輪指令：
 範圍：
 
 - Webhook 保留給 public 價格變動清單與 admin smoke 告警。
-- Discord bot 負責個人目標價提醒與個人價格變動摘要。
+- Discord bot 負責個人目標價提醒與個人價格變動報告。
 - 從現有 `production-smoke` / `smoke-daemon` 結果產生管理者告警，告警對象是維運者；支援 `FAIL`、需要人工注意的 `WARN`、恢復正常通知與 cooldown / 去重。
 - public webhook 內容只能包含安全摘要；管理者告警可包含檢查名稱、狀態、簡短原因、時間與 runbook 方向。
 - Discord webhook URL 與 bot token 只放在 untracked `.env` 或部署 secret，不提交 Git。
-- Discord bot 需要新增 daemon、slash command registration、watch / digest 設定資料表與 notification delivery log。
+- Discord bot 需要新增 daemon、slash command registration、watch / price-report 設定資料表與 notification delivery log。
 
 完成條件：
 
 - public 價格變動清單不包含 secret、raw HTML、DB URL、internal headers、crawler stack trace、parse error raw content 或 raw IP。
 - 公開價格變動清單只列出本輪變價商品名稱、站內商品連結、舊價、新價與差額，並受 `PRICE_CHANGE_DISCORD_MAX_ITEMS` 上限控制。
-- Discord bot 可讓使用者開關個人價格變動摘要，並可用 `/digest now` 立即取得摘要。
+- Discord bot 可讓使用者開關個人價格變動報告，並可用 `/price-report now` 立即取得報告。
 - Discord bot 可讓使用者建立、查看與取消單品目標價提醒。
 - 目標價達標 DM 有去重，不會每輪 crawler 重複通知同一個已達標 watch。
 - 個人通知不需要網站登入，不做公開頻道個人通知，不暴露個人追蹤清單。
@@ -224,9 +224,9 @@ Discord bot 第一輪指令：
 ### v3.1：Discord Bot 個人化通知
 
 - Discord bot daemon 與 slash command registration。
-- 個人價格變動摘要：`/digest enable`、`/digest disable`、`/digest settings`、`/digest now`。
+- 個人價格變動報告：`/price-report enable`、`/price-report disable`、`/price-report settings`、`/price-report now`。
 - 個人目標價提醒：`/watch`、`/watchlist`、`/unwatch`。
-- Watch / digest 設定資料表、Discord user preference、notification delivery log。
+- Watch / price-report 設定資料表、Discord user preference、notification delivery log。
 - DM 通知去重、cooldown / rate limit、secret 與訊息安全邊界。
 
 ### v3.2：維運檢視、外部監控與公開流量硬化
@@ -242,5 +242,5 @@ Discord bot 第一輪指令：
 - 公開服務狀態頁或公開狀態推播是否重啟；若重啟，需先確認一般使用者是否真的需要，而不是只服務維運者。
 - 外部監控工具選型與部署位置。
 - 內網 ops status page 是否已足夠，或是否還需要額外 CLI 報表。
-- Discord digest 的預設每日發送時間。
+- Discord price report 的預設每日發送時間。
 - `/watch` 未來是否支援原價屋 URL 或 Discord 內搜尋商品。

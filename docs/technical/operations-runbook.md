@@ -516,14 +516,14 @@ Discord bot 尚未實作；本節先記錄已定案的第三版方向，避免�
 Bot 目標：
 
 - 個人目標價提醒：使用者追蹤單一商品，價格小於等於目標價時收到 DM。
-- 個人價格變動摘要：使用者設定固定 interval / window / scope，定期收到特定時間段內實際變價商品摘要。
+- 個人價格變動報告：使用者設定固定 interval / window / scope，定期收到特定時間段內實際變價商品報告。
 
 第一輪指令：
 
-- `/digest enable <interval> <window> [scope]`
-- `/digest disable`
-- `/digest settings`
-- `/digest now`
+- `/price-report enable <interval> <window> [scope]`
+- `/price-report disable`
+- `/price-report settings`
+- `/price-report now`
 - `/watch <商品連結或商品ID> <目標價格>`
 - `/watchlist`
 - `/unwatch <watch_id>`
@@ -534,7 +534,7 @@ Bot 目標：
 - `window` 只支援 `24h`、`12h`、`6h`。
 - `scope` 支援 `all` 與 `watchlist`，預設 `all`。
 - 時區固定 `Asia/Taipei`。
-- Digest 每次最多列 50 筆，超過上限時顯示另有幾筆未列出。
+- Price report 每次最多列 50 筆，超過上限時顯示另有幾筆未列出。
 - `/watch` 第一版支援 PartsRadarTW 商品 URL 或站內商品 ID，不以原價屋 iBuy URL 作為主流程。
 - 同一 watch 達標後預設只通知一次；使用者修改目標價或重新建立 watch 才重新啟用。
 

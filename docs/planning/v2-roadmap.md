@@ -294,7 +294,7 @@ fix(web): remove unstable coolpc import tool
 
 ## 第三版方向
 
-第三版已另立 [第三版 Roadmap](v3-roadmap.md)。目前第三版範圍已改以商品分享 / Open Graph、Discord webhook 公開變價廣播、Discord 管理者告警、Discord bot 個人目標價提醒與個人價格變動摘要、內網 ops status page、外部監控與公開流量硬化為主；分享配單與公開服務狀態頁暫緩。未列入項目與非目標不再於本文件重複，均以第三版 Roadmap 為準。
+第三版已另立 [第三版 Roadmap](v3-roadmap.md)。目前第三版範圍已改以商品分享 / Open Graph、Discord webhook 公開變價廣播、Discord 管理者告警、Discord bot 個人目標價提醒與個人價格變動報告、內網 ops status page、外部監控與公開流量硬化為主；分享配單與公開服務狀態頁暫緩。未列入項目與非目標不再於本文件重複，均以第三版 Roadmap 為準。
 
 ## GitHub Release 策略
 
