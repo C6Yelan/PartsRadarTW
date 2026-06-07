@@ -450,7 +450,8 @@ describe("production smoke checks", () => {
         expect.objectContaining({
           name: "source image anomalies",
           status: "OK",
-          message: "624 invalid image URL issue(s) in 24h, warnAfter=2000",
+          message:
+            "624 rows / 16 distinct products / 5 distinct raw image urls in 24h, warnAfter=2000",
         }),
         expect.objectContaining({
           name: "rate limit headers",
@@ -625,7 +626,8 @@ describe("production smoke checks", () => {
         expect.objectContaining({
           name: "source image anomalies",
           status: "WARN",
-          message: "2001 invalid image URL issue(s) in 24h, warnAfter=2000",
+          message:
+            "2001 rows / 16 distinct products / 5 distinct raw image urls in 24h, warnAfter=2000",
         }),
       ]),
     );
@@ -740,7 +742,8 @@ describe("production smoke checks", () => {
         expect.objectContaining({
           name: "source image anomalies",
           status: "OK",
-          message: "0 invalid image URL issue(s) in 24h, warnAfter=2000",
+          message:
+            "0 rows / 0 distinct products / 0 distinct raw image urls in 24h, warnAfter=2000",
         }),
       ]),
     );
@@ -904,6 +907,21 @@ function createSmokeClient({
         }
 
         return trueParseErrorCount;
+      },
+      findMany: async ({
+        where,
+      }: {
+        where: { errorType?: "INVALID_IMAGE_URL" | { not: "INVALID_IMAGE_URL" } };
+      }) => {
+        if (where.errorType !== "INVALID_IMAGE_URL") {
+          return [];
+        }
+
+        return Array.from({ length: invalidImageErrorCount }, (_, index) => ({
+          rawToken: `TOKEN-${(index % 16) + 1}`,
+          rawName: `Invalid image product ${(index % 16) + 1}`,
+          rawImageUrl: `/eval/${(index % 5) + 1}/`,
+        }));
       },
     },
     product: {

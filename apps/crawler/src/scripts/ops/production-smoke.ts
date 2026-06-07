@@ -135,6 +135,12 @@ interface RateLimitHeaderSnapshot {
   reset: number;
 }
 
+interface SourceImageAnomalyRecord {
+  rawToken: string | null;
+  rawName: string | null;
+  rawImageUrl: string | null;
+}
+
 type ProductionSmokeClient = Pick<
   PrismaClient,
   "crawlRun" | "parseError" | "product" | "productLinkHealth" | "rawSnapshot"
@@ -513,9 +519,7 @@ async function checkPublicEndpoints(options: ProductionSmokeOptions): Promise<{
   const checks: SmokeCheckResult[] = [];
   const homepage = await fetchText("/", options);
   checks.push(
-    homepage.ok
-      ? ok("homepage", `HTTP ${homepage.status}`)
-      : fail("homepage", homepage.message),
+    homepage.ok ? ok("homepage", `HTTP ${homepage.status}`) : fail("homepage", homepage.message),
   );
 
   const buildListPage = await fetchText("/build-list", options);
@@ -540,7 +544,10 @@ async function checkPublicEndpoints(options: ProductionSmokeOptions): Promise<{
   const categories = await fetchJson("/api/categories", options);
   checks.push(checkV2Categories(categories));
 
-  const products = await fetchJson(`/api/products?pageSize=${options.productImageSampleSize}`, options);
+  const products = await fetchJson(
+    `/api/products?pageSize=${options.productImageSampleSize}`,
+    options,
+  );
   const productsBody = products.ok && isProductsResponse(products.body) ? products.body : null;
   const firstProduct = productsBody?.data[0] ?? null;
   const productId = firstProduct?.id ?? null;
@@ -570,16 +577,25 @@ async function checkPublicEndpoints(options: ProductionSmokeOptions): Promise<{
       isProductDetailResponse(productDetail.body) &&
       productDetail.body.id === productId
       ? ok("product detail api", productId)
-      : fail("product detail api", productDetail.ok ? "response shape is invalid" : productDetail.message),
+      : fail(
+          "product detail api",
+          productDetail.ok ? "response shape is invalid" : productDetail.message,
+        ),
   );
 
   checks.push(await checkProductImageEndpoints(productsBody?.data ?? [], options));
 
-  const priceHistory = await fetchJson(`/api/products/${productId}/price-history?range=90d`, options);
+  const priceHistory = await fetchJson(
+    `/api/products/${productId}/price-history?range=90d`,
+    options,
+  );
   checks.push(
     priceHistory.ok && isPriceHistoryResponse(priceHistory.body)
       ? ok("price-history api", `points=${priceHistory.body.points.length}`)
-      : fail("price-history api", priceHistory.ok ? "response shape is invalid" : priceHistory.message),
+      : fail(
+          "price-history api",
+          priceHistory.ok ? "response shape is invalid" : priceHistory.message,
+        ),
   );
 
   return {
@@ -786,7 +802,9 @@ async function checkRecentSuspectedBlocks(
   });
   const message = `${count} suspected block run(s) in ${options.recentWindowHours}h`;
 
-  return count > 0 ? warn("recent suspected blocks", message) : ok("recent suspected blocks", message);
+  return count > 0
+    ? warn("recent suspected blocks", message)
+    : ok("recent suspected blocks", message);
 }
 
 async function checkRecentParseErrors(
@@ -822,19 +840,67 @@ async function checkSourceImageAnomalies(
   now: Date,
 ): Promise<SmokeCheckResult> {
   const since = new Date(now.getTime() - options.recentWindowHours * MILLISECONDS_PER_HOUR);
-  const count = await client.parseError.count({
+  const records = await client.parseError.findMany({
     where: {
       errorType: "INVALID_IMAGE_URL",
       createdAt: {
         gte: since,
       },
     },
+    select: {
+      rawToken: true,
+      rawName: true,
+      rawImageUrl: true,
+    },
   });
-  const message = `${count} invalid image URL issue(s) in ${options.recentWindowHours}h, warnAfter=${options.invalidImageUrlWarnCount}`;
+  const summary = summarizeSourceImageAnomalies(records);
+  const message = `${summary.rows} rows / ${summary.distinctProducts} distinct products / ${summary.distinctRawImageUrls} distinct raw image urls in ${options.recentWindowHours}h, warnAfter=${options.invalidImageUrlWarnCount}`;
 
-  return count > options.invalidImageUrlWarnCount
+  return summary.rows > options.invalidImageUrlWarnCount
     ? warn("source image anomalies", message)
     : ok("source image anomalies", message);
+}
+
+function summarizeSourceImageAnomalies(records: SourceImageAnomalyRecord[]) {
+  const productKeys = new Set<string>();
+  const rawImageUrls = new Set<string>();
+
+  for (const record of records) {
+    const productKey = toSourceImageAnomalyProductKey(record);
+    const rawImageUrl = normalizeNullableText(record.rawImageUrl);
+
+    if (productKey) {
+      productKeys.add(productKey);
+    }
+
+    if (rawImageUrl) {
+      rawImageUrls.add(rawImageUrl);
+    }
+  }
+
+  return {
+    rows: records.length,
+    distinctProducts: productKeys.size,
+    distinctRawImageUrls: rawImageUrls.size,
+  };
+}
+
+function toSourceImageAnomalyProductKey(record: SourceImageAnomalyRecord): string | null {
+  const rawToken = normalizeNullableText(record.rawToken);
+
+  if (rawToken) {
+    return `token:${rawToken}`;
+  }
+
+  const rawName = normalizeNullableText(record.rawName);
+
+  return rawName ? `name:${rawName}` : null;
+}
+
+function normalizeNullableText(value: string | null): string | null {
+  const trimmed = value?.trim();
+
+  return trimmed || null;
 }
 
 async function checkActiveProductCount(
@@ -928,7 +994,10 @@ async function checkLinkHealth(
       options.introductionTemporaryLinkWarnCount,
       options.introductionTemporaryLinkFailCount,
     ),
-  ].reduce<SmokeStatus>((currentStatus, nextStatus) => worseStatus(currentStatus, nextStatus), "OK");
+  ].reduce<SmokeStatus>(
+    (currentStatus, nextStatus) => worseStatus(currentStatus, nextStatus),
+    "OK",
+  );
 
   return {
     name: "link health",
@@ -970,7 +1039,10 @@ function checkRateLimitHeaders(
   const message = `clientSource=${snapshot.clientSource} limit=${snapshot.limit} remaining=${snapshot.remaining}`;
 
   if (snapshot.clientSource === "unknown" && isPublicHttpsUrl(options.baseUrl)) {
-    return warn("rate limit headers", `${message}; public HTTPS smoke should expose client identity`);
+    return warn(
+      "rate limit headers",
+      `${message}; public HTTPS smoke should expose client identity`,
+    );
   }
 
   return ok("rate limit headers", message);
@@ -1163,8 +1235,7 @@ async function fetchWithTimeout(
     const response = await fetch(url, {
       signal: controller.signal,
       headers: {
-        "user-agent":
-          "PartsRadarTW production smoke (+https://github.com/C6Yelan/PartsRadarTW)",
+        "user-agent": "PartsRadarTW production smoke (+https://github.com/C6Yelan/PartsRadarTW)",
       },
     });
 
