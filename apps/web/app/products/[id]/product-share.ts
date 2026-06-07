@@ -9,6 +9,10 @@ interface ProductShareNavigator {
   };
 }
 
+export function createProductShareUrl(origin: string, productId: string): string {
+  return new URL(`/products/${encodeURIComponent(productId)}`, origin).toString();
+}
+
 export async function shareProductUrl({
   navigatorRef,
   title,

@@ -1,6 +1,23 @@
 // apps/web/tests/products/product-share.test.ts
 import { describe, expect, it, vi } from "vitest";
-import { shareProductUrl } from "../../app/products/[id]/product-share";
+import {
+  createProductShareUrl,
+  shareProductUrl,
+} from "../../app/products/[id]/product-share";
+
+describe("createProductShareUrl", () => {
+  it("builds a canonical product URL without caller query state", () => {
+    expect(createProductShareUrl("https://partsradar.test", "product-1")).toBe(
+      "https://partsradar.test/products/product-1",
+    );
+    expect(
+      createProductShareUrl(
+        "https://partsradar.test/products/product-1?returnTo=%2F%3Figrp%3D7",
+        "product-1",
+      ),
+    ).toBe("https://partsradar.test/products/product-1");
+  });
+});
 
 describe("shareProductUrl", () => {
   it("uses Web Share API when available", async () => {

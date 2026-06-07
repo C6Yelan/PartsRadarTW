@@ -12,7 +12,11 @@ import PriceHistoryPanel, {
   type PriceHistoryRange,
   type ProductPriceHistoryBody,
 } from "./price-history-panel";
-import { shareProductUrl, type ProductShareResult } from "./product-share";
+import {
+  createProductShareUrl,
+  shareProductUrl,
+  type ProductShareResult,
+} from "./product-share";
 
 type LoadState = "idle" | "loading" | "ready" | "not-found" | "error";
 type ProductLinkHealthStatus = "ok" | "broken" | "temporary_error";
@@ -198,7 +202,7 @@ export default function ProductDetail({
       navigatorRef: navigator,
       title: product.name,
       text: `${product.name} - ${formatPrice(product.price.amount)}`,
-      url: window.location.href,
+      url: createProductShareUrl(window.location.origin, product.id),
     });
 
     if (result !== "cancelled") {
