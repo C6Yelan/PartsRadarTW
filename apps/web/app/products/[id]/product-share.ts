@@ -1,6 +1,7 @@
 // apps/web/app/products/[id]/product-share.ts
 
 export type ProductShareResult = "shared" | "copied" | "cancelled" | "failed";
+export type ProductShareStatus = Extract<ProductShareResult, "copied" | "failed"> | null;
 
 interface ProductShareNavigator {
   share?: (data: ShareData) => Promise<void>;
@@ -51,4 +52,20 @@ export async function shareProductUrl({
   }
 
   return "failed";
+}
+
+export function toVisibleProductShareStatus(result: ProductShareResult): ProductShareStatus {
+  return result === "copied" || result === "failed" ? result : null;
+}
+
+export function formatProductShareStatus(status: ProductShareStatus): string {
+  if (status === "copied") {
+    return "已複製連結";
+  }
+
+  if (status === "failed") {
+    return "目前無法分享";
+  }
+
+  return "";
 }

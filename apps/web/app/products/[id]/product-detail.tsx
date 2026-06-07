@@ -14,13 +14,14 @@ import PriceHistoryPanel, {
 } from "./price-history-panel";
 import {
   createProductShareUrl,
+  formatProductShareStatus,
   shareProductUrl,
-  type ProductShareResult,
+  toVisibleProductShareStatus,
+  type ProductShareStatus,
 } from "./product-share";
 
 type LoadState = "idle" | "loading" | "ready" | "not-found" | "error";
 type ProductLinkHealthStatus = "ok" | "broken" | "temporary_error";
-type ShareStatus = Extract<ProductShareResult, "shared" | "copied" | "failed"> | null;
 
 interface ProductLinkHealth {
   status: ProductLinkHealthStatus;
@@ -76,7 +77,7 @@ export default function ProductDetail({
   const [priceHistory, setPriceHistory] = useState<ProductPriceHistoryBody | null>(null);
   const [historyRange, setHistoryRange] = useState<PriceHistoryRange>(90);
   const [imageError, setImageError] = useState(false);
-  const [shareStatus, setShareStatus] = useState<ShareStatus>(null);
+  const [shareStatus, setShareStatus] = useState<ProductShareStatus>(null);
   const {
     addBuildListProduct,
     quantityByProductId,
@@ -205,10 +206,10 @@ export default function ProductDetail({
       url: createProductShareUrl(window.location.origin, product.id),
     });
 
-    if (result !== "cancelled") {
-      setShareStatus(result);
-    }
+    setShareStatus(toVisibleProductShareStatus(result));
   }
+
+  const shareStatusMessage = formatProductShareStatus(shareStatus);
 
   return (
     <main className="detail-shell">
@@ -371,9 +372,11 @@ export default function ProductDetail({
                   </a>
                 ) : null}
               </div>
-              <p className="detail-share-status" aria-live="polite">
-                {formatShareStatus(shareStatus)}
-              </p>
+              {shareStatusMessage ? (
+                <p className="detail-share-status" aria-live="polite">
+                  {shareStatusMessage}
+                </p>
+              ) : null}
             </div>
             {renderLinkHealthNotice(product)}
           </div>
@@ -413,10 +416,7 @@ function formatDateTime(value: string) {
   }).format(new Date(value));
 }
 
-function toExternalActionClassName(
-  health: ProductLinkHealth | null,
-  extraClassName?: "secondary",
-) {
+function toExternalActionClassName(health: ProductLinkHealth | null, extraClassName?: "secondary") {
   return [
     "external-action",
     extraClassName,
@@ -429,9 +429,7 @@ function toExternalActionClassName(
 function renderLinkHealthNotice(product: ProductDetailBody) {
   const notices = [
     toLinkHealthNotice("原價屋連結", product.source.health),
-    product.introduction
-      ? toLinkHealthNotice("產品介紹連結", product.introduction.health)
-      : null,
+    product.introduction ? toLinkHealthNotice("產品介紹連結", product.introduction.health) : null,
   ].filter((notice): notice is string => Boolean(notice));
 
   if (notices.length === 0) {
@@ -445,28 +443,10 @@ function renderLinkHealthNotice(product: ProductDetailBody) {
   );
 }
 
-function formatShareStatus(status: ShareStatus): string {
-  if (status === "shared") {
-    return "已開啟分享";
-  }
-
-  if (status === "copied") {
-    return "已複製連結";
-  }
-
-  if (status === "failed") {
-    return "目前無法分享";
-  }
-
-  return "";
-}
-
 function toLinkHealthNotice(label: string, health: ProductLinkHealth | null) {
   if (!health || health.status === "ok") {
     return null;
   }
 
-  return health.status === "broken"
-    ? `${label}可能已失效`
-    : `${label}暫時無法確認`;
+  return health.status === "broken" ? `${label}可能已失效` : `${label}暫時無法確認`;
 }

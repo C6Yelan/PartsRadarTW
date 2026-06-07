@@ -2,7 +2,9 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   createProductShareUrl,
+  formatProductShareStatus,
   shareProductUrl,
+  toVisibleProductShareStatus,
 } from "../../app/products/[id]/product-share";
 
 describe("createProductShareUrl", () => {
@@ -16,6 +18,19 @@ describe("createProductShareUrl", () => {
         "product-1",
       ),
     ).toBe("https://partsradar.test/products/product-1");
+  });
+});
+
+describe("product share status", () => {
+  it("only shows status text for clipboard fallback and real failures", () => {
+    expect(toVisibleProductShareStatus("shared")).toBeNull();
+    expect(toVisibleProductShareStatus("cancelled")).toBeNull();
+    expect(toVisibleProductShareStatus("copied")).toBe("copied");
+    expect(toVisibleProductShareStatus("failed")).toBe("failed");
+
+    expect(formatProductShareStatus(null)).toBe("");
+    expect(formatProductShareStatus("copied")).toBe("已複製連結");
+    expect(formatProductShareStatus("failed")).toBe("目前無法分享");
   });
 });
 
