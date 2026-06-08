@@ -13,6 +13,7 @@
     "test:watch": "vitest",
     "check": "pnpm typecheck && pnpm lint && pnpm build",
     "ops:crawl-coolpc-daemon": "pnpm --filter @partsradar/crawler ops:crawl-coolpc-daemon",
+    "ops:discord-bot": "pnpm --filter @partsradar/crawler ops:discord-bot",
     "ops:image-cache:backfill": "pnpm --filter @partsradar/crawler ops:image-cache:backfill",
     "ops:maintenance-daemon": "pnpm --filter @partsradar/crawler ops:maintenance-daemon",
     "ops:product-links:check": "pnpm --filter @partsradar/crawler ops:product-links:check",

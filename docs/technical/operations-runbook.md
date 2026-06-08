@@ -509,26 +509,57 @@ smoke Discord notification policy 行為：
 - Discord 發送失敗、rate limit 或 state file 寫入失敗只會寫入安全 log，不會讓 `smoke-daemon` 崩潰或停止後續檢查。
 - `--run-once` 也會走相同 policy，可用於主機端單次驗證。
 
-## Planned Discord Bot Personalized Notifications
+## Discord Bot Personalized Notifications
 
-Discord bot 尚未實作；本節先記錄已定案的第三版方向，避免把 webhook 誤當成個人化通知方案。
+Discord bot foundation 已開始實作，並和 webhook foundation 分開。Webhook 只做公開價格變動廣播與 admin smoke 告警；Discord bot 才處理個人化 DM。
 
 Bot 目標：
 
 - 個人目標價提醒：使用者追蹤單一商品，價格小於等於目標價時收到 DM。
 - 個人價格變動報告：使用者設定固定 interval / window / scope，定期收到特定時間段內實際變價商品報告。
 
-第一輪指令：
+目前已實作：
+
+- `discord-bot` Compose profile 與 `pnpm ops:discord-bot` daemon entrypoint。
+- Discord slash command registration。
+- `/price-report now`：使用者手動要求最近 `24h` / `12h` / `6h` 價格變動報告，bot 透過 DM 回傳。
+- `/price-report now` 每次最多列 `DISCORD_PRICE_REPORT_MAX_ITEMS` 筆，預設 50。
+- 每次 `/price-report now` 會寫入 `discord_notification_deliveries`，供後續去重、排程與維運檢視使用。
+
+尚未實作：
 
 - `/price-report enable <interval> <window> [scope]`
 - `/price-report disable`
 - `/price-report settings`
-- `/price-report now`
 - `/watch <商品連結或商品ID> <目標價格>`
 - `/watchlist`
 - `/unwatch <watch_id>`
 
-第一輪限制：
+目前設定：
+
+- `DISCORD_BOT_TOKEN`：Discord bot token，只能放在 untracked `.env` 或部署 secret。
+- `DISCORD_APPLICATION_ID`：Discord application id。
+- `DISCORD_GUILD_ID`：Discord guild id；第一輪建議設定 guild command，註冊與測試速度較快。
+- `DISCORD_BOT_REGISTER_COMMANDS_ON_START`：daemon 啟動時是否註冊 slash command，預設 `true`。
+- `DISCORD_PRICE_REPORT_MAX_ITEMS`：`/price-report now` DM 最多列出的變價商品數，預設 50。
+- `DISCORD_BOT_COMMAND_COOLDOWN_SECONDS`：每位使用者手動指令 cooldown，預設 60。
+
+啟動：
+
+```bash
+docker compose --profile discord-bot up -d discord-bot
+docker compose --profile discord-bot ps discord-bot
+docker compose --profile discord-bot logs --tail=100 discord-bot
+```
+
+只註冊 slash command 並退出：
+
+```bash
+docker compose --profile discord-bot run --rm discord-bot \
+  pnpm --filter @partsradar/crawler ops:discord-bot -- --register-commands
+```
+
+已定案但尚未完整實作的第一輪限制：
 
 - `interval` 只支援 `daily`、`every_12h`、`every_6h`。
 - `window` 只支援 `24h`、`12h`、`6h`。

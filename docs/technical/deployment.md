@@ -37,6 +37,7 @@
 | `crawler-daemon` | scheduled CoolPC crawl |
 | `maintenance-daemon` | scheduled link health check and missing image backfill |
 | `raw-snapshot-cleanup-daemon` | scheduled raw snapshot cleanup |
+| `discord-bot` | Discord slash command bot for personal DM notifications |
 | `postgres` | 商品、價格、crawler 狀態與 metadata |
 | `cloudflared` | Cloudflare Tunnel public entry |
 
@@ -154,6 +155,8 @@ PRODUCT_IMAGE_STORAGE_DIR=/var/lib/partsradar/product-images
 | `MAINTENANCE_IMAGE_LIMIT` / `MAINTENANCE_IMAGE_MIN_DELAY_MS` / `MAINTENANCE_IMAGE_MAX_DELAY_MS` | missing image backfill maintenance 節奏 |
 | `EXTERNAL_FETCH_LOCK_DIR` / `EXTERNAL_FETCH_LOCK_STALE_SECONDS` | 外部抓取 shared lock |
 | `RAW_SNAPSHOT_CLEANUP_INTERVAL_SECONDS` | cleanup daemon 節奏 |
+| `DISCORD_BOT_TOKEN` / `DISCORD_APPLICATION_ID` / `DISCORD_GUILD_ID` | Discord bot 個人化通知設定；只在 `discord-bot` profile 啟用時需要 |
+| `DISCORD_BOT_REGISTER_COMMANDS_ON_START` / `DISCORD_PRICE_REPORT_MAX_ITEMS` / `DISCORD_BOT_COMMAND_COOLDOWN_SECONDS` | Discord bot 指令註冊、報告列數與 cooldown |
 | `CLOUDFLARED_IMAGE` | 固定版本 cloudflared image |
 | `CLOUDFLARE_TUNNEL_TOKEN` | Tunnel token |
 | `NODE_ENV` | production |
@@ -180,9 +183,10 @@ PRODUCT_IMAGE_STORAGE_DIR=/var/lib/partsradar/product-images
 10. private validation `/api/source-status`。
 11. 視需要先手動跑 product image backfill。
 12. 啟動 `scheduled-crawler` profile 中的 `crawler-daemon`、`maintenance-daemon` 與 `raw-snapshot-cleanup-daemon`。
-13. 建立 Cloudflare remotely-managed tunnel。
-14. 啟動 `public-tunnel` profile。
-15. 驗證正式網域、API、圖片 API、crawler、maintenance 與資料狀態。
+13. 若啟用 Discord 個人化通知，設定 bot secret 後啟動 `discord-bot` profile。
+14. 建立 Cloudflare remotely-managed tunnel。
+15. 啟動 `public-tunnel` profile。
+16. 驗證正式網域、API、圖片 API、crawler、maintenance、Discord bot 與資料狀態。
 
 ## Migration / Backup / Monitoring
 

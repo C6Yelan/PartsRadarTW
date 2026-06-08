@@ -229,6 +229,8 @@ Discord bot 第一輪指令：
 - Watch / price-report 設定資料表、Discord user preference、notification delivery log。
 - DM 通知去重、cooldown / rate limit、secret 與訊息安全邊界。
 
+目前第一個 foundation slice 已完成：`discord-bot` daemon、slash command registration、`/price-report now` DM 報告、Discord 通知資料表與 delivery log。`/price-report enable/disable/settings`、定期發送與 `/watch` 系列仍待後續 slice。
+
 ### v3.2：維運檢視、外部監控與公開流量硬化
 
 - 受保護的內網 ops status page 與資料品質維運檢視。

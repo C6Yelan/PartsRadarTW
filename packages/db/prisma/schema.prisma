@@ -77,6 +77,46 @@ enum ProductLinkHealthStatus {
   @@map("product_link_health_status")
 }
 
+enum DiscordPriceReportInterval {
+  DAILY     @map("daily")
+  EVERY_12H @map("every_12h")
+  EVERY_6H  @map("every_6h")
+
+  @@map("discord_price_report_interval")
+}
+
+enum DiscordPriceReportWindow {
+  HOURS_24 @map("24h")
+  HOURS_12 @map("12h")
+  HOURS_6  @map("6h")
+
+  @@map("discord_price_report_window")
+}
+
+enum DiscordPriceReportScope {
+  ALL       @map("all")
+  WATCHLIST @map("watchlist")
+
+  @@map("discord_price_report_scope")
+}
+
+enum DiscordNotificationKind {
+  PRICE_REPORT_NOW       @map("price_report_now")
+  SCHEDULED_PRICE_REPORT @map("scheduled_price_report")
+  TARGET_PRICE           @map("target_price")
+
+  @@map("discord_notification_kind")
+}
+
+enum DiscordNotificationStatus {
+  SENT         @map("sent")
+  SKIPPED      @map("skipped")
+  FAILED       @map("failed")
+  RATE_LIMITED @map("rate_limited")
+
+  @@map("discord_notification_status")
+}
+
 model SourceCategory {
   id              String                   @id @default(uuid()) @db.Uuid
   igrp            Int
@@ -120,6 +160,8 @@ model Product {
   currentPrice          CurrentPrice?
   priceSnapshots        PriceSnapshot[]
   linkHealthChecks      ProductLinkHealth[]
+  discordTargetWatches  DiscordTargetPriceWatch[]
+  discordDeliveries     DiscordNotificationDelivery[]
 
   @@unique([sourceCategoryId, ibuyToken], map: "products_source_category_id_ibuy_token_key")
   @@index([sourceCategoryId], map: "products_source_category_id_idx")
@@ -185,6 +227,65 @@ model ProductLinkHealth {
   @@index([status], map: "product_link_health_status_idx")
   @@index([checkedAt], map: "product_link_health_checked_at_idx")
   @@map("product_link_health")
+}
+
+model DiscordPriceReportSetting {
+  id             String                     @id @default(uuid()) @db.Uuid
+  discordUserId  String                     @unique(map: "discord_price_report_settings_discord_user_id_key") @map("discord_user_id") @db.Text
+  interval       DiscordPriceReportInterval
+  window         DiscordPriceReportWindow
+  scope          DiscordPriceReportScope    @default(ALL)
+  timezone       String                     @default("Asia/Taipei") @db.Text
+  maxItems       Int                        @default(50) @map("max_items")
+  enabled        Boolean                    @default(true)
+  nextSendAt     DateTime?                  @map("next_send_at") @db.Timestamptz(6)
+  lastSentAt     DateTime?                  @map("last_sent_at") @db.Timestamptz(6)
+  createdAt      DateTime                   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime                   @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([enabled, nextSendAt], map: "discord_price_report_settings_enabled_next_send_at_idx")
+  @@map("discord_price_report_settings")
+}
+
+model DiscordTargetPriceWatch {
+  id             String                         @id @default(uuid()) @db.Uuid
+  discordUserId  String                         @map("discord_user_id") @db.Text
+  productId      String                         @map("product_id") @db.Uuid
+  product        Product                        @relation(fields: [productId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  targetPrice    Int                            @map("target_price")
+  currency       Currency                       @default(TWD)
+  enabled        Boolean                        @default(true)
+  lastNotifiedAt DateTime?                      @map("last_notified_at") @db.Timestamptz(6)
+  createdAt      DateTime                       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime                       @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deliveries     DiscordNotificationDelivery[]
+
+  @@index([discordUserId, enabled], map: "discord_target_price_watches_user_enabled_idx")
+  @@index([productId, enabled], map: "discord_target_price_watches_product_enabled_idx")
+  @@map("discord_target_price_watches")
+}
+
+model DiscordNotificationDelivery {
+  id                 String                    @id @default(uuid()) @db.Uuid
+  discordUserId      String                    @map("discord_user_id") @db.Text
+  kind               DiscordNotificationKind
+  status             DiscordNotificationStatus
+  productId          String?                   @map("product_id") @db.Uuid
+  product            Product?                  @relation(fields: [productId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  targetPriceWatchId String?                   @map("target_price_watch_id") @db.Uuid
+  targetPriceWatch   DiscordTargetPriceWatch?  @relation(fields: [targetPriceWatchId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  dedupeKey          String?                   @unique(map: "discord_notification_deliveries_dedupe_key_key") @map("dedupe_key") @db.Text
+  itemCount          Int                       @default(0) @map("item_count")
+  messageCount       Int                       @default(0) @map("message_count")
+  errorMessage       String?                   @map("error_message") @db.Text
+  deliveredAt        DateTime?                 @map("delivered_at") @db.Timestamptz(6)
+  createdAt          DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([discordUserId, createdAt], map: "discord_notification_deliveries_user_created_at_idx")
+  @@index([kind, status, createdAt], map: "discord_notification_deliveries_kind_status_created_at_idx")
+  @@index([productId], map: "discord_notification_deliveries_product_id_idx")
+  @@index([targetPriceWatchId], map: "discord_notification_deliveries_target_watch_id_idx")
+  @@map("discord_notification_deliveries")
 }
 
 model CrawlRun {

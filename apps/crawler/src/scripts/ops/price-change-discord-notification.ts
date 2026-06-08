@@ -94,6 +94,20 @@ interface PreviousPriceSnapshot {
   capturedAt: Date;
 }
 
+export interface RecentPriceChangeOptions {
+  since: Date;
+  until?: Date;
+}
+
+export interface PriceChangeReportMessageOptions {
+  publicBaseUrl: string;
+  maxItems: number;
+  title?: string;
+  browseLabel?: string;
+  hiddenLimitLabel?: string;
+  emptyMessage?: string;
+}
+
 export function parsePriceChangeDiscordNotificationOptions(
   args: string[],
   env: NodeJS.ProcessEnv,
@@ -124,9 +138,7 @@ export async function sendCrawlRunPriceChangeDiscordNotification({
   client: PriceChangeDiscordClient;
   crawlRunId: string;
   options: PriceChangeDiscordNotificationOptions;
-  sendDiscordWebhook?: (
-    options: DiscordWebhookSendOptions,
-  ) => Promise<DiscordWebhookSendResult>;
+  sendDiscordWebhook?: (options: DiscordWebhookSendOptions) => Promise<DiscordWebhookSendResult>;
 }): Promise<PriceChangeDiscordNotificationResult> {
   if (!options.publicWebhookUrl) {
     return {
@@ -277,12 +289,90 @@ export async function readCrawlRunPriceChanges(
   return changes.sort(comparePriceChanges);
 }
 
-export function createPriceChangeDiscordMessages(
-  changes: PriceChangeDiscordNotificationItem[],
-  options: Pick<PriceChangeDiscordNotificationOptions, "publicBaseUrl" | "maxItems">,
-): DiscordWebhookMessage[] {
-  if (changes.length === 0) {
+export async function readRecentPriceChanges(
+  client: PriceChangeDiscordClient,
+  { since, until = new Date() }: RecentPriceChangeOptions,
+): Promise<PriceChangeDiscordNotificationItem[]> {
+  if (since.getTime() >= until.getTime()) {
     return [];
+  }
+
+  const currentSnapshots = (await client.priceSnapshot.findMany({
+    where: {
+      capturedAt: {
+        gte: since,
+        lte: until,
+      },
+    },
+    select: {
+      id: true,
+      productId: true,
+      price: true,
+      currency: true,
+      capturedAt: true,
+      product: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+    },
+    orderBy: [{ capturedAt: "asc" }, { id: "asc" }],
+  })) as CrawlRunPriceSnapshot[];
+
+  if (currentSnapshots.length === 0) {
+    return [];
+  }
+
+  const productIds = [...new Set(currentSnapshots.map((snapshot) => snapshot.productId))];
+  const previousSnapshots = (await client.priceSnapshot.findMany({
+    where: {
+      productId: { in: productIds },
+      capturedAt: { lt: until },
+    },
+    select: {
+      id: true,
+      productId: true,
+      price: true,
+      currency: true,
+      capturedAt: true,
+    },
+    orderBy: [{ productId: "asc" }, { capturedAt: "desc" }, { id: "desc" }],
+  })) as PreviousPriceSnapshot[];
+  const previousByProduct = groupPreviousSnapshots(previousSnapshots);
+  const latestChangeByProduct = new Map<string, PriceChangeDiscordNotificationItem>();
+
+  for (const current of currentSnapshots) {
+    const previous = previousByProduct
+      .get(current.productId)
+      ?.find((snapshot) => snapshot.capturedAt.getTime() < current.capturedAt.getTime());
+
+    if (!previous || previous.price === current.price || previous.currency !== current.currency) {
+      continue;
+    }
+
+    latestChangeByProduct.set(current.productId, {
+      productId: current.product.id,
+      productName: current.product.name,
+      previousPrice: previous.price,
+      currentPrice: current.price,
+      currency: current.currency,
+      changedAt: current.capturedAt,
+      delta: current.price - previous.price,
+    });
+  }
+
+  return [...latestChangeByProduct.values()].sort(comparePriceChanges);
+}
+
+export function createPriceChangeReportMessages(
+  changes: PriceChangeDiscordNotificationItem[],
+  options: PriceChangeReportMessageOptions,
+): string[] {
+  const title = options.title ?? "PartsRadarTW price report";
+
+  if (changes.length === 0) {
+    return [formatDiscordWebhookText(options.emptyMessage ?? `${title}\nNo price changes found.`)];
   }
 
   const listedChanges = changes.slice(0, options.maxItems);
@@ -297,30 +387,55 @@ export function createPriceChangeDiscordMessages(
       publicBaseUrl: options.publicBaseUrl,
     }),
   );
+  const browseLine = `${options.browseLabel ?? "Browse"}: ${createProductsUrl(
+    options.publicBaseUrl,
+  )}`;
   const chunks = chunkLines(lines, {
     totalCount: changes.length,
     listedCount: listedChanges.length,
     hiddenCount,
     observedAt,
     publicBaseUrl: options.publicBaseUrl,
+    title,
+    browseLine,
+    hiddenLimitLabel: options.hiddenLimitLabel ?? "report item limit",
   });
 
-  return chunks.map((chunk, index) => ({
+  return chunks.map((chunk, index) =>
+    formatPriceChangeMessageContent({
+      totalCount: changes.length,
+      listedCount: listedChanges.length,
+      hiddenCount,
+      observedAt,
+      chunk,
+      partIndex: index + 1,
+      partCount: chunks.length,
+      title,
+      browseLine,
+      hiddenLimitLabel: options.hiddenLimitLabel ?? "report item limit",
+    }),
+  );
+}
+
+export function createPriceChangeDiscordMessages(
+  changes: PriceChangeDiscordNotificationItem[],
+  options: Pick<PriceChangeDiscordNotificationOptions, "publicBaseUrl" | "maxItems">,
+): DiscordWebhookMessage[] {
+  if (changes.length === 0) {
+    return [];
+  }
+
+  const contents = createPriceChangeReportMessages(changes, {
+    publicBaseUrl: options.publicBaseUrl,
+    maxItems: options.maxItems,
+    title: "PartsRadarTW price changes",
+    browseLabel: "Browse",
+    hiddenLimitLabel: "PRICE_CHANGE_DISCORD_MAX_ITEMS",
+  });
+
+  return contents.map((content) => ({
     username: "PartsRadarTW",
-    content: [
-      createPriceChangeHeader({
-        totalCount: changes.length,
-        listedCount: listedChanges.length,
-        hiddenCount,
-        observedAt,
-        partIndex: index + 1,
-        partCount: chunks.length,
-      }),
-      "",
-      chunk.join("\n"),
-      "",
-      `Browse: ${createProductsUrl(options.publicBaseUrl)}`,
-    ].join("\n"),
+    content,
   }));
 }
 
@@ -365,6 +480,9 @@ function chunkLines(
     hiddenCount: number;
     observedAt: Date;
     publicBaseUrl: string;
+    title: string;
+    browseLine: string;
+    hiddenLimitLabel: string;
   },
 ): string[][] {
   const chunks: string[][] = [];
@@ -399,19 +517,23 @@ function formatPriceChangeMessageContent({
   listedCount,
   hiddenCount,
   observedAt,
-  publicBaseUrl,
   chunk,
   partIndex,
   partCount,
+  title,
+  browseLine,
+  hiddenLimitLabel,
 }: {
   totalCount: number;
   listedCount: number;
   hiddenCount: number;
   observedAt: Date;
-  publicBaseUrl: string;
   chunk: string[];
   partIndex: number;
   partCount: number;
+  title: string;
+  browseLine: string;
+  hiddenLimitLabel: string;
 }): string {
   return [
     createPriceChangeHeader({
@@ -421,11 +543,13 @@ function formatPriceChangeMessageContent({
       observedAt,
       partIndex,
       partCount,
+      title,
+      hiddenLimitLabel,
     }),
     "",
     chunk.join("\n"),
     "",
-    `Browse: ${createProductsUrl(publicBaseUrl)}`,
+    browseLine,
   ].join("\n");
 }
 
@@ -436,6 +560,8 @@ function createPriceChangeHeader({
   observedAt,
   partIndex,
   partCount,
+  title,
+  hiddenLimitLabel,
 }: {
   totalCount: number;
   listedCount: number;
@@ -443,17 +569,16 @@ function createPriceChangeHeader({
   observedAt: Date;
   partIndex: number;
   partCount: number;
+  title: string;
+  hiddenLimitLabel: string;
 }): string {
-  const title =
-    partCount > 1
-      ? `PartsRadarTW price changes (${partIndex}/${partCount})`
-      : "PartsRadarTW price changes";
+  const displayTitle = partCount > 1 ? `${title} (${partIndex}/${partCount})` : title;
   const countLine =
     hiddenCount > 0
-      ? `Changes: ${totalCount}. Listed: ${listedCount}; ${hiddenCount} hidden by PRICE_CHANGE_DISCORD_MAX_ITEMS.`
+      ? `Changes: ${totalCount}. Listed: ${listedCount}; ${hiddenCount} hidden by ${hiddenLimitLabel}.`
       : `Changes: ${totalCount}.`;
 
-  return [title, `Observed at: ${formatTaipeiMinute(observedAt)}`, countLine].join("\n");
+  return [displayTitle, `Observed at: ${formatTaipeiMinute(observedAt)}`, countLine].join("\n");
 }
 
 function formatPriceChangeLine({
@@ -512,7 +637,7 @@ function createProductsUrl(publicBaseUrl: string): string {
   return new URL("/", publicBaseUrl).toString();
 }
 
-function normalizePublicBaseUrl(value: string): string {
+export function normalizePublicBaseUrl(value: string): string {
   let url: URL;
 
   try {

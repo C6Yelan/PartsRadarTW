@@ -363,6 +363,34 @@ services:
         "ops:production-smoke-daemon",
       ]
 
+  discord-bot:
+    profiles:
+      - discord-bot
+    build:
+      context: .
+      target: crawler
+    restart: unless-stopped
+    environment:
+      <<: *app-env
+      DISCORD_BOT_TOKEN: "${DISCORD_BOT_TOKEN:-replace_with_discord_bot_token}"
+      DISCORD_APPLICATION_ID: "${DISCORD_APPLICATION_ID:-replace_with_discord_application_id}"
+      DISCORD_GUILD_ID: "${DISCORD_GUILD_ID:-replace_with_discord_guild_id}"
+      DISCORD_BOT_REGISTER_COMMANDS_ON_START: "${DISCORD_BOT_REGISTER_COMMANDS_ON_START:-true}"
+      DISCORD_PRICE_REPORT_MAX_ITEMS: "${DISCORD_PRICE_REPORT_MAX_ITEMS:-50}"
+      DISCORD_BOT_COMMAND_COOLDOWN_SECONDS: "${DISCORD_BOT_COMMAND_COOLDOWN_SECONDS:-60}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      seed:
+        condition: service_completed_successfully
+    command:
+      [
+        "pnpm",
+        "--filter",
+        "@partsradar/crawler",
+        "ops:discord-bot",
+      ]
+
   cloudflared:
     profiles:
       - public-tunnel

@@ -6,8 +6,10 @@ import type {
 } from "../../../src/scripts/ops/discord-webhook";
 import {
   createPriceChangeDiscordMessages,
+  createPriceChangeReportMessages,
   parsePriceChangeDiscordNotificationOptions,
   readCrawlRunPriceChanges,
+  readRecentPriceChanges,
   sendCrawlRunPriceChangeDiscordNotification,
   type PriceChangeDiscordClient,
   type PriceChangeDiscordNotificationItem,
@@ -27,14 +29,11 @@ describe("price change Discord notification options", () => {
 
   it("accepts public webhook, base URL, and max item overrides", () => {
     expect(
-      parsePriceChangeDiscordNotificationOptions(
-        ["--price-change-discord-max-items", "75"],
-        {
-          DISCORD_PUBLIC_WEBHOOK_URL: WEBHOOK_URL,
-          PARTSRADAR_PUBLIC_BASE_URL: "https://partsradar.test/app/",
-          PRICE_CHANGE_DISCORD_MAX_ITEMS: "25",
-        },
-      ),
+      parsePriceChangeDiscordNotificationOptions(["--price-change-discord-max-items", "75"], {
+        DISCORD_PUBLIC_WEBHOOK_URL: WEBHOOK_URL,
+        PARTSRADAR_PUBLIC_BASE_URL: "https://partsradar.test/app/",
+        PRICE_CHANGE_DISCORD_MAX_ITEMS: "25",
+      }),
     ).toEqual({
       publicWebhookUrl: WEBHOOK_URL,
       publicBaseUrl: "https://partsradar.test/app",
@@ -44,10 +43,7 @@ describe("price change Discord notification options", () => {
 
   it("rejects unsafe option values", () => {
     expect(() =>
-      parsePriceChangeDiscordNotificationOptions(
-        ["--price-change-discord-max-items", "0"],
-        {},
-      ),
+      parsePriceChangeDiscordNotificationOptions(["--price-change-discord-max-items", "0"], {}),
     ).toThrow("must be an integer between 1 and 200");
 
     expect(() =>
@@ -159,6 +155,62 @@ describe("readCrawlRunPriceChanges", () => {
   });
 });
 
+describe("readRecentPriceChanges", () => {
+  it("returns each product's latest price change inside the requested window", async () => {
+    const client = createPriceChangeClient([
+      snapshot({
+        id: "old-1",
+        productId: "product-1",
+        productName: "GPU A",
+        crawlRunId: "old-run",
+        price: 10000,
+        capturedAt: "2026-06-07T01:00:00.000Z",
+      }),
+      snapshot({
+        id: "mid-1",
+        productId: "product-1",
+        productName: "GPU A",
+        crawlRunId: "run-1",
+        price: 9300,
+        capturedAt: "2026-06-07T03:00:00.000Z",
+      }),
+      snapshot({
+        id: "new-1",
+        productId: "product-1",
+        productName: "GPU A",
+        crawlRunId: "run-2",
+        price: 9000,
+        capturedAt: "2026-06-07T04:00:00.000Z",
+      }),
+      snapshot({
+        id: "new-product",
+        productId: "product-2",
+        productName: "First Seen SSD",
+        crawlRunId: "run-2",
+        price: 2500,
+        capturedAt: "2026-06-07T04:10:00.000Z",
+      }),
+    ]);
+
+    await expect(
+      readRecentPriceChanges(client, {
+        since: new Date("2026-06-07T02:00:00.000Z"),
+        until: new Date("2026-06-07T05:00:00.000Z"),
+      }),
+    ).resolves.toEqual([
+      {
+        productId: "product-1",
+        productName: "GPU A",
+        previousPrice: 9300,
+        currentPrice: 9000,
+        currency: "TWD",
+        changedAt: new Date("2026-06-07T04:00:00.000Z"),
+        delta: -300,
+      },
+    ]);
+  });
+});
+
 describe("createPriceChangeDiscordMessages", () => {
   it("lists price changes with product links and hidden-count cap text", () => {
     const messages = createPriceChangeDiscordMessages(
@@ -206,6 +258,18 @@ describe("createPriceChangeDiscordMessages", () => {
     for (const message of messages) {
       expect(message.content?.length).toBeLessThanOrEqual(2000);
     }
+  });
+});
+
+describe("createPriceChangeReportMessages", () => {
+  it("creates an empty report message when no recent price changes exist", () => {
+    expect(
+      createPriceChangeReportMessages([], {
+        publicBaseUrl: PUBLIC_BASE_URL,
+        maxItems: 50,
+        title: "PartsRadarTW price report - past 24h",
+      }),
+    ).toEqual(["PartsRadarTW price report - past 24h\nNo price changes found."]);
   });
 });
 
@@ -374,15 +438,44 @@ function createPriceChangeClient(snapshots: TestSnapshot[]): PriceChangeDiscordC
         }));
     }
 
+    if (
+      !where.productId &&
+      typeof where.capturedAt === "object" &&
+      where.capturedAt !== null &&
+      "gte" in where.capturedAt &&
+      "lte" in where.capturedAt
+    ) {
+      const capturedAtFilter = where.capturedAt as { gte: Date; lte: Date };
+
+      return snapshots
+        .filter(
+          (snapshot) =>
+            snapshot.capturedAt.getTime() >= capturedAtFilter.gte.getTime() &&
+            snapshot.capturedAt.getTime() <= capturedAtFilter.lte.getTime(),
+        )
+        .sort(compareCapturedAtAsc)
+        .map((snapshot) => ({
+          id: snapshot.id,
+          productId: snapshot.productId,
+          price: snapshot.price,
+          currency: snapshot.currency,
+          capturedAt: snapshot.capturedAt,
+          product: {
+            id: snapshot.productId,
+            name: snapshot.productName,
+          },
+        }));
+    }
+
     const productIdFilter = where.productId as { in: string[] };
-    const crawlRunFilter = where.crawlRunId as { not: string };
+    const crawlRunFilter = where.crawlRunId as { not: string } | undefined;
     const capturedAtFilter = where.capturedAt as { lt: Date };
 
     return snapshots
       .filter(
         (snapshot) =>
           productIdFilter.in.includes(snapshot.productId) &&
-          snapshot.crawlRunId !== crawlRunFilter.not &&
+          (!crawlRunFilter || snapshot.crawlRunId !== crawlRunFilter.not) &&
           snapshot.capturedAt.getTime() < capturedAtFilter.lt.getTime(),
       )
       .sort(comparePreviousSnapshotOrder)
