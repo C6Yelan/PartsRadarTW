@@ -124,7 +124,7 @@ Response shape：
 - `id`
 - `name`
 - `category`
-- `image`
+- `image`：缺少主要圖片資料時為 `null`，由前端顯示 fallback
 - `price`
 - `source`
 - `introduction`
@@ -136,6 +136,7 @@ Response shape：
 
 - 商品存在但 inactive 回 `200`，由 `status.isActive` 告知 UI。
 - 商品不存在回 `404`。
+- 缺少主要圖片資料不等於商品不存在；詳細頁仍回 `200`，`image` 為 `null`。
 - `source.url` 指向原價屋購買 / 查看導流，不含 session token。
 - `introduction` 來自來源列產品介紹連結；蝦皮、PDF、driver/download 類低品質 URL 回 `null`。
 - `source.health` 與 `introduction.health` 來自已持久化的 link checker 結果；沒有檢查紀錄或 URL 已變更時回 `null`。
@@ -176,7 +177,7 @@ Response shape：
 
 規則：
 
-- 只回傳 display-ready 商品的價格歷史；商品不存在、分類停用、缺圖片或無目前價格時回 `404`。
+- 只回傳有目前價格且來源分類啟用商品的價格歷史；商品不存在、分類停用或無目前價格時回 `404`。缺少主要圖片資料不影響價格歷史查詢。
 - `days` 以目前時間回推，且只接受固定 allowlist，避免任意大型歷史查詢。
 - 價格歷史只讀 `price_snapshots` 與 `current_prices`，不觸發 crawler，也不依賴 raw snapshot 檔案。
 - `points` 依 `observedAt` 由舊到新排序。

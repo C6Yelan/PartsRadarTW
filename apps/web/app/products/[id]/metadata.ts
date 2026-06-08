@@ -67,12 +67,6 @@ export async function createProductDetailMetadata(
         sourceCategory: {
           enabled: true,
         },
-        primaryImageUrl: {
-          not: null,
-        },
-        primaryImageCheckedAt: {
-          not: null,
-        },
         currentPrice: {
           isNot: null,
         },

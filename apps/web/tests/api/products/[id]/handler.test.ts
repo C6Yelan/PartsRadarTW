@@ -23,12 +23,6 @@ describe("GET /api/products/{id} handler", () => {
         sourceCategory: {
           enabled: true,
         },
-        primaryImageUrl: {
-          not: null,
-        },
-        primaryImageCheckedAt: {
-          not: null,
-        },
         currentPrice: {
           isNot: null,
         },
@@ -76,6 +70,26 @@ describe("GET /api/products/{id} handler", () => {
     expect(JSON.stringify(body)).not.toContain("iBuyToken");
     expect(JSON.stringify(body)).not.toContain("source_item_key");
     expect(JSON.stringify(body)).not.toContain("PHPSESSID");
+  });
+
+  it("returns product details with a nullable image when primary image data is missing", async () => {
+    const response = await createGetProductHandler(
+      fakeProductDetailClient(
+        product({
+          primaryImageUrl: null,
+          primaryImageCheckedAt: null,
+        }),
+      ),
+    )(PRODUCT_ID);
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      id: PRODUCT_ID,
+      image: null,
+      price: {
+        amount: 6990,
+      },
+    });
   });
 
   it("returns inactive product details when the product still has a current price", async () => {

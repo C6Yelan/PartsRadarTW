@@ -1,10 +1,7 @@
 // apps/web/app/api/products/[id]/price-history/handler.ts
 import type { Prisma } from "@partsradar/db";
 
-import {
-  InvalidQueryError,
-  parseOptionalIntegerQuery,
-} from "../../../_shared/query";
+import { InvalidQueryError, parseOptionalIntegerQuery } from "../../../_shared/query";
 import {
   internalErrorResponse,
   invalidQueryResponse,
@@ -113,12 +110,6 @@ export function createGetProductPriceHistoryHandler(
           id: normalizedProductId,
           sourceCategory: {
             enabled: true,
-          },
-          primaryImageUrl: {
-            not: null,
-          },
-          primaryImageCheckedAt: {
-            not: null,
           },
           currentPrice: {
             isNot: null,

@@ -11,7 +11,7 @@ const PRODUCT_ID = "11111111-1111-1111-1111-111111111111";
 const NOW = new Date("2026-06-01T12:00:00.000Z");
 
 describe("GET /api/products/{id}/price-history handler", () => {
-  it("returns price history points and summary for a display-ready product", async () => {
+  it("returns price history points and summary for a product with a current price", async () => {
     const client = fakePriceHistoryClient({
       productResult: productRecord({
         price: 5600,
@@ -37,12 +37,6 @@ describe("GET /api/products/{id}/price-history handler", () => {
         id: PRODUCT_ID,
         sourceCategory: {
           enabled: true,
-        },
-        primaryImageUrl: {
-          not: null,
-        },
-        primaryImageCheckedAt: {
-          not: null,
         },
         currentPrice: {
           isNot: null,
@@ -339,7 +333,7 @@ describe("GET /api/products/{id}/price-history handler", () => {
     expect(client.priceSnapshotFindManyCallCount).toBe(0);
   });
 
-  it("returns 404 when the product is not display-ready", async () => {
+  it("returns 404 when the product does not exist", async () => {
     const client = fakePriceHistoryClient({
       productResult: null,
       snapshots: [],

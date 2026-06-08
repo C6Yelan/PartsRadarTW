@@ -113,6 +113,20 @@ describe("build list model", () => {
       alt: "GPU RTX 4070",
     });
   });
+
+  it("backfills product image URLs when a detail product has no image yet", () => {
+    expect(
+      toBuildListProduct({
+        ...product(),
+        image: null,
+      }),
+    ).toMatchObject({
+      image: {
+        url: "/api/product-images/product-1.webp",
+        alt: "GPU RTX 4070",
+      },
+    });
+  });
 });
 
 function product(overrides: Partial<BuildListProduct> = {}): BuildListProduct {

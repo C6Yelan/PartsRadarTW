@@ -41,7 +41,7 @@ interface ProductDetailBody {
   image: {
     url: string;
     alt: string;
-  };
+  } | null;
   price: {
     amount: number;
     currency: "TWD";
@@ -247,7 +247,7 @@ export default function ProductDetail({
       {state === "ready" && product ? (
         <section className="detail-layout">
           <div className="detail-media">
-            {imageError ? (
+            {!product.image || imageError ? (
               <div className="detail-image-fallback" aria-label="圖片暫時無法顯示" role="img">
                 <span className="image-fallback-copy">
                   <strong>圖片暫時無法顯示</strong>

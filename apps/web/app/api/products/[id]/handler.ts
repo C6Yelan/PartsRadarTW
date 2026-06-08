@@ -85,7 +85,7 @@ interface ProductDetailResponseBody {
     url: string;
     alt: string;
     capturedAt: string;
-  };
+  } | null;
   price: {
     amount: number;
     currency: "TWD";
@@ -133,12 +133,6 @@ export function createGetProductHandler(
           sourceCategory: {
             enabled: true,
           },
-          primaryImageUrl: {
-            not: null,
-          },
-          primaryImageCheckedAt: {
-            not: null,
-          },
           currentPrice: {
             isNot: null,
           },
@@ -161,9 +155,6 @@ function toProductDetailResponse(product: ProductDetailRecord): ProductDetailRes
   if (!product.currentPrice) {
     throw new Error("Product detail query returned a product without current price.");
   }
-  if (!product.primaryImageUrl || !product.primaryImageCheckedAt) {
-    throw new Error("Product detail query returned a product without primary image data.");
-  }
 
   const purchaseUrl = createCoolpcPurchaseUrl(product.ibuyToken);
 
@@ -176,11 +167,7 @@ function toProductDetailResponse(product: ProductDetailRecord): ProductDetailRes
       displayName: product.sourceCategory.displayName,
       sourceName: product.sourceCategory.sourceName,
     },
-    image: {
-      url: createPublicProductImagePath(product.id),
-      alt: product.name,
-      capturedAt: product.primaryImageCheckedAt.toISOString(),
-    },
+    image: toProductDetailImage(product),
     price: {
       amount: product.currentPrice.priceSnapshot.price,
       currency: product.currentPrice.priceSnapshot.currency,
@@ -205,6 +192,18 @@ function toProductDetailResponse(product: ProductDetailRecord): ProductDetailRes
     },
     firstSeenAt: product.firstSeenAt.toISOString(),
     lastSeenAt: product.lastSeenAt.toISOString(),
+  };
+}
+
+function toProductDetailImage(product: ProductDetailRecord): ProductDetailResponseBody["image"] {
+  if (!product.primaryImageUrl || !product.primaryImageCheckedAt) {
+    return null;
+  }
+
+  return {
+    url: createPublicProductImagePath(product.id),
+    alt: product.name,
+    capturedAt: product.primaryImageCheckedAt.toISOString(),
   };
 }
 

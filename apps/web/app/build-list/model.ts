@@ -39,7 +39,8 @@ export interface BuildListSummary {
   totalAmount: number;
 }
 
-interface BuildListProductInput extends Omit<BuildListProduct, "introductionUrl"> {
+interface BuildListProductInput extends Omit<BuildListProduct, "image" | "introductionUrl"> {
+  image?: BuildListProduct["image"] | null;
   introduction?: {
     url: string;
   } | null;
@@ -219,7 +220,10 @@ function normalizeBuildListProduct(value: Record<string, unknown>): BuildListPro
   const sourceName = value.source.name;
   const sourceUrl = toHttpUrl(value.source.url);
   const introductionUrl = value.introductionUrl === null ? null : toHttpUrl(value.introductionUrl);
-  const storedImage = normalizeBuildListImage(value.image, name ?? categoryDisplayName ?? "商品圖片");
+  const storedImage = normalizeBuildListImage(
+    value.image,
+    name ?? categoryDisplayName ?? "商品圖片",
+  );
 
   if (
     !id ||

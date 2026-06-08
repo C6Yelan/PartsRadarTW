@@ -44,7 +44,7 @@ describe("product detail metadata", () => {
     expect(JSON.stringify(metadata)).not.toContain("raw_snapshot");
   });
 
-  it("queries display-ready public product fields for metadata", async () => {
+  it("queries public product fields for metadata without requiring image data", async () => {
     const client = fakeProductMetadataClient(product());
     const metadata = await createProductDetailMetadata(client, PRODUCT_ID.toUpperCase(), {
       publicSiteUrl: "https://partsradar.net/some-path?ignored=1",
@@ -57,12 +57,6 @@ describe("product detail metadata", () => {
         sourceCategory: {
           enabled: true,
         },
-        primaryImageUrl: {
-          not: null,
-        },
-        primaryImageCheckedAt: {
-          not: null,
-        },
         currentPrice: {
           isNot: null,
         },
@@ -71,9 +65,9 @@ describe("product detail metadata", () => {
     expect(client.lastProductFindFirstArgs?.select).not.toHaveProperty("ibuyToken");
     expect(client.lastProductFindFirstArgs?.select).not.toHaveProperty("sourceUrl");
     expect(client.lastProductFindFirstArgs?.select.currentPrice.select.lastSeenAt).toBe(true);
-    expect(client.lastProductFindFirstArgs?.select.currentPrice.select.priceSnapshot.select).not.toHaveProperty(
-      "capturedAt",
-    );
+    expect(
+      client.lastProductFindFirstArgs?.select.currentPrice.select.priceSnapshot.select,
+    ).not.toHaveProperty("capturedAt");
     expect(metadata.alternates?.canonical).toBe(`https://partsradar.net/products/${PRODUCT_ID}`);
   });
 
