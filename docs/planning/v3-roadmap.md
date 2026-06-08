@@ -34,7 +34,7 @@
 
 - Public webhook：`crawler-daemon` 在有商品價格變動時，用公開 webhook 列出本輪變價商品、舊價、新價與差額；這是公開廣播，不是個人化訂閱。
 - Admin webhook：`smoke-daemon` 對管理者 Discord 頻道送出 `WARN` / `FAIL` / `RECOVERED`，不推給一般使用者。
-- Discord bot：處理個人化 slash commands、DM 目標價提醒與 DM 價格變動報告。
+- Discord bot：處理 slash commands、手動價格報告回覆、個人目標價提醒與定期價格變動報告。
 - 分享入口：使用者貼上商品連結時，透過商品頁 Open Graph / canonical URL 提供安全摘要；目前不做分享配單 link preview。
 
 Discord bot 第一輪指令：
@@ -42,7 +42,7 @@ Discord bot 第一輪指令：
 - `/price-report enable <interval> <window> [scope]`：開啟固定時間價格變動報告。
 - `/price-report disable`：關閉價格變動報告。
 - `/price-report settings`：查看目前報告設定。
-- `/price-report now`：立即產生一次報告，用於驗證設定與手動查看。
+- `/price-report now`：立即在指令發出的頻道或私訊 context 產生一次報告，用於驗證設定與手動查看。
 - `/watch <商品連結或商品ID> <目標價格>`：追蹤單一商品目標價。
 - `/watchlist`：顯示自己的追蹤商品、目前價格、目標價格、是否已觸發與站內連結。
 - `/unwatch <watch_id>`：取消追蹤；`watch_id` 使用 bot 產生的短 ID，不暴露 DB UUID。
@@ -54,7 +54,7 @@ Discord bot 第一輪指令：
 - `scope` 支援 `all` 與 `watchlist`，預設 `all`。
 - 時區固定 `Asia/Taipei`。
 - 每次最多列 50 筆，超過上限時顯示另有幾筆未列出。
-- 摘要內容包含商品名稱、舊價、新價、差額、站內商品連結與更新時間。
+- 摘要內容分成「價格變動」與「新增商品」兩區；價格變動列商品名稱、舊價、新價、差額與站內商品連結，新增商品列商品名稱、目前價格與站內商品連結。
 
 目標價提醒第一版限制：
 
@@ -65,7 +65,7 @@ Discord bot 第一輪指令：
 
 安全與隱私邊界：
 
-- 個人通知只走 DM，不在公開頻道暴露個人追蹤。
+- `/price-report now` 可在指令所在頻道或私訊回覆；含個人追蹤清單或目標價設定的通知不得在公開頻道暴露。
 - Bot 只保存 Discord user id 與必要偏好，不建立網站帳號。
 - 訊息不包含 iBuy token、來源購買 URL、raw HTML、crawler error detail、DB/internal URL、raw IP 或 internal headers。
 - Bot commands 需有簡單 cooldown / rate limit，避免查詢與通知設定被濫用。
@@ -109,14 +109,14 @@ Discord bot 第一輪指令：
 
 - public 價格變動清單不包含 secret、raw HTML、DB URL、internal headers、crawler stack trace、parse error raw content 或 raw IP。
 - 公開價格變動清單只列出本輪變價商品名稱、站內商品連結、舊價、新價與差額，並受 `PRICE_CHANGE_DISCORD_MAX_ITEMS` 上限控制。
-- Discord bot 可讓使用者開關個人價格變動報告，並可用 `/price-report now` 立即取得報告。
+- Discord bot 可讓使用者開關個人價格變動報告，並可用 `/price-report now` 在指令所在 context 立即取得報告。
 - Discord bot 可讓使用者建立、查看與取消單品目標價提醒。
 - 目標價達標 DM 有去重，不會每輪 crawler 重複通知同一個已達標 watch。
-- 個人通知不需要網站登入，不做公開頻道個人通知，不暴露個人追蹤清單。
+- 個人通知不需要網站登入，不在公開頻道暴露個人追蹤清單。
 - 單次 smoke 與 daemon 模式都能在測試設定下送出告警。
 - 重複 `WARN` / `FAIL` 不會造成通知洗版。
 - log 與 Discord message 不包含 `.env`、DB URL、Cloudflare token、raw HTML、stack trace、raw IP 或 internal header dump。
-- Bot 指令、DM 與 delivery log 不包含 iBuy token、來源購買 URL、raw HTML、crawler error detail 或 internal URL。
+- Bot 指令、interaction 回覆、DM 與 delivery log 不包含 iBuy token、來源購買 URL、raw HTML、crawler error detail 或 internal URL。
 
 ### 3. 服務狀態頁（暫緩）
 
@@ -229,7 +229,7 @@ Discord bot 第一輪指令：
 - Watch / price-report 設定資料表、Discord user preference、notification delivery log。
 - DM 通知去重、cooldown / rate limit、secret 與訊息安全邊界。
 
-目前第一個 foundation slice 已完成：`discord-bot` daemon、slash command registration、`/price-report now` DM 報告、Discord 通知資料表與 delivery log。`/price-report enable/disable/settings`、定期發送與 `/watch` 系列仍待後續 slice。
+目前第一個 foundation slice 已完成：`discord-bot` daemon、slash command registration、`/price-report now` 指令 context 回覆報告、Discord 通知資料表與 delivery log。`/price-report enable/disable/settings`、定期發送與 `/watch` 系列仍待後續 slice。
 
 ### v3.2：維運檢視、外部監控與公開流量硬化
 

@@ -33,6 +33,19 @@ export interface PriceChangeDiscordNotificationItem {
   delta: number;
 }
 
+export interface PriceReportNewProductItem {
+  productId: string;
+  productName: string;
+  currentPrice: number;
+  currency: string;
+  firstSeenAt: Date;
+}
+
+export interface RecentPriceReport {
+  priceChanges: PriceChangeDiscordNotificationItem[];
+  newProducts: PriceReportNewProductItem[];
+}
+
 export type PriceChangeDiscordNotificationSkipReason =
   | "missing_webhook_url"
   | "no_price_changes"
@@ -118,6 +131,13 @@ export interface PriceChangeReportMessageOptions {
   browseLabel?: string;
   hiddenLimitLabel?: string;
   emptyMessage?: string;
+}
+
+export interface PersonalPriceReportMessageOptions {
+  publicBaseUrl: string;
+  maxItems: number;
+  windowHours: number;
+  generatedAt: Date;
 }
 
 export function parsePriceChangeDiscordNotificationOptions(
@@ -343,8 +363,18 @@ export async function readRecentPriceChanges(
   client: PriceChangeDiscordClient,
   { since, until = new Date() }: RecentPriceChangeOptions,
 ): Promise<PriceChangeDiscordNotificationItem[]> {
+  return (await readRecentPriceReport(client, { since, until })).priceChanges;
+}
+
+export async function readRecentPriceReport(
+  client: PriceChangeDiscordClient,
+  { since, until = new Date() }: RecentPriceChangeOptions,
+): Promise<RecentPriceReport> {
   if (since.getTime() >= until.getTime()) {
-    return [];
+    return {
+      priceChanges: [],
+      newProducts: [],
+    };
   }
 
   const currentSnapshots = (await client.priceSnapshot.findMany({
@@ -371,7 +401,10 @@ export async function readRecentPriceChanges(
   })) as CrawlRunPriceSnapshot[];
 
   if (currentSnapshots.length === 0) {
-    return [];
+    return {
+      priceChanges: [],
+      newProducts: [],
+    };
   }
 
   const productIds = [...new Set(currentSnapshots.map((snapshot) => snapshot.productId))];
@@ -390,14 +423,46 @@ export async function readRecentPriceChanges(
     orderBy: [{ productId: "asc" }, { capturedAt: "desc" }, { id: "desc" }],
   })) as PreviousPriceSnapshot[];
   const previousByProduct = groupPreviousSnapshots(previousSnapshots);
+  const existingProductIds = new Set(
+    previousSnapshots
+      .filter((snapshot) => snapshot.capturedAt.getTime() < since.getTime())
+      .map((snapshot) => snapshot.productId),
+  );
   const latestChangeByProduct = new Map<string, PriceChangeDiscordNotificationItem>();
+  const newProductByProduct = new Map<string, PriceReportNewProductItem>();
 
   for (const current of currentSnapshots) {
+    if (!existingProductIds.has(current.productId)) {
+      const newProduct = newProductByProduct.get(current.productId);
+
+      if (!newProduct) {
+        newProductByProduct.set(current.productId, {
+          productId: current.product.id,
+          productName: current.product.name,
+          currentPrice: current.price,
+          currency: current.currency,
+          firstSeenAt: current.capturedAt,
+        });
+      } else {
+        newProductByProduct.set(current.productId, {
+          ...newProduct,
+          productName: current.product.name,
+          currentPrice: current.price,
+          currency: current.currency,
+        });
+      }
+      continue;
+    }
+
     const previous = previousByProduct
       .get(current.productId)
       ?.find((snapshot) => snapshot.capturedAt.getTime() < current.capturedAt.getTime());
 
-    if (!previous || previous.price === current.price || previous.currency !== current.currency) {
+    if (!previous) {
+      continue;
+    }
+
+    if (previous.price === current.price || previous.currency !== current.currency) {
       continue;
     }
 
@@ -412,7 +477,10 @@ export async function readRecentPriceChanges(
     });
   }
 
-  return [...latestChangeByProduct.values()].sort(comparePriceChanges);
+  return {
+    priceChanges: [...latestChangeByProduct.values()].sort(comparePriceChanges),
+    newProducts: [...newProductByProduct.values()].sort(compareNewProducts),
+  };
 }
 
 export function createPriceChangeReportMessages(
@@ -489,6 +557,52 @@ export function createPriceChangeDiscordMessages(
   }));
 }
 
+export function createPersonalPriceReportMessages(
+  report: RecentPriceReport,
+  options: PersonalPriceReportMessageOptions,
+): string[] {
+  const listedPriceChanges = report.priceChanges.slice(0, options.maxItems);
+  const remainingItemLimit = Math.max(0, options.maxItems - listedPriceChanges.length);
+  const listedNewProducts = report.newProducts.slice(0, remainingItemLimit);
+  const hiddenPriceChangeCount = report.priceChanges.length - listedPriceChanges.length;
+  const hiddenNewProductCount = report.newProducts.length - listedNewProducts.length;
+  const bodyLines = [
+    "價格變動",
+    createCountLine(report.priceChanges.length, "筆價格變動"),
+    ...(listedPriceChanges.length > 0
+      ? listedPriceChanges.map((change, index) =>
+          formatPersonalPriceChangeLine({
+            change,
+            index,
+            publicBaseUrl: options.publicBaseUrl,
+          }),
+        )
+      : ["沒有價格變動。"]),
+    "",
+    "新增商品",
+    createCountLine(report.newProducts.length, "個新增商品"),
+    ...(listedNewProducts.length > 0
+      ? listedNewProducts.map((product, index) =>
+          formatNewProductLine({
+            product,
+            index,
+            publicBaseUrl: options.publicBaseUrl,
+          }),
+        )
+      : ["沒有新增商品。"]),
+    ...createHiddenReportLines({ hiddenPriceChangeCount, hiddenNewProductCount }),
+    "",
+    `開啟 PartsRadarTW：${createProductsUrl(options.publicBaseUrl)}`,
+  ];
+  const title = `PartsRadarTW 價格報告 - 過去 ${options.windowHours} 小時`;
+  const headerLines = [title, `產生時間：${formatTaipeiMinute(options.generatedAt)}`, ""];
+
+  return chunkReportBodyLines({
+    headerLines,
+    bodyLines,
+  });
+}
+
 function groupPreviousSnapshots(
   snapshots: PreviousPriceSnapshot[],
 ): Map<string, PreviousPriceSnapshot[]> {
@@ -514,6 +628,19 @@ function comparePriceChanges(
   }
 
   const timeDiff = right.changedAt.getTime() - left.changedAt.getTime();
+
+  if (timeDiff !== 0) {
+    return timeDiff;
+  }
+
+  return left.productName.localeCompare(right.productName, "zh-Hant");
+}
+
+function compareNewProducts(
+  left: PriceReportNewProductItem,
+  right: PriceReportNewProductItem,
+): number {
+  const timeDiff = right.firstSeenAt.getTime() - left.firstSeenAt.getTime();
 
   if (timeDiff !== 0) {
     return timeDiff;
@@ -560,6 +687,41 @@ function chunkLines(
   }
 
   return chunks;
+}
+
+function chunkReportBodyLines({
+  headerLines,
+  bodyLines,
+}: {
+  headerLines: string[];
+  bodyLines: string[];
+}): string[] {
+  const chunks: string[][] = [];
+  let currentChunk: string[] = [];
+
+  for (const line of bodyLines) {
+    const nextChunk = [...currentChunk, line];
+    const nextContent = [...headerLines, ...nextChunk].join("\n");
+
+    if (currentChunk.length > 0 && nextContent.length > MESSAGE_MAX_LENGTH) {
+      chunks.push(currentChunk);
+      currentChunk = [];
+    }
+
+    currentChunk.push(line);
+  }
+
+  if (currentChunk.length > 0) {
+    chunks.push(currentChunk);
+  }
+
+  const partCount = chunks.length;
+
+  return chunks.map((chunk, index) => {
+    const title = partCount > 1 ? `${headerLines[0]} (${index + 1}/${partCount})` : headerLines[0];
+
+    return formatDiscordWebhookText([title, ...headerLines.slice(1), ...chunk].join("\n"));
+  });
 }
 
 function formatPriceChangeMessageContent({
@@ -654,6 +816,52 @@ function formatPriceChangeLine({
   );
 }
 
+function formatPersonalPriceChangeLine({
+  change,
+  index,
+  publicBaseUrl,
+}: {
+  change: PriceChangeDiscordNotificationItem;
+  index: number;
+  publicBaseUrl: string;
+}): string {
+  const productName = escapeMarkdownLinkText(
+    formatDiscordWebhookText(toSingleLine(change.productName), PRODUCT_NAME_MAX_LENGTH),
+  );
+  const previousPrice = formatTaiwanDollar(change.previousPrice, change.currency);
+  const currentPrice = formatTaiwanDollar(change.currentPrice, change.currency);
+  const delta = formatSignedTaiwanDollar(change.delta, change.currency);
+  const productUrl = createProductUrl(publicBaseUrl, change.productId);
+
+  return formatDiscordWebhookText(
+    `${index + 1}. [${productName}](${productUrl}) - ${previousPrice} -> ${currentPrice}（${delta}）`,
+    280,
+  );
+}
+
+function formatNewProductLine({
+  product,
+  index,
+  publicBaseUrl,
+}: {
+  product: PriceReportNewProductItem;
+  index: number;
+  publicBaseUrl: string;
+}): string {
+  const productName = escapeMarkdownLinkText(
+    formatDiscordWebhookText(toSingleLine(product.productName), PRODUCT_NAME_MAX_LENGTH),
+  );
+  const productUrl = createProductUrl(publicBaseUrl, product.productId);
+
+  return formatDiscordWebhookText(
+    `${index + 1}. [${productName}](${productUrl}) - ${formatTaiwanDollar(
+      product.currentPrice,
+      product.currency,
+    )}`,
+    260,
+  );
+}
+
 function formatPrice(amount: number, currency: string): string {
   return `${currency} ${amount.toLocaleString("en-US")}`;
 }
@@ -662,6 +870,20 @@ function formatSignedPrice(amount: number, currency: string): string {
   const sign = amount > 0 ? "+" : "-";
 
   return `${sign}${formatPrice(Math.abs(amount), currency)}`;
+}
+
+function formatTaiwanDollar(amount: number, currency: string): string {
+  if (currency === "TWD") {
+    return `NT$${amount.toLocaleString("en-US")}`;
+  }
+
+  return `${currency} ${amount.toLocaleString("en-US")}`;
+}
+
+function formatSignedTaiwanDollar(amount: number, currency: string): string {
+  const sign = amount > 0 ? "+" : "-";
+
+  return `${sign}${formatTaiwanDollar(Math.abs(amount), currency)}`;
 }
 
 function formatTaipeiMinute(value: Date): string {
@@ -685,6 +907,30 @@ function createProductUrl(publicBaseUrl: string, productId: string): string {
 
 function createProductsUrl(publicBaseUrl: string): string {
   return new URL("/", publicBaseUrl).toString();
+}
+
+function createCountLine(count: number, label: string): string {
+  return count > 0 ? `找到 ${count} ${label}。` : `找到 0 ${label}。`;
+}
+
+function createHiddenReportLines({
+  hiddenPriceChangeCount,
+  hiddenNewProductCount,
+}: {
+  hiddenPriceChangeCount: number;
+  hiddenNewProductCount: number;
+}): string[] {
+  const lines: string[] = [];
+
+  if (hiddenPriceChangeCount > 0) {
+    lines.push(`另有 ${hiddenPriceChangeCount} 筆價格變動未列出。`);
+  }
+
+  if (hiddenNewProductCount > 0) {
+    lines.push(`另有 ${hiddenNewProductCount} 個新增商品未列出。`);
+  }
+
+  return lines.length > 0 ? ["", ...lines] : [];
 }
 
 export function normalizePublicBaseUrl(value: string): string {

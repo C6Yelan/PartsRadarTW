@@ -1,9 +1,9 @@
 // apps/crawler/src/scripts/ops/discord-bot.ts
 import type { PrismaClient } from "@partsradar/db";
 import {
-  createPriceChangeReportMessages,
+  createPersonalPriceReportMessages,
   normalizePublicBaseUrl,
-  readRecentPriceChanges,
+  readRecentPriceReport,
   type PriceChangeDiscordClient,
 } from "./price-change-discord-notification";
 import {
@@ -76,16 +76,20 @@ export type DiscordDirectMessageSendResult =
       message: string;
     };
 
+export type DiscordBotMessageSendResult = DiscordDirectMessageSendResult;
+
 export type PriceReportNowResult =
   | {
       status: "sent";
       changeCount: number;
+      newProductCount: number;
       listedCount: number;
       messageCount: number;
     }
   | {
       status: "rate_limited";
       changeCount: number;
+      newProductCount: number;
       listedCount: number;
       messageCount: number;
       sentMessageCount: number;
@@ -95,6 +99,7 @@ export type PriceReportNowResult =
   | {
       status: "failed";
       changeCount: number;
+      newProductCount: number;
       listedCount: number;
       messageCount: number;
       sentMessageCount: number;
@@ -134,7 +139,7 @@ interface DiscordGatewayPayload {
   t?: string | null;
 }
 
-interface DiscordInteraction {
+export interface DiscordInteraction {
   id: string;
   token: string;
   type: number;
@@ -262,7 +267,7 @@ export async function sendPriceReportNow({
   maxItems,
   publicBaseUrl,
   now = new Date(),
-  sendDirectMessages,
+  sendReportMessages,
 }: {
   client: DiscordBotClient;
   discordUserId: string;
@@ -270,26 +275,18 @@ export async function sendPriceReportNow({
   maxItems: number;
   publicBaseUrl: string;
   now?: Date;
-  sendDirectMessages: (
-    userId: string,
-    contents: string[],
-  ) => Promise<DiscordDirectMessageSendResult>;
+  sendReportMessages: (contents: string[]) => Promise<DiscordBotMessageSendResult>;
 }): Promise<PriceReportNowResult> {
   const since = new Date(now.getTime() - windowHours * HOUR_MS);
-  const changes = await readRecentPriceChanges(client, { since, until: now });
-  const listedCount = Math.min(changes.length, maxItems);
-  const contents = createPriceChangeReportMessages(changes, {
+  const report = await readRecentPriceReport(client, { since, until: now });
+  const listedCount = Math.min(report.priceChanges.length + report.newProducts.length, maxItems);
+  const contents = createPersonalPriceReportMessages(report, {
     publicBaseUrl,
     maxItems,
-    title: `PartsRadarTW price report - past ${windowHours}h`,
-    browseLabel: "Open PartsRadarTW",
-    emptyMessage: [
-      `PartsRadarTW price report - past ${windowHours}h`,
-      "No price changes found.",
-      `Open PartsRadarTW: ${new URL("/", publicBaseUrl).toString()}`,
-    ].join("\n"),
+    windowHours,
+    generatedAt: now,
   });
-  const result = await sendDirectMessages(discordUserId, contents);
+  const result = await sendReportMessages(contents);
 
   await recordPriceReportDelivery({
     client,
@@ -304,7 +301,8 @@ export async function sendPriceReportNow({
   if (result.status === "sent") {
     return {
       status: "sent",
-      changeCount: changes.length,
+      changeCount: report.priceChanges.length,
+      newProductCount: report.newProducts.length,
       listedCount,
       messageCount: contents.length,
     };
@@ -313,7 +311,8 @@ export async function sendPriceReportNow({
   if (result.status === "rate_limited") {
     return {
       status: "rate_limited",
-      changeCount: changes.length,
+      changeCount: report.priceChanges.length,
+      newProductCount: report.newProducts.length,
       listedCount,
       messageCount: contents.length,
       sentMessageCount: result.sentMessageCount,
@@ -324,7 +323,8 @@ export async function sendPriceReportNow({
 
   return {
     status: "failed",
-    changeCount: changes.length,
+    changeCount: report.priceChanges.length,
+    newProductCount: report.newProducts.length,
     listedCount,
     messageCount: contents.length,
     sentMessageCount: result.sentMessageCount,
@@ -432,6 +432,69 @@ export async function sendDiscordDirectMessages({
   };
 }
 
+export async function sendDiscordInteractionMessages({
+  token,
+  applicationId,
+  apiBaseUrl,
+  interaction,
+  contents,
+  fetchImpl = fetch,
+}: {
+  token: string;
+  applicationId: string;
+  apiBaseUrl: string;
+  interaction: DiscordInteraction;
+  contents: string[];
+  fetchImpl?: FetchImpl;
+}): Promise<DiscordBotMessageSendResult> {
+  const httpStatuses: number[] = [];
+
+  for (const [index, content] of contents.entries()) {
+    const path =
+      index === 0
+        ? `/webhooks/${applicationId}/${interaction.token}/messages/@original`
+        : `/webhooks/${applicationId}/${interaction.token}`;
+    const method = index === 0 ? "PATCH" : "POST";
+    const messageResult = await sendDiscordRestRequest<unknown>({
+      token,
+      apiBaseUrl,
+      fetchImpl,
+      method,
+      path,
+      body: createDiscordMessagePayload(content),
+    });
+
+    if (messageResult.status === "ok") {
+      httpStatuses.push(messageResult.httpStatus);
+      continue;
+    }
+
+    if (messageResult.status === "rate_limited") {
+      return {
+        status: "rate_limited",
+        messageCount: contents.length,
+        sentMessageCount: httpStatuses.length,
+        retryAfterMs: messageResult.retryAfterMs,
+        global: messageResult.global,
+      };
+    }
+
+    return {
+      status: "failed",
+      messageCount: contents.length,
+      sentMessageCount: httpStatuses.length,
+      httpStatus: messageResult.httpStatus,
+      message: messageResult.message,
+    };
+  }
+
+  return {
+    status: "sent",
+    messageCount: contents.length,
+    httpStatuses,
+  };
+}
+
 export async function handleDiscordInteraction({
   client,
   interaction,
@@ -457,7 +520,7 @@ export async function handleDiscordInteraction({
       apiBaseUrl: options.apiBaseUrl,
       interaction,
       fetchImpl,
-      content: "This command is not supported by this PartsRadarTW bot version.",
+      content: "這個 PartsRadarTW bot 版本尚未支援此指令。",
     });
     return;
   }
@@ -470,7 +533,7 @@ export async function handleDiscordInteraction({
       apiBaseUrl: options.apiBaseUrl,
       interaction,
       fetchImpl,
-      content: "Unable to resolve the Discord user for this command.",
+      content: "無法辨識這次指令的 Discord 使用者。",
     });
     return;
   }
@@ -483,7 +546,7 @@ export async function handleDiscordInteraction({
       apiBaseUrl: options.apiBaseUrl,
       interaction,
       fetchImpl,
-      content: `Please wait ${cooldown.retryAfterSeconds}s before requesting another price report.`,
+      content: `請等待 ${cooldown.retryAfterSeconds} 秒後再產生下一份價格報告。`,
     });
     return;
   }
@@ -495,29 +558,21 @@ export async function handleDiscordInteraction({
     fetchImpl,
   });
 
-  const result = await sendPriceReportNow({
+  await sendPriceReportNow({
     client,
     discordUserId,
     windowHours: command.windowHours,
     maxItems: command.maxItems ?? options.priceReportMaxItems,
     publicBaseUrl: options.publicBaseUrl,
-    sendDirectMessages: (userId, contents) =>
-      sendDiscordDirectMessages({
+    sendReportMessages: (contents) =>
+      sendDiscordInteractionMessages({
         token: options.token,
+        applicationId: options.applicationId,
         apiBaseUrl: options.apiBaseUrl,
-        userId,
+        interaction,
         contents,
         fetchImpl,
       }),
-  });
-
-  await editInteractionResponse({
-    token: options.token,
-    applicationId: options.applicationId,
-    apiBaseUrl: options.apiBaseUrl,
-    interaction,
-    fetchImpl,
-    content: formatPriceReportNowInteractionResult(result),
   });
 }
 
@@ -755,7 +810,7 @@ function createPriceReportCommand(): Record<string, unknown> {
       {
         type: DISCORD_OPTION_TYPE_SUBCOMMAND,
         name: "now",
-        description: "Send a price change report by DM now.",
+        description: "Show a price change report here now.",
         options: [
           {
             type: DISCORD_OPTION_TYPE_STRING,
@@ -763,15 +818,15 @@ function createPriceReportCommand(): Record<string, unknown> {
             description: "Time window to include.",
             required: false,
             choices: [
-              { name: "past 24 hours", value: "24h" },
-              { name: "past 12 hours", value: "12h" },
-              { name: "past 6 hours", value: "6h" },
+              { name: "過去 24 小時", value: "24h" },
+              { name: "過去 12 小時", value: "12h" },
+              { name: "過去 6 小時", value: "6h" },
             ],
           },
           {
             type: DISCORD_OPTION_TYPE_INTEGER,
             name: "max_items",
-            description: "Maximum changed products to list.",
+            description: "最多列出的商品數。",
             required: false,
             min_value: 1,
             max_value: MAX_PRICE_REPORT_ITEMS,
@@ -857,11 +912,13 @@ async function deferInteractionResponse({
   apiBaseUrl,
   interaction,
   fetchImpl,
+  ephemeral = false,
 }: {
   token: string;
   apiBaseUrl: string;
   interaction: DiscordInteraction;
   fetchImpl: FetchImpl;
+  ephemeral?: boolean;
 }): Promise<void> {
   await sendDiscordRestRequest({
     token,
@@ -871,48 +928,9 @@ async function deferInteractionResponse({
     path: `/interactions/${interaction.id}/${interaction.token}/callback`,
     body: {
       type: DISCORD_INTERACTION_CALLBACK_DEFERRED_CHANNEL_MESSAGE,
-      data: {
-        flags: DISCORD_EPHEMERAL_MESSAGE_FLAG,
-      },
+      data: ephemeral ? { flags: DISCORD_EPHEMERAL_MESSAGE_FLAG } : undefined,
     },
   });
-}
-
-async function editInteractionResponse({
-  token,
-  applicationId,
-  apiBaseUrl,
-  interaction,
-  fetchImpl,
-  content,
-}: {
-  token: string;
-  applicationId: string;
-  apiBaseUrl: string;
-  interaction: DiscordInteraction;
-  fetchImpl: FetchImpl;
-  content: string;
-}): Promise<void> {
-  await sendDiscordRestRequest({
-    token,
-    apiBaseUrl,
-    fetchImpl,
-    method: "PATCH",
-    path: `/webhooks/${applicationId}/${interaction.token}/messages/@original`,
-    body: createDiscordMessagePayload(content, true),
-  });
-}
-
-function formatPriceReportNowInteractionResult(result: PriceReportNowResult): string {
-  if (result.status === "sent") {
-    return `Price report sent by DM. changes=${result.changeCount} listed=${result.listedCount} messages=${result.messageCount}`;
-  }
-
-  if (result.status === "rate_limited") {
-    return `Discord rate limited the DM request. sentMessages=${result.sentMessageCount}/${result.messageCount} retryAfterMs=${result.retryAfterMs}`;
-  }
-
-  return `Unable to send the DM price report. sentMessages=${result.sentMessageCount}/${result.messageCount} httpStatus=${result.httpStatus ?? "none"}`;
 }
 
 function createDiscordMessagePayload(content: string, ephemeral = false): Record<string, unknown> {

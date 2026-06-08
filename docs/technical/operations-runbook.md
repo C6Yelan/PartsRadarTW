@@ -470,7 +470,7 @@ http://127.0.0.1:3001/ops/status?token=<OPS_STATUS_TOKEN>
 
 ## Discord Webhook Notification Foundation
 
-目前已實作的 Discord 通知基礎使用 incoming webhook。`crawler-daemon` 會在每輪 scheduled crawl 成功寫入價格變動後，對公開頻道列出本輪變價商品與金額差；`smoke-daemon` 則在每輪 production smoke summary 後，依 notification policy 對管理者頻道送出 `WARN` / `FAIL` / `RECOVERED` 通知。Discord bot 個人化通知已納入第三版規劃，但尚未在本節的 webhook foundation 中實作。
+目前已實作的 Discord webhook 通知基礎使用 incoming webhook。`crawler-daemon` 會在每輪 scheduled crawl 成功寫入價格變動後，對公開頻道列出本輪變價商品與金額差；`smoke-daemon` 則在每輪 production smoke summary 後，依 notification policy 對管理者頻道送出 `WARN` / `FAIL` / `RECOVERED` 通知。Discord bot foundation 與 slash command 行為另見下方 bot 小節。
 
 可選 secret：
 
@@ -513,7 +513,7 @@ smoke Discord notification policy 行為：
 
 ## Discord Bot Personalized Notifications
 
-Discord bot foundation 已開始實作，並和 webhook foundation 分開。Webhook 只做公開價格變動廣播與 admin smoke 告警；Discord bot 才處理個人化 DM。
+Discord bot foundation 已開始實作，並和 webhook foundation 分開。Webhook 只做公開價格變動廣播與 admin smoke 告警；Discord bot 才處理使用者 slash command 與個人化通知。手動報告會回覆在指令發出的 Discord context；未來含個人追蹤設定的排程報告與目標價提醒需另行定義 DM 或發送目標。
 
 Bot 目標：
 
@@ -524,8 +524,9 @@ Bot 目標：
 
 - `discord-bot` Compose profile 與 `pnpm ops:discord-bot` daemon entrypoint。
 - Discord slash command registration。
-- `/price-report now`：使用者手動要求最近 `24h` / `12h` / `6h` 價格變動報告，bot 透過 DM 回傳。
-- `/price-report now` 每次最多列 `DISCORD_PRICE_REPORT_MAX_ITEMS` 筆，預設 50。
+- `/price-report now`：使用者手動要求最近 `24h` / `12h` / `6h` 價格報告，bot 會在指令發出的頻道或私訊 context 回覆中文報告。
+- `/price-report now` 報告分成「價格變動」與「新增商品」兩區；沒有資料時分區顯示空狀態。
+- `/price-report now` 每次最多列 `DISCORD_PRICE_REPORT_MAX_ITEMS` 筆，預設 50；上限套用在兩區合計列出的商品數。
 - 每次 `/price-report now` 會寫入 `discord_notification_deliveries`，供後續去重、排程與維運檢視使用。
 
 尚未實作：
@@ -543,7 +544,7 @@ Bot 目標：
 - `DISCORD_APPLICATION_ID`：Discord application id。
 - `DISCORD_GUILD_ID`：Discord guild id；第一輪建議設定 guild command，註冊與測試速度較快。
 - `DISCORD_BOT_REGISTER_COMMANDS_ON_START`：daemon 啟動時是否註冊 slash command，預設 `true`。
-- `DISCORD_PRICE_REPORT_MAX_ITEMS`：`/price-report now` DM 最多列出的變價商品數，預設 50。
+- `DISCORD_PRICE_REPORT_MAX_ITEMS`：`/price-report now` 最多列出的商品數，預設 50。
 - `DISCORD_BOT_COMMAND_COOLDOWN_SECONDS`：每位使用者手動指令 cooldown，預設 60。
 
 啟動：
@@ -573,7 +574,7 @@ docker compose --profile discord-bot run --rm discord-bot \
 
 安全邊界：
 
-- 個人通知只走 DM，不在公開頻道暴露個人追蹤。
+- `/price-report now` 只產生全站價格報告，可在指令所在頻道或私訊回覆；含個人追蹤清單或目標價設定的通知不得在公開頻道暴露。
 - Bot 只保存 Discord user id 與必要偏好，不建立網站帳號。
 - Bot token 只能放在 untracked `.env` 或部署 secret。
 - Bot 訊息不得包含 iBuy token、來源購買 URL、raw HTML、crawler error detail、DB/internal URL、raw IP 或 internal headers。

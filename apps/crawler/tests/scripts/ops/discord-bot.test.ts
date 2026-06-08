@@ -4,6 +4,7 @@ import {
   parseDiscordBotOptions,
   registerDiscordBotCommands,
   sendDiscordDirectMessages,
+  sendDiscordInteractionMessages,
   sendPriceReportNow,
   type DiscordBotClient,
 } from "../../../src/scripts/ops/discord-bot";
@@ -144,8 +145,63 @@ describe("sendDiscordDirectMessages", () => {
   });
 });
 
+describe("sendDiscordInteractionMessages", () => {
+  it("edits the original command response and posts follow-up chunks", async () => {
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await expect(
+      sendDiscordInteractionMessages({
+        token: TOKEN,
+        applicationId: APPLICATION_ID,
+        apiBaseUrl: API_BASE_URL,
+        interaction: {
+          id: "interaction-1",
+          token: "interaction-token",
+          type: 2,
+        },
+        contents: ["Report 1", "Report 2 @everyone"],
+        fetchImpl: fetchMock as typeof fetch,
+      }),
+    ).resolves.toEqual({
+      status: "sent",
+      messageCount: 2,
+      httpStatuses: [200, 200],
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const [firstUrl, firstRequest] = fetchMock.mock.calls[0] as [
+      Parameters<typeof fetch>[0],
+      RequestInit,
+    ];
+    const [secondUrl, secondRequest] = fetchMock.mock.calls[1] as [
+      Parameters<typeof fetch>[0],
+      RequestInit,
+    ];
+    expect(String(firstUrl)).toBe(
+      `${API_BASE_URL}/webhooks/${APPLICATION_ID}/interaction-token/messages/@original`,
+    );
+    expect(firstRequest.method).toBe("PATCH");
+    expect(JSON.parse(String(firstRequest.body))).toEqual({
+      content: "Report 1",
+      allowed_mentions: {
+        parse: [],
+      },
+    });
+    expect(String(secondUrl)).toBe(`${API_BASE_URL}/webhooks/${APPLICATION_ID}/interaction-token`);
+    expect(secondRequest.method).toBe("POST");
+    expect(JSON.parse(String(secondRequest.body))).toEqual({
+      content: "Report 2 @everyone",
+      allowed_mentions: {
+        parse: [],
+      },
+    });
+  });
+});
+
 describe("sendPriceReportNow", () => {
-  it("sends a recent price report by DM and records the delivery", async () => {
+  it("sends a recent price report in the command context and records the delivery", async () => {
     const client = createDiscordBotClient([
       snapshot({
         id: "old-1",
@@ -153,7 +209,7 @@ describe("sendPriceReportNow", () => {
         productName: "GPU A",
         crawlRunId: "old-run",
         price: 12000,
-        capturedAt: "2026-06-07T01:00:00.000Z",
+        capturedAt: "2026-06-06T01:00:00.000Z",
       }),
       snapshot({
         id: "new-1",
@@ -163,8 +219,16 @@ describe("sendPriceReportNow", () => {
         price: 10990,
         capturedAt: "2026-06-07T03:00:00.000Z",
       }),
+      snapshot({
+        id: "new-2",
+        productId: "product-2",
+        productName: "SSD B",
+        crawlRunId: "new-run",
+        price: 2490,
+        capturedAt: "2026-06-07T04:00:00.000Z",
+      }),
     ]);
-    const sendDirectMessages = vi.fn(async () => ({
+    const sendReportMessages = vi.fn(async (_contents: string[]) => ({
       status: "sent" as const,
       messageCount: 1,
       httpStatuses: [200],
@@ -178,25 +242,30 @@ describe("sendPriceReportNow", () => {
         maxItems: 50,
         publicBaseUrl: PUBLIC_BASE_URL,
         now: new Date("2026-06-07T05:00:00.000Z"),
-        sendDirectMessages,
+        sendReportMessages,
       }),
     ).resolves.toEqual({
       status: "sent",
       changeCount: 1,
-      listedCount: 1,
+      newProductCount: 1,
+      listedCount: 2,
       messageCount: 1,
     });
 
-    expect(sendDirectMessages).toHaveBeenCalledWith(
-      "111122223333444455",
-      expect.arrayContaining([expect.stringContaining("GPU A")]),
-    );
+    expect(sendReportMessages).toHaveBeenCalledWith([
+      expect.stringContaining("PartsRadarTW 價格報告 - 過去 24 小時"),
+    ]);
+    const reportContent = sendReportMessages.mock.calls[0]?.[0][0] ?? "";
+    expect(reportContent).toContain("價格變動");
+    expect(reportContent).toContain("GPU A");
+    expect(reportContent).toContain("新增商品");
+    expect(reportContent).toContain("SSD B");
     expect(client.discordNotificationDelivery.create).toHaveBeenCalledWith({
       data: {
         discordUserId: "111122223333444455",
         kind: "PRICE_REPORT_NOW",
         status: "SENT",
-        itemCount: 1,
+        itemCount: 2,
         messageCount: 1,
         deliveredAt: new Date("2026-06-07T05:00:00.000Z"),
         errorMessage: null,

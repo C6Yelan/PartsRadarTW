@@ -55,7 +55,7 @@ product_list_view
 | `product_link_health` | 商品外部連結健康狀態 | 每商品每 link kind 一筆；保存目前 URL、狀態、HTTP status、檢查時間、最後成功 / 失敗時間與連續失敗次數。 |
 | `discord_price_report_settings` | Discord 個人價格變動報告設定 | 每個 Discord user id 一筆；保存 interval、window、scope、timezone、max items、enabled 與下次/上次發送時間。 |
 | `discord_target_price_watches` | Discord 個人目標價追蹤 | 以 Discord user id + product 建立目標價追蹤；不建立網站帳號；達標通知狀態由 watch 與 delivery log 控制。 |
-| `discord_notification_deliveries` | Discord 個人通知發送紀錄 | 記錄 price report / target price DM 的 kind、status、item count、message count、錯誤摘要與 delivery time；供去重、維運檢視與後續排程使用。 |
+| `discord_notification_deliveries` | Discord 通知發送紀錄 | 記錄手動 price report interaction 回覆、定期 price report 或 target price 通知的 kind、status、item count、message count、錯誤摘要與 delivery time；供去重、維運檢視與後續排程使用。 |
 | `crawl_runs` | 整輪 crawler 摘要 | 保存 status、start / finish、trigger、error、backoff；不保存分類結果 JSON 或可推得的 count cache。 |
 | `crawl_run_category_results` | 單分類 crawl 結果 | `crawl_run_id + source_category_id` 唯一；保存狀態、raw snapshot、error。 |
 | `raw_snapshots` | fetch metadata | 保存 URL、fetch time、HTTP / content status、hash、gzip path、duplicate reference。 |
@@ -144,7 +144,7 @@ product_list_view
 
 ## Discord Bot Notification Tables
 
-Discord bot 個人化通知只保存 Discord user id 與必要偏好，不建立網站帳號，也不把 Discord id 綁到網站使用者。
+Discord bot 只保存 Discord user id 與必要偏好，不建立網站帳號，也不把 Discord id 綁到網站使用者。手動 `/price-report now` 回覆在指令所在 Discord context；後續定期報告若要支援頻道或 DM 目標，需在實作時明確保存發送目標。
 
 `discord_price_report_settings` 保存：
 
