@@ -45,6 +45,10 @@ export type PriceChangeDiscordNotificationResult =
       changeCount: number;
       listedCount: number;
       messageCount: number;
+      snapshotCount?: number;
+      unmatchedSnapshotCount?: number;
+      unchangedSnapshotCount?: number;
+      currencyMismatchCount?: number;
     }
   | {
       status: "sent";
@@ -92,6 +96,14 @@ interface PreviousPriceSnapshot {
   price: number;
   currency: string;
   capturedAt: Date;
+}
+
+interface CrawlRunPriceChangeReadResult {
+  changes: PriceChangeDiscordNotificationItem[];
+  snapshotCount: number;
+  unmatchedSnapshotCount: number;
+  unchangedSnapshotCount: number;
+  currencyMismatchCount: number;
 }
 
 export interface RecentPriceChangeOptions {
@@ -150,7 +162,8 @@ export async function sendCrawlRunPriceChangeDiscordNotification({
     };
   }
 
-  const changes = await readCrawlRunPriceChanges(client, crawlRunId);
+  const readResult = await readCrawlRunPriceChangeSummary(client, crawlRunId);
+  const { changes } = readResult;
 
   if (changes.length === 0) {
     return {
@@ -159,6 +172,10 @@ export async function sendCrawlRunPriceChangeDiscordNotification({
       changeCount: 0,
       listedCount: 0,
       messageCount: 0,
+      snapshotCount: readResult.snapshotCount,
+      unmatchedSnapshotCount: readResult.unmatchedSnapshotCount,
+      unchangedSnapshotCount: readResult.unchangedSnapshotCount,
+      currencyMismatchCount: readResult.currencyMismatchCount,
     };
   }
 
@@ -222,6 +239,13 @@ export async function readCrawlRunPriceChanges(
   client: PriceChangeDiscordClient,
   crawlRunId: string,
 ): Promise<PriceChangeDiscordNotificationItem[]> {
+  return (await readCrawlRunPriceChangeSummary(client, crawlRunId)).changes;
+}
+
+export async function readCrawlRunPriceChangeSummary(
+  client: PriceChangeDiscordClient,
+  crawlRunId: string,
+): Promise<CrawlRunPriceChangeReadResult> {
   const currentSnapshots = (await client.priceSnapshot.findMany({
     where: { crawlRunId },
     select: {
@@ -241,7 +265,13 @@ export async function readCrawlRunPriceChanges(
   })) as CrawlRunPriceSnapshot[];
 
   if (currentSnapshots.length === 0) {
-    return [];
+    return {
+      changes: [],
+      snapshotCount: 0,
+      unmatchedSnapshotCount: 0,
+      unchangedSnapshotCount: 0,
+      currencyMismatchCount: 0,
+    };
   }
 
   const productIds = [...new Set(currentSnapshots.map((snapshot) => snapshot.productId))];
@@ -265,13 +295,27 @@ export async function readCrawlRunPriceChanges(
   })) as PreviousPriceSnapshot[];
   const previousByProduct = groupPreviousSnapshots(previousSnapshots);
   const changes: PriceChangeDiscordNotificationItem[] = [];
+  let unmatchedSnapshotCount = 0;
+  let unchangedSnapshotCount = 0;
+  let currencyMismatchCount = 0;
 
   for (const current of currentSnapshots) {
     const previous = previousByProduct
       .get(current.productId)
       ?.find((snapshot) => snapshot.capturedAt.getTime() < current.capturedAt.getTime());
 
-    if (!previous || previous.price === current.price || previous.currency !== current.currency) {
+    if (!previous) {
+      unmatchedSnapshotCount += 1;
+      continue;
+    }
+
+    if (previous.currency !== current.currency) {
+      currencyMismatchCount += 1;
+      continue;
+    }
+
+    if (previous.price === current.price) {
+      unchangedSnapshotCount += 1;
       continue;
     }
 
@@ -286,7 +330,13 @@ export async function readCrawlRunPriceChanges(
     });
   }
 
-  return changes.sort(comparePriceChanges);
+  return {
+    changes: changes.sort(comparePriceChanges),
+    snapshotCount: currentSnapshots.length,
+    unmatchedSnapshotCount,
+    unchangedSnapshotCount,
+    currencyMismatchCount,
+  };
 }
 
 export async function readRecentPriceChanges(

@@ -9,6 +9,7 @@ import {
   createPriceChangeReportMessages,
   parsePriceChangeDiscordNotificationOptions,
   readCrawlRunPriceChanges,
+  readCrawlRunPriceChangeSummary,
   readRecentPriceChanges,
   sendCrawlRunPriceChangeDiscordNotification,
   type PriceChangeDiscordClient,
@@ -152,6 +153,29 @@ describe("readCrawlRunPriceChanges", () => {
     const changes = await readCrawlRunPriceChanges(client, "target-run");
 
     expect(changes.map((change) => change.productId)).toEqual(["large", "small"]);
+  });
+});
+
+describe("readCrawlRunPriceChangeSummary", () => {
+  it("reports current-run snapshots that cannot be matched to previous prices", async () => {
+    const client = createPriceChangeClient([
+      snapshot({
+        id: "new-product-snapshot",
+        productId: "product-1",
+        productName: "First Seen RAM",
+        crawlRunId: "target-run",
+        price: 1990,
+        capturedAt: "2026-06-07T02:00:00.000Z",
+      }),
+    ]);
+
+    await expect(readCrawlRunPriceChangeSummary(client, "target-run")).resolves.toEqual({
+      changes: [],
+      snapshotCount: 1,
+      unmatchedSnapshotCount: 1,
+      unchangedSnapshotCount: 0,
+      currencyMismatchCount: 0,
+    });
   });
 });
 
@@ -348,6 +372,46 @@ describe("sendCrawlRunPriceChangeDiscordNotification", () => {
         content: expect.stringContaining("GPU A"),
       }),
     });
+  });
+
+  it("skips with diagnostics when snapshots exist but no previous price can be matched", async () => {
+    const client = createPriceChangeClient([
+      snapshot({
+        id: "new-product-snapshot",
+        productId: "product-1",
+        productName: "First Seen RAM",
+        crawlRunId: "target-run",
+        price: 1990,
+        capturedAt: "2026-06-07T02:00:00.000Z",
+      }),
+    ]);
+    const sendDiscordWebhook = vi.fn<
+      (options: DiscordWebhookSendOptions) => Promise<DiscordWebhookSendResult>
+    >(async () => ({ status: "sent", httpStatus: 204 }));
+
+    await expect(
+      sendCrawlRunPriceChangeDiscordNotification({
+        client,
+        crawlRunId: "target-run",
+        options: {
+          publicWebhookUrl: WEBHOOK_URL,
+          publicBaseUrl: PUBLIC_BASE_URL,
+          maxItems: 50,
+        },
+        sendDiscordWebhook,
+      }),
+    ).resolves.toEqual({
+      status: "skipped",
+      reason: "no_price_changes",
+      changeCount: 0,
+      listedCount: 0,
+      messageCount: 0,
+      snapshotCount: 1,
+      unmatchedSnapshotCount: 1,
+      unchangedSnapshotCount: 0,
+      currencyMismatchCount: 0,
+    });
+    expect(sendDiscordWebhook).not.toHaveBeenCalled();
   });
 });
 

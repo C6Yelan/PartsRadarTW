@@ -215,7 +215,7 @@ export async function processCoolpcCategorySnapshot(
   // Every successful parse reaches the product writer. It avoids duplicate
   // price snapshots itself, while unchanged crawls still refresh last_seen_at
   // and advance missing counters for products absent from the parsed list.
-  await productWriter({
+  const productWriteSummary = await productWriter({
     crawlRunId,
     rawSnapshotId: rawSnapshot.id,
     sourceCategoryId: category.id,
@@ -229,6 +229,7 @@ export async function processCoolpcCategorySnapshot(
         ? CRAWL_RUN_CATEGORY_RESULT_STATUSES.SUCCESS_UNCHANGED
         : CRAWL_RUN_CATEGORY_RESULT_STATUSES.SUCCESS_CHANGED,
     rawSnapshotId: rawSnapshot.id,
+    productWriteSummary,
   };
 }
 

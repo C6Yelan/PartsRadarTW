@@ -44,6 +44,15 @@ describe("CoolPC category snapshot processor", () => {
     expect(result).toEqual({
       status: CRAWL_RUN_CATEGORY_RESULT_STATUSES.SUCCESS_CHANGED,
       rawSnapshotId: "raw-snapshot-1",
+      productWriteSummary: {
+        processedItemCount: 2,
+        createdProductCount: 2,
+        updatedProductCount: 0,
+        priceSnapshotCreatedCount: 2,
+        priceUnchangedCount: 0,
+        missingProductUpdatedCount: 0,
+        markedInactiveProductCount: 0,
+      },
     });
     expect(client.rawSnapshots[0]).toMatchObject({
       id: "raw-snapshot-1",
@@ -94,6 +103,15 @@ describe("CoolPC category snapshot processor", () => {
     expect(result).toEqual({
       status: CRAWL_RUN_CATEGORY_RESULT_STATUSES.SUCCESS_UNCHANGED,
       rawSnapshotId: "raw-snapshot-2",
+      productWriteSummary: {
+        processedItemCount: 2,
+        createdProductCount: 2,
+        updatedProductCount: 0,
+        priceSnapshotCreatedCount: 2,
+        priceUnchangedCount: 0,
+        missingProductUpdatedCount: 0,
+        markedInactiveProductCount: 0,
+      },
     });
     expect(client.rawSnapshots).toHaveLength(2);
     expect(client.rawSnapshots[1]?.parsedResultHash).toBe(client.rawSnapshots[0]?.parsedResultHash);
@@ -148,6 +166,15 @@ describe("CoolPC category snapshot processor", () => {
     expect(result).toEqual({
       status: CRAWL_RUN_CATEGORY_RESULT_STATUSES.SUCCESS_CHANGED,
       rawSnapshotId: "raw-snapshot-2",
+      productWriteSummary: {
+        processedItemCount: 2,
+        createdProductCount: 2,
+        updatedProductCount: 0,
+        priceSnapshotCreatedCount: 2,
+        priceUnchangedCount: 0,
+        missingProductUpdatedCount: 0,
+        markedInactiveProductCount: 0,
+      },
     });
     expect(client.rawSnapshots[1]?.parsedResultHash).not.toBe(
       client.rawSnapshots[0]?.parsedResultHash,
@@ -205,6 +232,15 @@ describe("CoolPC category snapshot processor", () => {
     expect(result).toEqual({
       status: CRAWL_RUN_CATEGORY_RESULT_STATUSES.SUCCESS_CHANGED,
       rawSnapshotId: "raw-snapshot-1",
+      productWriteSummary: {
+        processedItemCount: 3,
+        createdProductCount: 3,
+        updatedProductCount: 0,
+        priceSnapshotCreatedCount: 3,
+        priceUnchangedCount: 0,
+        missingProductUpdatedCount: 0,
+        markedInactiveProductCount: 0,
+      },
     });
     expect(client.parseErrors).toEqual([
       expect.objectContaining({

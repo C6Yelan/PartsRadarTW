@@ -28,11 +28,9 @@ export const CRAWL_RUN_CATEGORY_RESULT_STATUSES = {
   PARSE_FAILED: "PARSE_FAILED",
 } as const;
 
-export type CrawlTriggerTypeValue =
-  (typeof CRAWL_TRIGGER_TYPES)[keyof typeof CRAWL_TRIGGER_TYPES];
+export type CrawlTriggerTypeValue = (typeof CRAWL_TRIGGER_TYPES)[keyof typeof CRAWL_TRIGGER_TYPES];
 
-export type CrawlRunStatusValue =
-  (typeof CRAWL_RUN_STATUSES)[keyof typeof CRAWL_RUN_STATUSES];
+export type CrawlRunStatusValue = (typeof CRAWL_RUN_STATUSES)[keyof typeof CRAWL_RUN_STATUSES];
 
 export type CrawlRunCategoryResultStatusValue =
   (typeof CRAWL_RUN_CATEGORY_RESULT_STATUSES)[keyof typeof CRAWL_RUN_CATEGORY_RESULT_STATUSES];
@@ -98,14 +96,13 @@ export interface ProcessCrawlCategoryResult {
   status: CrawlRunCategoryResultStatusValue;
   rawSnapshotId?: string | null;
   errorMessage?: string | null;
+  productWriteSummary?: CrawlRunCategoryProductWriteSummary | null;
 }
 
 export interface RunCoolpcCrawlOnceOptions {
   client: CrawlRunWriteClient;
   triggerType?: CrawlTriggerTypeValue;
-  processCategory: (
-    context: ProcessCrawlCategoryContext,
-  ) => Promise<ProcessCrawlCategoryResult>;
+  processCategory: (context: ProcessCrawlCategoryContext) => Promise<ProcessCrawlCategoryResult>;
   now?: () => Date;
 }
 
@@ -115,6 +112,17 @@ export interface RecordedCrawlRunCategoryResult {
   status: CrawlRunCategoryResultStatusValue;
   rawSnapshotId: string | null;
   errorMessage: string | null;
+  productWriteSummary: CrawlRunCategoryProductWriteSummary | null;
+}
+
+export interface CrawlRunCategoryProductWriteSummary {
+  processedItemCount: number;
+  createdProductCount: number;
+  updatedProductCount: number;
+  priceSnapshotCreatedCount: number;
+  priceUnchangedCount: number;
+  missingProductUpdatedCount: number;
+  markedInactiveProductCount: number;
 }
 
 export interface RunCoolpcCrawlOnceResult {
@@ -189,6 +197,7 @@ export async function runCoolpcCrawlOnce({
       status: result.status,
       rawSnapshotId: result.rawSnapshotId ?? null,
       errorMessage: result.errorMessage ?? null,
+      productWriteSummary: result.productWriteSummary ?? null,
     });
 
     // Suspected block means the source may be serving non-product content. Stop
@@ -219,14 +228,18 @@ export async function runCoolpcCrawlOnce({
 function resolveCrawlRunStatus(results: RecordedCrawlRunCategoryResult[]): CrawlRunStatusValue {
   // The run table stores only the overall state. Category counts and per-category
   // details remain derivable from crawl_run_category_results.
-  if (results.some((result) => result.status === CRAWL_RUN_CATEGORY_RESULT_STATUSES.SUSPECTED_BLOCK)) {
+  if (
+    results.some((result) => result.status === CRAWL_RUN_CATEGORY_RESULT_STATUSES.SUSPECTED_BLOCK)
+  ) {
     return CRAWL_RUN_STATUSES.SUSPECTED_BLOCK;
   }
 
   const successCount = results.filter((result) => isSuccessStatus(result.status)).length;
 
   if (successCount === results.length) {
-    return results.some((result) => result.status === CRAWL_RUN_CATEGORY_RESULT_STATUSES.SUCCESS_CHANGED)
+    return results.some(
+      (result) => result.status === CRAWL_RUN_CATEGORY_RESULT_STATUSES.SUCCESS_CHANGED,
+    )
       ? CRAWL_RUN_STATUSES.SUCCESS_CHANGED
       : CRAWL_RUN_STATUSES.SUCCESS_UNCHANGED;
   }

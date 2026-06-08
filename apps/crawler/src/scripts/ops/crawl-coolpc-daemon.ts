@@ -3,6 +3,7 @@ import type { PrismaClient } from "@partsradar/db";
 import {
   CRAWL_RUN_STATUSES,
   CRAWL_TRIGGER_TYPES,
+  type CrawlRunCategoryProductWriteSummary,
   type RunCoolpcCrawlOnceResult,
 } from "../../coolpc/crawl-run";
 import {
@@ -68,6 +69,8 @@ interface ShutdownController {
   readonly requested: boolean;
   sleep(ms: number): Promise<void>;
 }
+
+type ProductWriteSummaryTotals = CrawlRunCategoryProductWriteSummary;
 
 export function parseDaemonOptions(
   args: string[],
@@ -213,11 +216,13 @@ async function runScheduledCycle(
       log,
     });
 
-    printCycleSummary(result);
+    const productWriteSummary = summarizeProductWrites(result);
+    printCycleSummary(result, productWriteSummary);
     await handlePriceChangeDiscordNotification({
       client,
       crawlRunId: result.crawlRunId,
       options: options.priceChangeDiscordNotification,
+      productWriteSummary,
     });
 
     return {
@@ -238,10 +243,12 @@ async function handlePriceChangeDiscordNotification({
   client,
   crawlRunId,
   options,
+  productWriteSummary,
 }: {
   client: PrismaClient;
   crawlRunId: string;
   options: PriceChangeDiscordNotificationOptions;
+  productWriteSummary: ProductWriteSummaryTotals;
 }): Promise<void> {
   try {
     const result = await sendCrawlRunPriceChangeDiscordNotification({
@@ -272,27 +279,64 @@ async function handlePriceChangeDiscordNotification({
     }
 
     if (result.reason === "no_price_changes") {
-      log("Price change Discord notification skipped. reason=no_price_changes");
+      log(
+        `Price change Discord notification skipped. reason=no_existing_product_price_changes priceSnapshots=${productWriteSummary.priceSnapshotCreatedCount} queriedSnapshots=${result.snapshotCount ?? 0} unmatchedSnapshots=${result.unmatchedSnapshotCount ?? 0} unchangedSnapshots=${result.unchangedSnapshotCount ?? 0} currencyMismatches=${result.currencyMismatchCount ?? 0}`,
+      );
       return;
     }
   } catch (error) {
-    log(
-      `Price change Discord notification failed before completion: ${toSafeErrorMessage(error)}`,
-    );
+    log(`Price change Discord notification failed before completion: ${toSafeErrorMessage(error)}`);
   }
 }
 
-function printCycleSummary(result: RunCoolpcCrawlOnceResult): void {
+function printCycleSummary(
+  result: RunCoolpcCrawlOnceResult,
+  productWriteSummary: ProductWriteSummaryTotals,
+): void {
   log(
-    `CoolPC scheduled crawl finished. run=${result.crawlRunId} status=${result.status} stoppedBySuspectedBlock=${result.stoppedBySuspectedBlock ? "yes" : "no"}`,
+    `CoolPC scheduled crawl finished. run=${result.crawlRunId} status=${result.status} stoppedBySuspectedBlock=${result.stoppedBySuspectedBlock ? "yes" : "no"} items=${productWriteSummary.processedItemCount} createdProducts=${productWriteSummary.createdProductCount} updatedProducts=${productWriteSummary.updatedProductCount} priceSnapshots=${productWriteSummary.priceSnapshotCreatedCount} priceUnchanged=${productWriteSummary.priceUnchangedCount} missingUpdated=${productWriteSummary.missingProductUpdatedCount} markedInactive=${productWriteSummary.markedInactiveProductCount}`,
   );
 
   for (const categoryResult of result.categoryResults) {
     const errorSuffix = categoryResult.errorMessage
       ? ` error=${toSafeCliErrorMessage(categoryResult.errorMessage)}`
       : "";
-    log(`IGrp=${categoryResult.igrp} status=${categoryResult.status}${errorSuffix}`);
+    const writeSuffix = categoryResult.productWriteSummary
+      ? ` items=${categoryResult.productWriteSummary.processedItemCount} createdProducts=${categoryResult.productWriteSummary.createdProductCount} updatedProducts=${categoryResult.productWriteSummary.updatedProductCount} priceSnapshots=${categoryResult.productWriteSummary.priceSnapshotCreatedCount} priceUnchanged=${categoryResult.productWriteSummary.priceUnchangedCount} missingUpdated=${categoryResult.productWriteSummary.missingProductUpdatedCount} markedInactive=${categoryResult.productWriteSummary.markedInactiveProductCount}`
+      : "";
+    log(`IGrp=${categoryResult.igrp} status=${categoryResult.status}${writeSuffix}${errorSuffix}`);
   }
+}
+
+function summarizeProductWrites(result: RunCoolpcCrawlOnceResult): ProductWriteSummaryTotals {
+  const totals: ProductWriteSummaryTotals = {
+    processedItemCount: 0,
+    createdProductCount: 0,
+    updatedProductCount: 0,
+    priceSnapshotCreatedCount: 0,
+    priceUnchangedCount: 0,
+    missingProductUpdatedCount: 0,
+    markedInactiveProductCount: 0,
+  };
+
+  for (const categoryResult of result.categoryResults) {
+    if (!categoryResult.productWriteSummary) {
+      continue;
+    }
+
+    totals.processedItemCount += categoryResult.productWriteSummary.processedItemCount;
+    totals.createdProductCount += categoryResult.productWriteSummary.createdProductCount;
+    totals.updatedProductCount += categoryResult.productWriteSummary.updatedProductCount;
+    totals.priceSnapshotCreatedCount +=
+      categoryResult.productWriteSummary.priceSnapshotCreatedCount;
+    totals.priceUnchangedCount += categoryResult.productWriteSummary.priceUnchangedCount;
+    totals.missingProductUpdatedCount +=
+      categoryResult.productWriteSummary.missingProductUpdatedCount;
+    totals.markedInactiveProductCount +=
+      categoryResult.productWriteSummary.markedInactiveProductCount;
+  }
+
+  return totals;
 }
 
 function shouldBackoffAfter(result: RunCoolpcCrawlOnceResult): boolean {

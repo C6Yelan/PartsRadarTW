@@ -493,7 +493,9 @@ http://127.0.0.1:3001/ops/status?token=<OPS_STATUS_TOKEN>
 public price-change notification 行為：
 
 - `crawler-daemon` 每輪 scheduled crawl 結束後，用該輪 `crawlRunId` 讀取新建立的 `price_snapshots`，並和同商品上一筆 snapshot 比對。
+- `SUCCESS_CHANGED` 代表分類解析結果 hash 變動，可能是商品名稱、圖片、商品新增 / 消失或價格變動；它不等於一定有可發送的舊價 / 新價差。
 - 只有已有舊價且價格真的改變的商品會送到公開 Discord；第一批新品、沒有舊價的商品、同價更新不會送出。
+- `crawler-daemon` log 會列出每輪與每分類的 `priceSnapshots`，並在跳過通知時列出 `queriedSnapshots`、`unmatchedSnapshots`、`unchangedSnapshots` 與 `currencyMismatches`。若 `priceSnapshots > 0` 但 `unmatchedSnapshots > 0`，通常代表新品、商品 identity 改變或缺少同 product id 的前一筆價格。
 - 訊息列出商品名稱、站內商品連結、舊價、新價與差額，時間以 Asia/Taipei 的 `MM/DD HH:MM GMT+8` 顯示。
 - 公開訊息不包含 iBuy token、來源購買 URL、raw HTML、crawler error detail、DB/internal URL 或維運 link-health/smoke 明細。
 - 沒有變價或未設定 `DISCORD_PUBLIC_WEBHOOK_URL` 時不送 Discord；public webhook 發送失敗或 rate limit 只寫安全 log，不會讓 crawler daemon 停止。
