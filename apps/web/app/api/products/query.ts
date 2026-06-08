@@ -74,12 +74,6 @@ export function buildProductWhere(
       enabled: true,
       ...(query.igrp !== undefined ? { igrp: query.igrp } : {}),
     },
-    primaryImageUrl: {
-      not: null,
-    },
-    primaryImageCheckedAt: {
-      not: null,
-    },
     currentPrice: {
       is: {
         priceSnapshot: {
@@ -116,12 +110,6 @@ export function buildProductVendorOptionsWhere(igrp: number): Prisma.ProductWher
       enabled: true,
       igrp,
     },
-    primaryImageUrl: {
-      not: null,
-    },
-    primaryImageCheckedAt: {
-      not: null,
-    },
     currentPrice: {
       isNot: null,
     },
@@ -147,10 +135,7 @@ export function toProductVendorOptions(records: ProductVendorRecord[]): ProductV
   return [...options.values()].sort((left, right) => left.name.localeCompare(right.name, "zh-TW"));
 }
 
-export function validateVendorValues(
-  vendors: string[],
-  options: ProductVendorOption[],
-): void {
+export function validateVendorValues(vendors: string[], options: ProductVendorOption[]): void {
   if (vendors.length === 0) {
     return;
   }
@@ -164,9 +149,7 @@ export function validateVendorValues(
   }
 }
 
-export function buildProductOrderBy(
-  sort: ProductSort,
-): Prisma.ProductOrderByWithRelationInput[] {
+export function buildProductOrderBy(sort: ProductSort): Prisma.ProductOrderByWithRelationInput[] {
   switch (sort) {
     case "price_desc":
       return [{ currentPrice: { priceSnapshot: { price: "desc" } } }, { id: "asc" }];

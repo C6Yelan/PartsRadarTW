@@ -34,7 +34,7 @@ export interface ProductListItem {
     url: string;
     alt: string;
     capturedAt: string;
-  };
+  } | null;
   price: {
     amount: number;
     currency: "TWD";

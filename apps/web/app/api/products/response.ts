@@ -30,7 +30,7 @@ interface ProductListResponseItem {
     url: string;
     alt: string;
     capturedAt: string;
-  };
+  } | null;
   price: {
     amount: number;
     currency: "TWD";
@@ -87,9 +87,6 @@ export function toProductResponseItem(product: ProductRecord): ProductListRespon
   if (!product.currentPrice) {
     throw new Error("Product list query returned a product without current price.");
   }
-  if (!product.primaryImageUrl || !product.primaryImageCheckedAt) {
-    throw new Error("Product list query returned a product without primary image data.");
-  }
 
   return {
     id: product.id,
@@ -100,12 +97,7 @@ export function toProductResponseItem(product: ProductRecord): ProductListRespon
       displayName: product.sourceCategory.displayName,
       sourceName: product.sourceCategory.sourceName,
     },
-    image: {
-      // Product image paths come from shared code so list/detail/manual smoke output cannot drift.
-      url: createPublicProductImagePath(product.id),
-      alt: product.name,
-      capturedAt: product.primaryImageCheckedAt.toISOString(),
-    },
+    image: toProductListImage(product),
     price: {
       amount: product.currentPrice.priceSnapshot.price,
       currency: product.currentPrice.priceSnapshot.currency,
@@ -123,6 +115,19 @@ export function toProductResponseItem(product: ProductRecord): ProductListRespon
       isActive: product.isActive,
       missingSince: toIsoStringOrNull(product.missingSince),
     },
+  };
+}
+
+function toProductListImage(product: ProductRecord): ProductListResponseItem["image"] {
+  if (!product.primaryImageUrl || !product.primaryImageCheckedAt) {
+    return null;
+  }
+
+  return {
+    // Product image paths come from shared code so list/detail/manual smoke output cannot drift.
+    url: createPublicProductImagePath(product.id),
+    alt: product.name,
+    capturedAt: product.primaryImageCheckedAt.toISOString(),
   };
 }
 
@@ -166,9 +171,7 @@ function toProductPriceMovement(
     throw new Error("Product list query returned a product without current price.");
   }
 
-  const since = new Date(
-    now.getTime() - PRODUCT_PRICE_MOVEMENT_RANGE_DAYS * 24 * 60 * 60 * 1000,
-  );
+  const since = new Date(now.getTime() - PRODUCT_PRICE_MOVEMENT_RANGE_DAYS * 24 * 60 * 60 * 1000);
   const sortedSnapshots = [...snapshots].sort(
     (left, right) => left.capturedAt.getTime() - right.capturedAt.getTime(),
   );

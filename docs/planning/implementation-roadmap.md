@@ -114,7 +114,7 @@
 完成條件：
 
 - 圖片 URL allowlist 與 `invalid_image_url` 規則已測試。
-- 商品列表 API 回傳站內圖片 API URL；商品詳細 API 可在缺圖時回 `image: null` 並由 UI fallback。
+- 商品列表與詳細 API 有圖片時回傳站內圖片 API URL，缺圖時回 `image: null` 並由 UI fallback。
 - 前端 fallback 不依賴 CoolPC hotlink。
 - storage、備份與搬遷原則已寫入部署與資安文件。
 
@@ -132,7 +132,7 @@
 
 完成條件：
 
-- 商品列表與詳細頁能顯示主要圖片、價格、來源與資料狀態；詳細頁缺圖時需維持可用並顯示 fallback。
+- 商品列表與詳細頁能顯示主要圖片、價格、來源與資料狀態；缺圖時需維持可用並顯示 fallback。
 - 查無商品、404、API 錯誤、stale、unavailable 都有可理解狀態。
 - UI 驗收完成；影響可見行為的重構需用 Playwright 驗證。
 

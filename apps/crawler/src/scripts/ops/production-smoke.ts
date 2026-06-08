@@ -97,7 +97,7 @@ interface ProductsResponse {
     id: string;
     image?: {
       url?: string;
-    };
+    } | null;
     priceMovement?: {
       rangeDays?: number;
       deltaAmount?: number | null;
@@ -657,15 +657,23 @@ async function checkProductImageEndpoints(
   options: ProductionSmokeOptions,
 ): Promise<SmokeCheckResult> {
   const failures: string[] = [];
+  let checkedCount = 0;
+  let skippedMissingImageCount = 0;
 
   for (const product of products.slice(0, options.productImageSampleSize)) {
     const imagePath = typeof product.image?.url === "string" ? product.image.url : null;
 
-    if (!imagePath?.startsWith("/api/product-images/")) {
-      failures.push(`${product.id}: missing public product image path`);
+    if (!imagePath) {
+      skippedMissingImageCount += 1;
       continue;
     }
 
+    if (!imagePath.startsWith("/api/product-images/")) {
+      failures.push(`${product.id}: invalid public product image path`);
+      continue;
+    }
+
+    checkedCount += 1;
     const result = await fetchWithTimeout(imagePath, options);
 
     if (!result.ok) {
@@ -683,11 +691,14 @@ async function checkProductImageEndpoints(
   if (failures.length > 0) {
     return fail(
       "product image api",
-      `checked=${products.length} failed=${failures.length} firstFailure=${failures[0]}`,
+      `checked=${checkedCount} skippedMissingImage=${skippedMissingImageCount} failed=${failures.length} firstFailure=${failures[0]}`,
     );
   }
 
-  return ok("product image api", `checked=${products.length}`);
+  return ok(
+    "product image api",
+    `checked=${checkedCount} skippedMissingImage=${skippedMissingImageCount}`,
+  );
 }
 
 async function checkSourceFreshness(

@@ -26,11 +26,7 @@ export function ProductRow({
 
   return (
     <article className={`product-row${isInBuildList ? " is-in-build-list" : ""}`}>
-      <ProductImage
-        alt={product.image.alt}
-        fallbackLabel={product.category.displayName}
-        src={product.image.url}
-      />
+      <ProductImage fallbackLabel={product.category.displayName} image={product.image} />
       <div className="product-main">
         <Link href={detailHref} title={product.name}>
           {product.name}
@@ -76,9 +72,7 @@ export function ProductRow({
               className="build-list-step-button"
               disabled={!canIncreaseBuildListQuantity}
               title={
-                canIncreaseBuildListQuantity
-                  ? "增加數量"
-                  : `最多 ${BUILD_LIST_MAX_QUANTITY} 件`
+                canIncreaseBuildListQuantity ? "增加數量" : `最多 ${BUILD_LIST_MAX_QUANTITY} 件`
               }
               type="button"
               onClick={() => onAddToBuildList(product)}
@@ -111,9 +105,7 @@ function formatPriceMovement(movement: ProductListItem["priceMovement"]) {
     return formatSignedPrice(deltaAmount);
   }
 
-  return `${formatSignedPrice(deltaAmount)} / ${formatSignedPercent(
-    movement.deltaPercent,
-  )}`;
+  return `${formatSignedPrice(deltaAmount)} / ${formatSignedPercent(movement.deltaPercent)}`;
 }
 
 function getPriceMovementTone(movement: ProductListItem["priceMovement"]) {

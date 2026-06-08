@@ -96,7 +96,7 @@ Scheduled crawler 至少覆蓋：
 - `/api/categories` 只回 enabled 分類。
 - `/api/products` 的 `q`、`igrp`、vendors、price、sort、status、pagination。
 - `pageSize` 上限與非法 query `400`。
-- 商品列表回站內圖片 URL；商品詳細有圖片時回站內圖片 URL，缺圖時回 `image: null` 並由前端 fallback。
+- 商品列表與詳細有圖片時回站內圖片 URL，缺圖時回 `image: null` 並由前端 fallback。
 - 商品不存在 `404`。
 - inactive 商品詳細仍可 `200`。
 - `/api/source-status` 的 `ok`、`stale`、`unavailable` 與分類聚合。

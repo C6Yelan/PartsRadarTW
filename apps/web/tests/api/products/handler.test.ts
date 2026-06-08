@@ -51,12 +51,6 @@ describe("GET /api/products handler", () => {
           enabled: true,
           igrp: 12,
         },
-        primaryImageUrl: {
-          not: null,
-        },
-        primaryImageCheckedAt: {
-          not: null,
-        },
         currentPrice: {
           is: {
             priceSnapshot: {
@@ -165,12 +159,6 @@ describe("GET /api/products handler", () => {
         sourceCategory: {
           enabled: true,
         },
-        primaryImageUrl: {
-          not: null,
-        },
-        primaryImageCheckedAt: {
-          not: null,
-        },
       },
       orderBy: [{ currentPrice: { priceSnapshot: { price: "asc" } } }, { id: "asc" }],
       skip: 0,
@@ -187,6 +175,49 @@ describe("GET /api/products handler", () => {
         sourceStatus: "unavailable",
         lastSuccessAt: null,
         vendors: [],
+      },
+    });
+  });
+
+  it("returns searchable products with nullable images when primary image data is missing", async () => {
+    const client = fakeProductsClient({
+      products: [
+        product({
+          primaryImageUrl: null,
+          primaryImageCheckedAt: null,
+        }),
+      ],
+      totalItems: 1,
+      sourceCategories: [],
+    });
+
+    const response = await createGetProductsHandler(client, { now: () => NOW })(
+      new Request("https://parts.example/api/products?q=RTX"),
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(client.lastProductFindProductsArgs).toMatchObject({
+      where: {
+        sourceCategory: {
+          enabled: true,
+        },
+        currentPrice: {
+          is: {
+            priceSnapshot: {
+              price: {},
+            },
+          },
+        },
+        AND: [searchTokenWhere("RTX")],
+      },
+    });
+    expect(body.data).toHaveLength(1);
+    expect(body.data[0]).toMatchObject({
+      id: PRODUCT_ID,
+      image: null,
+      price: {
+        amount: 6990,
       },
     });
   });
@@ -245,12 +276,7 @@ describe("GET /api/products handler", () => {
     expect(client.lastProductFindProductsArgs?.take).toBeUndefined();
     expect(client.lastPriceSnapshotFindManyArgs?.where).toMatchObject({
       productId: {
-        in: [
-          flatProduct.id,
-          noHistoryProduct.id,
-          smallerDropProduct.id,
-          largestDropProduct.id,
-        ],
+        in: [flatProduct.id, noHistoryProduct.id, smallerDropProduct.id, largestDropProduct.id],
       },
     });
     expect(body.data.map((item: { id: string }) => item.id)).toEqual([
@@ -388,12 +414,6 @@ describe("GET /api/products handler", () => {
         sourceCategory: {
           enabled: true,
           igrp: 12,
-        },
-        primaryImageUrl: {
-          not: null,
-        },
-        primaryImageCheckedAt: {
-          not: null,
         },
         currentPrice: {
           isNot: null,

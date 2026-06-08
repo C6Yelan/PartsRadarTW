@@ -2,15 +2,17 @@
 import { useState } from "react";
 
 interface ProductImageProps {
-  alt: string;
   fallbackLabel: string;
-  src: string;
+  image: {
+    url: string;
+    alt: string;
+  } | null;
 }
 
-export function ProductImage({ alt, fallbackLabel, src }: ProductImageProps) {
+export function ProductImage({ fallbackLabel, image }: ProductImageProps) {
   const [hasError, setHasError] = useState(false);
 
-  if (hasError) {
+  if (!image || hasError) {
     return (
       <div
         className="product-image fallback"
@@ -28,12 +30,12 @@ export function ProductImage({ alt, fallbackLabel, src }: ProductImageProps) {
   return (
     // biome-ignore lint/performance/noImgElement: Product images are served by the local API; plain img keeps the fallback path direct.
     <img
-      alt={alt}
+      alt={image.alt}
       className="product-image"
       draggable={false}
       loading="lazy"
       referrerPolicy="no-referrer"
-      src={src}
+      src={image.url}
       onContextMenu={(event) => event.preventDefault()}
       onError={() => setHasError(true)}
     />

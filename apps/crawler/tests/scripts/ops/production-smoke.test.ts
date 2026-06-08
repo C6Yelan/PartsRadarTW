@@ -340,7 +340,7 @@ describe("production smoke checks", () => {
         expect.objectContaining({
           name: "product image api",
           status: "OK",
-          message: "checked=2",
+          message: "checked=2 skippedMissingImage=0",
         }),
         expect.objectContaining({
           name: "source freshness",
@@ -353,6 +353,27 @@ describe("production smoke checks", () => {
       expect.arrayContaining([
         expect.objectContaining({
           name: "crawler freshness",
+        }),
+      ]),
+    );
+  });
+
+  it("skips public product image checks for list items without image metadata", async () => {
+    const { crawlerCwd } = await createWorkspace();
+    stubHealthyPublicApi({
+      nullImageProductIds: new Set(["product-2"]),
+      productCount: 2,
+    });
+    const options = parseProductionSmokeOptions(["--public-only"], {}, crawlerCwd);
+    const summary = await runProductionPublicSmoke(options, new Date("2026-06-02T12:00:00.000Z"));
+
+    expect(summary.status).toBe("OK");
+    expect(summary.checks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "product image api",
+          status: "OK",
+          message: "checked=1 skippedMissingImage=1",
         }),
       ]),
     );
@@ -481,7 +502,7 @@ describe("production smoke checks", () => {
         expect.objectContaining({
           name: "product image api",
           status: "OK",
-          message: "checked=1",
+          message: "checked=1 skippedMissingImage=0",
         }),
       ]),
     );
@@ -587,7 +608,7 @@ describe("production smoke checks", () => {
         expect.objectContaining({
           name: "product image api",
           status: "FAIL",
-          message: "checked=3 failed=1 firstFailure=product-2: HTTP 404",
+          message: "checked=3 skippedMissingImage=0 failed=1 firstFailure=product-2: HTTP 404",
         }),
       ]),
     );
@@ -769,6 +790,7 @@ function stubHealthyPublicApi({
   includePriceMovement = true,
   imageStatus = 200,
   imageStatusByProductId = new Map<string, number>(),
+  nullImageProductIds = new Set<string>(),
   productCount = 1,
   rateLimitClientSource = "cf",
 }: {
@@ -777,6 +799,7 @@ function stubHealthyPublicApi({
   includePriceMovement?: boolean;
   imageStatus?: number;
   imageStatusByProductId?: Map<string, number>;
+  nullImageProductIds?: Set<string>;
   productCount?: number;
   rateLimitClientSource?: string;
 } = {}): void {
@@ -814,9 +837,11 @@ function stubHealthyPublicApi({
 
               return {
                 id,
-                image: {
-                  url: `/api/product-images/${id}.webp`,
-                },
+                image: nullImageProductIds.has(id)
+                  ? null
+                  : {
+                      url: `/api/product-images/${id}.webp`,
+                    },
                 ...(includePriceMovement
                   ? {
                       priceMovement: {
