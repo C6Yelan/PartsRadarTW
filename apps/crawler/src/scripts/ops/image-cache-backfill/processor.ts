@@ -14,6 +14,9 @@ export interface ProductImageCandidate {
   id: string;
   name: string;
   primaryImageUrl: string | null;
+  primaryImageCheckedAt: Date | null;
+  firstSeenAt: Date;
+  lastSeenAt: Date;
   sourceCategory: {
     igrp: number;
     displayName: string;
@@ -45,6 +48,9 @@ export async function readCandidates(
       id: true,
       name: true,
       primaryImageUrl: true,
+      primaryImageCheckedAt: true,
+      firstSeenAt: true,
+      lastSeenAt: true,
       sourceCategory: {
         select: {
           igrp: true,
@@ -75,6 +81,9 @@ export async function readMissingImageCandidates(
       id: true,
       name: true,
       primaryImageUrl: true,
+      primaryImageCheckedAt: true,
+      firstSeenAt: true,
+      lastSeenAt: true,
       sourceCategory: {
         select: {
           igrp: true,
@@ -82,7 +91,13 @@ export async function readMissingImageCandidates(
         },
       },
     },
-    orderBy: [{ sourceCategory: { igrp: "asc" } }, { id: "asc" }],
+    orderBy: [
+      { firstSeenAt: "desc" },
+      { lastSeenAt: "desc" },
+      { primaryImageCheckedAt: "desc" },
+      { sourceCategory: { igrp: "asc" } },
+      { id: "asc" },
+    ],
   });
   const missingCandidates: ProductImageCandidate[] = [];
 

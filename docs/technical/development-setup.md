@@ -85,6 +85,9 @@ repo 應提供 `.env.example` 作為範本。實際本機設定使用 `.env.loca
 | `CRAWLER_INTERVAL_SECONDS` | crawler 週期秒數，預設 `1800` |
 | `CRAWLER_BACKOFF_SECONDS` | 連續失敗後延後秒數，第一版預設 `3600` |
 | `CRAWLER_CATEGORY_DELAY_MS` | crawler 分類頁請求間隔，預設 `8000` |
+| `CRAWLER_IMAGE_BACKFILL_LIMIT` | scheduled crawler 成功後立即補的缺圖數量，預設 `20`；設為 `0` 可關閉 |
+| `CRAWLER_IMAGE_BACKFILL_MIN_DELAY_MS` / `CRAWLER_IMAGE_BACKFILL_MAX_DELAY_MS` | scheduled crawler 即時補圖請求間隔，預設 `3000` 到 `8000` |
+| `CRAWLER_IMAGE_BACKFILL_TIMEOUT_MS` | scheduled crawler 即時補圖單張來源請求 timeout，預設 `15000` |
 | `MAINTENANCE_INTERVAL_SECONDS` | link health / missing image maintenance 週期秒數，預設 `86400` |
 | `MAINTENANCE_INITIAL_DELAY_SECONDS` | maintenance daemon 啟動後第一次執行前延遲，預設 `900` |
 | `MAINTENANCE_TASK_COOLDOWN_SECONDS` | maintenance 內 link check 與 image backfill 間 cooldown，預設 `600` |

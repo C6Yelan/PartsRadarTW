@@ -173,6 +173,7 @@ curl -i https://<domain>/api/source-status
 - 手動 `manual:crawl-coolpc-once` 已在同一台主機成功跑過，且 `/api/source-status` 可回 `ok`。
 - `maintenance-daemon` 沒在同一時間持有 external fetch lock；若有，`crawler-daemon` 會跳過當輪並等下一次 interval。
 - `.env` 中的 `CRAWLER_INTERVAL_SECONDS`、`CRAWLER_BACKOFF_SECONDS` 與 `CRAWLER_CATEGORY_DELAY_MS` 已確認；預設分別為 `1800`、`3600`、`8000`。
+- `.env` 中的 `CRAWLER_IMAGE_BACKFILL_LIMIT` 與 `CRAWLER_IMAGE_BACKFILL_MIN_DELAY_MS` / `CRAWLER_IMAGE_BACKFILL_MAX_DELAY_MS` 已確認；預設每輪成功 crawl 後補最新缺圖 `20` 張，間隔 `3000` 到 `8000` ms。
 - `.env` 中的 `EXTERNAL_FETCH_LOCK_DIR` 與 `EXTERNAL_FETCH_LOCK_STALE_SECONDS` 已確認；所有會打外部來源的 scheduled task 共用這把鎖。
 - `WEB_BIND_HOST` 與 `POSTGRES_BIND_HOST` 仍維持 `127.0.0.1`。
 
@@ -691,7 +692,11 @@ docker compose --profile scheduled-crawler up -d raw-snapshot-cleanup-daemon
 
 ## Product Image Cache Backfill
 
-商品資料 crawl 只會把 `primary_image_url` 寫入 DB，不會在價格 crawler 當輪下載站內 WebP 縮圖。Production 的缺圖補齊由 `maintenance-daemon` 低頻處理；手動 product image cache backfill 主要用於新主機、新 volume 或大量補跑。
+商品資料 crawl 主流程只負責把 `primary_image_url` 寫入 DB；本地 WebP 縮圖由 crawler 當輪後的小批次補圖與 `maintenance-daemon` 低頻兜底處理。手動 product image cache backfill 主要用於新主機、新 volume 或大量補跑。
+
+Scheduled `crawler-daemon` 在成功完成一輪 crawl 後，會在同一把 external fetch lock 內額外補一小批最新缺圖商品。預設 `CRAWLER_IMAGE_BACKFILL_LIMIT=20`、`CRAWLER_IMAGE_BACKFILL_MIN_DELAY_MS=3000`、`CRAWLER_IMAGE_BACKFILL_MAX_DELAY_MS=8000`、`CRAWLER_IMAGE_BACKFILL_TIMEOUT_MS=15000`。候選會優先選最近 `first_seen_at` / `last_seen_at` 的商品，所以新上架商品不需要等 daily maintenance。
+
+此即時補圖是 best-effort 附帶任務：成功或失敗都不會改變 crawler run status、backoff 判斷或商品資料寫入結果。若來源站圖片請求失敗，只會留下 `Immediate image backfill ... failed` 或 summary log，之後仍可由下一輪 crawler 或 daily `maintenance-daemon` 補上。
 
 先跑小批次 dry-run：
 
