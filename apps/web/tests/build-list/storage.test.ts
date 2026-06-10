@@ -62,7 +62,6 @@ function item(): BuildListItem {
       name: "coolpc",
       url: "https://www.coolpc.com.tw/evaluate.php?iBuy=GPU-RTX-4070",
     },
-    introductionUrl: "https://example.com/gpu",
     quantity: 1,
     addedAt: "2026-06-03T10:00:00.000Z",
     updatedAt: "2026-06-03T10:00:00.000Z",

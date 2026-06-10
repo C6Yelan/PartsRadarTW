@@ -34,8 +34,6 @@ const DEFAULT_BROKEN_LINK_WARN_COUNT = 1;
 const DEFAULT_BROKEN_LINK_FAIL_COUNT = 50;
 const DEFAULT_TEMPORARY_LINK_WARN_COUNT = 100;
 const DEFAULT_TEMPORARY_LINK_FAIL_COUNT = 500;
-const DEFAULT_INTRODUCTION_TEMPORARY_LINK_WARN_COUNT = 500;
-const DEFAULT_INTRODUCTION_TEMPORARY_LINK_FAIL_COUNT = 1000;
 const DEFAULT_RAW_SNAPSHOT_NORMAL_RETENTION_DAYS = 30;
 const DEFAULT_RAW_SNAPSHOT_ABNORMAL_RETENTION_DAYS = 90;
 const DEFAULT_RAW_SNAPSHOT_RETENTION_GRACE_DAYS = 2;
@@ -69,10 +67,6 @@ export interface ProductionSmokeOptions {
   sourceBrokenLinkFailCount: number;
   sourceTemporaryLinkWarnCount: number;
   sourceTemporaryLinkFailCount: number;
-  introductionBrokenLinkWarnCount: number;
-  introductionBrokenLinkFailCount: number;
-  introductionTemporaryLinkWarnCount: number;
-  introductionTemporaryLinkFailCount: number;
   rawSnapshotNormalRetentionDays: number;
   rawSnapshotAbnormalRetentionDays: number;
   rawSnapshotRetentionGraceDays: number;
@@ -332,42 +326,6 @@ export function parseProductionSmokeOptions(
       fallbackArgName: "--temporary-link-fail-count",
       fallbackEnvName: "SMOKE_TEMPORARY_LINK_FAIL_COUNT",
       fallback: DEFAULT_TEMPORARY_LINK_FAIL_COUNT,
-      min: 0,
-      max: 1000000,
-    }),
-    introductionBrokenLinkWarnCount: parseIntegerOption({
-      args,
-      env,
-      argName: "--introduction-broken-link-warn-count",
-      envName: "SMOKE_INTRODUCTION_BROKEN_LINK_WARN_COUNT",
-      fallback: DEFAULT_BROKEN_LINK_WARN_COUNT,
-      min: 0,
-      max: 1000000,
-    }),
-    introductionBrokenLinkFailCount: parseIntegerOption({
-      args,
-      env,
-      argName: "--introduction-broken-link-fail-count",
-      envName: "SMOKE_INTRODUCTION_BROKEN_LINK_FAIL_COUNT",
-      fallback: DEFAULT_BROKEN_LINK_FAIL_COUNT,
-      min: 0,
-      max: 1000000,
-    }),
-    introductionTemporaryLinkWarnCount: parseIntegerOption({
-      args,
-      env,
-      argName: "--introduction-temporary-link-warn-count",
-      envName: "SMOKE_INTRODUCTION_TEMPORARY_LINK_WARN_COUNT",
-      fallback: DEFAULT_INTRODUCTION_TEMPORARY_LINK_WARN_COUNT,
-      min: 0,
-      max: 1000000,
-    }),
-    introductionTemporaryLinkFailCount: parseIntegerOption({
-      args,
-      env,
-      argName: "--introduction-temporary-link-fail-count",
-      envName: "SMOKE_INTRODUCTION_TEMPORARY_LINK_FAIL_COUNT",
-      fallback: DEFAULT_INTRODUCTION_TEMPORARY_LINK_FAIL_COUNT,
       min: 0,
       max: 1000000,
     }),
@@ -961,26 +919,11 @@ async function checkLinkHealth(
   client: ProductionSmokeClient,
   options: ProductionSmokeOptions,
 ): Promise<SmokeCheckResult> {
-  const [
-    sourceBrokenCount,
-    sourceTemporaryCount,
-    introductionBrokenCount,
-    introductionTemporaryCount,
-  ] = await Promise.all([
+  const [sourceBrokenCount, sourceTemporaryCount] = await Promise.all([
     countActiveProductLinks(client, PRODUCT_LINK_KINDS.SOURCE, PRODUCT_LINK_HEALTH_STATUSES.BROKEN),
     countActiveProductLinks(
       client,
       PRODUCT_LINK_KINDS.SOURCE,
-      PRODUCT_LINK_HEALTH_STATUSES.TEMPORARY_ERROR,
-    ),
-    countActiveProductLinks(
-      client,
-      PRODUCT_LINK_KINDS.INTRODUCTION,
-      PRODUCT_LINK_HEALTH_STATUSES.BROKEN,
-    ),
-    countActiveProductLinks(
-      client,
-      PRODUCT_LINK_KINDS.INTRODUCTION,
       PRODUCT_LINK_HEALTH_STATUSES.TEMPORARY_ERROR,
     ),
   ]);
@@ -995,16 +938,6 @@ async function checkLinkHealth(
       options.sourceTemporaryLinkWarnCount,
       options.sourceTemporaryLinkFailCount,
     ),
-    countStatus(
-      introductionBrokenCount,
-      options.introductionBrokenLinkWarnCount,
-      options.introductionBrokenLinkFailCount,
-    ),
-    countStatus(
-      introductionTemporaryCount,
-      options.introductionTemporaryLinkWarnCount,
-      options.introductionTemporaryLinkFailCount,
-    ),
   ].reduce<SmokeStatus>(
     (currentStatus, nextStatus) => worseStatus(currentStatus, nextStatus),
     "OK",
@@ -1013,7 +946,7 @@ async function checkLinkHealth(
   return {
     name: "link health",
     status,
-    message: `source broken=${sourceBrokenCount} temporary=${sourceTemporaryCount}, introduction broken=${introductionBrokenCount} temporary=${introductionTemporaryCount}`,
+    message: `source broken=${sourceBrokenCount} temporary=${sourceTemporaryCount}`,
   };
 }
 
@@ -1494,9 +1427,6 @@ Options:
                                            Default: ${DEFAULT_INVALID_IMAGE_URL_WARN_COUNT}
   --source-temporary-link-warn-count <n>   Warn when source.url temporary link errors exceed this.
                                            Default: ${DEFAULT_TEMPORARY_LINK_WARN_COUNT}
-  --introduction-temporary-link-warn-count <n>
-                                           Warn when introduction temporary link errors exceed this.
-                                           Default: ${DEFAULT_INTRODUCTION_TEMPORARY_LINK_WARN_COUNT}
   --help                                   Show this help message.
 `);
 }

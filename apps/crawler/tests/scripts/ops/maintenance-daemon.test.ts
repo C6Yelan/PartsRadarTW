@@ -46,7 +46,7 @@ describe("maintenance daemon options", () => {
         staleAfterHours: 48,
         minDelayMs: 10000,
         maxDelayMs: 20000,
-        kinds: [PRODUCT_LINK_KINDS.SOURCE, PRODUCT_LINK_KINDS.INTRODUCTION],
+        kinds: [PRODUCT_LINK_KINDS.SOURCE],
       },
       image: {
         limit: 150,
@@ -239,7 +239,7 @@ function createMaintenanceOptions(
       maxDelayMs: 20000,
       timeoutMs: 10000,
       failureThreshold: 3,
-      kinds: [PRODUCT_LINK_KINDS.SOURCE, PRODUCT_LINK_KINDS.INTRODUCTION],
+      kinds: [PRODUCT_LINK_KINDS.SOURCE],
     },
     image: {
       workspaceRoot: "/workspace",

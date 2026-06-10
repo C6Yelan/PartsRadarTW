@@ -28,30 +28,6 @@ describe("collectOpsStatus", () => {
     ]);
   });
 
-  it("warns when introduction temporary link count reaches the default smoke threshold", async () => {
-    const summary = await collectOpsStatus(
-      fakeOpsClient({
-        linkHealth: {
-          INTRODUCTION: {
-            OK: 967,
-            BROKEN: 0,
-            TEMPORARY_ERROR: 500,
-          },
-        },
-      }),
-      {
-        now: () => NOW,
-        productImageStorageDir: "/images",
-        productImageExists: async () => true,
-      },
-    );
-
-    expect(summary.overallLevel).toBe("warn");
-    expect(summary.checks.find((check) => check.key === "link-health")).toMatchObject({
-      level: "warn",
-      message: "source broken=0 temporary=0, introduction broken=0 temporary=500",
-    });
-  });
 });
 
 describe("readOpsStatusThresholds", () => {
@@ -73,7 +49,7 @@ describe("readOpsStatusThresholds", () => {
 
 interface FakeOpsClientOptions {
   linkHealth?: Partial<
-    Record<"SOURCE" | "INTRODUCTION", Partial<Record<"OK" | "BROKEN" | "TEMPORARY_ERROR", number>>>
+    Record<"SOURCE", Partial<Record<"OK" | "BROKEN" | "TEMPORARY_ERROR", number>>>
   >;
 }
 
@@ -84,12 +60,6 @@ function fakeOpsClient(options: FakeOpsClientOptions = {}): OpsStatusReadClient 
       BROKEN: 0,
       TEMPORARY_ERROR: 0,
       ...options.linkHealth?.SOURCE,
-    },
-    INTRODUCTION: {
-      OK: 8,
-      BROKEN: 0,
-      TEMPORARY_ERROR: 0,
-      ...options.linkHealth?.INTRODUCTION,
     },
   };
 
@@ -159,13 +129,10 @@ function fakeOpsClient(options: FakeOpsClientOptions = {}): OpsStatusReadClient 
     },
     productLinkHealth: {
       async count(args) {
-        const kind = args.where?.linkKind;
+        const kind = String(args.where?.linkKind ?? "");
         const status = args.where?.status;
 
-        if (
-          (kind === "SOURCE" || kind === "INTRODUCTION") &&
-          (status === "OK" || status === "BROKEN" || status === "TEMPORARY_ERROR")
-        ) {
+        if (kind === "SOURCE" && (status === "OK" || status === "BROKEN" || status === "TEMPORARY_ERROR")) {
           return linkHealth[kind][status];
         }
 

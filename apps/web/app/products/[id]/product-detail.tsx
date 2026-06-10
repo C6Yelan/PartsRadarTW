@@ -53,10 +53,6 @@ interface ProductDetailBody {
     url: string;
     health: ProductLinkHealth | null;
   };
-  introduction: {
-    url: string;
-    health: ProductLinkHealth | null;
-  } | null;
   status: {
     isActive: boolean;
     missingSince: string | null;
@@ -360,17 +356,6 @@ export default function ProductDetail({
                 >
                   分享
                 </button>
-                {product.introduction ? (
-                  <a
-                    aria-label="產品介紹，開新分頁"
-                    className={toExternalActionClassName(product.introduction.health, "secondary")}
-                    href={product.introduction.url}
-                    rel="noreferrer"
-                    target="_blank"
-                  >
-                    產品介紹
-                  </a>
-                ) : null}
               </div>
               {shareStatusMessage ? (
                 <p className="detail-share-status" aria-live="polite">
@@ -416,21 +401,16 @@ function formatDateTime(value: string) {
   }).format(new Date(value));
 }
 
-function toExternalActionClassName(health: ProductLinkHealth | null, extraClassName?: "secondary") {
-  return [
-    "external-action",
-    extraClassName,
-    health && health.status !== "ok" ? "needs-link-check" : null,
-  ]
+function toExternalActionClassName(health: ProductLinkHealth | null) {
+  return ["external-action", health && health.status !== "ok" ? "needs-link-check" : null]
     .filter(Boolean)
     .join(" ");
 }
 
 function renderLinkHealthNotice(product: ProductDetailBody) {
-  const notices = [
-    toLinkHealthNotice("原價屋連結", product.source.health),
-    product.introduction ? toLinkHealthNotice("產品介紹連結", product.introduction.health) : null,
-  ].filter((notice): notice is string => Boolean(notice));
+  const notices = [toLinkHealthNotice("原價屋連結", product.source.health)].filter(
+    (notice): notice is string => Boolean(notice),
+  );
 
   if (notices.length === 0) {
     return null;

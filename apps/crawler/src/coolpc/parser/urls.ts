@@ -60,31 +60,6 @@ export function normalizeCoolpcProductImageUrl(
   return `${COOLPC_OFFICIAL_BASE_URL}${url.pathname}`;
 }
 
-export function normalizeCoolpcIntroductionUrl(
-  rawIntroductionUrl: string,
-  baseUrl = COOLPC_OFFICIAL_BASE_URL,
-): string | null {
-  const trimmedUrl = rawIntroductionUrl.trim();
-
-  if (trimmedUrl.length === 0) {
-    return null;
-  }
-
-  let url: URL;
-
-  try {
-    url = new URL(trimmedUrl, baseUrl);
-  } catch {
-    return null;
-  }
-
-  if (!["http:", "https:"].includes(url.protocol)) {
-    return null;
-  }
-
-  return url.toString();
-}
-
 export function sanitizeCoolpcSourceUrl(sourceUrl: string): string {
   const url = new URL(sourceUrl);
   // Session IDs are request state, not a stable product or category source URL.

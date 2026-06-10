@@ -72,7 +72,7 @@ describe("build list model", () => {
   it("normalizes persisted localStorage data and drops invalid entries", () => {
     const normalizedItems = normalizeBuildListItems([
       item({ quantity: 120 }),
-      item({ id: "product-2", introductionUrl: "javascript:alert(1)" }),
+      { ...item({ id: "product-2" }), source: { name: "coolpc", url: "javascript:alert(1)" } },
       { id: "broken" },
     ]);
 
@@ -89,9 +89,6 @@ describe("build list model", () => {
           url: "/api/product-images/product-1.webp",
           alt: "GPU image",
         },
-        introduction: {
-          url: "https://example.com/gpu",
-        },
       }),
     ).toMatchObject({
       id: "product-1",
@@ -99,7 +96,6 @@ describe("build list model", () => {
         url: "/api/product-images/product-1.webp",
         alt: "GPU image",
       },
-      introductionUrl: "https://example.com/gpu",
     });
   });
 
@@ -153,7 +149,6 @@ function product(overrides: Partial<BuildListProduct> = {}): BuildListProduct {
       name: "coolpc",
       url: "https://www.coolpc.com.tw/evaluate.php?iBuy=GPU-RTX-4070",
     },
-    introductionUrl: "https://example.com/gpu",
     ...overrides,
   };
 }

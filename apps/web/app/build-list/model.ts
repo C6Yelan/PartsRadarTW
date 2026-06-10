@@ -24,7 +24,6 @@ export interface BuildListProduct {
     name: "coolpc";
     url: string;
   };
-  introductionUrl: string | null;
 }
 
 export interface BuildListItem extends BuildListProduct {
@@ -39,12 +38,8 @@ export interface BuildListSummary {
   totalAmount: number;
 }
 
-interface BuildListProductInput extends Omit<BuildListProduct, "image" | "introductionUrl"> {
+interface BuildListProductInput extends Omit<BuildListProduct, "image"> {
   image?: BuildListProduct["image"] | null;
-  introduction?: {
-    url: string;
-  } | null;
-  introductionUrl?: string | null;
 }
 
 export function toBuildListProduct(product: BuildListProductInput): BuildListProduct {
@@ -59,7 +54,6 @@ export function toBuildListProduct(product: BuildListProductInput): BuildListPro
     category: product.category,
     price: product.price,
     source: product.source,
-    introductionUrl: product.introduction?.url ?? product.introductionUrl ?? null,
   };
 }
 
@@ -219,7 +213,6 @@ function normalizeBuildListProduct(value: Record<string, unknown>): BuildListPro
   const priceLastSeenAt = normalizeIsoDate(value.price.lastSeenAt);
   const sourceName = value.source.name;
   const sourceUrl = toHttpUrl(value.source.url);
-  const introductionUrl = value.introductionUrl === null ? null : toHttpUrl(value.introductionUrl);
   const storedImage = normalizeBuildListImage(
     value.image,
     name ?? categoryDisplayName ?? "商品圖片",
@@ -238,8 +231,7 @@ function normalizeBuildListProduct(value: Record<string, unknown>): BuildListPro
     !priceCapturedAt ||
     !priceLastSeenAt ||
     sourceName !== "coolpc" ||
-    !sourceUrl ||
-    (value.introductionUrl !== null && value.introductionUrl !== undefined && !introductionUrl)
+    !sourceUrl
   ) {
     return null;
   }
@@ -264,7 +256,6 @@ function normalizeBuildListProduct(value: Record<string, unknown>): BuildListPro
       name: "coolpc",
       url: sourceUrl,
     },
-    introductionUrl,
   };
 }
 

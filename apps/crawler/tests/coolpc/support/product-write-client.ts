@@ -12,7 +12,6 @@ export interface FakeProduct {
   vendorName: string | null;
   primaryImageUrl: string | null;
   primaryImageCheckedAt: Date | null;
-  introductionUrl: string | null;
   sourceUrl: string;
   isActive: boolean;
   missingSince: Date | null;
@@ -111,7 +110,6 @@ export class FakeCoolpcProductWriteClient implements CoolpcProductWriteClient {
         vendorName: data.vendorName,
         primaryImageUrl: data.primaryImageUrl,
         primaryImageCheckedAt: data.primaryImageCheckedAt,
-        introductionUrl: data.introductionUrl,
         sourceUrl: data.sourceUrl,
         isActive: data.isActive,
         missingSince: data.missingSince,
@@ -228,7 +226,6 @@ export class FakeCoolpcProductWriteClient implements CoolpcProductWriteClient {
       vendorName: item.vendorName,
       primaryImageUrl: item.primaryImageUrl,
       primaryImageCheckedAt: item.fetchedAt,
-      introductionUrl: item.introductionUrl,
       sourceUrl: item.sourceUrl,
       isActive: overrides.isActive ?? true,
       missingSince: overrides.missingSince ?? null,
@@ -247,7 +244,6 @@ export function productItem({
   vendorSlug = "amd",
   vendorName = "AMD",
   primaryImageUrl = "https://www.coolpc.com.tw/eval/4/amd7500f.jpg",
-  introductionUrl = "https://www.amd.com/zh-tw/products/processors/desktops/ryzen/7000-series/amd-ryzen-5-7500f.html",
   price,
   fetchedAt = new Date("2026-05-27T10:30:00.000Z"),
 }: {
@@ -258,7 +254,6 @@ export function productItem({
   vendorSlug?: string | null;
   vendorName?: string | null;
   primaryImageUrl?: string | null;
-  introductionUrl?: string | null;
   price: number;
   fetchedAt?: Date;
 }): ParsedCoolpcProduct {
@@ -274,7 +269,6 @@ export function productItem({
     vendorSlug,
     vendorName,
     primaryImageUrl,
-    introductionUrl,
     price,
     currency: "TWD",
     sourceUrl: "https://www.coolpc.com.tw/eachview.php?IGrp=4",

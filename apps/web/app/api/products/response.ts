@@ -3,7 +3,6 @@ import {
   COOLPC_SOURCE_NAME,
   createCoolpcPurchaseUrl,
   createPublicProductImagePath,
-  toPublicIntroductionUrl,
 } from "@partsradar/shared";
 import {
   buildSourceStatusResponse,
@@ -46,9 +45,6 @@ interface ProductListResponseItem {
     name: typeof COOLPC_SOURCE_NAME;
     url: string;
   };
-  introduction: {
-    url: string;
-  } | null;
   status: {
     isActive: boolean;
     missingSince: string | null;
@@ -110,7 +106,6 @@ export function toProductResponseItem(product: ProductRecord): ProductListRespon
       // Build the public purchase URL directly so stored crawler source URLs cannot leak.
       url: createCoolpcPurchaseUrl(product.ibuyToken),
     },
-    introduction: toIntroductionResponse(product.introductionUrl),
     status: {
       isActive: product.isActive,
       missingSince: toIsoStringOrNull(product.missingSince),
@@ -216,12 +211,4 @@ function toProductPriceMovement(
 
 function toIsoStringOrNull(value: Date | null): string | null {
   return value ? value.toISOString() : null;
-}
-
-function toIntroductionResponse(
-  introductionUrl: string | null,
-): ProductListResponseItem["introduction"] {
-  const publicIntroductionUrl = toPublicIntroductionUrl(introductionUrl);
-
-  return publicIntroductionUrl ? { url: publicIntroductionUrl } : null;
 }

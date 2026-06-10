@@ -218,7 +218,7 @@ curl -i https://<domain>/api/source-status
 
 商品外部連結健康檢查由 crawler ops command 執行，只更新 `product_link_health` 狀態供 UI 低干擾提示使用。它不在使用者 request lifecycle 內執行，也不會刪除商品、停用商品或移除連結。Production 的低頻排程由 `maintenance-daemon` 負責，手動 command 主要用於 dry-run、單次驗證或緊急補跑。
 
-先看 persisted link health 診斷報表。這個 report 只讀 DB，不發送外部 request，也不列出原始 URL 或產品明細；它用來把 `source` / `introduction` 的狀態、HTTP status 與 `failure_count` 分布分開判讀：
+先看 persisted link health 診斷報表。這個 report 只讀 DB，不發送外部 request，也不列出原始 URL 或產品明細；它用來判讀 `source` 查看 / 購買連結的狀態、HTTP status 與 `failure_count` 分布：
 
 ```bash
 docker compose --profile manual-crawler run --rm crawler \
@@ -227,7 +227,7 @@ docker compose --profile manual-crawler run --rm crawler \
 
 常用 report 選項：
 
-- `--kinds source,introduction`：只看指定連結種類，預設兩者都列。
+- `--kinds source`：只看指定連結種類；目前只支援 `source`。
 - `--include-inactive`：包含 inactive 商品；預設只看 active 商品，和 production smoke 的 link health scope 一致。
 
 先跑小批次 dry-run，確認候選數與 log 內容：
@@ -246,11 +246,11 @@ docker compose --profile manual-crawler run --rm crawler \
 
 常用選項：
 
-- `--kinds source,introduction`：檢查原價屋購買連結與產品介紹連結，預設兩者都檢查。
+- `--kinds source`：檢查原價屋查看 / 購買連結；目前只支援 `source`。
 - `--igrp <number>`：限制單一分類。
 - `--stale-after-hours <hours>`：只重查超過指定時間的既有紀錄，預設 48。
 - `--failure-threshold <count>`：連續 404 / 410 達門檻才標記 broken，預設 3。
-- `--min-delay-ms` / `--max-delay-ms`：控制 live request 間隔，預設 10000 到 20000 ms，避免對來源站或第三方介紹頁造成壓力。
+- `--min-delay-ms` / `--max-delay-ms`：控制 live request 間隔，預設 10000 到 20000 ms，避免對來源站造成壓力。
 
 驗證重點：
 
@@ -322,10 +322,10 @@ docker compose --profile manual-crawler run --rm crawler \
 - source image anomaly 是第三方來源圖片 URL 品質訊號，低於門檻只視為 OK/info，超過門檻才 WARN，不直接 FAIL。smoke 會同時顯示 rows、distinct products 與 distinct raw image urls，避免把每輪重複寫入的 parse error rows 誤解成同等數量的受影響商品。
 - display-ready active 商品數沒有低於門檻。
 - active 商品缺圖數沒有超過門檻。
-- active 商品 link health 的 source / introduction broken 與 temporary error 數沒有超過各自門檻。
+- active 商品 source link health 的 broken 與 temporary error 數沒有超過門檻。
 - raw snapshot metadata 沒有明顯超過 retention grace。
 
-Link health smoke 會分開統計 `source` 與 `introduction`。`source` 代表 public `source.url` 的原價屋購買 / 查看連結，門檻應維持較嚴格；`introduction` 代表產品介紹頁，403 / 429 / timeout 這類 temporary error 對主瀏覽流程影響較低，預設採較高的 temporary 門檻。`SMOKE_BROKEN_LINK_*` 與 `SMOKE_TEMPORARY_LINK_*` 舊變數仍可作為 local CLI / script fallback；Compose 新部署使用 `SMOKE_SOURCE_*_LINK_*` 與 `SMOKE_INTRODUCTION_*_LINK_*`。
+Link health smoke 只統計 `source`。`source` 代表 public `source.url` 的原價屋查看 / 購買連結；原價屋來源列中的產品介紹連結已移除，不再進 DB、API、UI、link checker 或 smoke 門檻。`SMOKE_BROKEN_LINK_*` 與 `SMOKE_TEMPORARY_LINK_*` 舊變數仍可作為 local CLI / script fallback；Compose 新部署使用 `SMOKE_SOURCE_*_LINK_*`。
 
 建議預設：
 
@@ -334,10 +334,6 @@ SMOKE_SOURCE_BROKEN_LINK_WARN_COUNT=1
 SMOKE_SOURCE_BROKEN_LINK_FAIL_COUNT=50
 SMOKE_SOURCE_TEMPORARY_LINK_WARN_COUNT=100
 SMOKE_SOURCE_TEMPORARY_LINK_FAIL_COUNT=500
-SMOKE_INTRODUCTION_BROKEN_LINK_WARN_COUNT=1
-SMOKE_INTRODUCTION_BROKEN_LINK_FAIL_COUNT=50
-SMOKE_INTRODUCTION_TEMPORARY_LINK_WARN_COUNT=500
-SMOKE_INTRODUCTION_TEMPORARY_LINK_FAIL_COUNT=1000
 ```
 
 啟動：
@@ -402,8 +398,6 @@ SMOKE_PUBLIC_BASE_URL=https://partsradar.net
 - `SMOKE_MISSING_IMAGE_WARN_COUNT` / `SMOKE_MISSING_IMAGE_FAIL_COUNT`：缺圖門檻，預設 200 / 500。
 - `SMOKE_SOURCE_BROKEN_LINK_WARN_COUNT` / `SMOKE_SOURCE_BROKEN_LINK_FAIL_COUNT`：source 購買 / 查看連結 broken 門檻，預設 1 / 50。
 - `SMOKE_SOURCE_TEMPORARY_LINK_WARN_COUNT` / `SMOKE_SOURCE_TEMPORARY_LINK_FAIL_COUNT`：source 購買 / 查看連結 temporary error 門檻，預設 100 / 500。
-- `SMOKE_INTRODUCTION_BROKEN_LINK_WARN_COUNT` / `SMOKE_INTRODUCTION_BROKEN_LINK_FAIL_COUNT`：產品介紹連結 broken 門檻，預設 1 / 50。
-- `SMOKE_INTRODUCTION_TEMPORARY_LINK_WARN_COUNT` / `SMOKE_INTRODUCTION_TEMPORARY_LINK_FAIL_COUNT`：產品介紹連結 temporary error 門檻，預設 500 / 1000。
 
 注意事項：
 
@@ -420,7 +414,7 @@ SMOKE_PUBLIC_BASE_URL=https://partsradar.net
 - overall `OK` / `WARN` / `FAIL`。
 - source freshness、crawler freshness、recent suspected block、parse error、source image anomaly。
 - display-ready active product count、product image cache missing count。
-- `source` / `introduction` link health 的 `ok`、`temporary_error`、`broken` 聚合。
+- `source` link health 的 `ok`、`temporary_error`、`broken` 聚合。
 - raw snapshot retention drift。
 - 最近 crawl runs 與 enabled source categories 的高層級時間資訊。
 

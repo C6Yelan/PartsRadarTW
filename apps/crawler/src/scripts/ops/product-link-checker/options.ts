@@ -100,17 +100,14 @@ export function printSummary(
 }
 
 function parseKinds(rawKinds: string | undefined): ProductLinkKindValue[] {
-  const rawValues = rawKinds?.split(",").map((value) => value.trim().toLowerCase()) ?? [
-    "source",
-    "introduction",
-  ];
+  const rawValues = rawKinds?.split(",").map((value) => value.trim().toLowerCase()) ?? ["source"];
   const kinds: ProductLinkKindValue[] = [];
 
   for (const rawValue of rawValues) {
     const kind = toProductLinkKind(rawValue);
 
     if (!kind) {
-      throw new Error("--kinds must contain source and/or introduction.");
+      throw new Error("--kinds only supports source.");
     }
 
     if (!kinds.includes(kind)) {
@@ -119,7 +116,7 @@ function parseKinds(rawKinds: string | undefined): ProductLinkKindValue[] {
   }
 
   if (kinds.length === 0) {
-    throw new Error("--kinds must contain source and/or introduction.");
+    throw new Error("--kinds only supports source.");
   }
 
   return kinds;
@@ -129,15 +126,13 @@ function toProductLinkKind(rawValue: string): ProductLinkKindValue | null {
   switch (rawValue) {
     case "source":
       return "SOURCE";
-    case "introduction":
-      return "INTRODUCTION";
     default:
       return null;
   }
 }
 
 function toPublicKindLabel(kind: ProductLinkKindValue): string {
-  return kind === "SOURCE" ? "source" : "introduction";
+  return kind === "SOURCE" ? "source" : kind;
 }
 
 export function toSummaryKey(status: ProductLinkHealthStatusValue): "ok" | "broken" | "temporaryError" {
@@ -161,8 +156,8 @@ Options:
   --dry-run                  Select candidates without source requests or DB writes.
   --limit <count>            Maximum due links to check. Default: all due links.
   --igrp <number>            Limit to one enabled CoolPC category.
-  --kinds <list>             Comma-separated link kinds: source,introduction.
-                             Default: source,introduction
+  --kinds <list>             Comma-separated link kinds. Only source is supported.
+                             Default: source
   --stale-after-hours <hrs>  Recheck links older than this. Default: ${DEFAULT_STALE_AFTER_HOURS}
   --failure-threshold <n>    Consecutive 404/410 failures before marking broken.
                              Default: ${DEFAULT_FAILURE_THRESHOLD}

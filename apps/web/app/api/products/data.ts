@@ -11,7 +11,6 @@ export const PRODUCT_SELECT = {
   name: true,
   primaryImageUrl: true,
   primaryImageCheckedAt: true,
-  introductionUrl: true,
   isActive: true,
   missingSince: true,
   currentPrice: {

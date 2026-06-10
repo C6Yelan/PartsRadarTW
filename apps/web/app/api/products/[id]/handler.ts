@@ -4,7 +4,6 @@ import {
   COOLPC_SOURCE_NAME,
   createCoolpcPurchaseUrl,
   createPublicProductImagePath,
-  toPublicIntroductionUrl,
 } from "@partsradar/shared";
 
 import { internalErrorResponse, jsonOk, notFoundResponse } from "../../_shared/responses";
@@ -12,7 +11,6 @@ import { normalizeProductId } from "./product-id";
 
 const PRODUCT_LINK_KINDS = {
   SOURCE: "SOURCE",
-  INTRODUCTION: "INTRODUCTION",
 } as const;
 
 const PRODUCT_DETAIL_SELECT = {
@@ -23,7 +21,6 @@ const PRODUCT_DETAIL_SELECT = {
   name: true,
   primaryImageUrl: true,
   primaryImageCheckedAt: true,
-  introductionUrl: true,
   isActive: true,
   missingSince: true,
   firstSeenAt: true,
@@ -98,10 +95,6 @@ interface ProductDetailResponseBody {
     url: string;
     health: ProductLinkHealthResponse | null;
   };
-  introduction: {
-    url: string;
-    health: ProductLinkHealthResponse | null;
-  } | null;
   status: {
     isActive: boolean;
     missingSince: string | null;
@@ -185,7 +178,6 @@ function toProductDetailResponse(product: ProductDetailRecord): ProductDetailRes
         purchaseUrl,
       ),
     },
-    introduction: toIntroductionResponse(product.introductionUrl, product.linkHealthChecks),
     status: {
       isActive: product.isActive,
       missingSince: toIsoStringOrNull(product.missingSince),
@@ -204,26 +196,6 @@ function toProductDetailImage(product: ProductDetailRecord): ProductDetailRespon
     url: createPublicProductImagePath(product.id),
     alt: product.name,
     capturedAt: product.primaryImageCheckedAt.toISOString(),
-  };
-}
-
-function toIntroductionResponse(
-  introductionUrl: string | null,
-  linkHealthChecks: ProductLinkHealthRecord[],
-): ProductDetailResponseBody["introduction"] {
-  const publicIntroductionUrl = toPublicIntroductionUrl(introductionUrl);
-
-  if (!publicIntroductionUrl) {
-    return null;
-  }
-
-  return {
-    url: publicIntroductionUrl,
-    health: toProductLinkHealthResponse(
-      linkHealthChecks,
-      PRODUCT_LINK_KINDS.INTRODUCTION,
-      publicIntroductionUrl,
-    ),
   };
 }
 

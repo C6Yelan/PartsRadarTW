@@ -60,7 +60,7 @@ folder instead of adding new `test-support/` directories inside runtime source.
 
 Parser / validation 至少覆蓋：
 
-- token、名稱、價格、圖片 URL、產品介紹 URL。
+- token、名稱、價格、圖片 URL。
 - `NT4880`、`NT4,880`、`$4880`、`$4,880`。
 - computed key：`coolpc:igrp:{IGrp}:ibuy:{iBuyToken}`。
 - 缺 token / 名稱 / 價格 / 圖片時不匯入正式商品。

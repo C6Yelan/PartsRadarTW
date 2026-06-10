@@ -164,7 +164,6 @@ function buildProductSeenUpdateData(item: ParsedCoolpcProduct): ProductSeenUpdat
           primaryImageCheckedAt: item.fetchedAt,
         }
       : {}),
-    introductionUrl: item.introductionUrl,
     sourceUrl: item.sourceUrl,
     isActive: true,
     missingSince: null,
@@ -226,7 +225,6 @@ function createProductData(item: ParsedCoolpcProduct): ProductCreateData {
     vendorName: item.vendorName,
     primaryImageUrl: item.primaryImageUrl,
     primaryImageCheckedAt: item.primaryImageUrl ? item.fetchedAt : null,
-    introductionUrl: item.introductionUrl,
     sourceUrl: item.sourceUrl,
     isActive: true,
     missingSince: null,

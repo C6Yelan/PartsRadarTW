@@ -50,10 +50,6 @@ describe("production smoke options", () => {
       sourceBrokenLinkFailCount: 50,
       sourceTemporaryLinkWarnCount: 100,
       sourceTemporaryLinkFailCount: 500,
-      introductionBrokenLinkWarnCount: 1,
-      introductionBrokenLinkFailCount: 50,
-      introductionTemporaryLinkWarnCount: 500,
-      introductionTemporaryLinkFailCount: 1000,
     });
     expect(options.productImageStorageDir).toBe(join(workspaceRoot, "storage", "product-images"));
   });
@@ -73,8 +69,6 @@ describe("production smoke options", () => {
         "45",
         "--missing-image-warn-count",
         "10",
-        "--introduction-temporary-link-warn-count",
-        "900",
       ],
       {
         SMOKE_TIMEOUT_MS: "9000",
@@ -98,7 +92,6 @@ describe("production smoke options", () => {
     expect(options.invalidImageUrlWarnCount).toBe(3000);
     expect(options.sourceTemporaryLinkWarnCount).toBe(77);
     expect(options.sourceTemporaryLinkFailCount).toBe(123);
-    expect(options.introductionTemporaryLinkWarnCount).toBe(900);
     expect(options.productImageStorageDir).toBe(join(workspaceRoot, "custom-images"));
   });
 
@@ -654,43 +647,6 @@ describe("production smoke checks", () => {
     );
   });
 
-  it("keeps introduction temporary link errors on the introduction threshold", async () => {
-    const { crawlerCwd, workspaceRoot } = await createWorkspace();
-    const imageDir = join(workspaceRoot, "product-images");
-    await mkdir(imageDir);
-    await writeFile(join(imageDir, "product-1.webp"), "webp");
-    stubHealthyPublicApi();
-    const options = parseProductionSmokeOptions(
-      [],
-      {
-        PRODUCT_IMAGE_STORAGE_DIR: imageDir,
-      },
-      crawlerCwd,
-    );
-    const summary = await runProductionSmoke(
-      createSmokeClient({
-        invalidImageErrorCount: 0,
-        trueParseErrorCount: 0,
-        linkHealthCounts: {
-          introductionTemporary: 407,
-        },
-      }),
-      options,
-      new Date("2026-06-02T12:00:00.000Z"),
-    );
-
-    expect(summary.status).toBe("OK");
-    expect(summary.checks).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          name: "link health",
-          status: "OK",
-          message: "source broken=0 temporary=0, introduction broken=0 temporary=407",
-        }),
-      ]),
-    );
-  });
-
   it("warns when source temporary link errors exceed the source threshold", async () => {
     const { crawlerCwd, workspaceRoot } = await createWorkspace();
     const imageDir = join(workspaceRoot, "product-images");
@@ -711,7 +667,6 @@ describe("production smoke checks", () => {
         trueParseErrorCount: 0,
         linkHealthCounts: {
           sourceTemporary: 101,
-          introductionTemporary: 407,
         },
       }),
       options,
@@ -724,7 +679,7 @@ describe("production smoke checks", () => {
         expect.objectContaining({
           name: "link health",
           status: "WARN",
-          message: "source broken=0 temporary=101, introduction broken=0 temporary=407",
+          message: "source broken=0 temporary=101",
         }),
       ]),
     );
@@ -897,13 +852,11 @@ function createSmokeClient({
 }: {
   invalidImageErrorCount: number;
   trueParseErrorCount: number;
-  linkHealthCounts?: {
-    sourceBroken?: number;
-    sourceTemporary?: number;
-    introductionBroken?: number;
-    introductionTemporary?: number;
-  };
-}) {
+	  linkHealthCounts?: {
+	    sourceBroken?: number;
+	    sourceTemporary?: number;
+	  };
+	}) {
   return {
     crawlRun: {
       findFirst: async ({ where }: { where: { status?: { in?: string[] } } }) =>
@@ -957,7 +910,7 @@ function createSmokeClient({
       count: async ({
         where,
       }: {
-        where: { linkKind?: "SOURCE" | "INTRODUCTION"; status?: "BROKEN" | "TEMPORARY_ERROR" };
+        where: { linkKind?: string; status?: "BROKEN" | "TEMPORARY_ERROR" };
       }) => {
         if (where.linkKind === "SOURCE" && where.status === "BROKEN") {
           return linkHealthCounts.sourceBroken ?? 0;
@@ -965,13 +918,6 @@ function createSmokeClient({
         if (where.linkKind === "SOURCE" && where.status === "TEMPORARY_ERROR") {
           return linkHealthCounts.sourceTemporary ?? 0;
         }
-        if (where.linkKind === "INTRODUCTION" && where.status === "BROKEN") {
-          return linkHealthCounts.introductionBroken ?? 0;
-        }
-        if (where.linkKind === "INTRODUCTION" && where.status === "TEMPORARY_ERROR") {
-          return linkHealthCounts.introductionTemporary ?? 0;
-        }
-
         return 0;
       },
     },

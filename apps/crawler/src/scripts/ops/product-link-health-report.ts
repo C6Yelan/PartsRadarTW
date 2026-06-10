@@ -262,17 +262,14 @@ function appendErrorBreakdown(lines: string[], breakdown: ProductLinkHealthError
 }
 
 function parseKinds(rawKinds: string | undefined): ProductLinkKindValue[] {
-  const rawValues = rawKinds?.split(",").map((value) => value.trim().toLowerCase()) ?? [
-    "source",
-    "introduction",
-  ];
+  const rawValues = rawKinds?.split(",").map((value) => value.trim().toLowerCase()) ?? ["source"];
   const kinds: ProductLinkKindValue[] = [];
 
   for (const rawValue of rawValues) {
     const kind = toProductLinkKind(rawValue);
 
     if (!kind) {
-      throw new Error("--kinds must contain source and/or introduction.");
+      throw new Error("--kinds only supports source.");
     }
 
     if (!kinds.includes(kind)) {
@@ -281,7 +278,7 @@ function parseKinds(rawKinds: string | undefined): ProductLinkKindValue[] {
   }
 
   if (kinds.length === 0) {
-    throw new Error("--kinds must contain source and/or introduction.");
+    throw new Error("--kinds only supports source.");
   }
 
   return kinds;
@@ -291,15 +288,13 @@ function toProductLinkKind(rawValue: string): ProductLinkKindValue | null {
   switch (rawValue) {
     case "source":
       return PRODUCT_LINK_KINDS.SOURCE;
-    case "introduction":
-      return PRODUCT_LINK_KINDS.INTRODUCTION;
     default:
       return null;
   }
 }
 
 function toPublicKindLabel(kind: ProductLinkKindValue): string {
-  return kind === PRODUCT_LINK_KINDS.SOURCE ? "source" : "introduction";
+  return kind === PRODUCT_LINK_KINDS.SOURCE ? "source" : kind;
 }
 
 function toPublicStatusLabel(status: ProductLinkHealthStatusValue): string {
@@ -345,8 +340,8 @@ export function printProductLinkHealthReportHelp(): void {
   pnpm ops:product-links:report [options]
 
 Options:
-  --kinds <list>       Comma-separated link kinds: source,introduction.
-                       Default: source,introduction
+  --kinds <list>       Comma-separated link kinds. Only source is supported.
+                       Default: source
   --include-inactive   Include inactive products. Default: active products only.
   --help               Show this help message.
 `);

@@ -19,8 +19,6 @@ const DEFAULT_BROKEN_LINK_WARN_COUNT = 1;
 const DEFAULT_BROKEN_LINK_FAIL_COUNT = 50;
 const DEFAULT_TEMPORARY_LINK_WARN_COUNT = 100;
 const DEFAULT_TEMPORARY_LINK_FAIL_COUNT = 500;
-const DEFAULT_INTRODUCTION_TEMPORARY_LINK_WARN_COUNT = 500;
-const DEFAULT_INTRODUCTION_TEMPORARY_LINK_FAIL_COUNT = 1000;
 const DEFAULT_RAW_SNAPSHOT_NORMAL_RETENTION_DAYS = 30;
 const DEFAULT_RAW_SNAPSHOT_ABNORMAL_RETENTION_DAYS = 90;
 const DEFAULT_RAW_SNAPSHOT_RETENTION_GRACE_DAYS = 2;
@@ -34,7 +32,7 @@ const SUCCESSFUL_SCHEDULED_STATUSES: CrawlRunStatus[] = [
   "SUCCESS_CHANGED",
   "SUCCESS_UNCHANGED",
 ];
-const LINK_KINDS = ["SOURCE", "INTRODUCTION"] as const;
+const LINK_KINDS = ["SOURCE"] as const;
 const LINK_STATUSES = ["OK", "BROKEN", "TEMPORARY_ERROR"] as const;
 
 export type OpsStatusLevel = "ok" | "warn" | "fail";
@@ -162,10 +160,6 @@ export interface OpsStatusThresholds {
   sourceBrokenLinkFailCount: number;
   sourceTemporaryLinkWarnCount: number;
   sourceTemporaryLinkFailCount: number;
-  introductionBrokenLinkWarnCount: number;
-  introductionBrokenLinkFailCount: number;
-  introductionTemporaryLinkWarnCount: number;
-  introductionTemporaryLinkFailCount: number;
   rawSnapshotNormalRetentionDays: number;
   rawSnapshotAbnormalRetentionDays: number;
   rawSnapshotRetentionGraceDays: number;
@@ -237,7 +231,6 @@ export interface OpsStatusSummary {
   };
   linkHealth: {
     source: OpsStatusLinkKindSummary;
-    introduction: OpsStatusLinkKindSummary;
   };
   sourceCategories: OpsSourceCategoryRecord[];
   latestScheduledRun: OpsLatestScheduledRunRecord | null;
@@ -467,22 +460,6 @@ export function readOpsStatusThresholds(env: OpsStatusEnv): OpsStatusThresholds 
       env.SMOKE_SOURCE_TEMPORARY_LINK_FAIL_COUNT ?? env.SMOKE_TEMPORARY_LINK_FAIL_COUNT,
       DEFAULT_TEMPORARY_LINK_FAIL_COUNT,
     ),
-    introductionBrokenLinkWarnCount: readNonNegativeInteger(
-      env.SMOKE_INTRODUCTION_BROKEN_LINK_WARN_COUNT,
-      DEFAULT_BROKEN_LINK_WARN_COUNT,
-    ),
-    introductionBrokenLinkFailCount: readNonNegativeInteger(
-      env.SMOKE_INTRODUCTION_BROKEN_LINK_FAIL_COUNT,
-      DEFAULT_BROKEN_LINK_FAIL_COUNT,
-    ),
-    introductionTemporaryLinkWarnCount: readNonNegativeInteger(
-      env.SMOKE_INTRODUCTION_TEMPORARY_LINK_WARN_COUNT,
-      DEFAULT_INTRODUCTION_TEMPORARY_LINK_WARN_COUNT,
-    ),
-    introductionTemporaryLinkFailCount: readNonNegativeInteger(
-      env.SMOKE_INTRODUCTION_TEMPORARY_LINK_FAIL_COUNT,
-      DEFAULT_INTRODUCTION_TEMPORARY_LINK_FAIL_COUNT,
-    ),
     rawSnapshotNormalRetentionDays: readPositiveInteger(
       env.SMOKE_RAW_SNAPSHOT_NORMAL_RETENTION_DAYS,
       DEFAULT_RAW_SNAPSHOT_NORMAL_RETENTION_DAYS,
@@ -509,20 +486,10 @@ export function readOpsStatusThresholds(env: OpsStatusEnv): OpsStatusThresholds 
 async function collectLinkHealth(
   client: OpsStatusReadClient,
 ): Promise<OpsStatusSummary["linkHealth"]> {
-  const [
-    sourceOk,
-    sourceBroken,
-    sourceTemporaryError,
-    introductionOk,
-    introductionBroken,
-    introductionTemporaryError,
-  ] = await Promise.all([
+  const [sourceOk, sourceBroken, sourceTemporaryError] = await Promise.all([
     countActiveProductLinks(client, "SOURCE", "OK"),
     countActiveProductLinks(client, "SOURCE", "BROKEN"),
     countActiveProductLinks(client, "SOURCE", "TEMPORARY_ERROR"),
-    countActiveProductLinks(client, "INTRODUCTION", "OK"),
-    countActiveProductLinks(client, "INTRODUCTION", "BROKEN"),
-    countActiveProductLinks(client, "INTRODUCTION", "TEMPORARY_ERROR"),
   ]);
 
   return {
@@ -530,11 +497,6 @@ async function collectLinkHealth(
       ok: sourceOk,
       broken: sourceBroken,
       temporaryError: sourceTemporaryError,
-    },
-    introduction: {
-      ok: introductionOk,
-      broken: introductionBroken,
-      temporaryError: introductionTemporaryError,
     },
   };
 }
@@ -746,23 +708,13 @@ function linkHealthCheck(
       thresholds.sourceTemporaryLinkWarnCount,
       thresholds.sourceTemporaryLinkFailCount,
     ),
-    countLevel(
-      linkHealth.introduction.broken,
-      thresholds.introductionBrokenLinkWarnCount,
-      thresholds.introductionBrokenLinkFailCount,
-    ),
-    countLevel(
-      linkHealth.introduction.temporaryError,
-      thresholds.introductionTemporaryLinkWarnCount,
-      thresholds.introductionTemporaryLinkFailCount,
-    ),
   ].reduce<OpsStatusLevel>((status, nextStatus) => worseLevel(status, nextStatus), "ok");
 
   return {
     key: "link-health",
     label: "商品連結健康",
     level,
-    message: `source broken=${linkHealth.source.broken} temporary=${linkHealth.source.temporaryError}, introduction broken=${linkHealth.introduction.broken} temporary=${linkHealth.introduction.temporaryError}`,
+    message: `source broken=${linkHealth.source.broken} temporary=${linkHealth.source.temporaryError}`,
   };
 }
 

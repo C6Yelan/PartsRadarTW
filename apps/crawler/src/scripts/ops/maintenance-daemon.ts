@@ -348,12 +348,6 @@ function buildProductLinkArgs(
     getStringArg(args, "--link-timeout-ms") ?? env.MAINTENANCE_LINK_TIMEOUT_MS ?? "10000",
   );
 
-  const kinds = getStringArg(args, "--link-kinds") ?? env.MAINTENANCE_LINK_KINDS;
-
-  if (kinds) {
-    appendOption(linkArgs, "--kinds", kinds);
-  }
-
   return linkArgs;
 }
 

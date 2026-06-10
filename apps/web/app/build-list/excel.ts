@@ -96,7 +96,6 @@ export function createBuildListWorksheetRows(items: BuildListItem[]): CellValue[
       "小計",
       "價格更新時間",
       "原價屋查看 / 購買網址",
-      "產品介紹網址",
       "備註",
     ],
     ...items.map((item) => [
@@ -107,10 +106,9 @@ export function createBuildListWorksheetRows(items: BuildListItem[]): CellValue[
       getBuildListLineSubtotal(item),
       formatBuildListExportDateTime(item.price.lastSeenAt),
       item.source.url,
-      item.introductionUrl ?? "",
       "",
     ]),
-    ["總價", "", summary.totalQuantity, "", summary.totalAmount, "", "", "", ""],
+    ["總價", "", summary.totalQuantity, "", summary.totalAmount, "", "", ""],
   ];
 }
 
@@ -123,13 +121,6 @@ function createBuildListWorksheetHyperlinks(items: BuildListItem[]): WorksheetHy
         target: item.source.url,
       },
     ];
-
-    if (item.introductionUrl) {
-      itemLinks.push({
-        cellRef: `H${rowIndex}`,
-        target: item.introductionUrl,
-      });
-    }
 
     return itemLinks;
   });
@@ -156,8 +147,8 @@ function buildWorksheetXml(rows: CellValue[][], hyperlinks: WorksheetHyperlink[]
     <col min="2" max="2" width="48" customWidth="1"/>
     <col min="3" max="5" width="12" customWidth="1"/>
     <col min="6" max="6" width="20" customWidth="1"/>
-    <col min="7" max="8" width="56" customWidth="1"/>
-    <col min="9" max="9" width="20" customWidth="1"/>
+    <col min="7" max="7" width="56" customWidth="1"/>
+    <col min="8" max="8" width="20" customWidth="1"/>
   </cols>
   <sheetData>
 ${rows.map((row, index) => buildRowXml(row, index + 1)).join("\n")}

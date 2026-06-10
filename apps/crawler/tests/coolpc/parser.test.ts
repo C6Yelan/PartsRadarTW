@@ -6,7 +6,6 @@ import { COOLPC_TARGET_CATEGORIES, type CoolpcTargetCategory } from "../../src/c
 import {
   createCoolpcCategoryUrl,
   createSourceItemKey,
-  normalizeCoolpcIntroductionUrl,
   normalizeCoolpcProductImageUrl,
   parseCoolpcCategoryPage,
   parsePriceText,
@@ -109,18 +108,6 @@ describe("CoolPC parser helpers", () => {
     expect(normalizeCoolpcProductImageUrl("javascript:alert(1)", 4)).toBeNull();
   });
 
-  it("normalizes only HTTP(S) introduction URLs", () => {
-    expect(normalizeCoolpcIntroductionUrl("https://www.amd.com/zh-tw/products/7500f")).toBe(
-      "https://www.amd.com/zh-tw/products/7500f",
-    );
-    expect(normalizeCoolpcIntroductionUrl("/article/product-intro.html")).toBe(
-      "https://www.coolpc.com.tw/article/product-intro.html",
-    );
-    expect(normalizeCoolpcIntroductionUrl("")).toBeNull();
-    expect(normalizeCoolpcIntroductionUrl("javascript:alert(1)")).toBeNull();
-    expect(normalizeCoolpcIntroductionUrl("data:text/html,<script>alert(1)</script>")).toBeNull();
-  });
-
   it("rejects non-positive or non-integer CoolPC image category ids", () => {
     expect(normalizeCoolpcProductImageUrl("/eval/4/amd7500f.jpg", 0)).toBeNull();
     expect(normalizeCoolpcProductImageUrl("/eval/4/amd7500f.jpg", -1)).toBeNull();
@@ -193,8 +180,6 @@ describe("CoolPC category parser", () => {
       vendorSlug: "amd",
       vendorName: "AMD",
       primaryImageUrl: "https://www.coolpc.com.tw/eval/4/amd7500f.jpg",
-      introductionUrl:
-        "https://www.amd.com/zh-tw/products/processors/desktops/ryzen/7000-series/amd-ryzen-5-7500f.html",
       price: 4880,
       currency: "TWD",
       sourceUrl: "https://www.coolpc.com.tw/eachview.php?IGrp=4",

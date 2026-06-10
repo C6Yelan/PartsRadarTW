@@ -25,7 +25,6 @@ describe("build list Excel export", () => {
         "小計",
         "價格更新時間",
         "原價屋查看 / 購買網址",
-        "產品介紹網址",
         "備註",
       ],
       [
@@ -36,10 +35,9 @@ describe("build list Excel export", () => {
         13_980,
         "2026-05-28 19:55",
         "https://www.coolpc.com.tw/evaluate.php?iBuy=GPU-RTX-4070",
-        "https://example.com/gpu",
         "",
       ],
-      ["總價", "", 2, "", 13_980, "", "", "", ""],
+      ["總價", "", 2, "", 13_980, "", "", ""],
     ]);
   });
 
@@ -57,14 +55,10 @@ describe("build list Excel export", () => {
     expect(worksheetXml).toContain("<c r=\"E2\"><v>13980</v></c>");
     expect(worksheetXml).toContain("2026-05-28 19:55");
     expect(worksheetXml).toContain("https://www.coolpc.com.tw/evaluate.php?iBuy=GPU-RTX-4070");
-    expect(worksheetXml).toContain("https://example.com/gpu");
+    expect(worksheetXml).not.toContain("https://example.com/gpu");
     expect(worksheetXml).toContain('<hyperlink ref="G2" r:id="rId1"/>');
-    expect(worksheetXml).toContain('<hyperlink ref="H2" r:id="rId2"/>');
     expect(worksheetRelationshipsXml).toContain(
       'Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://www.coolpc.com.tw/evaluate.php?iBuy=GPU-RTX-4070" TargetMode="External"',
-    );
-    expect(worksheetRelationshipsXml).toContain(
-      'Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://example.com/gpu" TargetMode="External"',
     );
     expect(worksheetXml).toContain("總價");
     expect(worksheetXml).toContain("<c r=\"E3\"><v>13980</v></c>");
@@ -91,7 +85,6 @@ function item(): BuildListItem {
       name: "coolpc",
       url: "https://www.coolpc.com.tw/evaluate.php?iBuy=GPU-RTX-4070",
     },
-    introductionUrl: "https://example.com/gpu",
     quantity: 2,
     addedAt: "2026-06-03T10:00:00.000Z",
     updatedAt: "2026-06-03T10:00:00.000Z",

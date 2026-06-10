@@ -1,6 +1,6 @@
 // apps/crawler/src/scripts/ops/product-link-checker/processor.ts
 import type { Prisma } from "@partsradar/db";
-import { createCoolpcPurchaseUrl, toPublicIntroductionUrl } from "@partsradar/shared";
+import { createCoolpcPurchaseUrl } from "@partsradar/shared";
 import { toSafeCliErrorMessage } from "../../shared/script-utils";
 import type { ProductLinkCheckerOptions, ProductLinkCheckerSummary } from "./options";
 import { toSummaryKey } from "./options";
@@ -8,7 +8,6 @@ import { toSummaryKey } from "./options";
 export const PRODUCT_LINK_KINDS = {
   // SOURCE matches the public API source.url purchase link, not products.source_url.
   SOURCE: "SOURCE",
-  INTRODUCTION: "INTRODUCTION",
 } as const;
 
 export const PRODUCT_LINK_HEALTH_STATUSES = {
@@ -26,7 +25,6 @@ export const PRODUCT_LINK_SELECT = {
   id: true,
   name: true,
   ibuyToken: true,
-  introductionUrl: true,
   sourceCategory: {
     select: {
       igrp: true,
@@ -340,17 +338,6 @@ function buildProductLinks(
       linkKind: PRODUCT_LINK_KINDS.SOURCE,
       url: createCoolpcPurchaseUrl(product.ibuyToken),
     });
-  }
-
-  if (options.kinds.includes(PRODUCT_LINK_KINDS.INTRODUCTION)) {
-    const publicIntroductionUrl = toPublicIntroductionUrl(product.introductionUrl);
-
-    if (publicIntroductionUrl) {
-      links.push({
-        linkKind: PRODUCT_LINK_KINDS.INTRODUCTION,
-        url: publicIntroductionUrl,
-      });
-    }
   }
 
   return links;

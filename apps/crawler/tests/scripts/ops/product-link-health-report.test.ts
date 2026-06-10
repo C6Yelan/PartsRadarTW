@@ -24,28 +24,28 @@ afterEach(async () => {
 });
 
 describe("product link health report options", () => {
-  it("uses active products and both link kinds by default", async () => {
+  it("uses active products and source links by default", async () => {
     const workspaceRoot = await createWorkspace();
     const options = parseProductLinkHealthReportOptions([], workspaceRoot);
 
     expect(options).toEqual({
       workspaceRoot,
       includeInactive: false,
-      kinds: [PRODUCT_LINK_KINDS.SOURCE, PRODUCT_LINK_KINDS.INTRODUCTION],
+      kinds: [PRODUCT_LINK_KINDS.SOURCE],
     });
   });
 
-  it("accepts kind filters and inactive rows", async () => {
+  it("accepts source kind filters and inactive rows", async () => {
     const workspaceRoot = await createWorkspace();
     const options = parseProductLinkHealthReportOptions(
-      ["--kinds", "introduction,source,introduction", "--include-inactive"],
+      ["--kinds", "source", "--include-inactive"],
       workspaceRoot,
     );
 
     expect(options).toEqual({
       workspaceRoot,
       includeInactive: true,
-      kinds: [PRODUCT_LINK_KINDS.INTRODUCTION, PRODUCT_LINK_KINDS.SOURCE],
+      kinds: [PRODUCT_LINK_KINDS.SOURCE],
     });
   });
 
@@ -54,21 +54,21 @@ describe("product link health report options", () => {
 
     expect(() =>
       parseProductLinkHealthReportOptions(["--kinds", "source,download"], workspaceRoot),
-    ).toThrow("--kinds must contain source and/or introduction");
+    ).toThrow("--kinds only supports source");
   });
 });
 
 describe("product link health report data", () => {
   it("reads active product link health rows by default", async () => {
     const workspaceRoot = await createWorkspace();
-    const options = parseProductLinkHealthReportOptions(["--kinds", "introduction"], workspaceRoot);
+    const options = parseProductLinkHealthReportOptions(["--kinds", "source"], workspaceRoot);
     const client = fakeReportClient([]);
 
     await readProductLinkHealthReport(client, options, NOW);
 
     expect(client.lastFindManyArgs).toMatchObject({
       where: {
-        linkKind: { in: [PRODUCT_LINK_KINDS.INTRODUCTION] },
+        linkKind: { in: [PRODUCT_LINK_KINDS.SOURCE] },
         product: { isActive: true },
       },
     });
@@ -82,41 +82,40 @@ describe("product link health report data", () => {
     await readProductLinkHealthReport(client, options, NOW);
 
     expect(client.lastFindManyArgs?.where).toEqual({
-      linkKind: { in: [PRODUCT_LINK_KINDS.SOURCE, PRODUCT_LINK_KINDS.INTRODUCTION] },
+      linkKind: { in: [PRODUCT_LINK_KINDS.SOURCE] },
     });
   });
 
-  it("splits status, HTTP status, and failure count by link kind", () => {
+  it("splits source status, HTTP status, and failure count", () => {
     const report = buildProductLinkHealthReport(
       [
         record({ linkKind: PRODUCT_LINK_KINDS.SOURCE }),
-        record({ linkKind: PRODUCT_LINK_KINDS.SOURCE }),
         record({
-          linkKind: PRODUCT_LINK_KINDS.INTRODUCTION,
+          linkKind: PRODUCT_LINK_KINDS.SOURCE,
           status: PRODUCT_LINK_HEALTH_STATUSES.TEMPORARY_ERROR,
           httpStatus: 403,
           failureCount: 1,
         }),
         record({
-          linkKind: PRODUCT_LINK_KINDS.INTRODUCTION,
+          linkKind: PRODUCT_LINK_KINDS.SOURCE,
           status: PRODUCT_LINK_HEALTH_STATUSES.TEMPORARY_ERROR,
           httpStatus: 403,
           failureCount: 1,
         }),
         record({
-          linkKind: PRODUCT_LINK_KINDS.INTRODUCTION,
+          linkKind: PRODUCT_LINK_KINDS.SOURCE,
           status: PRODUCT_LINK_HEALTH_STATUSES.TEMPORARY_ERROR,
           httpStatus: 404,
           failureCount: 2,
         }),
         record({
-          linkKind: PRODUCT_LINK_KINDS.INTRODUCTION,
+          linkKind: PRODUCT_LINK_KINDS.SOURCE,
           status: PRODUCT_LINK_HEALTH_STATUSES.TEMPORARY_ERROR,
           httpStatus: null,
           failureCount: 3,
         }),
         record({
-          linkKind: PRODUCT_LINK_KINDS.INTRODUCTION,
+          linkKind: PRODUCT_LINK_KINDS.SOURCE,
           status: PRODUCT_LINK_HEALTH_STATUSES.BROKEN,
           httpStatus: 404,
           failureCount: 4,
@@ -124,7 +123,7 @@ describe("product link health report data", () => {
       ],
       {
         includeInactive: false,
-        kinds: [PRODUCT_LINK_KINDS.SOURCE, PRODUCT_LINK_KINDS.INTRODUCTION],
+        kinds: [PRODUCT_LINK_KINDS.SOURCE],
       },
       NOW,
     );
@@ -132,18 +131,9 @@ describe("product link health report data", () => {
     expect(report.kinds).toEqual([
       expect.objectContaining({
         linkKind: PRODUCT_LINK_KINDS.SOURCE,
-        total: 2,
+        total: 6,
         statuses: {
-          OK: 2,
-          TEMPORARY_ERROR: 0,
-          BROKEN: 0,
-        },
-      }),
-      expect.objectContaining({
-        linkKind: PRODUCT_LINK_KINDS.INTRODUCTION,
-        total: 5,
-        statuses: {
-          OK: 0,
+          OK: 1,
           TEMPORARY_ERROR: 4,
           BROKEN: 1,
         },
@@ -176,13 +166,13 @@ describe("product link health report data", () => {
       [
         record({ linkKind: PRODUCT_LINK_KINDS.SOURCE }),
         record({
-          linkKind: PRODUCT_LINK_KINDS.INTRODUCTION,
+          linkKind: PRODUCT_LINK_KINDS.SOURCE,
           status: PRODUCT_LINK_HEALTH_STATUSES.TEMPORARY_ERROR,
           httpStatus: 403,
           failureCount: 1,
         }),
         record({
-          linkKind: PRODUCT_LINK_KINDS.INTRODUCTION,
+          linkKind: PRODUCT_LINK_KINDS.SOURCE,
           status: PRODUCT_LINK_HEALTH_STATUSES.TEMPORARY_ERROR,
           httpStatus: null,
           failureCount: 1,
@@ -190,7 +180,7 @@ describe("product link health report data", () => {
       ],
       {
         includeInactive: false,
-        kinds: [PRODUCT_LINK_KINDS.SOURCE, PRODUCT_LINK_KINDS.INTRODUCTION],
+        kinds: [PRODUCT_LINK_KINDS.SOURCE],
       },
       NOW,
     );
@@ -202,11 +192,6 @@ Total records: 3
 
 source:
   ok: 1
-  temporary_error: 0
-  broken: 0
-
-introduction:
-  ok: 0
   temporary_error: 2
     http_status:
       403: 1

@@ -49,7 +49,7 @@ product_list_view
 | Table | 責任 | 重要規則 |
 | --- | --- | --- |
 | `source_categories` | 第一版 CoolPC 分類主檔 | `igrp` 唯一；保存 `source_name`、`display_name`、enabled、最後檢查與成功時間。 |
-| `products` | 商品主檔 | `source_category_id + ibuy_token` 唯一；保存名稱、vendor、主要圖片、introduction URL、來源頁、active / missing 狀態與 seen timestamps。 |
+| `products` | 商品主檔 | `source_category_id + ibuy_token` 唯一；保存名稱、vendor、主要圖片、來源頁、active / missing 狀態與 seen timestamps。 |
 | `price_snapshots` | 價格歷史 | 新商品或價格變動才新增；長期保留；`raw_snapshot_id` nullable，避免 raw snapshot 清理破壞價格歷史。 |
 | `current_prices` | 網站目前價格指標 | `product_id` 為主鍵；指向同商品的 `price_snapshots`；價格值從 snapshot 取得。 |
 | `product_link_health` | 商品外部連結健康狀態 | 每商品每 link kind 一筆；保存目前 URL、狀態、HTTP status、檢查時間、最後成功 / 失敗時間與連續失敗次數。 |
@@ -74,7 +74,6 @@ product_list_view
 - `vendor_name`
 - `primary_image_url`
 - `primary_image_checked_at`
-- `introduction_url`
 - `source_url`
 - `is_active`
 - `missing_since`
@@ -124,7 +123,7 @@ product_list_view
 `product_link_health` 保存：
 
 - `product_id`
-- `link_kind`：`source` 或 `introduction`
+- `link_kind`：`source`
 - `url`
 - `status`：`ok`、`broken` 或 `temporary_error`
 - nullable `http_status`

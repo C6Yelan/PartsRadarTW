@@ -92,9 +92,8 @@ HTTP 200 不等於成功。parser 前需驗證：
 3. 讀同商品區塊 `div.t` 名稱。
 4. 讀同商品區塊 `div.x` 價格。
 5. 擷取主要商品圖片 URL。
-6. 擷取可公開候選的產品介紹 URL。
-7. 解析整數 TWD 價格。
-8. 產生 computed `source_item_key`。
+6. 解析整數 TWD 價格。
+7. 產生 computed `source_item_key`。
 
 Parsed item：
 
@@ -104,7 +103,6 @@ Parsed item：
 - computed `source_item_key`
 - 商品原始名稱
 - 主要圖片 URL
-- introduction URL
 - price / `TWD`
 - source page URL
 - fetched time
@@ -126,12 +124,6 @@ DB 不保存此 key；正式 identity 是 `sourceCategoryId + iBuyToken`。
 - 不接受任意外部圖片、`javascript:`、`data:` 或 session token。
 - 缺圖或非法圖記為 `invalid_image_url`，候選商品不進正式資料。
 - `parse_errors.raw_image_url` 只供內部 debug，不公開。
-
-產品介紹 URL：
-
-- 可保存來源列「開箱討論」或產品介紹類 URL。
-- API 公開前需過濾蝦皮、PDF、driver/download 類低品質外部連結。
-- 沒有可用連結時回 `null`。
 
 ## Price Parsing
 

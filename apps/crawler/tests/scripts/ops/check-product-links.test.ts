@@ -44,7 +44,7 @@ describe("product link checker options", () => {
       maxDelayMs: 20000,
       timeoutMs: 10000,
       failureThreshold: 3,
-      kinds: [PRODUCT_LINK_KINDS.SOURCE, PRODUCT_LINK_KINDS.INTRODUCTION],
+      kinds: [PRODUCT_LINK_KINDS.SOURCE],
     });
   });
 
@@ -52,7 +52,7 @@ describe("product link checker options", () => {
     const workspaceRoot = await createWorkspace();
 
     expect(() => parseOptions(["--dry-run", "--kinds", "source,download"], workspaceRoot)).toThrow(
-      "--kinds must contain source and/or introduction",
+      "--kinds only supports source",
     );
   });
 });
@@ -64,25 +64,17 @@ describe("product link checker candidates", () => {
       [
         product({
           ibuyToken: "GPU-NEW",
-          introductionUrl:
-            "https://example.com/products/gpu-review?utm_source=ad&variant=black#reviews",
           linkHealthChecks: [
             health({
               linkKind: PRODUCT_LINK_KINDS.SOURCE,
               url: "https://www.coolpc.com.tw/evaluate.php?iBuy=GPU-OLD",
               checkedAt: new Date("2026-06-02T11:00:00.000Z"),
             }),
-            health({
-              linkKind: PRODUCT_LINK_KINDS.INTRODUCTION,
-              url: "https://example.com/products/gpu-review?variant=black",
-              checkedAt: new Date("2026-05-31T11:00:00.000Z"),
-            }),
           ],
         }),
         product({
           id: "22222222-2222-2222-2222-222222222222",
           ibuyToken: "GPU-FRESH",
-          introductionUrl: null,
           linkHealthChecks: [
             health({
               linkKind: PRODUCT_LINK_KINDS.SOURCE,
@@ -100,10 +92,6 @@ describe("product link checker candidates", () => {
       expect.objectContaining({
         linkKind: PRODUCT_LINK_KINDS.SOURCE,
         url: "https://www.coolpc.com.tw/evaluate.php?iBuy=GPU-NEW",
-      }),
-      expect.objectContaining({
-        linkKind: PRODUCT_LINK_KINDS.INTRODUCTION,
-        url: "https://example.com/products/gpu-review?variant=black",
       }),
     ]);
   });
@@ -241,7 +229,6 @@ function product(overrides: Partial<ProductLinkProductRecord> = {}): ProductLink
     id: "11111111-1111-1111-1111-111111111111",
     name: "GPU RTX 4070",
     ibuyToken: "GPU-RTX-4070",
-    introductionUrl: null,
     sourceCategory: {
       igrp: 12,
       displayName: "顯示卡",
@@ -288,7 +275,7 @@ function productLinkOptions(): ProductLinkCheckerOptions {
     maxDelayMs: 20000,
     timeoutMs: 10000,
     failureThreshold: 3,
-    kinds: [PRODUCT_LINK_KINDS.SOURCE, PRODUCT_LINK_KINDS.INTRODUCTION],
+    kinds: [PRODUCT_LINK_KINDS.SOURCE],
   };
 }
 

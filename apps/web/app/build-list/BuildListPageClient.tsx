@@ -236,14 +236,6 @@ function BuildListItemRow({
               ↗
             </span>
           </a>
-          {item.introductionUrl ? (
-            <a href={item.introductionUrl} rel="noreferrer" target="_blank">
-              產品介紹
-              <span className="build-list-link-icon" aria-hidden="true">
-                ↗
-              </span>
-            </a>
-          ) : null}
         </div>
       </div>
 

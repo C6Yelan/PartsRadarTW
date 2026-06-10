@@ -89,7 +89,6 @@ export default async function OpsStatusPage({ searchParams }: OpsStatusPageProps
           <h2>Link Health</h2>
           <div className="ops-link-health-grid">
             <LinkHealthColumn title="Source" summary={summary.linkHealth.source} />
-            <LinkHealthColumn title="Introduction" summary={summary.linkHealth.introduction} />
           </div>
         </article>
 

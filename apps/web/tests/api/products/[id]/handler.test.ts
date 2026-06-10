@@ -56,10 +56,6 @@ describe("GET /api/products/{id} handler", () => {
         url: "https://www.coolpc.com.tw/evaluate.php?iBuy=GPU-RTX-4070",
         health: null,
       },
-      introduction: {
-        url: "https://www.nvidia.com/zh-tw/geforce/graphics-cards/40-series/rtx-4070/",
-        health: null,
-      },
       status: {
         isActive: true,
         missingSince: null,
@@ -70,6 +66,7 @@ describe("GET /api/products/{id} handler", () => {
     expect(JSON.stringify(body)).not.toContain("iBuyToken");
     expect(JSON.stringify(body)).not.toContain("source_item_key");
     expect(JSON.stringify(body)).not.toContain("PHPSESSID");
+    expect(body).not.toHaveProperty("introduction");
   });
 
   it("returns product details with a nullable image when primary image data is missing", async () => {
@@ -111,42 +108,10 @@ describe("GET /api/products/{id} handler", () => {
     });
   });
 
-  it("omits unsafe introduction URLs", async () => {
-    const response = await createGetProductHandler(
-      fakeProductDetailClient(product({ introductionUrl: "javascript:alert(1)" })),
-    )(PRODUCT_ID);
-
-    expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({
-      introduction: null,
-    });
-  });
-
-  it("sanitizes public introduction URLs before returning them", async () => {
+  it("returns public link health status for the current source URL", async () => {
     const response = await createGetProductHandler(
       fakeProductDetailClient(
         product({
-          introductionUrl:
-            "https://example.com/products/gpu-review?utm_source=ad&PHPSESSID=secret&variant=black#reviews",
-        }),
-      ),
-    )(PRODUCT_ID);
-
-    expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({
-      introduction: {
-        url: "https://example.com/products/gpu-review?variant=black",
-        health: null,
-      },
-    });
-  });
-
-  it("returns public link health status for the current source and introduction URLs", async () => {
-    const response = await createGetProductHandler(
-      fakeProductDetailClient(
-        product({
-          introductionUrl:
-            "https://example.com/products/gpu-review?utm_source=ad&variant=black#reviews",
           linkHealthChecks: [
             {
               linkKind: "SOURCE",
@@ -154,13 +119,6 @@ describe("GET /api/products/{id} handler", () => {
               status: "OK",
               httpStatus: 200,
               checkedAt: new Date("2026-05-28T12:10:00.000Z"),
-            },
-            {
-              linkKind: "INTRODUCTION",
-              url: "https://example.com/products/gpu-review?variant=black",
-              status: "BROKEN",
-              httpStatus: 404,
-              checkedAt: new Date("2026-05-28T12:11:00.000Z"),
             },
           ],
         }),
@@ -174,14 +132,6 @@ describe("GET /api/products/{id} handler", () => {
           status: "ok",
           httpStatus: 200,
           checkedAt: "2026-05-28T12:10:00.000Z",
-        },
-      },
-      introduction: {
-        url: "https://example.com/products/gpu-review?variant=black",
-        health: {
-          status: "broken",
-          httpStatus: 404,
-          checkedAt: "2026-05-28T12:11:00.000Z",
         },
       },
     });
@@ -209,36 +159,6 @@ describe("GET /api/products/{id} handler", () => {
       source: {
         health: null,
       },
-    });
-  });
-
-  it("omits public introduction URLs with embedded credentials", async () => {
-    const response = await createGetProductHandler(
-      fakeProductDetailClient(
-        product({ introductionUrl: "https://user:secret@example.com/products/gpu-review" }),
-      ),
-    )(PRODUCT_ID);
-
-    expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({
-      introduction: null,
-    });
-  });
-
-  it.each([
-    "https://s.shopee.tw/5Ak0QFrSVB",
-    "https://shopee.tw/product/54133273/24027157445/",
-    "https://www.amd.com/content/dam/amd/en/documents/partner-hub/ryzen/guide.pdf",
-    "https://www.amd.com/zh-tw/support/downloads/previous-drivers.html/processors/ryzen.html",
-    "https://example.com/products/gpu-driver-download",
-  ])("omits low-quality introduction URLs: %s", async (introductionUrl) => {
-    const response = await createGetProductHandler(
-      fakeProductDetailClient(product({ introductionUrl })),
-    )(PRODUCT_ID);
-
-    expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({
-      introduction: null,
     });
   });
 
@@ -325,7 +245,6 @@ function product(overrides: Partial<NonNullable<ProductRecord>> = {}): NonNullab
     name: "GPU RTX 4070",
     primaryImageUrl: "https://www.coolpc.com.tw/eval/12/gpu-rtx-4070.jpg",
     primaryImageCheckedAt: new Date("2026-05-28T11:55:00.000Z"),
-    introductionUrl: "https://www.nvidia.com/zh-tw/geforce/graphics-cards/40-series/rtx-4070/",
     isActive: true,
     missingSince: null,
     firstSeenAt: new Date("2026-05-28T10:00:00.000Z"),

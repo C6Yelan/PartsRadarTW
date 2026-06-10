@@ -135,7 +135,7 @@ fix(web): remove unstable coolpc import tool
 範圍：
 
 - 低頻連結健康檢查。
-- 原價屋查看 / 購買連結與產品介紹連結狀態欄位。
+- 原價屋查看 / 購買連結狀態欄位。
 - 失效、暫時失敗與待重試狀態。
 - UI 隱藏或低干擾標示失效連結。
 - backoff 與 request rate 控制。
@@ -188,7 +188,7 @@ fix(web): remove unstable coolpc import tool
 - 為每個候選分類建立 display name、source name 與必要的 title keyword validation。
 - 對候選分類做 manual live validation 與 raw snapshot replay，不通過者不啟用。
 - 分批更新 `COOLPC_TARGET_CATEGORIES` 與 DB seed，不一次全開。
-- 驗證 parser 是否能穩定取得 `iBuyToken`、商品名稱、價格、來源連結、主要圖片與產品介紹連結。
+- 驗證 parser 是否能穩定取得 `iBuyToken`、商品名稱、價格、來源連結與主要圖片。
 - 針對新分類跑 image backfill、link health 與 API/UI smoke。
 
 目前狀態：
@@ -211,15 +211,15 @@ fix(web): remove unstable coolpc import tool
 
 - 在商品列表與商品詳情頁加入「加入配單」入口。
 - 配單以 client-side state / localStorage 保存，不需要帳號、不寫入伺服器個人資料。
-- 配單項目包含商品 ID、商品名稱、分類、目前價格、價格更新時間、原價屋查看 / 購買網址與產品介紹網址。
+- 配單項目包含商品 ID、商品名稱、分類、目前價格、價格更新時間與原價屋查看 / 購買網址。
 - 支援調整數量、移除品項、清空配單與顯示總價。
 - 匯出 Excel，且每件商品都附原價屋購買網址。
-- Excel 可包含分類、商品名稱、數量、目前價格、小計、價格更新時間、原價屋購買網址、產品介紹網址、備註欄與總價。
+- Excel 可包含分類、商品名稱、數量、目前價格、小計、價格更新時間、原價屋購買網址、備註欄與總價。
 
 目前狀態：
 
 - 已完成第一輪：商品列表與商品詳情頁加入配單入口，配單使用 client-side state / `localStorage`，支援品項數量、移除、清空、品項小計、總價、配單品項數量顯示與 reload 保存。
-- 已完成 Excel 直接匯出，內容包含分類、商品名稱、數量、目前價格、小計、價格更新時間、原價屋查看 / 購買網址、產品介紹網址、備註欄與總價。
+- 已完成 Excel 直接匯出，內容包含分類、商品名稱、數量、目前價格、小計、價格更新時間、原價屋查看 / 購買網址、備註欄與總價。
 - 2026-06-03 本地 Playwright MCP 已驗證電腦與手機使用者流程：首頁加入配單、商品詳情頁加入配單、`localStorage` 保存、reload 後數量保留、數量調整、移除、清空、Excel artifact 內容與無水平溢出。
 - 已新增 repo path comment policy test，讓 `apps/` 與 `packages/` 下 `.ts`、`.tsx`、`.css` 的 repo-relative path comment 規則可重跑驗證，並排除 generated / fixture / build output 檔案。
 - 已完成部署驗收：`/build-list` local / public 都回 `HTTP 200`。

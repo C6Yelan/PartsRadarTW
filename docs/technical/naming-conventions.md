@@ -9,7 +9,6 @@
 - `sourceUrl`：crawler / DB 內部保存的來源分類頁 URL。它代表資料被抓取的頁面，不代表使用者查看 / 購買連結。
 - `purchaseUrl` 或 `coolpcPurchaseUrl`：由 `ibuyToken` 產生的 `evaluate.php?iBuy=...` 使用者查看 / 購買連結。新增內部變數時應使用這個語彙。
 - `source.url`：目前 public API / web model 的相容欄位，內容是查看 / 購買連結。不要在新內部變數中把它叫成 `sourceUrl`；若未來要改 public shape，需另做 API migration。
-- `introductionUrl`：產品介紹連結。歷史 migration 中的 `discussion_url` 只代表舊欄位名稱，不應出現在新程式碼、文件或 public API 語彙。
 - `linkKind`：外部連結健康檢查的 DB enum。現有 `SOURCE` 值代表 public API 的 `source.url` 查看 / 購買連結；新增程式註解時需說明它不是 `products.source_url`。
 
 ## Products, Vendors, And Build List

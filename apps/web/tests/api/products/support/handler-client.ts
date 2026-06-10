@@ -143,7 +143,6 @@ export function product(overrides: Partial<ProductRecord> = {}): ProductRecord {
     name: "GPU RTX 4070",
     primaryImageUrl: "https://www.coolpc.com.tw/eval/12/gpu-rtx-4070.jpg",
     primaryImageCheckedAt: new Date("2026-05-28T11:55:00.000Z"),
-    introductionUrl: "https://www.nvidia.com/zh-tw/geforce/graphics-cards/40-series/rtx-4070/",
     isActive: true,
     missingSince: null,
     currentPrice: {
