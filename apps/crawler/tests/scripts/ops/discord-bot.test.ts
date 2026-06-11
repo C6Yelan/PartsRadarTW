@@ -388,10 +388,13 @@ describe("sendPriceReportNow", () => {
       embeds: [
         expect.objectContaining({
           title: "PartsRadarTW 價格報告",
-          description: "過去 24 小時：價格變動 1，新增商品 1",
+          description: expect.stringContaining("過去 24 小時：價格變動 1，新增商品 1"),
         }),
       ],
     });
+    expect(reportMessage?.embeds?.[0]?.description).toContain("\n價格變動 (1)\n");
+    expect(reportMessage?.embeds?.[0]?.description).toContain("\n新增商品 (1)\n");
+    expect(reportMessage?.embeds?.[0]?.fields).toBeUndefined();
     expect(JSON.stringify(reportMessage)).toContain("GPU A");
     expect(JSON.stringify(reportMessage)).toContain("SSD B");
     expect(client.discordNotificationDelivery.create).toHaveBeenCalledWith({
@@ -407,7 +410,7 @@ describe("sendPriceReportNow", () => {
     });
   });
 
-  it("does not add visible continuation labels to split embed fields", async () => {
+  it("keeps long report content continuous without blank embed fields", async () => {
     const snapshots = Array.from({ length: 14 }, (_, index) =>
       snapshot({
         id: `new-${index}`,
@@ -436,11 +439,12 @@ describe("sendPriceReportNow", () => {
     });
 
     const reportMessage = sendReportMessages.mock.calls[0]?.[0][0];
-    const fieldNames = reportMessage?.embeds?.[0]?.fields?.map((field) => field.name) ?? [];
+    const description = reportMessage?.embeds?.[0]?.description ?? "";
 
-    expect(fieldNames).toContain("新增商品 (14)");
-    expect(fieldNames).toContain("\u200b");
-    expect(fieldNames.some((name) => name.includes("續"))).toBe(false);
+    expect(reportMessage?.embeds?.[0]?.fields).toBeUndefined();
+    expect(description).toContain("新增商品 (14)\n- [Long New Product");
+    expect(description).not.toContain("\u200b");
+    expect(description).not.toContain("續");
   });
 
   it("enables daily report settings for a Discord user", async () => {

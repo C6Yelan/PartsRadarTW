@@ -11,8 +11,6 @@ import {
   DAY_MS,
   DISCORD_EMBED_COLOR,
   DISCORD_EMBED_DESCRIPTION_MAX_LENGTH,
-  DISCORD_EMBED_FIELD_VALUE_MAX_LENGTH,
-  DISCORD_EMBED_MAX_FIELDS,
   HOUR_MS,
   MAX_DUE_PRICE_REPORT_SETTINGS_PER_CYCLE,
   MAX_PRICE_REPORT_ITEMS,
@@ -22,7 +20,6 @@ import {
 import { formatDiscordBotText } from "./rest";
 import type {
   DiscordBotClient,
-  DiscordBotEmbedField,
   DiscordBotMessage,
   DiscordBotMessageSendResult,
   DiscordBotOptions,
@@ -340,42 +337,31 @@ function createPersonalPriceReportEmbedMessages(
   const listedNewProducts = report.newProducts.slice(0, remainingItemLimit);
   const hiddenPriceChangeCount = report.priceChanges.length - listedPriceChanges.length;
   const hiddenNewProductCount = report.newProducts.length - listedNewProducts.length;
-  const fields = [
-    ...createReportSectionFields({
-      title: `價格變動 (${report.priceChanges.length})`,
-      emptyText: "沒有價格變動。",
-      lines: listedPriceChanges.map((change) =>
-        formatPersonalPriceChangeEmbedLine(change, options.publicBaseUrl),
-      ),
-    }),
-    ...createReportSectionFields({
-      title: `新增商品 (${report.newProducts.length})`,
-      emptyText: "沒有新增商品。",
-      lines: listedNewProducts.map((product) =>
-        formatNewProductEmbedLine(product, options.publicBaseUrl),
-      ),
-    }),
-  ];
-  const fieldChunks = chunkArray(fields, DISCORD_EMBED_MAX_FIELDS);
+  const descriptionChunks = createReportDescriptionChunks({
+    priceChangeCount: report.priceChanges.length,
+    newProductCount: report.newProducts.length,
+    windowHours: options.windowHours,
+    priceChangeLines: listedPriceChanges.map((change) =>
+      formatPersonalPriceChangeEmbedLine(change, options.publicBaseUrl),
+    ),
+    newProductLines: listedNewProducts.map((product) =>
+      formatNewProductEmbedLine(product, options.publicBaseUrl),
+    ),
+  });
   const footer = formatHiddenReportFooter({
     hiddenPriceChangeCount,
     hiddenNewProductCount,
   });
-  const chunks = fieldChunks.length > 0 ? fieldChunks : [[{ name: "價格報告", value: "沒有資料。" }]];
 
-  return chunks.map((chunk, index) => ({
+  return descriptionChunks.map((description, index) => ({
     embeds: [
       {
         title:
-          chunks.length > 1
-            ? `PartsRadarTW 價格報告 (${index + 1}/${chunks.length})`
+          descriptionChunks.length > 1
+            ? `PartsRadarTW 價格報告 (${index + 1}/${descriptionChunks.length})`
             : "PartsRadarTW 價格報告",
-        description: formatDiscordBotText(
-          `過去 ${options.windowHours} 小時：價格變動 ${report.priceChanges.length}，新增商品 ${report.newProducts.length}`,
-          DISCORD_EMBED_DESCRIPTION_MAX_LENGTH,
-        ),
+        description,
         color: DISCORD_EMBED_COLOR,
-        fields: chunk,
         footer: footer ? { text: footer } : undefined,
         timestamp: options.generatedAt.toISOString(),
       },
@@ -383,40 +369,36 @@ function createPersonalPriceReportEmbedMessages(
   }));
 }
 
-function createReportSectionFields({
-  title,
-  emptyText,
-  lines,
+function createReportDescriptionChunks({
+  priceChangeCount,
+  newProductCount,
+  windowHours,
+  priceChangeLines,
+  newProductLines,
 }: {
-  title: string;
-  emptyText: string;
-  lines: string[];
-}): DiscordBotEmbedField[] {
-  if (lines.length === 0) {
-    return [
-      {
-        name: title,
-        value: emptyText,
-      },
-    ];
-  }
-
-  return chunkFieldValueLines(lines).map((value, index) => ({
-    name: index === 0 ? title : "\u200b",
-    value,
-  }));
-}
-
-function chunkFieldValueLines(lines: string[]): string[] {
+  priceChangeCount: number;
+  newProductCount: number;
+  windowHours: number;
+  priceChangeLines: string[];
+  newProductLines: string[];
+}): string[] {
+  const lines = [
+    `過去 ${windowHours} 小時：價格變動 ${priceChangeCount}，新增商品 ${newProductCount}`,
+    `價格變動 (${priceChangeCount})`,
+    ...(priceChangeLines.length > 0 ? priceChangeLines : ["沒有價格變動。"]),
+    `新增商品 (${newProductCount})`,
+    ...(newProductLines.length > 0 ? newProductLines : ["沒有新增商品。"]),
+  ];
   const chunks: string[] = [];
   let current = "";
 
   for (const line of lines) {
-    const next = current ? `${current}\n${line}` : line;
+    const formattedLine = formatDiscordBotText(line, DISCORD_EMBED_DESCRIPTION_MAX_LENGTH);
+    const next = current ? `${current}\n${formattedLine}` : formattedLine;
 
-    if (current && next.length > DISCORD_EMBED_FIELD_VALUE_MAX_LENGTH) {
+    if (current && next.length > DISCORD_EMBED_DESCRIPTION_MAX_LENGTH) {
       chunks.push(current);
-      current = line;
+      current = formattedLine;
       continue;
     }
 
@@ -648,14 +630,4 @@ function toSingleLine(value: string): string {
 
 function escapeMarkdownLinkText(value: string): string {
   return value.replace(/([\\[\]])/g, "\\$1");
-}
-
-function chunkArray<T>(values: T[], size: number): T[][] {
-  const chunks: T[][] = [];
-
-  for (let index = 0; index < values.length; index += size) {
-    chunks.push(values.slice(index, index + size));
-  }
-
-  return chunks;
 }

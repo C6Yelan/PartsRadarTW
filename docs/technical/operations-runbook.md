@@ -521,7 +521,7 @@ Bot 目標：
 - Discord slash command registration。
 - `/price-report now`：使用者手動要求最近 `24h` / `12h` / `6h` 價格報告，bot 會在指令發出的頻道或私訊 context 以 embed 回覆中文報告。
 - Slash command 會註冊 global command 供 DM 使用；若設定 `DISCORD_GUILD_ID`，也會額外註冊 guild command 方便伺服器測試。
-- `/price-report now` 報告分成「價格變動」與「新增商品」兩個 embed 欄位；沒有資料時分區顯示空狀態。
+- `/price-report now` 報告在 embed description 中連續顯示「價格變動」與「新增商品」兩個區段；沒有資料時分區顯示空狀態。
 - `/price-report now` 每次最多列 `DISCORD_PRICE_REPORT_MAX_ITEMS` 筆，預設 50；上限套用在兩區合計列出的商品數；per-user cooldown 只套用在實際產生報告的 `now` 指令。
 - 每次 `/price-report now` 會寫入 `discord_notification_deliveries`，供後續去重、排程與維運檢視使用。
 - `/price-report enable [window] [max_items] [time]`：開啟每日價格報告 DM；`time` 使用台北時間 `HH:mm`，未填時沿用啟用後每 24 小時發送一次。
