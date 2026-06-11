@@ -44,6 +44,7 @@ export type {
   DiscordRestResult,
   FetchImpl,
   PriceReportNowResult,
+  PriceReportTimeOfDay,
 } from "./discord-bot/types";
 
 function log(message: string): void {

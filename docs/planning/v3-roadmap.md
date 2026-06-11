@@ -39,7 +39,7 @@
 
 Discord bot 第一輪指令：
 
-- `/price-report enable [window] [max_items]`：開啟每日價格變動報告 DM。
+- `/price-report enable [window] [max_items] [time]`：開啟每日價格變動報告 DM；`time` 為台北時間 `HH:mm`。
 - `/price-report disable`：關閉價格變動報告。
 - `/price-report settings`：查看目前報告設定。
 - `/price-report now`：立即在指令發出的頻道或私訊 context 產生一次報告，用於驗證設定與手動查看。

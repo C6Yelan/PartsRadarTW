@@ -62,20 +62,20 @@ export async function handleDiscordInteraction({
     return;
   }
 
-  const cooldown = cooldowns.consume(discordUserId, new Date());
-
-  if (!cooldown.allowed) {
-    await sendInteractionResponse({
-      token: options.token,
-      apiBaseUrl: options.apiBaseUrl,
-      interaction,
-      fetchImpl,
-      content: `請等待 ${cooldown.retryAfterSeconds} 秒後再產生下一份價格報告。`,
-    });
-    return;
-  }
-
   if (command.name === "now") {
+    const cooldown = cooldowns.consume(discordUserId, new Date());
+
+    if (!cooldown.allowed) {
+      await sendInteractionResponse({
+        token: options.token,
+        apiBaseUrl: options.apiBaseUrl,
+        interaction,
+        fetchImpl,
+        content: `請等待 ${cooldown.retryAfterSeconds} 秒後再產生下一份價格報告。`,
+      });
+      return;
+    }
+
     await deferInteractionResponse({
       token: options.token,
       apiBaseUrl: options.apiBaseUrl,
@@ -103,11 +103,23 @@ export async function handleDiscordInteraction({
   }
 
   if (command.name === "enable") {
+    if (!command.timeInputValid) {
+      await sendInteractionResponse({
+        token: options.token,
+        apiBaseUrl: options.apiBaseUrl,
+        interaction,
+        fetchImpl,
+        content: "每日發送時間格式需為台北時間 HH:mm，例如 `09:30` 或 `21:00`。",
+      });
+      return;
+    }
+
     const setting = await enableDailyPriceReport({
       client,
       discordUserId,
       windowHours: command.windowHours,
       maxItems: command.maxItems ?? options.priceReportMaxItems,
+      timeOfDay: command.timeOfDay,
     });
 
     await sendInteractionResponse({

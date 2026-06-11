@@ -184,6 +184,11 @@ export interface CommandCooldownResult {
   retryAfterSeconds: number;
 }
 
+export interface PriceReportTimeOfDay {
+  hour: number;
+  minute: number;
+}
+
 export type ParsedPriceReportCommand =
   | {
       name: "now";
@@ -194,6 +199,8 @@ export type ParsedPriceReportCommand =
       name: "enable";
       windowHours: number;
       maxItems: number | null;
+      timeOfDay: PriceReportTimeOfDay | null;
+      timeInputValid: boolean;
     }
   | {
       name: "disable";

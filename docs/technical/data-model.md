@@ -181,7 +181,7 @@ Discord bot 只保存 Discord user id 與必要偏好，不建立網站帳號，
 規則：
 
 - `/price-report now` 會寫入 delivery log，但不建立 price report setting。
-- `/price-report enable` / `disable` / `settings` 讀寫 `discord_price_report_settings`；第一輪只由指令建立每日 DM 報告，不提供指定每日幾點。
+- `/price-report enable` / `disable` / `settings` 讀寫 `discord_price_report_settings`；每日 DM 報告可用 `time` 參數設定台北時間 `HH:mm`，下一次發送時間保存在 `next_send_at`。
 - `/watch` 系列之後才會讀寫 `discord_target_price_watches`。
 - `error_message` 只保存安全摘要，不保存 token、source URL、raw HTML、DB URL、internal headers 或 raw IP。
 

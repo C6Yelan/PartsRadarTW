@@ -77,6 +77,12 @@ export function createPriceReportCommand({
             min_value: 1,
             max_value: MAX_PRICE_REPORT_ITEMS,
           },
+          {
+            type: DISCORD_OPTION_TYPE_STRING,
+            name: "time",
+            description: "每日私訊發送時間，台北時間 HH:mm。",
+            required: false,
+          },
         ],
       },
       {
@@ -109,11 +115,27 @@ export function parsePriceReportInteraction(interaction: DiscordInteraction): Pa
   const windowOption = subcommand.options?.find((option) => option.name === "window");
   const maxItemsOption = subcommand.options?.find((option) => option.name === "max_items");
 
-  if (subcommand.name === "now" || subcommand.name === "enable") {
+  if (subcommand.name === "now") {
     return {
       name: subcommand.name,
       windowHours: parseWindowHours(windowOption?.value),
       maxItems: parseMaxItems(maxItemsOption?.value),
+    };
+  }
+
+  if (subcommand.name === "enable") {
+    const timeOption = subcommand.options?.find((option) => option.name === "time");
+    const timeOfDay = parseTimeOfDay(timeOption?.value);
+
+    return {
+      name: subcommand.name,
+      windowHours: parseWindowHours(windowOption?.value),
+      maxItems: parseMaxItems(maxItemsOption?.value),
+      timeOfDay,
+      timeInputValid:
+        timeOption?.value === undefined ||
+        (typeof timeOption.value === "string" && timeOption.value.trim() === "") ||
+        timeOfDay !== null,
     };
   }
 
@@ -144,4 +166,21 @@ function parseMaxItems(value: unknown): number | null {
   }
 
   return Math.min(Math.max(value, 1), MAX_PRICE_REPORT_ITEMS);
+}
+
+function parseTimeOfDay(value: unknown): { hour: number; minute: number } | null {
+  if (typeof value !== "string" || value.trim() === "") {
+    return null;
+  }
+
+  const match = /^([01]?\d|2[0-3]):([0-5]\d)$/.exec(value.trim());
+
+  if (!match) {
+    return null;
+  }
+
+  return {
+    hour: Number(match[1]),
+    minute: Number(match[2]),
+  };
 }

@@ -1,7 +1,9 @@
 // apps/crawler/tests/scripts/ops/discord-bot.test.ts
 import { describe, expect, it, vi } from "vitest";
 import {
+  CommandCooldowns,
   enableDailyPriceReport,
+  handleDiscordInteraction,
   parseDiscordBotOptions,
   registerDiscordBotCommands,
   sendDiscordDirectMessages,
@@ -10,6 +12,8 @@ import {
   sendPriceReportNow,
   type DiscordBotClient,
   type DiscordBotMessage,
+  type DiscordBotOptions,
+  type DiscordInteraction,
 } from "../../../src/scripts/ops/discord-bot";
 
 const TOKEN = "test_bot_token";
@@ -100,6 +104,7 @@ describe("registerDiscordBotCommands", () => {
     expect(String(requestInit.body)).toContain('"name":"price-report"');
     expect(String(requestInit.body)).toContain('"name":"now"');
     expect(String(requestInit.body)).toContain('"name":"enable"');
+    expect(String(requestInit.body)).toContain('"name":"time"');
     expect(String(requestInit.body)).toContain('"name":"disable"');
     expect(String(requestInit.body)).toContain('"name":"settings"');
   });
@@ -266,6 +271,66 @@ describe("sendDiscordInteractionMessages", () => {
   });
 });
 
+describe("handleDiscordInteraction", () => {
+  it("does not consume the price report cooldown for settings commands", async () => {
+    const client = createDiscordBotClient([]);
+    const cooldowns = new CommandCooldowns(60);
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+    const options = createDiscordBotOptions();
+
+    await handleDiscordInteraction({
+      client,
+      options,
+      cooldowns,
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createInteraction("settings"),
+    });
+    await handleDiscordInteraction({
+      client,
+      options,
+      cooldowns,
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createInteraction("now"),
+    });
+
+    const requestBodies = fetchMock.mock.calls.map(([, requestInit]) =>
+      String((requestInit as RequestInit | undefined)?.body ?? ""),
+    );
+    const urls = fetchMock.mock.calls.map(([url]) => String(url));
+
+    expect(requestBodies.join("\n")).not.toContain("請等待");
+    expect(urls).toContain(`${API_BASE_URL}/webhooks/${APPLICATION_ID}/interaction-token/messages/@original`);
+  });
+
+  it("rejects invalid daily report time values", async () => {
+    const client = createDiscordBotClient([]);
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createInteraction("enable", [
+        {
+          type: 3,
+          name: "time",
+          value: "25:99",
+        },
+      ]),
+    });
+
+    const requestBody = String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body);
+
+    expect(requestBody).toContain("每日發送時間格式需為台北時間 HH:mm");
+    expect(client.discordPriceReportSetting.upsert).not.toHaveBeenCalled();
+  });
+});
+
 describe("sendPriceReportNow", () => {
   it("sends a recent price report in the command context and records the delivery", async () => {
     const client = createDiscordBotClient([
@@ -342,6 +407,42 @@ describe("sendPriceReportNow", () => {
     });
   });
 
+  it("does not add visible continuation labels to split embed fields", async () => {
+    const snapshots = Array.from({ length: 14 }, (_, index) =>
+      snapshot({
+        id: `new-${index}`,
+        productId: `product-${index}`,
+        productName: `Long New Product ${index} ${"A".repeat(90)}`,
+        crawlRunId: "new-run",
+        price: 1000 + index,
+        capturedAt: `2026-06-07T03:${String(index).padStart(2, "0")}:00.000Z`,
+      }),
+    );
+    const client = createDiscordBotClient(snapshots);
+    const sendReportMessages = vi.fn(async (_messages: DiscordBotMessage[]) => ({
+      status: "sent" as const,
+      messageCount: 1,
+      httpStatuses: [200],
+    }));
+
+    await sendPriceReportNow({
+      client,
+      discordUserId: "111122223333444455",
+      windowHours: 24,
+      maxItems: 50,
+      publicBaseUrl: PUBLIC_BASE_URL,
+      now: new Date("2026-06-07T05:00:00.000Z"),
+      sendReportMessages,
+    });
+
+    const reportMessage = sendReportMessages.mock.calls[0]?.[0][0];
+    const fieldNames = reportMessage?.embeds?.[0]?.fields?.map((field) => field.name) ?? [];
+
+    expect(fieldNames).toContain("新增商品 (14)");
+    expect(fieldNames).toContain("\u200b");
+    expect(fieldNames.some((name) => name.includes("續"))).toBe(false);
+  });
+
   it("enables daily report settings for a Discord user", async () => {
     const client = createDiscordBotClient([]);
     const setting = await enableDailyPriceReport({
@@ -367,6 +468,25 @@ describe("sendPriceReportNow", () => {
         },
       }),
     );
+  });
+
+  it("enables daily report settings at a specific Taipei time", async () => {
+    const client = createDiscordBotClient([]);
+    const setting = await enableDailyPriceReport({
+      client,
+      discordUserId: "111122223333444455",
+      windowHours: 24,
+      maxItems: 50,
+      timeOfDay: {
+        hour: 21,
+        minute: 30,
+      },
+      now: new Date("2026-06-07T05:00:00.000Z"),
+    });
+
+    expect(setting).toMatchObject({
+      nextSendAt: new Date("2026-06-07T13:30:00.000Z"),
+    });
   });
 
   it("sends due scheduled daily reports by DM and advances the next run", async () => {
@@ -441,11 +561,102 @@ describe("sendPriceReportNow", () => {
       },
       data: {
         lastSentAt: new Date("2026-06-07T05:00:00.000Z"),
-        nextSendAt: new Date("2026-06-08T05:00:00.000Z"),
+        nextSendAt: new Date("2026-06-08T04:59:00.000Z"),
+      },
+    });
+  });
+
+  it("keeps the configured daily send time when advancing scheduled reports", async () => {
+    const client = createDiscordBotClient(
+      [
+        snapshot({
+          id: "new-1",
+          productId: "product-1",
+          productName: "GPU A",
+          crawlRunId: "new-run",
+          price: 10990,
+          capturedAt: "2026-06-07T03:00:00.000Z",
+        }),
+      ],
+      [
+        priceReportSetting({
+          id: "setting-1",
+          discordUserId: "111122223333444455",
+          nextSendAt: new Date("2026-06-07T01:30:00.000Z"),
+        }),
+      ],
+    );
+    const sendDirectMessages = vi.fn(
+      async (_discordUserId: string, _messages: DiscordBotMessage[]) => ({
+        status: "sent" as const,
+        messageCount: 1,
+        httpStatuses: [200],
+      }),
+    );
+
+    await sendDueScheduledPriceReports({
+      client,
+      options: {
+        publicBaseUrl: PUBLIC_BASE_URL,
+        priceReportMaxItems: 50,
+      },
+      now: new Date("2026-06-07T05:00:00.000Z"),
+      sendDirectMessages,
+    });
+
+    expect(client.discordPriceReportSetting.update).toHaveBeenCalledWith({
+      where: {
+        id: "setting-1",
+      },
+      data: {
+        lastSentAt: new Date("2026-06-07T05:00:00.000Z"),
+        nextSendAt: new Date("2026-06-08T01:30:00.000Z"),
       },
     });
   });
 });
+
+function createDiscordBotOptions(): DiscordBotOptions {
+  return {
+    token: TOKEN,
+    applicationId: APPLICATION_ID,
+    guildId: GUILD_ID,
+    publicBaseUrl: PUBLIC_BASE_URL,
+    apiBaseUrl: API_BASE_URL,
+    gatewayUrl: "wss://discord.test/gateway",
+    registerCommands: false,
+    registerCommandsOnStart: true,
+    priceReportMaxItems: 50,
+    commandCooldownSeconds: 60,
+    priceReportScheduleIntervalSeconds: 300,
+  };
+}
+
+function createInteraction(
+  subcommandName: string,
+  subcommandOptions: NonNullable<NonNullable<DiscordInteraction["data"]>["options"]> = [],
+): DiscordInteraction {
+  return {
+    id: "interaction-1",
+    token: "interaction-token",
+    type: 2,
+    data: {
+      name: "price-report",
+      options: [
+        {
+          type: 1,
+          name: subcommandName,
+          options: subcommandOptions,
+        },
+      ],
+    },
+    member: {
+      user: {
+        id: "111122223333444455",
+      },
+    },
+  };
+}
 
 interface TestSnapshot {
   id: string;

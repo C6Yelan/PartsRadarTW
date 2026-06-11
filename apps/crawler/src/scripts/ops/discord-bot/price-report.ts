@@ -28,7 +28,10 @@ import type {
   DiscordBotOptions,
   DiscordDirectMessageSendResult,
   PriceReportNowResult,
+  PriceReportTimeOfDay,
 } from "./types";
+
+const TAIPEI_UTC_OFFSET_MS = 8 * HOUR_MS;
 
 export async function sendPriceReportNow({
   client,
@@ -144,14 +147,18 @@ export async function enableDailyPriceReport({
   discordUserId,
   windowHours,
   maxItems,
+  timeOfDay = null,
   now = new Date(),
 }: {
   client: DiscordBotClient;
   discordUserId: string;
   windowHours: number;
   maxItems: number;
+  timeOfDay?: PriceReportTimeOfDay | null;
   now?: Date;
 }): Promise<DiscordPriceReportSetting> {
+  const nextSendAt = calculateNextSendAt(now, "DAILY", timeOfDay);
+
   return client.discordPriceReportSetting.upsert({
     where: {
       discordUserId,
@@ -164,7 +171,7 @@ export async function enableDailyPriceReport({
       timezone: TIME_ZONE,
       maxItems: clampPriceReportMaxItems(maxItems),
       enabled: true,
-      nextSendAt: calculateNextSendAt(now, "DAILY"),
+      nextSendAt,
     },
     update: {
       interval: "DAILY",
@@ -173,7 +180,7 @@ export async function enableDailyPriceReport({
       timezone: TIME_ZONE,
       maxItems: clampPriceReportMaxItems(maxItems),
       enabled: true,
-      nextSendAt: calculateNextSendAt(now, "DAILY"),
+      nextSendAt,
     },
   });
 }
@@ -244,7 +251,7 @@ export async function sendDueScheduledPriceReports({
       },
       data: {
         lastSentAt: result.status === "sent" ? now : setting.lastSentAt,
-        nextSendAt: calculateNextSendAt(now, setting.interval),
+        nextSendAt: calculateNextSendAtAfterScheduledRun(now, setting),
       },
     });
   }
@@ -395,7 +402,7 @@ function createReportSectionFields({
   }
 
   return chunkFieldValueLines(lines).map((value, index) => ({
-    name: index === 0 ? title : `${title} 續`,
+    name: index === 0 ? title : "\u200b",
     value,
   }));
 }
@@ -459,11 +466,65 @@ function formatNewProductEmbedLine(
   );
 }
 
-function calculateNextSendAt(now: Date, interval: DiscordPriceReportSetting["interval"]): Date {
+function calculateNextSendAt(
+  now: Date,
+  interval: DiscordPriceReportSetting["interval"],
+  timeOfDay: PriceReportTimeOfDay | null = null,
+): Date {
+  if (interval === "DAILY" && timeOfDay) {
+    return calculateNextDailySendAt(now, timeOfDay);
+  }
+
   const intervalMs =
     interval === "EVERY_6H" ? 6 * HOUR_MS : interval === "EVERY_12H" ? 12 * HOUR_MS : DAY_MS;
 
   return new Date(now.getTime() + intervalMs);
+}
+
+function calculateNextSendAtAfterScheduledRun(
+  now: Date,
+  setting: Pick<DiscordPriceReportSetting, "interval" | "nextSendAt">,
+): Date {
+  const intervalMs =
+    setting.interval === "EVERY_6H"
+      ? 6 * HOUR_MS
+      : setting.interval === "EVERY_12H"
+        ? 12 * HOUR_MS
+        : DAY_MS;
+
+  if (!setting.nextSendAt) {
+    return new Date(now.getTime() + intervalMs);
+  }
+
+  let nextSendAt = new Date(setting.nextSendAt.getTime() + intervalMs);
+
+  while (nextSendAt.getTime() <= now.getTime()) {
+    nextSendAt = new Date(nextSendAt.getTime() + intervalMs);
+  }
+
+  return nextSendAt;
+}
+
+function calculateNextDailySendAt(now: Date, timeOfDay: PriceReportTimeOfDay): Date {
+  const todaySendAt = createTaipeiDateTimeUtc(now, timeOfDay);
+
+  return todaySendAt.getTime() > now.getTime()
+    ? todaySendAt
+    : new Date(todaySendAt.getTime() + DAY_MS);
+}
+
+function createTaipeiDateTimeUtc(reference: Date, timeOfDay: PriceReportTimeOfDay): Date {
+  const taipeiReference = new Date(reference.getTime() + TAIPEI_UTC_OFFSET_MS);
+
+  return new Date(
+    Date.UTC(
+      taipeiReference.getUTCFullYear(),
+      taipeiReference.getUTCMonth(),
+      taipeiReference.getUTCDate(),
+      timeOfDay.hour,
+      timeOfDay.minute,
+    ) - TAIPEI_UTC_OFFSET_MS,
+  );
 }
 
 function toPriceReportWindow(windowHours: number): DiscordPriceReportSetting["window"] {
@@ -503,6 +564,7 @@ export function formatPriceReportSettingMessage(setting: DiscordPriceReportSetti
     "每日價格提醒已開啟。",
     `統計區間：${formatWindowLabel(setting.window)}`,
     `每次最多：${setting.maxItems} 筆`,
+    `每日時間：${formatTaipeiTime(setting.nextSendAt)}`,
     `下一次：${formatTaipeiMinute(setting.nextSendAt)}`,
   ].join("\n");
 }
@@ -528,6 +590,23 @@ export function formatTaipeiMinute(value: Date | null): string {
   const byType = new Map(parts.map((part) => [part.type, part.value]));
 
   return `${byType.get("month")}/${byType.get("day")} ${byType.get("hour")}:${byType.get("minute")} GMT+8`;
+}
+
+function formatTaipeiTime(value: Date | null): string {
+  if (!value) {
+    return "尚未排程";
+  }
+
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: TIME_ZONE,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    hourCycle: "h23",
+  }).formatToParts(value);
+  const byType = new Map(parts.map((part) => [part.type, part.value]));
+
+  return `${byType.get("hour")}:${byType.get("minute")} GMT+8`;
 }
 
 function formatTaiwanDollar(amount: number, currency: string): string {
