@@ -1,12 +1,15 @@
 // apps/crawler/tests/scripts/ops/discord-bot.test.ts
 import { describe, expect, it, vi } from "vitest";
 import {
+  enableDailyPriceReport,
   parseDiscordBotOptions,
   registerDiscordBotCommands,
   sendDiscordDirectMessages,
   sendDiscordInteractionMessages,
+  sendDueScheduledPriceReports,
   sendPriceReportNow,
   type DiscordBotClient,
+  type DiscordBotMessage,
 } from "../../../src/scripts/ops/discord-bot";
 
 const TOKEN = "test_bot_token";
@@ -34,6 +37,7 @@ describe("Discord bot options", () => {
       registerCommandsOnStart: true,
       priceReportMaxItems: 50,
       commandCooldownSeconds: 60,
+      priceReportScheduleIntervalSeconds: 300,
     });
   });
 
@@ -67,11 +71,24 @@ describe("registerDiscordBotCommands", () => {
       httpStatus: 200,
     });
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    const [url, requestInit] = fetchMock.mock.calls[0] as [
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const [globalUrl, globalRequestInit] = fetchMock.mock.calls[0] as [
       Parameters<typeof fetch>[0],
       RequestInit,
     ];
+    const [url, requestInit] = fetchMock.mock.calls[1] as [
+      Parameters<typeof fetch>[0],
+      RequestInit,
+    ];
+    expect(String(globalUrl)).toBe(`${API_BASE_URL}/applications/${APPLICATION_ID}/commands`);
+    expect(globalRequestInit.method).toBe("PUT");
+    expect(JSON.parse(String(globalRequestInit.body))).toEqual([
+      expect.objectContaining({
+        name: "price-report",
+        contexts: [0, 1],
+        dm_permission: true,
+      }),
+    ]);
     expect(String(url)).toBe(
       `${API_BASE_URL}/applications/${APPLICATION_ID}/guilds/${GUILD_ID}/commands`,
     );
@@ -82,6 +99,9 @@ describe("registerDiscordBotCommands", () => {
     });
     expect(String(requestInit.body)).toContain('"name":"price-report"');
     expect(String(requestInit.body)).toContain('"name":"now"');
+    expect(String(requestInit.body)).toContain('"name":"enable"');
+    expect(String(requestInit.body)).toContain('"name":"disable"');
+    expect(String(requestInit.body)).toContain('"name":"settings"');
   });
 });
 
@@ -100,7 +120,7 @@ describe("sendDiscordDirectMessages", () => {
         token: TOKEN,
         apiBaseUrl: API_BASE_URL,
         userId: "111122223333444455",
-        contents: ["Report 1", "Report 2 @everyone"],
+        messages: [{ content: "Report 1" }, { content: "Report 2 @everyone" }],
         fetchImpl: fetchMock as typeof fetch,
       }),
     ).resolves.toEqual({
@@ -132,7 +152,7 @@ describe("sendDiscordDirectMessages", () => {
         token: TOKEN,
         apiBaseUrl: API_BASE_URL,
         userId: "111122223333444455",
-        contents: ["Report"],
+        messages: [{ content: "Report" }],
         fetchImpl: fetchMock as typeof fetch,
       }),
     ).resolves.toEqual({
@@ -161,7 +181,7 @@ describe("sendDiscordInteractionMessages", () => {
           token: "interaction-token",
           type: 2,
         },
-        contents: ["Report 1", "Report 2 @everyone"],
+        messages: [{ content: "Report 1" }, { content: "Report 2 @everyone" }],
         fetchImpl: fetchMock as typeof fetch,
       }),
     ).resolves.toEqual({
@@ -198,6 +218,52 @@ describe("sendDiscordInteractionMessages", () => {
       },
     });
   });
+
+  it("sends embed payloads with mentions disabled", async () => {
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await expect(
+      sendDiscordInteractionMessages({
+        token: TOKEN,
+        applicationId: APPLICATION_ID,
+        apiBaseUrl: API_BASE_URL,
+        interaction: {
+          id: "interaction-1",
+          token: "interaction-token",
+          type: 2,
+        },
+        messages: [
+          {
+            embeds: [
+              {
+                title: "PartsRadarTW 價格報告",
+                description: "過去 24 小時：價格變動 1，新增商品 0",
+              },
+            ],
+          },
+        ],
+        fetchImpl: fetchMock as typeof fetch,
+      }),
+    ).resolves.toMatchObject({
+      status: "sent",
+      messageCount: 1,
+    });
+
+    const [, request] = fetchMock.mock.calls[0] as [Parameters<typeof fetch>[0], RequestInit];
+    expect(JSON.parse(String(request.body))).toEqual({
+      embeds: [
+        {
+          title: "PartsRadarTW 價格報告",
+          description: "過去 24 小時：價格變動 1，新增商品 0",
+        },
+      ],
+      allowed_mentions: {
+        parse: [],
+      },
+    });
+  });
 });
 
 describe("sendPriceReportNow", () => {
@@ -228,7 +294,7 @@ describe("sendPriceReportNow", () => {
         capturedAt: "2026-06-07T04:00:00.000Z",
       }),
     ]);
-    const sendReportMessages = vi.fn(async (_contents: string[]) => ({
+    const sendReportMessages = vi.fn(async (_messages: DiscordBotMessage[]) => ({
       status: "sent" as const,
       messageCount: 1,
       httpStatuses: [200],
@@ -252,14 +318,17 @@ describe("sendPriceReportNow", () => {
       messageCount: 1,
     });
 
-    expect(sendReportMessages).toHaveBeenCalledWith([
-      expect.stringContaining("PartsRadarTW 價格報告 - 過去 24 小時"),
-    ]);
-    const reportContent = sendReportMessages.mock.calls[0]?.[0][0] ?? "";
-    expect(reportContent).toContain("價格變動");
-    expect(reportContent).toContain("GPU A");
-    expect(reportContent).toContain("新增商品");
-    expect(reportContent).toContain("SSD B");
+    const reportMessage = sendReportMessages.mock.calls[0]?.[0][0];
+    expect(reportMessage).toMatchObject({
+      embeds: [
+        expect.objectContaining({
+          title: "PartsRadarTW 價格報告",
+          description: "過去 24 小時：價格變動 1，新增商品 1",
+        }),
+      ],
+    });
+    expect(JSON.stringify(reportMessage)).toContain("GPU A");
+    expect(JSON.stringify(reportMessage)).toContain("SSD B");
     expect(client.discordNotificationDelivery.create).toHaveBeenCalledWith({
       data: {
         discordUserId: "111122223333444455",
@@ -269,6 +338,110 @@ describe("sendPriceReportNow", () => {
         messageCount: 1,
         deliveredAt: new Date("2026-06-07T05:00:00.000Z"),
         errorMessage: null,
+      },
+    });
+  });
+
+  it("enables daily report settings for a Discord user", async () => {
+    const client = createDiscordBotClient([]);
+    const setting = await enableDailyPriceReport({
+      client,
+      discordUserId: "111122223333444455",
+      windowHours: 12,
+      maxItems: 10,
+      now: new Date("2026-06-07T05:00:00.000Z"),
+    });
+
+    expect(setting).toMatchObject({
+      discordUserId: "111122223333444455",
+      interval: "DAILY",
+      window: "HOURS_12",
+      maxItems: 10,
+      enabled: true,
+      nextSendAt: new Date("2026-06-08T05:00:00.000Z"),
+    });
+    expect(client.discordPriceReportSetting.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          discordUserId: "111122223333444455",
+        },
+      }),
+    );
+  });
+
+  it("sends due scheduled daily reports by DM and advances the next run", async () => {
+    const client = createDiscordBotClient(
+      [
+        snapshot({
+          id: "old-1",
+          productId: "product-1",
+          productName: "GPU A",
+          crawlRunId: "old-run",
+          price: 12000,
+          capturedAt: "2026-06-06T01:00:00.000Z",
+        }),
+        snapshot({
+          id: "new-1",
+          productId: "product-1",
+          productName: "GPU A",
+          crawlRunId: "new-run",
+          price: 10990,
+          capturedAt: "2026-06-07T03:00:00.000Z",
+        }),
+      ],
+      [
+        priceReportSetting({
+          id: "setting-1",
+          discordUserId: "111122223333444455",
+          nextSendAt: new Date("2026-06-07T04:59:00.000Z"),
+        }),
+      ],
+    );
+    const sendDirectMessages = vi.fn(async (_discordUserId: string, _messages: DiscordBotMessage[]) => ({
+      status: "sent" as const,
+      messageCount: 1,
+      httpStatuses: [200],
+    }));
+
+    await expect(
+      sendDueScheduledPriceReports({
+        client,
+        options: {
+          publicBaseUrl: PUBLIC_BASE_URL,
+          priceReportMaxItems: 50,
+        },
+        now: new Date("2026-06-07T05:00:00.000Z"),
+        sendDirectMessages,
+      }),
+    ).resolves.toEqual({
+      processedCount: 1,
+      sentCount: 1,
+      rateLimitedCount: 0,
+      failedCount: 0,
+    });
+
+    expect(sendDirectMessages).toHaveBeenCalledWith(
+      "111122223333444455",
+      expect.arrayContaining([
+        expect.objectContaining({
+          embeds: [expect.objectContaining({ title: "PartsRadarTW 價格報告" })],
+        }),
+      ]),
+    );
+    expect(client.discordNotificationDelivery.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        discordUserId: "111122223333444455",
+        kind: "SCHEDULED_PRICE_REPORT",
+        status: "SENT",
+      }),
+    });
+    expect(client.discordPriceReportSetting.update).toHaveBeenCalledWith({
+      where: {
+        id: "setting-1",
+      },
+      data: {
+        lastSentAt: new Date("2026-06-07T05:00:00.000Z"),
+        nextSendAt: new Date("2026-06-08T05:00:00.000Z"),
       },
     });
   });
@@ -282,6 +455,21 @@ interface TestSnapshot {
   price: number;
   currency: string;
   capturedAt: Date;
+}
+
+interface TestPriceReportSetting {
+  id: string;
+  discordUserId: string;
+  interval: "DAILY" | "EVERY_12H" | "EVERY_6H";
+  window: "HOURS_24" | "HOURS_12" | "HOURS_6";
+  scope: "ALL" | "WATCHLIST";
+  timezone: string;
+  maxItems: number;
+  enabled: boolean;
+  nextSendAt: Date | null;
+  lastSentAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 function snapshot({
@@ -312,12 +500,55 @@ function snapshot({
   };
 }
 
-function createDiscordBotClient(snapshots: TestSnapshot[]): DiscordBotClient & {
+function priceReportSetting({
+  id,
+  discordUserId,
+  nextSendAt,
+  interval = "DAILY",
+  window = "HOURS_24",
+  maxItems = 50,
+  enabled = true,
+}: {
+  id: string;
+  discordUserId: string;
+  nextSendAt: Date | null;
+  interval?: TestPriceReportSetting["interval"];
+  window?: TestPriceReportSetting["window"];
+  maxItems?: number;
+  enabled?: boolean;
+}): TestPriceReportSetting {
+  return {
+    id,
+    discordUserId,
+    interval,
+    window,
+    scope: "ALL",
+    timezone: "Asia/Taipei",
+    maxItems,
+    enabled,
+    nextSendAt,
+    lastSentAt: null,
+    createdAt: new Date("2026-06-07T00:00:00.000Z"),
+    updatedAt: new Date("2026-06-07T00:00:00.000Z"),
+  };
+}
+
+function createDiscordBotClient(
+  snapshots: TestSnapshot[],
+  settings: TestPriceReportSetting[] = [],
+): DiscordBotClient & {
   priceSnapshot: {
     findMany: ReturnType<typeof vi.fn>;
   };
   discordNotificationDelivery: {
     create: ReturnType<typeof vi.fn>;
+  };
+  discordPriceReportSetting: {
+    findMany: ReturnType<typeof vi.fn>;
+    findUnique: ReturnType<typeof vi.fn>;
+    update: ReturnType<typeof vi.fn>;
+    updateMany: ReturnType<typeof vi.fn>;
+    upsert: ReturnType<typeof vi.fn>;
   };
 } {
   const findMany = vi.fn(async (args: { where: Record<string, unknown> }) => {
@@ -360,6 +591,86 @@ function createDiscordBotClient(snapshots: TestSnapshot[]): DiscordBotClient & {
         capturedAt: snapshot.capturedAt,
       }));
   });
+  const settingRows = [...settings];
+  const settingFindMany = vi.fn(async (args: { where: { nextSendAt?: { lte: Date }; enabled?: boolean } }) => {
+    const nextSendAtLte = args.where.nextSendAt?.lte;
+
+    return settingRows.filter((setting) => {
+      if (args.where.enabled !== undefined && setting.enabled !== args.where.enabled) {
+        return false;
+      }
+
+      return (
+        !nextSendAtLte ||
+        (setting.nextSendAt !== null && setting.nextSendAt.getTime() <= nextSendAtLte.getTime())
+      );
+    });
+  });
+  const settingFindUnique = vi.fn(async (args: { where: { discordUserId: string } }) => {
+    return settingRows.find((setting) => setting.discordUserId === args.where.discordUserId) ?? null;
+  });
+  const settingUpdate = vi.fn(async (args: { where: { id: string }; data: Partial<TestPriceReportSetting> }) => {
+    const setting = settingRows.find((row) => row.id === args.where.id);
+
+    if (!setting) {
+      throw new Error("Setting not found.");
+    }
+
+    Object.assign(setting, args.data);
+    return setting;
+  });
+  const settingUpdateMany = vi.fn(
+    async (args: { where: { discordUserId: string; enabled?: boolean }; data: Partial<TestPriceReportSetting> }) => {
+      let count = 0;
+
+      for (const setting of settingRows) {
+        if (
+          setting.discordUserId === args.where.discordUserId &&
+          (args.where.enabled === undefined || setting.enabled === args.where.enabled)
+        ) {
+          Object.assign(setting, args.data);
+          count += 1;
+        }
+      }
+
+      return { count };
+    },
+  );
+  const settingUpsert = vi.fn(
+    async (args: {
+      where: { discordUserId: string };
+      create: Pick<
+        TestPriceReportSetting,
+        | "discordUserId"
+        | "interval"
+        | "window"
+        | "scope"
+        | "timezone"
+        | "maxItems"
+        | "enabled"
+        | "nextSendAt"
+      >;
+      update: Partial<TestPriceReportSetting>;
+    }) => {
+      const existing = settingRows.find((setting) => setting.discordUserId === args.where.discordUserId);
+
+      if (existing) {
+        Object.assign(existing, args.update);
+        return existing;
+      }
+
+      const created = {
+        id: "setting-created",
+        lastSentAt: null,
+        createdAt: new Date("2026-06-07T00:00:00.000Z"),
+        updatedAt: new Date("2026-06-07T00:00:00.000Z"),
+        ...args.create,
+      };
+      settingRows.push(created);
+
+      return created;
+    },
+  );
 
   return {
     priceSnapshot: {
@@ -368,12 +679,26 @@ function createDiscordBotClient(snapshots: TestSnapshot[]): DiscordBotClient & {
     discordNotificationDelivery: {
       create: vi.fn(async () => ({ id: "delivery-1" })),
     },
+    discordPriceReportSetting: {
+      findMany: settingFindMany,
+      findUnique: settingFindUnique,
+      update: settingUpdate,
+      updateMany: settingUpdateMany,
+      upsert: settingUpsert,
+    },
   } as unknown as DiscordBotClient & {
     priceSnapshot: {
       findMany: ReturnType<typeof vi.fn>;
     };
     discordNotificationDelivery: {
       create: ReturnType<typeof vi.fn>;
+    };
+    discordPriceReportSetting: {
+      findMany: ReturnType<typeof vi.fn>;
+      findUnique: ReturnType<typeof vi.fn>;
+      update: ReturnType<typeof vi.fn>;
+      updateMany: ReturnType<typeof vi.fn>;
+      upsert: ReturnType<typeof vi.fn>;
     };
   };
 }

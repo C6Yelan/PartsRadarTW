@@ -508,7 +508,7 @@ smoke Discord notification policy 行為：
 
 ## Discord Bot Personalized Notifications
 
-Discord bot foundation 已開始實作，並和 webhook foundation 分開。Webhook 只做公開價格變動廣播與 admin smoke 告警；Discord bot 才處理使用者 slash command 與個人化通知。手動報告會回覆在指令發出的 Discord context；未來含個人追蹤設定的排程報告與目標價提醒需另行定義 DM 或發送目標。
+Discord bot foundation 已開始實作，並和 webhook foundation 分開。Webhook 只做公開價格變動廣播與 admin smoke 告警；Discord bot 才處理使用者 slash command 與個人化通知。手動報告會回覆在指令發出的 Discord context；每日價格提醒以 DM 發送。
 
 Bot 目標：
 
@@ -519,16 +519,17 @@ Bot 目標：
 
 - `discord-bot` Compose profile 與 `pnpm ops:discord-bot` daemon entrypoint。
 - Discord slash command registration。
-- `/price-report now`：使用者手動要求最近 `24h` / `12h` / `6h` 價格報告，bot 會在指令發出的頻道或私訊 context 回覆中文報告。
-- `/price-report now` 報告分成「價格變動」與「新增商品」兩區；沒有資料時分區顯示空狀態。
+- `/price-report now`：使用者手動要求最近 `24h` / `12h` / `6h` 價格報告，bot 會在指令發出的頻道或私訊 context 以 embed 回覆中文報告。
+- Slash command 會註冊 global command 供 DM 使用；若設定 `DISCORD_GUILD_ID`，也會額外註冊 guild command 方便伺服器測試。
+- `/price-report now` 報告分成「價格變動」與「新增商品」兩個 embed 欄位；沒有資料時分區顯示空狀態。
 - `/price-report now` 每次最多列 `DISCORD_PRICE_REPORT_MAX_ITEMS` 筆，預設 50；上限套用在兩區合計列出的商品數。
 - 每次 `/price-report now` 會寫入 `discord_notification_deliveries`，供後續去重、排程與維運檢視使用。
+- `/price-report enable [window] [max_items]`：開啟每日價格報告 DM；第一輪每日提醒採啟用後每 24 小時發送一次，不提供指定每日幾點。
+- `/price-report disable`：關閉每日價格報告 DM。
+- `/price-report settings`：查看每日價格報告設定。
 
 尚未實作：
 
-- `/price-report enable <interval> <window> [scope]`
-- `/price-report disable`
-- `/price-report settings`
 - `/watch <商品連結或商品ID> <目標價格>`
 - `/watchlist`
 - `/unwatch <watch_id>`
@@ -541,6 +542,7 @@ Bot 目標：
 - `DISCORD_BOT_REGISTER_COMMANDS_ON_START`：daemon 啟動時是否註冊 slash command，預設 `true`。
 - `DISCORD_PRICE_REPORT_MAX_ITEMS`：`/price-report now` 最多列出的商品數，預設 50。
 - `DISCORD_BOT_COMMAND_COOLDOWN_SECONDS`：每位使用者手動指令 cooldown，預設 60。
+- `DISCORD_PRICE_REPORT_SCHEDULE_INTERVAL_SECONDS`：bot daemon 檢查 due 每日報告設定的間隔，預設 300，允許 60 到 3600。
 
 啟動：
 
@@ -557,11 +559,11 @@ docker compose --profile discord-bot run --rm discord-bot \
   pnpm --filter @partsradar/crawler ops:discord-bot -- --register-commands
 ```
 
-已定案但尚未完整實作的第一輪限制：
+已定案的第一輪限制：
 
-- `interval` 只支援 `daily`、`every_12h`、`every_6h`。
+- 目前指令只開放每日報告；資料模型保留 `daily`、`every_12h`、`every_6h` 供後續擴充。
 - `window` 只支援 `24h`、`12h`、`6h`。
-- `scope` 支援 `all` 與 `watchlist`，預設 `all`。
+- 目前只支援全站 `all`；`watchlist` scope 等 `/watch` 系列完成後再開放。
 - 時區固定 `Asia/Taipei`。
 - Price report 每次最多列 50 筆，超過上限時顯示另有幾筆未列出。
 - `/watch` 第一版支援 PartsRadarTW 商品 URL 或站內商品 ID，不以原價屋 iBuy URL 作為主流程。
@@ -569,7 +571,7 @@ docker compose --profile discord-bot run --rm discord-bot \
 
 安全邊界：
 
-- `/price-report now` 只產生全站價格報告，可在指令所在頻道或私訊回覆；含個人追蹤清單或目標價設定的通知不得在公開頻道暴露。
+- `/price-report now` 只產生全站價格報告，可在指令所在頻道或私訊回覆；每日提醒與未來含個人追蹤清單或目標價設定的通知不得在公開頻道暴露。
 - Bot 只保存 Discord user id 與必要偏好，不建立網站帳號。
 - Bot token 只能放在 untracked `.env` 或部署 secret。
 - Bot 訊息不得包含 iBuy token、來源購買 URL、raw HTML、crawler error detail、DB/internal URL、raw IP 或 internal headers。

@@ -1,10 +1,12 @@
 // apps/crawler/src/scripts/ops/discord-bot.ts
-import type { PrismaClient } from "@partsradar/db";
+import type { DiscordPriceReportSetting, PrismaClient } from "@partsradar/db";
 import {
-  createPersonalPriceReportMessages,
   normalizePublicBaseUrl,
   readRecentPriceReport,
   type PriceChangeDiscordClient,
+  type PriceChangeDiscordNotificationItem,
+  type PriceReportNewProductItem,
+  type RecentPriceReport,
 } from "./price-change-discord-notification";
 import {
   getStringArg,
@@ -19,7 +21,11 @@ const DEFAULT_PUBLIC_BASE_URL = "https://partsradar.net";
 const DEFAULT_PRICE_REPORT_MAX_ITEMS = 50;
 const MAX_PRICE_REPORT_ITEMS = 50;
 const DEFAULT_COMMAND_COOLDOWN_SECONDS = 60;
+const DEFAULT_PRICE_REPORT_SCHEDULE_INTERVAL_SECONDS = 300;
+const MAX_DUE_PRICE_REPORT_SETTINGS_PER_CYCLE = 25;
 const HOUR_MS = 60 * 60 * 1000;
+const DAY_MS = 24 * HOUR_MS;
+const TIME_ZONE = "Asia/Taipei";
 const DISCORD_EPHEMERAL_MESSAGE_FLAG = 64;
 const DISCORD_COMMAND_TYPE_CHAT_INPUT = 1;
 const DISCORD_OPTION_TYPE_SUBCOMMAND = 1;
@@ -28,6 +34,16 @@ const DISCORD_OPTION_TYPE_INTEGER = 4;
 const DISCORD_INTERACTION_TYPE_APPLICATION_COMMAND = 2;
 const DISCORD_INTERACTION_CALLBACK_CHANNEL_MESSAGE = 4;
 const DISCORD_INTERACTION_CALLBACK_DEFERRED_CHANNEL_MESSAGE = 5;
+const DISCORD_APPLICATION_CONTEXT_GUILD = 0;
+const DISCORD_APPLICATION_CONTEXT_BOT_DM = 1;
+const DISCORD_EMBED_COLOR = 0x2563eb;
+const DISCORD_EMBED_MAX_FIELDS = 25;
+const DISCORD_EMBED_FIELD_VALUE_MAX_LENGTH = 1024;
+const DISCORD_EMBED_TITLE_MAX_LENGTH = 256;
+const DISCORD_EMBED_DESCRIPTION_MAX_LENGTH = 4096;
+const DISCORD_EMBED_FOOTER_TEXT_MAX_LENGTH = 2048;
+const DISCORD_MESSAGE_CONTENT_MAX_LENGTH = 2000;
+const PRODUCT_NAME_MAX_LENGTH = 96;
 const GATEWAY_OP_DISPATCH = 0;
 const GATEWAY_OP_HEARTBEAT = 1;
 const GATEWAY_OP_IDENTIFY = 2;
@@ -50,10 +66,33 @@ export interface DiscordBotOptions {
   registerCommandsOnStart: boolean;
   priceReportMaxItems: number;
   commandCooldownSeconds: number;
+  priceReportScheduleIntervalSeconds: number;
 }
 
 export type DiscordBotClient = PriceChangeDiscordClient &
-  Pick<PrismaClient, "discordNotificationDelivery">;
+  Pick<PrismaClient, "discordNotificationDelivery" | "discordPriceReportSetting">;
+
+export interface DiscordBotEmbedField {
+  name: string;
+  value: string;
+  inline?: boolean;
+}
+
+export interface DiscordBotEmbed {
+  title?: string;
+  description?: string;
+  color?: number;
+  fields?: DiscordBotEmbedField[];
+  footer?: {
+    text: string;
+  };
+  timestamp?: string;
+}
+
+export interface DiscordBotMessage {
+  content?: string;
+  embeds?: DiscordBotEmbed[];
+}
 
 export type DiscordDirectMessageSendResult =
   | {
@@ -195,6 +234,24 @@ interface CommandCooldownResult {
   retryAfterSeconds: number;
 }
 
+type ParsedPriceReportCommand =
+  | {
+      name: "now";
+      windowHours: number;
+      maxItems: number | null;
+    }
+  | {
+      name: "enable";
+      windowHours: number;
+      maxItems: number | null;
+    }
+  | {
+      name: "disable";
+    }
+  | {
+      name: "settings";
+    };
+
 export function parseDiscordBotOptions(
   args: string[],
   env: NodeJS.ProcessEnv = process.env,
@@ -234,6 +291,15 @@ export function parseDiscordBotOptions(
       min: 0,
       max: 3600,
     }),
+    priceReportScheduleIntervalSeconds: parseIntegerOption({
+      args,
+      env,
+      argName: "--price-report-schedule-interval-seconds",
+      envName: "DISCORD_PRICE_REPORT_SCHEDULE_INTERVAL_SECONDS",
+      fallback: DEFAULT_PRICE_REPORT_SCHEDULE_INTERVAL_SECONDS,
+      min: 60,
+      max: 3600,
+    }),
   };
 }
 
@@ -246,18 +312,29 @@ export async function registerDiscordBotCommands({
 }: Pick<DiscordBotOptions, "token" | "applicationId" | "guildId" | "apiBaseUrl"> & {
   fetchImpl?: FetchImpl;
 }): Promise<DiscordRestResult<unknown>> {
-  const path = guildId
-    ? `/applications/${applicationId}/guilds/${guildId}/commands`
-    : `/applications/${applicationId}/commands`;
-
-  return sendDiscordRestRequest<unknown>({
+  const globalResult = await sendDiscordRestRequest<unknown>({
     token,
     apiBaseUrl,
     fetchImpl,
     method: "PUT",
-    path,
-    body: [createPriceReportCommand()],
+    path: `/applications/${applicationId}/commands`,
+    body: [createPriceReportCommand({ includeDmContexts: true })],
   });
+
+  if (globalResult.status !== "ok" || !guildId) {
+    return globalResult;
+  }
+
+  const guildResult = await sendDiscordRestRequest<unknown>({
+    token,
+    apiBaseUrl,
+    fetchImpl,
+    method: "PUT",
+    path: `/applications/${applicationId}/guilds/${guildId}/commands`,
+    body: [createPriceReportCommand({ includeDmContexts: false })],
+  });
+
+  return guildResult;
 }
 
 export async function sendPriceReportNow({
@@ -275,25 +352,61 @@ export async function sendPriceReportNow({
   maxItems: number;
   publicBaseUrl: string;
   now?: Date;
-  sendReportMessages: (contents: string[]) => Promise<DiscordBotMessageSendResult>;
+  sendReportMessages: (messages: DiscordBotMessage[]) => Promise<DiscordBotMessageSendResult>;
+}): Promise<PriceReportNowResult> {
+  return sendPriceReport({
+    client,
+    discordUserId,
+    windowHours,
+    maxItems,
+    publicBaseUrl,
+    now,
+    deliveryKind: "PRICE_REPORT_NOW",
+    sendReportMessages,
+  });
+}
+
+async function sendPriceReport({
+  client,
+  discordUserId,
+  windowHours,
+  maxItems,
+  publicBaseUrl,
+  now,
+  deliveryKind,
+  sendReportMessages,
+}: {
+  client: DiscordBotClient;
+  discordUserId: string;
+  windowHours: number;
+  maxItems: number;
+  publicBaseUrl: string;
+  now: Date;
+  deliveryKind: "PRICE_REPORT_NOW" | "SCHEDULED_PRICE_REPORT";
+  sendReportMessages: (messages: DiscordBotMessage[]) => Promise<DiscordBotMessageSendResult>;
 }): Promise<PriceReportNowResult> {
   const since = new Date(now.getTime() - windowHours * HOUR_MS);
+  const boundedMaxItems = clampPriceReportMaxItems(maxItems);
   const report = await readRecentPriceReport(client, { since, until: now });
-  const listedCount = Math.min(report.priceChanges.length + report.newProducts.length, maxItems);
-  const contents = createPersonalPriceReportMessages(report, {
+  const listedCount = Math.min(
+    report.priceChanges.length + report.newProducts.length,
+    boundedMaxItems,
+  );
+  const messages = createPersonalPriceReportEmbedMessages(report, {
     publicBaseUrl,
-    maxItems,
+    maxItems: boundedMaxItems,
     windowHours,
     generatedAt: now,
   });
-  const result = await sendReportMessages(contents);
+  const result = await sendReportMessages(messages);
 
   await recordPriceReportDelivery({
     client,
     discordUserId,
+    kind: deliveryKind,
     status: result.status,
     itemCount: listedCount,
-    messageCount: contents.length,
+    messageCount: messages.length,
     deliveredAt: result.status === "sent" ? now : null,
     errorMessage: result.status === "failed" ? result.message : null,
   });
@@ -304,7 +417,7 @@ export async function sendPriceReportNow({
       changeCount: report.priceChanges.length,
       newProductCount: report.newProducts.length,
       listedCount,
-      messageCount: contents.length,
+      messageCount: messages.length,
     };
   }
 
@@ -314,7 +427,7 @@ export async function sendPriceReportNow({
       changeCount: report.priceChanges.length,
       newProductCount: report.newProducts.length,
       listedCount,
-      messageCount: contents.length,
+      messageCount: messages.length,
       sentMessageCount: result.sentMessageCount,
       retryAfterMs: result.retryAfterMs,
       global: result.global,
@@ -326,7 +439,7 @@ export async function sendPriceReportNow({
     changeCount: report.priceChanges.length,
     newProductCount: report.newProducts.length,
     listedCount,
-    messageCount: contents.length,
+    messageCount: messages.length,
     sentMessageCount: result.sentMessageCount,
     httpStatus: result.httpStatus,
     message: result.message,
@@ -337,13 +450,13 @@ export async function sendDiscordDirectMessages({
   token,
   apiBaseUrl,
   userId,
-  contents,
+  messages,
   fetchImpl = fetch,
 }: {
   token: string;
   apiBaseUrl: string;
   userId: string;
-  contents: string[];
+  messages: DiscordBotMessage[];
   fetchImpl?: FetchImpl;
 }): Promise<DiscordDirectMessageSendResult> {
   const channelResult = await sendDiscordRestRequest<DiscordDirectMessageChannel>({
@@ -360,7 +473,7 @@ export async function sendDiscordDirectMessages({
   if (channelResult.status === "rate_limited") {
     return {
       status: "rate_limited",
-      messageCount: contents.length,
+      messageCount: messages.length,
       sentMessageCount: 0,
       retryAfterMs: channelResult.retryAfterMs,
       global: channelResult.global,
@@ -370,7 +483,7 @@ export async function sendDiscordDirectMessages({
   if (channelResult.status === "failed") {
     return {
       status: "failed",
-      messageCount: contents.length,
+      messageCount: messages.length,
       sentMessageCount: 0,
       httpStatus: channelResult.httpStatus,
       message: channelResult.message,
@@ -382,7 +495,7 @@ export async function sendDiscordDirectMessages({
   if (!channelId) {
     return {
       status: "failed",
-      messageCount: contents.length,
+      messageCount: messages.length,
       sentMessageCount: 0,
       httpStatus: channelResult.httpStatus,
       message: "Discord API returned a DM channel without an id.",
@@ -391,14 +504,14 @@ export async function sendDiscordDirectMessages({
 
   const httpStatuses: number[] = [];
 
-  for (const content of contents) {
+  for (const message of messages) {
     const messageResult = await sendDiscordRestRequest<unknown>({
       token,
       apiBaseUrl,
       fetchImpl,
       method: "POST",
       path: `/channels/${channelId}/messages`,
-      body: createDiscordMessagePayload(content),
+      body: createDiscordMessagePayload(message),
     });
 
     if (messageResult.status === "ok") {
@@ -409,7 +522,7 @@ export async function sendDiscordDirectMessages({
     if (messageResult.status === "rate_limited") {
       return {
         status: "rate_limited",
-        messageCount: contents.length,
+        messageCount: messages.length,
         sentMessageCount: httpStatuses.length,
         retryAfterMs: messageResult.retryAfterMs,
         global: messageResult.global,
@@ -418,7 +531,7 @@ export async function sendDiscordDirectMessages({
 
     return {
       status: "failed",
-      messageCount: contents.length,
+      messageCount: messages.length,
       sentMessageCount: httpStatuses.length,
       httpStatus: messageResult.httpStatus,
       message: messageResult.message,
@@ -427,7 +540,7 @@ export async function sendDiscordDirectMessages({
 
   return {
     status: "sent",
-    messageCount: contents.length,
+    messageCount: messages.length,
     httpStatuses,
   };
 }
@@ -437,19 +550,19 @@ export async function sendDiscordInteractionMessages({
   applicationId,
   apiBaseUrl,
   interaction,
-  contents,
+  messages,
   fetchImpl = fetch,
 }: {
   token: string;
   applicationId: string;
   apiBaseUrl: string;
   interaction: DiscordInteraction;
-  contents: string[];
+  messages: DiscordBotMessage[];
   fetchImpl?: FetchImpl;
 }): Promise<DiscordBotMessageSendResult> {
   const httpStatuses: number[] = [];
 
-  for (const [index, content] of contents.entries()) {
+  for (const [index, message] of messages.entries()) {
     const path =
       index === 0
         ? `/webhooks/${applicationId}/${interaction.token}/messages/@original`
@@ -461,7 +574,7 @@ export async function sendDiscordInteractionMessages({
       fetchImpl,
       method,
       path,
-      body: createDiscordMessagePayload(content),
+      body: createDiscordMessagePayload(message),
     });
 
     if (messageResult.status === "ok") {
@@ -472,7 +585,7 @@ export async function sendDiscordInteractionMessages({
     if (messageResult.status === "rate_limited") {
       return {
         status: "rate_limited",
-        messageCount: contents.length,
+        messageCount: messages.length,
         sentMessageCount: httpStatuses.length,
         retryAfterMs: messageResult.retryAfterMs,
         global: messageResult.global,
@@ -481,7 +594,7 @@ export async function sendDiscordInteractionMessages({
 
     return {
       status: "failed",
-      messageCount: contents.length,
+      messageCount: messages.length,
       sentMessageCount: httpStatuses.length,
       httpStatus: messageResult.httpStatus,
       message: messageResult.message,
@@ -490,9 +603,157 @@ export async function sendDiscordInteractionMessages({
 
   return {
     status: "sent",
-    messageCount: contents.length,
+    messageCount: messages.length,
     httpStatuses,
   };
+}
+
+export async function enableDailyPriceReport({
+  client,
+  discordUserId,
+  windowHours,
+  maxItems,
+  now = new Date(),
+}: {
+  client: DiscordBotClient;
+  discordUserId: string;
+  windowHours: number;
+  maxItems: number;
+  now?: Date;
+}): Promise<DiscordPriceReportSetting> {
+  return client.discordPriceReportSetting.upsert({
+    where: {
+      discordUserId,
+    },
+    create: {
+      discordUserId,
+      interval: "DAILY",
+      window: toPriceReportWindow(windowHours),
+      scope: "ALL",
+      timezone: TIME_ZONE,
+      maxItems: clampPriceReportMaxItems(maxItems),
+      enabled: true,
+      nextSendAt: calculateNextSendAt(now, "DAILY"),
+    },
+    update: {
+      interval: "DAILY",
+      window: toPriceReportWindow(windowHours),
+      scope: "ALL",
+      timezone: TIME_ZONE,
+      maxItems: clampPriceReportMaxItems(maxItems),
+      enabled: true,
+      nextSendAt: calculateNextSendAt(now, "DAILY"),
+    },
+  });
+}
+
+export interface ScheduledPriceReportSummary {
+  processedCount: number;
+  sentCount: number;
+  rateLimitedCount: number;
+  failedCount: number;
+}
+
+export async function sendDueScheduledPriceReports({
+  client,
+  options,
+  now = new Date(),
+  sendDirectMessages,
+}: {
+  client: DiscordBotClient;
+  options: Pick<DiscordBotOptions, "publicBaseUrl" | "priceReportMaxItems">;
+  now?: Date;
+  sendDirectMessages: (
+    discordUserId: string,
+    messages: DiscordBotMessage[],
+  ) => Promise<DiscordBotMessageSendResult>;
+}): Promise<ScheduledPriceReportSummary> {
+  const settings = await client.discordPriceReportSetting.findMany({
+    where: {
+      enabled: true,
+      nextSendAt: {
+        lte: now,
+      },
+    },
+    orderBy: [{ nextSendAt: "asc" }, { id: "asc" }],
+    take: MAX_DUE_PRICE_REPORT_SETTINGS_PER_CYCLE,
+  });
+  const summary: ScheduledPriceReportSummary = {
+    processedCount: 0,
+    sentCount: 0,
+    rateLimitedCount: 0,
+    failedCount: 0,
+  };
+
+  for (const setting of settings) {
+    summary.processedCount += 1;
+
+    const result = await sendPriceReport({
+      client,
+      discordUserId: setting.discordUserId,
+      windowHours: toWindowHours(setting.window),
+      maxItems: clampPriceReportMaxItems(Math.min(setting.maxItems, options.priceReportMaxItems)),
+      publicBaseUrl: options.publicBaseUrl,
+      now,
+      deliveryKind: "SCHEDULED_PRICE_REPORT",
+      sendReportMessages: (messages) => sendDirectMessages(setting.discordUserId, messages),
+    });
+
+    if (result.status === "sent") {
+      summary.sentCount += 1;
+    } else if (result.status === "rate_limited") {
+      summary.rateLimitedCount += 1;
+    } else {
+      summary.failedCount += 1;
+    }
+
+    await client.discordPriceReportSetting.update({
+      where: {
+        id: setting.id,
+      },
+      data: {
+        lastSentAt: result.status === "sent" ? now : setting.lastSentAt,
+        nextSendAt: calculateNextSendAt(now, setting.interval),
+      },
+    });
+  }
+
+  return summary;
+}
+
+async function disablePriceReport({
+  client,
+  discordUserId,
+}: {
+  client: DiscordBotClient;
+  discordUserId: string;
+}): Promise<number> {
+  const result = await client.discordPriceReportSetting.updateMany({
+    where: {
+      discordUserId,
+      enabled: true,
+    },
+    data: {
+      enabled: false,
+      nextSendAt: null,
+    },
+  });
+
+  return result.count;
+}
+
+async function readPriceReportSetting({
+  client,
+  discordUserId,
+}: {
+  client: DiscordBotClient;
+  discordUserId: string;
+}): Promise<DiscordPriceReportSetting | null> {
+  return client.discordPriceReportSetting.findUnique({
+    where: {
+      discordUserId,
+    },
+  });
 }
 
 export async function handleDiscordInteraction({
@@ -512,7 +773,7 @@ export async function handleDiscordInteraction({
     return;
   }
 
-  const command = parsePriceReportNowInteraction(interaction);
+  const command = parsePriceReportInteraction(interaction);
 
   if (!command) {
     await sendInteractionResponse({
@@ -551,28 +812,72 @@ export async function handleDiscordInteraction({
     return;
   }
 
-  await deferInteractionResponse({
+  if (command.name === "now") {
+    await deferInteractionResponse({
+      token: options.token,
+      apiBaseUrl: options.apiBaseUrl,
+      interaction,
+      fetchImpl,
+    });
+
+    await sendPriceReportNow({
+      client,
+      discordUserId,
+      windowHours: command.windowHours,
+      maxItems: command.maxItems ?? options.priceReportMaxItems,
+      publicBaseUrl: options.publicBaseUrl,
+      sendReportMessages: (messages) =>
+        sendDiscordInteractionMessages({
+          token: options.token,
+          applicationId: options.applicationId,
+          apiBaseUrl: options.apiBaseUrl,
+          interaction,
+          messages,
+          fetchImpl,
+        }),
+    });
+    return;
+  }
+
+  if (command.name === "enable") {
+    const setting = await enableDailyPriceReport({
+      client,
+      discordUserId,
+      windowHours: command.windowHours,
+      maxItems: command.maxItems ?? options.priceReportMaxItems,
+    });
+
+    await sendInteractionResponse({
+      token: options.token,
+      apiBaseUrl: options.apiBaseUrl,
+      interaction,
+      fetchImpl,
+      content: `已開啟每日價格提醒。報告會以私訊發送，區間：${formatWindowLabel(setting.window)}，上限：${setting.maxItems} 筆，下一次：${formatTaipeiMinute(setting.nextSendAt)}。`,
+    });
+    return;
+  }
+
+  if (command.name === "disable") {
+    const disabledCount = await disablePriceReport({ client, discordUserId });
+
+    await sendInteractionResponse({
+      token: options.token,
+      apiBaseUrl: options.apiBaseUrl,
+      interaction,
+      fetchImpl,
+      content: disabledCount > 0 ? "已關閉每日價格提醒。" : "目前沒有開啟每日價格提醒。",
+    });
+    return;
+  }
+
+  const setting = await readPriceReportSetting({ client, discordUserId });
+
+  await sendInteractionResponse({
     token: options.token,
     apiBaseUrl: options.apiBaseUrl,
     interaction,
     fetchImpl,
-  });
-
-  await sendPriceReportNow({
-    client,
-    discordUserId,
-    windowHours: command.windowHours,
-    maxItems: command.maxItems ?? options.priceReportMaxItems,
-    publicBaseUrl: options.publicBaseUrl,
-    sendReportMessages: (contents) =>
-      sendDiscordInteractionMessages({
-        token: options.token,
-        applicationId: options.applicationId,
-        apiBaseUrl: options.apiBaseUrl,
-        interaction,
-        contents,
-        fetchImpl,
-      }),
+    content: formatPriceReportSettingMessage(setting),
   });
 }
 
@@ -603,7 +908,7 @@ export async function runDiscordBotDaemon({
     }
 
     logMessage(
-      `Discord bot commands registered. scope=${options.guildId ? "guild" : "global"} httpStatus=${result.httpStatus}`,
+      `Discord bot commands registered. scope=${options.guildId ? "global+guild" : "global"} httpStatus=${result.httpStatus}`,
     );
 
     if (options.registerCommands) {
@@ -613,6 +918,13 @@ export async function runDiscordBotDaemon({
 
   const shutdown = createShutdownController(logMessage);
   const cooldowns = new CommandCooldowns(options.commandCooldownSeconds);
+  const scheduledReportLoop = runScheduledPriceReportLoop({
+    client,
+    options,
+    shutdown,
+    fetchImpl,
+    logMessage,
+  });
 
   logMessage("Discord bot daemon started.");
 
@@ -633,7 +945,49 @@ export async function runDiscordBotDaemon({
     }
   }
 
+  await scheduledReportLoop;
   logMessage("Discord bot daemon stopped.");
+}
+
+async function runScheduledPriceReportLoop({
+  client,
+  options,
+  shutdown,
+  fetchImpl,
+  logMessage,
+}: {
+  client: DiscordBotClient;
+  options: DiscordBotOptions;
+  shutdown: ShutdownController;
+  fetchImpl: FetchImpl;
+  logMessage: (message: string) => void;
+}): Promise<void> {
+  while (!shutdown.requested) {
+    try {
+      const summary = await sendDueScheduledPriceReports({
+        client,
+        options,
+        sendDirectMessages: (discordUserId, messages) =>
+          sendDiscordDirectMessages({
+            token: options.token,
+            apiBaseUrl: options.apiBaseUrl,
+            userId: discordUserId,
+            messages,
+            fetchImpl,
+          }),
+      });
+
+      if (summary.processedCount > 0) {
+        logMessage(
+          `Scheduled price reports processed. processed=${summary.processedCount} sent=${summary.sentCount} rateLimited=${summary.rateLimitedCount} failed=${summary.failedCount}`,
+        );
+      }
+    } catch (error) {
+      logMessage(`Scheduled price report loop failed: ${toSafeCliErrorMessage(error)}`);
+    }
+
+    await shutdown.sleep(options.priceReportScheduleIntervalSeconds * 1000);
+  }
 }
 
 class CommandCooldowns {
@@ -774,6 +1128,7 @@ async function runGatewaySession({
 async function recordPriceReportDelivery({
   client,
   discordUserId,
+  kind,
   status,
   itemCount,
   messageCount,
@@ -782,6 +1137,7 @@ async function recordPriceReportDelivery({
 }: {
   client: DiscordBotClient;
   discordUserId: string;
+  kind: "PRICE_REPORT_NOW" | "SCHEDULED_PRICE_REPORT";
   status: DiscordDirectMessageSendResult["status"];
   itemCount: number;
   messageCount: number;
@@ -791,7 +1147,7 @@ async function recordPriceReportDelivery({
   await client.discordNotificationDelivery.create({
     data: {
       discordUserId,
-      kind: "PRICE_REPORT_NOW",
+      kind,
       status: status === "sent" ? "SENT" : status === "rate_limited" ? "RATE_LIMITED" : "FAILED",
       itemCount,
       messageCount,
@@ -801,21 +1157,31 @@ async function recordPriceReportDelivery({
   });
 }
 
-function createPriceReportCommand(): Record<string, unknown> {
+function createPriceReportCommand({
+  includeDmContexts,
+}: {
+  includeDmContexts: boolean;
+}): Record<string, unknown> {
   return {
     name: "price-report",
     description: "Send PartsRadarTW price change reports.",
     type: DISCORD_COMMAND_TYPE_CHAT_INPUT,
+    ...(includeDmContexts
+      ? {
+          contexts: [DISCORD_APPLICATION_CONTEXT_GUILD, DISCORD_APPLICATION_CONTEXT_BOT_DM],
+          dm_permission: true,
+        }
+      : {}),
     options: [
       {
         type: DISCORD_OPTION_TYPE_SUBCOMMAND,
         name: "now",
-        description: "Show a price change report here now.",
+        description: "立即在目前頻道或私訊顯示價格報告。",
         options: [
           {
             type: DISCORD_OPTION_TYPE_STRING,
             name: "window",
-            description: "Time window to include.",
+            description: "報告統計區間。",
             required: false,
             choices: [
               { name: "過去 24 小時", value: "24h" },
@@ -833,13 +1199,47 @@ function createPriceReportCommand(): Record<string, unknown> {
           },
         ],
       },
+      {
+        type: DISCORD_OPTION_TYPE_SUBCOMMAND,
+        name: "enable",
+        description: "開啟每日價格報告私訊。",
+        options: [
+          {
+            type: DISCORD_OPTION_TYPE_STRING,
+            name: "window",
+            description: "每天報告要統計的時間區間。",
+            required: false,
+            choices: [
+              { name: "過去 24 小時", value: "24h" },
+              { name: "過去 12 小時", value: "12h" },
+              { name: "過去 6 小時", value: "6h" },
+            ],
+          },
+          {
+            type: DISCORD_OPTION_TYPE_INTEGER,
+            name: "max_items",
+            description: "每天最多列出的商品數。",
+            required: false,
+            min_value: 1,
+            max_value: MAX_PRICE_REPORT_ITEMS,
+          },
+        ],
+      },
+      {
+        type: DISCORD_OPTION_TYPE_SUBCOMMAND,
+        name: "disable",
+        description: "關閉每日價格報告私訊。",
+      },
+      {
+        type: DISCORD_OPTION_TYPE_SUBCOMMAND,
+        name: "settings",
+        description: "查看每日價格報告設定。",
+      },
     ],
   };
 }
 
-function parsePriceReportNowInteraction(
-  interaction: DiscordInteraction,
-): { windowHours: number; maxItems: number | null } | null {
+function parsePriceReportInteraction(interaction: DiscordInteraction): ParsedPriceReportCommand | null {
   if (interaction.data?.name !== "price-report") {
     return null;
   }
@@ -848,17 +1248,28 @@ function parsePriceReportNowInteraction(
     (option) => option.type === DISCORD_OPTION_TYPE_SUBCOMMAND,
   );
 
-  if (subcommand?.name !== "now") {
+  if (!subcommand) {
     return null;
   }
 
   const windowOption = subcommand.options?.find((option) => option.name === "window");
   const maxItemsOption = subcommand.options?.find((option) => option.name === "max_items");
 
-  return {
-    windowHours: parseWindowHours(windowOption?.value),
-    maxItems: parseMaxItems(maxItemsOption?.value),
-  };
+  if (subcommand.name === "now" || subcommand.name === "enable") {
+    return {
+      name: subcommand.name,
+      windowHours: parseWindowHours(windowOption?.value),
+      maxItems: parseMaxItems(maxItemsOption?.value),
+    };
+  }
+
+  if (subcommand.name === "disable" || subcommand.name === "settings") {
+    return {
+      name: subcommand.name,
+    };
+  }
+
+  return null;
 }
 
 function parseWindowHours(value: unknown): number {
@@ -879,6 +1290,146 @@ function parseMaxItems(value: unknown): number | null {
   }
 
   return Math.min(Math.max(value, 1), MAX_PRICE_REPORT_ITEMS);
+}
+
+function createPersonalPriceReportEmbedMessages(
+  report: RecentPriceReport,
+  options: {
+    publicBaseUrl: string;
+    maxItems: number;
+    windowHours: number;
+    generatedAt: Date;
+  },
+): DiscordBotMessage[] {
+  const listedPriceChanges = report.priceChanges.slice(0, options.maxItems);
+  const remainingItemLimit = Math.max(0, options.maxItems - listedPriceChanges.length);
+  const listedNewProducts = report.newProducts.slice(0, remainingItemLimit);
+  const hiddenPriceChangeCount = report.priceChanges.length - listedPriceChanges.length;
+  const hiddenNewProductCount = report.newProducts.length - listedNewProducts.length;
+  const fields = [
+    ...createReportSectionFields({
+      title: `價格變動 (${report.priceChanges.length})`,
+      emptyText: "沒有價格變動。",
+      lines: listedPriceChanges.map((change) =>
+        formatPersonalPriceChangeEmbedLine(change, options.publicBaseUrl),
+      ),
+    }),
+    ...createReportSectionFields({
+      title: `新增商品 (${report.newProducts.length})`,
+      emptyText: "沒有新增商品。",
+      lines: listedNewProducts.map((product) =>
+        formatNewProductEmbedLine(product, options.publicBaseUrl),
+      ),
+    }),
+  ];
+  const fieldChunks = chunkArray(fields, DISCORD_EMBED_MAX_FIELDS);
+  const footer = formatHiddenReportFooter({
+    hiddenPriceChangeCount,
+    hiddenNewProductCount,
+  });
+  const chunks = fieldChunks.length > 0 ? fieldChunks : [[{ name: "價格報告", value: "沒有資料。" }]];
+
+  return chunks.map((chunk, index) => ({
+    embeds: [
+      {
+        title:
+          chunks.length > 1
+            ? `PartsRadarTW 價格報告 (${index + 1}/${chunks.length})`
+            : "PartsRadarTW 價格報告",
+        description: formatDiscordBotText(
+          `過去 ${options.windowHours} 小時：價格變動 ${report.priceChanges.length}，新增商品 ${report.newProducts.length}`,
+          DISCORD_EMBED_DESCRIPTION_MAX_LENGTH,
+        ),
+        color: DISCORD_EMBED_COLOR,
+        fields: chunk,
+        footer: footer ? { text: footer } : undefined,
+        timestamp: options.generatedAt.toISOString(),
+      },
+    ],
+  }));
+}
+
+function createReportSectionFields({
+  title,
+  emptyText,
+  lines,
+}: {
+  title: string;
+  emptyText: string;
+  lines: string[];
+}): DiscordBotEmbedField[] {
+  if (lines.length === 0) {
+    return [
+      {
+        name: title,
+        value: emptyText,
+      },
+    ];
+  }
+
+  return chunkFieldValueLines(lines).map((value, index) => ({
+    name: index === 0 ? title : `${title} 續`,
+    value,
+  }));
+}
+
+function chunkFieldValueLines(lines: string[]): string[] {
+  const chunks: string[] = [];
+  let current = "";
+
+  for (const line of lines) {
+    const next = current ? `${current}\n${line}` : line;
+
+    if (current && next.length > DISCORD_EMBED_FIELD_VALUE_MAX_LENGTH) {
+      chunks.push(current);
+      current = line;
+      continue;
+    }
+
+    current = next;
+  }
+
+  if (current) {
+    chunks.push(current);
+  }
+
+  return chunks;
+}
+
+function formatPersonalPriceChangeEmbedLine(
+  change: PriceChangeDiscordNotificationItem,
+  publicBaseUrl: string,
+): string {
+  const productName = escapeMarkdownLinkText(
+    formatDiscordBotText(toSingleLine(change.productName), PRODUCT_NAME_MAX_LENGTH),
+  );
+  const productUrl = createProductUrl(publicBaseUrl, change.productId);
+
+  return formatDiscordBotText(
+    `- [${productName}](${productUrl}) ${formatTaiwanDollar(
+      change.previousPrice,
+      change.currency,
+    )} -> ${formatTaiwanDollar(change.currentPrice, change.currency)} (${formatSignedTaiwanDollar(
+      change.delta,
+      change.currency,
+    )})`,
+    280,
+  );
+}
+
+function formatNewProductEmbedLine(
+  product: PriceReportNewProductItem,
+  publicBaseUrl: string,
+): string {
+  const productName = escapeMarkdownLinkText(
+    formatDiscordBotText(toSingleLine(product.productName), PRODUCT_NAME_MAX_LENGTH),
+  );
+  const productUrl = createProductUrl(publicBaseUrl, product.productId);
+
+  return formatDiscordBotText(
+    `- [${productName}](${productUrl}) ${formatTaiwanDollar(product.currentPrice, product.currency)}`,
+    240,
+  );
 }
 
 async function sendInteractionResponse({
@@ -933,13 +1484,71 @@ async function deferInteractionResponse({
   });
 }
 
-function createDiscordMessagePayload(content: string, ephemeral = false): Record<string, unknown> {
+function createDiscordMessagePayload(
+  message: DiscordBotMessage | string,
+  ephemeral = false,
+): Record<string, unknown> {
+  const normalizedMessage = normalizeDiscordBotMessage(message);
+
   return {
-    content: formatDiscordBotText(content, 2000),
+    content: normalizedMessage.content,
+    embeds: normalizedMessage.embeds,
     flags: ephemeral ? DISCORD_EPHEMERAL_MESSAGE_FLAG : undefined,
     allowed_mentions: {
       parse: [],
     },
+  };
+}
+
+function normalizeDiscordBotMessage(message: DiscordBotMessage | string): DiscordBotMessage {
+  if (typeof message === "string") {
+    return {
+      content: formatDiscordBotText(message, DISCORD_MESSAGE_CONTENT_MAX_LENGTH),
+    };
+  }
+
+  const content =
+    typeof message.content === "string"
+      ? formatDiscordBotText(message.content, DISCORD_MESSAGE_CONTENT_MAX_LENGTH)
+      : undefined;
+  const embeds = message.embeds?.map(normalizeDiscordBotEmbed).filter((embed) => {
+    return Boolean(embed.title || embed.description || (embed.fields && embed.fields.length > 0));
+  });
+
+  if (!content && (!embeds || embeds.length === 0)) {
+    return {
+      content: "價格報告目前沒有可顯示內容。",
+    };
+  }
+
+  return {
+    content,
+    embeds: embeds && embeds.length > 0 ? embeds : undefined,
+  };
+}
+
+function normalizeDiscordBotEmbed(embed: DiscordBotEmbed): DiscordBotEmbed {
+  return {
+    title:
+      typeof embed.title === "string"
+        ? formatDiscordBotText(embed.title, DISCORD_EMBED_TITLE_MAX_LENGTH)
+        : undefined,
+    description:
+      typeof embed.description === "string"
+        ? formatDiscordBotText(embed.description, DISCORD_EMBED_DESCRIPTION_MAX_LENGTH)
+        : undefined,
+    color: typeof embed.color === "number" ? embed.color : undefined,
+    fields: embed.fields?.slice(0, DISCORD_EMBED_MAX_FIELDS).map((field) => ({
+      name: formatDiscordBotText(field.name, DISCORD_EMBED_TITLE_MAX_LENGTH),
+      value: formatDiscordBotText(field.value, DISCORD_EMBED_FIELD_VALUE_MAX_LENGTH),
+      inline: field.inline,
+    })),
+    footer: embed.footer
+      ? {
+          text: formatDiscordBotText(embed.footer.text, DISCORD_EMBED_FOOTER_TEXT_MAX_LENGTH),
+        }
+      : undefined,
+    timestamp: embed.timestamp,
   };
 }
 
@@ -1287,6 +1896,128 @@ function formatDiscordRestFailure(
   )}`;
 }
 
+function calculateNextSendAt(now: Date, interval: DiscordPriceReportSetting["interval"]): Date {
+  const intervalMs =
+    interval === "EVERY_6H" ? 6 * HOUR_MS : interval === "EVERY_12H" ? 12 * HOUR_MS : DAY_MS;
+
+  return new Date(now.getTime() + intervalMs);
+}
+
+function toPriceReportWindow(windowHours: number): DiscordPriceReportSetting["window"] {
+  if (windowHours === 6) {
+    return "HOURS_6";
+  }
+
+  if (windowHours === 12) {
+    return "HOURS_12";
+  }
+
+  return "HOURS_24";
+}
+
+function toWindowHours(window: DiscordPriceReportSetting["window"]): number {
+  if (window === "HOURS_6") {
+    return 6;
+  }
+
+  if (window === "HOURS_12") {
+    return 12;
+  }
+
+  return 24;
+}
+
+function clampPriceReportMaxItems(value: number): number {
+  return Math.min(Math.max(value, 1), MAX_PRICE_REPORT_ITEMS);
+}
+
+function formatPriceReportSettingMessage(setting: DiscordPriceReportSetting | null): string {
+  if (!setting?.enabled) {
+    return "尚未開啟每日價格提醒。使用 `/price-report enable` 可開啟每日私訊報告。";
+  }
+
+  return [
+    "每日價格提醒已開啟。",
+    `統計區間：${formatWindowLabel(setting.window)}`,
+    `每次最多：${setting.maxItems} 筆`,
+    `下一次：${formatTaipeiMinute(setting.nextSendAt)}`,
+  ].join("\n");
+}
+
+function formatWindowLabel(window: DiscordPriceReportSetting["window"]): string {
+  return `過去 ${toWindowHours(window)} 小時`;
+}
+
+function formatTaipeiMinute(value: Date | null): string {
+  if (!value) {
+    return "尚未排程";
+  }
+
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: TIME_ZONE,
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    hourCycle: "h23",
+  }).formatToParts(value);
+  const byType = new Map(parts.map((part) => [part.type, part.value]));
+
+  return `${byType.get("month")}/${byType.get("day")} ${byType.get("hour")}:${byType.get("minute")} GMT+8`;
+}
+
+function formatTaiwanDollar(amount: number, currency: string): string {
+  if (currency === "TWD") {
+    return `NT$${amount.toLocaleString("en-US")}`;
+  }
+
+  return `${currency} ${amount.toLocaleString("en-US")}`;
+}
+
+function formatSignedTaiwanDollar(amount: number, currency: string): string {
+  const sign = amount > 0 ? "+" : "-";
+
+  return `${sign}${formatTaiwanDollar(Math.abs(amount), currency)}`;
+}
+
+function formatHiddenReportFooter({
+  hiddenPriceChangeCount,
+  hiddenNewProductCount,
+}: {
+  hiddenPriceChangeCount: number;
+  hiddenNewProductCount: number;
+}): string | null {
+  const parts = [
+    hiddenPriceChangeCount > 0 ? `另有 ${hiddenPriceChangeCount} 筆價格變動未列出` : null,
+    hiddenNewProductCount > 0 ? `另有 ${hiddenNewProductCount} 個新增商品未列出` : null,
+  ].filter((part): part is string => Boolean(part));
+
+  return parts.length > 0 ? parts.join("，") : null;
+}
+
+function createProductUrl(publicBaseUrl: string, productId: string): string {
+  return new URL(`/products/${productId}`, publicBaseUrl).toString();
+}
+
+function toSingleLine(value: string): string {
+  return value.replace(/\s+/g, " ").trim();
+}
+
+function escapeMarkdownLinkText(value: string): string {
+  return value.replace(/([\\[\]])/g, "\\$1");
+}
+
+function chunkArray<T>(values: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+
+  for (let index = 0; index < values.length; index += size) {
+    chunks.push(values.slice(index, index + size));
+  }
+
+  return chunks;
+}
+
 function formatDiscordBotText(value: string, maxLength: number): string {
   const text = replaceControlCharacters(value);
 
@@ -1318,16 +2049,20 @@ function printHelp(): void {
 Options:
   --register-commands         Register slash commands and exit.
   --price-report-max-items <n>
-                              Maximum rows in /price-report now DMs.
+                              Maximum rows in price report messages.
                               Default: ${DEFAULT_PRICE_REPORT_MAX_ITEMS}, range: 1-${MAX_PRICE_REPORT_ITEMS}
   --command-cooldown-seconds <sec>
                               Per-user cooldown for bot commands.
                               Default: ${DEFAULT_COMMAND_COOLDOWN_SECONDS}, range: 0-3600
+  --price-report-schedule-interval-seconds <sec>
+                              Delay between scheduled price report checks.
+                              Default: ${DEFAULT_PRICE_REPORT_SCHEDULE_INTERVAL_SECONDS}, range: 60-3600
 
 Environment:
   DISCORD_BOT_TOKEN, DISCORD_APPLICATION_ID, DISCORD_GUILD_ID,
   DISCORD_BOT_REGISTER_COMMANDS_ON_START, DISCORD_PRICE_REPORT_MAX_ITEMS,
-  DISCORD_BOT_COMMAND_COOLDOWN_SECONDS, PARTSRADAR_PUBLIC_BASE_URL
+  DISCORD_BOT_COMMAND_COOLDOWN_SECONDS, DISCORD_PRICE_REPORT_SCHEDULE_INTERVAL_SECONDS,
+  PARTSRADAR_PUBLIC_BASE_URL
 `);
 }
 
@@ -1351,7 +2086,7 @@ async function main(): Promise<void> {
     }
 
     log(
-      `Discord bot commands registered. scope=${options.guildId ? "guild" : "global"} httpStatus=${result.httpStatus}`,
+      `Discord bot commands registered. scope=${options.guildId ? "global+guild" : "global"} httpStatus=${result.httpStatus}`,
     );
     return;
   }

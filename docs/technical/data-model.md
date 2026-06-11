@@ -143,7 +143,7 @@ product_list_view
 
 ## Discord Bot Notification Tables
 
-Discord bot 只保存 Discord user id 與必要偏好，不建立網站帳號，也不把 Discord id 綁到網站使用者。手動 `/price-report now` 回覆在指令所在 Discord context；後續定期報告若要支援頻道或 DM 目標，需在實作時明確保存發送目標。
+Discord bot 只保存 Discord user id 與必要偏好，不建立網站帳號，也不把 Discord id 綁到網站使用者。手動 `/price-report now` 回覆在指令所在 Discord context；每日價格報告以 Discord user id 建立 DM 發送。
 
 `discord_price_report_settings` 保存：
 
@@ -180,8 +180,8 @@ Discord bot 只保存 Discord user id 與必要偏好，不建立網站帳號，
 
 規則：
 
-- `/price-report now` 目前會寫入 delivery log，但不建立 price report setting。
-- 定期 price report 之後才會讀寫 `discord_price_report_settings`。
+- `/price-report now` 會寫入 delivery log，但不建立 price report setting。
+- `/price-report enable` / `disable` / `settings` 讀寫 `discord_price_report_settings`；第一輪只由指令建立每日 DM 報告，不提供指定每日幾點。
 - `/watch` 系列之後才會讀寫 `discord_target_price_watches`。
 - `error_message` 只保存安全摘要，不保存 token、source URL、raw HTML、DB URL、internal headers 或 raw IP。
 

@@ -6,7 +6,6 @@ import type {
 } from "../../../src/scripts/ops/discord-webhook";
 import {
   createPriceChangeDiscordMessages,
-  createPersonalPriceReportMessages,
   createPriceChangeReportMessages,
   parsePriceChangeDiscordNotificationOptions,
   readCrawlRunPriceChanges,
@@ -363,60 +362,6 @@ describe("createPriceChangeReportMessages", () => {
         title: "PartsRadarTW price report - past 24h",
       }),
     ).toEqual(["PartsRadarTW price report - past 24h\nNo price changes found."]);
-  });
-});
-
-describe("createPersonalPriceReportMessages", () => {
-  it("creates a Chinese two-section price report", () => {
-    const messages = createPersonalPriceReportMessages(
-      {
-        priceChanges: [change({ productId: "gpu", productName: "GPU A", delta: -500 })],
-        newProducts: [
-          {
-            productId: "ssd",
-            productName: "SSD B",
-            currentPrice: 2490,
-            currency: "TWD",
-            firstSeenAt: new Date("2026-06-07T03:00:00.000Z"),
-          },
-        ],
-      },
-      {
-        publicBaseUrl: PUBLIC_BASE_URL,
-        maxItems: 50,
-        windowHours: 24,
-        generatedAt: new Date("2026-06-07T05:00:00.000Z"),
-      },
-    );
-
-    expect(messages).toHaveLength(1);
-    expect(messages[0]).toContain("PartsRadarTW 價格報告 - 過去 24 小時");
-    expect(messages[0]).toContain("價格變動");
-    expect(messages[0]).toContain("找到 1 筆價格變動。");
-    expect(messages[0]).toContain(
-      "1. [GPU A](https://partsradar.test/products/gpu) - NT$10,000 -> NT$9,500（-NT$500）",
-    );
-    expect(messages[0]).toContain("新增商品");
-    expect(messages[0]).toContain("找到 1 個新增商品。");
-    expect(messages[0]).toContain("1. [SSD B](https://partsradar.test/products/ssd) - NT$2,490");
-  });
-
-  it("shows empty copy for both report sections", () => {
-    const [message] = createPersonalPriceReportMessages(
-      {
-        priceChanges: [],
-        newProducts: [],
-      },
-      {
-        publicBaseUrl: PUBLIC_BASE_URL,
-        maxItems: 50,
-        windowHours: 24,
-        generatedAt: new Date("2026-06-07T05:00:00.000Z"),
-      },
-    );
-
-    expect(message).toContain("價格變動\n找到 0 筆價格變動。\n沒有價格變動。");
-    expect(message).toContain("新增商品\n找到 0 個新增商品。\n沒有新增商品。");
   });
 });
 
