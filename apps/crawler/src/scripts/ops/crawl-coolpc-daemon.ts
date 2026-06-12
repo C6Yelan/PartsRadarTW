@@ -20,14 +20,12 @@ import {
   toSafeCliErrorMessage,
 } from "../shared/script-utils";
 import {
+  clearExternalFetchPriority,
   DEFAULT_EXTERNAL_FETCH_LOCK_STALE_SECONDS,
+  DEFAULT_EXTERNAL_FETCH_PRIORITY_TTL_SECONDS,
+  requestExternalFetchPriority,
   tryAcquireExternalFetchLock,
 } from "./external-fetch-lock";
-import {
-  type ImageBackfillOptions,
-  parseOptions as parseImageBackfillOptions,
-} from "./image-cache-backfill/options";
-import { backfillImages, readMissingImageCandidates } from "./image-cache-backfill/processor";
 import {
   DEFAULT_PRICE_CHANGE_DISCORD_MAX_ITEMS,
   MAX_PRICE_CHANGE_DISCORD_ITEMS,
@@ -35,26 +33,45 @@ import {
   sendCrawlRunPriceChangeDiscordNotification,
   type PriceChangeDiscordNotificationOptions,
 } from "./price-change-discord-notification";
+import type { BackfillSummary, ImageBackfillOptions } from "./image-cache-backfill/options";
+import {
+  backfillImages,
+  readMissingImageCandidatesByProductIds,
+} from "./image-cache-backfill/processor";
 
 const CONFIRM_LIVE_FETCH_FLAG = "--confirm-live-fetch";
 const DEFAULT_STORAGE_DIR = "temp/coolpc-daemon/snapshots";
+const DEFAULT_PRODUCT_IMAGE_STORAGE_DIR = "storage/product-images";
 const DEFAULT_INTERVAL_SECONDS = 1800;
 const DEFAULT_BACKOFF_SECONDS = 3600;
+const DEFAULT_LOCK_RETRY_SECONDS = 120;
+const DEFAULT_NEW_PRODUCT_IMAGE_MIN_DELAY_MS = 5000;
+const DEFAULT_NEW_PRODUCT_IMAGE_MAX_DELAY_MS = 12000;
+const DEFAULT_NEW_PRODUCT_IMAGE_TIMEOUT_MS = 15000;
+const DEFAULT_NEW_PRODUCT_IMAGE_MAX_SOURCE_BYTES = 5 * 1024 * 1024;
 const MIN_INTERVAL_SECONDS = 60;
 const MIN_BACKOFF_SECONDS = 60;
+const MIN_LOCK_RETRY_SECONDS = 30;
+const MAX_LOCK_RETRY_SECONDS = 600;
 const MIN_CATEGORY_DELAY_MS = 3000;
 const MAX_CATEGORY_DELAY_MS = 60000;
-const DEFAULT_IMAGE_BACKFILL_LIMIT = 20;
-const MAX_IMAGE_BACKFILL_LIMIT = 50;
-const DEFAULT_IMAGE_BACKFILL_MIN_DELAY_MS = 3000;
-const DEFAULT_IMAGE_BACKFILL_MAX_DELAY_MS = 8000;
-const DEFAULT_IMAGE_BACKFILL_TIMEOUT_MS = 15000;
-const MIN_IMAGE_BACKFILL_DELAY_MS = 3000;
-const MAX_IMAGE_BACKFILL_DELAY_MS = 60000;
-const MIN_IMAGE_BACKFILL_TIMEOUT_MS = 1000;
-const MAX_IMAGE_BACKFILL_TIMEOUT_MS = 60000;
+const MIN_NEW_PRODUCT_IMAGE_DELAY_MS = 1000;
+const MAX_NEW_PRODUCT_IMAGE_DELAY_MS = 60000;
+const MIN_NEW_PRODUCT_IMAGE_TIMEOUT_MS = 1000;
+const MAX_NEW_PRODUCT_IMAGE_TIMEOUT_MS = 120000;
+const MIN_NEW_PRODUCT_IMAGE_SOURCE_BYTES = 64 * 1024;
+const MAX_NEW_PRODUCT_IMAGE_SOURCE_BYTES = 20 * 1024 * 1024;
 const SCHEDULED_CRAWL_USER_AGENT =
   "PartsRadarTW scheduled crawler (+https://github.com/C6Yelan/PartsRadarTW)";
+
+export interface NewProductImageBackfillOptions {
+  workspaceRoot: string;
+  storageDir: string;
+  minDelayMs: number;
+  maxDelayMs: number;
+  timeoutMs: number;
+  maxSourceBytes: number;
+}
 
 export interface CoolpcDaemonOptions {
   workspaceRoot: string;
@@ -64,11 +81,12 @@ export interface CoolpcDaemonOptions {
   categoryDelayMs: number;
   lockDir: string;
   lockStaleSeconds: number;
+  lockRetrySeconds: number;
+  prioritySignalTtlSeconds: number;
   runOnce: boolean;
   baseUrl?: string;
   priceChangeDiscordNotification: PriceChangeDiscordNotificationOptions;
-  imageBackfillLimit: number;
-  imageBackfill: ImageBackfillOptions;
+  newProductImageBackfill: NewProductImageBackfillOptions;
 }
 
 interface ParseIntegerOption {
@@ -87,6 +105,17 @@ interface ShutdownController {
 }
 
 type ProductWriteSummaryTotals = CrawlRunCategoryProductWriteSummary;
+
+type NewProductImageBackfillHandler = (args: {
+  client: PrismaClient;
+  productIds: string[];
+  options: NewProductImageBackfillOptions;
+}) => Promise<void>;
+
+interface ScheduledCycleResult {
+  shouldBackoff: boolean;
+  retryAfterSeconds?: number;
+}
 
 export function parseDaemonOptions(
   args: string[],
@@ -108,49 +137,7 @@ export function parseDaemonOptions(
     workspaceRoot,
     getStringArg(args, "--storage-dir") ?? env.SNAPSHOT_STORAGE_DIR ?? DEFAULT_STORAGE_DIR,
   );
-  const imageBackfillLimit = parseIntegerOption({
-    args,
-    argName: "--image-backfill-limit",
-    env,
-    envName: "CRAWLER_IMAGE_BACKFILL_LIMIT",
-    fallback: DEFAULT_IMAGE_BACKFILL_LIMIT,
-    min: 0,
-    max: MAX_IMAGE_BACKFILL_LIMIT,
-  });
-  const imageBackfillMinDelayMs = parseIntegerOption({
-    args,
-    argName: "--image-backfill-min-delay-ms",
-    env,
-    envName: "CRAWLER_IMAGE_BACKFILL_MIN_DELAY_MS",
-    fallback: DEFAULT_IMAGE_BACKFILL_MIN_DELAY_MS,
-    min: MIN_IMAGE_BACKFILL_DELAY_MS,
-    max: MAX_IMAGE_BACKFILL_DELAY_MS,
-  });
-  const imageBackfillMaxDelayMs = parseIntegerOption({
-    args,
-    argName: "--image-backfill-max-delay-ms",
-    env,
-    envName: "CRAWLER_IMAGE_BACKFILL_MAX_DELAY_MS",
-    fallback: DEFAULT_IMAGE_BACKFILL_MAX_DELAY_MS,
-    min: MIN_IMAGE_BACKFILL_DELAY_MS,
-    max: MAX_IMAGE_BACKFILL_DELAY_MS,
-  });
-
-  if (imageBackfillMinDelayMs > imageBackfillMaxDelayMs) {
-    throw new Error(
-      "--image-backfill-min-delay-ms/CRAWLER_IMAGE_BACKFILL_MIN_DELAY_MS must be less than or equal to --image-backfill-max-delay-ms/CRAWLER_IMAGE_BACKFILL_MAX_DELAY_MS.",
-    );
-  }
-
-  const imageBackfillTimeoutMs = parseIntegerOption({
-    args,
-    argName: "--image-backfill-timeout-ms",
-    env,
-    envName: "CRAWLER_IMAGE_BACKFILL_TIMEOUT_MS",
-    fallback: DEFAULT_IMAGE_BACKFILL_TIMEOUT_MS,
-    min: MIN_IMAGE_BACKFILL_TIMEOUT_MS,
-    max: MAX_IMAGE_BACKFILL_TIMEOUT_MS,
-  });
+  const newProductImageBackfill = parseNewProductImageBackfillOptions(args, env, workspaceRoot);
 
   return {
     workspaceRoot,
@@ -195,23 +182,89 @@ export function parseDaemonOptions(
       min: 60,
       max: 7 * 24 * 60 * 60,
     }),
+    lockRetrySeconds: parseIntegerOption({
+      args,
+      argName: "--lock-retry-seconds",
+      env,
+      envName: "CRAWLER_LOCK_RETRY_SECONDS",
+      fallback: DEFAULT_LOCK_RETRY_SECONDS,
+      min: MIN_LOCK_RETRY_SECONDS,
+      max: MAX_LOCK_RETRY_SECONDS,
+    }),
+    prioritySignalTtlSeconds: parseIntegerOption({
+      args,
+      argName: "--priority-signal-ttl-seconds",
+      env,
+      envName: "EXTERNAL_FETCH_PRIORITY_TTL_SECONDS",
+      fallback: DEFAULT_EXTERNAL_FETCH_PRIORITY_TTL_SECONDS,
+      min: 60,
+      max: 60 * 60,
+    }),
     runOnce: args.includes("--run-once"),
     baseUrl: validateCoolpcBaseUrl(env.COOLPC_BASE_URL),
     priceChangeDiscordNotification: parsePriceChangeDiscordNotificationOptions(args, env),
-    imageBackfillLimit,
-    imageBackfill: {
-      ...parseImageBackfillOptions(
-        buildImageBackfillArgs({
-          limit: Math.max(imageBackfillLimit, 1),
-          minDelayMs: imageBackfillMinDelayMs,
-          maxDelayMs: imageBackfillMaxDelayMs,
-          timeoutMs: imageBackfillTimeoutMs,
-        }),
-        cwd,
-        env,
-      ),
-      limit: imageBackfillLimit,
-    },
+    newProductImageBackfill,
+  };
+}
+
+function parseNewProductImageBackfillOptions(
+  args: string[],
+  env: NodeJS.ProcessEnv,
+  workspaceRoot: string,
+): NewProductImageBackfillOptions {
+  const minDelayMs = parseIntegerOption({
+    args,
+    argName: "--new-product-image-min-delay-ms",
+    env,
+    envName: "CRAWLER_NEW_PRODUCT_IMAGE_MIN_DELAY_MS",
+    fallback: DEFAULT_NEW_PRODUCT_IMAGE_MIN_DELAY_MS,
+    min: MIN_NEW_PRODUCT_IMAGE_DELAY_MS,
+    max: MAX_NEW_PRODUCT_IMAGE_DELAY_MS,
+  });
+  const maxDelayMs = parseIntegerOption({
+    args,
+    argName: "--new-product-image-max-delay-ms",
+    env,
+    envName: "CRAWLER_NEW_PRODUCT_IMAGE_MAX_DELAY_MS",
+    fallback: DEFAULT_NEW_PRODUCT_IMAGE_MAX_DELAY_MS,
+    min: MIN_NEW_PRODUCT_IMAGE_DELAY_MS,
+    max: MAX_NEW_PRODUCT_IMAGE_DELAY_MS,
+  });
+
+  if (minDelayMs > maxDelayMs) {
+    throw new Error(
+      "--new-product-image-min-delay-ms/CRAWLER_NEW_PRODUCT_IMAGE_MIN_DELAY_MS must be less than or equal to --new-product-image-max-delay-ms/CRAWLER_NEW_PRODUCT_IMAGE_MAX_DELAY_MS.",
+    );
+  }
+
+  return {
+    workspaceRoot,
+    storageDir: resolveRelativeToWorkspace(
+      workspaceRoot,
+      getStringArg(args, "--product-image-storage-dir") ??
+        env.PRODUCT_IMAGE_STORAGE_DIR ??
+        DEFAULT_PRODUCT_IMAGE_STORAGE_DIR,
+    ),
+    minDelayMs,
+    maxDelayMs,
+    timeoutMs: parseIntegerOption({
+      args,
+      argName: "--new-product-image-timeout-ms",
+      env,
+      envName: "CRAWLER_NEW_PRODUCT_IMAGE_TIMEOUT_MS",
+      fallback: DEFAULT_NEW_PRODUCT_IMAGE_TIMEOUT_MS,
+      min: MIN_NEW_PRODUCT_IMAGE_TIMEOUT_MS,
+      max: MAX_NEW_PRODUCT_IMAGE_TIMEOUT_MS,
+    }),
+    maxSourceBytes: parseIntegerOption({
+      args,
+      argName: "--new-product-image-max-source-bytes",
+      env,
+      envName: "CRAWLER_NEW_PRODUCT_IMAGE_MAX_SOURCE_BYTES",
+      fallback: DEFAULT_NEW_PRODUCT_IMAGE_MAX_SOURCE_BYTES,
+      min: MIN_NEW_PRODUCT_IMAGE_SOURCE_BYTES,
+      max: MAX_NEW_PRODUCT_IMAGE_SOURCE_BYTES,
+    }),
   };
 }
 
@@ -235,7 +288,7 @@ async function main(): Promise<void> {
 
     await assertSeededCategories(client);
     log(
-      `CoolPC scheduled crawler started. interval=${options.intervalSeconds}s backoff=${options.backoffSeconds}s categoryDelay=${options.categoryDelayMs}ms imageBackfillLimit=${options.imageBackfillLimit} imageBackfillDelay=${options.imageBackfill.minDelayMs}-${options.imageBackfill.maxDelayMs}ms runOnce=${options.runOnce ? "yes" : "no"}`,
+      `CoolPC scheduled crawler started. interval=${options.intervalSeconds}s backoff=${options.backoffSeconds}s categoryDelay=${options.categoryDelayMs}ms newProductImageDelay=${options.newProductImageBackfill.minDelayMs}-${options.newProductImageBackfill.maxDelayMs}ms runOnce=${options.runOnce ? "yes" : "no"}`,
     );
 
     do {
@@ -245,7 +298,9 @@ async function main(): Promise<void> {
         break;
       }
 
-      const waitSeconds = result.shouldBackoff ? options.backoffSeconds : options.intervalSeconds;
+      const waitSeconds =
+        result.retryAfterSeconds ??
+        (result.shouldBackoff ? options.backoffSeconds : options.intervalSeconds);
       const nextRunAt = new Date(Date.now() + waitSeconds * 1000).toISOString();
       log(
         `Next CoolPC scheduled crawl at ${nextRunAt} (${waitSeconds}s, ${result.shouldBackoff ? "backoff" : "normal interval"}).`,
@@ -258,28 +313,60 @@ async function main(): Promise<void> {
   }
 }
 
-async function runScheduledCycle(
+export async function runScheduledCycle(
   client: PrismaClient,
   options: CoolpcDaemonOptions,
-): Promise<{ shouldBackoff: boolean }> {
-  const lock = await tryAcquireExternalFetchLock({
+  dependencies: {
+    acquireLock?: typeof tryAcquireExternalFetchLock;
+    requestPriority?: typeof requestExternalFetchPriority;
+    clearPriority?: typeof clearExternalFetchPriority;
+    crawlCategories?: typeof runCoolpcCategoryCrawl;
+    notifyPriceChanges?: typeof handlePriceChangeDiscordNotification;
+    backfillNewProductImages?: NewProductImageBackfillHandler;
+  } = {},
+): Promise<ScheduledCycleResult> {
+  const acquireLock = dependencies.acquireLock ?? tryAcquireExternalFetchLock;
+  const requestPriority = dependencies.requestPriority ?? requestExternalFetchPriority;
+  const clearPriority = dependencies.clearPriority ?? clearExternalFetchPriority;
+  const crawlCategories = dependencies.crawlCategories ?? runCoolpcCategoryCrawl;
+  const notifyPriceChanges = dependencies.notifyPriceChanges ?? handlePriceChangeDiscordNotification;
+  const backfillNewProductImages =
+    dependencies.backfillNewProductImages ?? handleNewProductImageBackfill;
+  const lock = await acquireLock({
     lockDir: options.lockDir,
     owner: "crawler-daemon",
     staleSeconds: options.lockStaleSeconds,
   });
 
   if (!lock) {
-    log("Skipping CoolPC scheduled crawl because another external fetch task holds the lock.");
+    await requestPriority({
+      lockDir: options.lockDir,
+      owner: "crawler-daemon",
+      ttlSeconds: options.prioritySignalTtlSeconds,
+    });
+    log(
+      `Skipping CoolPC scheduled crawl because another external fetch task holds the lock. Requested priority retry in ${options.lockRetrySeconds}s.`,
+    );
 
     return {
       shouldBackoff: false,
+      retryAfterSeconds: options.lockRetrySeconds,
     };
   }
 
+  await clearPriority({
+    lockDir: options.lockDir,
+    owner: "crawler-daemon",
+  });
+
   log("Starting CoolPC scheduled crawl cycle.");
 
+  let result: RunCoolpcCrawlOnceResult;
+  let productWriteSummary: ProductWriteSummaryTotals;
+  let shouldBackoff: boolean;
+
   try {
-    const result = await runCoolpcCategoryCrawl({
+    result = await crawlCategories({
       client,
       storageDir: options.storageDir,
       triggerType: CRAWL_TRIGGER_TYPES.SCHEDULED,
@@ -289,26 +376,9 @@ async function runScheduledCycle(
       log,
     });
 
-    const productWriteSummary = summarizeProductWrites(result);
-    const shouldBackoff = shouldBackoffAfter(result);
+    productWriteSummary = summarizeProductWrites(result);
+    shouldBackoff = shouldBackoffAfter(result);
     printCycleSummary(result, productWriteSummary);
-    await handlePriceChangeDiscordNotification({
-      client,
-      crawlRunId: result.crawlRunId,
-      options: options.priceChangeDiscordNotification,
-      productWriteSummary,
-    });
-    await runImmediateImageBackfill({
-      client,
-      options,
-      shouldBackoff,
-      status: result.status,
-      stoppedBySuspectedBlock: result.stoppedBySuspectedBlock,
-    });
-
-    return {
-      shouldBackoff,
-    };
   } catch (error) {
     log(`CoolPC scheduled crawl cycle failed: ${toSafeErrorMessage(error)}`);
 
@@ -318,52 +388,97 @@ async function runScheduledCycle(
   } finally {
     await lock.release();
   }
-}
 
-export async function runImmediateImageBackfill({
-  client,
-  options,
-  shouldBackoff,
-  status,
-  stoppedBySuspectedBlock,
-}: {
-  client: PrismaClient;
-  options: CoolpcDaemonOptions;
-  shouldBackoff: boolean;
-  status: RunCoolpcCrawlOnceResult["status"];
-  stoppedBySuspectedBlock: boolean;
-}): Promise<void> {
-  if (options.imageBackfillLimit <= 0) {
-    log("Immediate image backfill skipped. reason=disabled");
-    return;
-  }
+  await notifyPriceChanges({
+    client,
+    crawlRunId: result.crawlRunId,
+    options: options.priceChangeDiscordNotification,
+    productWriteSummary,
+  });
 
   if (shouldBackoff) {
-    log(
-      `Immediate image backfill skipped. reason=crawl_not_clean status=${status} stoppedBySuspectedBlock=${stoppedBySuspectedBlock ? "yes" : "no"}`,
-    );
+    if (productWriteSummary.createdProductIds.length > 0) {
+      log(
+        `New product image backfill skipped. reason=crawl_not_clean status=${result.status} stoppedBySuspectedBlock=${result.stoppedBySuspectedBlock ? "yes" : "no"} createdProducts=${productWriteSummary.createdProductIds.length}`,
+      );
+    }
+  } else {
+    await backfillNewProductImages({
+      client,
+      productIds: productWriteSummary.createdProductIds,
+      options: options.newProductImageBackfill,
+    });
+  }
+
+  return {
+    shouldBackoff,
+  };
+}
+
+async function handleNewProductImageBackfill({
+  client,
+  productIds,
+  options,
+}: {
+  client: PrismaClient;
+  productIds: string[];
+  options: NewProductImageBackfillOptions;
+}): Promise<void> {
+  const uniqueProductIds = [...new Set(productIds)];
+
+  if (uniqueProductIds.length === 0) {
     return;
   }
 
-  try {
-    const candidates = await readMissingImageCandidates(client, options.imageBackfill);
+  const imageOptions = createImageBackfillOptions(options);
 
-    log(`Immediate image backfill selected ${candidates.length} missing image candidate(s).`);
+  try {
+    const candidates = await readMissingImageCandidatesByProductIds(
+      client,
+      imageOptions,
+      uniqueProductIds,
+    );
 
     if (candidates.length === 0) {
+      log(`New product image backfill skipped. createdProducts=${uniqueProductIds.length}`);
       return;
     }
 
-    const summary = await backfillImages(candidates, options.imageBackfill);
-
     log(
-      `Immediate image backfill finished. cached=${summary.cached} reused=${summary.reused} skipped=${summary.skipped} invalid=${summary.invalid} failed=${summary.failed} liveFetches=${summary.liveFetches}`,
+      `Starting new product image backfill. createdProducts=${uniqueProductIds.length} candidates=${candidates.length}`,
     );
+    const summary = await backfillImages(candidates, imageOptions);
+    logNewProductImageBackfillSummary(summary, uniqueProductIds.length);
   } catch (error) {
-    log(
-      `Immediate image backfill failed without affecting crawler status: ${toSafeErrorMessage(error)}`,
-    );
+    log(`New product image backfill failed: ${toSafeErrorMessage(error)}`);
   }
+}
+
+function createImageBackfillOptions(
+  options: NewProductImageBackfillOptions,
+): ImageBackfillOptions {
+  return {
+    workspaceRoot: options.workspaceRoot,
+    storageDir: options.storageDir,
+    limit: null,
+    productId: null,
+    igrp: null,
+    minDelayMs: options.minDelayMs,
+    maxDelayMs: options.maxDelayMs,
+    timeoutMs: options.timeoutMs,
+    maxSourceBytes: options.maxSourceBytes,
+    dryRun: false,
+    overwrite: false,
+  };
+}
+
+function logNewProductImageBackfillSummary(
+  summary: BackfillSummary,
+  createdProductCount: number,
+): void {
+  log(
+    `New product image backfill finished. createdProducts=${createdProductCount} selected=${summary.selected} cached=${summary.cached} reused=${summary.reused} skipped=${summary.skipped} invalid=${summary.invalid} failed=${summary.failed} liveFetches=${summary.liveFetches}`,
+  );
 }
 
 async function handlePriceChangeDiscordNotification({
@@ -439,6 +554,7 @@ function summarizeProductWrites(result: RunCoolpcCrawlOnceResult): ProductWriteS
   const totals: ProductWriteSummaryTotals = {
     processedItemCount: 0,
     createdProductCount: 0,
+    createdProductIds: [],
     updatedProductCount: 0,
     priceSnapshotCreatedCount: 0,
     priceUnchangedCount: 0,
@@ -453,6 +569,7 @@ function summarizeProductWrites(result: RunCoolpcCrawlOnceResult): ProductWriteS
 
     totals.processedItemCount += categoryResult.productWriteSummary.processedItemCount;
     totals.createdProductCount += categoryResult.productWriteSummary.createdProductCount;
+    totals.createdProductIds.push(...categoryResult.productWriteSummary.createdProductIds);
     totals.updatedProductCount += categoryResult.productWriteSummary.updatedProductCount;
     totals.priceSnapshotCreatedCount +=
       categoryResult.productWriteSummary.priceSnapshotCreatedCount;
@@ -507,30 +624,6 @@ function parseIntegerOption({
   }
 
   return value;
-}
-
-function buildImageBackfillArgs({
-  limit,
-  minDelayMs,
-  maxDelayMs,
-  timeoutMs,
-}: {
-  limit: number;
-  minDelayMs: number;
-  maxDelayMs: number;
-  timeoutMs: number;
-}): string[] {
-  return [
-    CONFIRM_LIVE_FETCH_FLAG,
-    "--limit",
-    String(limit),
-    "--min-delay-ms",
-    String(minDelayMs),
-    "--max-delay-ms",
-    String(maxDelayMs),
-    "--timeout-ms",
-    String(timeoutMs),
-  ];
 }
 
 function createShutdownController(): ShutdownController {
@@ -593,21 +686,30 @@ Options:
                              Default: ${DEFAULT_INTERVAL_SECONDS}, minimum: ${MIN_INTERVAL_SECONDS}
   --backoff-seconds <sec>    Delay after fetch/parse/block failures.
                              Default: ${DEFAULT_BACKOFF_SECONDS}, minimum: ${MIN_BACKOFF_SECONDS}
+  --lock-retry-seconds <sec> Delay before retrying when another external fetch task holds the lock.
+                             Default: ${DEFAULT_LOCK_RETRY_SECONDS}, range: ${MIN_LOCK_RETRY_SECONDS}-${MAX_LOCK_RETRY_SECONDS}
   --category-delay-ms <ms>   Delay between live category requests.
                              Default: ${DEFAULT_COOLPC_CATEGORY_DELAY_MS}, range: ${MIN_CATEGORY_DELAY_MS}-${MAX_CATEGORY_DELAY_MS}
-  --image-backfill-limit <n> Missing product thumbnails to backfill after a clean crawl.
-                             Default: ${DEFAULT_IMAGE_BACKFILL_LIMIT}, range: 0-${MAX_IMAGE_BACKFILL_LIMIT}; 0 disables it.
-  --image-backfill-min-delay-ms <ms>
-                             Minimum delay between immediate source image requests.
-                             Default: ${DEFAULT_IMAGE_BACKFILL_MIN_DELAY_MS}
-  --image-backfill-max-delay-ms <ms>
-                             Maximum delay between immediate source image requests.
-                             Default: ${DEFAULT_IMAGE_BACKFILL_MAX_DELAY_MS}
-  --image-backfill-timeout-ms <ms>
-                             Immediate source image request timeout.
-                             Default: ${DEFAULT_IMAGE_BACKFILL_TIMEOUT_MS}
+  --new-product-image-min-delay-ms <ms>
+                             Minimum delay between new-product image requests.
+                             Default: ${DEFAULT_NEW_PRODUCT_IMAGE_MIN_DELAY_MS}
+  --new-product-image-max-delay-ms <ms>
+                             Maximum delay between new-product image requests.
+                             Default: ${DEFAULT_NEW_PRODUCT_IMAGE_MAX_DELAY_MS}
+  --new-product-image-timeout-ms <ms>
+                             Timeout for each new-product source image request.
+                             Default: ${DEFAULT_NEW_PRODUCT_IMAGE_TIMEOUT_MS}
+  --new-product-image-max-source-bytes <bytes>
+                             Maximum accepted source image size for new products.
+                             Default: ${DEFAULT_NEW_PRODUCT_IMAGE_MAX_SOURCE_BYTES}
+  --product-image-storage-dir <path>
+                             Product image cache directory from the workspace root.
+                             Default: PRODUCT_IMAGE_STORAGE_DIR, then ${DEFAULT_PRODUCT_IMAGE_STORAGE_DIR}
   --lock-dir <path>          Shared external fetch lock directory.
   --lock-stale-seconds <sec> Break stale external fetch locks after this age.
+  --priority-signal-ttl-seconds <sec>
+                             Higher-priority external fetch signal TTL.
+                             Default: ${DEFAULT_EXTERNAL_FETCH_PRIORITY_TTL_SECONDS}
   --price-change-discord-max-items <n>
                              Public Discord price-change rows per crawl.
                              Default: ${DEFAULT_PRICE_CHANGE_DISCORD_MAX_ITEMS}, range: 1-${MAX_PRICE_CHANGE_DISCORD_ITEMS}
@@ -615,10 +717,12 @@ Options:
                              Default: ${DEFAULT_STORAGE_DIR}
 
 Environment:
-  CRAWLER_INTERVAL_SECONDS, CRAWLER_BACKOFF_SECONDS, CRAWLER_CATEGORY_DELAY_MS,
-  CRAWLER_IMAGE_BACKFILL_LIMIT, CRAWLER_IMAGE_BACKFILL_MIN_DELAY_MS,
-  CRAWLER_IMAGE_BACKFILL_MAX_DELAY_MS, CRAWLER_IMAGE_BACKFILL_TIMEOUT_MS,
+  CRAWLER_INTERVAL_SECONDS, CRAWLER_BACKOFF_SECONDS, CRAWLER_LOCK_RETRY_SECONDS,
+  CRAWLER_CATEGORY_DELAY_MS,
+  CRAWLER_NEW_PRODUCT_IMAGE_MIN_DELAY_MS, CRAWLER_NEW_PRODUCT_IMAGE_MAX_DELAY_MS,
+  CRAWLER_NEW_PRODUCT_IMAGE_TIMEOUT_MS, CRAWLER_NEW_PRODUCT_IMAGE_MAX_SOURCE_BYTES,
   SNAPSHOT_STORAGE_DIR, EXTERNAL_FETCH_LOCK_DIR, EXTERNAL_FETCH_LOCK_STALE_SECONDS,
+  EXTERNAL_FETCH_PRIORITY_TTL_SECONDS,
   PRODUCT_IMAGE_STORAGE_DIR, COOLPC_BASE_URL, DISCORD_PUBLIC_WEBHOOK_URL,
   PARTSRADAR_PUBLIC_BASE_URL, PRICE_CHANGE_DISCORD_MAX_ITEMS
 `);

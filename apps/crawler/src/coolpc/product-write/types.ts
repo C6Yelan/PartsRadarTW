@@ -13,6 +13,7 @@ export interface WriteCoolpcProductPricesOptions {
 export interface WriteCoolpcProductPricesResult {
   processedItemCount: number;
   createdProductCount: number;
+  createdProductIds: string[];
   updatedProductCount: number;
   priceSnapshotCreatedCount: number;
   priceUnchangedCount: number;

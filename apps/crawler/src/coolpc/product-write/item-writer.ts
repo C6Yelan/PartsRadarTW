@@ -11,7 +11,11 @@ import type {
 
 type ProductItemWriteResult = Pick<
   WriteCoolpcProductPricesResult,
-  "createdProductCount" | "updatedProductCount" | "priceSnapshotCreatedCount" | "priceUnchangedCount"
+  | "createdProductCount"
+  | "createdProductIds"
+  | "updatedProductCount"
+  | "priceSnapshotCreatedCount"
+  | "priceUnchangedCount"
 >;
 
 export async function writeProductItem({
@@ -30,9 +34,15 @@ export async function writeProductItem({
   if (!existingProduct) {
     // First sighting must create the complete read path in one pass:
     // product -> price_snapshot -> current_price.
-    await createProductWithCurrentPrice({ client, crawlRunId, rawSnapshotId, item });
+    const productId = await createProductWithCurrentPrice({
+      client,
+      crawlRunId,
+      rawSnapshotId,
+      item,
+    });
     return {
       createdProductCount: 1,
+      createdProductIds: [productId],
       updatedProductCount: 0,
       priceSnapshotCreatedCount: 1,
       priceUnchangedCount: 0,
@@ -66,6 +76,7 @@ export async function writeProductItem({
 
     return {
       createdProductCount: 0,
+      createdProductIds: [],
       updatedProductCount: 1,
       priceSnapshotCreatedCount: 1,
       priceUnchangedCount: 0,
@@ -82,6 +93,7 @@ export async function writeProductItem({
 
   return {
     createdProductCount: 0,
+    createdProductIds: [],
     updatedProductCount: 1,
     priceSnapshotCreatedCount: 0,
     priceUnchangedCount: 1,
@@ -121,7 +133,7 @@ async function createProductWithCurrentPrice({
   crawlRunId: string;
   rawSnapshotId: string | null;
   item: ParsedCoolpcProduct;
-}): Promise<void> {
+}): Promise<string> {
   const product = await client.product.create({
     data: createProductData(item),
     select: { id: true },
@@ -135,6 +147,8 @@ async function createProductWithCurrentPrice({
   });
 
   await createCurrentPrice(client, product.id, priceSnapshot.id, item.fetchedAt);
+
+  return product.id;
 }
 
 function updateProductSeenData(

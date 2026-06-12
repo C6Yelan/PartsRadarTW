@@ -47,6 +47,7 @@ describe("CoolPC category snapshot processor", () => {
       productWriteSummary: {
         processedItemCount: 2,
         createdProductCount: 2,
+        createdProductIds: ["product-1", "product-2"],
         updatedProductCount: 0,
         priceSnapshotCreatedCount: 2,
         priceUnchangedCount: 0,
@@ -106,6 +107,7 @@ describe("CoolPC category snapshot processor", () => {
       productWriteSummary: {
         processedItemCount: 2,
         createdProductCount: 2,
+        createdProductIds: ["product-1", "product-2"],
         updatedProductCount: 0,
         priceSnapshotCreatedCount: 2,
         priceUnchangedCount: 0,
@@ -169,6 +171,7 @@ describe("CoolPC category snapshot processor", () => {
       productWriteSummary: {
         processedItemCount: 2,
         createdProductCount: 2,
+        createdProductIds: ["product-1", "product-2"],
         updatedProductCount: 0,
         priceSnapshotCreatedCount: 2,
         priceUnchangedCount: 0,
@@ -235,6 +238,7 @@ describe("CoolPC category snapshot processor", () => {
       productWriteSummary: {
         processedItemCount: 3,
         createdProductCount: 3,
+        createdProductIds: ["product-1", "product-2", "product-3"],
         updatedProductCount: 0,
         priceSnapshotCreatedCount: 3,
         priceUnchangedCount: 0,

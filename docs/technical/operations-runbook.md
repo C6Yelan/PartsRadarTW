@@ -171,10 +171,11 @@ curl -i https://<domain>/api/source-status
 啟動前條件：
 
 - 手動 `manual:crawl-coolpc-once` 已在同一台主機成功跑過，且 `/api/source-status` 可回 `ok`。
-- `maintenance-daemon` 沒在同一時間持有 external fetch lock；若有，`crawler-daemon` 會跳過當輪並等下一次 interval。
+- 若 `maintenance-daemon` 正在持有 external fetch lock，`crawler-daemon` 會寫入 price-priority signal 並在 `CRAWLER_LOCK_RETRY_SECONDS` 後重試；maintenance link health 會在下一個安全邊界讓路。
 - `.env` 中的 `CRAWLER_INTERVAL_SECONDS`、`CRAWLER_BACKOFF_SECONDS` 與 `CRAWLER_CATEGORY_DELAY_MS` 已確認；預設分別為 `1800`、`3600`、`8000`。
-- `.env` 中的 `CRAWLER_IMAGE_BACKFILL_LIMIT` 與 `CRAWLER_IMAGE_BACKFILL_MIN_DELAY_MS` / `CRAWLER_IMAGE_BACKFILL_MAX_DELAY_MS` 已確認；預設每輪成功 crawl 後補最新缺圖 `20` 張，間隔 `3000` 到 `8000` ms。
-- `.env` 中的 `EXTERNAL_FETCH_LOCK_DIR` 與 `EXTERNAL_FETCH_LOCK_STALE_SECONDS` 已確認；所有會打外部來源的 scheduled task 共用這把鎖。
+- `.env` 中的 `CRAWLER_LOCK_RETRY_SECONDS` 已確認；預設 `120`。
+- `.env` 中的 `PRODUCT_IMAGE_STORAGE_DIR` 與 `CRAWLER_NEW_PRODUCT_IMAGE_*` 已確認；crawler-daemon 只會在每輪價格 crawl 後補本輪新增商品圖片。
+- `.env` 中的 `EXTERNAL_FETCH_LOCK_DIR`、`EXTERNAL_FETCH_LOCK_STALE_SECONDS` 與 `EXTERNAL_FETCH_PRIORITY_TTL_SECONDS` 已確認；價格 crawl 與 link health check 共用 lock，但價格 crawl 的 priority signal 會讓 link health 暫停。
 - `WEB_BIND_HOST` 與 `POSTGRES_BIND_HOST` 仍維持 `127.0.0.1`。
 
 啟動：
@@ -190,6 +191,8 @@ docker compose --profile scheduled-crawler ps crawler-daemon
 docker compose --profile scheduled-crawler logs --tail=100 crawler-daemon
 ```
 
+若該輪有新品且 crawl 結果不需 backoff，log 會在價格 crawl summary 與 Discord 通知後顯示 `Starting new product image backfill` / `New product image backfill finished`。這段 follow-up 不會持有 external fetch lock，也不會掃描既有缺圖商品；若該輪疑似被擋或需要 backoff，會略過新品補圖。
+
 停止：
 
 ```bash
@@ -203,7 +206,7 @@ docker compose --profile scheduled-crawler stop crawler-daemon
 - 低於 `60` 秒的 schedule interval / backoff 會被 daemon 拒絕。
 - 低於 `3000` ms 的 category delay 會被 daemon 拒絕。
 - 疑似被來源站攔截時，當輪 crawl 會停止並進入 backoff。
-- 若 shared external fetch lock 被 maintenance task 持有，當輪 crawl 會跳過，不會並行抓來源。
+- 若 shared external fetch lock 被 maintenance task 持有，crawler 會要求 priority retry，不會並行抓來源，也不會等完整 30 分鐘才再試。
 - daemon log 不應輸出 `.env`、`DATABASE_URL`、Cloudflare token 或其他 secret。
 
 驗證：
@@ -261,12 +264,9 @@ docker compose --profile manual-crawler run --rm crawler \
 
 ## Scheduled Maintenance Daemon
 
-`maintenance-daemon` 負責低頻外部維護任務，目前包含：
+`maintenance-daemon` 負責低頻 product link health check：每天跑排程，但只選超過 48 小時未確認或 URL 已變更的 due links；每輪預設最多 200 條。商品圖片補圖不在 scheduled maintenance 內執行，需使用手動 backfill 工具。
 
-- product link health check：每天跑排程，但只選超過 48 小時未確認或 URL 已變更的 due links；每輪預設最多 200 條。
-- missing product image backfill：只補本地沒有 `{productId}.webp` 的 active 商品，不 overwrite 既有圖片；每輪預設最多 150 張。
-
-此 service 只在 `scheduled-crawler` profile 啟動。它和 `crawler-daemon` 共用 `EXTERNAL_FETCH_LOCK_DIR`，避免同時抓外部來源。daemon 啟動後預設先等 900 秒，再開始第一輪，降低部署或重啟時多個 daemon 同時起跑的機率。
+此 service 只在 `scheduled-crawler` profile 啟動。它和 `crawler-daemon` 共用 `EXTERNAL_FETCH_LOCK_DIR`，避免定期價格抓取與 link health check 同時抓外部來源。daemon 啟動後預設先等 900 秒，再開始第一輪，降低部署或重啟時多個 daemon 同時起跑的機率。若價格 crawler 到點但 lock 被 link health 持有，crawler 會寫入短效 priority signal；maintenance 會在下一筆 link request 前或 request 間 delay 後暫停、釋放 lock，並在 `MAINTENANCE_PRICE_PRIORITY_PAUSE_SECONDS` 後繼續下一輪。
 
 啟動：
 
@@ -285,14 +285,13 @@ docker compose --profile scheduled-crawler logs --tail=100 maintenance-daemon
 
 - `MAINTENANCE_INTERVAL_SECONDS`：maintenance cycle 間隔，預設 86400，允許 3600 到 604800。
 - `MAINTENANCE_INITIAL_DELAY_SECONDS`：daemon 啟動後第一次執行前的延遲，預設 900。
-- `MAINTENANCE_TASK_COOLDOWN_SECONDS`：link check 有送出 live requests 後，進入 image backfill 前的 cooldown，預設 600。
+- `MAINTENANCE_PRICE_PRIORITY_PAUSE_SECONDS`：因價格 crawler priority 暫停後多久再繼續，預設 300。
 - `MAINTENANCE_LINK_LIMIT`：每輪最多 link candidates，預設 200。
 - `MAINTENANCE_LINK_STALE_AFTER_HOURS`：link health due window，預設 48。
 - `MAINTENANCE_LINK_MIN_DELAY_MS` / `MAINTENANCE_LINK_MAX_DELAY_MS`：link live request delay，預設 10000 到 20000 ms。
-- `MAINTENANCE_IMAGE_LIMIT`：每輪最多 missing images，預設 150。
-- `MAINTENANCE_IMAGE_MIN_DELAY_MS` / `MAINTENANCE_IMAGE_MAX_DELAY_MS`：image live request delay，預設 8000 到 16000 ms。
 - `EXTERNAL_FETCH_LOCK_DIR`：crawler 與 maintenance 共用的外部抓取鎖路徑。
 - `EXTERNAL_FETCH_LOCK_STALE_SECONDS`：鎖超過此秒數視為 stale，預設 43200。
+- `EXTERNAL_FETCH_PRIORITY_TTL_SECONDS`：price-priority signal 有效秒數，預設 600。
 
 單次 dry-run 驗證：
 
@@ -382,7 +381,7 @@ SMOKE_PUBLIC_BASE_URL=https://partsradar.net
 - `WARN`：服務仍可用，但資料流或維運狀態需要觀察，例如來源成功時間偏舊、近期有 suspected block、source image anomaly、缺圖或壞連結超過警戒值。
 - `FAIL`：服務或資料流有明確失敗，例如 HTTP/API 掛掉、沒有 successful scheduled crawl、最新 crawler 疑似被擋、來源成功時間超過 fail 門檻。
 
-若 `product image api` 是 `FAIL`，代表商品列表已導出 `/api/product-images/...webp`，但公開圖片 API 無法回應圖片內容。優先檢查 `product_images` volume 是否有檔案、`PRODUCT_IMAGE_STORAGE_DIR` 是否正確、`storage-init` 是否已修權限，以及 `maintenance-daemon` 或手動 image backfill 是否實際補過缺圖。
+若 `product image api` 是 `FAIL`，代表商品列表已導出 `/api/product-images/...webp`，但公開圖片 API 無法回應圖片內容。優先檢查 `product_images` volume 是否有檔案、`PRODUCT_IMAGE_STORAGE_DIR` 是否正確、`storage-init` 是否已修權限，以及 `crawler-daemon` 新品圖片補圖或手動 image backfill 是否實際補過缺圖。
 
 常用設定：
 
@@ -688,11 +687,7 @@ docker compose --profile scheduled-crawler up -d raw-snapshot-cleanup-daemon
 
 ## Product Image Cache Backfill
 
-商品資料 crawl 主流程只負責把 `primary_image_url` 寫入 DB；本地 WebP 縮圖由 crawler 當輪後的小批次補圖與 `maintenance-daemon` 低頻兜底處理。手動 product image cache backfill 主要用於新主機、新 volume 或大量補跑。
-
-Scheduled `crawler-daemon` 在成功完成一輪 crawl 後，會在同一把 external fetch lock 內額外補一小批最新缺圖商品。預設 `CRAWLER_IMAGE_BACKFILL_LIMIT=20`、`CRAWLER_IMAGE_BACKFILL_MIN_DELAY_MS=3000`、`CRAWLER_IMAGE_BACKFILL_MAX_DELAY_MS=8000`、`CRAWLER_IMAGE_BACKFILL_TIMEOUT_MS=15000`。候選會優先選最近 `first_seen_at` / `last_seen_at` 的商品，所以新上架商品不需要等 daily maintenance。
-
-此即時補圖是 best-effort 附帶任務：成功或失敗都不會改變 crawler run status、backoff 判斷或商品資料寫入結果。若來源站圖片請求失敗，只會留下 `Immediate image backfill ... failed` 或 summary log，之後仍可由下一輪 crawler 或 daily `maintenance-daemon` 補上。
+商品資料 crawl 主流程會把 `primary_image_url` 寫入 DB；`crawler-daemon` 在每輪價格 crawl 完成並釋放 external fetch lock 後，只針對本輪新增商品建立本地 WebP 縮圖。`maintenance-daemon` 不做圖片補圖；新主機、重建 volume 或大量缺圖修復仍使用手動 product image cache backfill，避免低優先度圖片維護反覆掃描既有商品並卡住價格資料更新。
 
 先跑小批次 dry-run：
 
@@ -748,6 +743,6 @@ docker compose exec -T web sh -lc 'find /var/lib/partsradar/product-images -type
 Backfill 規則：
 
 - 不使用 `--overwrite`，除非明確要重建已存在的圖片。
-- 不和 `manual:crawl-coolpc-once`、`crawler-daemon` 或 `maintenance-daemon` 同時執行，避免對來源站產生額外負載。
+- 不和 `manual:crawl-coolpc-once`、`crawler-daemon` 或 `maintenance-daemon` 同時執行，避免和 scheduled 新品補圖或其他外部來源檢查重疊。
 - 中斷後可重跑；已存在的 `.webp` 會被 skipped。
 - 圖片寫入 volume 後通常不需要重啟 `web`，重新整理頁面即可讀到新檔案。

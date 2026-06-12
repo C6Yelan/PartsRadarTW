@@ -118,6 +118,7 @@ export interface RecordedCrawlRunCategoryResult {
 export interface CrawlRunCategoryProductWriteSummary {
   processedItemCount: number;
   createdProductCount: number;
+  createdProductIds: string[];
   updatedProductCount: number;
   priceSnapshotCreatedCount: number;
   priceUnchangedCount: number;

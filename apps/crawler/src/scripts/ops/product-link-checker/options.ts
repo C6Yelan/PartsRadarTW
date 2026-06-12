@@ -35,6 +35,7 @@ export interface ProductLinkCheckerSummary {
   broken: number;
   temporaryError: number;
   liveRequests: number;
+  pausedForPriority: boolean;
 }
 
 export function parseOptions(
@@ -97,6 +98,7 @@ export function printSummary(
   console.log(`- Broken: ${summary.broken}`);
   console.log(`- Temporary error: ${summary.temporaryError}`);
   console.log(`- Live requests: ${summary.liveRequests}`);
+  console.log(`- Paused for priority: ${summary.pausedForPriority ? "yes" : "no"}`);
 }
 
 function parseKinds(rawKinds: string | undefined): ProductLinkKindValue[] {

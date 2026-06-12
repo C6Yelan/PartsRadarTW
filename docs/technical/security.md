@@ -118,7 +118,8 @@
 
 - 前端使用站內 `/api/product-images/{productId}.webp`。
 - `web` 不在訪客請求期間抓 CoolPC 圖片。
-- backfill / crawler 低頻建立或更新 WebP cache。
+- `crawler-daemon` 每輪價格 crawl 完成後，只針對本輪新增商品低頻建立 WebP cache。
+- 手動 backfill 負責新主機、重建 volume 或大量缺圖修復。
 - 缺圖時使用 fallback，不 hotlink 來源站。
 
 若未來使用 image optimizer 或 proxy：
@@ -155,7 +156,7 @@ https://www.coolpc.com.tw/eachview.php?IGrp={分類編號}
 - 不對外開 port，不提供 HTTP trigger。
 - interval / backoff 不低於 60 秒，分類間 delay 不低於 3000 ms。
 - 疑似攔截停止當輪並 backoff。
-- scheduled crawler 與 maintenance daemon 共用 external fetch lock，避免價格抓取、連結檢查與缺圖補齊同時打外部來源。
+- scheduled crawler 與 maintenance daemon 共用 external fetch lock，避免價格抓取與連結檢查同時打外部來源；價格 crawler 可用短效 priority signal 讓 maintenance link health 在安全邊界暫停並延後幾分鐘繼續。scheduled crawler 的新品圖片補圖只在價格 crawl lock 釋放後針對本輪新增商品執行。
 - manual crawler、scheduled crawler、link checker、image backfill 不應同時跑；手動 ops 前應先檢查 scheduled daemon 狀態或暫停相關 service。
 
 ## Raw Snapshot And Logging

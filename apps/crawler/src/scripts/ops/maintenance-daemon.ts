@@ -1,16 +1,6 @@
 // apps/crawler/src/scripts/ops/maintenance-daemon.ts
 import type { PrismaClient } from "@partsradar/db";
 import {
-  type BackfillSummary,
-  type ImageBackfillOptions,
-  parseOptions as parseImageBackfillOptions,
-} from "./image-cache-backfill/options";
-import {
-  backfillImages,
-  readMissingImageCandidates,
-  type ProductImageCandidate,
-} from "./image-cache-backfill/processor";
-import {
   type ProductLinkCheckerOptions,
   type ProductLinkCheckerSummary,
   parseOptions as parseProductLinkOptions,
@@ -19,10 +9,13 @@ import {
   checkProductLinks,
   readProductLinkCandidates,
   type ProductLinkCandidate,
+  type ProductLinkCheckerDependencies,
   type ProductLinkHealthClient,
 } from "./product-link-checker/processor";
 import {
   DEFAULT_EXTERNAL_FETCH_LOCK_STALE_SECONDS,
+  DEFAULT_EXTERNAL_FETCH_PRIORITY_TTL_SECONDS,
+  hasActiveExternalFetchPriority,
   tryAcquireExternalFetchLock,
 } from "./external-fetch-lock";
 import {
@@ -39,16 +32,14 @@ const HELP_FLAG = "--help";
 const RUN_ONCE_FLAG = "--run-once";
 const DEFAULT_MAINTENANCE_INTERVAL_SECONDS = 24 * 60 * 60;
 const DEFAULT_MAINTENANCE_INITIAL_DELAY_SECONDS = 15 * 60;
-const DEFAULT_MAINTENANCE_TASK_COOLDOWN_SECONDS = 10 * 60;
+const DEFAULT_PRICE_PRIORITY_PAUSE_SECONDS = 5 * 60;
 const MIN_MAINTENANCE_INTERVAL_SECONDS = 60 * 60;
 const MAX_MAINTENANCE_INTERVAL_SECONDS = 7 * 24 * 60 * 60;
 const MIN_NON_NEGATIVE_SECONDS = 0;
 const MAX_INITIAL_DELAY_SECONDS = 24 * 60 * 60;
-const MAX_TASK_COOLDOWN_SECONDS = 24 * 60 * 60;
+const MIN_PRICE_PRIORITY_PAUSE_SECONDS = 60;
+const MAX_PRICE_PRIORITY_PAUSE_SECONDS = 60 * 60;
 const DEFAULT_LINK_LIMIT = 200;
-const DEFAULT_IMAGE_LIMIT = 150;
-const DEFAULT_IMAGE_MIN_DELAY_MS = 8000;
-const DEFAULT_IMAGE_MAX_DELAY_MS = 16000;
 
 export interface MaintenanceDaemonOptions {
   workspaceRoot: string;
@@ -56,11 +47,11 @@ export interface MaintenanceDaemonOptions {
   runOnce: boolean;
   intervalSeconds: number;
   initialDelaySeconds: number;
-  taskCooldownSeconds: number;
+  pricePriorityPauseSeconds: number;
+  prioritySignalTtlSeconds: number;
   lockDir: string;
   lockStaleSeconds: number;
   link: ProductLinkCheckerOptions;
-  image: ImageBackfillOptions;
 }
 
 export interface ShutdownController {
@@ -70,12 +61,13 @@ export interface ShutdownController {
 
 export interface MaintenanceCycleSummary {
   skippedForLock: boolean;
+  pausedForPriority: boolean;
   link: ProductLinkCheckerSummary | null;
-  image: BackfillSummary | null;
 }
 
 interface MaintenanceDaemonDependencies {
   acquireLock?: typeof tryAcquireExternalFetchLock;
+  hasPriority?: typeof hasActiveExternalFetchPriority;
   readLinks?: (
     client: ProductLinkHealthClient,
     options: ProductLinkCheckerOptions,
@@ -85,15 +77,8 @@ interface MaintenanceDaemonDependencies {
     client: ProductLinkHealthClient,
     candidates: ProductLinkCandidate[],
     options: ProductLinkCheckerOptions,
+    dependencies?: ProductLinkCheckerDependencies,
   ) => Promise<ProductLinkCheckerSummary>;
-  readMissingImages?: (
-    client: PrismaClient,
-    options: ImageBackfillOptions,
-  ) => Promise<ProductImageCandidate[]>;
-  backfillMissingImages?: (
-    candidates: ProductImageCandidate[],
-    options: ImageBackfillOptions,
-  ) => Promise<BackfillSummary>;
   logMessage?: (message: string) => void;
 }
 
@@ -152,14 +137,23 @@ export function parseMaintenanceDaemonOptions(
       min: MIN_NON_NEGATIVE_SECONDS,
       max: MAX_INITIAL_DELAY_SECONDS,
     }),
-    taskCooldownSeconds: parseIntegerOption({
+    pricePriorityPauseSeconds: parseIntegerOption({
       args,
       env,
-      argName: "--task-cooldown-seconds",
-      envName: "MAINTENANCE_TASK_COOLDOWN_SECONDS",
-      fallback: DEFAULT_MAINTENANCE_TASK_COOLDOWN_SECONDS,
-      min: MIN_NON_NEGATIVE_SECONDS,
-      max: MAX_TASK_COOLDOWN_SECONDS,
+      argName: "--price-priority-pause-seconds",
+      envName: "MAINTENANCE_PRICE_PRIORITY_PAUSE_SECONDS",
+      fallback: DEFAULT_PRICE_PRIORITY_PAUSE_SECONDS,
+      min: MIN_PRICE_PRIORITY_PAUSE_SECONDS,
+      max: MAX_PRICE_PRIORITY_PAUSE_SECONDS,
+    }),
+    prioritySignalTtlSeconds: parseIntegerOption({
+      args,
+      env,
+      argName: "--priority-signal-ttl-seconds",
+      envName: "EXTERNAL_FETCH_PRIORITY_TTL_SECONDS",
+      fallback: DEFAULT_EXTERNAL_FETCH_PRIORITY_TTL_SECONDS,
+      min: 60,
+      max: 60 * 60,
     }),
     lockDir,
     lockStaleSeconds: parseIntegerOption({
@@ -172,7 +166,6 @@ export function parseMaintenanceDaemonOptions(
       max: 7 * 24 * 60 * 60,
     }),
     link: parseProductLinkOptions(buildProductLinkArgs(args, env, dryRun), cwd),
-    image: parseImageBackfillOptions(buildImageBackfillArgs(args, env, dryRun), cwd, env),
   };
 }
 
@@ -195,7 +188,7 @@ async function main(): Promise<void> {
     client = db.prisma;
 
     log(
-      `Maintenance daemon started. interval=${options.intervalSeconds}s initialDelay=${options.initialDelaySeconds}s taskCooldown=${options.taskCooldownSeconds}s runOnce=${options.runOnce ? "yes" : "no"} dryRun=${options.dryRun ? "yes" : "no"}`,
+      `Maintenance daemon started. interval=${options.intervalSeconds}s initialDelay=${options.initialDelaySeconds}s pricePriorityPause=${options.pricePriorityPauseSeconds}s runOnce=${options.runOnce ? "yes" : "no"} dryRun=${options.dryRun ? "yes" : "no"}`,
     );
     await runMaintenanceDaemon({ client, options, shutdown });
   } finally {
@@ -218,8 +211,14 @@ export async function runMaintenanceDaemon({
   }
 
   while (!shutdown.requested) {
+    let nextDelaySeconds = options.intervalSeconds;
+
     try {
-      await runMaintenanceCycle({ client, options, dependencies });
+      const summary = await runMaintenanceCycle({ client, options, dependencies });
+
+      if (summary.pausedForPriority) {
+        nextDelaySeconds = options.pricePriorityPauseSeconds;
+      }
     } catch (error) {
       logMessage(`Maintenance cycle failed: ${toSafeCliErrorMessage(error)}`);
 
@@ -232,9 +231,9 @@ export async function runMaintenanceDaemon({
       break;
     }
 
-    const nextRunAt = new Date(Date.now() + options.intervalSeconds * 1000).toISOString();
-    logMessage(`Next maintenance cycle at ${nextRunAt} (${options.intervalSeconds}s).`);
-    await shutdown.sleep(options.intervalSeconds * 1000);
+    const nextRunAt = new Date(Date.now() + nextDelaySeconds * 1000).toISOString();
+    logMessage(`Next maintenance cycle at ${nextRunAt} (${nextDelaySeconds}s).`);
+    await shutdown.sleep(nextDelaySeconds * 1000);
   }
 }
 
@@ -254,34 +253,25 @@ export async function runMaintenanceCycle({
   if (!lock) {
     logMessage("Skipping maintenance cycle because another external fetch task holds the lock.");
 
-    return {
-      skippedForLock: true,
-      link: null,
-      image: null,
-    };
-  }
+      return {
+        skippedForLock: true,
+        pausedForPriority: false,
+        link: null,
+      };
+    }
 
   try {
     logMessage("Starting maintenance cycle.");
     const linkSummary = await runLinkTask(client, options, dependencies);
 
-    if (linkSummary.liveRequests > 0 && options.taskCooldownSeconds > 0) {
-      logMessage(
-        `Waiting ${options.taskCooldownSeconds}s before product image maintenance to avoid back-to-back source pressure.`,
-      );
-      await delay(options.taskCooldownSeconds * 1000);
-    }
-
-    const imageSummary = await runImageTask(client, options, dependencies);
-
     logMessage(
-      `Maintenance cycle finished. linkRequests=${linkSummary.liveRequests} imageRequests=${imageSummary.liveFetches}`,
+      `Maintenance cycle finished. linkRequests=${linkSummary.liveRequests} pausedForPriority=${linkSummary.pausedForPriority ? "yes" : "no"}`,
     );
 
     return {
       skippedForLock: false,
+      pausedForPriority: linkSummary.pausedForPriority,
       link: linkSummary,
-      image: imageSummary,
     };
   } finally {
     await lock.release();
@@ -295,27 +285,21 @@ async function runLinkTask(
 ): Promise<ProductLinkCheckerSummary> {
   const readLinks = dependencies.readLinks ?? readProductLinkCandidates;
   const checkLinks = dependencies.checkLinks ?? checkProductLinks;
+  const hasPriority = dependencies.hasPriority ?? hasActiveExternalFetchPriority;
   const logMessage = dependencies.logMessage ?? log;
   const candidates = await readLinks(client, options.link);
 
   logMessage(`Maintenance link task selected ${candidates.length} candidate(s).`);
 
-  return checkLinks(client, candidates, options.link);
-}
-
-async function runImageTask(
-  client: PrismaClient,
-  options: MaintenanceDaemonOptions,
-  dependencies: MaintenanceDaemonDependencies,
-): Promise<BackfillSummary> {
-  const readMissingImages = dependencies.readMissingImages ?? readMissingImageCandidates;
-  const backfillMissingImages = dependencies.backfillMissingImages ?? backfillImages;
-  const logMessage = dependencies.logMessage ?? log;
-  const candidates = await readMissingImages(client, options.image);
-
-  logMessage(`Maintenance image task selected ${candidates.length} missing image candidate(s).`);
-
-  return backfillMissingImages(candidates, options.image);
+  return checkLinks(client, candidates, options.link, {
+    log: logMessage,
+    shouldPause: () =>
+      hasPriority({
+        lockDir: options.lockDir,
+        owner: "crawler-daemon",
+        ttlSeconds: options.prioritySignalTtlSeconds,
+      }),
+  });
 }
 
 function buildProductLinkArgs(
@@ -351,36 +335,6 @@ function buildProductLinkArgs(
   return linkArgs;
 }
 
-function buildImageBackfillArgs(
-  args: string[],
-  env: NodeJS.ProcessEnv,
-  dryRun: boolean,
-): string[] {
-  const imageArgs = dryRun ? [DRY_RUN_FLAG] : [CONFIRM_LIVE_FETCH_FLAG];
-  appendOption(imageArgs, "--limit", getStringArg(args, "--image-limit") ?? env.MAINTENANCE_IMAGE_LIMIT ?? String(DEFAULT_IMAGE_LIMIT));
-  appendOption(
-    imageArgs,
-    "--min-delay-ms",
-    getStringArg(args, "--image-min-delay-ms") ??
-      env.MAINTENANCE_IMAGE_MIN_DELAY_MS ??
-      String(DEFAULT_IMAGE_MIN_DELAY_MS),
-  );
-  appendOption(
-    imageArgs,
-    "--max-delay-ms",
-    getStringArg(args, "--image-max-delay-ms") ??
-      env.MAINTENANCE_IMAGE_MAX_DELAY_MS ??
-      String(DEFAULT_IMAGE_MAX_DELAY_MS),
-  );
-  appendOption(
-    imageArgs,
-    "--timeout-ms",
-    getStringArg(args, "--image-timeout-ms") ?? env.MAINTENANCE_IMAGE_TIMEOUT_MS ?? "15000",
-  );
-
-  return imageArgs;
-}
-
 function appendOption(args: string[], name: string, value: string): void {
   args.push(name, value);
 }
@@ -403,15 +357,16 @@ function parseIntegerOption({
   max: number;
 }): number {
   const raw = getStringArg(args, argName) ?? env[envName] ?? String(fallback);
+  const errorMessage = `${argName}/${envName} must be an integer between ${min} and ${max}.`;
 
   if (!/^(0|[1-9][0-9]*)$/.test(raw)) {
-    throw new Error(`${argName}/${envName} must be an integer between ${min} and ${max}.`);
+    throw new Error(errorMessage);
   }
 
   const value = Number(raw);
 
   if (!Number.isSafeInteger(value) || value < min || value > max) {
-    throw new Error(`${argName}/${envName} must be an integer between ${min} and ${max}.`);
+    throw new Error(errorMessage);
   }
 
   return value;
@@ -472,22 +427,20 @@ Options:
                                 Default: ${DEFAULT_MAINTENANCE_INTERVAL_SECONDS}
   --initial-delay-seconds <sec> Delay before the first cycle in daemon mode.
                                 Default: ${DEFAULT_MAINTENANCE_INITIAL_DELAY_SECONDS}
-  --task-cooldown-seconds <sec> Delay between link check and image backfill when links were fetched.
-                                Default: ${DEFAULT_MAINTENANCE_TASK_COOLDOWN_SECONDS}
+  --price-priority-pause-seconds <sec>
+                                Delay before resuming after yielding to the price crawler.
+                                Default: ${DEFAULT_PRICE_PRIORITY_PAUSE_SECONDS}
   --link-limit <count>          Maximum due product links per cycle.
                                 Default: ${DEFAULT_LINK_LIMIT}
-  --image-limit <count>         Maximum missing images per cycle.
-                                Default: ${DEFAULT_IMAGE_LIMIT}
   --lock-dir <path>             Shared external fetch lock directory.
                                 Default: EXTERNAL_FETCH_LOCK_DIR, then temp/external-fetch.lock
   --lock-stale-seconds <sec>    Break stale external fetch locks after this age.
                                 Default: ${DEFAULT_EXTERNAL_FETCH_LOCK_STALE_SECONDS}
+  --priority-signal-ttl-seconds <sec>
+                                Higher-priority external fetch signal TTL.
+                                Default: ${DEFAULT_EXTERNAL_FETCH_PRIORITY_TTL_SECONDS}
   --help                        Show this help message.
 `);
-}
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function log(message: string): void {

@@ -20,6 +20,7 @@ describe("CoolPC product price writer", () => {
     expect(result).toEqual({
       processedItemCount: 1,
       createdProductCount: 1,
+      createdProductIds: ["product-1"],
       updatedProductCount: 0,
       priceSnapshotCreatedCount: 1,
       priceUnchangedCount: 0,

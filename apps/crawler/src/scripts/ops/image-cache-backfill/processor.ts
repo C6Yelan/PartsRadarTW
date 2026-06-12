@@ -116,6 +116,60 @@ export async function readMissingImageCandidates(
   return missingCandidates;
 }
 
+export async function readMissingImageCandidatesByProductIds(
+  client: PrismaClient,
+  options: ImageBackfillOptions,
+  productIds: string[],
+): Promise<ProductImageCandidate[]> {
+  const uniqueProductIds = [...new Set(productIds)];
+
+  if (uniqueProductIds.length === 0) {
+    return [];
+  }
+
+  const candidates = await client.product.findMany({
+    where: {
+      id: { in: uniqueProductIds },
+      isActive: true,
+      primaryImageUrl: { not: null },
+      sourceCategory: {
+        enabled: true,
+      },
+    },
+    select: {
+      id: true,
+      name: true,
+      primaryImageUrl: true,
+      primaryImageCheckedAt: true,
+      firstSeenAt: true,
+      lastSeenAt: true,
+      sourceCategory: {
+        select: {
+          igrp: true,
+          displayName: true,
+        },
+      },
+    },
+    orderBy: [
+      { firstSeenAt: "desc" },
+      { lastSeenAt: "desc" },
+      { sourceCategory: { igrp: "asc" } },
+      { id: "asc" },
+    ],
+  });
+  const missingCandidates: ProductImageCandidate[] = [];
+
+  for (const candidate of candidates) {
+    if (await pathExists(join(options.storageDir, `${candidate.id}.webp`))) {
+      continue;
+    }
+
+    missingCandidates.push(candidate);
+  }
+
+  return missingCandidates;
+}
+
 export async function backfillImages(
   candidates: ProductImageCandidate[],
   options: ImageBackfillOptions,

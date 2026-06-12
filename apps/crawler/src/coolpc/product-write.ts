@@ -51,6 +51,7 @@ async function writeCoolpcProductPricesInTransaction({
   const result: WriteCoolpcProductPricesResult = {
     processedItemCount: items.length,
     createdProductCount: 0,
+    createdProductIds: [],
     updatedProductCount: 0,
     priceSnapshotCreatedCount: 0,
     priceUnchangedCount: 0,
@@ -71,6 +72,7 @@ async function writeCoolpcProductPricesInTransaction({
     });
 
     result.createdProductCount += itemResult.createdProductCount;
+    result.createdProductIds.push(...itemResult.createdProductIds);
     result.updatedProductCount += itemResult.updatedProductCount;
     result.priceSnapshotCreatedCount += itemResult.priceSnapshotCreatedCount;
     result.priceUnchangedCount += itemResult.priceUnchangedCount;

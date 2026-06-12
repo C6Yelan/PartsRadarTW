@@ -34,8 +34,8 @@
 | `storage-init` | 一次性初始化 snapshot / product image named volume 權限 |
 | `web` | Next.js 網站與查詢 API |
 | `crawler` | 手動 crawl / backfill / ops tools |
-| `crawler-daemon` | scheduled CoolPC crawl |
-| `maintenance-daemon` | scheduled link health check and missing image backfill |
+| `crawler-daemon` | scheduled CoolPC crawl + new-product image cache follow-up |
+| `maintenance-daemon` | scheduled link health check |
 | `raw-snapshot-cleanup-daemon` | scheduled raw snapshot cleanup |
 | `discord-bot` | Discord slash command bot for personal DM notifications |
 | `postgres` | 商品、價格、crawler 狀態與 metadata |
@@ -72,7 +72,7 @@
 - `web`、`crawler`、`crawler-daemon`、`maintenance-daemon` 與 `raw-snapshot-cleanup-daemon` 都等 `storage-init` 成功後才啟動；長時間 runtime 仍使用非 root user。
 - `crawler` 預設 command 是 help，避免 `docker compose up` 意外 live fetch。
 - `crawler-daemon` 與 `maintenance-daemon` 只在 `scheduled-crawler` profile 啟動，且 command 保留 `--confirm-live-fetch`。
-- `crawler-daemon` 與 `maintenance-daemon` 共用 `EXTERNAL_FETCH_LOCK_DIR`，避免定期價格抓取、連結檢查與缺圖補齊同時打外部來源。
+- `crawler-daemon` 與 `maintenance-daemon` 共用 `EXTERNAL_FETCH_LOCK_DIR`，避免定期價格抓取與連結檢查同時打外部來源；價格 crawler 到點時會發出短效 priority signal，讓 maintenance link health 在安全邊界暫停並延後幾分鐘繼續。新品圖片快取只在每輪價格 crawl 完成並釋放 lock 後針對本輪新增商品執行，既有缺圖修復仍使用手動 backfill 工具。
 - `cloudflared` 只在 `public-tunnel` profile 啟動。
 - `COOLPC_BASE_URL` 在 production Compose 固定為 `https://www.coolpc.com.tw`。
 - `web` 預設綁 `127.0.0.1:${WEB_PORT:-3000}`；公開流量走 Cloudflare Tunnel。
@@ -131,7 +131,8 @@ PRODUCT_IMAGE_STORAGE_DIR=/var/lib/partsradar/product-images
 責任：
 
 - `web` 只讀 `PRODUCT_IMAGE_STORAGE_DIR`，透過 `/api/product-images/{productId}.webp` 回傳。
-- `crawler` 或 backfill 工具負責建立 / 更新縮圖。
+- `crawler-daemon` 只針對本輪新增商品建立縮圖，不做全量或反覆缺圖掃描。
+- 手動 backfill 工具負責新主機、重建 volume 或大量缺圖修復。
 - 缺圖、檔案不存在或讀取失敗時，前端使用 fallback。
 - 圖片 cache 需納入備份 / 搬遷計畫，不視為可任意丟棄的暫存。
 
@@ -149,12 +150,11 @@ PRODUCT_IMAGE_STORAGE_DIR=/var/lib/partsradar/product-images
 | `API_RATE_LIMIT_WINDOW_SECONDS` / `API_RATE_LIMIT_CACHE_SIZE` | Web API 限流 window 與 bounded cache 大小 |
 | `SNAPSHOT_STORAGE_DIR` | container 內 snapshot path |
 | `PRODUCT_IMAGE_STORAGE_DIR` | container 內縮圖 path |
-| `CRAWLER_INTERVAL_SECONDS` / `CRAWLER_BACKOFF_SECONDS` / `CRAWLER_CATEGORY_DELAY_MS` | scheduled crawler 節奏 |
-| `CRAWLER_IMAGE_BACKFILL_LIMIT` / `CRAWLER_IMAGE_BACKFILL_MIN_DELAY_MS` / `CRAWLER_IMAGE_BACKFILL_MAX_DELAY_MS` / `CRAWLER_IMAGE_BACKFILL_TIMEOUT_MS` | scheduled crawler 成功後的小批次即時補圖節奏 |
-| `MAINTENANCE_INTERVAL_SECONDS` / `MAINTENANCE_INITIAL_DELAY_SECONDS` / `MAINTENANCE_TASK_COOLDOWN_SECONDS` | scheduled maintenance 節奏 |
+| `CRAWLER_INTERVAL_SECONDS` / `CRAWLER_BACKOFF_SECONDS` / `CRAWLER_LOCK_RETRY_SECONDS` / `CRAWLER_CATEGORY_DELAY_MS` | scheduled crawler 節奏 |
+| `CRAWLER_NEW_PRODUCT_IMAGE_MIN_DELAY_MS` / `CRAWLER_NEW_PRODUCT_IMAGE_MAX_DELAY_MS` / `CRAWLER_NEW_PRODUCT_IMAGE_TIMEOUT_MS` / `CRAWLER_NEW_PRODUCT_IMAGE_MAX_SOURCE_BYTES` | scheduled crawler 新增商品圖片快取節奏 |
+| `MAINTENANCE_INTERVAL_SECONDS` / `MAINTENANCE_INITIAL_DELAY_SECONDS` / `MAINTENANCE_PRICE_PRIORITY_PAUSE_SECONDS` | scheduled maintenance 節奏 |
 | `MAINTENANCE_LINK_LIMIT` / `MAINTENANCE_LINK_STALE_AFTER_HOURS` / `MAINTENANCE_LINK_MIN_DELAY_MS` / `MAINTENANCE_LINK_MAX_DELAY_MS` | link health maintenance 節奏 |
-| `MAINTENANCE_IMAGE_LIMIT` / `MAINTENANCE_IMAGE_MIN_DELAY_MS` / `MAINTENANCE_IMAGE_MAX_DELAY_MS` | missing image backfill maintenance 節奏 |
-| `EXTERNAL_FETCH_LOCK_DIR` / `EXTERNAL_FETCH_LOCK_STALE_SECONDS` | 外部抓取 shared lock |
+| `EXTERNAL_FETCH_LOCK_DIR` / `EXTERNAL_FETCH_LOCK_STALE_SECONDS` / `EXTERNAL_FETCH_PRIORITY_TTL_SECONDS` | 外部抓取 shared lock 與 priority signal |
 | `RAW_SNAPSHOT_CLEANUP_INTERVAL_SECONDS` | cleanup daemon 節奏 |
 | `DISCORD_BOT_TOKEN` / `DISCORD_APPLICATION_ID` / `DISCORD_GUILD_ID` | Discord bot 個人化通知設定；只在 `discord-bot` profile 啟用時需要 |
 | `DISCORD_BOT_REGISTER_COMMANDS_ON_START` / `DISCORD_PRICE_REPORT_MAX_ITEMS` / `DISCORD_BOT_COMMAND_COOLDOWN_SECONDS` / `DISCORD_PRICE_REPORT_SCHEDULE_INTERVAL_SECONDS` | Discord bot 指令註冊、報告列數、cooldown 與每日報告 due setting 檢查間隔 |

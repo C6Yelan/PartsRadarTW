@@ -104,11 +104,12 @@ export interface LinkCheckOutcome {
   errorMessage: string | null;
 }
 
-interface ProductLinkCheckerDependencies {
+export interface ProductLinkCheckerDependencies {
   fetchLink?: (url: string, options: ProductLinkCheckerOptions) => Promise<LinkCheckOutcome>;
   delay?: (ms: number) => Promise<void>;
   log?: (message: string) => void;
   now?: () => Date;
+  shouldPause?: () => Promise<boolean> | boolean;
 }
 
 export async function readProductLinkCandidates(
@@ -183,11 +184,13 @@ export async function checkProductLinks(
     broken: 0,
     temporaryError: 0,
     liveRequests: 0,
+    pausedForPriority: false,
   };
   const log = dependencies.log ?? console.log;
   const fetchLink = dependencies.fetchLink ?? fetchProductLink;
   const sleep = dependencies.delay ?? delay;
   const now = dependencies.now ?? (() => new Date());
+  const shouldPause = dependencies.shouldPause ?? (() => false);
 
   log(`Selected ${candidates.length} product link candidate(s).`);
   log(
@@ -198,6 +201,12 @@ export async function checkProductLinks(
   log("");
 
   for (const candidate of candidates) {
+    if (await shouldPause()) {
+      summary.pausedForPriority = true;
+      log("Pausing product link health checks for a higher-priority external fetch task.");
+      break;
+    }
+
     if (options.dryRun) {
       summary.dryRun += 1;
       log(`[dry-run] ${formatCandidate(candidate)} | ${candidate.url}`);
@@ -208,6 +217,12 @@ export async function checkProductLinks(
       const waitMs = randomDelayMs(options.minDelayMs, options.maxDelayMs);
       log(`Waiting ${waitMs}ms before the next link request...`);
       await sleep(waitMs);
+
+      if (await shouldPause()) {
+        summary.pausedForPriority = true;
+        log("Pausing product link health checks for a higher-priority external fetch task.");
+        break;
+      }
     }
 
     const checkedAt = now();

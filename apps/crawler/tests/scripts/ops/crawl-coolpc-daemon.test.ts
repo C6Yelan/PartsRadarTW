@@ -2,18 +2,20 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { CRAWL_RUN_STATUSES } from "../../../src/coolpc/crawl-run";
+import { afterEach, describe, expect, it } from "vitest";
+import {
+  CRAWL_RUN_CATEGORY_RESULT_STATUSES,
+  CRAWL_RUN_STATUSES,
+} from "../../../src/coolpc/crawl-run";
 import {
   type CoolpcDaemonOptions,
   parseDaemonOptions,
-  runImmediateImageBackfill,
+  runScheduledCycle,
 } from "../../../src/scripts/ops/crawl-coolpc-daemon";
 
 const tempRoots: string[] = [];
 
 afterEach(async () => {
-  vi.restoreAllMocks();
   await Promise.all(tempRoots.splice(0).map((path) => rm(path, { recursive: true, force: true })));
 });
 
@@ -31,14 +33,16 @@ describe("CoolPC scheduled crawler daemon options", () => {
       {
         CRAWLER_INTERVAL_SECONDS: "600",
         CRAWLER_BACKOFF_SECONDS: "7200",
+        CRAWLER_LOCK_RETRY_SECONDS: "90",
         CRAWLER_CATEGORY_DELAY_MS: "5000",
-        CRAWLER_IMAGE_BACKFILL_LIMIT: "7",
-        CRAWLER_IMAGE_BACKFILL_MIN_DELAY_MS: "3000",
-        CRAWLER_IMAGE_BACKFILL_MAX_DELAY_MS: "9000",
-        CRAWLER_IMAGE_BACKFILL_TIMEOUT_MS: "12000",
+        CRAWLER_NEW_PRODUCT_IMAGE_MIN_DELAY_MS: "6000",
+        CRAWLER_NEW_PRODUCT_IMAGE_MAX_DELAY_MS: "9000",
+        CRAWLER_NEW_PRODUCT_IMAGE_TIMEOUT_MS: "18000",
+        CRAWLER_NEW_PRODUCT_IMAGE_MAX_SOURCE_BYTES: "4194304",
         SNAPSHOT_STORAGE_DIR: "storage/snapshots",
         PRODUCT_IMAGE_STORAGE_DIR: "storage/product-images",
         EXTERNAL_FETCH_LOCK_STALE_SECONDS: "21600",
+        EXTERNAL_FETCH_PRIORITY_TTL_SECONDS: "300",
         COOLPC_BASE_URL: "https://www.coolpc.com.tw",
       },
       crawlerCwd,
@@ -52,21 +56,17 @@ describe("CoolPC scheduled crawler daemon options", () => {
       categoryDelayMs: 5000,
       lockDir: join(workspaceRoot, "storage", "snapshots", ".locks", "external-fetch"),
       lockStaleSeconds: 21600,
+      lockRetrySeconds: 90,
+      prioritySignalTtlSeconds: 300,
       runOnce: false,
       baseUrl: "https://www.coolpc.com.tw",
-      imageBackfillLimit: 7,
-      imageBackfill: {
+      newProductImageBackfill: {
         workspaceRoot,
         storageDir: join(workspaceRoot, "storage", "product-images"),
-        limit: 7,
-        productId: null,
-        igrp: null,
-        minDelayMs: 3000,
+        minDelayMs: 6000,
         maxDelayMs: 9000,
-        timeoutMs: 12000,
-        maxSourceBytes: 5 * 1024 * 1024,
-        dryRun: false,
-        overwrite: false,
+        timeoutMs: 18000,
+        maxSourceBytes: 4194304,
       },
       priceChangeDiscordNotification: {
         publicWebhookUrl: null,
@@ -150,70 +150,147 @@ describe("CoolPC scheduled crawler daemon options", () => {
         crawlerCwd,
       ),
     ).toThrow("--category-delay-ms/CRAWLER_CATEGORY_DELAY_MS must be at most 60000");
-  });
-
-  it("allows disabling immediate image backfill without disabling the crawler", async () => {
-    const { crawlerCwd } = await createWorkspace();
-    const options = parseDaemonOptions(
-      ["--confirm-live-fetch", "--image-backfill-limit", "0"],
-      {},
-      crawlerCwd,
-    );
-
-    expect(options.imageBackfillLimit).toBe(0);
-    expect(options.imageBackfill.limit).toBe(0);
-  });
-
-  it("rejects aggressive immediate image backfill settings", async () => {
-    const { crawlerCwd } = await createWorkspace();
-
-    expect(() =>
-      parseDaemonOptions(
-        ["--confirm-live-fetch", "--image-backfill-limit", "51"],
-        {},
-        crawlerCwd,
-      ),
-    ).toThrow("--image-backfill-limit/CRAWLER_IMAGE_BACKFILL_LIMIT must be at most 50");
 
     expect(() =>
       parseDaemonOptions(
         [
           "--confirm-live-fetch",
-          "--image-backfill-min-delay-ms",
-          "9000",
-          "--image-backfill-max-delay-ms",
-          "8000",
+          "--new-product-image-min-delay-ms",
+          "12000",
+          "--new-product-image-max-delay-ms",
+          "5000",
         ],
         {},
         crawlerCwd,
       ),
-    ).toThrow("must be less than or equal to");
+    ).toThrow("--new-product-image-min-delay-ms/CRAWLER_NEW_PRODUCT_IMAGE_MIN_DELAY_MS");
   });
-});
 
-describe("CoolPC scheduled crawler immediate image backfill", () => {
-  it("logs image backfill failures without throwing into the crawler cycle", async () => {
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+  it("releases the external fetch lock before non-crawl follow-up work", async () => {
+    const calls: string[] = [];
+    const fakeLock = {
+      lockDir: "/tmp/external-fetch.lock",
+      owner: "crawler-daemon",
+      async release() {
+        calls.push("release-lock");
+      },
+    };
 
-    await expect(
-      runImmediateImageBackfill({
-        client: {
-          product: {
-            findMany: async () => {
-              throw new Error("image storage temporarily unavailable");
+    const result = await runScheduledCycle({} as never, createDaemonOptions(), {
+      acquireLock: async () => {
+        calls.push("acquire-lock");
+        return fakeLock;
+      },
+      crawlCategories: async () => {
+        calls.push("crawl-categories");
+        return {
+          crawlRunId: "crawl-run-1",
+          status: CRAWL_RUN_STATUSES.SUCCESS_CHANGED,
+          stoppedBySuspectedBlock: false,
+          categoryResults: [
+            {
+              sourceCategoryId: "category-4",
+              igrp: 4,
+              status: CRAWL_RUN_CATEGORY_RESULT_STATUSES.SUCCESS_CHANGED,
+              rawSnapshotId: "raw-snapshot-1",
+              errorMessage: null,
+              productWriteSummary: {
+                processedItemCount: 1,
+                createdProductCount: 1,
+                createdProductIds: ["product-1"],
+                updatedProductCount: 0,
+                priceSnapshotCreatedCount: 1,
+                priceUnchangedCount: 0,
+                missingProductUpdatedCount: 0,
+                markedInactiveProductCount: 0,
+              },
+            },
+          ],
+        };
+      },
+      notifyPriceChanges: async () => {
+        calls.push("notify-price-changes");
+      },
+      backfillNewProductImages: async ({ productIds }) => {
+        expect(productIds).toEqual(["product-1"]);
+        calls.push("backfill-new-product-images");
+      },
+    });
+
+    expect(result).toEqual({ shouldBackoff: false });
+    expect(calls).toEqual([
+      "acquire-lock",
+      "crawl-categories",
+      "release-lock",
+      "notify-price-changes",
+      "backfill-new-product-images",
+    ]);
+  });
+
+  it("requests priority and retries soon when another external fetch task holds the lock", async () => {
+    const calls: string[] = [];
+
+    const result = await runScheduledCycle({} as never, createDaemonOptions(), {
+      acquireLock: async () => null,
+      requestPriority: async ({ owner, ttlSeconds }) => {
+        calls.push(`request-priority:${owner}:${ttlSeconds}`);
+      },
+      crawlCategories: async () => {
+        calls.push("crawl-categories");
+        throw new Error("should not crawl without lock");
+      },
+    });
+
+    expect(result).toEqual({ shouldBackoff: false, retryAfterSeconds: 120 });
+    expect(calls).toEqual(["request-priority:crawler-daemon:600"]);
+  });
+
+  it("skips new product image backfill when the crawl result should back off", async () => {
+    const calls: string[] = [];
+    const fakeLock = {
+      lockDir: "/tmp/external-fetch.lock",
+      owner: "crawler-daemon",
+      async release() {
+        calls.push("release-lock");
+      },
+    };
+
+    const result = await runScheduledCycle({} as never, createDaemonOptions(), {
+      acquireLock: async () => fakeLock,
+      crawlCategories: async () => ({
+        crawlRunId: "crawl-run-1",
+        status: CRAWL_RUN_STATUSES.SUSPECTED_BLOCK,
+        stoppedBySuspectedBlock: true,
+        categoryResults: [
+          {
+            sourceCategoryId: "category-4",
+            igrp: 4,
+            status: CRAWL_RUN_CATEGORY_RESULT_STATUSES.SUCCESS_CHANGED,
+            rawSnapshotId: "raw-snapshot-1",
+            errorMessage: null,
+            productWriteSummary: {
+              processedItemCount: 1,
+              createdProductCount: 1,
+              createdProductIds: ["product-1"],
+              updatedProductCount: 0,
+              priceSnapshotCreatedCount: 1,
+              priceUnchangedCount: 0,
+              missingProductUpdatedCount: 0,
+              markedInactiveProductCount: 0,
             },
           },
-        } as never,
-        options: createDaemonOptions(),
-        shouldBackoff: false,
-        status: CRAWL_RUN_STATUSES.SUCCESS_CHANGED,
-        stoppedBySuspectedBlock: false,
+        ],
       }),
-    ).resolves.toBeUndefined();
+      notifyPriceChanges: async () => {
+        calls.push("notify-price-changes");
+      },
+      backfillNewProductImages: async () => {
+        calls.push("backfill-new-product-images");
+      },
+    });
 
-    expect(logSpy).toHaveBeenCalledWith(
-      expect.stringContaining("failed without affecting crawler status"),
-    );
+    expect(result).toEqual({ shouldBackoff: true });
+    expect(calls).toEqual(["release-lock", "notify-price-changes"]);
   });
 });
 
@@ -236,26 +313,22 @@ function createDaemonOptions(overrides: Partial<CoolpcDaemonOptions> = {}): Cool
     categoryDelayMs: 8000,
     lockDir: "/workspace/storage/snapshots/.locks/external-fetch",
     lockStaleSeconds: 43200,
+    lockRetrySeconds: 120,
+    prioritySignalTtlSeconds: 600,
     runOnce: false,
     baseUrl: "https://www.coolpc.com.tw",
+    newProductImageBackfill: {
+      workspaceRoot: "/workspace",
+      storageDir: "/workspace/storage/product-images",
+      minDelayMs: 5000,
+      maxDelayMs: 12000,
+      timeoutMs: 15000,
+      maxSourceBytes: 5 * 1024 * 1024,
+    },
     priceChangeDiscordNotification: {
       publicWebhookUrl: null,
       publicBaseUrl: "https://partsradar.net/",
       maxItems: 50,
-    },
-    imageBackfillLimit: 20,
-    imageBackfill: {
-      workspaceRoot: "/workspace",
-      storageDir: "/workspace/storage/product-images",
-      limit: 20,
-      productId: null,
-      igrp: null,
-      minDelayMs: 3000,
-      maxDelayMs: 8000,
-      timeoutMs: 15000,
-      maxSourceBytes: 5 * 1024 * 1024,
-      dryRun: false,
-      overwrite: false,
     },
     ...overrides,
   };

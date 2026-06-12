@@ -301,6 +301,7 @@ export function createProductWriterSpy(): {
       return {
         processedItemCount: items.length,
         createdProductCount: items.length,
+        createdProductIds: items.map((_, index) => `product-${index + 1}`),
         updatedProductCount: 0,
         priceSnapshotCreatedCount: items.length,
         priceUnchangedCount: 0,
