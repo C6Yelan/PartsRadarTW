@@ -18,7 +18,6 @@ import {
 
 const TOKEN = "test_bot_token";
 const APPLICATION_ID = "123456789012345678";
-const GUILD_ID = "987654321098765432";
 const API_BASE_URL = "https://discord.test/api/v10";
 const PUBLIC_BASE_URL = "https://partsradar.test/";
 
@@ -28,13 +27,11 @@ describe("Discord bot options", () => {
       parseDiscordBotOptions([], {
         DISCORD_BOT_TOKEN: TOKEN,
         DISCORD_APPLICATION_ID: APPLICATION_ID,
-        DISCORD_GUILD_ID: GUILD_ID,
         PARTSRADAR_PUBLIC_BASE_URL: PUBLIC_BASE_URL,
       }),
     ).toMatchObject({
       token: TOKEN,
       applicationId: APPLICATION_ID,
-      guildId: GUILD_ID,
       publicBaseUrl: "https://partsradar.test/",
       apiBaseUrl: "https://discord.com/api/v10",
       registerCommands: false,
@@ -57,7 +54,7 @@ describe("Discord bot options", () => {
 });
 
 describe("registerDiscordBotCommands", () => {
-  it("registers the global price-report command and clears configured guild commands", async () => {
+  it("registers the global price-report command", async () => {
     const fetchMock = vi.fn<typeof fetch>(
       async () => new Response(JSON.stringify([{ id: "command-1" }]), { status: 200 }),
     );
@@ -66,27 +63,25 @@ describe("registerDiscordBotCommands", () => {
       registerDiscordBotCommands({
         token: TOKEN,
         applicationId: APPLICATION_ID,
-        guildId: GUILD_ID,
         apiBaseUrl: API_BASE_URL,
         fetchImpl: fetchMock as typeof fetch,
       }),
     ).resolves.toMatchObject({
       status: "ok",
       httpStatus: 200,
-      clearedGuildCommands: true,
     });
 
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     const [globalUrl, globalRequestInit] = fetchMock.mock.calls[0] as [
-      Parameters<typeof fetch>[0],
-      RequestInit,
-    ];
-    const [url, requestInit] = fetchMock.mock.calls[1] as [
       Parameters<typeof fetch>[0],
       RequestInit,
     ];
     expect(String(globalUrl)).toBe(`${API_BASE_URL}/applications/${APPLICATION_ID}/commands`);
     expect(globalRequestInit.method).toBe("PUT");
+    expect(globalRequestInit.headers).toMatchObject({
+      authorization: `Bot ${TOKEN}`,
+      "content-type": "application/json",
+    });
     expect(JSON.parse(String(globalRequestInit.body))).toEqual([
       expect.objectContaining({
         name: "price-report",
@@ -94,37 +89,6 @@ describe("registerDiscordBotCommands", () => {
         dm_permission: true,
       }),
     ]);
-    expect(String(url)).toBe(
-      `${API_BASE_URL}/applications/${APPLICATION_ID}/guilds/${GUILD_ID}/commands`,
-    );
-    expect(requestInit.method).toBe("PUT");
-    expect(requestInit.headers).toMatchObject({
-      authorization: `Bot ${TOKEN}`,
-      "content-type": "application/json",
-    });
-    expect(JSON.parse(String(requestInit.body))).toEqual([]);
-  });
-
-  it("registers only the global command when no guild is configured", async () => {
-    const fetchMock = vi.fn<typeof fetch>(
-      async () => new Response(JSON.stringify([{ id: "command-1" }]), { status: 200 }),
-    );
-
-    await expect(
-      registerDiscordBotCommands({
-        token: TOKEN,
-        applicationId: APPLICATION_ID,
-        guildId: null,
-        apiBaseUrl: API_BASE_URL,
-        fetchImpl: fetchMock as typeof fetch,
-      }),
-    ).resolves.toMatchObject({
-      status: "ok",
-      httpStatus: 200,
-      clearedGuildCommands: false,
-    });
-
-    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -642,7 +606,6 @@ function createDiscordBotOptions(): DiscordBotOptions {
   return {
     token: TOKEN,
     applicationId: APPLICATION_ID,
-    guildId: GUILD_ID,
     publicBaseUrl: PUBLIC_BASE_URL,
     apiBaseUrl: API_BASE_URL,
     gatewayUrl: "wss://discord.test/gateway",

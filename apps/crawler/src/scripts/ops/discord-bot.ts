@@ -70,9 +70,7 @@ async function main(): Promise<void> {
       throw new Error(`Discord command registration failed: ${formatDiscordRestFailure(result)}`);
     }
 
-    log(
-      `Discord bot commands registered. scope=global guildCommands=${result.clearedGuildCommands ? "cleared" : "none"} httpStatus=${result.httpStatus}`,
-    );
+    log(`Discord bot commands registered. scope=global httpStatus=${result.httpStatus}`);
     return;
   }
 

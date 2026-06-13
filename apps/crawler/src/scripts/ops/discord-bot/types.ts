@@ -8,7 +8,6 @@ export type FetchImpl = typeof fetch;
 export interface DiscordBotOptions {
   token: string;
   applicationId: string;
-  guildId: string | null;
   publicBaseUrl: string;
   apiBaseUrl: string;
   gatewayUrl: string;

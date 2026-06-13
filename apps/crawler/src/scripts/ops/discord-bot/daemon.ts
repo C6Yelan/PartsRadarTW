@@ -31,7 +31,6 @@ export async function runDiscordBotDaemon({
     const result = await registerDiscordBotCommands({
       token: options.token,
       applicationId: options.applicationId,
-      guildId: options.guildId,
       apiBaseUrl: options.apiBaseUrl,
       fetchImpl,
     });
@@ -40,9 +39,7 @@ export async function runDiscordBotDaemon({
       throw new Error(`Discord command registration failed: ${formatDiscordRestFailure(result)}`);
     }
 
-    logMessage(
-      `Discord bot commands registered. scope=global guildCommands=${result.clearedGuildCommands ? "cleared" : "none"} httpStatus=${result.httpStatus}`,
-    );
+    logMessage(`Discord bot commands registered. scope=global httpStatus=${result.httpStatus}`);
 
     if (options.registerCommands) {
       return;
