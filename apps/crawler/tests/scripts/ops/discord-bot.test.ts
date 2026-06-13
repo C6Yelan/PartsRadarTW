@@ -57,7 +57,7 @@ describe("Discord bot options", () => {
 });
 
 describe("registerDiscordBotCommands", () => {
-  it("registers the price-report command in the configured guild", async () => {
+  it("registers the global price-report command and clears configured guild commands", async () => {
     const fetchMock = vi.fn<typeof fetch>(
       async () => new Response(JSON.stringify([{ id: "command-1" }]), { status: 200 }),
     );
@@ -73,6 +73,7 @@ describe("registerDiscordBotCommands", () => {
     ).resolves.toMatchObject({
       status: "ok",
       httpStatus: 200,
+      clearedGuildCommands: true,
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -101,12 +102,29 @@ describe("registerDiscordBotCommands", () => {
       authorization: `Bot ${TOKEN}`,
       "content-type": "application/json",
     });
-    expect(String(requestInit.body)).toContain('"name":"price-report"');
-    expect(String(requestInit.body)).toContain('"name":"now"');
-    expect(String(requestInit.body)).toContain('"name":"enable"');
-    expect(String(requestInit.body)).toContain('"name":"time"');
-    expect(String(requestInit.body)).toContain('"name":"disable"');
-    expect(String(requestInit.body)).toContain('"name":"settings"');
+    expect(JSON.parse(String(requestInit.body))).toEqual([]);
+  });
+
+  it("registers only the global command when no guild is configured", async () => {
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify([{ id: "command-1" }]), { status: 200 }),
+    );
+
+    await expect(
+      registerDiscordBotCommands({
+        token: TOKEN,
+        applicationId: APPLICATION_ID,
+        guildId: null,
+        apiBaseUrl: API_BASE_URL,
+        fetchImpl: fetchMock as typeof fetch,
+      }),
+    ).resolves.toMatchObject({
+      status: "ok",
+      httpStatus: 200,
+      clearedGuildCommands: false,
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
 

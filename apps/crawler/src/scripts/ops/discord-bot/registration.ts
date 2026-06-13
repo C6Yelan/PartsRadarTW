@@ -4,6 +4,15 @@ import { createPriceReportCommand } from "./commands";
 import { sendDiscordRestRequest } from "./rest";
 import type { DiscordBotOptions, DiscordRestResult, FetchImpl } from "./types";
 
+export type DiscordCommandRegistrationResult =
+  | {
+      status: "ok";
+      httpStatus: number;
+      body: unknown | null;
+      clearedGuildCommands: boolean;
+    }
+  | Exclude<DiscordRestResult<unknown>, { status: "ok" }>;
+
 export async function registerDiscordBotCommands({
   token,
   applicationId,
@@ -12,28 +21,42 @@ export async function registerDiscordBotCommands({
   fetchImpl = fetch,
 }: Pick<DiscordBotOptions, "token" | "applicationId" | "guildId" | "apiBaseUrl"> & {
   fetchImpl?: FetchImpl;
-}): Promise<DiscordRestResult<unknown>> {
+}): Promise<DiscordCommandRegistrationResult> {
   const globalResult = await sendDiscordRestRequest<unknown>({
     token,
     apiBaseUrl,
     fetchImpl,
     method: "PUT",
     path: `/applications/${applicationId}/commands`,
-    body: [createPriceReportCommand({ includeDmContexts: true })],
+    body: [createPriceReportCommand()],
   });
 
-  if (globalResult.status !== "ok" || !guildId) {
+  if (globalResult.status !== "ok") {
     return globalResult;
   }
 
-  const guildResult = await sendDiscordRestRequest<unknown>({
+  if (!guildId) {
+    return {
+      ...globalResult,
+      clearedGuildCommands: false,
+    };
+  }
+
+  const guildCleanupResult = await sendDiscordRestRequest<unknown>({
     token,
     apiBaseUrl,
     fetchImpl,
     method: "PUT",
     path: `/applications/${applicationId}/guilds/${guildId}/commands`,
-    body: [createPriceReportCommand({ includeDmContexts: false })],
+    body: [],
   });
 
-  return guildResult;
+  if (guildCleanupResult.status !== "ok") {
+    return guildCleanupResult;
+  }
+
+  return {
+    ...globalResult,
+    clearedGuildCommands: true,
+  };
 }

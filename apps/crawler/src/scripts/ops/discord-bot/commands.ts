@@ -11,21 +11,13 @@ import {
 } from "./constants";
 import type { DiscordInteraction, ParsedPriceReportCommand } from "./types";
 
-export function createPriceReportCommand({
-  includeDmContexts,
-}: {
-  includeDmContexts: boolean;
-}): Record<string, unknown> {
+export function createPriceReportCommand(): Record<string, unknown> {
   return {
     name: "price-report",
     description: "Send PartsRadarTW price change reports.",
     type: DISCORD_COMMAND_TYPE_CHAT_INPUT,
-    ...(includeDmContexts
-      ? {
-          contexts: [DISCORD_APPLICATION_CONTEXT_GUILD, DISCORD_APPLICATION_CONTEXT_BOT_DM],
-          dm_permission: true,
-        }
-      : {}),
+    contexts: [DISCORD_APPLICATION_CONTEXT_GUILD, DISCORD_APPLICATION_CONTEXT_BOT_DM],
+    dm_permission: true,
     options: [
       {
         type: DISCORD_OPTION_TYPE_SUBCOMMAND,

@@ -41,7 +41,7 @@ export async function runDiscordBotDaemon({
     }
 
     logMessage(
-      `Discord bot commands registered. scope=${options.guildId ? "global+guild" : "global"} httpStatus=${result.httpStatus}`,
+      `Discord bot commands registered. scope=global guildCommands=${result.clearedGuildCommands ? "cleared" : "none"} httpStatus=${result.httpStatus}`,
     );
 
     if (options.registerCommands) {

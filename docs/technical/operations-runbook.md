@@ -519,7 +519,7 @@ Bot 目標：
 - `discord-bot` Compose profile 與 `pnpm ops:discord-bot` daemon entrypoint。
 - Discord slash command registration。
 - `/price-report now`：使用者手動要求最近 `24h` / `12h` / `6h` 價格報告，bot 會在指令發出的頻道或私訊 context 以 embed 回覆中文報告。
-- Slash command 會註冊 global command 供 DM 使用；若設定 `DISCORD_GUILD_ID`，也會額外註冊 guild command 方便伺服器測試。
+- Slash command 只註冊 global command，供伺服器與 DM 使用；若設定 `DISCORD_GUILD_ID`，registration 會清空該 guild 既有 guild-scoped commands，避免 Discord client 同時顯示 global 與 guild 的重複 `/price-report`。
 - `/price-report now` 報告在 embed description 中連續顯示「價格變動」與「新增商品」兩個區段；沒有資料時分區顯示空狀態。
 - `/price-report now` 每次最多列 `DISCORD_PRICE_REPORT_MAX_ITEMS` 筆，預設 50；上限套用在兩區合計列出的商品數；per-user cooldown 只套用在實際產生報告的 `now` 指令。
 - 每次 `/price-report now` 會寫入 `discord_notification_deliveries`，供後續去重、排程與維運檢視使用。
@@ -537,7 +537,7 @@ Bot 目標：
 
 - `DISCORD_BOT_TOKEN`：Discord bot token，只能放在 untracked `.env` 或部署 secret。
 - `DISCORD_APPLICATION_ID`：Discord application id。
-- `DISCORD_GUILD_ID`：Discord guild id；第一輪建議設定 guild command，註冊與測試速度較快。
+- `DISCORD_GUILD_ID`：Discord guild id；可保留用於清理舊 guild-scoped commands，避免和 global command 重複顯示。
 - `DISCORD_BOT_REGISTER_COMMANDS_ON_START`：daemon 啟動時是否註冊 slash command，預設 `true`。
 - `DISCORD_PRICE_REPORT_MAX_ITEMS`：`/price-report now` 最多列出的商品數，預設 50。
 - `DISCORD_BOT_COMMAND_COOLDOWN_SECONDS`：每位使用者手動指令 cooldown，預設 60。

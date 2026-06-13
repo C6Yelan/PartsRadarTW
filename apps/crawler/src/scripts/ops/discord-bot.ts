@@ -71,7 +71,7 @@ async function main(): Promise<void> {
     }
 
     log(
-      `Discord bot commands registered. scope=${options.guildId ? "global+guild" : "global"} httpStatus=${result.httpStatus}`,
+      `Discord bot commands registered. scope=global guildCommands=${result.clearedGuildCommands ? "cleared" : "none"} httpStatus=${result.httpStatus}`,
     );
     return;
   }
