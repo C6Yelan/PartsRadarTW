@@ -105,6 +105,14 @@ describe("readCrawlRunPriceChanges", () => {
       {
         productId: "product-1",
         productName: "Changed GPU",
+        category: {
+          igrp: 12,
+          displayName: "顯示卡",
+        },
+        subcategory: {
+          slug: "asus",
+          displayName: "華碩",
+        },
         previousPrice: 10000,
         currentPrice: 9500,
         currency: "TWD",
@@ -226,6 +234,14 @@ describe("readRecentPriceChanges", () => {
       {
         productId: "product-1",
         productName: "GPU A",
+        category: {
+          igrp: 12,
+          displayName: "顯示卡",
+        },
+        subcategory: {
+          slug: "asus",
+          displayName: "華碩",
+        },
         previousPrice: 9300,
         currentPrice: 9000,
         currency: "TWD",
@@ -283,6 +299,14 @@ describe("readRecentPriceReport", () => {
         {
           productId: "gpu",
           productName: "Changed GPU",
+          category: {
+            igrp: 12,
+            displayName: "顯示卡",
+          },
+          subcategory: {
+            slug: "asus",
+            displayName: "華碩",
+          },
           previousPrice: 12000,
           currentPrice: 10990,
           currency: "TWD",
@@ -294,6 +318,14 @@ describe("readRecentPriceReport", () => {
         {
           productId: "ssd",
           productName: "Brand New SSD",
+          category: {
+            igrp: 12,
+            displayName: "顯示卡",
+          },
+          subcategory: {
+            slug: "asus",
+            displayName: "華碩",
+          },
           currentPrice: 2390,
           currency: "TWD",
           firstSeenAt: new Date("2026-06-07T04:00:00.000Z"),
@@ -491,6 +523,10 @@ interface TestSnapshot {
   price: number;
   currency: string;
   capturedAt: Date;
+  categoryIgrp: number;
+  categoryName: string;
+  vendorSlug: string | null;
+  vendorName: string | null;
 }
 
 function snapshot({
@@ -501,6 +537,10 @@ function snapshot({
   price,
   capturedAt,
   currency = "TWD",
+  categoryIgrp = 12,
+  categoryName = "顯示卡",
+  vendorSlug = "asus",
+  vendorName = "華碩",
 }: {
   id: string;
   productId: string;
@@ -509,6 +549,10 @@ function snapshot({
   price: number;
   capturedAt: string;
   currency?: string;
+  categoryIgrp?: number;
+  categoryName?: string;
+  vendorSlug?: string | null;
+  vendorName?: string | null;
 }): TestSnapshot {
   return {
     id,
@@ -518,6 +562,10 @@ function snapshot({
     price,
     currency,
     capturedAt: new Date(capturedAt),
+    categoryIgrp,
+    categoryName,
+    vendorSlug,
+    vendorName,
   };
 }
 
@@ -539,6 +587,14 @@ function change({
     productName,
     previousPrice,
     currentPrice: previousPrice + delta,
+    category: {
+      igrp: 12,
+      displayName: "顯示卡",
+    },
+    subcategory: {
+      slug: "asus",
+      displayName: "華碩",
+    },
     currency: "TWD",
     changedAt,
     delta,
@@ -557,17 +613,7 @@ function createPriceChangeClient(snapshots: TestSnapshot[]): PriceChangeDiscordC
       return snapshots
         .filter((snapshot) => snapshot.crawlRunId === where.crawlRunId)
         .sort(compareCapturedAtAsc)
-        .map((snapshot) => ({
-          id: snapshot.id,
-          productId: snapshot.productId,
-          price: snapshot.price,
-          currency: snapshot.currency,
-          capturedAt: snapshot.capturedAt,
-          product: {
-            id: snapshot.productId,
-            name: snapshot.productName,
-          },
-        }));
+        .map(toPrismaSnapshotWithProduct);
     }
 
     if (
@@ -586,17 +632,7 @@ function createPriceChangeClient(snapshots: TestSnapshot[]): PriceChangeDiscordC
             snapshot.capturedAt.getTime() <= capturedAtFilter.lte.getTime(),
         )
         .sort(compareCapturedAtAsc)
-        .map((snapshot) => ({
-          id: snapshot.id,
-          productId: snapshot.productId,
-          price: snapshot.price,
-          currency: snapshot.currency,
-          capturedAt: snapshot.capturedAt,
-          product: {
-            id: snapshot.productId,
-            name: snapshot.productName,
-          },
-        }));
+        .map(toPrismaSnapshotWithProduct);
     }
 
     const productIdFilter = where.productId as { in: string[] };
@@ -628,6 +664,26 @@ function createPriceChangeClient(snapshots: TestSnapshot[]): PriceChangeDiscordC
     priceSnapshot: {
       findMany: ReturnType<typeof vi.fn>;
     };
+  };
+}
+
+function toPrismaSnapshotWithProduct(snapshot: TestSnapshot) {
+  return {
+    id: snapshot.id,
+    productId: snapshot.productId,
+    price: snapshot.price,
+    currency: snapshot.currency,
+    capturedAt: snapshot.capturedAt,
+    product: {
+      id: snapshot.productId,
+      name: snapshot.productName,
+      vendorSlug: snapshot.vendorSlug,
+      vendorName: snapshot.vendorName,
+      sourceCategory: {
+        igrp: snapshot.categoryIgrp,
+        displayName: snapshot.categoryName,
+      },
+    },
   };
 }
 

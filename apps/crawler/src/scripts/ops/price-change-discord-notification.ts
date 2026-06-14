@@ -17,6 +17,8 @@ export type {
   PriceChangeDiscordNotificationSkipReason,
   PriceChangeReportMessageOptions,
   PriceReportNewProductItem,
+  PriceReportProductCategory,
+  PriceReportProductSubcategory,
   RecentPriceChangeOptions,
   RecentPriceReport,
 } from "./price-change-discord-notification/types";

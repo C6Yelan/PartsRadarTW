@@ -11,6 +11,8 @@ export interface PriceChangeDiscordNotificationOptions {
 export interface PriceChangeDiscordNotificationItem {
   productId: string;
   productName: string;
+  category: PriceReportProductCategory;
+  subcategory: PriceReportProductSubcategory | null;
   previousPrice: number;
   currentPrice: number;
   currency: string;
@@ -21,9 +23,21 @@ export interface PriceChangeDiscordNotificationItem {
 export interface PriceReportNewProductItem {
   productId: string;
   productName: string;
+  category: PriceReportProductCategory;
+  subcategory: PriceReportProductSubcategory | null;
   currentPrice: number;
   currency: string;
   firstSeenAt: Date;
+}
+
+export interface PriceReportProductCategory {
+  igrp: number;
+  displayName: string;
+}
+
+export interface PriceReportProductSubcategory {
+  slug: string | null;
+  displayName: string;
 }
 
 export interface RecentPriceReport {
@@ -85,6 +99,12 @@ export interface CrawlRunPriceSnapshot {
   product: {
     id: string;
     name: string;
+    vendorSlug: string | null;
+    vendorName: string | null;
+    sourceCategory: {
+      igrp: number;
+      displayName: string;
+    };
   };
 }
 

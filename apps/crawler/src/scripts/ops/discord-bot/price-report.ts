@@ -5,6 +5,8 @@ import {
   readRecentPriceReport,
   type PriceChangeDiscordNotificationItem,
   type PriceReportNewProductItem,
+  type PriceReportProductCategory,
+  type PriceReportProductSubcategory,
   type RecentPriceReport,
 } from "../price-change-discord-notification";
 import {
@@ -341,11 +343,19 @@ function createPersonalPriceReportEmbedMessages(
     priceChangeCount: report.priceChanges.length,
     newProductCount: report.newProducts.length,
     windowHours: options.windowHours,
-    priceChangeLines: listedPriceChanges.map((change) =>
-      formatPersonalPriceChangeEmbedLine(change, options.publicBaseUrl),
+    priceChangeLines: formatGroupedReportLines(
+      listedPriceChanges.map((change) => ({
+        category: change.category,
+        subcategory: change.subcategory,
+        line: formatPersonalPriceChangeEmbedLine(change, options.publicBaseUrl),
+      })),
     ),
-    newProductLines: listedNewProducts.map((product) =>
-      formatNewProductEmbedLine(product, options.publicBaseUrl),
+    newProductLines: formatGroupedReportLines(
+      listedNewProducts.map((product) => ({
+        category: product.category,
+        subcategory: product.subcategory,
+        line: formatNewProductEmbedLine(product, options.publicBaseUrl),
+      })),
     ),
   });
   const footer = formatHiddenReportFooter({
@@ -384,8 +394,10 @@ function createReportDescriptionChunks({
 }): string[] {
   const lines = [
     `過去 ${windowHours} 小時：價格變動 ${priceChangeCount}，新增商品 ${newProductCount}`,
+    "",
     `價格變動 (${priceChangeCount})`,
     ...(priceChangeLines.length > 0 ? priceChangeLines : ["沒有價格變動。"]),
+    "",
     `新增商品 (${newProductCount})`,
     ...(newProductLines.length > 0 ? newProductLines : ["沒有新增商品。"]),
   ];
@@ -410,6 +422,74 @@ function createReportDescriptionChunks({
   }
 
   return chunks;
+}
+
+interface GroupedReportLineItem {
+  category: PriceReportProductCategory;
+  subcategory: PriceReportProductSubcategory | null;
+  line: string;
+}
+
+function formatGroupedReportLines(items: GroupedReportLineItem[]): string[] {
+  const lines: string[] = [];
+  const categoryGroups = groupReportItems(items, (item) => formatCategoryKey(item.category));
+
+  for (const categoryItems of categoryGroups.values()) {
+    const category = categoryItems[0]?.category;
+
+    if (!category) {
+      continue;
+    }
+
+    if (lines.length > 0) {
+      lines.push("");
+    }
+
+    lines.push(`**${formatReportHeading(category.displayName)}**`);
+
+    const subcategoryGroups = groupReportItems(categoryItems, (item) =>
+      formatSubcategoryKey(item.subcategory),
+    );
+
+    for (const subcategoryItems of subcategoryGroups.values()) {
+      const subcategory = subcategoryItems[0]?.subcategory;
+      lines.push(formatReportSubcategoryHeading(subcategory));
+      lines.push(...subcategoryItems.map((item) => item.line));
+    }
+  }
+
+  return lines;
+}
+
+function groupReportItems<T>(items: T[], toKey: (item: T) => string): Map<string, T[]> {
+  const groups = new Map<string, T[]>();
+
+  for (const item of items) {
+    const key = toKey(item);
+    const group = groups.get(key) ?? [];
+    group.push(item);
+    groups.set(key, group);
+  }
+
+  return groups;
+}
+
+function formatCategoryKey(category: PriceReportProductCategory): string {
+  return `${String(category.igrp).padStart(4, "0")}:${category.displayName}`;
+}
+
+function formatSubcategoryKey(subcategory: PriceReportProductSubcategory | null): string {
+  return `${subcategory?.slug ?? "unknown"}:${subcategory?.displayName ?? "未分類"}`;
+}
+
+function formatReportSubcategoryHeading(
+  subcategory: PriceReportProductSubcategory | null,
+): string {
+  return `_${formatReportHeading(subcategory?.displayName ?? "未分類")}_`;
+}
+
+function formatReportHeading(value: string): string {
+  return escapeMarkdownText(formatDiscordBotText(toSingleLine(value), 80));
 }
 
 function formatPersonalPriceChangeEmbedLine(
@@ -630,4 +710,8 @@ function toSingleLine(value: string): string {
 
 function escapeMarkdownLinkText(value: string): string {
   return value.replace(/([\\[\]])/g, "\\$1");
+}
+
+function escapeMarkdownText(value: string): string {
+  return value.replace(/([\\*_~`|[\]])/g, "\\$1");
 }

@@ -483,6 +483,9 @@ describe("sendPriceReportNow", () => {
         id: "old-1",
         productId: "product-1",
         productName: "GPU A",
+        categoryIgrp: 12,
+        categoryName: "顯示卡",
+        vendorName: "華碩",
         crawlRunId: "old-run",
         price: 12000,
         capturedAt: "2026-06-06T01:00:00.000Z",
@@ -491,6 +494,9 @@ describe("sendPriceReportNow", () => {
         id: "new-1",
         productId: "product-1",
         productName: "GPU A",
+        categoryIgrp: 12,
+        categoryName: "顯示卡",
+        vendorName: "華碩",
         crawlRunId: "new-run",
         price: 10990,
         capturedAt: "2026-06-07T03:00:00.000Z",
@@ -499,6 +505,9 @@ describe("sendPriceReportNow", () => {
         id: "new-2",
         productId: "product-2",
         productName: "SSD B",
+        categoryIgrp: 8,
+        categoryName: "SSD/硬碟",
+        vendorName: "Samsung",
         crawlRunId: "new-run",
         price: 2490,
         capturedAt: "2026-06-07T04:00:00.000Z",
@@ -538,7 +547,12 @@ describe("sendPriceReportNow", () => {
       ],
     });
     expect(reportMessage?.embeds?.[0]?.description).toContain("\n價格變動 (1)\n");
-    expect(reportMessage?.embeds?.[0]?.description).toContain("\n新增商品 (1)\n");
+    expect(reportMessage?.embeds?.[0]?.description).toContain(
+      "\n\n價格變動 (1)\n**顯示卡**\n_華碩_\n- [GPU A]",
+    );
+    expect(reportMessage?.embeds?.[0]?.description).toContain(
+      "\n\n新增商品 (1)\n**SSD/硬碟**\n_Samsung_\n- [SSD B]",
+    );
     expect(reportMessage?.embeds?.[0]?.fields).toBeUndefined();
     expect(JSON.stringify(reportMessage)).toContain("GPU A");
     expect(JSON.stringify(reportMessage)).toContain("SSD B");
@@ -587,7 +601,7 @@ describe("sendPriceReportNow", () => {
     const description = reportMessage?.embeds?.[0]?.description ?? "";
 
     expect(reportMessage?.embeds?.[0]?.fields).toBeUndefined();
-    expect(description).toContain("新增商品 (14)\n- [Long New Product");
+    expect(description).toContain("新增商品 (14)\n**顯示卡**\n_華碩_\n- [Long New Product");
     expect(description).not.toContain("\u200b");
     expect(description).not.toContain("續");
   });
@@ -881,6 +895,10 @@ interface TestSnapshot {
   price: number;
   currency: string;
   capturedAt: Date;
+  categoryIgrp: number;
+  categoryName: string;
+  vendorSlug: string | null;
+  vendorName: string | null;
 }
 
 interface TestPriceReportSetting {
@@ -906,6 +924,10 @@ function snapshot({
   price,
   capturedAt,
   currency = "TWD",
+  categoryIgrp = 12,
+  categoryName = "顯示卡",
+  vendorSlug = "asus",
+  vendorName = "華碩",
 }: {
   id: string;
   productId: string;
@@ -914,6 +936,10 @@ function snapshot({
   price: number;
   capturedAt: string;
   currency?: string;
+  categoryIgrp?: number;
+  categoryName?: string;
+  vendorSlug?: string | null;
+  vendorName?: string | null;
 }): TestSnapshot {
   return {
     id,
@@ -923,6 +949,10 @@ function snapshot({
     price,
     currency,
     capturedAt: new Date(capturedAt),
+    categoryIgrp,
+    categoryName,
+    vendorSlug,
+    vendorName,
   };
 }
 
@@ -1139,6 +1169,12 @@ function toPrismaSnapshotWithProduct(snapshot: TestSnapshot) {
     product: {
       id: snapshot.productId,
       name: snapshot.productName,
+      vendorSlug: snapshot.vendorSlug,
+      vendorName: snapshot.vendorName,
+      sourceCategory: {
+        igrp: snapshot.categoryIgrp,
+        displayName: snapshot.categoryName,
+      },
     },
   };
 }

@@ -34,6 +34,14 @@ export async function readCrawlRunPriceChangeSummary(
         select: {
           id: true,
           name: true,
+          vendorSlug: true,
+          vendorName: true,
+          sourceCategory: {
+            select: {
+              igrp: true,
+              displayName: true,
+            },
+          },
         },
       },
     },
@@ -98,6 +106,8 @@ export async function readCrawlRunPriceChangeSummary(
     changes.push({
       productId: current.product.id,
       productName: current.product.name,
+      category: current.product.sourceCategory,
+      subcategory: toProductSubcategory(current.product),
       previousPrice: previous.price,
       currentPrice: current.price,
       currency: current.currency,
@@ -150,6 +160,14 @@ export async function readRecentPriceReport(
         select: {
           id: true,
           name: true,
+          vendorSlug: true,
+          vendorName: true,
+          sourceCategory: {
+            select: {
+              igrp: true,
+              displayName: true,
+            },
+          },
         },
       },
     },
@@ -195,6 +213,8 @@ export async function readRecentPriceReport(
         newProductByProduct.set(current.productId, {
           productId: current.product.id,
           productName: current.product.name,
+          category: current.product.sourceCategory,
+          subcategory: toProductSubcategory(current.product),
           currentPrice: current.price,
           currency: current.currency,
           firstSeenAt: current.capturedAt,
@@ -203,6 +223,8 @@ export async function readRecentPriceReport(
         newProductByProduct.set(current.productId, {
           ...newProduct,
           productName: current.product.name,
+          category: current.product.sourceCategory,
+          subcategory: toProductSubcategory(current.product),
           currentPrice: current.price,
           currency: current.currency,
         });
@@ -225,6 +247,8 @@ export async function readRecentPriceReport(
     latestChangeByProduct.set(current.productId, {
       productId: current.product.id,
       productName: current.product.name,
+      category: current.product.sourceCategory,
+      subcategory: toProductSubcategory(current.product),
       previousPrice: previous.price,
       currentPrice: current.price,
       currency: current.currency,
@@ -237,6 +261,15 @@ export async function readRecentPriceReport(
     priceChanges: [...latestChangeByProduct.values()].sort(comparePriceChanges),
     newProducts: [...newProductByProduct.values()].sort(compareNewProducts),
   };
+}
+
+function toProductSubcategory(product: CrawlRunPriceSnapshot["product"]) {
+  return product.vendorName
+    ? {
+        slug: product.vendorSlug,
+        displayName: product.vendorName,
+      }
+    : null;
 }
 
 function groupPreviousSnapshots(
