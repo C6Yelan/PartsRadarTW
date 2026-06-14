@@ -523,9 +523,9 @@ Bot 目標：
 - `/price-report now` 報告在 embed description 中連續顯示「價格變動」與「新增商品」兩個區段；沒有資料時分區顯示空狀態。
 - `/price-report now` 每次最多列 `DISCORD_PRICE_REPORT_MAX_ITEMS` 筆，預設 50；上限套用在兩區合計列出的商品數；per-user cooldown 只套用在實際產生報告的 `now` 指令。
 - 每次 `/price-report now` 會寫入 `discord_notification_deliveries`，供後續去重、排程與維運檢視使用。
-- `/price-report enable [window] [max_items] [time]`：開啟每日價格報告 DM；`time` 使用台北時間 `HH:mm`，未填時沿用啟用後每 24 小時發送一次。
-- `/price-report disable`：關閉每日價格報告 DM。
-- `/price-report settings`：查看每日價格報告設定。
+- `/price-report settings`：查看每日價格報告設定，並提供「開啟/修改每日報告」與「關閉每日報告」按鈕。
+- 「開啟/修改每日報告」會開啟 modal，要求設定統計區間、最多列出商品數與每日私訊發送時間；`time` 使用台北時間 `HH:mm`。
+- 「關閉每日報告」會直接關閉每日價格報告 DM。
 
 尚未實作：
 

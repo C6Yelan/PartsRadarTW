@@ -41,6 +41,65 @@ export interface DiscordBotEmbed {
 export interface DiscordBotMessage {
   content?: string;
   embeds?: DiscordBotEmbed[];
+  components?: DiscordMessageComponent[];
+}
+
+export type DiscordMessageComponent = DiscordActionRowComponent;
+
+export interface DiscordActionRowComponent {
+  type: 1;
+  components: DiscordButtonComponent[];
+}
+
+export interface DiscordButtonComponent {
+  type: 2;
+  style: number;
+  custom_id: string;
+  label: string;
+  disabled?: boolean;
+}
+
+export interface DiscordModal {
+  custom_id: string;
+  title: string;
+  components: DiscordModalComponent[];
+}
+
+export type DiscordModalComponent = DiscordModalLabelComponent;
+
+export interface DiscordModalLabelComponent {
+  type: 18;
+  label: string;
+  description?: string;
+  component: DiscordModalInputComponent;
+}
+
+export type DiscordModalInputComponent =
+  | DiscordModalStringSelectComponent
+  | DiscordModalTextInputComponent;
+
+export interface DiscordModalStringSelectComponent {
+  type: 3;
+  custom_id: string;
+  placeholder?: string;
+  options: Array<{
+    label: string;
+    value: string;
+    description?: string;
+    default?: boolean;
+  }>;
+  required?: boolean;
+}
+
+export interface DiscordModalTextInputComponent {
+  type: 4;
+  custom_id: string;
+  style: number;
+  min_length?: number;
+  max_length?: number;
+  required?: boolean;
+  value?: string;
+  placeholder?: string;
 }
 
 export type DiscordDirectMessageSendResult =
@@ -134,6 +193,10 @@ export interface DiscordInteraction {
   data?: {
     name?: string;
     options?: DiscordInteractionOption[];
+    custom_id?: string;
+    component_type?: number;
+    values?: string[];
+    components?: DiscordInteractionComponent[];
   };
   member?: {
     user?: DiscordUser;
@@ -146,6 +209,15 @@ export interface DiscordInteractionOption {
   name: string;
   value?: unknown;
   options?: DiscordInteractionOption[];
+}
+
+export interface DiscordInteractionComponent {
+  type: number;
+  custom_id?: string;
+  value?: unknown;
+  values?: string[];
+  component?: DiscordInteractionComponent;
+  components?: DiscordInteractionComponent[];
 }
 
 export interface DiscordUser {
@@ -195,15 +267,22 @@ export type ParsedPriceReportCommand =
       maxItems: number | null;
     }
   | {
-      name: "enable";
-      windowHours: number;
-      maxItems: number | null;
-      timeOfDay: PriceReportTimeOfDay | null;
-      timeInputValid: boolean;
-    }
-  | {
-      name: "disable";
-    }
-  | {
       name: "settings";
     };
+
+export type ParsedPriceReportComponent =
+  | {
+      name: "open_settings_modal";
+    }
+  | {
+      name: "disable_daily_report";
+    };
+
+export interface ParsedPriceReportModal {
+  windowHours: number;
+  windowInputValid: boolean;
+  maxItems: number | null;
+  maxItemsInputValid: boolean;
+  timeOfDay: PriceReportTimeOfDay | null;
+  timeInputValid: boolean;
+}

@@ -87,8 +87,14 @@ describe("registerDiscordBotCommands", () => {
         name: "price-report",
         contexts: [0, 1],
         dm_permission: true,
+        options: [
+          expect.objectContaining({ name: "now" }),
+          expect.objectContaining({ name: "settings" }),
+        ],
       }),
     ]);
+    expect(String(globalRequestInit.body)).not.toContain('"enable"');
+    expect(String(globalRequestInit.body)).not.toContain('"disable"');
   });
 });
 
@@ -254,6 +260,49 @@ describe("sendDiscordInteractionMessages", () => {
 });
 
 describe("handleDiscordInteraction", () => {
+  it("sends settings management buttons from the settings command", async () => {
+    const client = createDiscordBotClient([]);
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createInteraction("settings"),
+    });
+
+    const requestBody = JSON.parse(
+      String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body),
+    );
+
+    expect(requestBody).toMatchObject({
+      type: 4,
+      data: {
+        content: expect.stringContaining("尚未開啟每日價格提醒"),
+        components: [
+          {
+            type: 1,
+            components: [
+              expect.objectContaining({
+                type: 2,
+                custom_id: "price-report:settings:open",
+                label: "開啟/修改每日報告",
+              }),
+              expect.objectContaining({
+                type: 2,
+                custom_id: "price-report:settings:disable",
+                label: "關閉每日報告",
+              }),
+            ],
+          },
+        ],
+      },
+    });
+  });
+
   it("does not consume the price report cooldown for settings commands", async () => {
     const client = createDiscordBotClient([]);
     const cooldowns = new CommandCooldowns(60);
@@ -286,7 +335,48 @@ describe("handleDiscordInteraction", () => {
     expect(urls).toContain(`${API_BASE_URL}/webhooks/${APPLICATION_ID}/interaction-token/messages/@original`);
   });
 
-  it("rejects invalid daily report time values", async () => {
+  it("opens a daily report settings modal from the settings button", async () => {
+    const client = createDiscordBotClient(
+      [],
+      [
+        priceReportSetting({
+          id: "setting-1",
+          discordUserId: "111122223333444455",
+          window: "HOURS_12",
+          maxItems: 12,
+          nextSendAt: new Date("2026-06-07T13:30:00.000Z"),
+        }),
+      ],
+    );
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createComponentInteraction("price-report:settings:open"),
+    });
+
+    const requestBody = JSON.parse(
+      String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body),
+    );
+
+    expect(requestBody).toMatchObject({
+      type: 9,
+      data: {
+        custom_id: "price-report:settings:modal",
+        title: "每日價格報告設定",
+      },
+    });
+    expect(JSON.stringify(requestBody.data.components)).toContain('"value":"12"');
+    expect(JSON.stringify(requestBody.data.components)).toContain('"value":"21:30"');
+    expect(JSON.stringify(requestBody.data.components)).toContain('"value":"12h","default":true');
+  });
+
+  it("enables daily report settings from the settings modal", async () => {
     const client = createDiscordBotClient([]);
     const fetchMock = vi.fn<typeof fetch>(
       async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
@@ -297,19 +387,92 @@ describe("handleDiscordInteraction", () => {
       options: createDiscordBotOptions(),
       cooldowns: new CommandCooldowns(60),
       fetchImpl: fetchMock as typeof fetch,
-      interaction: createInteraction("enable", [
-        {
-          type: 3,
-          name: "time",
-          value: "25:99",
-        },
-      ]),
+      interaction: createSettingsModalSubmitInteraction({
+        window: "6h",
+        maxItems: "8",
+        time: "21:30",
+      }),
+    });
+
+    expect(client.discordPriceReportSetting.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          window: "HOURS_6",
+          maxItems: 8,
+          enabled: true,
+        }),
+        update: expect.objectContaining({
+          window: "HOURS_6",
+          maxItems: 8,
+          enabled: true,
+        }),
+      }),
+    );
+    expect(String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body)).toContain(
+      "已開啟每日價格提醒",
+    );
+  });
+
+  it("rejects invalid daily report modal values", async () => {
+    const client = createDiscordBotClient([]);
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createSettingsModalSubmitInteraction({
+        maxItems: "0",
+        time: "25:99",
+      }),
     });
 
     const requestBody = String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body);
 
+    expect(requestBody).toContain("最多商品數需為 1-50 的整數");
     expect(requestBody).toContain("每日發送時間格式需為台北時間 HH:mm");
     expect(client.discordPriceReportSetting.upsert).not.toHaveBeenCalled();
+  });
+
+  it("disables daily report settings from the settings button", async () => {
+    const client = createDiscordBotClient(
+      [],
+      [
+        priceReportSetting({
+          id: "setting-1",
+          discordUserId: "111122223333444455",
+          nextSendAt: new Date("2026-06-07T13:30:00.000Z"),
+        }),
+      ],
+    );
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createComponentInteraction("price-report:settings:disable"),
+    });
+
+    expect(client.discordPriceReportSetting.updateMany).toHaveBeenCalledWith({
+      where: {
+        discordUserId: "111122223333444455",
+        enabled: true,
+      },
+      data: {
+        enabled: false,
+        nextSendAt: null,
+      },
+    });
+    expect(String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body)).toContain(
+      "已關閉每日價格提醒",
+    );
   });
 });
 
@@ -632,6 +795,73 @@ function createInteraction(
           type: 1,
           name: subcommandName,
           options: subcommandOptions,
+        },
+      ],
+    },
+    member: {
+      user: {
+        id: "111122223333444455",
+      },
+    },
+  };
+}
+
+function createComponentInteraction(customId: string): DiscordInteraction {
+  return {
+    id: "interaction-1",
+    token: "interaction-token",
+    type: 3,
+    data: {
+      custom_id: customId,
+      component_type: 2,
+    },
+    member: {
+      user: {
+        id: "111122223333444455",
+      },
+    },
+  };
+}
+
+function createSettingsModalSubmitInteraction({
+  window = "24h",
+  maxItems = "50",
+  time = "09:00",
+}: {
+  window?: string;
+  maxItems?: string;
+  time?: string;
+}): DiscordInteraction {
+  return {
+    id: "interaction-1",
+    token: "interaction-token",
+    type: 5,
+    data: {
+      custom_id: "price-report:settings:modal",
+      components: [
+        {
+          type: 18,
+          component: {
+            type: 3,
+            custom_id: "price-report:settings:window",
+            values: [window],
+          },
+        },
+        {
+          type: 18,
+          component: {
+            type: 4,
+            custom_id: "price-report:settings:max-items",
+            value: maxItems,
+          },
+        },
+        {
+          type: 18,
+          component: {
+            type: 4,
+            custom_id: "price-report:settings:time",
+            value: time,
+          },
         },
       ],
     },

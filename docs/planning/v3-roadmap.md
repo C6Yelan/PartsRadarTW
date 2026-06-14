@@ -39,9 +39,7 @@
 
 Discord bot 第一輪指令：
 
-- `/price-report enable [window] [max_items] [time]`：開啟每日價格變動報告 DM；`time` 為台北時間 `HH:mm`。
-- `/price-report disable`：關閉價格變動報告。
-- `/price-report settings`：查看目前報告設定。
+- `/price-report settings`：查看目前報告設定，並透過按鈕與 modal 開啟、修改或關閉每日價格變動報告 DM；`time` 為台北時間 `HH:mm`。
 - `/price-report now`：立即在指令發出的頻道或私訊 context 產生一次報告，用於驗證設定與手動查看。
 - `/watch <商品連結或商品ID> <目標價格>`：追蹤單一商品目標價。
 - `/watchlist`：顯示自己的追蹤商品、目前價格、目標價格、是否已觸發與站內連結。
@@ -224,12 +222,12 @@ Discord bot 第一輪指令：
 ### v3.1：Discord Bot 個人化通知
 
 - Discord bot daemon 與 slash command registration。
-- 個人價格變動報告：`/price-report enable`、`/price-report disable`、`/price-report settings`、`/price-report now`。
+- 個人價格變動報告：`/price-report settings` 按鈕/modal、`/price-report now`。
 - 個人目標價提醒：`/watch`、`/watchlist`、`/unwatch`。
 - Watch / price-report 設定資料表、Discord user preference、notification delivery log。
 - DM 通知去重、cooldown / rate limit、secret 與訊息安全邊界。
 
-目前 bot foundation slice 已完成：`discord-bot` daemon、slash command registration、DM 可用的 global command、`/price-report now` embed 報告、`/price-report enable/disable/settings` 每日 DM 報告設定、定期 due setting 發送、Discord 通知資料表與 delivery log。`/watch` 系列仍待後續 slice。
+目前 bot foundation slice 已完成：`discord-bot` daemon、slash command registration、DM 可用的 global command、`/price-report now` embed 報告、`/price-report settings` 按鈕/modal 每日 DM 報告設定、定期 due setting 發送、Discord 通知資料表與 delivery log。`/watch` 系列仍待後續 slice。
 
 ### v3.2：維運檢視、外部監控與公開流量硬化
 

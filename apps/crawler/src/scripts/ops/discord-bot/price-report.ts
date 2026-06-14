@@ -539,7 +539,7 @@ function clampPriceReportMaxItems(value: number): number {
 
 export function formatPriceReportSettingMessage(setting: DiscordPriceReportSetting | null): string {
   if (!setting?.enabled) {
-    return "尚未開啟每日價格提醒。使用 `/price-report enable` 可開啟每日私訊報告。";
+    return "尚未開啟每日價格提醒。使用下方按鈕可開啟每日私訊報告。";
   }
 
   return [

@@ -10,6 +10,7 @@ import {
   DISCORD_EPHEMERAL_MESSAGE_FLAG,
   DISCORD_INTERACTION_CALLBACK_CHANNEL_MESSAGE,
   DISCORD_INTERACTION_CALLBACK_DEFERRED_CHANNEL_MESSAGE,
+  DISCORD_INTERACTION_CALLBACK_MODAL,
   DISCORD_MESSAGE_CONTENT_MAX_LENGTH,
 } from "./constants";
 import type {
@@ -19,6 +20,7 @@ import type {
   DiscordDirectMessageChannel,
   DiscordDirectMessageSendResult,
   DiscordInteraction,
+  DiscordModal,
   DiscordRestOptions,
   DiscordRestResult,
   FetchImpl,
@@ -191,13 +193,15 @@ export async function sendInteractionResponse({
   apiBaseUrl,
   interaction,
   fetchImpl,
+  message,
   content,
 }: {
   token: string;
   apiBaseUrl: string;
   interaction: DiscordInteraction;
   fetchImpl: FetchImpl;
-  content: string;
+  message?: DiscordBotMessage;
+  content?: string;
 }): Promise<void> {
   await sendDiscordRestRequest({
     token,
@@ -207,7 +211,33 @@ export async function sendInteractionResponse({
     path: `/interactions/${interaction.id}/${interaction.token}/callback`,
     body: {
       type: DISCORD_INTERACTION_CALLBACK_CHANNEL_MESSAGE,
-      data: createDiscordMessagePayload(content, true),
+      data: createDiscordMessagePayload(message ?? content ?? "OK", true),
+    },
+  });
+}
+
+export async function sendModalInteractionResponse({
+  token,
+  apiBaseUrl,
+  interaction,
+  fetchImpl,
+  modal,
+}: {
+  token: string;
+  apiBaseUrl: string;
+  interaction: DiscordInteraction;
+  fetchImpl: FetchImpl;
+  modal: DiscordModal;
+}): Promise<void> {
+  await sendDiscordRestRequest({
+    token,
+    apiBaseUrl,
+    fetchImpl,
+    method: "POST",
+    path: `/interactions/${interaction.id}/${interaction.token}/callback`,
+    body: {
+      type: DISCORD_INTERACTION_CALLBACK_MODAL,
+      data: modal,
     },
   });
 }
@@ -247,6 +277,7 @@ function createDiscordMessagePayload(
   return {
     content: normalizedMessage.content,
     embeds: normalizedMessage.embeds,
+    components: normalizedMessage.components,
     flags: ephemeral ? DISCORD_EPHEMERAL_MESSAGE_FLAG : undefined,
     allowed_mentions: {
       parse: [],
@@ -269,7 +300,7 @@ function normalizeDiscordBotMessage(message: DiscordBotMessage | string): Discor
     return Boolean(embed.title || embed.description || (embed.fields && embed.fields.length > 0));
   });
 
-  if (!content && (!embeds || embeds.length === 0)) {
+  if (!content && (!embeds || embeds.length === 0) && (!message.components || message.components.length === 0)) {
     return {
       content: "價格報告目前沒有可顯示內容。",
     };
@@ -278,6 +309,7 @@ function normalizeDiscordBotMessage(message: DiscordBotMessage | string): Discor
   return {
     content,
     embeds: embeds && embeds.length > 0 ? embeds : undefined,
+    components: message.components,
   };
 }
 
