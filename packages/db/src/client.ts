@@ -25,4 +25,4 @@ if (process.env.NODE_ENV !== "production") {
 }
 
 export { PrismaClient };
-export * from "@prisma/client";
+export type { CrawlRunStatus, DiscordPriceReportSetting, ParseErrorType, Prisma } from "@prisma/client";
