@@ -12,6 +12,7 @@ import {
   parsePriceReportComponentInteraction,
   parsePriceReportInteraction,
   parsePriceReportModalSubmit,
+  parseWatchInteraction,
 } from "./commands";
 import type { CommandCooldowns } from "./cooldowns";
 import {
@@ -30,6 +31,7 @@ import {
   sendModalInteractionResponse,
 } from "./rest";
 import type { DiscordBotClient, DiscordBotOptions, DiscordInteraction, FetchImpl } from "./types";
+import { createTargetPriceWatch, createTargetPriceWatchResponseMessage } from "./watch";
 
 export async function handleDiscordInteraction({
   client,
@@ -89,8 +91,9 @@ async function handleApplicationCommandInteraction({
   fetchImpl: FetchImpl;
 }): Promise<void> {
   const command = parsePriceReportInteraction(interaction);
+  const watchCommand = command ? null : parseWatchInteraction(interaction);
 
-  if (!command) {
+  if (!command && !watchCommand) {
     await sendUnsupportedInteractionResponse({ interaction, options, fetchImpl });
     return;
   }
@@ -102,58 +105,84 @@ async function handleApplicationCommandInteraction({
     return;
   }
 
-  if (command.name === "now") {
-    const cooldown = cooldowns.consume(discordUserId, new Date());
+  if (command) {
+    if (command.name === "now") {
+      const cooldown = cooldowns.consume(discordUserId, new Date());
 
-    if (!cooldown.allowed) {
-      await sendInteractionResponse({
+      if (!cooldown.allowed) {
+        await sendInteractionResponse({
+          token: options.token,
+          apiBaseUrl: options.apiBaseUrl,
+          interaction,
+          fetchImpl,
+          content: `請等待 ${cooldown.retryAfterSeconds} 秒後再產生下一份價格報告。`,
+        });
+        return;
+      }
+
+      await deferInteractionResponse({
         token: options.token,
         apiBaseUrl: options.apiBaseUrl,
         interaction,
         fetchImpl,
-        content: `請等待 ${cooldown.retryAfterSeconds} 秒後再產生下一份價格報告。`,
+      });
+
+      await sendPriceReportNow({
+        client,
+        discordUserId,
+        windowHours: command.windowHours,
+        maxItems: command.maxItems ?? options.priceReportMaxItems,
+        publicBaseUrl: options.publicBaseUrl,
+        sendReportMessages: (messages) =>
+          sendDiscordInteractionMessages({
+            token: options.token,
+            applicationId: options.applicationId,
+            apiBaseUrl: options.apiBaseUrl,
+            interaction,
+            messages,
+            fetchImpl,
+          }),
       });
       return;
     }
 
-    await deferInteractionResponse({
+    const setting = await readPriceReportSetting({ client, discordUserId });
+
+    await sendInteractionResponse({
       token: options.token,
       apiBaseUrl: options.apiBaseUrl,
       interaction,
       fetchImpl,
-    });
-
-    await sendPriceReportNow({
-      client,
-      discordUserId,
-      windowHours: command.windowHours,
-      maxItems: command.maxItems ?? options.priceReportMaxItems,
-      publicBaseUrl: options.publicBaseUrl,
-      sendReportMessages: (messages) =>
-        sendDiscordInteractionMessages({
-          token: options.token,
-          applicationId: options.applicationId,
-          apiBaseUrl: options.apiBaseUrl,
-          interaction,
-          messages,
-          fetchImpl,
-        }),
+      message: {
+        content: formatPriceReportSettingMessage(setting),
+        components: createPriceReportSettingsComponents(),
+      },
     });
     return;
   }
 
-  const setting = await readPriceReportSetting({ client, discordUserId });
+  if (watchCommand) {
+    const result = await createTargetPriceWatch({
+      client,
+      discordUserId,
+      productInput: watchCommand.productInput,
+      targetPrice: watchCommand.targetPrice,
+    });
 
-  await sendInteractionResponse({
-    token: options.token,
-    apiBaseUrl: options.apiBaseUrl,
-    interaction,
-    fetchImpl,
-    message: {
-      content: formatPriceReportSettingMessage(setting),
-      components: createPriceReportSettingsComponents(),
-    },
-  });
+    await sendInteractionResponse({
+      token: options.token,
+      apiBaseUrl: options.apiBaseUrl,
+      interaction,
+      fetchImpl,
+      message: createTargetPriceWatchResponseMessage({
+        result,
+        publicBaseUrl: options.publicBaseUrl,
+      }),
+    });
+    return;
+  }
+
+  await sendUnsupportedInteractionResponse({ interaction, options, fetchImpl });
 }
 
 async function handleMessageComponentInteraction({

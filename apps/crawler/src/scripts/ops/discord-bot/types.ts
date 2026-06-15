@@ -19,7 +19,10 @@ export interface DiscordBotOptions {
 }
 
 export type DiscordBotClient = PriceChangeDiscordClient &
-  Pick<PrismaClient, "discordNotificationDelivery" | "discordPriceReportSetting">;
+  Pick<
+    PrismaClient,
+    "discordNotificationDelivery" | "discordPriceReportSetting" | "discordTargetPriceWatch" | "product"
+  >;
 
 export interface DiscordBotEmbedField {
   name: string;
@@ -269,6 +272,11 @@ export type ParsedPriceReportCommand =
   | {
       name: "settings";
     };
+
+export interface ParsedWatchCommand {
+  productInput: string | null;
+  targetPrice: number | null;
+}
 
 export type ParsedPriceReportComponent =
   | {

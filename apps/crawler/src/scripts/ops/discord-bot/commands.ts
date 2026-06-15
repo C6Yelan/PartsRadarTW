@@ -15,6 +15,7 @@ import {
   DISCORD_OPTION_TYPE_STRING,
   DISCORD_OPTION_TYPE_SUBCOMMAND,
   DISCORD_TEXT_INPUT_STYLE_SHORT,
+  MAX_TARGET_PRICE,
   MAX_PRICE_REPORT_ITEMS,
 } from "./constants";
 import type {
@@ -25,6 +26,7 @@ import type {
   ParsedPriceReportCommand,
   ParsedPriceReportComponent,
   ParsedPriceReportModal,
+  ParsedWatchCommand,
 } from "./types";
 
 const PRICE_REPORT_SETTINGS_OPEN_CUSTOM_ID = "price-report:settings:open";
@@ -77,6 +79,32 @@ export function createPriceReportCommand(): Record<string, unknown> {
   };
 }
 
+export function createWatchCommand(): Record<string, unknown> {
+  return {
+    name: "watch",
+    description: "Set a PartsRadarTW target price alert.",
+    type: DISCORD_COMMAND_TYPE_CHAT_INPUT,
+    contexts: [DISCORD_APPLICATION_CONTEXT_GUILD, DISCORD_APPLICATION_CONTEXT_BOT_DM],
+    dm_permission: true,
+    options: [
+      {
+        type: DISCORD_OPTION_TYPE_STRING,
+        name: "product",
+        description: "PartsRadarTW 商品 ID 或商品頁 URL。",
+        required: true,
+      },
+      {
+        type: DISCORD_OPTION_TYPE_INTEGER,
+        name: "target_price",
+        description: "目標價格，單位為新台幣。",
+        required: true,
+        min_value: 1,
+        max_value: MAX_TARGET_PRICE,
+      },
+    ],
+  };
+}
+
 export function parsePriceReportInteraction(interaction: DiscordInteraction): ParsedPriceReportCommand | null {
   if (interaction.data?.name !== "price-report") {
     return null;
@@ -108,6 +136,30 @@ export function parsePriceReportInteraction(interaction: DiscordInteraction): Pa
   }
 
   return null;
+}
+
+export function parseWatchInteraction(interaction: DiscordInteraction): ParsedWatchCommand | null {
+  if (interaction.data?.name !== "watch") {
+    return null;
+  }
+
+  const productOption = interaction.data.options?.find((option) => option.name === "product");
+  const targetPriceOption = interaction.data.options?.find(
+    (option) => option.name === "target_price",
+  );
+  const productInput = typeof productOption?.value === "string" ? productOption.value.trim() : "";
+  const targetPrice =
+    typeof targetPriceOption?.value === "number" &&
+    Number.isInteger(targetPriceOption.value) &&
+    targetPriceOption.value >= 1 &&
+    targetPriceOption.value <= MAX_TARGET_PRICE
+      ? targetPriceOption.value
+      : null;
+
+  return {
+    productInput: productInput.length > 0 ? productInput : null,
+    targetPrice,
+  };
 }
 
 export function createPriceReportSettingsComponents(): DiscordMessageComponent[] {

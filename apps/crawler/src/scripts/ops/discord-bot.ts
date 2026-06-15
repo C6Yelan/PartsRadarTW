@@ -5,7 +5,12 @@ import { parseDiscordBotOptions, printDiscordBotHelp } from "./discord-bot/optio
 import { registerDiscordBotCommands } from "./discord-bot/registration";
 import { formatDiscordRestFailure } from "./discord-bot/rest";
 
-export { createPriceReportCommand, parsePriceReportInteraction } from "./discord-bot/commands";
+export {
+  createPriceReportCommand,
+  createWatchCommand,
+  parsePriceReportInteraction,
+  parseWatchInteraction,
+} from "./discord-bot/commands";
 export { CommandCooldowns } from "./discord-bot/cooldowns";
 export { runDiscordBotDaemon } from "./discord-bot/daemon";
 export { runGatewaySession } from "./discord-bot/gateway";
@@ -33,6 +38,7 @@ export {
   sendDiscordRestRequest,
   sendInteractionResponse,
 } from "./discord-bot/rest";
+export { createTargetPriceWatch, normalizeWatchProductReference } from "./discord-bot/watch";
 export type { ScheduledPriceReportSummary } from "./discord-bot/price-report";
 export type {
   DiscordBotClient,

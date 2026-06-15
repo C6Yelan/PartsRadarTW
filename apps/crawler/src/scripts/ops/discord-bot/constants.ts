@@ -8,6 +8,7 @@ export const MAX_PRICE_REPORT_ITEMS = 50;
 export const DEFAULT_COMMAND_COOLDOWN_SECONDS = 60;
 export const DEFAULT_PRICE_REPORT_SCHEDULE_INTERVAL_SECONDS = 300;
 export const MAX_DUE_PRICE_REPORT_SETTINGS_PER_CYCLE = 25;
+export const MAX_TARGET_PRICE = 99_999_999;
 export const HOUR_MS = 60 * 60 * 1000;
 export const DAY_MS = 24 * HOUR_MS;
 export const TIME_ZONE = "Asia/Taipei";

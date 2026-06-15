@@ -258,6 +258,7 @@ model DiscordTargetPriceWatch {
   updatedAt      DateTime                       @updatedAt @map("updated_at") @db.Timestamptz(6)
   deliveries     DiscordNotificationDelivery[]
 
+  @@unique([discordUserId, productId], map: "discord_target_price_watches_discord_user_id_product_id_key")
   @@index([discordUserId, enabled], map: "discord_target_price_watches_user_enabled_idx")
   @@index([productId, enabled], map: "discord_target_price_watches_product_enabled_idx")
   @@map("discord_target_price_watches")

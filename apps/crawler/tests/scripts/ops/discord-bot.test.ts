@@ -5,6 +5,7 @@ import {
   CommandCooldowns,
   enableDailyPriceReport,
   handleDiscordInteraction,
+  normalizeWatchProductReference,
   parseDiscordBotOptions,
   readNextScheduledPriceReportDueAt,
   registerDiscordBotCommands,
@@ -22,6 +23,7 @@ const TOKEN = "test_bot_token";
 const APPLICATION_ID = "123456789012345678";
 const API_BASE_URL = "https://discord.test/api/v10";
 const PUBLIC_BASE_URL = "https://partsradar.test/";
+const WATCH_PRODUCT_ID = "11111111-1111-4111-8111-111111111111";
 
 describe("Discord bot options", () => {
   it("parses required bot settings and safe defaults", () => {
@@ -56,7 +58,7 @@ describe("Discord bot options", () => {
 });
 
 describe("registerDiscordBotCommands", () => {
-  it("registers the global price-report command", async () => {
+  it("registers the global price-report and watch commands", async () => {
     const fetchMock = vi.fn<typeof fetch>(
       async () => new Response(JSON.stringify([{ id: "command-1" }]), { status: 200 }),
     );
@@ -94,9 +96,30 @@ describe("registerDiscordBotCommands", () => {
           expect.objectContaining({ name: "settings" }),
         ],
       }),
+      expect.objectContaining({
+        name: "watch",
+        contexts: [0, 1],
+        dm_permission: true,
+        options: [
+          expect.objectContaining({ name: "product", type: 3, required: true }),
+          expect.objectContaining({ name: "target_price", type: 4, required: true }),
+        ],
+      }),
     ]);
     expect(String(globalRequestInit.body)).not.toContain('"enable"');
     expect(String(globalRequestInit.body)).not.toContain('"disable"');
+  });
+});
+
+describe("normalizeWatchProductReference", () => {
+  it("accepts product ids and PartsRadarTW product URLs", () => {
+    expect(normalizeWatchProductReference(WATCH_PRODUCT_ID.toUpperCase())).toBe(WATCH_PRODUCT_ID);
+    expect(normalizeWatchProductReference(`https://partsradar.test/products/${WATCH_PRODUCT_ID}`)).toBe(
+      WATCH_PRODUCT_ID,
+    );
+    expect(normalizeWatchProductReference(`/products/${WATCH_PRODUCT_ID}`)).toBe(WATCH_PRODUCT_ID);
+    expect(normalizeWatchProductReference("https://partsradar.test/products/not-a-product")).toBeNull();
+    expect(normalizeWatchProductReference("/products/%E0%A4%A")).toBeNull();
   });
 });
 
@@ -262,6 +285,96 @@ describe("sendDiscordInteractionMessages", () => {
 });
 
 describe("handleDiscordInteraction", () => {
+  it("creates a target price watch from the watch command", async () => {
+    const client = createDiscordBotClient([
+      snapshot({
+        id: "snapshot-watch-1",
+        productId: WATCH_PRODUCT_ID,
+        productName: "RTX 5070 測試卡",
+        crawlRunId: "new-run",
+        price: 18_990,
+        capturedAt: "2026-06-07T03:00:00.000Z",
+      }),
+    ]);
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createWatchInteraction(`https://partsradar.test/products/${WATCH_PRODUCT_ID}`, 17_500),
+    });
+
+    expect(client.discordTargetPriceWatch.upsert).toHaveBeenCalledWith({
+      where: {
+        discordUserId_productId: {
+          discordUserId: "111122223333444455",
+          productId: WATCH_PRODUCT_ID,
+        },
+      },
+      create: {
+        discordUserId: "111122223333444455",
+        productId: WATCH_PRODUCT_ID,
+        targetPrice: 17_500,
+        currency: "TWD",
+        enabled: true,
+      },
+      update: {
+        targetPrice: 17_500,
+        currency: "TWD",
+        enabled: true,
+        lastNotifiedAt: null,
+      },
+      select: expect.objectContaining({
+        id: true,
+        targetPrice: true,
+      }),
+    });
+
+    const requestBody = JSON.parse(
+      String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body),
+    );
+
+    expect(requestBody).toMatchObject({
+      type: 4,
+      data: {
+        embeds: [
+          expect.objectContaining({
+            title: "已保存目標價追蹤",
+            description: expect.stringContaining("RTX 5070 測試卡"),
+            fields: expect.arrayContaining([
+              expect.objectContaining({ name: "目前價格", value: "NT$18,990" }),
+              expect.objectContaining({ name: "目標價格", value: "NT$17,500" }),
+            ]),
+          }),
+        ],
+      },
+    });
+  });
+
+  it("rejects invalid watch target prices without writing a watch", async () => {
+    const client = createDiscordBotClient([]);
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createWatchInteraction(WATCH_PRODUCT_ID, 0),
+    });
+
+    expect(client.discordTargetPriceWatch.upsert).not.toHaveBeenCalled();
+    expect(String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body)).toContain(
+      "目標價格需為",
+    );
+  });
+
   it("sends settings management buttons from the settings command", async () => {
     const client = createDiscordBotClient([]);
     const fetchMock = vi.fn<typeof fetch>(
@@ -962,6 +1075,34 @@ function createSettingsModalSubmitInteraction({
   };
 }
 
+function createWatchInteraction(productInput: string, targetPrice: number): DiscordInteraction {
+  return {
+    id: "interaction-1",
+    token: "interaction-token",
+    type: 2,
+    data: {
+      name: "watch",
+      options: [
+        {
+          type: 3,
+          name: "product",
+          value: productInput,
+        },
+        {
+          type: 4,
+          name: "target_price",
+          value: targetPrice,
+        },
+      ],
+    },
+    member: {
+      user: {
+        id: "111122223333444455",
+      },
+    },
+  };
+}
+
 interface TestSnapshot {
   id: string;
   productId: string;
@@ -987,6 +1128,18 @@ interface TestPriceReportSetting {
   enabled: boolean;
   nextSendAt: Date | null;
   lastSentAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface TestTargetPriceWatch {
+  id: string;
+  discordUserId: string;
+  productId: string;
+  targetPrice: number;
+  currency: string;
+  enabled: boolean;
+  lastNotifiedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -1067,7 +1220,11 @@ function priceReportSetting({
 function createDiscordBotClient(
   snapshots: TestSnapshot[],
   settings: TestPriceReportSetting[] = [],
+  watches: TestTargetPriceWatch[] = [],
 ): DiscordBotClient & {
+  product: {
+    findFirst: ReturnType<typeof vi.fn>;
+  };
   priceSnapshot: {
     findMany: ReturnType<typeof vi.fn>;
   };
@@ -1082,7 +1239,18 @@ function createDiscordBotClient(
     updateMany: ReturnType<typeof vi.fn>;
     upsert: ReturnType<typeof vi.fn>;
   };
+  discordTargetPriceWatch: {
+    upsert: ReturnType<typeof vi.fn>;
+  };
 } {
+  const productFindFirst = vi.fn(async (args: { where: { id?: string } }) => {
+    const productId = args.where.id;
+    const latestSnapshot = snapshots
+      .filter((snapshot) => snapshot.productId === productId)
+      .sort((left, right) => right.capturedAt.getTime() - left.capturedAt.getTime())[0];
+
+    return latestSnapshot ? toPrismaWatchProduct(latestSnapshot) : null;
+  });
   const findMany = vi.fn(async (args: { where: Record<string, unknown> }) => {
     const where = args.where;
 
@@ -1224,8 +1392,43 @@ function createDiscordBotClient(
       return created;
     },
   );
+  const watchRows = [...watches];
+  const watchUpsert = vi.fn(
+    async (args: {
+      where: { discordUserId_productId: { discordUserId: string; productId: string } };
+      create: Pick<
+        TestTargetPriceWatch,
+        "discordUserId" | "productId" | "targetPrice" | "currency" | "enabled"
+      >;
+      update: Partial<TestTargetPriceWatch>;
+    }) => {
+      const key = args.where.discordUserId_productId;
+      const existing = watchRows.find(
+        (watch) => watch.discordUserId === key.discordUserId && watch.productId === key.productId,
+      );
+
+      if (existing) {
+        Object.assign(existing, args.update);
+        return existing;
+      }
+
+      const created = {
+        id: "watch-created",
+        lastNotifiedAt: null,
+        createdAt: new Date("2026-06-07T00:00:00.000Z"),
+        updatedAt: new Date("2026-06-07T00:00:00.000Z"),
+        ...args.create,
+      };
+      watchRows.push(created);
+
+      return created;
+    },
+  );
 
   return {
+    product: {
+      findFirst: productFindFirst,
+    },
     priceSnapshot: {
       findMany,
     },
@@ -1240,7 +1443,13 @@ function createDiscordBotClient(
       updateMany: settingUpdateMany,
       upsert: settingUpsert,
     },
+    discordTargetPriceWatch: {
+      upsert: watchUpsert,
+    },
   } as unknown as DiscordBotClient & {
+    product: {
+      findFirst: ReturnType<typeof vi.fn>;
+    };
     priceSnapshot: {
       findMany: ReturnType<typeof vi.fn>;
     };
@@ -1253,6 +1462,9 @@ function createDiscordBotClient(
       findUnique: ReturnType<typeof vi.fn>;
       update: ReturnType<typeof vi.fn>;
       updateMany: ReturnType<typeof vi.fn>;
+      upsert: ReturnType<typeof vi.fn>;
+    };
+    discordTargetPriceWatch: {
       upsert: ReturnType<typeof vi.fn>;
     };
   };
@@ -1273,6 +1485,21 @@ function toPrismaSnapshotWithProduct(snapshot: TestSnapshot) {
       sourceCategory: {
         igrp: snapshot.categoryIgrp,
         displayName: snapshot.categoryName,
+      },
+    },
+  };
+}
+
+function toPrismaWatchProduct(snapshot: TestSnapshot) {
+  return {
+    id: snapshot.productId,
+    name: snapshot.productName,
+    currentPrice: {
+      lastSeenAt: snapshot.capturedAt,
+      priceSnapshot: {
+        price: snapshot.price,
+        currency: snapshot.currency,
+        capturedAt: snapshot.capturedAt,
       },
     },
   };
