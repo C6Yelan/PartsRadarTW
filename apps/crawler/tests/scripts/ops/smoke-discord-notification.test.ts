@@ -125,9 +125,17 @@ describe("createSmokeDiscordNotificationDecision", () => {
       throw new Error("Expected send decision.");
     }
 
-    expect(decision.message.content).toContain("PartsRadarTW smoke WARN");
-    expect(decision.message.content).toContain("Affected checks: WARN source freshness");
-    expect(decision.message.content).not.toContain("lastSuccessAt=90m ago");
+    expect(decision.message.content).toBeUndefined();
+    expect(decision.message.username).toBe("PartsRadarTW ops");
+    expect(decision.message.embeds?.[0]).toMatchObject({
+      title: "PartsRadarTW smoke WARN",
+      color: 0xf59e0b,
+      timestamp: checkedAt.toISOString(),
+    });
+    expect(decision.message.embeds?.[0]?.description).toContain(
+      "Affected checks: WARN source freshness",
+    );
+    expect(decision.message.embeds?.[0]?.description).not.toContain("lastSuccessAt=90m ago");
   });
 
   it("skips repeated unchanged WARN within cooldown", () => {
@@ -248,8 +256,13 @@ describe("createSmokeDiscordNotificationDecision", () => {
       throw new Error("Expected send decision.");
     }
 
-    expect(decision.message.content).toContain("PartsRadarTW smoke RECOVERED");
-    expect(decision.message.content).toContain("Previous status: FAIL");
+    expect(decision.message.content).toBeUndefined();
+    expect(decision.message.embeds?.[0]).toMatchObject({
+      title: "PartsRadarTW smoke RECOVERED",
+      color: 0x16a34a,
+      timestamp: checkedAt.toISOString(),
+    });
+    expect(decision.message.embeds?.[0]?.description).toContain("Previous status: FAIL");
   });
 
   it("skips subsequent OK after recovered notification", () => {

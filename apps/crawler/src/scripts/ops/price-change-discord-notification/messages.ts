@@ -1,6 +1,7 @@
 // apps/crawler/src/scripts/ops/price-change-discord-notification/messages.ts
 
 import {
+  type DiscordWebhookEmbed,
   type DiscordWebhookMessage,
   formatDiscordWebhookText,
 } from "../discord-webhook";
@@ -10,6 +11,9 @@ import type {
   PriceChangeDiscordNotificationOptions,
   PriceChangeReportMessageOptions,
 } from "./types";
+
+const PRICE_CHANGE_EMBED_COLOR = 0x2563eb;
+const DISCORD_EMBED_DESCRIPTION_TARGET_LENGTH = 3900;
 
 export function createPriceChangeReportMessages(
   changes: PriceChangeDiscordNotificationItem[],
@@ -71,7 +75,7 @@ export function createPriceChangeDiscordMessages(
     return [];
   }
 
-  const contents = createPriceChangeReportMessages(changes, {
+  const embeds = createPriceChangeDiscordEmbeds(changes, {
     publicBaseUrl: options.publicBaseUrl,
     maxItems: options.maxItems,
     title: "PartsRadarTW price changes",
@@ -79,10 +83,124 @@ export function createPriceChangeDiscordMessages(
     hiddenLimitLabel: "PRICE_CHANGE_DISCORD_MAX_ITEMS",
   });
 
-  return contents.map((content) => ({
+  return embeds.map((embed) => ({
     username: "PartsRadarTW",
-    content,
+    embeds: [embed],
   }));
+}
+
+function createPriceChangeDiscordEmbeds(
+  changes: PriceChangeDiscordNotificationItem[],
+  options: PriceChangeReportMessageOptions,
+): DiscordWebhookEmbed[] {
+  const title = options.title ?? "PartsRadarTW price report";
+  const listedChanges = changes.slice(0, options.maxItems);
+  const hiddenCount = changes.length - listedChanges.length;
+  const observedAt = new Date(
+    Math.max(...listedChanges.map((change) => change.changedAt.getTime())),
+  );
+  const browseLine = `${options.browseLabel ?? "Browse"}: ${createProductsUrl(
+    options.publicBaseUrl,
+  )}`;
+  const hiddenLimitLabel = options.hiddenLimitLabel ?? "report item limit";
+  const lines = listedChanges.map((change, index) =>
+    formatPriceChangeLine({
+      change,
+      index,
+      publicBaseUrl: options.publicBaseUrl,
+    }),
+  );
+  const chunks = chunkEmbedLines(lines, {
+    totalCount: changes.length,
+    listedCount: listedChanges.length,
+    hiddenCount,
+    observedAt,
+    browseLine,
+    hiddenLimitLabel,
+  });
+
+  return chunks.map((chunk, index) => ({
+    title: chunks.length > 1 ? `${title} (${index + 1}/${chunks.length})` : title,
+    description: formatPriceChangeEmbedDescription({
+      totalCount: changes.length,
+      listedCount: listedChanges.length,
+      hiddenCount,
+      observedAt,
+      chunk,
+      browseLine,
+      hiddenLimitLabel,
+    }),
+    color: PRICE_CHANGE_EMBED_COLOR,
+    timestamp: observedAt.toISOString(),
+  }));
+}
+
+function chunkEmbedLines(
+  lines: string[],
+  context: {
+    totalCount: number;
+    listedCount: number;
+    hiddenCount: number;
+    observedAt: Date;
+    browseLine: string;
+    hiddenLimitLabel: string;
+  },
+): string[][] {
+  const chunks: string[][] = [];
+  let currentChunk: string[] = [];
+
+  for (const line of lines) {
+    if (
+      currentChunk.length > 0 &&
+      formatPriceChangeEmbedDescription({
+        ...context,
+        chunk: [...currentChunk, line],
+      }).length > DISCORD_EMBED_DESCRIPTION_TARGET_LENGTH
+    ) {
+      chunks.push(currentChunk);
+      currentChunk = [];
+    }
+
+    currentChunk.push(line);
+  }
+
+  if (currentChunk.length > 0) {
+    chunks.push(currentChunk);
+  }
+
+  return chunks;
+}
+
+function formatPriceChangeEmbedDescription({
+  totalCount,
+  listedCount,
+  hiddenCount,
+  observedAt,
+  chunk,
+  browseLine,
+  hiddenLimitLabel,
+}: {
+  totalCount: number;
+  listedCount: number;
+  hiddenCount: number;
+  observedAt: Date;
+  chunk: string[];
+  browseLine: string;
+  hiddenLimitLabel: string;
+}): string {
+  return [
+    `Observed at: ${formatTaipeiMinute(observedAt)}`,
+    formatPriceChangeCountLine({
+      totalCount,
+      listedCount,
+      hiddenCount,
+      hiddenLimitLabel,
+    }),
+    "",
+    chunk.join("\n"),
+    "",
+    browseLine,
+  ].join("\n");
 }
 
 function chunkLines(
@@ -186,12 +304,30 @@ function createPriceChangeHeader({
   hiddenLimitLabel: string;
 }): string {
   const displayTitle = partCount > 1 ? `${title} (${partIndex}/${partCount})` : title;
-  const countLine =
-    hiddenCount > 0
-      ? `Changes: ${totalCount}. Listed: ${listedCount}; ${hiddenCount} hidden by ${hiddenLimitLabel}.`
-      : `Changes: ${totalCount}.`;
+  const countLine = formatPriceChangeCountLine({
+    totalCount,
+    listedCount,
+    hiddenCount,
+    hiddenLimitLabel,
+  });
 
   return [displayTitle, `Observed at: ${formatTaipeiMinute(observedAt)}`, countLine].join("\n");
+}
+
+function formatPriceChangeCountLine({
+  totalCount,
+  listedCount,
+  hiddenCount,
+  hiddenLimitLabel,
+}: {
+  totalCount: number;
+  listedCount: number;
+  hiddenCount: number;
+  hiddenLimitLabel: string;
+}): string {
+  return hiddenCount > 0
+    ? `Changes: ${totalCount}. Listed: ${listedCount}; ${hiddenCount} hidden by ${hiddenLimitLabel}.`
+    : `Changes: ${totalCount}.`;
 }
 
 function formatPriceChangeLine({

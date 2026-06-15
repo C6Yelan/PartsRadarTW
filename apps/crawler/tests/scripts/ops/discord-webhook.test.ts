@@ -93,6 +93,50 @@ describe("sendDiscordWebhookMessage", () => {
     });
   });
 
+  it("posts embed-only payloads with mentions disabled", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () => new Response(null, { status: 204 }));
+
+    await expect(
+      sendDiscordWebhookMessage({
+        webhookUrl: WEBHOOK_URL,
+        message: {
+          username: "PartsRadarTW",
+          embeds: [
+            {
+              title: "PartsRadarTW price changes",
+              description: "GPU A changed price",
+              color: 0x2563eb,
+              timestamp: "2026-06-07T02:00:00.000Z",
+            },
+          ],
+        },
+        fetchImpl: fetchMock as typeof fetch,
+      }),
+    ).resolves.toEqual({
+      status: "sent",
+      httpStatus: 204,
+    });
+
+    const [, requestInit] = fetchMock.mock.calls[0] as [
+      Parameters<typeof fetch>[0],
+      RequestInit,
+    ];
+    expect(JSON.parse(String(requestInit?.body))).toEqual({
+      username: "PartsRadarTW",
+      embeds: [
+        {
+          title: "PartsRadarTW price changes",
+          description: "GPU A changed price",
+          color: 0x2563eb,
+          timestamp: "2026-06-07T02:00:00.000Z",
+        },
+      ],
+      allowed_mentions: {
+        parse: [],
+      },
+    });
+  });
+
   it("returns Discord rate limit retry timing without retrying immediately", async () => {
     const fetchMock = vi.fn<typeof fetch>(
       async () =>

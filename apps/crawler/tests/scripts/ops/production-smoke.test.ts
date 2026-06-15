@@ -199,7 +199,11 @@ describe("production smoke daemon Discord notifications", () => {
       expect.objectContaining({
         webhookUrl: DISCORD_ADMIN_WEBHOOK_URL,
         message: expect.objectContaining({
-          content: expect.stringContaining("PartsRadarTW smoke WARN"),
+          embeds: [
+            expect.objectContaining({
+              title: "PartsRadarTW smoke WARN",
+            }),
+          ],
         }),
       }),
     );
@@ -207,7 +211,10 @@ describe("production smoke daemon Discord notifications", () => {
     if (!webhookCall) {
       throw new Error("Expected Discord webhook sender call.");
     }
-    expect(webhookCall.message.content).toContain("Affected checks: WARN rate limit headers");
+    expect(webhookCall.message.content).toBeUndefined();
+    expect(webhookCall.message.embeds?.[0]?.description).toContain(
+      "Affected checks: WARN rate limit headers",
+    );
     expect(logMessage).toHaveBeenCalledWith(
       "Smoke Discord notification sent. kind=WARN httpStatus=204",
     );

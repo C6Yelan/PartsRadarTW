@@ -10,6 +10,11 @@ const DEFAULT_STATE_FILE = "storage/ops/smoke-discord-state.json";
 const DEFAULT_COOLDOWN_SECONDS = 3600;
 const MAX_COOLDOWN_SECONDS = 7 * 24 * 60 * 60;
 const RUNBOOK_REFERENCE = "docs/technical/operations-runbook.md#production-smoke-daemon";
+const SMOKE_EMBED_COLORS: Record<SmokeDiscordNotificationKind, number> = {
+  WARN: 0xf59e0b,
+  FAIL: 0xdc2626,
+  RECOVERED: 0x16a34a,
+};
 
 export type SmokeDiscordNotificationKind = "WARN" | "FAIL" | "RECOVERED";
 
@@ -280,12 +285,19 @@ function createAbnormalMessage(summary: ProductionSmokeSummary): DiscordWebhookM
   const abnormalChecks = summary.checks.filter((check) => check.status !== "OK");
 
   return {
-    content: [
-      `PartsRadarTW smoke ${summary.status}`,
-      `Checked at: ${summary.checkedAt.toISOString()}`,
-      `Affected checks: ${formatAffectedChecks(abnormalChecks)}`,
-      `Runbook: ${RUNBOOK_REFERENCE}`,
-    ].join("\n"),
+    username: "PartsRadarTW ops",
+    embeds: [
+      {
+        title: `PartsRadarTW smoke ${summary.status}`,
+        description: [
+          `Checked at: ${summary.checkedAt.toISOString()}`,
+          `Affected checks: ${formatAffectedChecks(abnormalChecks)}`,
+          `Runbook: ${RUNBOOK_REFERENCE}`,
+        ].join("\n"),
+        color: summary.status === "FAIL" ? SMOKE_EMBED_COLORS.FAIL : SMOKE_EMBED_COLORS.WARN,
+        timestamp: summary.checkedAt.toISOString(),
+      },
+    ],
   };
 }
 
@@ -294,12 +306,19 @@ function createRecoveredMessage(
   previousStatus: SmokeStatus,
 ): DiscordWebhookMessage {
   return {
-    content: [
-      "PartsRadarTW smoke RECOVERED",
-      `Previous status: ${previousStatus}`,
-      `Checked at: ${summary.checkedAt.toISOString()}`,
-      `Runbook: ${RUNBOOK_REFERENCE}`,
-    ].join("\n"),
+    username: "PartsRadarTW ops",
+    embeds: [
+      {
+        title: "PartsRadarTW smoke RECOVERED",
+        description: [
+          `Previous status: ${previousStatus}`,
+          `Checked at: ${summary.checkedAt.toISOString()}`,
+          `Runbook: ${RUNBOOK_REFERENCE}`,
+        ].join("\n"),
+        color: SMOKE_EMBED_COLORS.RECOVERED,
+        timestamp: summary.checkedAt.toISOString(),
+      },
+    ],
   };
 }
 

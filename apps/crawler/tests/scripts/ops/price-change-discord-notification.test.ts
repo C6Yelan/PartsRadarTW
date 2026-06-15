@@ -350,15 +350,23 @@ describe("createPriceChangeDiscordMessages", () => {
     );
 
     expect(messages).toHaveLength(1);
-    expect(messages[0]?.content).toContain("Changes: 3. Listed: 2; 1 hidden");
-    expect(messages[0]?.content).toContain(
+    expect(messages[0]?.content).toBeUndefined();
+    expect(messages[0]?.embeds?.[0]).toMatchObject({
+      title: "PartsRadarTW price changes",
+      color: 0x2563eb,
+      timestamp: "2026-06-07T02:00:00.000Z",
+    });
+    expect(messages[0]?.embeds?.[0]?.description).toContain(
+      "Changes: 3. Listed: 2; 1 hidden",
+    );
+    expect(messages[0]?.embeds?.[0]?.description).toContain(
       "1. -TWD 500 | [GPU A](https://partsradar.test/products/product-1)",
     );
-    expect(messages[0]?.content).toContain(
+    expect(messages[0]?.embeds?.[0]?.description).toContain(
       "2. +TWD 200 | [RAM B](https://partsradar.test/products/product-2)",
     );
-    expect(messages[0]?.content).not.toContain("SSD C");
-    expect(messages[0]?.content).toContain("Browse: https://partsradar.test/");
+    expect(messages[0]?.embeds?.[0]?.description).not.toContain("SSD C");
+    expect(messages[0]?.embeds?.[0]?.description).toContain("Browse: https://partsradar.test/");
   });
 
   it("splits long change lists into multiple Discord-sized messages", () => {
@@ -377,10 +385,11 @@ describe("createPriceChangeDiscordMessages", () => {
     );
 
     expect(messages.length).toBeGreaterThan(1);
-    expect(messages[0]?.content).toContain("PartsRadarTW price changes (1/");
-    expect(messages.at(-1)?.content).toContain("Browse: https://partsradar.test/");
+    expect(messages[0]?.embeds?.[0]?.title).toContain("PartsRadarTW price changes (1/");
+    expect(messages.at(-1)?.embeds?.[0]?.description).toContain("Browse: https://partsradar.test/");
     for (const message of messages) {
-      expect(message.content?.length).toBeLessThanOrEqual(2000);
+      expect(message.content).toBeUndefined();
+      expect(message.embeds?.[0]?.description?.length).toBeLessThanOrEqual(4096);
     }
   });
 });
@@ -469,7 +478,11 @@ describe("sendCrawlRunPriceChangeDiscordNotification", () => {
     expect(sendDiscordWebhook).toHaveBeenCalledWith({
       webhookUrl: WEBHOOK_URL,
       message: expect.objectContaining({
-        content: expect.stringContaining("GPU A"),
+        embeds: [
+          expect.objectContaining({
+            description: expect.stringContaining("GPU A"),
+          }),
+        ],
       }),
     });
   });
