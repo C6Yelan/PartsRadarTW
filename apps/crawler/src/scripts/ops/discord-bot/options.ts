@@ -186,7 +186,7 @@ Options:
                               Per-user cooldown for bot commands.
                               Default: ${DEFAULT_COMMAND_COOLDOWN_SECONDS}, range: 0-3600
   --price-report-schedule-interval-seconds <sec>
-                              Delay between scheduled price report checks.
+                              Maximum fallback delay between scheduled price report scans.
                               Default: ${DEFAULT_PRICE_REPORT_SCHEDULE_INTERVAL_SECONDS}, range: 60-3600
 
 Environment:

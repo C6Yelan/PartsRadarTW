@@ -12,11 +12,13 @@ export { runGatewaySession } from "./discord-bot/gateway";
 export { handleDiscordInteraction } from "./discord-bot/interactions";
 export { parseDiscordBotOptions, printDiscordBotHelp } from "./discord-bot/options";
 export {
+  calculateScheduledPriceReportSleepMs,
   disablePriceReport,
   enableDailyPriceReport,
   formatPriceReportSettingMessage,
   formatTaipeiMinute,
   formatWindowLabel,
+  readNextScheduledPriceReportDueAt,
   readPriceReportSetting,
   sendDueScheduledPriceReports,
   sendPriceReportNow,

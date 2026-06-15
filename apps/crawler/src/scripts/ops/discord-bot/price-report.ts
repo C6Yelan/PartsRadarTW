@@ -258,6 +258,47 @@ export async function sendDueScheduledPriceReports({
   return summary;
 }
 
+export async function readNextScheduledPriceReportDueAt({
+  client,
+}: {
+  client: DiscordBotClient;
+}): Promise<Date | null> {
+  const setting = await client.discordPriceReportSetting.findFirst({
+    where: {
+      enabled: true,
+      nextSendAt: {
+        not: null,
+      },
+    },
+    select: {
+      nextSendAt: true,
+    },
+    orderBy: [{ nextSendAt: "asc" }, { id: "asc" }],
+  });
+
+  return setting?.nextSendAt ?? null;
+}
+
+export function calculateScheduledPriceReportSleepMs({
+  now,
+  nextDueAt,
+  maxSleepMs,
+  minSleepMs = 1000,
+}: {
+  now: Date;
+  nextDueAt: Date | null;
+  maxSleepMs: number;
+  minSleepMs?: number;
+}): number {
+  if (!nextDueAt) {
+    return maxSleepMs;
+  }
+
+  const dueInMs = nextDueAt.getTime() - now.getTime();
+
+  return Math.min(maxSleepMs, Math.max(minSleepMs, dueInMs));
+}
+
 export async function disablePriceReport({
   client,
   discordUserId,

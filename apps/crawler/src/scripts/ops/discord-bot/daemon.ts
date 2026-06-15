@@ -3,7 +3,11 @@
 import { toSafeCliErrorMessage } from "../../shared/script-utils";
 import { CommandCooldowns } from "./cooldowns";
 import { createShutdownController, getWebSocketConstructor, runGatewaySession } from "./gateway";
-import { sendDueScheduledPriceReports } from "./price-report";
+import {
+  calculateScheduledPriceReportSleepMs,
+  readNextScheduledPriceReportDueAt,
+  sendDueScheduledPriceReports,
+} from "./price-report";
 import { registerDiscordBotCommands } from "./registration";
 import { formatDiscordRestFailure, sendDiscordDirectMessages } from "./rest";
 import type {
@@ -93,10 +97,14 @@ async function runScheduledPriceReportLoop({
   logMessage: (message: string) => void;
 }): Promise<void> {
   while (!shutdown.requested) {
+    let nextSleepMs = options.priceReportScheduleIntervalSeconds * 1000;
+
     try {
+      const now = new Date();
       const summary = await sendDueScheduledPriceReports({
         client,
         options,
+        now,
         sendDirectMessages: (discordUserId, messages) =>
           sendDiscordDirectMessages({
             token: options.token,
@@ -112,11 +120,17 @@ async function runScheduledPriceReportLoop({
           `Scheduled price reports processed. processed=${summary.processedCount} sent=${summary.sentCount} rateLimited=${summary.rateLimitedCount} failed=${summary.failedCount}`,
         );
       }
+
+      nextSleepMs = calculateScheduledPriceReportSleepMs({
+        now: new Date(),
+        nextDueAt: await readNextScheduledPriceReportDueAt({ client }),
+        maxSleepMs: nextSleepMs,
+      });
     } catch (error) {
       logMessage(`Scheduled price report loop failed: ${toSafeCliErrorMessage(error)}`);
     }
 
-    await shutdown.sleep(options.priceReportScheduleIntervalSeconds * 1000);
+    await shutdown.sleep(nextSleepMs);
   }
 }
 

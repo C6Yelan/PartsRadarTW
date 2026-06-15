@@ -542,7 +542,7 @@ Bot 目標：
 - `DISCORD_BOT_REGISTER_COMMANDS_ON_START`：daemon 啟動時是否註冊 slash command，預設 `true`。
 - `DISCORD_PRICE_REPORT_MAX_ITEMS`：`/price-report now` 最多列出的商品數，預設 50。
 - `DISCORD_BOT_COMMAND_COOLDOWN_SECONDS`：每位使用者手動指令 cooldown，預設 60。
-- `DISCORD_PRICE_REPORT_SCHEDULE_INTERVAL_SECONDS`：bot daemon 檢查 due 每日報告設定的間隔，預設 300，允許 60 到 3600。
+- `DISCORD_PRICE_REPORT_SCHEDULE_INTERVAL_SECONDS`：bot daemon 的 fallback 掃描上限，預設 300，允許 60 到 3600。每輪處理後會讀取下一筆啟用中的 `nextSendAt`；若時間早於此上限，daemon 會睡到該 due time 附近才醒來，最短 sleep 為 1 秒，避免高頻輪詢。
 
 啟動：
 
