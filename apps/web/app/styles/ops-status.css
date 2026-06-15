@@ -10,6 +10,7 @@
 
 .ops-status-header,
 .ops-panel,
+.ops-runtime-panel,
 .ops-table-panel,
 .ops-check-card,
 .ops-metric-tile {
@@ -163,8 +164,91 @@
 }
 
 .ops-panel,
+.ops-runtime-panel,
 .ops-table-panel {
   padding: 18px;
+}
+
+.ops-runtime-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.65fr);
+  gap: 18px;
+}
+
+.ops-schedule-list {
+  display: grid;
+}
+
+.ops-schedule-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.34fr) minmax(0, 0.66fr);
+  gap: 18px;
+  padding: 14px 0;
+  border-top: 1px solid var(--border);
+}
+
+.ops-schedule-row:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.ops-schedule-row:last-child {
+  padding-bottom: 0;
+}
+
+.ops-schedule-row h3 {
+  margin: 0;
+  color: var(--text-strong);
+  font-size: 15px;
+  line-height: 1.25;
+}
+
+.ops-schedule-row p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.ops-schedule-row ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.ops-policy-list {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  margin: 0;
+}
+
+.ops-policy-list div {
+  padding: 0 0 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.ops-policy-list div:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.ops-policy-list dt {
+  color: var(--text-strong);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.ops-policy-list dd {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
 }
 
 .ops-link-health-grid {
@@ -265,8 +349,14 @@
 @media (max-width: 1080px) {
   .ops-status-meta,
   .ops-check-grid,
-  .ops-status-columns {
+  .ops-status-columns,
+  .ops-runtime-layout {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ops-schedule-row {
+    grid-template-columns: 1fr;
+    gap: 10px;
   }
 }
 
@@ -288,6 +378,7 @@
   .ops-status-meta,
   .ops-check-grid,
   .ops-status-columns,
+  .ops-runtime-layout,
   .ops-link-health-grid {
     grid-template-columns: 1fr;
   }
@@ -301,6 +392,7 @@
   }
 
   .ops-panel,
+  .ops-runtime-panel,
   .ops-table-panel {
     padding: 14px;
   }

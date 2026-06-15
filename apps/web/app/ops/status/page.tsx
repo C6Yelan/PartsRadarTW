@@ -84,6 +84,38 @@ export default async function OpsStatusPage({ searchParams }: OpsStatusPageProps
         ))}
       </section>
 
+      <section className="ops-runtime-panel" aria-labelledby="ops-runtime-heading">
+        <div className="ops-section-heading">
+          <h2 id="ops-runtime-heading">排程與互斥策略</h2>
+          <p>依目前部署 env 與程式預設值彙整，不代表 container process 存活檢查。</p>
+        </div>
+        <div className="ops-runtime-layout">
+          <div className="ops-schedule-list">
+            {summary.runtimeSchedule.jobs.map((job) => (
+              <section className="ops-schedule-row" key={job.key}>
+                <div>
+                  <h3>{job.label}</h3>
+                  <p>{job.cadence}</p>
+                </div>
+                <ul>
+                  {job.details.map((detail) => (
+                    <li key={detail}>{detail}</li>
+                  ))}
+                </ul>
+              </section>
+            ))}
+          </div>
+          <dl className="ops-policy-list">
+            {summary.runtimeSchedule.policies.map((policy) => (
+              <div key={policy.key}>
+                <dt>{policy.label}</dt>
+                <dd>{policy.detail}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      </section>
+
       <section className="ops-status-columns" aria-label="data quality details">
         <article className="ops-panel">
           <h2>Link Health</h2>

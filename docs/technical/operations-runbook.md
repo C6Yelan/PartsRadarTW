@@ -413,6 +413,8 @@ SMOKE_PUBLIC_BASE_URL=https://partsradar.net
 - overall `OK` / `WARN` / `FAIL`。
 - source freshness、crawler freshness、recent suspected block、parse error、source image anomaly。
 - display-ready active product count、product image cache missing count。
+- 目前部署 env / 程式預設推導出的 daemon 排程：價格 crawler、新增商品圖片補圖、link health maintenance、raw snapshot cleanup、production smoke 與 Discord bot due report scan。
+- 外部抓取互斥策略：shared external-fetch lock、價格 crawler priority signal、maintenance 暫停延後，以及排程圖片補圖只處理本輪新增商品。
 - `source` link health 的 `ok`、`temporary_error`、`broken` 聚合。
 - raw snapshot retention drift。
 - 最近 crawl runs 與 enabled source categories 的高層級時間資訊。
