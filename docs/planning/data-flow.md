@@ -200,6 +200,7 @@ coolpc:igrp:{IGrp}:ibuy:{iBuyToken}
 Fetch failed：
 
 - 寫 raw snapshot metadata 或 fetch error。
+- live fetch 可重試例外會先短 retry；最終失敗時，fetch error 需包含 `error.name`、`error.message`、`error.cause.code` 與 `error.cause.message`。
 - 更新分類 `last_checked_at`。
 - 不更新 `last_success_at`、product、price 或 current price。
 - 可繼續下一分類。

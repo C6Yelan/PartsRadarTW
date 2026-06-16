@@ -83,7 +83,7 @@ repo 應提供 `.env.example` 作為範本。實際本機設定使用 `.env.loca
 | `SNAPSHOT_STORAGE_DIR` | raw snapshot 壓縮檔保存位置 |
 | `PRODUCT_IMAGE_STORAGE_DIR` | 商品縮圖快取保存位置；本機 Next.js dev server 預設對應 repo root 的 `storage/product-images` |
 | `CRAWLER_INTERVAL_SECONDS` | crawler 週期秒數，預設 `1800` |
-| `CRAWLER_BACKOFF_SECONDS` | 連續失敗後延後秒數，第一版預設 `3600` |
+| `CRAWLER_BACKOFF_SECONDS` | 連續失敗後延後秒數，第一版預設 `3600`；整輪全分類 fetch failed 時會先用較短 retry 間隔重新嘗試 |
 | `CRAWLER_LOCK_RETRY_SECONDS` | crawler 因外部抓取鎖被 maintenance 持有而要求 priority 後的重試秒數，預設 `120` |
 | `CRAWLER_CATEGORY_DELAY_MS` | crawler 分類頁請求間隔，預設 `8000` |
 | `CRAWLER_NEW_PRODUCT_IMAGE_MIN_DELAY_MS` | crawler 每輪新增商品圖片請求最小間隔，預設 `5000` |

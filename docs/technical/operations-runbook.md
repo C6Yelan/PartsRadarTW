@@ -206,6 +206,8 @@ docker compose --profile scheduled-crawler stop crawler-daemon
 - 低於 `60` 秒的 schedule interval / backoff 會被 daemon 拒絕。
 - 低於 `3000` ms 的 category delay 會被 daemon 拒絕。
 - 疑似被來源站攔截時，當輪 crawl 會停止並進入 backoff。
+- 單分類 fetch 例外會短 retry；若仍失敗，分類結果會保存 `error.name`、`error.message`、`error.cause.code` 與 `error.cause.message`，避免 log 只剩 `fetch failed`。
+- 若整輪所有分類都是 `FETCH_FAILED`，daemon 會先用較短 retry 間隔重新嘗試，預設不超過 600 秒；其他 parse/block 失敗仍走 `CRAWLER_BACKOFF_SECONDS`。
 - 若 shared external fetch lock 被 maintenance task 持有，crawler 會要求 priority retry，不會並行抓來源，也不會等完整 30 分鐘才再試。
 - daemon log 不應輸出 `.env`、`DATABASE_URL`、Cloudflare token 或其他 secret。
 

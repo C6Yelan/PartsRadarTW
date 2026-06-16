@@ -20,6 +20,7 @@ export const DEFAULT_COOLPC_CATEGORY_DELAY_MS = 8000;
 export const DEFAULT_COOLPC_FETCH_TIMEOUT_MS = 30000;
 export const MAX_COOLPC_RESPONSE_BODY_BYTES = 5 * 1024 * 1024;
 
+const DEFAULT_COOLPC_FETCH_RETRY_DELAYS_MS = [3000] as const;
 const MIN_COOLPC_CATEGORY_DELAY_MS = 1000;
 const MAX_COOLPC_CATEGORY_DELAY_MS = 60000;
 const MIN_COOLPC_FETCH_TIMEOUT_MS = 5000;
@@ -52,6 +53,12 @@ interface ValidateRawReplayOptions {
 interface CrawlTimingOptions {
   delayMs: number;
   fetchTimeoutMs: number;
+}
+
+interface CoolpcFetchRetryOptions {
+  fetchImpl?: typeof fetch;
+  retryDelaysMs?: readonly number[];
+  sleep?: (ms: number) => Promise<void>;
 }
 
 export async function runCoolpcCategoryCrawl({
@@ -257,44 +264,63 @@ async function readRawCategorySnapshot(
   };
 }
 
-async function fetchLiveCategorySnapshot(
+export async function fetchLiveCategorySnapshot(
   igrp: number,
   fetchedAt: Date,
   url: string,
   userAgent: string,
   timeoutMs: number,
   log: ((message: string) => void) | undefined,
+  retryOptions: CoolpcFetchRetryOptions = {},
 ): Promise<CoolpcCategorySnapshotInput> {
   log?.(`Fetching IGrp=${igrp}: ${url}`);
+  const fetchImpl = retryOptions.fetchImpl ?? fetch;
+  const retryDelaysMs = retryOptions.retryDelaysMs ?? DEFAULT_COOLPC_FETCH_RETRY_DELAYS_MS;
+  const sleep = retryOptions.sleep ?? delay;
+  const maxAttempts = retryDelaysMs.length + 1;
 
-  try {
-    const response = await fetch(url, {
-      headers: {
-        accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "accept-language": "zh-TW,zh;q=0.9,en;q=0.8",
-        "user-agent": userAgent,
-      },
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-    const bytes = await readResponseBodyWithLimit(response);
-    const rawHtml = decodeCoolpcHtml(bytes);
+  for (let attemptIndex = 0; attemptIndex < maxAttempts; attemptIndex += 1) {
+    try {
+      const response = await fetchImpl(url, {
+        headers: {
+          accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          "accept-language": "zh-TW,zh;q=0.9,en;q=0.8",
+          "user-agent": userAgent,
+        },
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+      const bytes = await readResponseBodyWithLimit(response);
+      const rawHtml = decodeCoolpcHtml(bytes);
 
-    return {
-      url,
-      fetchedAt,
-      httpStatus: response.status,
-      rawHtml,
-      fetchError: response.ok ? null : `HTTP ${response.status}`,
-    };
-  } catch (error) {
-    return {
-      url,
-      fetchedAt,
-      httpStatus: null,
-      rawHtml: null,
-      fetchError: toErrorMessage(error),
-    };
+      return {
+        url,
+        fetchedAt,
+        httpStatus: response.status,
+        rawHtml,
+        fetchError: response.ok ? null : `HTTP ${response.status}`,
+      };
+    } catch (error) {
+      const retryDelayMs = retryDelaysMs[attemptIndex];
+
+      if (retryDelayMs !== undefined && isRetryableCoolpcFetchError(error)) {
+        log?.(
+          `Fetching IGrp=${igrp} failed. attempt=${attemptIndex + 1}/${maxAttempts} retryInMs=${retryDelayMs} error=${formatCoolpcFetchError(error)}`,
+        );
+        await sleep(retryDelayMs);
+        continue;
+      }
+
+      return {
+        url,
+        fetchedAt,
+        httpStatus: null,
+        rawHtml: null,
+        fetchError: formatCoolpcFetchError(error),
+      };
+    }
   }
+
+  throw new Error("Unreachable CoolPC fetch retry state.");
 }
 
 function delay(ms: number): Promise<void> {
@@ -335,6 +361,38 @@ async function cancelReader(reader: ReadableStreamDefaultReader<Uint8Array>): Pr
   }
 }
 
-function toErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+export function formatCoolpcFetchError(error: unknown): string {
+  if (!(error instanceof Error)) {
+    return String(error);
+  }
+
+  const parts = [`name=${error.name || "Error"}`, `message=${error.message || "(empty)"}`];
+  const cause = error.cause;
+
+  if (isRecord(cause)) {
+    const code = cause.code;
+    const message = cause.message;
+
+    if (typeof code === "string" || typeof code === "number") {
+      parts.push(`cause.code=${String(code)}`);
+    }
+
+    if (typeof message === "string" && message.length > 0) {
+      parts.push(`cause.message=${message}`);
+    }
+  }
+
+  return parts.join(" ");
+}
+
+function isRetryableCoolpcFetchError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return true;
+  }
+
+  return !error.message.startsWith("CoolPC response body exceeds ");
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }

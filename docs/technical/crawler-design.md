@@ -35,7 +35,7 @@ https://www.coolpc.com.tw/eachview.php?IGrp={分類編號}
 - 每輪依目前啟用分類逐一抓取。
 - 單分類 fetch / parse failed 可記錄後繼續下一分類。
 - 疑似被攔截時立即停止當輪。
-- 連續失敗進入 1 小時 backoff。
+- 連續失敗進入 backoff；若整輪所有分類都是 fetch failed，先用較短 retry 間隔重新嘗試，避免瞬斷直接等待完整 backoff。
 - 不在 Next.js request / API route 執行。
 - 只寫 domain truth tables，不寫 `product_list_view`。
 
@@ -46,6 +46,7 @@ https://www.coolpc.com.tw/eachview.php?IGrp={分類編號}
 - 只使用 `eachview.php?IGrp={igrp}`。
 - 不保留或依賴 `PHPSESSID`。
 - 設定 timeout，避免單分類卡住整輪。
+- 單分類 live fetch 發生可重試例外時先短暫 retry；最終仍失敗時，fetch error 會記錄 `error.name`、`error.message`、`error.cause.code` 與 `error.cause.message`。
 - 取得回應後先建立 raw snapshot metadata，再做內容驗證。
 - 明確處理 Big5 到 UTF-8 解碼。
 

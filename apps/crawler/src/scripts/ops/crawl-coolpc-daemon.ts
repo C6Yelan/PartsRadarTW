@@ -1,6 +1,7 @@
 // apps/crawler/src/scripts/ops/crawl-coolpc-daemon.ts
 import type { PrismaClient } from "@partsradar/db";
 import {
+  CRAWL_RUN_CATEGORY_RESULT_STATUSES,
   CRAWL_RUN_STATUSES,
   CRAWL_TRIGGER_TYPES,
   type CrawlRunCategoryProductWriteSummary,
@@ -44,6 +45,7 @@ const DEFAULT_STORAGE_DIR = "temp/coolpc-daemon/snapshots";
 const DEFAULT_PRODUCT_IMAGE_STORAGE_DIR = "storage/product-images";
 const DEFAULT_INTERVAL_SECONDS = 1800;
 const DEFAULT_BACKOFF_SECONDS = 3600;
+const DEFAULT_ALL_FETCH_FAILED_RETRY_SECONDS = 600;
 const DEFAULT_LOCK_RETRY_SECONDS = 120;
 const DEFAULT_NEW_PRODUCT_IMAGE_MIN_DELAY_MS = 5000;
 const DEFAULT_NEW_PRODUCT_IMAGE_MAX_DELAY_MS = 12000;
@@ -389,6 +391,14 @@ export async function runScheduledCycle(
     await lock.release();
   }
 
+  const retryAfterSeconds = resolveAllFetchFailedRetrySeconds(result, options);
+
+  if (retryAfterSeconds !== undefined) {
+    log(
+      `All CoolPC categories failed during fetch. Retrying in ${retryAfterSeconds}s before using the regular ${options.backoffSeconds}s backoff.`,
+    );
+  }
+
   await notifyPriceChanges({
     client,
     crawlRunId: result.crawlRunId,
@@ -410,9 +420,14 @@ export async function runScheduledCycle(
     });
   }
 
-  return {
-    shouldBackoff,
-  };
+  return retryAfterSeconds === undefined
+    ? {
+        shouldBackoff,
+      }
+    : {
+        shouldBackoff,
+        retryAfterSeconds,
+      };
 }
 
 async function handleNewProductImageBackfill({
@@ -591,6 +606,27 @@ function shouldBackoffAfter(result: RunCoolpcCrawlOnceResult): boolean {
   return (
     result.status !== CRAWL_RUN_STATUSES.SUCCESS_CHANGED &&
     result.status !== CRAWL_RUN_STATUSES.SUCCESS_UNCHANGED
+  );
+}
+
+function resolveAllFetchFailedRetrySeconds(
+  result: RunCoolpcCrawlOnceResult,
+  options: CoolpcDaemonOptions,
+): number | undefined {
+  if (!isAllCategoryFetchFailed(result)) {
+    return undefined;
+  }
+
+  return Math.min(options.backoffSeconds, DEFAULT_ALL_FETCH_FAILED_RETRY_SECONDS);
+}
+
+function isAllCategoryFetchFailed(result: RunCoolpcCrawlOnceResult): boolean {
+  return (
+    result.categoryResults.length > 0 &&
+    result.categoryResults.every(
+      (categoryResult) =>
+        categoryResult.status === CRAWL_RUN_CATEGORY_RESULT_STATUSES.FETCH_FAILED,
+    )
   );
 }
 
