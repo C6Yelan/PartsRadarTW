@@ -22,6 +22,7 @@ import {
 import { formatDiscordBotText } from "./rest";
 import type {
   DiscordBotClient,
+  DiscordBotEmbed,
   DiscordBotMessage,
   DiscordBotMessageSendResult,
   DiscordBotOptions,
@@ -31,6 +32,7 @@ import type {
 } from "./types";
 
 const TAIPEI_UTC_OFFSET_MS = 8 * HOUR_MS;
+const DISCORD_MESSAGE_MAX_EMBEDS = 10;
 
 export async function sendPriceReportNow({
   client,
@@ -380,17 +382,14 @@ function createPersonalPriceReportEmbedMessages(
   const listedNewProducts = report.newProducts.slice(0, remainingItemLimit);
   const hiddenPriceChangeCount = report.priceChanges.length - listedPriceChanges.length;
   const hiddenNewProductCount = report.newProducts.length - listedNewProducts.length;
-  const descriptionChunks = createReportDescriptionChunks({
+  const embeds = createReportEmbeds({
     priceChangeCount: report.priceChanges.length,
     newProductCount: report.newProducts.length,
     windowHours: options.windowHours,
-    priceChangeLines: formatGroupedReportLines(
-      listedPriceChanges.map((change) => ({
-        category: change.category,
-        subcategory: change.subcategory,
-        line: formatPersonalPriceChangeEmbedLine(change, options.publicBaseUrl),
-      })),
-    ),
+    listedPriceChanges,
+    listedNewProducts,
+    publicBaseUrl: options.publicBaseUrl,
+    generatedAt: options.generatedAt,
     newProductLines: formatGroupedReportLines(
       listedNewProducts.map((product) => ({
         category: product.category,
@@ -398,50 +397,105 @@ function createPersonalPriceReportEmbedMessages(
         line: formatNewProductEmbedLine(product, options.publicBaseUrl),
       })),
     ),
-  });
-  const footer = formatHiddenReportFooter({
     hiddenPriceChangeCount,
     hiddenNewProductCount,
+    priceChangeMovementCounts: countPriceChangeMovements(report.priceChanges),
   });
 
-  return descriptionChunks.map((description, index) => ({
-    embeds: [
-      {
-        title:
-          descriptionChunks.length > 1
-            ? `PartsRadarTW 價格報告 (${index + 1}/${descriptionChunks.length})`
-            : "PartsRadarTW 價格報告",
-        description,
-        color: DISCORD_EMBED_COLOR,
-        footer: footer ? { text: footer } : undefined,
-        timestamp: options.generatedAt.toISOString(),
-      },
-    ],
-  }));
+  return createReportMessages(embeds);
 }
 
-function createReportDescriptionChunks({
+function createReportEmbeds({
   priceChangeCount,
   newProductCount,
   windowHours,
-  priceChangeLines,
+  listedPriceChanges,
+  listedNewProducts,
+  publicBaseUrl,
+  generatedAt,
   newProductLines,
+  hiddenPriceChangeCount,
+  hiddenNewProductCount,
+  priceChangeMovementCounts,
 }: {
   priceChangeCount: number;
   newProductCount: number;
   windowHours: number;
-  priceChangeLines: string[];
+  listedPriceChanges: PriceChangeDiscordNotificationItem[];
+  listedNewProducts: PriceReportNewProductItem[];
+  publicBaseUrl: string;
+  generatedAt: Date;
   newProductLines: string[];
-}): string[] {
-  const lines = [
-    `過去 ${windowHours} 小時：價格變動 ${priceChangeCount}，新增商品 ${newProductCount}`,
-    "",
-    `價格變動 (${priceChangeCount})`,
-    ...(priceChangeLines.length > 0 ? priceChangeLines : ["沒有價格變動。"]),
-    "",
-    `新增商品 (${newProductCount})`,
-    ...(newProductLines.length > 0 ? newProductLines : ["沒有新增商品。"]),
-  ];
+  hiddenPriceChangeCount: number;
+  hiddenNewProductCount: number;
+  priceChangeMovementCounts: PriceChangeMovementCounts;
+}): DiscordBotEmbed[] {
+  const timestamp = generatedAt.toISOString();
+  const priceChangeGroups = createPriceChangeMovementGroups(listedPriceChanges, publicBaseUrl);
+  const embeds: DiscordBotEmbed[] = [];
+
+  embeds.push(
+    ...createReportSectionEmbeds({
+      title: "PartsRadarTW 價格報告 - 價格變動",
+      lines: [
+        `過去 ${windowHours} 小時：${formatPriceChangeSummary(
+          priceChangeMovementCounts,
+        )}，新增商品 ${newProductCount}`,
+        "",
+        ...formatPriceChangeSectionLines(priceChangeGroups, priceChangeCount),
+      ],
+      footer: formatHiddenReportFooter({
+        hiddenPriceChangeCount,
+        hiddenNewProductCount: 0,
+      }),
+      timestamp,
+    }),
+  );
+
+  embeds.push(
+    ...createReportSectionEmbeds({
+      title: "PartsRadarTW 價格報告 - 新增商品",
+      lines: [
+        `過去 ${windowHours} 小時：新增商品 ${newProductCount}`,
+        "",
+        `新增商品 (${newProductCount})`,
+        ...formatNewProductSectionLines(newProductLines, listedNewProducts.length, newProductCount),
+      ],
+      footer: formatHiddenReportFooter({
+        hiddenPriceChangeCount: 0,
+        hiddenNewProductCount,
+      }),
+      timestamp,
+    }),
+  );
+
+  return embeds;
+}
+
+function createReportSectionEmbeds({
+  title,
+  lines,
+  footer,
+  timestamp,
+}: {
+  title: string;
+  lines: string[];
+  footer: string | null;
+  timestamp: string;
+}): DiscordBotEmbed[] {
+  const descriptionChunks = createReportDescriptionChunks(lines);
+
+  return descriptionChunks.map((description, index) => ({
+    title:
+      descriptionChunks.length > 1 ? `${title} (${index + 1}/${descriptionChunks.length})` : title,
+    description,
+    color: DISCORD_EMBED_COLOR,
+    footer: footer && index === descriptionChunks.length - 1 ? { text: footer } : undefined,
+    timestamp,
+  }));
+}
+
+function createReportDescriptionChunks(lines: string[]): string[] {
   const chunks: string[] = [];
   let current = "";
 
@@ -465,10 +519,147 @@ function createReportDescriptionChunks({
   return chunks;
 }
 
+function createReportMessages(embeds: DiscordBotEmbed[]): DiscordBotMessage[] {
+  const messages: DiscordBotMessage[] = [];
+
+  for (let index = 0; index < embeds.length; index += DISCORD_MESSAGE_MAX_EMBEDS) {
+    messages.push({
+      embeds: embeds.slice(index, index + DISCORD_MESSAGE_MAX_EMBEDS),
+    });
+  }
+
+  return messages;
+}
+
 interface GroupedReportLineItem {
   category: PriceReportProductCategory;
   subcategory: PriceReportProductSubcategory | null;
   line: string;
+}
+
+interface PriceChangeMovementGroup {
+  kind: "drop" | "rise" | "other";
+  title: string;
+  count: number;
+  lines: string[];
+}
+
+interface PriceChangeMovementCounts {
+  drop: number;
+  rise: number;
+  other: number;
+}
+
+function countPriceChangeMovements(
+  priceChanges: PriceChangeDiscordNotificationItem[],
+): PriceChangeMovementCounts {
+  return {
+    drop: priceChanges.filter((change) => change.delta < 0).length,
+    rise: priceChanges.filter((change) => change.delta > 0).length,
+    other: priceChanges.filter((change) => change.delta === 0).length,
+  };
+}
+
+function createPriceChangeMovementGroups(
+  priceChanges: PriceChangeDiscordNotificationItem[],
+  publicBaseUrl: string,
+): PriceChangeMovementGroup[] {
+  return [
+    createPriceChangeMovementGroup({
+      kind: "drop",
+      title: "降價",
+      priceChanges: priceChanges.filter((change) => change.delta < 0),
+      publicBaseUrl,
+    }),
+    createPriceChangeMovementGroup({
+      kind: "rise",
+      title: "漲價",
+      priceChanges: priceChanges.filter((change) => change.delta > 0),
+      publicBaseUrl,
+    }),
+    createPriceChangeMovementGroup({
+      kind: "other",
+      title: "其他變動",
+      priceChanges: priceChanges.filter((change) => change.delta === 0),
+      publicBaseUrl,
+    }),
+  ];
+}
+
+function createPriceChangeMovementGroup({
+  kind,
+  title,
+  priceChanges,
+  publicBaseUrl,
+}: {
+  kind: PriceChangeMovementGroup["kind"];
+  title: string;
+  priceChanges: PriceChangeDiscordNotificationItem[];
+  publicBaseUrl: string;
+}): PriceChangeMovementGroup {
+  return {
+    kind,
+    title,
+    count: priceChanges.length,
+    lines: formatGroupedReportLines(
+      priceChanges.map((change) => ({
+        category: change.category,
+        subcategory: change.subcategory,
+        line: formatPersonalPriceChangeEmbedLine(change, publicBaseUrl),
+      })),
+    ),
+  };
+}
+
+function formatPriceChangeSummary(counts: PriceChangeMovementCounts): string {
+  const parts = [`降價 ${counts.drop}`, `漲價 ${counts.rise}`];
+
+  if (counts.other > 0) {
+    parts.push(`其他變動 ${counts.other}`);
+  }
+
+  return parts.join("，");
+}
+
+function formatPriceChangeSectionLines(
+  groups: PriceChangeMovementGroup[],
+  totalPriceChangeCount: number,
+): string[] {
+  if (totalPriceChangeCount === 0) {
+    return ["價格變動 (0)", "沒有價格變動。"];
+  }
+
+  const lines = [`價格變動 (${totalPriceChangeCount})`];
+
+  for (const group of groups) {
+    if (group.lines.length === 0) {
+      continue;
+    }
+
+    lines.push("", `__${group.title} (${group.count})__`, ...group.lines);
+  }
+
+  if (lines.length === 1) {
+    lines.push("本次項目上限已用完，未列出價格變動。");
+  }
+
+  return lines;
+}
+
+function formatNewProductSectionLines(
+  newProductLines: string[],
+  listedNewProductCount: number,
+  totalNewProductCount: number,
+): string[] {
+  if (totalNewProductCount === 0) {
+    return ["沒有新增商品。"];
+  }
+
+  if (listedNewProductCount === 0) {
+    return ["本次項目上限已用完，未列出新增商品。"];
+  }
+
+  return newProductLines;
 }
 
 function formatGroupedReportLines(items: GroupedReportLineItem[]): string[] {
@@ -541,16 +732,18 @@ function formatPersonalPriceChangeEmbedLine(
     formatDiscordBotText(toSingleLine(change.productName), PRODUCT_NAME_MAX_LENGTH),
   );
   const productUrl = createProductUrl(publicBaseUrl, change.productId);
+  const movementLabel = change.delta < 0 ? "跌" : change.delta > 0 ? "漲" : "變動";
+  const delta = formatAbsoluteTaiwanDollar(change.delta, change.currency);
 
   return formatDiscordBotText(
-    `- [${productName}](${productUrl}) ${formatTaiwanDollar(
-      change.previousPrice,
-      change.currency,
-    )} -> ${formatTaiwanDollar(change.currentPrice, change.currency)} (${formatSignedTaiwanDollar(
-      change.delta,
-      change.currency,
-    )})`,
-    280,
+    [
+      `- **${movementLabel} ${delta}** [${productName}](${productUrl})`,
+      `  ${formatTaiwanDollar(change.previousPrice, change.currency)} -> ${formatTaiwanDollar(
+        change.currentPrice,
+        change.currency,
+      )}`,
+    ].join("\n"),
+    320,
   );
 }
 
@@ -564,8 +757,11 @@ function formatNewProductEmbedLine(
   const productUrl = createProductUrl(publicBaseUrl, product.productId);
 
   return formatDiscordBotText(
-    `- [${productName}](${productUrl}) ${formatTaiwanDollar(product.currentPrice, product.currency)}`,
-    240,
+    `- **新** [${productName}](${productUrl})\n  ${formatTaiwanDollar(
+      product.currentPrice,
+      product.currency,
+    )}`,
+    280,
   );
 }
 
@@ -720,10 +916,8 @@ function formatTaiwanDollar(amount: number, currency: string): string {
   return `${currency} ${amount.toLocaleString("en-US")}`;
 }
 
-function formatSignedTaiwanDollar(amount: number, currency: string): string {
-  const sign = amount > 0 ? "+" : "-";
-
-  return `${sign}${formatTaiwanDollar(Math.abs(amount), currency)}`;
+function formatAbsoluteTaiwanDollar(amount: number, currency: string): string {
+  return formatTaiwanDollar(Math.abs(amount), currency);
 }
 
 function formatHiddenReportFooter({

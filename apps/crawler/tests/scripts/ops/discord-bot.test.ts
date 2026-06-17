@@ -656,19 +656,30 @@ describe("sendPriceReportNow", () => {
     expect(reportMessage).toMatchObject({
       embeds: [
         expect.objectContaining({
-          title: "PartsRadarTW 價格報告",
-          description: expect.stringContaining("過去 24 小時：價格變動 1，新增商品 1"),
+          title: "PartsRadarTW 價格報告 - 價格變動",
+          description: expect.stringContaining("過去 24 小時：降價 1，漲價 0，新增商品 1"),
+        }),
+        expect.objectContaining({
+          title: "PartsRadarTW 價格報告 - 新增商品",
+          description: expect.stringContaining("過去 24 小時：新增商品 1"),
         }),
       ],
     });
-    expect(reportMessage?.embeds?.[0]?.description).toContain("\n價格變動 (1)\n");
-    expect(reportMessage?.embeds?.[0]?.description).toContain(
-      "\n\n價格變動 (1)\n**顯示卡**\n_華碩_\n- [GPU A]",
+    const priceChangeDescription = reportMessage?.embeds?.[0]?.description ?? "";
+    const newProductDescription = reportMessage?.embeds?.[1]?.description ?? "";
+
+    expect(priceChangeDescription).toContain("\n價格變動 (1)\n");
+    expect(priceChangeDescription).toContain(
+      "\n__降價 (1)__\n**顯示卡**\n_華碩_\n- **跌 NT$1,010** [GPU A]",
     );
-    expect(reportMessage?.embeds?.[0]?.description).toContain(
-      "\n\n新增商品 (1)\n**SSD/硬碟**\n_Samsung_\n- [SSD B]",
+    expect(priceChangeDescription).toContain("\n  NT$12,000 -> NT$10,990");
+    expect(newProductDescription).toContain("\n新增商品 (1)\n");
+    expect(newProductDescription).toContain(
+      "\n新增商品 (1)\n**SSD/硬碟**\n_Samsung_\n- **新** [SSD B]",
     );
+    expect(newProductDescription).toContain("\n  NT$2,490");
     expect(reportMessage?.embeds?.[0]?.fields).toBeUndefined();
+    expect(reportMessage?.embeds?.[1]?.fields).toBeUndefined();
     expect(JSON.stringify(reportMessage)).toContain("GPU A");
     expect(JSON.stringify(reportMessage)).toContain("SSD B");
     expect(client.discordNotificationDelivery.create).toHaveBeenCalledWith({
@@ -713,10 +724,11 @@ describe("sendPriceReportNow", () => {
     });
 
     const reportMessage = sendReportMessages.mock.calls[0]?.[0][0];
-    const description = reportMessage?.embeds?.[0]?.description ?? "";
+    const description = reportMessage?.embeds?.[1]?.description ?? "";
 
     expect(reportMessage?.embeds?.[0]?.fields).toBeUndefined();
-    expect(description).toContain("新增商品 (14)\n**顯示卡**\n_華碩_\n- [Long New Product");
+    expect(reportMessage?.embeds?.[1]?.fields).toBeUndefined();
+    expect(description).toContain("新增商品 (14)\n**顯示卡**\n_華碩_\n- **新** [Long New Product");
     expect(description).not.toContain("\u200b");
     expect(description).not.toContain("續");
   });
@@ -822,7 +834,10 @@ describe("sendPriceReportNow", () => {
       "111122223333444455",
       expect.arrayContaining([
         expect.objectContaining({
-          embeds: [expect.objectContaining({ title: "PartsRadarTW 價格報告" })],
+          embeds: [
+            expect.objectContaining({ title: "PartsRadarTW 價格報告 - 價格變動" }),
+            expect.objectContaining({ title: "PartsRadarTW 價格報告 - 新增商品" }),
+          ],
         }),
       ]),
     );
