@@ -732,12 +732,11 @@ function formatPersonalPriceChangeEmbedLine(
     formatDiscordBotText(toSingleLine(change.productName), PRODUCT_NAME_MAX_LENGTH),
   );
   const productUrl = createProductUrl(publicBaseUrl, change.productId);
-  const movementLabel = change.delta < 0 ? "跌" : change.delta > 0 ? "漲" : "變動";
-  const delta = formatAbsoluteTaiwanDollar(change.delta, change.currency);
+  const delta = formatSignedTaiwanDollar(change.delta, change.currency);
 
   return formatDiscordBotText(
     [
-      `- **${movementLabel} ${delta}** [${productName}](${productUrl})`,
+      `- **${delta}** [${productName}](${productUrl})`,
       `  ${formatTaiwanDollar(change.previousPrice, change.currency)} -> ${formatTaiwanDollar(
         change.currentPrice,
         change.currency,
@@ -757,10 +756,7 @@ function formatNewProductEmbedLine(
   const productUrl = createProductUrl(publicBaseUrl, product.productId);
 
   return formatDiscordBotText(
-    `- **新** [${productName}](${productUrl})\n  ${formatTaiwanDollar(
-      product.currentPrice,
-      product.currency,
-    )}`,
+    `- [${productName}](${productUrl})\n  ${formatTaiwanDollar(product.currentPrice, product.currency)}`,
     280,
   );
 }
@@ -916,8 +912,10 @@ function formatTaiwanDollar(amount: number, currency: string): string {
   return `${currency} ${amount.toLocaleString("en-US")}`;
 }
 
-function formatAbsoluteTaiwanDollar(amount: number, currency: string): string {
-  return formatTaiwanDollar(Math.abs(amount), currency);
+function formatSignedTaiwanDollar(amount: number, currency: string): string {
+  const sign = amount > 0 ? "+" : amount < 0 ? "-" : "";
+
+  return `${sign}${formatTaiwanDollar(Math.abs(amount), currency)}`;
 }
 
 function formatHiddenReportFooter({
