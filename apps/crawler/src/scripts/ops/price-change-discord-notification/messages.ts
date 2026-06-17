@@ -103,13 +103,7 @@ function createPriceChangeDiscordEmbeds(
     options.publicBaseUrl,
   )}`;
   const hiddenLimitLabel = options.hiddenLimitLabel ?? "report item limit";
-  const lines = listedChanges.map((change, index) =>
-    formatPriceChangeLine({
-      change,
-      index,
-      publicBaseUrl: options.publicBaseUrl,
-    }),
-  );
+  const lines = formatGroupedPriceChangeEmbedLines(listedChanges, options.publicBaseUrl);
   const chunks = chunkEmbedLines(lines, {
     totalCount: changes.length,
     listedCount: listedChanges.length,
@@ -353,6 +347,99 @@ function formatPriceChangeLine({
   );
 }
 
+function formatGroupedPriceChangeEmbedLines(
+  changes: PriceChangeDiscordNotificationItem[],
+  publicBaseUrl: string,
+): string[] {
+  const items = changes.map((change) => ({
+    category: change.category,
+    subcategory: change.subcategory,
+    line: formatPriceChangeEmbedLine({ change, publicBaseUrl }),
+  }));
+  const lines: string[] = [];
+  const categoryGroups = groupReportItems(items, (item) => formatCategoryKey(item.category));
+
+  for (const categoryItems of categoryGroups.values()) {
+    const category = categoryItems[0]?.category;
+
+    if (!category) {
+      continue;
+    }
+
+    if (lines.length > 0) {
+      lines.push("");
+    }
+
+    lines.push(`**${formatReportHeading(category.displayName)}**`);
+
+    const subcategoryGroups = groupReportItems(categoryItems, (item) =>
+      formatSubcategoryKey(item.subcategory),
+    );
+
+    for (const subcategoryItems of subcategoryGroups.values()) {
+      const subcategory = subcategoryItems[0]?.subcategory;
+      lines.push(formatReportSubcategoryHeading(subcategory));
+      lines.push(...subcategoryItems.map((item) => item.line));
+    }
+  }
+
+  return lines;
+}
+
+function formatPriceChangeEmbedLine({
+  change,
+  publicBaseUrl,
+}: {
+  change: PriceChangeDiscordNotificationItem;
+  publicBaseUrl: string;
+}): string {
+  const productName = escapeMarkdownLinkText(
+    formatDiscordWebhookText(toSingleLine(change.productName), PRODUCT_NAME_MAX_LENGTH),
+  );
+  const delta = formatSignedPrice(change.delta, change.currency);
+  const previousPrice = formatPrice(change.previousPrice, change.currency);
+  const currentPrice = formatPrice(change.currentPrice, change.currency);
+  const productUrl = createProductUrl(publicBaseUrl, change.productId);
+
+  return formatDiscordWebhookText(
+    `- [${productName}](${productUrl}) ${previousPrice} -> ${currentPrice} (${delta})`,
+    280,
+  );
+}
+
+function groupReportItems<T>(items: T[], toKey: (item: T) => string): Map<string, T[]> {
+  const groups = new Map<string, T[]>();
+
+  for (const item of items) {
+    const key = toKey(item);
+    const group = groups.get(key) ?? [];
+    group.push(item);
+    groups.set(key, group);
+  }
+
+  return groups;
+}
+
+function formatCategoryKey(category: PriceChangeDiscordNotificationItem["category"]): string {
+  return `${String(category.igrp).padStart(4, "0")}:${category.displayName}`;
+}
+
+function formatSubcategoryKey(
+  subcategory: PriceChangeDiscordNotificationItem["subcategory"],
+): string {
+  return `${subcategory?.slug ?? "unknown"}:${subcategory?.displayName ?? "未分類"}`;
+}
+
+function formatReportSubcategoryHeading(
+  subcategory: PriceChangeDiscordNotificationItem["subcategory"],
+): string {
+  return `_${formatReportHeading(subcategory?.displayName ?? "未分類")}_`;
+}
+
+function formatReportHeading(value: string): string {
+  return escapeMarkdownText(formatDiscordWebhookText(toSingleLine(value), 80));
+}
+
 function formatPrice(amount: number, currency: string): string {
   return `${currency} ${amount.toLocaleString("en-US")}`;
 }
@@ -392,4 +479,8 @@ function toSingleLine(value: string): string {
 
 function escapeMarkdownLinkText(value: string): string {
   return value.replace(/([\\[\]])/g, "\\$1");
+}
+
+function escapeMarkdownText(value: string): string {
+  return value.replace(/([\\`*_{}[\]()#+\-.!|>])/g, "\\$1");
 }

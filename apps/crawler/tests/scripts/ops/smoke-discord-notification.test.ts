@@ -132,10 +132,12 @@ describe("createSmokeDiscordNotificationDecision", () => {
       color: 0xf59e0b,
       timestamp: checkedAt.toISOString(),
     });
+    expect(decision.message.embeds?.[0]?.description).toContain("Status: WARN");
+    expect(decision.message.embeds?.[0]?.description).toContain("Issues:");
     expect(decision.message.embeds?.[0]?.description).toContain(
-      "Affected checks: WARN source freshness",
+      "- WARN source freshness: lastSuccessAt=90m ago",
     );
-    expect(decision.message.embeds?.[0]?.description).not.toContain("lastSuccessAt=90m ago");
+    expect(decision.message.embeds?.[0]?.description).not.toContain("Runbook:");
   });
 
   it("skips repeated unchanged WARN within cooldown", () => {
@@ -263,6 +265,9 @@ describe("createSmokeDiscordNotificationDecision", () => {
       timestamp: checkedAt.toISOString(),
     });
     expect(decision.message.embeds?.[0]?.description).toContain("Previous status: FAIL");
+    expect(decision.message.embeds?.[0]?.description).toContain("Current state:");
+    expect(decision.message.embeds?.[0]?.description).toContain("- OK homepage: homepage OK");
+    expect(decision.message.embeds?.[0]?.description).not.toContain("Runbook:");
   });
 
   it("skips subsequent OK after recovered notification", () => {

@@ -99,7 +99,7 @@ Discord bot 第一輪指令：
 - Webhook 保留給 public 價格變動清單與 admin smoke 告警。
 - Discord bot 負責個人目標價提醒與個人價格變動報告。
 - 從現有 `production-smoke` / `smoke-daemon` 結果產生管理者告警，告警對象是維運者；支援 `FAIL`、需要人工注意的 `WARN`、恢復正常通知與 cooldown / 去重。
-- public webhook 內容只能包含安全摘要；管理者告警可包含檢查名稱、狀態、簡短原因、時間與 runbook 方向。
+- public webhook 內容只能包含安全摘要；管理者告警可包含檢查名稱、狀態、具體原因摘要與時間，不放要求人工翻閱的 runbook link。
 - Discord webhook URL 與 bot token 只放在 untracked `.env` 或部署 secret，不提交 Git。
 - Discord bot 需要新增 daemon、slash command registration、watch / price-report 設定資料表與 notification delivery log。
 
@@ -186,7 +186,7 @@ Discord bot 第一輪指令：
 
 完成條件：
 
-- 維運檢視能指出需要人工處理的資料類型與建議 runbook 方向。
+- 維運檢視能指出需要人工處理的資料類型、影響範圍與具體處置線索。
 - 不公開 raw HTML、parse error raw content、DB URL、token 或 secret-bearing error。
 - web dashboard 必須完成 access control / auth / network boundary 設計，且 public `web` 不能看到頁面內容。
 

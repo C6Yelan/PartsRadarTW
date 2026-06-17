@@ -212,9 +212,11 @@ describe("production smoke daemon Discord notifications", () => {
       throw new Error("Expected Discord webhook sender call.");
     }
     expect(webhookCall.message.content).toBeUndefined();
+    expect(webhookCall.message.embeds?.[0]?.description).toContain("Issues:");
     expect(webhookCall.message.embeds?.[0]?.description).toContain(
-      "Affected checks: WARN rate limit headers",
+      "- WARN rate limit headers: clientSource=unknown limit=360 remaining=359; public HTTPS smoke should expose client identity",
     );
+    expect(webhookCall.message.embeds?.[0]?.description).not.toContain("Runbook:");
     expect(logMessage).toHaveBeenCalledWith(
       "Smoke Discord notification sent. kind=WARN httpStatus=204",
     );

@@ -340,7 +340,15 @@ describe("createPriceChangeDiscordMessages", () => {
     const messages = createPriceChangeDiscordMessages(
       [
         change({ productId: "product-1", productName: "GPU A", delta: -500 }),
-        change({ productId: "product-2", productName: "RAM B", delta: 200 }),
+        change({
+          productId: "product-2",
+          productName: "RAM B",
+          delta: 200,
+          categoryIgrp: 10,
+          categoryName: "記憶體",
+          subcategorySlug: "kingston",
+          subcategoryName: "Kingston",
+        }),
         change({ productId: "product-3", productName: "SSD C", delta: -100 }),
       ],
       {
@@ -359,11 +367,13 @@ describe("createPriceChangeDiscordMessages", () => {
     expect(messages[0]?.embeds?.[0]?.description).toContain(
       "Changes: 3. Listed: 2; 1 hidden",
     );
+    expect(messages[0]?.embeds?.[0]?.description).toContain("**顯示卡**\n_華碩_");
     expect(messages[0]?.embeds?.[0]?.description).toContain(
-      "1. -TWD 500 | [GPU A](https://partsradar.test/products/product-1)",
+      "- [GPU A](https://partsradar.test/products/product-1) TWD 10,000 -> TWD 9,500 (-TWD 500)",
     );
+    expect(messages[0]?.embeds?.[0]?.description).toContain("**記憶體**\n_Kingston_");
     expect(messages[0]?.embeds?.[0]?.description).toContain(
-      "2. +TWD 200 | [RAM B](https://partsradar.test/products/product-2)",
+      "- [RAM B](https://partsradar.test/products/product-2) TWD 10,000 -> TWD 10,200 (+TWD 200)",
     );
     expect(messages[0]?.embeds?.[0]?.description).not.toContain("SSD C");
     expect(messages[0]?.embeds?.[0]?.description).toContain("Browse: https://partsradar.test/");
@@ -588,12 +598,20 @@ function change({
   previousPrice = 10000,
   delta,
   changedAt = new Date("2026-06-07T02:00:00.000Z"),
+  categoryIgrp = 12,
+  categoryName = "顯示卡",
+  subcategorySlug = "asus",
+  subcategoryName = "華碩",
 }: {
   productId: string;
   productName: string;
   previousPrice?: number;
   delta: number;
   changedAt?: Date;
+  categoryIgrp?: number;
+  categoryName?: string;
+  subcategorySlug?: string | null;
+  subcategoryName?: string | null;
 }): PriceChangeDiscordNotificationItem {
   return {
     productId,
@@ -601,13 +619,15 @@ function change({
     previousPrice,
     currentPrice: previousPrice + delta,
     category: {
-      igrp: 12,
-      displayName: "顯示卡",
+      igrp: categoryIgrp,
+      displayName: categoryName,
     },
-    subcategory: {
-      slug: "asus",
-      displayName: "華碩",
-    },
+    subcategory: subcategoryName
+      ? {
+          slug: subcategorySlug,
+          displayName: subcategoryName,
+        }
+      : null,
     currency: "TWD",
     changedAt,
     delta,

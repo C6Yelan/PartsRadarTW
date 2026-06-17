@@ -2,14 +2,18 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import type { ProductionSmokeSummary, SmokeCheckResult, SmokeStatus } from "./production-smoke";
-import { type DiscordWebhookMessage, readDiscordWebhookUrl } from "./discord-webhook";
+import {
+  type DiscordWebhookMessage,
+  formatDiscordWebhookText,
+  readDiscordWebhookUrl,
+} from "./discord-webhook";
 import { getStringArg, resolveRelativeToWorkspace } from "../shared/script-utils";
 
 const STATE_VERSION = 1;
 const DEFAULT_STATE_FILE = "storage/ops/smoke-discord-state.json";
 const DEFAULT_COOLDOWN_SECONDS = 3600;
 const MAX_COOLDOWN_SECONDS = 7 * 24 * 60 * 60;
-const RUNBOOK_REFERENCE = "docs/technical/operations-runbook.md#production-smoke-daemon";
+const MAX_DETAILED_CHECK_LINES = 8;
 const SMOKE_EMBED_COLORS: Record<SmokeDiscordNotificationKind, number> = {
   WARN: 0xf59e0b,
   FAIL: 0xdc2626,
@@ -289,11 +293,7 @@ function createAbnormalMessage(summary: ProductionSmokeSummary): DiscordWebhookM
     embeds: [
       {
         title: `PartsRadarTW smoke ${summary.status}`,
-        description: [
-          `Checked at: ${summary.checkedAt.toISOString()}`,
-          `Affected checks: ${formatAffectedChecks(abnormalChecks)}`,
-          `Runbook: ${RUNBOOK_REFERENCE}`,
-        ].join("\n"),
+        description: formatAbnormalSmokeDescription(summary, abnormalChecks),
         color: summary.status === "FAIL" ? SMOKE_EMBED_COLORS.FAIL : SMOKE_EMBED_COLORS.WARN,
         timestamp: summary.checkedAt.toISOString(),
       },
@@ -310,11 +310,7 @@ function createRecoveredMessage(
     embeds: [
       {
         title: "PartsRadarTW smoke RECOVERED",
-        description: [
-          `Previous status: ${previousStatus}`,
-          `Checked at: ${summary.checkedAt.toISOString()}`,
-          `Runbook: ${RUNBOOK_REFERENCE}`,
-        ].join("\n"),
+        description: formatRecoveredSmokeDescription(summary, previousStatus),
         color: SMOKE_EMBED_COLORS.RECOVERED,
         timestamp: summary.checkedAt.toISOString(),
       },
@@ -322,17 +318,49 @@ function createRecoveredMessage(
   };
 }
 
-function formatAffectedChecks(checks: SmokeCheckResult[]): string {
+function formatAbnormalSmokeDescription(
+  summary: ProductionSmokeSummary,
+  checks: SmokeCheckResult[],
+): string {
+  return [
+    `Checked at: ${summary.checkedAt.toISOString()}`,
+    `Status: ${summary.status}`,
+    "",
+    "Issues:",
+    ...formatDetailedCheckLines(checks),
+  ].join("\n");
+}
+
+function formatRecoveredSmokeDescription(
+  summary: ProductionSmokeSummary,
+  previousStatus: SmokeStatus,
+): string {
+  return [
+    `Previous status: ${previousStatus}`,
+    `Checked at: ${summary.checkedAt.toISOString()}`,
+    "",
+    "Current state:",
+    ...formatDetailedCheckLines(summary.checks),
+  ].join("\n");
+}
+
+function formatDetailedCheckLines(checks: SmokeCheckResult[]): string[] {
   if (checks.length === 0) {
-    return "none";
+    return ["- No checks reported."];
   }
 
-  const visibleChecks = checks.slice(0, 6).map((check) => `${check.status} ${check.name}`);
+  const visibleChecks = checks
+    .slice(0, MAX_DETAILED_CHECK_LINES)
+    .map(
+      (check) =>
+        `- ${check.status} ${formatDiscordWebhookText(check.name, 80)}: ${formatDiscordWebhookText(
+          check.message,
+          260,
+        )}`,
+    );
   const hiddenCount = checks.length - visibleChecks.length;
 
-  return hiddenCount > 0
-    ? `${visibleChecks.join(", ")} and ${hiddenCount} more`
-    : visibleChecks.join(", ");
+  return hiddenCount > 0 ? [...visibleChecks, `- ... ${hiddenCount} more checks`] : visibleChecks;
 }
 
 function parseSmokeDiscordNotificationState(value: unknown): SmokeDiscordNotificationState {
