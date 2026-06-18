@@ -434,40 +434,54 @@ function createReportEmbeds({
   const priceChangeGroups = createPriceChangeMovementGroups(listedPriceChanges, publicBaseUrl);
   const embeds: DiscordBotEmbed[] = [];
 
-  embeds.push(
-    ...createReportSectionEmbeds({
-      title: "PartsRadarTW 價格報告 - 價格變動",
-      lines: [
-        `過去 ${windowHours} 小時：${formatPriceChangeSummary(
-          priceChangeMovementCounts,
-        )}，新增商品 ${newProductCount}`,
-        "",
-        ...formatPriceChangeSectionLines(priceChangeGroups, priceChangeCount),
-      ],
-      footer: formatHiddenReportFooter({
-        hiddenPriceChangeCount,
-        hiddenNewProductCount: 0,
+  if (priceChangeCount > 0) {
+    embeds.push(
+      ...createReportSectionEmbeds({
+        title: "PartsRadarTW 價格報告 - 價格變動",
+        lines: [
+          `過去 **${windowHours} 小時**：${formatPriceChangeSummary(priceChangeMovementCounts)}`,
+          "",
+          ...formatPriceChangeSectionLines(priceChangeGroups),
+        ],
+        footer: formatHiddenReportFooter({
+          hiddenPriceChangeCount,
+          hiddenNewProductCount: 0,
+        }),
+        timestamp,
       }),
-      timestamp,
-    }),
-  );
+    );
+  }
 
-  embeds.push(
-    ...createReportSectionEmbeds({
-      title: "PartsRadarTW 價格報告 - 新增商品",
-      lines: [
-        `過去 ${windowHours} 小時：新增商品 ${newProductCount}`,
-        "",
-        `新增商品 (${newProductCount})`,
-        ...formatNewProductSectionLines(newProductLines, listedNewProducts.length, newProductCount),
-      ],
-      footer: formatHiddenReportFooter({
-        hiddenPriceChangeCount: 0,
-        hiddenNewProductCount,
+  if (newProductCount > 0) {
+    embeds.push(
+      ...createReportSectionEmbeds({
+        title: "PartsRadarTW 價格報告 - 新增商品",
+        lines: [
+          `過去 **${windowHours} 小時**：**${newProductCount} 個新增商品**`,
+          "",
+          ...formatNewProductSectionLines(
+            newProductLines,
+            listedNewProducts.length,
+            newProductCount,
+          ),
+        ],
+        footer: formatHiddenReportFooter({
+          hiddenPriceChangeCount: 0,
+          hiddenNewProductCount,
+        }),
+        timestamp,
       }),
+    );
+  }
+
+  if (embeds.length === 0) {
+    embeds.push({
+      title: "PartsRadarTW 價格報告",
+      description: `過去 ${windowHours} 小時沒有價格變動或新增商品。`,
+      color: DISCORD_EMBED_COLOR,
       timestamp,
-    }),
-  );
+    });
+  }
 
   return embeds;
 }
@@ -612,34 +626,31 @@ function createPriceChangeMovementGroup({
 }
 
 function formatPriceChangeSummary(counts: PriceChangeMovementCounts): string {
-  const parts = [`降價 ${counts.drop}`, `漲價 ${counts.rise}`];
+  const parts = [`**降價 ${counts.drop}**`, `**漲價 ${counts.rise}**`];
 
   if (counts.other > 0) {
-    parts.push(`其他變動 ${counts.other}`);
+    parts.push(`**其他變動 ${counts.other}**`);
   }
 
   return parts.join("，");
 }
 
-function formatPriceChangeSectionLines(
-  groups: PriceChangeMovementGroup[],
-  totalPriceChangeCount: number,
-): string[] {
-  if (totalPriceChangeCount === 0) {
-    return ["價格變動 (0)", "沒有價格變動。"];
-  }
-
-  const lines = [`價格變動 (${totalPriceChangeCount})`];
+function formatPriceChangeSectionLines(groups: PriceChangeMovementGroup[]): string[] {
+  const lines: string[] = [];
 
   for (const group of groups) {
     if (group.lines.length === 0) {
       continue;
     }
 
-    lines.push("", `__${group.title} (${group.count})__`, ...group.lines);
+    if (lines.length > 0) {
+      lines.push("");
+    }
+
+    lines.push(`__**${group.title} (${group.count})**__`, ...group.lines);
   }
 
-  if (lines.length === 1) {
+  if (lines.length === 0) {
     lines.push("本次項目上限已用完，未列出價格變動。");
   }
 
@@ -685,7 +696,9 @@ function formatGroupedReportLines(items: GroupedReportLineItem[]): string[] {
 
     for (const subcategoryItems of subcategoryGroups.values()) {
       const subcategory = subcategoryItems[0]?.subcategory;
-      lines.push(formatReportSubcategoryHeading(subcategory));
+      if (shouldShowReportSubcategoryHeading(subcategory)) {
+        lines.push(formatReportSubcategoryHeading(subcategory));
+      }
       lines.push(...subcategoryItems.map((item) => item.line));
     }
   }
@@ -720,28 +733,60 @@ function formatReportSubcategoryHeading(
   return `_${formatReportHeading(subcategory?.displayName ?? "未分類")}_`;
 }
 
+function shouldShowReportSubcategoryHeading(
+  subcategory: PriceReportProductSubcategory | null,
+): boolean {
+  return Boolean(subcategory?.displayName && subcategory.displayName !== "未分類");
+}
+
 function formatReportHeading(value: string): string {
   return escapeMarkdownText(formatDiscordBotText(toSingleLine(value), 80));
+}
+
+function formatReportProductLinkText(
+  productName: string,
+  subcategory: PriceReportProductSubcategory | null,
+): string {
+  const reportProductName = stripLeadingSubcategoryName(toSingleLine(productName), subcategory);
+
+  return escapeMarkdownLinkText(formatDiscordBotText(reportProductName, PRODUCT_NAME_MAX_LENGTH));
+}
+
+function stripLeadingSubcategoryName(
+  productName: string,
+  subcategory: PriceReportProductSubcategory | null,
+): string {
+  const subcategoryName = toSingleLine(subcategory?.displayName ?? "");
+
+  if (!subcategoryName || subcategoryName === "未分類") {
+    return productName;
+  }
+
+  if (!productName.toLocaleLowerCase().startsWith(subcategoryName.toLocaleLowerCase())) {
+    return productName;
+  }
+
+  const strippedName = productName
+    .slice(subcategoryName.length)
+    .replace(/^[\s:：\-–—_/／]+/, "")
+    .trim();
+
+  return strippedName || productName;
 }
 
 function formatPersonalPriceChangeEmbedLine(
   change: PriceChangeDiscordNotificationItem,
   publicBaseUrl: string,
 ): string {
-  const productName = escapeMarkdownLinkText(
-    formatDiscordBotText(toSingleLine(change.productName), PRODUCT_NAME_MAX_LENGTH),
-  );
+  const productName = formatReportProductLinkText(change.productName, change.subcategory);
   const productUrl = createProductUrl(publicBaseUrl, change.productId);
   const delta = formatSignedTaiwanDollar(change.delta, change.currency);
 
   return formatDiscordBotText(
-    [
-      `- **${delta}** [${productName}](${productUrl})`,
-      `  ${formatTaiwanDollar(change.previousPrice, change.currency)} -> ${formatTaiwanDollar(
-        change.currentPrice,
-        change.currency,
-      )}`,
-    ].join("\n"),
+    `- **${delta}** ${formatTaiwanDollar(change.previousPrice, change.currency)} -> ${formatTaiwanDollar(
+      change.currentPrice,
+      change.currency,
+    )} [${productName}](${productUrl})`,
     320,
   );
 }
@@ -750,13 +795,11 @@ function formatNewProductEmbedLine(
   product: PriceReportNewProductItem,
   publicBaseUrl: string,
 ): string {
-  const productName = escapeMarkdownLinkText(
-    formatDiscordBotText(toSingleLine(product.productName), PRODUCT_NAME_MAX_LENGTH),
-  );
+  const productName = formatReportProductLinkText(product.productName, product.subcategory);
   const productUrl = createProductUrl(publicBaseUrl, product.productId);
 
   return formatDiscordBotText(
-    `- [${productName}](${productUrl})\n  ${formatTaiwanDollar(product.currentPrice, product.currency)}`,
+    `- **${formatTaiwanDollar(product.currentPrice, product.currency)}** [${productName}](${productUrl})`,
     280,
   );
 }
