@@ -12,7 +12,9 @@ import {
   parsePriceReportComponentInteraction,
   parsePriceReportInteraction,
   parsePriceReportModalSubmit,
+  parseUnwatchInteraction,
   parseWatchInteraction,
+  parseWatchlistInteraction,
 } from "./commands";
 import type { CommandCooldowns } from "./cooldowns";
 import {
@@ -31,7 +33,14 @@ import {
   sendModalInteractionResponse,
 } from "./rest";
 import type { DiscordBotClient, DiscordBotOptions, DiscordInteraction, FetchImpl } from "./types";
-import { createTargetPriceWatch, createTargetPriceWatchResponseMessage } from "./watch";
+import {
+  createDisableTargetPriceWatchResponseMessage,
+  createTargetPriceWatch,
+  createTargetPriceWatchResponseMessage,
+  createTargetPriceWatchlistResponseMessage,
+  disableTargetPriceWatch,
+  readTargetPriceWatchlist,
+} from "./watch";
 
 export async function handleDiscordInteraction({
   client,
@@ -92,8 +101,11 @@ async function handleApplicationCommandInteraction({
 }): Promise<void> {
   const command = parsePriceReportInteraction(interaction);
   const watchCommand = command ? null : parseWatchInteraction(interaction);
+  const watchlistCommand = command || watchCommand ? false : parseWatchlistInteraction(interaction);
+  const unwatchCommand =
+    command || watchCommand || watchlistCommand ? null : parseUnwatchInteraction(interaction);
 
-  if (!command && !watchCommand) {
+  if (!command && !watchCommand && !watchlistCommand && !unwatchCommand) {
     await sendUnsupportedInteractionResponse({ interaction, options, fetchImpl });
     return;
   }
@@ -175,6 +187,42 @@ async function handleApplicationCommandInteraction({
       interaction,
       fetchImpl,
       message: createTargetPriceWatchResponseMessage({
+        result,
+        publicBaseUrl: options.publicBaseUrl,
+      }),
+    });
+    return;
+  }
+
+  if (watchlistCommand) {
+    const result = await readTargetPriceWatchlist({ client, discordUserId });
+
+    await sendInteractionResponse({
+      token: options.token,
+      apiBaseUrl: options.apiBaseUrl,
+      interaction,
+      fetchImpl,
+      message: createTargetPriceWatchlistResponseMessage({
+        result,
+        publicBaseUrl: options.publicBaseUrl,
+      }),
+    });
+    return;
+  }
+
+  if (unwatchCommand) {
+    const result = await disableTargetPriceWatch({
+      client,
+      discordUserId,
+      watchInput: unwatchCommand.watchInput,
+    });
+
+    await sendInteractionResponse({
+      token: options.token,
+      apiBaseUrl: options.apiBaseUrl,
+      interaction,
+      fetchImpl,
+      message: createDisableTargetPriceWatchResponseMessage({
         result,
         publicBaseUrl: options.publicBaseUrl,
       }),

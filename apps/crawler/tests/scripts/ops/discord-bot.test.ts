@@ -24,6 +24,7 @@ const APPLICATION_ID = "123456789012345678";
 const API_BASE_URL = "https://discord.test/api/v10";
 const PUBLIC_BASE_URL = "https://partsradar.test/";
 const WATCH_PRODUCT_ID = "11111111-1111-4111-8111-111111111111";
+const WATCH_ROW_ID = "22222222-2222-4222-8222-222222222222";
 
 describe("Discord bot options", () => {
   it("parses required bot settings and safe defaults", () => {
@@ -104,6 +105,17 @@ describe("registerDiscordBotCommands", () => {
           expect.objectContaining({ name: "product", type: 3, required: true }),
           expect.objectContaining({ name: "target_price", type: 4, required: true }),
         ],
+      }),
+      expect.objectContaining({
+        name: "watchlist",
+        contexts: [0, 1],
+        dm_permission: true,
+      }),
+      expect.objectContaining({
+        name: "unwatch",
+        contexts: [0, 1],
+        dm_permission: true,
+        options: [expect.objectContaining({ name: "watch_id", type: 3, required: true })],
       }),
     ]);
     expect(String(globalRequestInit.body)).not.toContain('"enable"');
@@ -372,6 +384,154 @@ describe("handleDiscordInteraction", () => {
     expect(client.discordTargetPriceWatch.upsert).not.toHaveBeenCalled();
     expect(String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body)).toContain(
       "目標價格需為",
+    );
+  });
+
+  it("shows active target price watches from the watchlist command", async () => {
+    const client = createDiscordBotClient(
+      [
+        snapshot({
+          id: "snapshot-watch-1",
+          productId: WATCH_PRODUCT_ID,
+          productName: "RTX 5070 測試卡",
+          crawlRunId: "new-run",
+          price: 18_990,
+          capturedAt: "2026-06-07T03:00:00.000Z",
+        }),
+      ],
+      [],
+      [
+        targetPriceWatch({
+          id: WATCH_ROW_ID,
+          discordUserId: "111122223333444455",
+          productId: WATCH_PRODUCT_ID,
+          targetPrice: 17_500,
+        }),
+        targetPriceWatch({
+          id: "33333333-3333-4333-8333-333333333333",
+          discordUserId: "111122223333444455",
+          productId: WATCH_PRODUCT_ID,
+          targetPrice: 10_000,
+          enabled: false,
+        }),
+      ],
+    );
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createWatchlistInteraction(),
+    });
+
+    const requestBody = JSON.parse(
+      String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body),
+    );
+
+    expect(requestBody).toMatchObject({
+      type: 4,
+      data: {
+        embeds: [
+          expect.objectContaining({
+            title: "目標價追蹤清單",
+            description: expect.stringContaining("`22222222`"),
+          }),
+        ],
+      },
+    });
+    expect(requestBody.data.embeds[0].description).toContain("NT$18,990");
+    expect(requestBody.data.embeds[0].description).toContain("目標 **NT$17,500**");
+    expect(requestBody.data.embeds[0].description).toContain("尚差 NT$1,490");
+    expect(requestBody.data.embeds[0].description).toContain("RTX 5070 測試卡");
+    expect(requestBody.data.embeds[0].description).not.toContain("33333333");
+  });
+
+  it("disables a target price watch from the unwatch command", async () => {
+    const client = createDiscordBotClient(
+      [
+        snapshot({
+          id: "snapshot-watch-1",
+          productId: WATCH_PRODUCT_ID,
+          productName: "RTX 5070 測試卡",
+          crawlRunId: "new-run",
+          price: 18_990,
+          capturedAt: "2026-06-07T03:00:00.000Z",
+        }),
+      ],
+      [],
+      [
+        targetPriceWatch({
+          id: WATCH_ROW_ID,
+          discordUserId: "111122223333444455",
+          productId: WATCH_PRODUCT_ID,
+          targetPrice: 17_500,
+        }),
+      ],
+    );
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createUnwatchInteraction("22222222"),
+    });
+
+    expect(client.discordTargetPriceWatch.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: WATCH_ROW_ID,
+        discordUserId: "111122223333444455",
+        enabled: true,
+      },
+      data: {
+        enabled: false,
+      },
+    });
+
+    const requestBody = JSON.parse(
+      String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body),
+    );
+
+    expect(requestBody).toMatchObject({
+      type: 4,
+      data: {
+        embeds: [
+          expect.objectContaining({
+            title: "已取消目標價追蹤",
+            description: expect.stringContaining("RTX 5070 測試卡"),
+          }),
+        ],
+      },
+    });
+    expect(requestBody.data.embeds[0].fields).toContainEqual(
+      expect.objectContaining({ name: "追蹤 ID", value: "22222222" }),
+    );
+  });
+
+  it("reports when unwatch cannot find an active watch", async () => {
+    const client = createDiscordBotClient([]);
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createUnwatchInteraction("22222222"),
+    });
+
+    expect(client.discordTargetPriceWatch.updateMany).not.toHaveBeenCalled();
+    expect(String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body)).toContain(
+      "找不到啟用中的目標價追蹤",
     );
   });
 
@@ -1112,6 +1272,45 @@ function createWatchInteraction(productInput: string, targetPrice: number): Disc
   };
 }
 
+function createWatchlistInteraction(): DiscordInteraction {
+  return {
+    id: "interaction-1",
+    token: "interaction-token",
+    type: 2,
+    data: {
+      name: "watchlist",
+    },
+    member: {
+      user: {
+        id: "111122223333444455",
+      },
+    },
+  };
+}
+
+function createUnwatchInteraction(watchInput: string): DiscordInteraction {
+  return {
+    id: "interaction-1",
+    token: "interaction-token",
+    type: 2,
+    data: {
+      name: "unwatch",
+      options: [
+        {
+          type: 3,
+          name: "watch_id",
+          value: watchInput,
+        },
+      ],
+    },
+    member: {
+      user: {
+        id: "111122223333444455",
+      },
+    },
+  };
+}
+
 interface TestSnapshot {
   id: string;
   productId: string;
@@ -1226,6 +1425,36 @@ function priceReportSetting({
   };
 }
 
+function targetPriceWatch({
+  id,
+  discordUserId,
+  productId,
+  targetPrice,
+  currency = "TWD",
+  enabled = true,
+  lastNotifiedAt = null,
+}: {
+  id: string;
+  discordUserId: string;
+  productId: string;
+  targetPrice: number;
+  currency?: string;
+  enabled?: boolean;
+  lastNotifiedAt?: Date | null;
+}): TestTargetPriceWatch {
+  return {
+    id,
+    discordUserId,
+    productId,
+    targetPrice,
+    currency,
+    enabled,
+    lastNotifiedAt,
+    createdAt: new Date("2026-06-07T00:00:00.000Z"),
+    updatedAt: new Date("2026-06-07T00:00:00.000Z"),
+  };
+}
+
 function createDiscordBotClient(
   snapshots: TestSnapshot[],
   settings: TestPriceReportSetting[] = [],
@@ -1249,6 +1478,9 @@ function createDiscordBotClient(
     upsert: ReturnType<typeof vi.fn>;
   };
   discordTargetPriceWatch: {
+    findFirst: ReturnType<typeof vi.fn>;
+    findMany: ReturnType<typeof vi.fn>;
+    updateMany: ReturnType<typeof vi.fn>;
     upsert: ReturnType<typeof vi.fn>;
   };
 } {
@@ -1402,6 +1634,81 @@ function createDiscordBotClient(
     },
   );
   const watchRows = [...watches];
+  const toWatchRecord = (watch: TestTargetPriceWatch) => toPrismaWatchListRecord(watch, snapshots);
+  const watchFindMany = vi.fn(
+    async (args: {
+      where: { discordUserId?: string; enabled?: boolean };
+      take?: number;
+    }) => {
+      const rows = watchRows
+        .filter((watch) => {
+          if (args.where.discordUserId !== undefined && watch.discordUserId !== args.where.discordUserId) {
+            return false;
+          }
+
+          return args.where.enabled === undefined || watch.enabled === args.where.enabled;
+        })
+        .sort((left, right) => {
+          return (
+            right.updatedAt.getTime() - left.updatedAt.getTime() ||
+            left.id.localeCompare(right.id)
+          );
+        })
+        .map(toWatchRecord);
+
+      return typeof args.take === "number" ? rows.slice(0, args.take) : rows;
+    },
+  );
+  const watchFindFirst = vi.fn(
+    async (args: {
+      where: { discordUserId?: string; productId?: string; enabled?: boolean };
+    }) => {
+      const watch = watchRows.find((row) => {
+        if (args.where.discordUserId !== undefined && row.discordUserId !== args.where.discordUserId) {
+          return false;
+        }
+
+        if (args.where.productId !== undefined && row.productId !== args.where.productId) {
+          return false;
+        }
+
+        return args.where.enabled === undefined || row.enabled === args.where.enabled;
+      });
+
+      return watch ? toWatchRecord(watch) : null;
+    },
+  );
+  const watchUpdateMany = vi.fn(
+    async (args: {
+      where: { id?: string; discordUserId?: string; productId?: string; enabled?: boolean };
+      data: Partial<TestTargetPriceWatch>;
+    }) => {
+      let count = 0;
+
+      for (const watch of watchRows) {
+        if (args.where.id !== undefined && watch.id !== args.where.id) {
+          continue;
+        }
+
+        if (args.where.discordUserId !== undefined && watch.discordUserId !== args.where.discordUserId) {
+          continue;
+        }
+
+        if (args.where.productId !== undefined && watch.productId !== args.where.productId) {
+          continue;
+        }
+
+        if (args.where.enabled !== undefined && watch.enabled !== args.where.enabled) {
+          continue;
+        }
+
+        Object.assign(watch, args.data);
+        count += 1;
+      }
+
+      return { count };
+    },
+  );
   const watchUpsert = vi.fn(
     async (args: {
       where: { discordUserId_productId: { discordUserId: string; productId: string } };
@@ -1453,6 +1760,9 @@ function createDiscordBotClient(
       upsert: settingUpsert,
     },
     discordTargetPriceWatch: {
+      findFirst: watchFindFirst,
+      findMany: watchFindMany,
+      updateMany: watchUpdateMany,
       upsert: watchUpsert,
     },
   } as unknown as DiscordBotClient & {
@@ -1474,6 +1784,9 @@ function createDiscordBotClient(
       upsert: ReturnType<typeof vi.fn>;
     };
     discordTargetPriceWatch: {
+      findFirst: ReturnType<typeof vi.fn>;
+      findMany: ReturnType<typeof vi.fn>;
+      updateMany: ReturnType<typeof vi.fn>;
       upsert: ReturnType<typeof vi.fn>;
     };
   };
@@ -1511,6 +1824,30 @@ function toPrismaWatchProduct(snapshot: TestSnapshot) {
         capturedAt: snapshot.capturedAt,
       },
     },
+  };
+}
+
+function toPrismaWatchListRecord(watch: TestTargetPriceWatch, snapshots: TestSnapshot[]) {
+  const latestSnapshot = snapshots
+    .filter((snapshot) => snapshot.productId === watch.productId)
+    .sort((left, right) => right.capturedAt.getTime() - left.capturedAt.getTime())[0];
+
+  return {
+    id: watch.id,
+    discordUserId: watch.discordUserId,
+    productId: watch.productId,
+    targetPrice: watch.targetPrice,
+    currency: watch.currency,
+    enabled: watch.enabled,
+    lastNotifiedAt: watch.lastNotifiedAt,
+    updatedAt: watch.updatedAt,
+    product: latestSnapshot
+      ? toPrismaWatchProduct(latestSnapshot)
+      : {
+          id: watch.productId,
+          name: "Unknown product",
+          currentPrice: null,
+        },
   };
 }
 

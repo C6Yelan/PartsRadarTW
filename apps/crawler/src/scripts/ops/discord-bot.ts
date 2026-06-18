@@ -7,9 +7,13 @@ import { formatDiscordRestFailure } from "./discord-bot/rest";
 
 export {
   createPriceReportCommand,
+  createUnwatchCommand,
   createWatchCommand,
+  createWatchlistCommand,
   parsePriceReportInteraction,
+  parseUnwatchInteraction,
   parseWatchInteraction,
+  parseWatchlistInteraction,
 } from "./discord-bot/commands";
 export { CommandCooldowns } from "./discord-bot/cooldowns";
 export { runDiscordBotDaemon } from "./discord-bot/daemon";
@@ -38,7 +42,12 @@ export {
   sendDiscordRestRequest,
   sendInteractionResponse,
 } from "./discord-bot/rest";
-export { createTargetPriceWatch, normalizeWatchProductReference } from "./discord-bot/watch";
+export {
+  createTargetPriceWatch,
+  disableTargetPriceWatch,
+  normalizeWatchProductReference,
+  readTargetPriceWatchlist,
+} from "./discord-bot/watch";
 export type { ScheduledPriceReportSummary } from "./discord-bot/price-report";
 export type {
   DiscordBotClient,

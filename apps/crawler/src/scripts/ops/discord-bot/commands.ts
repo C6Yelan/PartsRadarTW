@@ -26,6 +26,7 @@ import type {
   ParsedPriceReportCommand,
   ParsedPriceReportComponent,
   ParsedPriceReportModal,
+  ParsedUnwatchCommand,
   ParsedWatchCommand,
 } from "./types";
 
@@ -105,6 +106,34 @@ export function createWatchCommand(): Record<string, unknown> {
   };
 }
 
+export function createWatchlistCommand(): Record<string, unknown> {
+  return {
+    name: "watchlist",
+    description: "Show your PartsRadarTW target price alerts.",
+    type: DISCORD_COMMAND_TYPE_CHAT_INPUT,
+    contexts: [DISCORD_APPLICATION_CONTEXT_GUILD, DISCORD_APPLICATION_CONTEXT_BOT_DM],
+    dm_permission: true,
+  };
+}
+
+export function createUnwatchCommand(): Record<string, unknown> {
+  return {
+    name: "unwatch",
+    description: "Disable a PartsRadarTW target price alert.",
+    type: DISCORD_COMMAND_TYPE_CHAT_INPUT,
+    contexts: [DISCORD_APPLICATION_CONTEXT_GUILD, DISCORD_APPLICATION_CONTEXT_BOT_DM],
+    dm_permission: true,
+    options: [
+      {
+        type: DISCORD_OPTION_TYPE_STRING,
+        name: "watch_id",
+        description: "watchlist 顯示的短 ID，或商品 ID / 商品頁 URL。",
+        required: true,
+      },
+    ],
+  };
+}
+
 export function parsePriceReportInteraction(interaction: DiscordInteraction): ParsedPriceReportCommand | null {
   if (interaction.data?.name !== "price-report") {
     return null;
@@ -136,6 +165,23 @@ export function parsePriceReportInteraction(interaction: DiscordInteraction): Pa
   }
 
   return null;
+}
+
+export function parseWatchlistInteraction(interaction: DiscordInteraction): boolean {
+  return interaction.data?.name === "watchlist";
+}
+
+export function parseUnwatchInteraction(interaction: DiscordInteraction): ParsedUnwatchCommand | null {
+  if (interaction.data?.name !== "unwatch") {
+    return null;
+  }
+
+  const watchOption = interaction.data.options?.find((option) => option.name === "watch_id");
+  const watchInput = typeof watchOption?.value === "string" ? watchOption.value.trim() : "";
+
+  return {
+    watchInput: watchInput.length > 0 ? watchInput : null,
+  };
 }
 
 export function parseWatchInteraction(interaction: DiscordInteraction): ParsedWatchCommand | null {

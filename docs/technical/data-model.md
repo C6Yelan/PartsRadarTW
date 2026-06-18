@@ -183,7 +183,7 @@ Discord bot 只保存 Discord user id 與必要偏好，不建立網站帳號，
 
 - `/price-report now` 會寫入 delivery log，但不建立 price report setting。
 - `/price-report settings` 的按鈕與 modal 讀寫 `discord_price_report_settings`；每日 DM 報告可在 modal 設定台北時間 `HH:mm`，下一次發送時間保存在 `next_send_at`。
-- `/watch` 會讀寫 `discord_target_price_watches`，目前支援保存或更新單一商品目標價；`/watchlist`、`/unwatch` 與目標價達標 DM worker 後續實作。
+- `/watch` 會讀寫 `discord_target_price_watches`，支援保存或更新單一商品目標價；`/watchlist` 讀取啟用中的追蹤；`/unwatch` 以 watch 短 ID、商品 ID 或商品頁 URL 停用追蹤；目標價達標 DM worker 後續實作。
 - `error_message` 只保存安全摘要，不保存 token、source URL、raw HTML、DB URL、internal headers 或 raw IP。
 
 ## Crawler State

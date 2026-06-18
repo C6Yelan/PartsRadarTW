@@ -278,6 +278,10 @@ export interface ParsedWatchCommand {
   targetPrice: number | null;
 }
 
+export interface ParsedUnwatchCommand {
+  watchInput: string | null;
+}
+
 export type ParsedPriceReportComponent =
   | {
       name: "open_settings_modal";

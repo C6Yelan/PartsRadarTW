@@ -531,11 +531,11 @@ Bot 目標：
 - 「開啟/修改每日報告」會開啟 modal，要求設定統計區間、最多列出商品數與每日私訊發送時間；`time` 使用台北時間 `HH:mm`。
 - 「關閉每日報告」會直接關閉每日價格報告 DM。
 - `/watch <商品連結或商品ID> <目標價格>`：保存或更新目前 Discord 使用者對單一 PartsRadarTW 商品的目標價追蹤；支援站內商品 UUID 或 `/products/<id>` 商品頁 URL。回覆會顯示目前價格、目標價與是否已達標。
+- `/watchlist`：顯示目前 Discord 使用者啟用中的目標價追蹤，包含 watch 短 ID、目前價格、目標價格、狀態與站內連結。
+- `/unwatch <watch_id>`：停用目前 Discord 使用者的單一目標價追蹤；`watch_id` 可使用 `/watchlist` 顯示的短 ID，也可輸入站內商品 UUID 或 `/products/<id>` 商品頁 URL。
 
 尚未實作：
 
-- `/watchlist`
-- `/unwatch <watch_id>`
 - 目標價達標 DM worker。
 
 目前設定：
