@@ -51,7 +51,7 @@ export type DiscordMessageComponent = DiscordActionRowComponent;
 
 export interface DiscordActionRowComponent {
   type: 1;
-  components: DiscordButtonComponent[];
+  components: Array<DiscordButtonComponent | DiscordStringSelectComponent>;
 }
 
 export interface DiscordButtonComponent {
@@ -59,6 +59,21 @@ export interface DiscordButtonComponent {
   style: number;
   custom_id: string;
   label: string;
+  disabled?: boolean;
+}
+
+export interface DiscordStringSelectComponent {
+  type: 3;
+  custom_id: string;
+  placeholder?: string;
+  options: Array<{
+    label: string;
+    value: string;
+    description?: string;
+    default?: boolean;
+  }>;
+  min_values?: number;
+  max_values?: number;
   disabled?: boolean;
 }
 
@@ -289,6 +304,10 @@ export type ParsedPriceReportComponent =
   | {
       name: "disable_daily_report";
     };
+
+export interface ParsedUnwatchComponent {
+  watchInput: string | null;
+}
 
 export interface ParsedPriceReportModal {
   windowHours: number;

@@ -12,6 +12,7 @@ import {
   parsePriceReportComponentInteraction,
   parsePriceReportInteraction,
   parsePriceReportModalSubmit,
+  parseUnwatchComponentInteraction,
   parseUnwatchInteraction,
   parseWatchInteraction,
   parseWatchlistInteraction,
@@ -38,6 +39,7 @@ import {
   createTargetPriceWatch,
   createTargetPriceWatchResponseMessage,
   createTargetPriceWatchlistResponseMessage,
+  createUnwatchSelectResponseMessage,
   disableTargetPriceWatch,
   readTargetPriceWatchlist,
 } from "./watch";
@@ -211,6 +213,23 @@ async function handleApplicationCommandInteraction({
   }
 
   if (unwatchCommand) {
+    if (!unwatchCommand.watchInput) {
+      const result = await readTargetPriceWatchlist({
+        client,
+        discordUserId,
+        maxItems: 25,
+      });
+
+      await sendInteractionResponse({
+        token: options.token,
+        apiBaseUrl: options.apiBaseUrl,
+        interaction,
+        fetchImpl,
+        message: createUnwatchSelectResponseMessage({ result }),
+      });
+      return;
+    }
+
     const result = await disableTargetPriceWatch({
       client,
       discordUserId,
@@ -245,8 +264,9 @@ async function handleMessageComponentInteraction({
   fetchImpl: FetchImpl;
 }): Promise<void> {
   const component = parsePriceReportComponentInteraction(interaction);
+  const unwatchComponent = component ? null : parseUnwatchComponentInteraction(interaction);
 
-  if (!component) {
+  if (!component && !unwatchComponent) {
     await sendUnsupportedInteractionResponse({ interaction, options, fetchImpl });
     return;
   }
@@ -258,7 +278,27 @@ async function handleMessageComponentInteraction({
     return;
   }
 
-  if (component.name === "open_settings_modal") {
+  if (unwatchComponent) {
+    const result = await disableTargetPriceWatch({
+      client,
+      discordUserId,
+      watchInput: unwatchComponent.watchInput,
+    });
+
+    await sendInteractionResponse({
+      token: options.token,
+      apiBaseUrl: options.apiBaseUrl,
+      interaction,
+      fetchImpl,
+      message: createDisableTargetPriceWatchResponseMessage({
+        result,
+        publicBaseUrl: options.publicBaseUrl,
+      }),
+    });
+    return;
+  }
+
+  if (component?.name === "open_settings_modal") {
     const setting = await readPriceReportSetting({ client, discordUserId });
 
     await sendModalInteractionResponse({

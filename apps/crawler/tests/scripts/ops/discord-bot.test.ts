@@ -115,7 +115,7 @@ describe("registerDiscordBotCommands", () => {
         name: "unwatch",
         contexts: [0, 1],
         dm_permission: true,
-        options: [expect.objectContaining({ name: "watch_id", type: 3, required: true })],
+        options: [expect.objectContaining({ name: "watch_id", type: 3, required: false })],
       }),
     ]);
     expect(String(globalRequestInit.body)).not.toContain('"enable"');
@@ -513,6 +513,140 @@ describe("handleDiscordInteraction", () => {
     expect(requestBody.data.embeds[0].fields).toContainEqual(
       expect.objectContaining({ name: "追蹤 ID", value: "22222222" }),
     );
+  });
+
+  it("shows a selectable unwatch menu when no watch id is provided", async () => {
+    const client = createDiscordBotClient(
+      [
+        snapshot({
+          id: "snapshot-watch-1",
+          productId: WATCH_PRODUCT_ID,
+          productName: "RTX 5070 測試卡",
+          crawlRunId: "new-run",
+          price: 18_990,
+          capturedAt: "2026-06-07T03:00:00.000Z",
+        }),
+      ],
+      [],
+      [
+        targetPriceWatch({
+          id: WATCH_ROW_ID,
+          discordUserId: "111122223333444455",
+          productId: WATCH_PRODUCT_ID,
+          targetPrice: 17_500,
+        }),
+      ],
+    );
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createUnwatchInteraction(),
+    });
+
+    expect(client.discordTargetPriceWatch.updateMany).not.toHaveBeenCalled();
+
+    const requestBody = JSON.parse(
+      String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body),
+    );
+
+    expect(requestBody).toMatchObject({
+      type: 4,
+      data: {
+        content: expect.stringContaining("選擇要取消的目標價追蹤"),
+        components: [
+          {
+            type: 1,
+            components: [
+              expect.objectContaining({
+                type: 3,
+                custom_id: "unwatch:select",
+                placeholder: "選擇要取消追蹤的商品",
+                min_values: 1,
+                max_values: 1,
+                options: [
+                  expect.objectContaining({
+                    label: "RTX 5070 測試卡",
+                    value: `watch:${WATCH_ROW_ID}`,
+                    description: expect.stringContaining("22222222"),
+                  }),
+                ],
+              }),
+            ],
+          },
+        ],
+      },
+    });
+    const option = requestBody.data.components[0].components[0].options[0];
+    expect(option.description).toContain("NT$18,990");
+    expect(option.description).toContain("目標 NT$17,500");
+  });
+
+  it("disables a target price watch from the unwatch select menu", async () => {
+    const client = createDiscordBotClient(
+      [
+        snapshot({
+          id: "snapshot-watch-1",
+          productId: WATCH_PRODUCT_ID,
+          productName: "RTX 5070 測試卡",
+          crawlRunId: "new-run",
+          price: 18_990,
+          capturedAt: "2026-06-07T03:00:00.000Z",
+        }),
+      ],
+      [],
+      [
+        targetPriceWatch({
+          id: WATCH_ROW_ID,
+          discordUserId: "111122223333444455",
+          productId: WATCH_PRODUCT_ID,
+          targetPrice: 17_500,
+        }),
+      ],
+    );
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createUnwatchSelectInteraction(`watch:${WATCH_ROW_ID}`),
+    });
+
+    expect(client.discordTargetPriceWatch.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: WATCH_ROW_ID,
+        discordUserId: "111122223333444455",
+        enabled: true,
+      },
+      data: {
+        enabled: false,
+      },
+    });
+
+    const requestBody = JSON.parse(
+      String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body),
+    );
+
+    expect(requestBody).toMatchObject({
+      type: 4,
+      data: {
+        embeds: [
+          expect.objectContaining({
+            title: "已取消目標價追蹤",
+            description: expect.stringContaining("RTX 5070 測試卡"),
+          }),
+        ],
+      },
+    });
   });
 
   it("reports when unwatch cannot find an active watch", async () => {
@@ -1288,20 +1422,41 @@ function createWatchlistInteraction(): DiscordInteraction {
   };
 }
 
-function createUnwatchInteraction(watchInput: string): DiscordInteraction {
+function createUnwatchInteraction(watchInput?: string): DiscordInteraction {
   return {
     id: "interaction-1",
     token: "interaction-token",
     type: 2,
     data: {
       name: "unwatch",
-      options: [
-        {
-          type: 3,
-          name: "watch_id",
-          value: watchInput,
-        },
-      ],
+      options:
+        watchInput === undefined
+          ? []
+          : [
+              {
+                type: 3,
+                name: "watch_id",
+                value: watchInput,
+              },
+            ],
+    },
+    member: {
+      user: {
+        id: "111122223333444455",
+      },
+    },
+  };
+}
+
+function createUnwatchSelectInteraction(watchInput: string): DiscordInteraction {
+  return {
+    id: "interaction-1",
+    token: "interaction-token",
+    type: 3,
+    data: {
+      custom_id: "unwatch:select",
+      component_type: 3,
+      values: [watchInput],
     },
     member: {
       user: {

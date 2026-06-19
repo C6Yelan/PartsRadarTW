@@ -43,7 +43,7 @@ Discord bot 第一輪指令：
 - `/price-report now`：立即在指令發出的頻道或私訊 context 產生一次報告，用於驗證設定與手動查看。
 - `/watch <商品連結或商品ID> <目標價格>`：追蹤單一商品目標價。
 - `/watchlist`：顯示自己的追蹤商品、目前價格、目標價格、是否已觸發與站內連結。
-- `/unwatch <watch_id>`：取消追蹤；`watch_id` 使用 bot 產生的短 ID，不暴露 DB UUID。
+- `/unwatch [watch_id]`：取消追蹤；省略 `watch_id` 時用選單列出自己的啟用中追蹤，`watch_id` 可使用 bot 產生的短 ID，不暴露 DB UUID。
 
 價格變動報告第一版限制：
 

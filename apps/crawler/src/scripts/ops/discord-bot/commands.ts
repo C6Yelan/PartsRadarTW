@@ -26,6 +26,7 @@ import type {
   ParsedPriceReportCommand,
   ParsedPriceReportComponent,
   ParsedPriceReportModal,
+  ParsedUnwatchComponent,
   ParsedUnwatchCommand,
   ParsedWatchCommand,
 } from "./types";
@@ -36,6 +37,7 @@ const PRICE_REPORT_SETTINGS_MODAL_CUSTOM_ID = "price-report:settings:modal";
 const PRICE_REPORT_SETTINGS_WINDOW_CUSTOM_ID = "price-report:settings:window";
 const PRICE_REPORT_SETTINGS_MAX_ITEMS_CUSTOM_ID = "price-report:settings:max-items";
 const PRICE_REPORT_SETTINGS_TIME_CUSTOM_ID = "price-report:settings:time";
+export const UNWATCH_SELECT_CUSTOM_ID = "unwatch:select";
 
 export function createPriceReportCommand(): Record<string, unknown> {
   return {
@@ -128,7 +130,7 @@ export function createUnwatchCommand(): Record<string, unknown> {
         type: DISCORD_OPTION_TYPE_STRING,
         name: "watch_id",
         description: "watchlist 顯示的短 ID，或商品 ID / 商品頁 URL。",
-        required: true,
+        required: false,
       },
     ],
   };
@@ -181,6 +183,20 @@ export function parseUnwatchInteraction(interaction: DiscordInteraction): Parsed
 
   return {
     watchInput: watchInput.length > 0 ? watchInput : null,
+  };
+}
+
+export function parseUnwatchComponentInteraction(
+  interaction: DiscordInteraction,
+): ParsedUnwatchComponent | null {
+  if (interaction.data?.custom_id !== UNWATCH_SELECT_CUSTOM_ID) {
+    return null;
+  }
+
+  const selectedValue = interaction.data.values?.[0];
+
+  return {
+    watchInput: typeof selectedValue === "string" && selectedValue.trim() ? selectedValue.trim() : null,
   };
 }
 
