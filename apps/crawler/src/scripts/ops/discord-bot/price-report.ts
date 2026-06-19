@@ -730,7 +730,7 @@ function formatSubcategoryKey(subcategory: PriceReportProductSubcategory | null)
 function formatReportSubcategoryHeading(
   subcategory: PriceReportProductSubcategory | null,
 ): string {
-  return `_${formatReportHeading(subcategory?.displayName ?? "未分類")}_`;
+  return `**${formatReportHeading(subcategory?.displayName ?? "未分類")}**`;
 }
 
 function shouldShowReportSubcategoryHeading(

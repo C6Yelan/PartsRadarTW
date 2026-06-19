@@ -367,11 +367,11 @@ describe("createPriceChangeDiscordMessages", () => {
     expect(messages[0]?.embeds?.[0]?.description).toContain(
       "Changes: 3. Listed: 2; 1 hidden",
     );
-    expect(messages[0]?.embeds?.[0]?.description).toContain("**顯示卡**\n_華碩_");
+    expect(messages[0]?.embeds?.[0]?.description).toContain("**顯示卡**\n**華碩**");
     expect(messages[0]?.embeds?.[0]?.description).toContain(
       "- [GPU A](https://partsradar.test/products/product-1) TWD 10,000 -> TWD 9,500 (-TWD 500)",
     );
-    expect(messages[0]?.embeds?.[0]?.description).toContain("**記憶體**\n_Kingston_");
+    expect(messages[0]?.embeds?.[0]?.description).toContain("**記憶體**\n**Kingston**");
     expect(messages[0]?.embeds?.[0]?.description).toContain(
       "- [RAM B](https://partsradar.test/products/product-2) TWD 10,000 -> TWD 10,200 (+TWD 200)",
     );

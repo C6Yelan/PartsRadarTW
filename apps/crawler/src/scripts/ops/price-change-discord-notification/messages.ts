@@ -433,7 +433,7 @@ function formatSubcategoryKey(
 function formatReportSubcategoryHeading(
   subcategory: PriceChangeDiscordNotificationItem["subcategory"],
 ): string {
-  return `_${formatReportHeading(subcategory?.displayName ?? "未分類")}_`;
+  return `**${formatReportHeading(subcategory?.displayName ?? "未分類")}**`;
 }
 
 function formatReportHeading(value: string): string {

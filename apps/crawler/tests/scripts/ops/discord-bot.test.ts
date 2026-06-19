@@ -829,10 +829,10 @@ describe("sendPriceReportNow", () => {
     const newProductDescription = reportMessage?.embeds?.[1]?.description ?? "";
 
     expect(priceChangeDescription).toContain(
-      "\n__**降價 (1)**__\n**顯示卡**\n_華碩_\n- **-NT$1,010** NT$12,000 -> NT$10,990 [GPU A]",
+      "\n__**降價 (1)**__\n**顯示卡**\n**華碩**\n- **-NT$1,010** NT$12,000 -> NT$10,990 [GPU A]",
     );
     expect(newProductDescription).toContain(
-      "\n**SSD/硬碟**\n_Samsung_\n- **NT$2,490** [SSD B]",
+      "\n**SSD/硬碟**\n**Samsung**\n- **NT$2,490** [SSD B]",
     );
     expect(reportMessage?.embeds?.[0]?.fields).toBeUndefined();
     expect(reportMessage?.embeds?.[1]?.fields).toBeUndefined();
@@ -883,7 +883,7 @@ describe("sendPriceReportNow", () => {
     const description = reportMessage?.embeds?.[0]?.description ?? "";
 
     expect(reportMessage?.embeds?.[0]?.fields).toBeUndefined();
-    expect(description).toContain("**顯示卡**\n_華碩_\n- **NT$1,013** [Long New Product 13");
+    expect(description).toContain("**顯示卡**\n**華碩**\n- **NT$1,013** [Long New Product 13");
     expect(description).not.toContain("\u200b");
     expect(description).not.toContain("續");
   });
