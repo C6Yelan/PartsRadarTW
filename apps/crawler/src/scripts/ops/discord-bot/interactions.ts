@@ -5,16 +5,19 @@ import {
   DISCORD_INTERACTION_TYPE_MESSAGE_COMPONENT,
   DISCORD_INTERACTION_TYPE_MODAL_SUBMIT,
   MAX_PRICE_REPORT_ITEMS,
+  MAX_TARGET_PRICE,
 } from "./constants";
 import {
   createPriceReportSettingsComponents,
   createPriceReportSettingsModal,
+  createWatchModal,
   parsePriceReportComponentInteraction,
   parsePriceReportInteraction,
   parsePriceReportModalSubmit,
   parseUnwatchComponentInteraction,
   parseUnwatchInteraction,
   parseWatchInteraction,
+  parseWatchModalSubmit,
   parseWatchlistInteraction,
 } from "./commands";
 import type { CommandCooldowns } from "./cooldowns";
@@ -178,6 +181,17 @@ async function handleApplicationCommandInteraction({
   }
 
   if (watchCommand) {
+    if (!watchCommand.productInput && watchCommand.targetPrice === null) {
+      await sendModalInteractionResponse({
+        token: options.token,
+        apiBaseUrl: options.apiBaseUrl,
+        interaction,
+        fetchImpl,
+        modal: createWatchModal(),
+      });
+      return;
+    }
+
     const result = await createTargetPriceWatch({
       client,
       discordUserId,
@@ -371,8 +385,9 @@ async function handleModalSubmitInteraction({
   fetchImpl: FetchImpl;
 }): Promise<void> {
   const modal = parsePriceReportModalSubmit(interaction);
+  const watchModal = modal ? null : parseWatchModalSubmit(interaction);
 
-  if (!modal) {
+  if (!modal && !watchModal) {
     await sendUnsupportedInteractionResponse({ interaction, options, fetchImpl });
     return;
   }
@@ -381,6 +396,43 @@ async function handleModalSubmitInteraction({
 
   if (!discordUserId) {
     await sendMissingUserResponse({ interaction, options, fetchImpl });
+    return;
+  }
+
+  if (watchModal) {
+    if (!watchModal.productInputValid || !watchModal.targetPriceInputValid) {
+      await sendInteractionResponse({
+        token: options.token,
+        apiBaseUrl: options.apiBaseUrl,
+        interaction,
+        fetchImpl,
+        content: formatWatchModalValidationMessage(watchModal),
+      });
+      return;
+    }
+
+    const result = await createTargetPriceWatch({
+      client,
+      discordUserId,
+      productInput: watchModal.productInput,
+      targetPrice: watchModal.targetPrice,
+    });
+
+    await sendInteractionResponse({
+      token: options.token,
+      apiBaseUrl: options.apiBaseUrl,
+      interaction,
+      fetchImpl,
+      message: createTargetPriceWatchResponseMessage({
+        result,
+        publicBaseUrl: options.publicBaseUrl,
+      }),
+    });
+    return;
+  }
+
+  if (!modal) {
+    await sendUnsupportedInteractionResponse({ interaction, options, fetchImpl });
     return;
   }
 
@@ -446,6 +498,25 @@ async function sendMissingUserResponse({
     fetchImpl,
     content: "無法辨識這次操作的 Discord 使用者。",
   });
+}
+
+function formatWatchModalValidationMessage({
+  productInputValid,
+  targetPriceInputValid,
+}: {
+  productInputValid: boolean;
+  targetPriceInputValid: boolean;
+}): string {
+  const messages = [
+    productInputValid
+      ? null
+      : "商品欄位需填 PartsRadarTW 商品頁連結或商品 ID。可到商品頁按分享/複製連結，或複製網址列的 `/products/...`。",
+    targetPriceInputValid
+      ? null
+      : `目標價格需為 1-${MAX_TARGET_PRICE.toLocaleString("en-US")} 的整數，請只填純數字。`,
+  ].filter((message): message is string => message !== null);
+
+  return messages.join("\n");
 }
 
 function formatPriceReportModalValidationMessage({

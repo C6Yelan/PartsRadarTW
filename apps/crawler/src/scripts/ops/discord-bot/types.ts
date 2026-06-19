@@ -293,6 +293,13 @@ export interface ParsedWatchCommand {
   targetPrice: number | null;
 }
 
+export interface ParsedWatchModal {
+  productInput: string | null;
+  productInputValid: boolean;
+  targetPrice: number | null;
+  targetPriceInputValid: boolean;
+}
+
 export interface ParsedUnwatchCommand {
   watchInput: string | null;
 }

@@ -29,6 +29,7 @@ import type {
   ParsedUnwatchComponent,
   ParsedUnwatchCommand,
   ParsedWatchCommand,
+  ParsedWatchModal,
 } from "./types";
 
 const PRICE_REPORT_SETTINGS_OPEN_CUSTOM_ID = "price-report:settings:open";
@@ -37,6 +38,9 @@ const PRICE_REPORT_SETTINGS_MODAL_CUSTOM_ID = "price-report:settings:modal";
 const PRICE_REPORT_SETTINGS_WINDOW_CUSTOM_ID = "price-report:settings:window";
 const PRICE_REPORT_SETTINGS_MAX_ITEMS_CUSTOM_ID = "price-report:settings:max-items";
 const PRICE_REPORT_SETTINGS_TIME_CUSTOM_ID = "price-report:settings:time";
+const WATCH_MODAL_CUSTOM_ID = "watch:modal";
+const WATCH_PRODUCT_CUSTOM_ID = "watch:product";
+const WATCH_TARGET_PRICE_CUSTOM_ID = "watch:target-price";
 export const UNWATCH_SELECT_CUSTOM_ID = "unwatch:select";
 export const UNWATCH_CONFIRM_CUSTOM_ID_PREFIX = "unwatch:confirm:";
 export const UNWATCH_CANCEL_CUSTOM_ID = "unwatch:cancel";
@@ -87,26 +91,10 @@ export function createPriceReportCommand(): Record<string, unknown> {
 export function createWatchCommand(): Record<string, unknown> {
   return {
     name: "watch",
-    description: "Set a PartsRadarTW target price alert.",
+    description: "Open a form to set a PartsRadarTW target price alert.",
     type: DISCORD_COMMAND_TYPE_CHAT_INPUT,
     contexts: [DISCORD_APPLICATION_CONTEXT_GUILD, DISCORD_APPLICATION_CONTEXT_BOT_DM],
     dm_permission: true,
-    options: [
-      {
-        type: DISCORD_OPTION_TYPE_STRING,
-        name: "product",
-        description: "PartsRadarTW 商品 ID 或商品頁 URL。",
-        required: true,
-      },
-      {
-        type: DISCORD_OPTION_TYPE_INTEGER,
-        name: "target_price",
-        description: "目標價格，單位為新台幣。",
-        required: true,
-        min_value: 1,
-        max_value: MAX_TARGET_PRICE,
-      },
-    ],
   };
 }
 
@@ -235,6 +223,51 @@ export function parseWatchInteraction(interaction: DiscordInteraction): ParsedWa
   return {
     productInput: productInput.length > 0 ? productInput : null,
     targetPrice,
+  };
+}
+
+export function createWatchModal({
+  productValue = "",
+  targetPriceValue = "",
+}: {
+  productValue?: string;
+  targetPriceValue?: string;
+} = {}): DiscordModal {
+  return {
+    custom_id: WATCH_MODAL_CUSTOM_ID,
+    title: "新增目標價追蹤",
+    components: [
+      {
+        type: DISCORD_COMPONENT_TYPE_LABEL,
+        label: "商品連結或商品 ID",
+        description: "到 PartsRadarTW 商品頁按分享/複製連結，或複製網址列的 /products/...。",
+        component: {
+          type: DISCORD_COMPONENT_TYPE_TEXT_INPUT,
+          custom_id: WATCH_PRODUCT_CUSTOM_ID,
+          style: DISCORD_TEXT_INPUT_STYLE_SHORT,
+          min_length: 1,
+          max_length: 300,
+          required: true,
+          value: productValue,
+          placeholder: "https://partsradar.net/products/...",
+        },
+      },
+      {
+        type: DISCORD_COMPONENT_TYPE_LABEL,
+        label: "目標價格",
+        description: "輸入希望提醒的價格，純數字即可，不要加 NT$、逗號或空格。",
+        component: {
+          type: DISCORD_COMPONENT_TYPE_TEXT_INPUT,
+          custom_id: WATCH_TARGET_PRICE_CUSTOM_ID,
+          style: DISCORD_TEXT_INPUT_STYLE_SHORT,
+          min_length: 1,
+          max_length: String(MAX_TARGET_PRICE).length,
+          required: true,
+          value: targetPriceValue,
+          placeholder: "17500",
+        },
+      },
+    ],
   };
 }
 
@@ -384,6 +417,30 @@ export function parsePriceReportModalSubmit(
   };
 }
 
+export function parseWatchModalSubmit(interaction: DiscordInteraction): ParsedWatchModal | null {
+  if (interaction.data?.custom_id !== WATCH_MODAL_CUSTOM_ID) {
+    return null;
+  }
+
+  const productValue = readSubmittedComponentValue(
+    interaction.data.components,
+    WATCH_PRODUCT_CUSTOM_ID,
+  );
+  const targetPriceValue = readSubmittedComponentValue(
+    interaction.data.components,
+    WATCH_TARGET_PRICE_CUSTOM_ID,
+  );
+  const productInput = typeof productValue === "string" ? productValue.trim() : "";
+  const targetPrice = parseTargetPriceInput(targetPriceValue);
+
+  return {
+    productInput: productInput.length > 0 ? productInput : null,
+    productInputValid: productInput.length > 0,
+    targetPrice,
+    targetPriceInputValid: targetPrice !== null,
+  };
+}
+
 function parseWindowHours(value: unknown): number {
   if (value === "6h") {
     return 6;
@@ -429,6 +486,18 @@ function parseMaxItemsInput(value: unknown): number | null {
 
   return Number.isSafeInteger(maxItems) && maxItems >= 1 && maxItems <= MAX_PRICE_REPORT_ITEMS
     ? maxItems
+    : null;
+}
+
+function parseTargetPriceInput(value: unknown): number | null {
+  if (typeof value !== "string" || !/^(0|[1-9][0-9]*)$/.test(value.trim())) {
+    return null;
+  }
+
+  const targetPrice = Number(value.trim());
+
+  return Number.isSafeInteger(targetPrice) && targetPrice >= 1 && targetPrice <= MAX_TARGET_PRICE
+    ? targetPrice
     : null;
 }
 

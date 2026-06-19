@@ -101,10 +101,6 @@ describe("registerDiscordBotCommands", () => {
         name: "watch",
         contexts: [0, 1],
         dm_permission: true,
-        options: [
-          expect.objectContaining({ name: "product", type: 3, required: true }),
-          expect.objectContaining({ name: "target_price", type: 4, required: true }),
-        ],
       }),
       expect.objectContaining({
         name: "watchlist",
@@ -118,6 +114,9 @@ describe("registerDiscordBotCommands", () => {
       }),
     ]);
     const registeredCommands = JSON.parse(String(globalRequestInit.body));
+    expect(registeredCommands.find((command: { name: string }) => command.name === "watch")).not.toHaveProperty(
+      "options",
+    );
     expect(registeredCommands.find((command: { name: string }) => command.name === "unwatch")).not.toHaveProperty(
       "options",
     );
@@ -300,7 +299,54 @@ describe("sendDiscordInteractionMessages", () => {
 });
 
 describe("handleDiscordInteraction", () => {
-  it("creates a target price watch from the watch command", async () => {
+  it("opens a target price watch modal from the watch command", async () => {
+    const client = createDiscordBotClient([]);
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createWatchOpenInteraction(),
+    });
+
+    expect(client.discordTargetPriceWatch.upsert).not.toHaveBeenCalled();
+
+    const requestBody = JSON.parse(
+      String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body),
+    );
+
+    expect(requestBody).toMatchObject({
+      type: 9,
+      data: {
+        custom_id: "watch:modal",
+        title: "新增目標價追蹤",
+        components: [
+          expect.objectContaining({
+            label: "商品連結或商品 ID",
+            description: expect.stringContaining("商品頁"),
+            component: expect.objectContaining({
+              custom_id: "watch:product",
+              placeholder: expect.stringContaining("/products/"),
+            }),
+          }),
+          expect.objectContaining({
+            label: "目標價格",
+            description: expect.stringContaining("純數字"),
+            component: expect.objectContaining({
+              custom_id: "watch:target-price",
+              placeholder: "17500",
+            }),
+          }),
+        ],
+      },
+    });
+  });
+
+  it("creates a target price watch from the watch modal", async () => {
     const client = createDiscordBotClient([
       snapshot({
         id: "snapshot-watch-1",
@@ -320,7 +366,10 @@ describe("handleDiscordInteraction", () => {
       options: createDiscordBotOptions(),
       cooldowns: new CommandCooldowns(60),
       fetchImpl: fetchMock as typeof fetch,
-      interaction: createWatchInteraction(`https://partsradar.test/products/${WATCH_PRODUCT_ID}`, 17_500),
+      interaction: createWatchModalSubmitInteraction({
+        productInput: `https://partsradar.test/products/${WATCH_PRODUCT_ID}`,
+        targetPrice: "17500",
+      }),
     });
 
     expect(client.discordTargetPriceWatch.upsert).toHaveBeenCalledWith({
@@ -370,6 +419,41 @@ describe("handleDiscordInteraction", () => {
     });
   });
 
+  it("keeps legacy watch command inputs working while command registration uses a modal", async () => {
+    const client = createDiscordBotClient([
+      snapshot({
+        id: "snapshot-watch-1",
+        productId: WATCH_PRODUCT_ID,
+        productName: "RTX 5070 測試卡",
+        crawlRunId: "new-run",
+        price: 18_990,
+        capturedAt: "2026-06-07T03:00:00.000Z",
+      }),
+    ]);
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createWatchInteraction(`https://partsradar.test/products/${WATCH_PRODUCT_ID}`, 17_500),
+    });
+
+    expect(client.discordTargetPriceWatch.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          discordUserId_productId: {
+            discordUserId: "111122223333444455",
+            productId: WATCH_PRODUCT_ID,
+          },
+        },
+      }),
+    );
+  });
+
   it("rejects invalid watch target prices without writing a watch", async () => {
     const client = createDiscordBotClient([]);
     const fetchMock = vi.fn<typeof fetch>(
@@ -388,6 +472,31 @@ describe("handleDiscordInteraction", () => {
     expect(String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body)).toContain(
       "目標價格需為",
     );
+  });
+
+  it("rejects invalid watch modal values with field guidance", async () => {
+    const client = createDiscordBotClient([]);
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createWatchModalSubmitInteraction({
+        productInput: "",
+        targetPrice: "NT$17,500",
+      }),
+    });
+
+    expect(client.discordTargetPriceWatch.upsert).not.toHaveBeenCalled();
+    const responseBody = String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body);
+    expect(responseBody).toContain("商品欄位需填 PartsRadarTW 商品頁連結或商品 ID");
+    expect(responseBody).toContain("複製網址列的 `/products/...`");
+    expect(responseBody).toContain("目標價格需為");
+    expect(responseBody).toContain("純數字");
   });
 
   it("shows active target price watches from the watchlist command", async () => {
@@ -1475,6 +1584,62 @@ function createSettingsModalSubmitInteraction({
             type: 4,
             custom_id: "price-report:settings:time",
             value: time,
+          },
+        },
+      ],
+    },
+    member: {
+      user: {
+        id: "111122223333444455",
+      },
+    },
+  };
+}
+
+function createWatchOpenInteraction(): DiscordInteraction {
+  return {
+    id: "interaction-1",
+    token: "interaction-token",
+    type: 2,
+    data: {
+      name: "watch",
+    },
+    member: {
+      user: {
+        id: "111122223333444455",
+      },
+    },
+  };
+}
+
+function createWatchModalSubmitInteraction({
+  productInput,
+  targetPrice,
+}: {
+  productInput: string;
+  targetPrice: string;
+}): DiscordInteraction {
+  return {
+    id: "interaction-1",
+    token: "interaction-token",
+    type: 5,
+    data: {
+      custom_id: "watch:modal",
+      components: [
+        {
+          type: 18,
+          component: {
+            type: 4,
+            custom_id: "watch:product",
+            value: productInput,
+          },
+        },
+        {
+          type: 18,
+          component: {
+            type: 4,
+            custom_id: "watch:target-price",
+            value: targetPrice,
           },
         },
       ],
