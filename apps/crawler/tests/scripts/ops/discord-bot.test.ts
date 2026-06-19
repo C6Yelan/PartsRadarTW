@@ -115,9 +115,12 @@ describe("registerDiscordBotCommands", () => {
         name: "unwatch",
         contexts: [0, 1],
         dm_permission: true,
-        options: [expect.objectContaining({ name: "watch_id", type: 3, required: false })],
       }),
     ]);
+    const registeredCommands = JSON.parse(String(globalRequestInit.body));
+    expect(registeredCommands.find((command: { name: string }) => command.name === "unwatch")).not.toHaveProperty(
+      "options",
+    );
     expect(String(globalRequestInit.body)).not.toContain('"enable"');
     expect(String(globalRequestInit.body)).not.toContain('"disable"');
   });
@@ -438,7 +441,7 @@ describe("handleDiscordInteraction", () => {
         embeds: [
           expect.objectContaining({
             title: "目標價追蹤清單",
-            description: expect.stringContaining("`22222222`"),
+            description: expect.stringContaining("RTX 5070 測試卡"),
           }),
         ],
       },
@@ -447,10 +450,11 @@ describe("handleDiscordInteraction", () => {
     expect(requestBody.data.embeds[0].description).toContain("目標 **NT$17,500**");
     expect(requestBody.data.embeds[0].description).toContain("尚差 NT$1,490");
     expect(requestBody.data.embeds[0].description).toContain("RTX 5070 測試卡");
+    expect(requestBody.data.embeds[0].description).not.toContain("22222222");
     expect(requestBody.data.embeds[0].description).not.toContain("33333333");
   });
 
-  it("disables a target price watch from the unwatch command", async () => {
+  it("asks for confirmation before disabling a legacy unwatch command input", async () => {
     const client = createDiscordBotClient(
       [
         snapshot({
@@ -484,16 +488,7 @@ describe("handleDiscordInteraction", () => {
       interaction: createUnwatchInteraction("22222222"),
     });
 
-    expect(client.discordTargetPriceWatch.updateMany).toHaveBeenCalledWith({
-      where: {
-        id: WATCH_ROW_ID,
-        discordUserId: "111122223333444455",
-        enabled: true,
-      },
-      data: {
-        enabled: false,
-      },
-    });
+    expect(client.discordTargetPriceWatch.updateMany).not.toHaveBeenCalled();
 
     const requestBody = JSON.parse(
       String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body),
@@ -504,14 +499,33 @@ describe("handleDiscordInteraction", () => {
       data: {
         embeds: [
           expect.objectContaining({
-            title: "已取消目標價追蹤",
+            title: "確認取消目標價追蹤",
             description: expect.stringContaining("RTX 5070 測試卡"),
           }),
         ],
+        components: [
+          {
+            type: 1,
+            components: [
+              expect.objectContaining({
+                type: 2,
+                style: 4,
+                custom_id: `unwatch:confirm:watch:${WATCH_ROW_ID}`,
+                label: "確認取消",
+              }),
+              expect.objectContaining({
+                type: 2,
+                style: 2,
+                custom_id: "unwatch:cancel",
+                label: "保留追蹤",
+              }),
+            ],
+          },
+        ],
       },
     });
-    expect(requestBody.data.embeds[0].fields).toContainEqual(
-      expect.objectContaining({ name: "追蹤 ID", value: "22222222" }),
+    expect(requestBody.data.embeds[0].fields).not.toContainEqual(
+      expect.objectContaining({ name: "追蹤 ID" }),
     );
   });
 
@@ -573,7 +587,7 @@ describe("handleDiscordInteraction", () => {
                   expect.objectContaining({
                     label: "RTX 5070 測試卡",
                     value: `watch:${WATCH_ROW_ID}`,
-                    description: expect.stringContaining("22222222"),
+                    description: expect.stringContaining("NT$18,990"),
                   }),
                 ],
               }),
@@ -585,9 +599,10 @@ describe("handleDiscordInteraction", () => {
     const option = requestBody.data.components[0].components[0].options[0];
     expect(option.description).toContain("NT$18,990");
     expect(option.description).toContain("目標 NT$17,500");
+    expect(option.description).not.toContain("22222222");
   });
 
-  it("disables a target price watch from the unwatch select menu", async () => {
+  it("asks for confirmation after selecting a watch from the unwatch menu", async () => {
     const client = createDiscordBotClient(
       [
         snapshot({
@@ -621,6 +636,77 @@ describe("handleDiscordInteraction", () => {
       interaction: createUnwatchSelectInteraction(`watch:${WATCH_ROW_ID}`),
     });
 
+    expect(client.discordTargetPriceWatch.updateMany).not.toHaveBeenCalled();
+
+    const requestBody = JSON.parse(
+      String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body),
+    );
+
+    expect(requestBody).toMatchObject({
+      type: 4,
+      data: {
+        embeds: [
+          expect.objectContaining({
+            title: "確認取消目標價追蹤",
+            description: expect.stringContaining("RTX 5070 測試卡"),
+          }),
+        ],
+        components: [
+          {
+            type: 1,
+            components: [
+              expect.objectContaining({
+                custom_id: `unwatch:confirm:watch:${WATCH_ROW_ID}`,
+                label: "確認取消",
+              }),
+              expect.objectContaining({
+                custom_id: "unwatch:cancel",
+                label: "保留追蹤",
+              }),
+            ],
+          },
+        ],
+      },
+    });
+    expect(requestBody.data.embeds[0].fields).not.toContainEqual(
+      expect.objectContaining({ name: "追蹤 ID" }),
+    );
+  });
+
+  it("disables a target price watch from the unwatch confirm button", async () => {
+    const client = createDiscordBotClient(
+      [
+        snapshot({
+          id: "snapshot-watch-1",
+          productId: WATCH_PRODUCT_ID,
+          productName: "RTX 5070 測試卡",
+          crawlRunId: "new-run",
+          price: 18_990,
+          capturedAt: "2026-06-07T03:00:00.000Z",
+        }),
+      ],
+      [],
+      [
+        targetPriceWatch({
+          id: WATCH_ROW_ID,
+          discordUserId: "111122223333444455",
+          productId: WATCH_PRODUCT_ID,
+          targetPrice: 17_500,
+        }),
+      ],
+    );
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createUnwatchConfirmInteraction(`watch:${WATCH_ROW_ID}`),
+    });
+
     expect(client.discordTargetPriceWatch.updateMany).toHaveBeenCalledWith({
       where: {
         id: WATCH_ROW_ID,
@@ -647,6 +733,29 @@ describe("handleDiscordInteraction", () => {
         ],
       },
     });
+    expect(requestBody.data.embeds[0].fields).not.toContainEqual(
+      expect.objectContaining({ name: "追蹤 ID" }),
+    );
+  });
+
+  it("keeps a target price watch from the unwatch cancel button", async () => {
+    const client = createDiscordBotClient([]);
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createUnwatchCancelInteraction(),
+    });
+
+    expect(client.discordTargetPriceWatch.updateMany).not.toHaveBeenCalled();
+    expect(String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body)).toContain(
+      "已保留目標價追蹤",
+    );
   });
 
   it("reports when unwatch cannot find an active watch", async () => {
@@ -1457,6 +1566,40 @@ function createUnwatchSelectInteraction(watchInput: string): DiscordInteraction 
       custom_id: "unwatch:select",
       component_type: 3,
       values: [watchInput],
+    },
+    member: {
+      user: {
+        id: "111122223333444455",
+      },
+    },
+  };
+}
+
+function createUnwatchConfirmInteraction(watchInput: string): DiscordInteraction {
+  return {
+    id: "interaction-1",
+    token: "interaction-token",
+    type: 3,
+    data: {
+      custom_id: `unwatch:confirm:${watchInput}`,
+      component_type: 2,
+    },
+    member: {
+      user: {
+        id: "111122223333444455",
+      },
+    },
+  };
+}
+
+function createUnwatchCancelInteraction(): DiscordInteraction {
+  return {
+    id: "interaction-1",
+    token: "interaction-token",
+    type: 3,
+    data: {
+      custom_id: "unwatch:cancel",
+      component_type: 2,
     },
     member: {
       user: {

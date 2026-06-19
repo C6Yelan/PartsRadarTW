@@ -306,6 +306,7 @@ export type ParsedPriceReportComponent =
     };
 
 export interface ParsedUnwatchComponent {
+  action: "select" | "confirm" | "cancel";
   watchInput: string | null;
 }
 

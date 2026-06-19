@@ -39,8 +39,10 @@ import {
   createTargetPriceWatch,
   createTargetPriceWatchResponseMessage,
   createTargetPriceWatchlistResponseMessage,
+  createUnwatchConfirmationResponseMessage,
   createUnwatchSelectResponseMessage,
   disableTargetPriceWatch,
+  readTargetPriceWatchForUnwatch,
   readTargetPriceWatchlist,
 } from "./watch";
 
@@ -230,7 +232,7 @@ async function handleApplicationCommandInteraction({
       return;
     }
 
-    const result = await disableTargetPriceWatch({
+    const result = await readTargetPriceWatchForUnwatch({
       client,
       discordUserId,
       watchInput: unwatchCommand.watchInput,
@@ -241,7 +243,7 @@ async function handleApplicationCommandInteraction({
       apiBaseUrl: options.apiBaseUrl,
       interaction,
       fetchImpl,
-      message: createDisableTargetPriceWatchResponseMessage({
+      message: createUnwatchConfirmationResponseMessage({
         result,
         publicBaseUrl: options.publicBaseUrl,
       }),
@@ -278,7 +280,38 @@ async function handleMessageComponentInteraction({
     return;
   }
 
-  if (unwatchComponent) {
+  if (unwatchComponent?.action === "cancel") {
+    await sendInteractionResponse({
+      token: options.token,
+      apiBaseUrl: options.apiBaseUrl,
+      interaction,
+      fetchImpl,
+      content: "已保留目標價追蹤，未做任何變更。",
+    });
+    return;
+  }
+
+  if (unwatchComponent?.action === "select") {
+    const result = await readTargetPriceWatchForUnwatch({
+      client,
+      discordUserId,
+      watchInput: unwatchComponent.watchInput,
+    });
+
+    await sendInteractionResponse({
+      token: options.token,
+      apiBaseUrl: options.apiBaseUrl,
+      interaction,
+      fetchImpl,
+      message: createUnwatchConfirmationResponseMessage({
+        result,
+        publicBaseUrl: options.publicBaseUrl,
+      }),
+    });
+    return;
+  }
+
+  if (unwatchComponent?.action === "confirm") {
     const result = await disableTargetPriceWatch({
       client,
       discordUserId,

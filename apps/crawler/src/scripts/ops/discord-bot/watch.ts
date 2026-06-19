@@ -3,13 +3,20 @@
 import type { Prisma } from "@partsradar/db";
 
 import {
+  DISCORD_BUTTON_STYLE_DANGER,
+  DISCORD_BUTTON_STYLE_SECONDARY,
   DISCORD_COMPONENT_TYPE_ACTION_ROW,
+  DISCORD_COMPONENT_TYPE_BUTTON,
   DISCORD_COMPONENT_TYPE_STRING_SELECT,
   DISCORD_EMBED_COLOR,
   MAX_TARGET_PRICE,
   PRODUCT_NAME_MAX_LENGTH,
 } from "./constants";
-import { UNWATCH_SELECT_CUSTOM_ID } from "./commands";
+import {
+  UNWATCH_CANCEL_CUSTOM_ID,
+  UNWATCH_CONFIRM_CUSTOM_ID_PREFIX,
+  UNWATCH_SELECT_CUSTOM_ID,
+} from "./commands";
 import { formatDiscordBotText } from "./rest";
 import type { DiscordBotClient, DiscordBotMessage } from "./types";
 
@@ -111,6 +118,21 @@ export type DisableTargetPriceWatchResult =
     }
   | {
       status: "disabled";
+      watch: TargetPriceWatchListRecord;
+    };
+
+export type TargetPriceWatchLookupResult =
+  | {
+      status: "invalid_reference";
+    }
+  | {
+      status: "not_found";
+    }
+  | {
+      status: "ambiguous_reference";
+    }
+  | {
+      status: "found";
       watch: TargetPriceWatchListRecord;
     };
 
@@ -231,6 +253,32 @@ export async function disableTargetPriceWatch({
   discordUserId: string;
   watchInput: string | null;
 }): Promise<DisableTargetPriceWatchResult> {
+  const result = await readTargetPriceWatchForUnwatch({
+    client,
+    discordUserId,
+    watchInput,
+  });
+
+  if (result.status !== "found") {
+    return result;
+  }
+
+  return disableTargetPriceWatchRecord({
+    client,
+    discordUserId,
+    watch: result.watch,
+  });
+}
+
+export async function readTargetPriceWatchForUnwatch({
+  client,
+  discordUserId,
+  watchInput,
+}: {
+  client: DiscordBotClient;
+  discordUserId: string;
+  watchInput: string | null;
+}): Promise<TargetPriceWatchLookupResult> {
   if (!watchInput) {
     return {
       status: "invalid_reference",
@@ -246,7 +294,7 @@ export async function disableTargetPriceWatch({
       };
     }
 
-    return disableTargetPriceWatchByWatchIdPrefix({
+    return readTargetPriceWatchByWatchIdPrefix({
       client,
       discordUserId,
       watchIdPrefix,
@@ -256,7 +304,7 @@ export async function disableTargetPriceWatch({
   const productId = normalizeWatchProductReference(watchInput);
 
   if (productId) {
-    return disableTargetPriceWatchByProductId({ client, discordUserId, productId });
+    return readTargetPriceWatchByProductId({ client, discordUserId, productId });
   }
 
   const watchIdPrefix = normalizeWatchIdPrefix(watchInput);
@@ -267,14 +315,14 @@ export async function disableTargetPriceWatch({
     };
   }
 
-  return disableTargetPriceWatchByWatchIdPrefix({
+  return readTargetPriceWatchByWatchIdPrefix({
     client,
     discordUserId,
     watchIdPrefix,
   });
 }
 
-async function disableTargetPriceWatchByWatchIdPrefix({
+async function readTargetPriceWatchByWatchIdPrefix({
   client,
   discordUserId,
   watchIdPrefix,
@@ -282,7 +330,7 @@ async function disableTargetPriceWatchByWatchIdPrefix({
   client: DiscordBotClient;
   discordUserId: string;
   watchIdPrefix: string;
-}): Promise<DisableTargetPriceWatchResult> {
+}): Promise<TargetPriceWatchLookupResult> {
   const watches = await client.discordTargetPriceWatch.findMany({
     where: {
       discordUserId,
@@ -305,14 +353,13 @@ async function disableTargetPriceWatchByWatchIdPrefix({
     };
   }
 
-  return disableTargetPriceWatchRecord({
-    client,
-    discordUserId,
+  return {
+    status: "found",
     watch: matchingWatches[0] as TargetPriceWatchListRecord,
-  });
+  };
 }
 
-async function disableTargetPriceWatchByProductId({
+async function readTargetPriceWatchByProductId({
   client,
   discordUserId,
   productId,
@@ -320,7 +367,7 @@ async function disableTargetPriceWatchByProductId({
   client: DiscordBotClient;
   discordUserId: string;
   productId: string;
-}): Promise<DisableTargetPriceWatchResult> {
+}): Promise<TargetPriceWatchLookupResult> {
   const watch = await client.discordTargetPriceWatch.findFirst({
     where: {
       discordUserId,
@@ -336,7 +383,10 @@ async function disableTargetPriceWatchByProductId({
     };
   }
 
-  return disableTargetPriceWatchRecord({ client, discordUserId, watch });
+  return {
+    status: "found",
+    watch,
+  };
 }
 
 async function disableTargetPriceWatchRecord({
@@ -452,7 +502,7 @@ export function createTargetPriceWatchlistResponseMessage({
         color: DISCORD_EMBED_COLOR,
         footer: {
           text: [
-            "使用 /unwatch watch_id:<ID> 取消追蹤。",
+            "使用 /unwatch 開啟選單取消追蹤。",
             result.hiddenCount > 0 ? `另有 ${result.hiddenCount} 筆未顯示。` : null,
           ]
             .filter((part): part is string => Boolean(part))
@@ -479,7 +529,7 @@ export function createUnwatchSelectResponseMessage({
   return {
     content: [
       "選擇要取消的目標價追蹤。",
-      result.hiddenCount > 0 ? `另有 ${result.hiddenCount} 筆未顯示，可先用 watch_id 取消。` : null,
+      result.hiddenCount > 0 ? `另有 ${result.hiddenCount} 筆未顯示；選單一次最多顯示 25 筆。` : null,
     ]
       .filter((part): part is string => Boolean(part))
       .join(" "),
@@ -501,6 +551,70 @@ export function createUnwatchSelectResponseMessage({
   };
 }
 
+export function createUnwatchConfirmationResponseMessage({
+  result,
+  publicBaseUrl,
+}: {
+  result: TargetPriceWatchLookupResult;
+  publicBaseUrl: string;
+}): DiscordBotMessage {
+  if (result.status === "invalid_reference") {
+    return {
+      content: "無法辨識要取消的追蹤項目，請重新執行 `/unwatch`。",
+    };
+  }
+
+  if (result.status === "not_found") {
+    return {
+      content: "找不到啟用中的目標價追蹤。請重新執行 `/unwatch` 查看目前清單。",
+    };
+  }
+
+  if (result.status === "ambiguous_reference") {
+    return {
+      content: "追蹤項目不夠明確。請重新執行 `/unwatch` 從選單選擇。",
+    };
+  }
+
+  const productName = formatDiscordBotText(result.watch.product.name, PRODUCT_NAME_MAX_LENGTH);
+
+  return {
+    embeds: [
+      {
+        title: "確認取消目標價追蹤",
+        description: `[${escapeMarkdownLinkText(productName)}](${createProductUrl(
+          publicBaseUrl,
+          result.watch.product.id,
+        )})`,
+        color: DISCORD_EMBED_COLOR,
+        fields: formatWatchSummaryFields(result.watch),
+        footer: {
+          text: "按下確認後才會取消追蹤。",
+        },
+      },
+    ],
+    components: [
+      {
+        type: DISCORD_COMPONENT_TYPE_ACTION_ROW,
+        components: [
+          {
+            type: DISCORD_COMPONENT_TYPE_BUTTON,
+            style: DISCORD_BUTTON_STYLE_DANGER,
+            custom_id: `${UNWATCH_CONFIRM_CUSTOM_ID_PREFIX}${WATCH_SELECT_VALUE_PREFIX}${result.watch.id}`,
+            label: "確認取消",
+          },
+          {
+            type: DISCORD_COMPONENT_TYPE_BUTTON,
+            style: DISCORD_BUTTON_STYLE_SECONDARY,
+            custom_id: UNWATCH_CANCEL_CUSTOM_ID,
+            label: "保留追蹤",
+          },
+        ],
+      },
+    ],
+  };
+}
+
 export function createDisableTargetPriceWatchResponseMessage({
   result,
   publicBaseUrl,
@@ -510,19 +624,19 @@ export function createDisableTargetPriceWatchResponseMessage({
 }): DiscordBotMessage {
   if (result.status === "invalid_reference") {
     return {
-      content: "請輸入 `/watchlist` 顯示的追蹤 ID，或 PartsRadarTW 商品 ID / 商品頁 URL。",
+      content: "無法辨識要取消的追蹤項目，請重新執行 `/unwatch`。",
     };
   }
 
   if (result.status === "not_found") {
     return {
-      content: "找不到啟用中的目標價追蹤。請用 `/watchlist` 查看目前清單。",
+      content: "找不到啟用中的目標價追蹤。請重新執行 `/unwatch` 查看目前清單。",
     };
   }
 
   if (result.status === "ambiguous_reference") {
     return {
-      content: "追蹤 ID 不夠明確。請輸入 `/watchlist` 顯示的完整短 ID。",
+      content: "追蹤項目不夠明確。請重新執行 `/unwatch` 從選單選擇。",
     };
   }
 
@@ -537,18 +651,7 @@ export function createDisableTargetPriceWatchResponseMessage({
           result.watch.product.id,
         )})`,
         color: DISCORD_EMBED_COLOR,
-        fields: [
-          {
-            name: "追蹤 ID",
-            value: formatWatchShortId(result.watch.id),
-            inline: true,
-          },
-          {
-            name: "目標價格",
-            value: formatTaiwanDollar(result.watch.targetPrice, result.watch.currency),
-            inline: true,
-          },
-        ],
+        fields: formatWatchSummaryFields(result.watch),
       },
     ],
   };
@@ -612,7 +715,7 @@ function formatWatchlistLine({
     currentPrice === null ? "目前價格未知" : formatTaiwanDollar(currentPrice, currentCurrency);
 
   return formatDiscordBotText(
-    `- \`${formatWatchShortId(watch.id)}\` **${currentPriceLabel}** / 目標 **${formatTaiwanDollar(
+    `- **${currentPriceLabel}** / 目標 **${formatTaiwanDollar(
       watch.targetPrice,
       watch.currency,
     )}** / ${status} [${productName}](${createProductUrl(publicBaseUrl, watch.product.id)})`,
@@ -635,13 +738,44 @@ function formatUnwatchSelectOption(watch: TargetPriceWatchListRecord): {
     label: formatDiscordBotText(productName, UNWATCH_SELECT_LABEL_MAX_LENGTH),
     value: `${WATCH_SELECT_VALUE_PREFIX}${watch.id}`,
     description: formatDiscordBotText(
-      `${formatWatchShortId(watch.id)} | ${currentPriceLabel} / 目標 ${formatTaiwanDollar(
+      `${currentPriceLabel} / 目標 ${formatTaiwanDollar(
         watch.targetPrice,
         watch.currency,
       )}`,
       UNWATCH_SELECT_DESCRIPTION_MAX_LENGTH,
     ),
   };
+}
+
+function formatWatchSummaryFields(watch: TargetPriceWatchListRecord): Array<{
+  name: string;
+  value: string;
+  inline?: boolean;
+}> {
+  const currentPrice = watch.product.currentPrice?.priceSnapshot.price ?? null;
+  const currentCurrency = watch.product.currentPrice?.priceSnapshot.currency ?? watch.currency;
+
+  return [
+    {
+      name: "目前價格",
+      value: currentPrice === null ? "目前價格未知" : formatTaiwanDollar(currentPrice, currentCurrency),
+      inline: true,
+    },
+    {
+      name: "目標價格",
+      value: formatTaiwanDollar(watch.targetPrice, watch.currency),
+      inline: true,
+    },
+    {
+      name: "狀態",
+      value: formatWatchStatus({
+        currentPrice,
+        targetPrice: watch.targetPrice,
+        currency: currentCurrency,
+        lastNotifiedAt: watch.lastNotifiedAt,
+      }),
+    },
+  ];
 }
 
 function formatWatchStatus({
@@ -664,10 +798,6 @@ function formatWatchStatus({
   }
 
   return `尚差 ${formatTaiwanDollar(currentPrice - targetPrice, currency)}`;
-}
-
-function formatWatchShortId(watchId: string): string {
-  return watchId.slice(0, 8);
 }
 
 function extractProductIdFromPath(value: string): string | null {

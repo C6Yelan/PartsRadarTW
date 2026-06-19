@@ -38,6 +38,8 @@ const PRICE_REPORT_SETTINGS_WINDOW_CUSTOM_ID = "price-report:settings:window";
 const PRICE_REPORT_SETTINGS_MAX_ITEMS_CUSTOM_ID = "price-report:settings:max-items";
 const PRICE_REPORT_SETTINGS_TIME_CUSTOM_ID = "price-report:settings:time";
 export const UNWATCH_SELECT_CUSTOM_ID = "unwatch:select";
+export const UNWATCH_CONFIRM_CUSTOM_ID_PREFIX = "unwatch:confirm:";
+export const UNWATCH_CANCEL_CUSTOM_ID = "unwatch:cancel";
 
 export function createPriceReportCommand(): Record<string, unknown> {
   return {
@@ -125,14 +127,6 @@ export function createUnwatchCommand(): Record<string, unknown> {
     type: DISCORD_COMMAND_TYPE_CHAT_INPUT,
     contexts: [DISCORD_APPLICATION_CONTEXT_GUILD, DISCORD_APPLICATION_CONTEXT_BOT_DM],
     dm_permission: true,
-    options: [
-      {
-        type: DISCORD_OPTION_TYPE_STRING,
-        name: "watch_id",
-        description: "watchlist 顯示的短 ID，或商品 ID / 商品頁 URL。",
-        required: false,
-      },
-    ],
   };
 }
 
@@ -189,15 +183,35 @@ export function parseUnwatchInteraction(interaction: DiscordInteraction): Parsed
 export function parseUnwatchComponentInteraction(
   interaction: DiscordInteraction,
 ): ParsedUnwatchComponent | null {
-  if (interaction.data?.custom_id !== UNWATCH_SELECT_CUSTOM_ID) {
-    return null;
+  const customId = interaction.data?.custom_id;
+
+  if (customId === UNWATCH_SELECT_CUSTOM_ID) {
+    const selectedValue = interaction.data?.values?.[0];
+
+    return {
+      action: "select",
+      watchInput:
+        typeof selectedValue === "string" && selectedValue.trim() ? selectedValue.trim() : null,
+    };
   }
 
-  const selectedValue = interaction.data.values?.[0];
+  if (customId?.startsWith(UNWATCH_CONFIRM_CUSTOM_ID_PREFIX)) {
+    const watchInput = customId.slice(UNWATCH_CONFIRM_CUSTOM_ID_PREFIX.length).trim();
 
-  return {
-    watchInput: typeof selectedValue === "string" && selectedValue.trim() ? selectedValue.trim() : null,
-  };
+    return {
+      action: "confirm",
+      watchInput: watchInput.length > 0 ? watchInput : null,
+    };
+  }
+
+  if (customId === UNWATCH_CANCEL_CUSTOM_ID) {
+    return {
+      action: "cancel",
+      watchInput: null,
+    };
+  }
+
+  return null;
 }
 
 export function parseWatchInteraction(interaction: DiscordInteraction): ParsedWatchCommand | null {
