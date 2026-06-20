@@ -10,6 +10,7 @@ import {
   DISCORD_EPHEMERAL_MESSAGE_FLAG,
   DISCORD_INTERACTION_CALLBACK_CHANNEL_MESSAGE,
   DISCORD_INTERACTION_CALLBACK_DEFERRED_CHANNEL_MESSAGE,
+  DISCORD_INTERACTION_CALLBACK_DEFERRED_UPDATE_MESSAGE,
   DISCORD_INTERACTION_CALLBACK_MODAL,
   DISCORD_MESSAGE_CONTENT_MAX_LENGTH,
 } from "./constants";
@@ -274,6 +275,31 @@ export async function deferInteractionResponse({
   assertDiscordInteractionResponseSucceeded("deferred", result);
 }
 
+export async function deferInteractionMessageUpdate({
+  token,
+  apiBaseUrl,
+  interaction,
+  fetchImpl,
+}: {
+  token: string;
+  apiBaseUrl: string;
+  interaction: DiscordInteraction;
+  fetchImpl: FetchImpl;
+}): Promise<void> {
+  const result = await sendDiscordRestRequest({
+    token,
+    apiBaseUrl,
+    fetchImpl,
+    method: "POST",
+    path: `/interactions/${interaction.id}/${interaction.token}/callback`,
+    body: {
+      type: DISCORD_INTERACTION_CALLBACK_DEFERRED_UPDATE_MESSAGE,
+    },
+  });
+
+  assertDiscordInteractionResponseSucceeded("deferred update", result);
+}
+
 export async function editDeferredInteractionResponse({
   token,
   applicationId,
@@ -478,7 +504,7 @@ function createDiscordApiUrl(apiBaseUrl: string, path: string): string {
 }
 
 function assertDiscordInteractionResponseSucceeded(
-  responseKind: "message" | "modal" | "deferred" | "deferred message",
+  responseKind: "message" | "modal" | "deferred" | "deferred update" | "deferred message",
   result: DiscordRestResult<unknown>,
 ): void {
   if (result.status === "ok") {

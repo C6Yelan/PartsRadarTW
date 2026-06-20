@@ -21,7 +21,10 @@ export interface DiscordBotOptions {
 export type DiscordBotClient = PriceChangeDiscordClient &
   Pick<
     PrismaClient,
-    "discordNotificationDelivery" | "discordPriceReportSetting" | "discordTargetPriceWatch" | "product"
+    | "discordNotificationDelivery"
+    | "discordPriceReportSetting"
+    | "discordTargetPriceWatch"
+    | "product"
   >;
 
 export interface DiscordBotEmbedField {
@@ -288,21 +291,21 @@ export type ParsedPriceReportCommand =
       name: "settings";
     };
 
-export interface ParsedWatchCommand {
-  productInput: string | null;
-  targetPrice: number | null;
-}
-
-export interface ParsedWatchModal {
-  productInput: string | null;
-  productInputValid: boolean;
-  targetPrice: number | null;
-  targetPriceInputValid: boolean;
-}
-
-export interface ParsedUnwatchCommand {
-  watchInput: string | null;
-}
+export type ParsedWatchModal =
+  | {
+      action: "create";
+      productInput: string | null;
+      productInputValid: boolean;
+      targetPrice: number | null;
+      targetPriceInputValid: boolean;
+    }
+  | {
+      action: "edit";
+      watchInput: string | null;
+      page: number;
+      targetPrice: number | null;
+      targetPriceInputValid: boolean;
+    };
 
 export type ParsedPriceReportComponent =
   | {
@@ -312,10 +315,16 @@ export type ParsedPriceReportComponent =
       name: "disable_daily_report";
     };
 
-export interface ParsedUnwatchComponent {
-  action: "select" | "confirm" | "cancel";
-  watchInput: string | null;
-}
+export type ParsedWatchComponent =
+  | { action: "add" }
+  | { action: "select"; watchInput: string | null; page: number }
+  | { action: "edit"; watchInput: string | null; targetPrice: number | null; page: number }
+  | {
+      action: "remove" | "confirm_remove" | "cancel_remove";
+      watchInput: string | null;
+      page: number;
+    }
+  | { action: "refresh" | "page"; page: number };
 
 export interface ParsedPriceReportModal {
   windowHours: number;

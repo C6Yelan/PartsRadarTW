@@ -26,9 +26,7 @@ import type {
   ParsedPriceReportCommand,
   ParsedPriceReportComponent,
   ParsedPriceReportModal,
-  ParsedUnwatchCommand,
-  ParsedUnwatchComponent,
-  ParsedWatchCommand,
+  ParsedWatchComponent,
   ParsedWatchModal,
 } from "./types";
 
@@ -38,12 +36,18 @@ const PRICE_REPORT_SETTINGS_MODAL_CUSTOM_ID = "price-report:settings:modal";
 const PRICE_REPORT_SETTINGS_WINDOW_CUSTOM_ID = "price-report:settings:window";
 const PRICE_REPORT_SETTINGS_MAX_ITEMS_CUSTOM_ID = "price-report:settings:max-items";
 const PRICE_REPORT_SETTINGS_TIME_CUSTOM_ID = "price-report:settings:time";
-const WATCH_MODAL_CUSTOM_ID = "watch:modal";
+const WATCH_CREATE_MODAL_CUSTOM_ID = "watch:create-modal";
+const WATCH_EDIT_MODAL_CUSTOM_ID_PREFIX = "watch:edit-modal:";
 const WATCH_PRODUCT_CUSTOM_ID = "watch:product";
 const WATCH_TARGET_PRICE_CUSTOM_ID = "watch:target-price";
-export const UNWATCH_SELECT_CUSTOM_ID = "unwatch:select";
-export const UNWATCH_CONFIRM_CUSTOM_ID_PREFIX = "unwatch:confirm:";
-export const UNWATCH_CANCEL_CUSTOM_ID = "unwatch:cancel";
+export const WATCH_ADD_CUSTOM_ID = "watch:add";
+export const WATCH_SELECT_CUSTOM_ID_PREFIX = "watch:select:";
+export const WATCH_EDIT_CUSTOM_ID_PREFIX = "watch:edit:";
+export const WATCH_REMOVE_CUSTOM_ID_PREFIX = "watch:remove:";
+export const WATCH_REMOVE_CONFIRM_CUSTOM_ID_PREFIX = "watch:remove-confirm:";
+export const WATCH_REMOVE_CANCEL_CUSTOM_ID_PREFIX = "watch:remove-cancel:";
+export const WATCH_REFRESH_CUSTOM_ID_PREFIX = "watch:refresh:";
+export const WATCH_PAGE_CUSTOM_ID_PREFIX = "watch:page:";
 
 export function createPriceReportCommand(): Record<string, unknown> {
   return {
@@ -91,27 +95,7 @@ export function createPriceReportCommand(): Record<string, unknown> {
 export function createWatchCommand(): Record<string, unknown> {
   return {
     name: "watch",
-    description: "Open a form to set a PartsRadarTW target price alert.",
-    type: DISCORD_COMMAND_TYPE_CHAT_INPUT,
-    contexts: [DISCORD_APPLICATION_CONTEXT_GUILD, DISCORD_APPLICATION_CONTEXT_BOT_DM],
-    dm_permission: true,
-  };
-}
-
-export function createWatchlistCommand(): Record<string, unknown> {
-  return {
-    name: "watchlist",
-    description: "Show your PartsRadarTW target price alerts.",
-    type: DISCORD_COMMAND_TYPE_CHAT_INPUT,
-    contexts: [DISCORD_APPLICATION_CONTEXT_GUILD, DISCORD_APPLICATION_CONTEXT_BOT_DM],
-    dm_permission: true,
-  };
-}
-
-export function createUnwatchCommand(): Record<string, unknown> {
-  return {
-    name: "unwatch",
-    description: "Disable a PartsRadarTW target price alert.",
+    description: "Manage your PartsRadarTW target price alerts.",
     type: DISCORD_COMMAND_TYPE_CHAT_INPUT,
     contexts: [DISCORD_APPLICATION_CONTEXT_GUILD, DISCORD_APPLICATION_CONTEXT_BOT_DM],
     dm_permission: true,
@@ -153,81 +137,114 @@ export function parsePriceReportInteraction(
   return null;
 }
 
-export function parseWatchlistInteraction(interaction: DiscordInteraction): boolean {
-  return interaction.data?.name === "watchlist";
-}
-
-export function parseUnwatchInteraction(
+export function parseWatchComponentInteraction(
   interaction: DiscordInteraction,
-): ParsedUnwatchCommand | null {
-  if (interaction.data?.name !== "unwatch") {
-    return null;
-  }
-
-  const watchOption = interaction.data.options?.find((option) => option.name === "watch_id");
-  const watchInput = typeof watchOption?.value === "string" ? watchOption.value.trim() : "";
-
-  return {
-    watchInput: watchInput.length > 0 ? watchInput : null,
-  };
-}
-
-export function parseUnwatchComponentInteraction(
-  interaction: DiscordInteraction,
-): ParsedUnwatchComponent | null {
+): ParsedWatchComponent | null {
   const customId = interaction.data?.custom_id;
 
-  if (customId === UNWATCH_SELECT_CUSTOM_ID) {
+  if (customId === WATCH_ADD_CUSTOM_ID) {
+    return { action: "add" };
+  }
+
+  if (customId?.startsWith(WATCH_SELECT_CUSTOM_ID_PREFIX)) {
+    const page = parsePage(customId.slice(WATCH_SELECT_CUSTOM_ID_PREFIX.length));
     const selectedValue = interaction.data?.values?.[0];
 
     return {
       action: "select",
       watchInput:
         typeof selectedValue === "string" && selectedValue.trim() ? selectedValue.trim() : null,
+      page,
     };
   }
 
-  if (customId?.startsWith(UNWATCH_CONFIRM_CUSTOM_ID_PREFIX)) {
-    const watchInput = customId.slice(UNWATCH_CONFIRM_CUSTOM_ID_PREFIX.length).trim();
+  const edit = parseWatchActionCustomId(customId, WATCH_EDIT_CUSTOM_ID_PREFIX, true);
 
+  if (edit) {
     return {
-      action: "confirm",
-      watchInput: watchInput.length > 0 ? watchInput : null,
+      action: "edit",
+      watchInput: edit.watchInput,
+      targetPrice: edit.targetPrice,
+      page: edit.page,
     };
   }
 
-  if (customId === UNWATCH_CANCEL_CUSTOM_ID) {
+  const remove = parseWatchActionCustomId(customId, WATCH_REMOVE_CUSTOM_ID_PREFIX);
+
+  if (remove) {
+    return { action: "remove", watchInput: remove.watchInput, page: remove.page };
+  }
+
+  const confirmRemove = parseWatchActionCustomId(customId, WATCH_REMOVE_CONFIRM_CUSTOM_ID_PREFIX);
+
+  if (confirmRemove) {
     return {
-      action: "cancel",
-      watchInput: null,
+      action: "confirm_remove",
+      watchInput: confirmRemove.watchInput,
+      page: confirmRemove.page,
+    };
+  }
+
+  const cancelRemove = parseWatchActionCustomId(customId, WATCH_REMOVE_CANCEL_CUSTOM_ID_PREFIX);
+
+  if (cancelRemove) {
+    return {
+      action: "cancel_remove",
+      watchInput: cancelRemove.watchInput,
+      page: cancelRemove.page,
+    };
+  }
+
+  if (customId?.startsWith(WATCH_REFRESH_CUSTOM_ID_PREFIX)) {
+    return {
+      action: "refresh",
+      page: parsePage(customId.slice(WATCH_REFRESH_CUSTOM_ID_PREFIX.length)),
+    };
+  }
+
+  if (customId?.startsWith(WATCH_PAGE_CUSTOM_ID_PREFIX)) {
+    return {
+      action: "page",
+      page: parsePage(customId.slice(WATCH_PAGE_CUSTOM_ID_PREFIX.length)),
     };
   }
 
   return null;
 }
 
-export function parseWatchInteraction(interaction: DiscordInteraction): ParsedWatchCommand | null {
-  if (interaction.data?.name !== "watch") {
+export function parseWatchInteraction(interaction: DiscordInteraction): boolean {
+  return interaction.data?.name === "watch";
+}
+
+function parseWatchActionCustomId(
+  customId: string | undefined,
+  prefix: string,
+  includesTargetPrice = false,
+): { watchInput: string | null; targetPrice: number | null; page: number } | null {
+  if (!customId?.startsWith(prefix)) {
     return null;
   }
 
-  const productOption = interaction.data.options?.find((option) => option.name === "product");
-  const targetPriceOption = interaction.data.options?.find(
-    (option) => option.name === "target_price",
-  );
-  const productInput = typeof productOption?.value === "string" ? productOption.value.trim() : "";
-  const targetPrice =
-    typeof targetPriceOption?.value === "number" &&
-    Number.isInteger(targetPriceOption.value) &&
-    targetPriceOption.value >= 1 &&
-    targetPriceOption.value <= MAX_TARGET_PRICE
-      ? targetPriceOption.value
-      : null;
+  const segments = customId.slice(prefix.length).split(":");
+  const watchId = segments[0]?.trim();
+  const targetPrice = includesTargetPrice ? parseTargetPriceInput(segments[1]) : null;
+  const page = parsePage(segments[includesTargetPrice ? 2 : 1]);
 
   return {
-    productInput: productInput.length > 0 ? productInput : null,
+    watchInput: watchId ? `watch:${watchId}` : null,
     targetPrice,
+    page,
   };
+}
+
+function parsePage(value: unknown): number {
+  if (typeof value !== "string" || !/^[0-9]+$/.test(value)) {
+    return 0;
+  }
+
+  const page = Number(value);
+
+  return Number.isSafeInteger(page) && page >= 0 ? page : 0;
 }
 
 export function createWatchModal({
@@ -238,7 +255,7 @@ export function createWatchModal({
   targetPriceValue?: string;
 } = {}): DiscordModal {
   return {
-    custom_id: WATCH_MODAL_CUSTOM_ID,
+    custom_id: WATCH_CREATE_MODAL_CUSTOM_ID,
     title: "新增目標價追蹤",
     components: [
       {
@@ -268,6 +285,38 @@ export function createWatchModal({
           max_length: String(MAX_TARGET_PRICE).length,
           required: true,
           ...(targetPriceValue ? { value: targetPriceValue } : {}),
+          placeholder: "17500",
+        },
+      },
+    ],
+  };
+}
+
+export function createWatchEditModal({
+  watchId,
+  targetPrice,
+  page,
+}: {
+  watchId: string;
+  targetPrice: number;
+  page: number;
+}): DiscordModal {
+  return {
+    custom_id: `${WATCH_EDIT_MODAL_CUSTOM_ID_PREFIX}${watchId}:${page}`,
+    title: "編輯目標價格",
+    components: [
+      {
+        type: DISCORD_COMPONENT_TYPE_LABEL,
+        label: "新目標價格",
+        description: "只修改目前選取商品的目標價格，請輸入純數字。",
+        component: {
+          type: DISCORD_COMPONENT_TYPE_TEXT_INPUT,
+          custom_id: WATCH_TARGET_PRICE_CUSTOM_ID,
+          style: DISCORD_TEXT_INPUT_STYLE_SHORT,
+          min_length: 1,
+          max_length: String(MAX_TARGET_PRICE).length,
+          required: true,
+          value: String(targetPrice),
           placeholder: "17500",
         },
       },
@@ -422,27 +471,44 @@ export function parsePriceReportModalSubmit(
 }
 
 export function parseWatchModalSubmit(interaction: DiscordInteraction): ParsedWatchModal | null {
-  if (interaction.data?.custom_id !== WATCH_MODAL_CUSTOM_ID) {
-    return null;
-  }
-
-  const productValue = readSubmittedComponentValue(
-    interaction.data.components,
-    WATCH_PRODUCT_CUSTOM_ID,
-  );
+  const customId = interaction.data?.custom_id;
   const targetPriceValue = readSubmittedComponentValue(
-    interaction.data.components,
+    interaction.data?.components,
     WATCH_TARGET_PRICE_CUSTOM_ID,
   );
-  const productInput = typeof productValue === "string" ? productValue.trim() : "";
   const targetPrice = parseTargetPriceInput(targetPriceValue);
 
-  return {
-    productInput: productInput.length > 0 ? productInput : null,
-    productInputValid: productInput.length > 0,
-    targetPrice,
-    targetPriceInputValid: targetPrice !== null,
-  };
+  if (customId === WATCH_CREATE_MODAL_CUSTOM_ID) {
+    const productValue = readSubmittedComponentValue(
+      interaction.data?.components,
+      WATCH_PRODUCT_CUSTOM_ID,
+    );
+    const productInput = typeof productValue === "string" ? productValue.trim() : "";
+
+    return {
+      action: "create",
+      productInput: productInput.length > 0 ? productInput : null,
+      productInputValid: productInput.length > 0,
+      targetPrice,
+      targetPriceInputValid: targetPrice !== null,
+    };
+  }
+
+  if (customId?.startsWith(WATCH_EDIT_MODAL_CUSTOM_ID_PREFIX)) {
+    const [watchId, pageValue] = customId
+      .slice(WATCH_EDIT_MODAL_CUSTOM_ID_PREFIX.length)
+      .split(":");
+
+    return {
+      action: "edit",
+      watchInput: watchId ? `watch:${watchId}` : null,
+      page: parsePage(pageValue),
+      targetPrice,
+      targetPriceInputValid: targetPrice !== null,
+    };
+  }
+
+  return null;
 }
 
 function parseWindowHours(value: unknown): number {

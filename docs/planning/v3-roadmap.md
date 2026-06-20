@@ -41,9 +41,7 @@ Discord bot 第一輪指令：
 
 - `/price-report settings`：查看目前報告設定，並透過按鈕與 modal 開啟、修改或關閉每日價格變動報告 DM；`time` 為台北時間 `HH:mm`。
 - `/price-report now`：立即在指令發出的頻道或私訊 context 產生一次報告，用於驗證設定與手動查看。
-- `/watch`：開啟表單追蹤單一商品目標價；商品欄位可貼 PartsRadarTW 商品頁分享連結、網址列 `/products/<id>` URL 或站內商品 ID，目標價格填純數字。
-- `/watchlist`：顯示自己的追蹤商品、目前價格、目標價格、是否已觸發與站內連結。
-- `/unwatch`：取消追蹤；送出後用選單列出自己的啟用中追蹤，選擇後需再按確認按鈕，不要求使用者輸入或查看 watch ID。
+- `/watch`：開啟私密的統合管理介面，列出自己的啟用中追蹤；可由同一介面新增追蹤、選取商品後修改目標價，或經確認後移除追蹤。新增表單支援 PartsRadarTW 商品頁分享連結、網址列 `/products/<id>` URL 或站內商品 ID；清單每頁最多 25 筆，使用者不需輸入或查看 watch ID。
 
 價格變動報告第一版限制：
 
@@ -57,6 +55,7 @@ Discord bot 第一輪指令：
 目標價提醒第一版限制：
 
 - `/watch` 第一版支援 PartsRadarTW 商品頁分享連結、站內 `/products/<id>` URL 或站內商品 ID，不以原價屋 iBuy URL 作為主流程。
+- 追蹤清單、編輯與移除統一由 `/watch` 的 ephemeral 介面處理，不另外註冊 `/watchlist` 或 `/unwatch`。
 - 價格小於等於目標價時 DM 使用者。
 - 同一 watch 達標後預設只通知一次；使用者修改目標價或重新建立 watch 才重新啟用。
 - 通知內容包含商品名稱、目前價格、目標價格、差額、站內商品連結與更新時間。
@@ -223,11 +222,11 @@ Discord bot 第一輪指令：
 
 - Discord bot daemon 與 slash command registration。
 - 個人價格變動報告：`/price-report settings` 按鈕/modal、`/price-report now`。
-- 個人目標價提醒：`/watch`、`/watchlist`、`/unwatch`。
+- 個人目標價提醒：統合式 `/watch` 管理介面。
 - Watch / price-report 設定資料表、Discord user preference、notification delivery log。
 - DM 通知去重、cooldown / rate limit、secret 與訊息安全邊界。
 
-目前 bot foundation slice 已完成：`discord-bot` daemon、slash command registration、DM 可用的 global command、`/price-report now` embed 報告、`/price-report settings` 按鈕/modal 每日 DM 報告設定、定期 due setting 發送、`/watch` 表單式目標價追蹤設定保存、`/watchlist` 啟用中追蹤列表、`/unwatch` 停用追蹤、Discord 通知資料表與 delivery log。目標價達標 DM worker 仍待後續 slice。
+目前 bot foundation slice 已完成：`discord-bot` daemon、slash command registration、DM 可用的 global command、`/price-report now` embed 報告、`/price-report settings` 按鈕/modal 每日 DM 報告設定、定期 due setting 發送、可新增 / 查看 / 編輯 / 確認移除的統合式 `/watch` 管理介面、Discord 通知資料表與 delivery log。目標價達標 DM worker 仍待後續 slice。
 
 ### v3.2：維運檢視、外部監控與公開流量硬化
 

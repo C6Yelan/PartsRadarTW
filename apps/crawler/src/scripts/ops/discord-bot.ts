@@ -7,19 +7,16 @@ import { formatDiscordRestFailure } from "./discord-bot/rest";
 
 export {
   createPriceReportCommand,
-  createUnwatchCommand,
   createWatchCommand,
-  createWatchlistCommand,
   parsePriceReportInteraction,
-  parseUnwatchInteraction,
   parseWatchInteraction,
-  parseWatchlistInteraction,
 } from "./discord-bot/commands";
 export { CommandCooldowns } from "./discord-bot/cooldowns";
 export { runDiscordBotDaemon } from "./discord-bot/daemon";
 export { runGatewaySession } from "./discord-bot/gateway";
 export { handleDiscordInteraction } from "./discord-bot/interactions";
 export { parseDiscordBotOptions, printDiscordBotHelp } from "./discord-bot/options";
+export type { ScheduledPriceReportSummary } from "./discord-bot/price-report";
 export {
   calculateScheduledPriceReportSleepMs,
   disablePriceReport,
@@ -34,6 +31,7 @@ export {
 } from "./discord-bot/price-report";
 export { registerDiscordBotCommands } from "./discord-bot/registration";
 export {
+  deferInteractionMessageUpdate,
   deferInteractionResponse,
   formatDiscordBotText,
   formatDiscordRestFailure,
@@ -42,13 +40,6 @@ export {
   sendDiscordRestRequest,
   sendInteractionResponse,
 } from "./discord-bot/rest";
-export {
-  createTargetPriceWatch,
-  disableTargetPriceWatch,
-  normalizeWatchProductReference,
-  readTargetPriceWatchlist,
-} from "./discord-bot/watch";
-export type { ScheduledPriceReportSummary } from "./discord-bot/price-report";
 export type {
   DiscordBotClient,
   DiscordBotEmbed,
@@ -63,6 +54,12 @@ export type {
   PriceReportNowResult,
   PriceReportTimeOfDay,
 } from "./discord-bot/types";
+export {
+  createTargetPriceWatch,
+  disableTargetPriceWatch,
+  normalizeWatchProductReference,
+  readTargetPriceWatchlist,
+} from "./discord-bot/watch";
 
 function log(message: string): void {
   console.log(`[${new Date().toISOString()}] ${message}`);

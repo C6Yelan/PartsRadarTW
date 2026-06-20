@@ -102,24 +102,15 @@ describe("registerDiscordBotCommands", () => {
         contexts: [0, 1],
         dm_permission: true,
       }),
-      expect.objectContaining({
-        name: "watchlist",
-        contexts: [0, 1],
-        dm_permission: true,
-      }),
-      expect.objectContaining({
-        name: "unwatch",
-        contexts: [0, 1],
-        dm_permission: true,
-      }),
     ]);
     const registeredCommands = JSON.parse(String(globalRequestInit.body));
     expect(
       registeredCommands.find((command: { name: string }) => command.name === "watch"),
     ).not.toHaveProperty("options");
-    expect(
-      registeredCommands.find((command: { name: string }) => command.name === "unwatch"),
-    ).not.toHaveProperty("options");
+    expect(registeredCommands.map((command: { name: string }) => command.name)).toEqual([
+      "price-report",
+      "watch",
+    ]);
     expect(String(globalRequestInit.body)).not.toContain('"enable"');
     expect(String(globalRequestInit.body)).not.toContain('"disable"');
   });
@@ -301,7 +292,7 @@ describe("sendDiscordInteractionMessages", () => {
 });
 
 describe("handleDiscordInteraction", () => {
-  it("opens a target price watch modal from the watch command", async () => {
+  it("opens an empty target price watch manager from the watch command", async () => {
     const client = createDiscordBotClient([]);
     const fetchMock = vi.fn<typeof fetch>(
       async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
@@ -317,6 +308,56 @@ describe("handleDiscordInteraction", () => {
 
     expect(client.discordTargetPriceWatch.upsert).not.toHaveBeenCalled();
 
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const deferredBody = JSON.parse(
+      String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body),
+    );
+    const requestBody = JSON.parse(
+      String((fetchMock.mock.calls[1]?.[1] as RequestInit | undefined)?.body),
+    );
+
+    expect(deferredBody).toEqual({ type: 5, data: { flags: 64 } });
+    expect(requestBody).toMatchObject({
+      embeds: [
+        expect.objectContaining({
+          title: "目標價追蹤設定",
+          description: "目前沒有啟用中的目標價追蹤。",
+        }),
+      ],
+      components: [
+        {
+          type: 1,
+          components: [
+            expect.objectContaining({ custom_id: "watch:add", label: "新增追蹤" }),
+            expect.objectContaining({ custom_id: "watch:edit:none:0:0", disabled: true }),
+            expect.objectContaining({ custom_id: "watch:remove:none:0", disabled: true }),
+            expect.objectContaining({ custom_id: "watch:refresh:0" }),
+          ],
+        },
+      ],
+    });
+    expect(client.discordTargetPriceWatch.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        skip: 0,
+        take: 26,
+      }),
+    );
+  });
+
+  it("opens the create form from the watch manager", async () => {
+    const client = createDiscordBotClient([]);
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createWatchButtonInteraction("watch:add"),
+    });
+
     const requestBody = JSON.parse(
       String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body),
     );
@@ -324,24 +365,14 @@ describe("handleDiscordInteraction", () => {
     expect(requestBody).toMatchObject({
       type: 9,
       data: {
-        custom_id: "watch:modal",
+        custom_id: "watch:create-modal",
         title: "新增目標價追蹤",
         components: [
           expect.objectContaining({
-            label: "商品連結或商品 ID",
-            description: expect.stringContaining("商品頁"),
-            component: expect.objectContaining({
-              custom_id: "watch:product",
-              placeholder: expect.stringContaining("/products/"),
-            }),
+            component: expect.objectContaining({ custom_id: "watch:product" }),
           }),
           expect.objectContaining({
-            label: "目標價格",
-            description: expect.stringContaining("純數字"),
-            component: expect.objectContaining({
-              custom_id: "watch:target-price",
-              placeholder: "17500",
-            }),
+            component: expect.objectContaining({ custom_id: "watch:target-price" }),
           }),
         ],
       },
@@ -350,7 +381,7 @@ describe("handleDiscordInteraction", () => {
     expect(requestBody.data.components[1].component).not.toHaveProperty("value");
   });
 
-  it("surfaces Discord API validation errors when the watch modal is rejected", async () => {
+  it("surfaces Discord API validation errors when the watch manager response is rejected", async () => {
     const client = createDiscordBotClient([]);
     const fetchMock = vi.fn<typeof fetch>(
       async () =>
@@ -384,7 +415,7 @@ describe("handleDiscordInteraction", () => {
         fetchImpl: fetchMock as typeof fetch,
         interaction: createWatchOpenInteraction(),
       }),
-    ).rejects.toThrow(/Discord modal interaction response failed:.*Invalid Form Body/);
+    ).rejects.toThrow(/Discord deferred interaction response failed:.*Invalid Form Body/);
   });
 
   it("creates a target price watch from the watch modal", async () => {
@@ -457,7 +488,7 @@ describe("handleDiscordInteraction", () => {
     expect(requestBody).toMatchObject({
       embeds: [
         expect.objectContaining({
-          title: "已保存目標價追蹤",
+          title: "目標價追蹤設定",
           description: expect.stringContaining("RTX 5070 測試卡"),
           fields: expect.arrayContaining([
             expect.objectContaining({ name: "目前價格", value: "NT$18,990" }),
@@ -466,19 +497,11 @@ describe("handleDiscordInteraction", () => {
         }),
       ],
     });
+    expect(requestBody.embeds[0].description).toContain("已保存目標價追蹤");
   });
 
-  it("keeps legacy watch command inputs working while command registration uses a modal", async () => {
-    const client = createDiscordBotClient([
-      snapshot({
-        id: "snapshot-watch-1",
-        productId: WATCH_PRODUCT_ID,
-        productName: "RTX 5070 測試卡",
-        crawlRunId: "new-run",
-        price: 18_990,
-        capturedAt: "2026-06-07T03:00:00.000Z",
-      }),
-    ]);
+  it("selects a watch and enables its edit and remove actions", async () => {
+    const client = createWatchManagerClient();
     const fetchMock = vi.fn<typeof fetch>(
       async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
     );
@@ -488,25 +511,51 @@ describe("handleDiscordInteraction", () => {
       options: createDiscordBotOptions(),
       cooldowns: new CommandCooldowns(60),
       fetchImpl: fetchMock as typeof fetch,
-      interaction: createWatchInteraction(
-        `https://partsradar.test/products/${WATCH_PRODUCT_ID}`,
-        17_500,
-      ),
+      interaction: createWatchSelectInteraction(`watch:${WATCH_ROW_ID}`, 0),
     });
 
-    expect(client.discordTargetPriceWatch.upsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: {
-          discordUserId_productId: {
-            discordUserId: "111122223333444455",
-            productId: WATCH_PRODUCT_ID,
-          },
-        },
-      }),
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const deferredBody = JSON.parse(
+      String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body),
     );
+    const requestBody = JSON.parse(
+      String((fetchMock.mock.calls[1]?.[1] as RequestInit | undefined)?.body),
+    );
+
+    expect(deferredBody).toEqual({ type: 6 });
+    expect(requestBody).toMatchObject({
+      embeds: [
+        expect.objectContaining({
+          title: "目標價追蹤設定",
+          description: expect.stringContaining("RTX 5070 測試卡"),
+        }),
+      ],
+      components: expect.arrayContaining([
+        expect.objectContaining({
+          components: [
+            expect.objectContaining({
+              custom_id: "watch:select:0",
+              options: [expect.objectContaining({ value: `watch:${WATCH_ROW_ID}`, default: true })],
+            }),
+          ],
+        }),
+        expect.objectContaining({
+          components: expect.arrayContaining([
+            expect.objectContaining({
+              custom_id: `watch:edit:${WATCH_ROW_ID}:17500:0`,
+              disabled: false,
+            }),
+            expect.objectContaining({
+              custom_id: `watch:remove:${WATCH_ROW_ID}:0`,
+              disabled: false,
+            }),
+          ]),
+        }),
+      ]),
+    });
   });
 
-  it("rejects invalid watch target prices without writing a watch", async () => {
+  it("opens a prefilled edit form for the selected watch", async () => {
     const client = createDiscordBotClient([]);
     const fetchMock = vi.fn<typeof fetch>(
       async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
@@ -517,13 +566,28 @@ describe("handleDiscordInteraction", () => {
       options: createDiscordBotOptions(),
       cooldowns: new CommandCooldowns(60),
       fetchImpl: fetchMock as typeof fetch,
-      interaction: createWatchInteraction(WATCH_PRODUCT_ID, 0),
+      interaction: createWatchButtonInteraction(`watch:edit:${WATCH_ROW_ID}:17500:0`),
     });
 
-    expect(client.discordTargetPriceWatch.upsert).not.toHaveBeenCalled();
-    expect(String((fetchMock.mock.calls[1]?.[1] as RequestInit | undefined)?.body)).toContain(
-      "目標價格需為",
+    const requestBody = JSON.parse(
+      String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body),
     );
+
+    expect(requestBody).toMatchObject({
+      type: 9,
+      data: {
+        custom_id: `watch:edit-modal:${WATCH_ROW_ID}:0`,
+        title: "編輯目標價格",
+        components: [
+          expect.objectContaining({
+            component: expect.objectContaining({
+              custom_id: "watch:target-price",
+              value: "17500",
+            }),
+          }),
+        ],
+      },
+    });
   });
 
   it("rejects invalid watch modal values with field guidance", async () => {
@@ -551,7 +615,7 @@ describe("handleDiscordInteraction", () => {
     expect(responseBody).toContain("純數字");
   });
 
-  it("shows active target price watches from the watchlist command", async () => {
+  it("shows active target price watches in the watch manager", async () => {
     const client = createDiscordBotClient(
       [
         snapshot({
@@ -589,54 +653,108 @@ describe("handleDiscordInteraction", () => {
       options: createDiscordBotOptions(),
       cooldowns: new CommandCooldowns(60),
       fetchImpl: fetchMock as typeof fetch,
-      interaction: createWatchlistInteraction(),
+      interaction: createWatchOpenInteraction(),
     });
 
     const requestBody = JSON.parse(
-      String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body),
+      String((fetchMock.mock.calls[1]?.[1] as RequestInit | undefined)?.body),
     );
 
     expect(requestBody).toMatchObject({
-      type: 4,
-      data: {
-        embeds: [
-          expect.objectContaining({
-            title: "目標價追蹤清單",
-            description: expect.stringContaining("RTX 5070 測試卡"),
-          }),
-        ],
-      },
+      embeds: [
+        expect.objectContaining({
+          title: "目標價追蹤設定",
+          description: expect.stringContaining("從選單選擇商品"),
+        }),
+      ],
+      components: expect.arrayContaining([
+        expect.objectContaining({
+          components: [
+            expect.objectContaining({
+              custom_id: "watch:select:0",
+              options: [
+                expect.objectContaining({
+                  label: "RTX 5070 測試卡",
+                  value: `watch:${WATCH_ROW_ID}`,
+                  description: expect.stringContaining("目標 NT$17,500"),
+                }),
+              ],
+            }),
+          ],
+        }),
+      ]),
     });
-    expect(requestBody.data.embeds[0].description).toContain("NT$18,990");
-    expect(requestBody.data.embeds[0].description).toContain("目標 **NT$17,500**");
-    expect(requestBody.data.embeds[0].description).toContain("尚差 NT$1,490");
-    expect(requestBody.data.embeds[0].description).toContain("RTX 5070 測試卡");
-    expect(requestBody.data.embeds[0].description).not.toContain("22222222");
-    expect(requestBody.data.embeds[0].description).not.toContain("33333333");
+    expect(JSON.stringify(requestBody.embeds)).not.toContain(WATCH_ROW_ID);
   });
 
-  it("asks for confirmation before disabling a legacy unwatch command input", async () => {
-    const client = createDiscordBotClient(
-      [
-        snapshot({
-          id: "snapshot-watch-1",
-          productId: WATCH_PRODUCT_ID,
-          productName: "RTX 5070 測試卡",
-          crawlRunId: "new-run",
-          price: 18_990,
-          capturedAt: "2026-06-07T03:00:00.000Z",
-        }),
-      ],
-      [],
-      [
-        targetPriceWatch({
-          id: WATCH_ROW_ID,
-          discordUserId: "111122223333444455",
-          productId: WATCH_PRODUCT_ID,
-          targetPrice: 17_500,
-        }),
-      ],
+  it("paginates watch manager options at the Discord select limit", async () => {
+    const snapshots = Array.from({ length: 26 }, (_, index) => {
+      const suffix = String(index + 1).padStart(12, "0");
+
+      return snapshot({
+        id: `snapshot-watch-${index + 1}`,
+        productId: `10000000-0000-4000-8000-${suffix}`,
+        productName: `測試商品 ${index + 1}`,
+        crawlRunId: "new-run",
+        price: 20_000 + index,
+        capturedAt: "2026-06-07T03:00:00.000Z",
+      });
+    });
+    const watches = snapshots.map((item, index) =>
+      targetPriceWatch({
+        id: `20000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
+        discordUserId: "111122223333444455",
+        productId: item.productId,
+        targetPrice: 17_500 + index,
+      }),
     );
+    const client = createDiscordBotClient(snapshots, [], watches);
+    const firstPageFetch = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: firstPageFetch as typeof fetch,
+      interaction: createWatchOpenInteraction(),
+    });
+
+    const firstPage = JSON.parse(String(firstPageFetch.mock.calls[1]?.[1]?.body));
+    expect(firstPage.components[0].components[0]).toMatchObject({
+      custom_id: "watch:select:0",
+      options: expect.any(Array),
+    });
+    expect(firstPage.components[0].components[0].options).toHaveLength(25);
+    expect(firstPage.components[2].components).toContainEqual(
+      expect.objectContaining({ custom_id: "watch:page:1", disabled: false }),
+    );
+
+    const secondPageFetch = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: secondPageFetch as typeof fetch,
+      interaction: createWatchButtonInteraction("watch:page:1"),
+    });
+
+    const secondPage = JSON.parse(String(secondPageFetch.mock.calls[1]?.[1]?.body));
+    expect(secondPage.components[0].components[0]).toMatchObject({
+      custom_id: "watch:select:1",
+      options: expect.any(Array),
+    });
+    expect(secondPage.components[0].components[0].options).toHaveLength(1);
+    expect(secondPage.components[2].components).toContainEqual(
+      expect.objectContaining({ custom_id: "watch:page:0", disabled: false }),
+    );
+  });
+
+  it("updates a selected watch from the edit form", async () => {
+    const client = createWatchManagerClient();
     const fetchMock = vi.fn<typeof fetch>(
       async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
     );
@@ -646,72 +764,76 @@ describe("handleDiscordInteraction", () => {
       options: createDiscordBotOptions(),
       cooldowns: new CommandCooldowns(60),
       fetchImpl: fetchMock as typeof fetch,
-      interaction: createUnwatchInteraction("22222222"),
+      interaction: createWatchEditModalSubmitInteraction({
+        watchId: WATCH_ROW_ID,
+        targetPrice: "16500",
+        page: 0,
+      }),
+    });
+
+    expect(client.discordTargetPriceWatch.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: WATCH_ROW_ID,
+        discordUserId: "111122223333444455",
+        enabled: true,
+      },
+      data: {
+        targetPrice: 16_500,
+        lastNotifiedAt: null,
+      },
+    });
+    const requestBody = JSON.parse(
+      String((fetchMock.mock.calls[1]?.[1] as RequestInit | undefined)?.body),
+    );
+    expect(requestBody.embeds[0].description).toContain("已更新目標價格");
+    expect(JSON.stringify(requestBody.embeds)).toContain("NT$16,500");
+  });
+
+  it("shows a confirmation before removing a selected watch", async () => {
+    const client = createWatchManagerClient();
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createWatchButtonInteraction(`watch:remove:${WATCH_ROW_ID}:0`),
     });
 
     expect(client.discordTargetPriceWatch.updateMany).not.toHaveBeenCalled();
-
-    const requestBody = JSON.parse(
-      String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body),
-    );
-
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({ type: 6 });
+    const requestBody = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body));
     expect(requestBody).toMatchObject({
-      type: 4,
-      data: {
-        embeds: [
-          expect.objectContaining({
-            title: "確認取消目標價追蹤",
-            description: expect.stringContaining("RTX 5070 測試卡"),
-          }),
-        ],
-        components: [
-          {
-            type: 1,
-            components: [
-              expect.objectContaining({
-                type: 2,
-                style: 4,
-                custom_id: `unwatch:confirm:watch:${WATCH_ROW_ID}`,
-                label: "確認取消",
-              }),
-              expect.objectContaining({
-                type: 2,
-                style: 2,
-                custom_id: "unwatch:cancel",
-                label: "保留追蹤",
-              }),
-            ],
-          },
-        ],
-      },
+      embeds: [
+        expect.objectContaining({
+          title: "確認移除目標價追蹤",
+          description: expect.stringContaining("RTX 5070 測試卡"),
+        }),
+      ],
+      components: [
+        {
+          type: 1,
+          components: [
+            expect.objectContaining({
+              custom_id: `watch:remove-confirm:${WATCH_ROW_ID}:0`,
+              label: "確認移除",
+            }),
+            expect.objectContaining({
+              custom_id: `watch:remove-cancel:${WATCH_ROW_ID}:0`,
+              label: "返回設定",
+            }),
+          ],
+        },
+      ],
     });
-    expect(requestBody.data.embeds[0].fields).not.toContainEqual(
-      expect.objectContaining({ name: "追蹤 ID" }),
-    );
+    expect(JSON.stringify(requestBody.embeds)).not.toContain(WATCH_ROW_ID);
   });
 
-  it("shows a selectable unwatch menu when no watch id is provided", async () => {
-    const client = createDiscordBotClient(
-      [
-        snapshot({
-          id: "snapshot-watch-1",
-          productId: WATCH_PRODUCT_ID,
-          productName: "RTX 5070 測試卡",
-          crawlRunId: "new-run",
-          price: 18_990,
-          capturedAt: "2026-06-07T03:00:00.000Z",
-        }),
-      ],
-      [],
-      [
-        targetPriceWatch({
-          id: WATCH_ROW_ID,
-          discordUserId: "111122223333444455",
-          productId: WATCH_PRODUCT_ID,
-          targetPrice: 17_500,
-        }),
-      ],
-    );
+  it("returns to the manager when removal is cancelled", async () => {
+    const client = createWatchManagerClient();
     const fetchMock = vi.fn<typeof fetch>(
       async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
     );
@@ -721,70 +843,25 @@ describe("handleDiscordInteraction", () => {
       options: createDiscordBotOptions(),
       cooldowns: new CommandCooldowns(60),
       fetchImpl: fetchMock as typeof fetch,
-      interaction: createUnwatchInteraction(),
+      interaction: createWatchButtonInteraction(`watch:remove-cancel:${WATCH_ROW_ID}:0`),
     });
 
     expect(client.discordTargetPriceWatch.updateMany).not.toHaveBeenCalled();
-
-    const requestBody = JSON.parse(
-      String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body),
-    );
-
-    expect(requestBody).toMatchObject({
-      type: 4,
-      data: {
-        content: expect.stringContaining("選擇要取消的目標價追蹤"),
-        components: [
-          {
-            type: 1,
-            components: [
-              expect.objectContaining({
-                type: 3,
-                custom_id: "unwatch:select",
-                placeholder: "選擇要取消追蹤的商品",
-                min_values: 1,
-                max_values: 1,
-                options: [
-                  expect.objectContaining({
-                    label: "RTX 5070 測試卡",
-                    value: `watch:${WATCH_ROW_ID}`,
-                    description: expect.stringContaining("NT$18,990"),
-                  }),
-                ],
-              }),
-            ],
-          },
-        ],
-      },
+    const requestBody = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body));
+    expect(requestBody.components[0].components[0].options[0]).toMatchObject({
+      value: `watch:${WATCH_ROW_ID}`,
+      default: true,
     });
-    const option = requestBody.data.components[0].components[0].options[0];
-    expect(option.description).toContain("NT$18,990");
-    expect(option.description).toContain("目標 NT$17,500");
-    expect(option.description).not.toContain("22222222");
+    expect(requestBody.components[1].components).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ custom_id: `watch:edit:${WATCH_ROW_ID}:17500:0` }),
+        expect.objectContaining({ custom_id: `watch:remove:${WATCH_ROW_ID}:0` }),
+      ]),
+    );
   });
 
-  it("asks for confirmation after selecting a watch from the unwatch menu", async () => {
-    const client = createDiscordBotClient(
-      [
-        snapshot({
-          id: "snapshot-watch-1",
-          productId: WATCH_PRODUCT_ID,
-          productName: "RTX 5070 測試卡",
-          crawlRunId: "new-run",
-          price: 18_990,
-          capturedAt: "2026-06-07T03:00:00.000Z",
-        }),
-      ],
-      [],
-      [
-        targetPriceWatch({
-          id: WATCH_ROW_ID,
-          discordUserId: "111122223333444455",
-          productId: WATCH_PRODUCT_ID,
-          targetPrice: 17_500,
-        }),
-      ],
-    );
+  it("removes a watch after confirmation and refreshes the manager", async () => {
+    const client = createWatchManagerClient();
     const fetchMock = vi.fn<typeof fetch>(
       async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
     );
@@ -794,78 +871,7 @@ describe("handleDiscordInteraction", () => {
       options: createDiscordBotOptions(),
       cooldowns: new CommandCooldowns(60),
       fetchImpl: fetchMock as typeof fetch,
-      interaction: createUnwatchSelectInteraction(`watch:${WATCH_ROW_ID}`),
-    });
-
-    expect(client.discordTargetPriceWatch.updateMany).not.toHaveBeenCalled();
-
-    const requestBody = JSON.parse(
-      String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body),
-    );
-
-    expect(requestBody).toMatchObject({
-      type: 4,
-      data: {
-        embeds: [
-          expect.objectContaining({
-            title: "確認取消目標價追蹤",
-            description: expect.stringContaining("RTX 5070 測試卡"),
-          }),
-        ],
-        components: [
-          {
-            type: 1,
-            components: [
-              expect.objectContaining({
-                custom_id: `unwatch:confirm:watch:${WATCH_ROW_ID}`,
-                label: "確認取消",
-              }),
-              expect.objectContaining({
-                custom_id: "unwatch:cancel",
-                label: "保留追蹤",
-              }),
-            ],
-          },
-        ],
-      },
-    });
-    expect(requestBody.data.embeds[0].fields).not.toContainEqual(
-      expect.objectContaining({ name: "追蹤 ID" }),
-    );
-  });
-
-  it("disables a target price watch from the unwatch confirm button", async () => {
-    const client = createDiscordBotClient(
-      [
-        snapshot({
-          id: "snapshot-watch-1",
-          productId: WATCH_PRODUCT_ID,
-          productName: "RTX 5070 測試卡",
-          crawlRunId: "new-run",
-          price: 18_990,
-          capturedAt: "2026-06-07T03:00:00.000Z",
-        }),
-      ],
-      [],
-      [
-        targetPriceWatch({
-          id: WATCH_ROW_ID,
-          discordUserId: "111122223333444455",
-          productId: WATCH_PRODUCT_ID,
-          targetPrice: 17_500,
-        }),
-      ],
-    );
-    const fetchMock = vi.fn<typeof fetch>(
-      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
-    );
-
-    await handleDiscordInteraction({
-      client,
-      options: createDiscordBotOptions(),
-      cooldowns: new CommandCooldowns(60),
-      fetchImpl: fetchMock as typeof fetch,
-      interaction: createUnwatchConfirmInteraction(`watch:${WATCH_ROW_ID}`),
+      interaction: createWatchButtonInteraction(`watch:remove-confirm:${WATCH_ROW_ID}:0`),
     });
 
     expect(client.discordTargetPriceWatch.updateMany).toHaveBeenCalledWith({
@@ -878,28 +884,15 @@ describe("handleDiscordInteraction", () => {
         enabled: false,
       },
     });
-
-    const requestBody = JSON.parse(
-      String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body),
-    );
-
-    expect(requestBody).toMatchObject({
-      type: 4,
-      data: {
-        embeds: [
-          expect.objectContaining({
-            title: "已取消目標價追蹤",
-            description: expect.stringContaining("RTX 5070 測試卡"),
-          }),
-        ],
-      },
+    const requestBody = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body));
+    expect(requestBody.embeds[0]).toMatchObject({
+      title: "目標價追蹤設定",
+      description: expect.stringContaining("已移除目標價追蹤"),
     });
-    expect(requestBody.data.embeds[0].fields).not.toContainEqual(
-      expect.objectContaining({ name: "追蹤 ID" }),
-    );
+    expect(requestBody.embeds[0].description).toContain("目前沒有啟用中的目標價追蹤");
   });
 
-  it("keeps a target price watch from the unwatch cancel button", async () => {
+  it("refreshes the current watch manager page", async () => {
     const client = createDiscordBotClient([]);
     const fetchMock = vi.fn<typeof fetch>(
       async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
@@ -910,17 +903,22 @@ describe("handleDiscordInteraction", () => {
       options: createDiscordBotOptions(),
       cooldowns: new CommandCooldowns(60),
       fetchImpl: fetchMock as typeof fetch,
-      interaction: createUnwatchCancelInteraction(),
+      interaction: createWatchButtonInteraction("watch:refresh:0"),
     });
 
-    expect(client.discordTargetPriceWatch.updateMany).not.toHaveBeenCalled();
-    expect(String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body)).toContain(
-      "已保留目標價追蹤",
-    );
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({ type: 6 });
+    expect(JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body))).toMatchObject({
+      embeds: [
+        expect.objectContaining({
+          title: "目標價追蹤設定",
+          description: "目前沒有啟用中的目標價追蹤。",
+        }),
+      ],
+    });
   });
 
-  it("reports when unwatch cannot find an active watch", async () => {
-    const client = createDiscordBotClient([]);
+  it("rejects an invalid target price from the edit form", async () => {
+    const client = createWatchManagerClient();
     const fetchMock = vi.fn<typeof fetch>(
       async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
     );
@@ -930,13 +928,15 @@ describe("handleDiscordInteraction", () => {
       options: createDiscordBotOptions(),
       cooldowns: new CommandCooldowns(60),
       fetchImpl: fetchMock as typeof fetch,
-      interaction: createUnwatchInteraction("22222222"),
+      interaction: createWatchEditModalSubmitInteraction({
+        watchId: WATCH_ROW_ID,
+        targetPrice: "NT$17,500",
+        page: 0,
+      }),
     });
 
     expect(client.discordTargetPriceWatch.updateMany).not.toHaveBeenCalled();
-    expect(String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body)).toContain(
-      "找不到啟用中的目標價追蹤",
-    );
+    expect(String(fetchMock.mock.calls[0]?.[1]?.body)).toContain("目標價格需為");
   });
 
   it("sends settings management buttons from the settings command", async () => {
@@ -1676,7 +1676,7 @@ function createWatchModalSubmitInteraction({
     token: "interaction-token",
     type: 5,
     data: {
-      custom_id: "watch:modal",
+      custom_id: "watch:create-modal",
       components: [
         {
           type: 18,
@@ -1704,83 +1704,30 @@ function createWatchModalSubmitInteraction({
   };
 }
 
-function createWatchInteraction(productInput: string, targetPrice: number): DiscordInteraction {
-  return {
-    id: "interaction-1",
-    token: "interaction-token",
-    type: 2,
-    data: {
-      name: "watch",
-      options: [
-        {
-          type: 3,
-          name: "product",
-          value: productInput,
-        },
-        {
-          type: 4,
-          name: "target_price",
-          value: targetPrice,
-        },
-      ],
-    },
-    member: {
-      user: {
-        id: "111122223333444455",
-      },
-    },
-  };
-}
-
-function createWatchlistInteraction(): DiscordInteraction {
-  return {
-    id: "interaction-1",
-    token: "interaction-token",
-    type: 2,
-    data: {
-      name: "watchlist",
-    },
-    member: {
-      user: {
-        id: "111122223333444455",
-      },
-    },
-  };
-}
-
-function createUnwatchInteraction(watchInput?: string): DiscordInteraction {
-  return {
-    id: "interaction-1",
-    token: "interaction-token",
-    type: 2,
-    data: {
-      name: "unwatch",
-      options:
-        watchInput === undefined
-          ? []
-          : [
-              {
-                type: 3,
-                name: "watch_id",
-                value: watchInput,
-              },
-            ],
-    },
-    member: {
-      user: {
-        id: "111122223333444455",
-      },
-    },
-  };
-}
-
-function createUnwatchSelectInteraction(watchInput: string): DiscordInteraction {
+function createWatchButtonInteraction(customId: string): DiscordInteraction {
   return {
     id: "interaction-1",
     token: "interaction-token",
     type: 3,
     data: {
-      custom_id: "unwatch:select",
+      custom_id: customId,
+      component_type: 2,
+    },
+    member: {
+      user: {
+        id: "111122223333444455",
+      },
+    },
+  };
+}
+
+function createWatchSelectInteraction(watchInput: string, page: number): DiscordInteraction {
+  return {
+    id: "interaction-1",
+    token: "interaction-token",
+    type: 3,
+    data: {
+      custom_id: `watch:select:${page}`,
       component_type: 3,
       values: [watchInput],
     },
@@ -1792,31 +1739,31 @@ function createUnwatchSelectInteraction(watchInput: string): DiscordInteraction 
   };
 }
 
-function createUnwatchConfirmInteraction(watchInput: string): DiscordInteraction {
+function createWatchEditModalSubmitInteraction({
+  watchId,
+  targetPrice,
+  page,
+}: {
+  watchId: string;
+  targetPrice: string;
+  page: number;
+}): DiscordInteraction {
   return {
     id: "interaction-1",
     token: "interaction-token",
-    type: 3,
+    type: 5,
     data: {
-      custom_id: `unwatch:confirm:${watchInput}`,
-      component_type: 2,
-    },
-    member: {
-      user: {
-        id: "111122223333444455",
-      },
-    },
-  };
-}
-
-function createUnwatchCancelInteraction(): DiscordInteraction {
-  return {
-    id: "interaction-1",
-    token: "interaction-token",
-    type: 3,
-    data: {
-      custom_id: "unwatch:cancel",
-      component_type: 2,
+      custom_id: `watch:edit-modal:${watchId}:${page}`,
+      components: [
+        {
+          type: 18,
+          component: {
+            type: 4,
+            custom_id: "watch:target-price",
+            value: targetPrice,
+          },
+        },
+      ],
     },
     member: {
       user: {
@@ -1968,6 +1915,30 @@ function targetPriceWatch({
     createdAt: new Date("2026-06-07T00:00:00.000Z"),
     updatedAt: new Date("2026-06-07T00:00:00.000Z"),
   };
+}
+
+function createWatchManagerClient() {
+  return createDiscordBotClient(
+    [
+      snapshot({
+        id: "snapshot-watch-1",
+        productId: WATCH_PRODUCT_ID,
+        productName: "RTX 5070 測試卡",
+        crawlRunId: "new-run",
+        price: 18_990,
+        capturedAt: "2026-06-07T03:00:00.000Z",
+      }),
+    ],
+    [],
+    [
+      targetPriceWatch({
+        id: WATCH_ROW_ID,
+        discordUserId: "111122223333444455",
+        productId: WATCH_PRODUCT_ID,
+        targetPrice: 17_500,
+      }),
+    ],
+  );
 }
 
 function createDiscordBotClient(
@@ -2164,7 +2135,11 @@ function createDiscordBotClient(
   const watchRows = [...watches];
   const toWatchRecord = (watch: TestTargetPriceWatch) => toPrismaWatchListRecord(watch, snapshots);
   const watchFindMany = vi.fn(
-    async (args: { where: { discordUserId?: string; enabled?: boolean }; take?: number }) => {
+    async (args: {
+      where: { discordUserId?: string; enabled?: boolean };
+      skip?: number;
+      take?: number;
+    }) => {
       const rows = watchRows
         .filter((watch) => {
           if (
@@ -2182,13 +2157,22 @@ function createDiscordBotClient(
           );
         })
         .map(toWatchRecord);
+      const start = args.skip ?? 0;
 
-      return typeof args.take === "number" ? rows.slice(0, args.take) : rows;
+      return typeof args.take === "number"
+        ? rows.slice(start, start + args.take)
+        : rows.slice(start);
     },
   );
   const watchFindFirst = vi.fn(
-    async (args: { where: { discordUserId?: string; productId?: string; enabled?: boolean } }) => {
+    async (args: {
+      where: { id?: string; discordUserId?: string; productId?: string; enabled?: boolean };
+    }) => {
       const watch = watchRows.find((row) => {
+        if (args.where.id !== undefined && row.id !== args.where.id) {
+          return false;
+        }
+
         if (
           args.where.discordUserId !== undefined &&
           row.discordUserId !== args.where.discordUserId
@@ -2260,7 +2244,7 @@ function createDiscordBotClient(
       }
 
       const created = {
-        id: "watch-created",
+        id: "44444444-4444-4444-8444-444444444444",
         lastNotifiedAt: null,
         createdAt: new Date("2026-06-07T00:00:00.000Z"),
         updatedAt: new Date("2026-06-07T00:00:00.000Z"),

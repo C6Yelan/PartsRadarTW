@@ -3,14 +3,13 @@
 import {
   createPriceReportSettingsComponents,
   createPriceReportSettingsModal,
+  createWatchEditModal,
   createWatchModal,
   parsePriceReportComponentInteraction,
   parsePriceReportInteraction,
   parsePriceReportModalSubmit,
-  parseUnwatchComponentInteraction,
-  parseUnwatchInteraction,
+  parseWatchComponentInteraction,
   parseWatchInteraction,
-  parseWatchlistInteraction,
   parseWatchModalSubmit,
 } from "./commands";
 import {
@@ -31,6 +30,7 @@ import {
   sendPriceReportNow,
 } from "./price-report";
 import {
+  deferInteractionMessageUpdate,
   deferInteractionResponse,
   editDeferredInteractionResponse,
   sendDiscordInteractionMessages,
@@ -39,15 +39,14 @@ import {
 } from "./rest";
 import type { DiscordBotClient, DiscordBotOptions, DiscordInteraction, FetchImpl } from "./types";
 import {
-  createDisableTargetPriceWatchResponseMessage,
   createTargetPriceWatch,
-  createTargetPriceWatchlistResponseMessage,
+  createTargetPriceWatchManagerMessage,
+  createTargetPriceWatchRemovalConfirmationMessage,
   createTargetPriceWatchResponseMessage,
-  createUnwatchConfirmationResponseMessage,
-  createUnwatchSelectResponseMessage,
   disableTargetPriceWatch,
-  readTargetPriceWatchForUnwatch,
+  readTargetPriceWatch,
   readTargetPriceWatchlist,
+  updateTargetPriceWatch,
 } from "./watch";
 
 export async function handleDiscordInteraction({
@@ -108,12 +107,9 @@ async function handleApplicationCommandInteraction({
   fetchImpl: FetchImpl;
 }): Promise<void> {
   const command = parsePriceReportInteraction(interaction);
-  const watchCommand = command ? null : parseWatchInteraction(interaction);
-  const watchlistCommand = command || watchCommand ? false : parseWatchlistInteraction(interaction);
-  const unwatchCommand =
-    command || watchCommand || watchlistCommand ? null : parseUnwatchInteraction(interaction);
+  const watchCommand = command ? false : parseWatchInteraction(interaction);
 
-  if (!command && !watchCommand && !watchlistCommand && !unwatchCommand) {
+  if (!command && !watchCommand) {
     await sendUnsupportedInteractionResponse({ interaction, options, fetchImpl });
     return;
   }
@@ -182,17 +178,6 @@ async function handleApplicationCommandInteraction({
   }
 
   if (watchCommand) {
-    if (!watchCommand.productInput && watchCommand.targetPrice === null) {
-      await sendModalInteractionResponse({
-        token: options.token,
-        apiBaseUrl: options.apiBaseUrl,
-        interaction,
-        fetchImpl,
-        modal: createWatchModal(),
-      });
-      return;
-    }
-
     await deferInteractionResponse({
       token: options.token,
       apiBaseUrl: options.apiBaseUrl,
@@ -201,12 +186,7 @@ async function handleApplicationCommandInteraction({
       ephemeral: true,
     });
 
-    const result = await createTargetPriceWatch({
-      client,
-      discordUserId,
-      productInput: watchCommand.productInput,
-      targetPrice: watchCommand.targetPrice,
-    });
+    const result = await readWatchManagerPage({ client, discordUserId, page: 0 });
 
     await editDeferredInteractionResponse({
       token: options.token,
@@ -214,60 +194,7 @@ async function handleApplicationCommandInteraction({
       apiBaseUrl: options.apiBaseUrl,
       interaction,
       fetchImpl,
-      message: createTargetPriceWatchResponseMessage({
-        result,
-        publicBaseUrl: options.publicBaseUrl,
-      }),
-    });
-    return;
-  }
-
-  if (watchlistCommand) {
-    const result = await readTargetPriceWatchlist({ client, discordUserId });
-
-    await sendInteractionResponse({
-      token: options.token,
-      apiBaseUrl: options.apiBaseUrl,
-      interaction,
-      fetchImpl,
-      message: createTargetPriceWatchlistResponseMessage({
-        result,
-        publicBaseUrl: options.publicBaseUrl,
-      }),
-    });
-    return;
-  }
-
-  if (unwatchCommand) {
-    if (!unwatchCommand.watchInput) {
-      const result = await readTargetPriceWatchlist({
-        client,
-        discordUserId,
-        maxItems: 25,
-      });
-
-      await sendInteractionResponse({
-        token: options.token,
-        apiBaseUrl: options.apiBaseUrl,
-        interaction,
-        fetchImpl,
-        message: createUnwatchSelectResponseMessage({ result }),
-      });
-      return;
-    }
-
-    const result = await readTargetPriceWatchForUnwatch({
-      client,
-      discordUserId,
-      watchInput: unwatchCommand.watchInput,
-    });
-
-    await sendInteractionResponse({
-      token: options.token,
-      apiBaseUrl: options.apiBaseUrl,
-      interaction,
-      fetchImpl,
-      message: createUnwatchConfirmationResponseMessage({
+      message: createTargetPriceWatchManagerMessage({
         result,
         publicBaseUrl: options.publicBaseUrl,
       }),
@@ -290,9 +217,9 @@ async function handleMessageComponentInteraction({
   fetchImpl: FetchImpl;
 }): Promise<void> {
   const component = parsePriceReportComponentInteraction(interaction);
-  const unwatchComponent = component ? null : parseUnwatchComponentInteraction(interaction);
+  const watchComponent = component ? null : parseWatchComponentInteraction(interaction);
 
-  if (!component && !unwatchComponent) {
+  if (!component && !watchComponent) {
     await sendUnsupportedInteractionResponse({ interaction, options, fetchImpl });
     return;
   }
@@ -304,52 +231,119 @@ async function handleMessageComponentInteraction({
     return;
   }
 
-  if (unwatchComponent?.action === "cancel") {
-    await sendInteractionResponse({
+  if (watchComponent?.action === "add") {
+    await sendModalInteractionResponse({
       token: options.token,
       apiBaseUrl: options.apiBaseUrl,
       interaction,
       fetchImpl,
-      content: "已保留目標價追蹤，未做任何變更。",
+      modal: createWatchModal(),
     });
     return;
   }
 
-  if (unwatchComponent?.action === "select") {
-    const result = await readTargetPriceWatchForUnwatch({
-      client,
-      discordUserId,
-      watchInput: unwatchComponent.watchInput,
-    });
+  if (watchComponent?.action === "edit") {
+    const watchId = extractWatchId(watchComponent.watchInput);
 
-    await sendInteractionResponse({
+    if (!watchId || !watchComponent.targetPrice) {
+      await sendUnsupportedInteractionResponse({ interaction, options, fetchImpl });
+      return;
+    }
+
+    await sendModalInteractionResponse({
       token: options.token,
       apiBaseUrl: options.apiBaseUrl,
       interaction,
       fetchImpl,
-      message: createUnwatchConfirmationResponseMessage({
-        result,
-        publicBaseUrl: options.publicBaseUrl,
+      modal: createWatchEditModal({
+        watchId,
+        targetPrice: watchComponent.targetPrice,
+        page: watchComponent.page,
       }),
     });
     return;
   }
 
-  if (unwatchComponent?.action === "confirm") {
-    const result = await disableTargetPriceWatch({
-      client,
-      discordUserId,
-      watchInput: unwatchComponent.watchInput,
-    });
-
-    await sendInteractionResponse({
+  if (watchComponent) {
+    await deferInteractionMessageUpdate({
       token: options.token,
       apiBaseUrl: options.apiBaseUrl,
       interaction,
       fetchImpl,
-      message: createDisableTargetPriceWatchResponseMessage({
+    });
+
+    if (watchComponent.action === "remove") {
+      const lookup = await readTargetPriceWatch({
+        client,
+        discordUserId,
+        watchInput: watchComponent.watchInput,
+      });
+
+      await editDeferredInteractionResponse({
+        token: options.token,
+        applicationId: options.applicationId,
+        apiBaseUrl: options.apiBaseUrl,
+        interaction,
+        fetchImpl,
+        message: createTargetPriceWatchRemovalConfirmationMessage({
+          result: lookup,
+          publicBaseUrl: options.publicBaseUrl,
+          page: watchComponent.page,
+        }),
+      });
+      return;
+    }
+
+    if (watchComponent.action === "confirm_remove") {
+      const disabled = await disableTargetPriceWatch({
+        client,
+        discordUserId,
+        watchInput: watchComponent.watchInput,
+      });
+      const result = await readWatchManagerPage({
+        client,
+        discordUserId,
+        page: watchComponent.page,
+      });
+
+      await editDeferredInteractionResponse({
+        token: options.token,
+        applicationId: options.applicationId,
+        apiBaseUrl: options.apiBaseUrl,
+        interaction,
+        fetchImpl,
+        message: createTargetPriceWatchManagerMessage({
+          result,
+          publicBaseUrl: options.publicBaseUrl,
+          notice:
+            disabled.status === "disabled"
+              ? "已移除目標價追蹤。"
+              : "追蹤已不存在，清單已重新整理。",
+        }),
+      });
+      return;
+    }
+
+    const result = await readWatchManagerPage({
+      client,
+      discordUserId,
+      page: watchComponent.page,
+    });
+    const selectedWatchInput =
+      watchComponent.action === "select" || watchComponent.action === "cancel_remove"
+        ? watchComponent.watchInput
+        : null;
+
+    await editDeferredInteractionResponse({
+      token: options.token,
+      applicationId: options.applicationId,
+      apiBaseUrl: options.apiBaseUrl,
+      interaction,
+      fetchImpl,
+      message: createTargetPriceWatchManagerMessage({
         result,
         publicBaseUrl: options.publicBaseUrl,
+        selectedWatchInput,
       }),
     });
     return;
@@ -410,7 +404,10 @@ async function handleModalSubmitInteraction({
   }
 
   if (watchModal) {
-    if (!watchModal.productInputValid || !watchModal.targetPriceInputValid) {
+    if (
+      !watchModal.targetPriceInputValid ||
+      (watchModal.action === "create" && !watchModal.productInputValid)
+    ) {
       await sendInteractionResponse({
         token: options.token,
         apiBaseUrl: options.apiBaseUrl,
@@ -429,12 +426,64 @@ async function handleModalSubmitInteraction({
       ephemeral: true,
     });
 
-    const result = await createTargetPriceWatch({
+    if (watchModal.action === "edit") {
+      const updateResult = await updateTargetPriceWatch({
+        client,
+        discordUserId,
+        watchInput: watchModal.watchInput,
+        targetPrice: watchModal.targetPrice,
+      });
+      const result = await readWatchManagerPage({
+        client,
+        discordUserId,
+        page: watchModal.page,
+      });
+
+      await editDeferredInteractionResponse({
+        token: options.token,
+        applicationId: options.applicationId,
+        apiBaseUrl: options.apiBaseUrl,
+        interaction,
+        fetchImpl,
+        message: createTargetPriceWatchManagerMessage({
+          result,
+          publicBaseUrl: options.publicBaseUrl,
+          selectedWatchInput:
+            updateResult.status === "updated" ? `watch:${updateResult.watch.id}` : null,
+          notice:
+            updateResult.status === "updated"
+              ? "已更新目標價格。"
+              : "無法更新追蹤，清單已重新整理。",
+        }),
+      });
+      return;
+    }
+
+    const createResult = await createTargetPriceWatch({
       client,
       discordUserId,
       productInput: watchModal.productInput,
       targetPrice: watchModal.targetPrice,
     });
+
+    if (createResult.status === "saved") {
+      const result = await readWatchManagerPage({ client, discordUserId, page: 0 });
+
+      await editDeferredInteractionResponse({
+        token: options.token,
+        applicationId: options.applicationId,
+        apiBaseUrl: options.apiBaseUrl,
+        interaction,
+        fetchImpl,
+        message: createTargetPriceWatchManagerMessage({
+          result,
+          publicBaseUrl: options.publicBaseUrl,
+          selectedWatchInput: `watch:${createResult.watch.id}`,
+          notice: "已保存目標價追蹤。",
+        }),
+      });
+      return;
+    }
 
     await editDeferredInteractionResponse({
       token: options.token,
@@ -443,7 +492,7 @@ async function handleModalSubmitInteraction({
       interaction,
       fetchImpl,
       message: createTargetPriceWatchResponseMessage({
-        result,
+        result: createResult,
         publicBaseUrl: options.publicBaseUrl,
       }),
     });
@@ -519,23 +568,43 @@ async function sendMissingUserResponse({
   });
 }
 
-function formatWatchModalValidationMessage({
-  productInputValid,
-  targetPriceInputValid,
-}: {
-  productInputValid: boolean;
-  targetPriceInputValid: boolean;
-}): string {
+function formatWatchModalValidationMessage(
+  modal: NonNullable<ReturnType<typeof parseWatchModalSubmit>>,
+): string {
   const messages = [
-    productInputValid
+    modal.action !== "create" || modal.productInputValid
       ? null
       : "商品欄位需填 PartsRadarTW 商品頁連結或商品 ID。可到商品頁按分享/複製連結，或複製網址列的 `/products/...`。",
-    targetPriceInputValid
+    modal.targetPriceInputValid
       ? null
       : `目標價格需為 1-${MAX_TARGET_PRICE.toLocaleString("en-US")} 的整數，請只填純數字。`,
   ].filter((message): message is string => message !== null);
 
   return messages.join("\n");
+}
+
+async function readWatchManagerPage({
+  client,
+  discordUserId,
+  page,
+}: {
+  client: DiscordBotClient;
+  discordUserId: string;
+  page: number;
+}) {
+  const result = await readTargetPriceWatchlist({ client, discordUserId, page });
+
+  if (result.watches.length === 0 && result.hasPreviousPage) {
+    return readWatchManagerPage({ client, discordUserId, page: page - 1 });
+  }
+
+  return result;
+}
+
+function extractWatchId(watchInput: string | null): string | null {
+  const match = /^watch:([0-9a-f-]{36})$/i.exec(watchInput ?? "");
+
+  return match?.[1] ?? null;
 }
 
 function formatPriceReportModalValidationMessage({

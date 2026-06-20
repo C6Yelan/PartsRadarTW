@@ -1,11 +1,6 @@
 // apps/crawler/src/scripts/ops/discord-bot/registration.ts
 
-import {
-  createPriceReportCommand,
-  createUnwatchCommand,
-  createWatchCommand,
-  createWatchlistCommand,
-} from "./commands";
+import { createPriceReportCommand, createWatchCommand } from "./commands";
 import { sendDiscordRestRequest } from "./rest";
 import type { DiscordBotOptions, DiscordRestResult, FetchImpl } from "./types";
 
@@ -23,11 +18,6 @@ export async function registerDiscordBotCommands({
     fetchImpl,
     method: "PUT",
     path: `/applications/${applicationId}/commands`,
-    body: [
-      createPriceReportCommand(),
-      createWatchCommand(),
-      createWatchlistCommand(),
-      createUnwatchCommand(),
-    ],
+    body: [createPriceReportCommand(), createWatchCommand()],
   });
 }
