@@ -203,7 +203,7 @@ export async function sendInteractionResponse({
   message?: DiscordBotMessage;
   content?: string;
 }): Promise<void> {
-  await sendDiscordRestRequest({
+  const result = await sendDiscordRestRequest({
     token,
     apiBaseUrl,
     fetchImpl,
@@ -214,6 +214,8 @@ export async function sendInteractionResponse({
       data: createDiscordMessagePayload(message ?? content ?? "OK", true),
     },
   });
+
+  assertDiscordInteractionResponseSucceeded("message", result);
 }
 
 export async function sendModalInteractionResponse({
@@ -229,7 +231,7 @@ export async function sendModalInteractionResponse({
   fetchImpl: FetchImpl;
   modal: DiscordModal;
 }): Promise<void> {
-  await sendDiscordRestRequest({
+  const result = await sendDiscordRestRequest({
     token,
     apiBaseUrl,
     fetchImpl,
@@ -240,6 +242,8 @@ export async function sendModalInteractionResponse({
       data: modal,
     },
   });
+
+  assertDiscordInteractionResponseSucceeded("modal", result);
 }
 
 export async function deferInteractionResponse({
@@ -255,7 +259,7 @@ export async function deferInteractionResponse({
   fetchImpl: FetchImpl;
   ephemeral?: boolean;
 }): Promise<void> {
-  await sendDiscordRestRequest({
+  const result = await sendDiscordRestRequest({
     token,
     apiBaseUrl,
     fetchImpl,
@@ -266,6 +270,37 @@ export async function deferInteractionResponse({
       data: ephemeral ? { flags: DISCORD_EPHEMERAL_MESSAGE_FLAG } : undefined,
     },
   });
+
+  assertDiscordInteractionResponseSucceeded("deferred", result);
+}
+
+export async function editDeferredInteractionResponse({
+  token,
+  applicationId,
+  apiBaseUrl,
+  interaction,
+  fetchImpl,
+  message,
+  content,
+}: {
+  token: string;
+  applicationId: string;
+  apiBaseUrl: string;
+  interaction: DiscordInteraction;
+  fetchImpl: FetchImpl;
+  message?: DiscordBotMessage;
+  content?: string;
+}): Promise<void> {
+  const result = await sendDiscordRestRequest({
+    token,
+    apiBaseUrl,
+    fetchImpl,
+    method: "PATCH",
+    path: `/webhooks/${applicationId}/${interaction.token}/messages/@original`,
+    body: createDiscordMessagePayload(message ?? content ?? "OK"),
+  });
+
+  assertDiscordInteractionResponseSucceeded("deferred message", result);
 }
 
 function createDiscordMessagePayload(
@@ -300,7 +335,11 @@ function normalizeDiscordBotMessage(message: DiscordBotMessage | string): Discor
     return Boolean(embed.title || embed.description || (embed.fields && embed.fields.length > 0));
   });
 
-  if (!content && (!embeds || embeds.length === 0) && (!message.components || message.components.length === 0)) {
+  if (
+    !content &&
+    (!embeds || embeds.length === 0) &&
+    (!message.components || message.components.length === 0)
+  ) {
     return {
       content: "價格報告目前沒有可顯示內容。",
     };
@@ -378,10 +417,12 @@ export async function sendDiscordRestRequest<T>({
     }
 
     if (!response.ok) {
+      const errorBody = await readDiscordJson<unknown>(response);
+
       return {
         status: "failed",
         httpStatus: response.status,
-        message: `Discord API returned HTTP ${response.status}.`,
+        message: formatDiscordApiError(response.status, errorBody),
         retryAfterMs: parseRetryAfterHeader(response.headers),
       };
     }
@@ -434,6 +475,47 @@ function parseRetryAfterHeader(headers: Headers): number | undefined {
 
 function createDiscordApiUrl(apiBaseUrl: string, path: string): string {
   return `${apiBaseUrl.replace(/\/+$/, "")}${path}`;
+}
+
+function assertDiscordInteractionResponseSucceeded(
+  responseKind: "message" | "modal" | "deferred" | "deferred message",
+  result: DiscordRestResult<unknown>,
+): void {
+  if (result.status === "ok") {
+    return;
+  }
+
+  throw new Error(
+    `Discord ${responseKind} interaction response failed: ${formatDiscordRestFailure(result)}`,
+  );
+}
+
+function formatDiscordApiError(httpStatus: number, body: unknown): string {
+  const details = isRecord(body) ? body : null;
+  const code =
+    typeof details?.code === "string" || typeof details?.code === "number"
+      ? ` code=${details.code}`
+      : "";
+  const message =
+    typeof details?.message === "string" && details.message.trim()
+      ? ` message=${details.message.trim()}`
+      : "";
+  const errors =
+    details?.errors === undefined ? "" : ` errors=${serializeDiscordErrors(details.errors)}`;
+
+  return `Discord API returned HTTP ${httpStatus}.${code}${message}${errors}`;
+}
+
+function serializeDiscordErrors(errors: unknown): string {
+  try {
+    return JSON.stringify(errors).slice(0, 2_000);
+  } catch {
+    return "unserializable";
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 export function formatDiscordRestFailure(

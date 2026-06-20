@@ -15,8 +15,8 @@ import {
   DISCORD_OPTION_TYPE_STRING,
   DISCORD_OPTION_TYPE_SUBCOMMAND,
   DISCORD_TEXT_INPUT_STYLE_SHORT,
-  MAX_TARGET_PRICE,
   MAX_PRICE_REPORT_ITEMS,
+  MAX_TARGET_PRICE,
 } from "./constants";
 import type {
   DiscordInteraction,
@@ -26,8 +26,8 @@ import type {
   ParsedPriceReportCommand,
   ParsedPriceReportComponent,
   ParsedPriceReportModal,
-  ParsedUnwatchComponent,
   ParsedUnwatchCommand,
+  ParsedUnwatchComponent,
   ParsedWatchCommand,
   ParsedWatchModal,
 } from "./types";
@@ -118,7 +118,9 @@ export function createUnwatchCommand(): Record<string, unknown> {
   };
 }
 
-export function parsePriceReportInteraction(interaction: DiscordInteraction): ParsedPriceReportCommand | null {
+export function parsePriceReportInteraction(
+  interaction: DiscordInteraction,
+): ParsedPriceReportCommand | null {
   if (interaction.data?.name !== "price-report") {
     return null;
   }
@@ -155,7 +157,9 @@ export function parseWatchlistInteraction(interaction: DiscordInteraction): bool
   return interaction.data?.name === "watchlist";
 }
 
-export function parseUnwatchInteraction(interaction: DiscordInteraction): ParsedUnwatchCommand | null {
+export function parseUnwatchInteraction(
+  interaction: DiscordInteraction,
+): ParsedUnwatchCommand | null {
   if (interaction.data?.name !== "unwatch") {
     return null;
   }
@@ -248,7 +252,7 @@ export function createWatchModal({
           min_length: 1,
           max_length: 300,
           required: true,
-          value: productValue,
+          ...(productValue ? { value: productValue } : {}),
           placeholder: "https://partsradar.net/products/...",
         },
       },
@@ -263,7 +267,7 @@ export function createWatchModal({
           min_length: 1,
           max_length: String(MAX_TARGET_PRICE).length,
           required: true,
-          value: targetPriceValue,
+          ...(targetPriceValue ? { value: targetPriceValue } : {}),
           placeholder: "17500",
         },
       },

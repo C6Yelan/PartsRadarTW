@@ -1,13 +1,6 @@
 // apps/crawler/src/scripts/ops/discord-bot/interactions.ts
 
 import {
-  DISCORD_INTERACTION_TYPE_APPLICATION_COMMAND,
-  DISCORD_INTERACTION_TYPE_MESSAGE_COMPONENT,
-  DISCORD_INTERACTION_TYPE_MODAL_SUBMIT,
-  MAX_PRICE_REPORT_ITEMS,
-  MAX_TARGET_PRICE,
-} from "./constants";
-import {
   createPriceReportSettingsComponents,
   createPriceReportSettingsModal,
   createWatchModal,
@@ -17,9 +10,16 @@ import {
   parseUnwatchComponentInteraction,
   parseUnwatchInteraction,
   parseWatchInteraction,
-  parseWatchModalSubmit,
   parseWatchlistInteraction,
+  parseWatchModalSubmit,
 } from "./commands";
+import {
+  DISCORD_INTERACTION_TYPE_APPLICATION_COMMAND,
+  DISCORD_INTERACTION_TYPE_MESSAGE_COMPONENT,
+  DISCORD_INTERACTION_TYPE_MODAL_SUBMIT,
+  MAX_PRICE_REPORT_ITEMS,
+  MAX_TARGET_PRICE,
+} from "./constants";
 import type { CommandCooldowns } from "./cooldowns";
 import {
   disablePriceReport,
@@ -32,6 +32,7 @@ import {
 } from "./price-report";
 import {
   deferInteractionResponse,
+  editDeferredInteractionResponse,
   sendDiscordInteractionMessages,
   sendInteractionResponse,
   sendModalInteractionResponse,
@@ -40,8 +41,8 @@ import type { DiscordBotClient, DiscordBotOptions, DiscordInteraction, FetchImpl
 import {
   createDisableTargetPriceWatchResponseMessage,
   createTargetPriceWatch,
-  createTargetPriceWatchResponseMessage,
   createTargetPriceWatchlistResponseMessage,
+  createTargetPriceWatchResponseMessage,
   createUnwatchConfirmationResponseMessage,
   createUnwatchSelectResponseMessage,
   disableTargetPriceWatch,
@@ -192,6 +193,14 @@ async function handleApplicationCommandInteraction({
       return;
     }
 
+    await deferInteractionResponse({
+      token: options.token,
+      apiBaseUrl: options.apiBaseUrl,
+      interaction,
+      fetchImpl,
+      ephemeral: true,
+    });
+
     const result = await createTargetPriceWatch({
       client,
       discordUserId,
@@ -199,8 +208,9 @@ async function handleApplicationCommandInteraction({
       targetPrice: watchCommand.targetPrice,
     });
 
-    await sendInteractionResponse({
+    await editDeferredInteractionResponse({
       token: options.token,
+      applicationId: options.applicationId,
       apiBaseUrl: options.apiBaseUrl,
       interaction,
       fetchImpl,
@@ -411,6 +421,14 @@ async function handleModalSubmitInteraction({
       return;
     }
 
+    await deferInteractionResponse({
+      token: options.token,
+      apiBaseUrl: options.apiBaseUrl,
+      interaction,
+      fetchImpl,
+      ephemeral: true,
+    });
+
     const result = await createTargetPriceWatch({
       client,
       discordUserId,
@@ -418,8 +436,9 @@ async function handleModalSubmitInteraction({
       targetPrice: watchModal.targetPrice,
     });
 
-    await sendInteractionResponse({
+    await editDeferredInteractionResponse({
       token: options.token,
+      applicationId: options.applicationId,
       apiBaseUrl: options.apiBaseUrl,
       interaction,
       fetchImpl,

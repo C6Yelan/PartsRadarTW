@@ -1,8 +1,12 @@
 // apps/crawler/tests/scripts/ops/discord-bot.test.ts
 import { describe, expect, it, vi } from "vitest";
 import {
-  calculateScheduledPriceReportSleepMs,
   CommandCooldowns,
+  calculateScheduledPriceReportSleepMs,
+  type DiscordBotClient,
+  type DiscordBotMessage,
+  type DiscordBotOptions,
+  type DiscordInteraction,
   enableDailyPriceReport,
   handleDiscordInteraction,
   normalizeWatchProductReference,
@@ -13,10 +17,6 @@ import {
   sendDiscordInteractionMessages,
   sendDueScheduledPriceReports,
   sendPriceReportNow,
-  type DiscordBotClient,
-  type DiscordBotMessage,
-  type DiscordBotOptions,
-  type DiscordInteraction,
 } from "../../../src/scripts/ops/discord-bot";
 
 const TOKEN = "test_bot_token";
@@ -114,12 +114,12 @@ describe("registerDiscordBotCommands", () => {
       }),
     ]);
     const registeredCommands = JSON.parse(String(globalRequestInit.body));
-    expect(registeredCommands.find((command: { name: string }) => command.name === "watch")).not.toHaveProperty(
-      "options",
-    );
-    expect(registeredCommands.find((command: { name: string }) => command.name === "unwatch")).not.toHaveProperty(
-      "options",
-    );
+    expect(
+      registeredCommands.find((command: { name: string }) => command.name === "watch"),
+    ).not.toHaveProperty("options");
+    expect(
+      registeredCommands.find((command: { name: string }) => command.name === "unwatch"),
+    ).not.toHaveProperty("options");
     expect(String(globalRequestInit.body)).not.toContain('"enable"');
     expect(String(globalRequestInit.body)).not.toContain('"disable"');
   });
@@ -128,11 +128,13 @@ describe("registerDiscordBotCommands", () => {
 describe("normalizeWatchProductReference", () => {
   it("accepts product ids and PartsRadarTW product URLs", () => {
     expect(normalizeWatchProductReference(WATCH_PRODUCT_ID.toUpperCase())).toBe(WATCH_PRODUCT_ID);
-    expect(normalizeWatchProductReference(`https://partsradar.test/products/${WATCH_PRODUCT_ID}`)).toBe(
-      WATCH_PRODUCT_ID,
-    );
+    expect(
+      normalizeWatchProductReference(`https://partsradar.test/products/${WATCH_PRODUCT_ID}`),
+    ).toBe(WATCH_PRODUCT_ID);
     expect(normalizeWatchProductReference(`/products/${WATCH_PRODUCT_ID}`)).toBe(WATCH_PRODUCT_ID);
-    expect(normalizeWatchProductReference("https://partsradar.test/products/not-a-product")).toBeNull();
+    expect(
+      normalizeWatchProductReference("https://partsradar.test/products/not-a-product"),
+    ).toBeNull();
     expect(normalizeWatchProductReference("/products/%E0%A4%A")).toBeNull();
   });
 });
@@ -344,6 +346,45 @@ describe("handleDiscordInteraction", () => {
         ],
       },
     });
+    expect(requestBody.data.components[0].component).not.toHaveProperty("value");
+    expect(requestBody.data.components[1].component).not.toHaveProperty("value");
+  });
+
+  it("surfaces Discord API validation errors when the watch modal is rejected", async () => {
+    const client = createDiscordBotClient([]);
+    const fetchMock = vi.fn<typeof fetch>(
+      async () =>
+        new Response(
+          JSON.stringify({
+            code: 50_035,
+            message: "Invalid Form Body",
+            errors: {
+              data: {
+                components: {
+                  0: {
+                    component: {
+                      value: {
+                        _errors: [{ code: "BASE_TYPE_BAD_LENGTH", message: "Must not be empty." }],
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          }),
+          { status: 400 },
+        ),
+    );
+
+    await expect(
+      handleDiscordInteraction({
+        client,
+        options: createDiscordBotOptions(),
+        cooldowns: new CommandCooldowns(60),
+        fetchImpl: fetchMock as typeof fetch,
+        interaction: createWatchOpenInteraction(),
+      }),
+    ).rejects.toThrow(/Discord modal interaction response failed:.*Invalid Form Body/);
   });
 
   it("creates a target price watch from the watch modal", async () => {
@@ -398,24 +439,32 @@ describe("handleDiscordInteraction", () => {
       }),
     });
 
-    const requestBody = JSON.parse(
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.invocationCallOrder[0]).toBeLessThan(
+      client.product.findFirst.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
+    );
+    const deferredResponseBody = JSON.parse(
       String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body),
     );
+    const requestBody = JSON.parse(
+      String((fetchMock.mock.calls[1]?.[1] as RequestInit | undefined)?.body),
+    );
 
+    expect(deferredResponseBody).toEqual({
+      type: 5,
+      data: { flags: 64 },
+    });
     expect(requestBody).toMatchObject({
-      type: 4,
-      data: {
-        embeds: [
-          expect.objectContaining({
-            title: "已保存目標價追蹤",
-            description: expect.stringContaining("RTX 5070 測試卡"),
-            fields: expect.arrayContaining([
-              expect.objectContaining({ name: "目前價格", value: "NT$18,990" }),
-              expect.objectContaining({ name: "目標價格", value: "NT$17,500" }),
-            ]),
-          }),
-        ],
-      },
+      embeds: [
+        expect.objectContaining({
+          title: "已保存目標價追蹤",
+          description: expect.stringContaining("RTX 5070 測試卡"),
+          fields: expect.arrayContaining([
+            expect.objectContaining({ name: "目前價格", value: "NT$18,990" }),
+            expect.objectContaining({ name: "目標價格", value: "NT$17,500" }),
+          ]),
+        }),
+      ],
     });
   });
 
@@ -439,7 +488,10 @@ describe("handleDiscordInteraction", () => {
       options: createDiscordBotOptions(),
       cooldowns: new CommandCooldowns(60),
       fetchImpl: fetchMock as typeof fetch,
-      interaction: createWatchInteraction(`https://partsradar.test/products/${WATCH_PRODUCT_ID}`, 17_500),
+      interaction: createWatchInteraction(
+        `https://partsradar.test/products/${WATCH_PRODUCT_ID}`,
+        17_500,
+      ),
     });
 
     expect(client.discordTargetPriceWatch.upsert).toHaveBeenCalledWith(
@@ -469,7 +521,7 @@ describe("handleDiscordInteraction", () => {
     });
 
     expect(client.discordTargetPriceWatch.upsert).not.toHaveBeenCalled();
-    expect(String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body)).toContain(
+    expect(String((fetchMock.mock.calls[1]?.[1] as RequestInit | undefined)?.body)).toContain(
       "目標價格需為",
     );
   });
@@ -959,7 +1011,9 @@ describe("handleDiscordInteraction", () => {
     const urls = fetchMock.mock.calls.map(([url]) => String(url));
 
     expect(requestBodies.join("\n")).not.toContain("請等待");
-    expect(urls).toContain(`${API_BASE_URL}/webhooks/${APPLICATION_ID}/interaction-token/messages/@original`);
+    expect(urls).toContain(
+      `${API_BASE_URL}/webhooks/${APPLICATION_ID}/interaction-token/messages/@original`,
+    );
   });
 
   it("opens a daily report settings modal from the settings button", async () => {
@@ -1183,9 +1237,7 @@ describe("sendPriceReportNow", () => {
     expect(priceChangeDescription).toContain(
       "\n__**降價 (1)**__\n**顯示卡**\n**華碩**\n- **-NT$1,010** NT$12,000 -> NT$10,990 [GPU A]",
     );
-    expect(newProductDescription).toContain(
-      "\n**SSD/硬碟**\n**Samsung**\n- **NT$2,490** [SSD B]",
-    );
+    expect(newProductDescription).toContain("\n**SSD/硬碟**\n**Samsung**\n- **NT$2,490** [SSD B]");
     expect(reportMessage?.embeds?.[0]?.fields).toBeUndefined();
     expect(reportMessage?.embeds?.[1]?.fields).toBeUndefined();
     expect(JSON.stringify(reportMessage)).toContain("GPU A");
@@ -1314,11 +1366,13 @@ describe("sendPriceReportNow", () => {
         }),
       ],
     );
-    const sendDirectMessages = vi.fn(async (_discordUserId: string, _messages: DiscordBotMessage[]) => ({
-      status: "sent" as const,
-      messageCount: 1,
-      httpStatuses: [200],
-    }));
+    const sendDirectMessages = vi.fn(
+      async (_discordUserId: string, _messages: DiscordBotMessage[]) => ({
+        status: "sent" as const,
+        messageCount: 1,
+        httpStatuses: [200],
+      }),
+    );
 
     await expect(
       sendDueScheduledPriceReports({
@@ -1341,9 +1395,7 @@ describe("sendPriceReportNow", () => {
       "111122223333444455",
       expect.arrayContaining([
         expect.objectContaining({
-          embeds: [
-            expect.objectContaining({ title: "PartsRadarTW 價格報告 - 價格變動" }),
-          ],
+          embeds: [expect.objectContaining({ title: "PartsRadarTW 價格報告 - 價格變動" })],
         }),
       ]),
     );
@@ -1996,56 +2048,67 @@ function createDiscordBotClient(
       }));
   });
   const settingRows = [...settings];
-  const settingFindFirst = vi.fn(async (args: { where: { enabled?: boolean; nextSendAt?: { not: null } } }) => {
-    const rows = settingRows
-      .filter((setting) => {
+  const settingFindFirst = vi.fn(
+    async (args: { where: { enabled?: boolean; nextSendAt?: { not: null } } }) => {
+      const rows = settingRows
+        .filter((setting) => {
+          if (args.where.enabled !== undefined && setting.enabled !== args.where.enabled) {
+            return false;
+          }
+
+          return !args.where.nextSendAt || setting.nextSendAt !== null;
+        })
+        .sort((left, right) => {
+          return (
+            (left.nextSendAt?.getTime() ?? Number.POSITIVE_INFINITY) -
+              (right.nextSendAt?.getTime() ?? Number.POSITIVE_INFINITY) ||
+            left.id.localeCompare(right.id)
+          );
+        });
+
+      const setting = rows[0];
+
+      return setting ? { nextSendAt: setting.nextSendAt } : null;
+    },
+  );
+  const settingFindMany = vi.fn(
+    async (args: { where: { nextSendAt?: { lte: Date }; enabled?: boolean } }) => {
+      const nextSendAtLte = args.where.nextSendAt?.lte;
+
+      return settingRows.filter((setting) => {
         if (args.where.enabled !== undefined && setting.enabled !== args.where.enabled) {
           return false;
         }
 
-        return !args.where.nextSendAt || setting.nextSendAt !== null;
-      })
-      .sort((left, right) => {
         return (
-          (left.nextSendAt?.getTime() ?? Number.POSITIVE_INFINITY) -
-            (right.nextSendAt?.getTime() ?? Number.POSITIVE_INFINITY) ||
-          left.id.localeCompare(right.id)
+          !nextSendAtLte ||
+          (setting.nextSendAt !== null && setting.nextSendAt.getTime() <= nextSendAtLte.getTime())
         );
       });
-
-    const setting = rows[0];
-
-    return setting ? { nextSendAt: setting.nextSendAt } : null;
+    },
+  );
+  const settingFindUnique = vi.fn(async (args: { where: { discordUserId: string } }) => {
+    return (
+      settingRows.find((setting) => setting.discordUserId === args.where.discordUserId) ?? null
+    );
   });
-  const settingFindMany = vi.fn(async (args: { where: { nextSendAt?: { lte: Date }; enabled?: boolean } }) => {
-    const nextSendAtLte = args.where.nextSendAt?.lte;
+  const settingUpdate = vi.fn(
+    async (args: { where: { id: string }; data: Partial<TestPriceReportSetting> }) => {
+      const setting = settingRows.find((row) => row.id === args.where.id);
 
-    return settingRows.filter((setting) => {
-      if (args.where.enabled !== undefined && setting.enabled !== args.where.enabled) {
-        return false;
+      if (!setting) {
+        throw new Error("Setting not found.");
       }
 
-      return (
-        !nextSendAtLte ||
-        (setting.nextSendAt !== null && setting.nextSendAt.getTime() <= nextSendAtLte.getTime())
-      );
-    });
-  });
-  const settingFindUnique = vi.fn(async (args: { where: { discordUserId: string } }) => {
-    return settingRows.find((setting) => setting.discordUserId === args.where.discordUserId) ?? null;
-  });
-  const settingUpdate = vi.fn(async (args: { where: { id: string }; data: Partial<TestPriceReportSetting> }) => {
-    const setting = settingRows.find((row) => row.id === args.where.id);
-
-    if (!setting) {
-      throw new Error("Setting not found.");
-    }
-
-    Object.assign(setting, args.data);
-    return setting;
-  });
+      Object.assign(setting, args.data);
+      return setting;
+    },
+  );
   const settingUpdateMany = vi.fn(
-    async (args: { where: { discordUserId: string; enabled?: boolean }; data: Partial<TestPriceReportSetting> }) => {
+    async (args: {
+      where: { discordUserId: string; enabled?: boolean };
+      data: Partial<TestPriceReportSetting>;
+    }) => {
       let count = 0;
 
       for (const setting of settingRows) {
@@ -2077,7 +2140,9 @@ function createDiscordBotClient(
       >;
       update: Partial<TestPriceReportSetting>;
     }) => {
-      const existing = settingRows.find((setting) => setting.discordUserId === args.where.discordUserId);
+      const existing = settingRows.find(
+        (setting) => setting.discordUserId === args.where.discordUserId,
+      );
 
       if (existing) {
         Object.assign(existing, args.update);
@@ -2099,13 +2164,13 @@ function createDiscordBotClient(
   const watchRows = [...watches];
   const toWatchRecord = (watch: TestTargetPriceWatch) => toPrismaWatchListRecord(watch, snapshots);
   const watchFindMany = vi.fn(
-    async (args: {
-      where: { discordUserId?: string; enabled?: boolean };
-      take?: number;
-    }) => {
+    async (args: { where: { discordUserId?: string; enabled?: boolean }; take?: number }) => {
       const rows = watchRows
         .filter((watch) => {
-          if (args.where.discordUserId !== undefined && watch.discordUserId !== args.where.discordUserId) {
+          if (
+            args.where.discordUserId !== undefined &&
+            watch.discordUserId !== args.where.discordUserId
+          ) {
             return false;
           }
 
@@ -2113,8 +2178,7 @@ function createDiscordBotClient(
         })
         .sort((left, right) => {
           return (
-            right.updatedAt.getTime() - left.updatedAt.getTime() ||
-            left.id.localeCompare(right.id)
+            right.updatedAt.getTime() - left.updatedAt.getTime() || left.id.localeCompare(right.id)
           );
         })
         .map(toWatchRecord);
@@ -2123,11 +2187,12 @@ function createDiscordBotClient(
     },
   );
   const watchFindFirst = vi.fn(
-    async (args: {
-      where: { discordUserId?: string; productId?: string; enabled?: boolean };
-    }) => {
+    async (args: { where: { discordUserId?: string; productId?: string; enabled?: boolean } }) => {
       const watch = watchRows.find((row) => {
-        if (args.where.discordUserId !== undefined && row.discordUserId !== args.where.discordUserId) {
+        if (
+          args.where.discordUserId !== undefined &&
+          row.discordUserId !== args.where.discordUserId
+        ) {
           return false;
         }
 
@@ -2153,7 +2218,10 @@ function createDiscordBotClient(
           continue;
         }
 
-        if (args.where.discordUserId !== undefined && watch.discordUserId !== args.where.discordUserId) {
+        if (
+          args.where.discordUserId !== undefined &&
+          watch.discordUserId !== args.where.discordUserId
+        ) {
           continue;
         }
 
