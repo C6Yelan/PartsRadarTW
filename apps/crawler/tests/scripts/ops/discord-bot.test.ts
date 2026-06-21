@@ -99,6 +99,7 @@ describe("registerDiscordBotCommands", () => {
       }),
       expect.objectContaining({
         name: "watch",
+        description: "設定與管理商品目標價格，集中查看目前價格及追蹤狀態。",
         contexts: [0, 1],
         dm_permission: true,
       }),
@@ -320,8 +321,8 @@ describe("handleDiscordInteraction", () => {
     expect(requestBody).toMatchObject({
       embeds: [
         expect.objectContaining({
-          title: "目標價追蹤設定",
-          description: "目前沒有啟用中的目標價追蹤。",
+          title: "商品目標價追蹤",
+          description: expect.stringContaining("目前尚未追蹤任何商品"),
         }),
       ],
       components: [
@@ -366,12 +367,16 @@ describe("handleDiscordInteraction", () => {
       type: 9,
       data: {
         custom_id: "watch:create-modal",
-        title: "新增目標價追蹤",
+        title: "新增商品目標價",
         components: [
           expect.objectContaining({
+            label: "PartsRadarTW 商品",
+            description: expect.stringContaining("商品頁完整網址"),
             component: expect.objectContaining({ custom_id: "watch:product" }),
           }),
           expect.objectContaining({
+            label: "理想入手價格（新台幣）",
+            description: expect.stringContaining("不要加 NT$"),
             component: expect.objectContaining({ custom_id: "watch:target-price" }),
           }),
         ],
@@ -488,7 +493,7 @@ describe("handleDiscordInteraction", () => {
     expect(requestBody).toMatchObject({
       embeds: [
         expect.objectContaining({
-          title: "目標價追蹤設定",
+          title: "商品目標價追蹤",
           description: expect.stringContaining("RTX 5070 測試卡"),
           fields: expect.arrayContaining([
             expect.objectContaining({ name: "目前價格", value: "NT$18,990" }),
@@ -497,7 +502,7 @@ describe("handleDiscordInteraction", () => {
         }),
       ],
     });
-    expect(requestBody.embeds[0].description).toContain("已保存目標價追蹤");
+    expect(requestBody.embeds[0].description).toContain("已儲存商品目標價");
   });
 
   it("selects a watch and enables its edit and remove actions", async () => {
@@ -526,7 +531,7 @@ describe("handleDiscordInteraction", () => {
     expect(requestBody).toMatchObject({
       embeds: [
         expect.objectContaining({
-          title: "目標價追蹤設定",
+          title: "商品目標價追蹤",
           description: expect.stringContaining("RTX 5070 測試卡"),
         }),
       ],
@@ -577,9 +582,11 @@ describe("handleDiscordInteraction", () => {
       type: 9,
       data: {
         custom_id: `watch:edit-modal:${WATCH_ROW_ID}:0`,
-        title: "編輯目標價格",
+        title: "修改商品目標價",
         components: [
           expect.objectContaining({
+            label: "新的目標價格（新台幣）",
+            description: expect.stringContaining("只會修改目前選取的商品"),
             component: expect.objectContaining({
               custom_id: "watch:target-price",
               value: "17500",
@@ -609,10 +616,10 @@ describe("handleDiscordInteraction", () => {
 
     expect(client.discordTargetPriceWatch.upsert).not.toHaveBeenCalled();
     const responseBody = String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body);
-    expect(responseBody).toContain("商品欄位需填 PartsRadarTW 商品頁連結或商品 ID");
-    expect(responseBody).toContain("複製網址列的 `/products/...`");
+    expect(responseBody).toContain("PartsRadarTW 商品頁完整網址");
+    expect(responseBody).toContain("網址 `/products/` 後面的商品 ID");
     expect(responseBody).toContain("目標價格需為");
-    expect(responseBody).toContain("純數字");
+    expect(responseBody).toContain("不要輸入 NT$");
   });
 
   it("shows active target price watches in the watch manager", async () => {
@@ -663,8 +670,8 @@ describe("handleDiscordInteraction", () => {
     expect(requestBody).toMatchObject({
       embeds: [
         expect.objectContaining({
-          title: "目標價追蹤設定",
-          description: expect.stringContaining("從選單選擇商品"),
+          title: "商品目標價追蹤",
+          description: expect.stringContaining("記錄商品的理想入手價"),
         }),
       ],
       components: expect.arrayContaining([
@@ -684,6 +691,9 @@ describe("handleDiscordInteraction", () => {
         }),
       ]),
     });
+    expect(requestBody.embeds[0].description).toContain("此設定頁面只有你看得到");
+    expect(requestBody.embeds[0].description).toContain("**使用方式**");
+    expect(requestBody.embeds[0].description).toContain("請從下方選單選擇");
     expect(JSON.stringify(requestBody.embeds)).not.toContain(WATCH_ROW_ID);
   });
 
@@ -829,6 +839,8 @@ describe("handleDiscordInteraction", () => {
         },
       ],
     });
+    expect(requestBody.embeds[0].description).toContain("移除後，這項商品將不再出現在你的追蹤清單");
+    expect(requestBody.embeds[0].footer.text).toContain("商品資料不會被刪除");
     expect(JSON.stringify(requestBody.embeds)).not.toContain(WATCH_ROW_ID);
   });
 
@@ -886,10 +898,10 @@ describe("handleDiscordInteraction", () => {
     });
     const requestBody = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body));
     expect(requestBody.embeds[0]).toMatchObject({
-      title: "目標價追蹤設定",
+      title: "商品目標價追蹤",
       description: expect.stringContaining("已移除目標價追蹤"),
     });
-    expect(requestBody.embeds[0].description).toContain("目前沒有啟用中的目標價追蹤");
+    expect(requestBody.embeds[0].description).toContain("目前尚未追蹤任何商品");
   });
 
   it("refreshes the current watch manager page", async () => {
@@ -910,8 +922,8 @@ describe("handleDiscordInteraction", () => {
     expect(JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body))).toMatchObject({
       embeds: [
         expect.objectContaining({
-          title: "目標價追蹤設定",
-          description: "目前沒有啟用中的目標價追蹤。",
+          title: "商品目標價追蹤",
+          description: expect.stringContaining("目前尚未追蹤任何商品"),
         }),
       ],
     });

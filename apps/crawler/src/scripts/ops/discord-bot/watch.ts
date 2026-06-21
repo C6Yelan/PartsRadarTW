@@ -30,6 +30,11 @@ const WATCH_SELECT_VALUE_PREFIX = "watch:";
 const WATCH_MANAGER_PAGE_SIZE = 25;
 const WATCH_SELECT_LABEL_MAX_LENGTH = 100;
 const WATCH_SELECT_DESCRIPTION_MAX_LENGTH = 100;
+const WATCH_MANAGER_GUIDE =
+  "此功能用來記錄商品的理想入手價，並集中比較目前價格與目標價；目前價格會隨 PartsRadarTW 資料更新。此設定頁面只有你看得到。\n\n" +
+  "**使用方式**\n" +
+  "1. 按「新增追蹤」，貼上 PartsRadarTW 商品頁網址並填寫目標價。\n" +
+  "2. 從下方選單選擇既有商品，即可修改目標價或移除追蹤。";
 
 const TARGET_PRICE_WATCH_PRODUCT_SELECT = {
   id: true,
@@ -418,19 +423,20 @@ export function createTargetPriceWatchResponseMessage({
 }): DiscordBotMessage {
   if (result.status === "invalid_product_reference") {
     return {
-      content: "請輸入 PartsRadarTW 商品 ID 或商品頁 URL。",
+      content:
+        "無法辨識商品。請貼上 PartsRadarTW 商品頁完整網址，或輸入網址 `/products/` 後面的商品 ID。",
     };
   }
 
   if (result.status === "invalid_target_price") {
     return {
-      content: `目標價格需為 1-${MAX_TARGET_PRICE.toLocaleString("en-US")} 的整數。`,
+      content: `目標價格需為 1-${MAX_TARGET_PRICE.toLocaleString("en-US")} 的新台幣整數，請不要輸入 NT$、逗號或空格。`,
     };
   }
 
   if (result.status === "product_not_found") {
     return {
-      content: "找不到可追蹤的商品。請確認商品 ID 或 PartsRadarTW 商品頁 URL 是否正確。",
+      content: "找不到可追蹤的商品。請確認商品頁網址或商品 ID 正確，且該商品目前仍有價格資料。",
     };
   }
 
@@ -443,7 +449,7 @@ export function createTargetPriceWatchResponseMessage({
   return {
     embeds: [
       {
-        title: "已保存目標價追蹤",
+        title: "已儲存商品目標價",
         description: `[${escapeMarkdownLinkText(productName)}](${createProductUrl(
           publicBaseUrl,
           result.product.id,
@@ -461,7 +467,7 @@ export function createTargetPriceWatchResponseMessage({
             inline: true,
           },
           {
-            name: "狀態",
+            name: "追蹤狀態",
             value: status,
           },
         ],
@@ -486,14 +492,16 @@ export function createTargetPriceWatchManagerMessage({
 }): DiscordBotMessage {
   const selectedWatchId = normalizeWatchId(selectedWatchInput);
   const selectedWatch = result.watches.find((watch) => watch.id === selectedWatchId) ?? null;
-  const managerDescription = selectedWatch
-    ? `[${escapeMarkdownLinkText(
+  const managerState = selectedWatch
+    ? `**目前選取的商品**\n[${escapeMarkdownLinkText(
         formatDiscordBotText(selectedWatch.product.name, PRODUCT_NAME_MAX_LENGTH),
-      )}](${createProductUrl(publicBaseUrl, selectedWatch.product.id)})`
+      )}](${createProductUrl(publicBaseUrl, selectedWatch.product.id)})\n\n可使用下方按鈕修改目標價或移除追蹤。`
     : result.watches.length > 0
-      ? "從選單選擇商品後，即可編輯目標價格或移除追蹤。"
-      : "目前沒有啟用中的目標價追蹤。";
-  const description = notice ? `**${notice}**\n\n${managerDescription}` : managerDescription;
+      ? "**你的追蹤清單**\n請從下方選單選擇要查看或管理的商品。"
+      : "**你的追蹤清單**\n目前尚未追蹤任何商品，請按「新增追蹤」開始設定。";
+  const description = [notice ? `**${notice}**` : null, WATCH_MANAGER_GUIDE, managerState]
+    .filter((section): section is string => section !== null)
+    .join("\n\n");
   const components: NonNullable<DiscordBotMessage["components"]> = [];
 
   if (result.watches.length > 0) {
@@ -575,7 +583,7 @@ export function createTargetPriceWatchManagerMessage({
   return {
     embeds: [
       {
-        title: "目標價追蹤設定",
+        title: "商品目標價追蹤",
         description,
         color: DISCORD_EMBED_COLOR,
         fields: selectedWatch ? formatWatchSummaryFields(selectedWatch) : undefined,
@@ -599,13 +607,13 @@ export function createTargetPriceWatchRemovalConfirmationMessage({
 }): DiscordBotMessage {
   if (result.status === "invalid_reference") {
     return {
-      content: "無法辨識要移除的追蹤項目，請重新執行 `/watch`。",
+      content: "無法辨識要移除的商品，請重新執行 `/watch` 並從清單選擇。",
     };
   }
 
   if (result.status === "not_found") {
     return {
-      content: "找不到啟用中的目標價追蹤，請重新執行 `/watch`。",
+      content: "這項追蹤可能已被移除，請重新執行 `/watch` 取得最新清單。",
     };
   }
 
@@ -615,14 +623,14 @@ export function createTargetPriceWatchRemovalConfirmationMessage({
     embeds: [
       {
         title: "確認移除目標價追蹤",
-        description: `[${escapeMarkdownLinkText(productName)}](${createProductUrl(
+        description: `你即將移除以下商品的目標價追蹤：\n\n[${escapeMarkdownLinkText(productName)}](${createProductUrl(
           publicBaseUrl,
           result.watch.product.id,
-        )})`,
+        )})\n\n移除後，這項商品將不再出現在你的追蹤清單。`,
         color: DISCORD_EMBED_COLOR,
         fields: formatWatchSummaryFields(result.watch),
         footer: {
-          text: "按下確認後才會移除追蹤。",
+          text: "商品資料不會被刪除；按下「確認移除」後才會生效。",
         },
       },
     ],
@@ -725,7 +733,7 @@ function formatWatchSummaryFields(watch: TargetPriceWatchListRecord): Array<{
       inline: true,
     },
     {
-      name: "狀態",
+      name: "追蹤狀態",
       value: formatWatchStatus({
         currentPrice,
         targetPrice: watch.targetPrice,
@@ -748,14 +756,16 @@ function formatWatchStatus({
   lastNotifiedAt: Date | null;
 }): string {
   if (currentPrice === null) {
-    return "待更新";
+    return "等待商品價格資料更新。";
   }
 
   if (currentPrice <= targetPrice) {
-    return lastNotifiedAt ? "已達標並通知" : "已達標";
+    return lastNotifiedAt
+      ? "已達到目標價格，且已發送通知。"
+      : "已達到目標價格；目前價格低於或等於目標價。";
   }
 
-  return `尚差 ${formatTaiwanDollar(currentPrice - targetPrice, currency)}`;
+  return `尚未達標；目前價格仍高於目標價 ${formatTaiwanDollar(currentPrice - targetPrice, currency)}。`;
 }
 
 function extractProductIdFromPath(value: string): string | null {

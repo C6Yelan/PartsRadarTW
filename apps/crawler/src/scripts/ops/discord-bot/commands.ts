@@ -95,7 +95,7 @@ export function createPriceReportCommand(): Record<string, unknown> {
 export function createWatchCommand(): Record<string, unknown> {
   return {
     name: "watch",
-    description: "Manage your PartsRadarTW target price alerts.",
+    description: "設定與管理商品目標價格，集中查看目前價格及追蹤狀態。",
     type: DISCORD_COMMAND_TYPE_CHAT_INPUT,
     contexts: [DISCORD_APPLICATION_CONTEXT_GUILD, DISCORD_APPLICATION_CONTEXT_BOT_DM],
     dm_permission: true,
@@ -256,12 +256,12 @@ export function createWatchModal({
 } = {}): DiscordModal {
   return {
     custom_id: WATCH_CREATE_MODAL_CUSTOM_ID,
-    title: "新增目標價追蹤",
+    title: "新增商品目標價",
     components: [
       {
         type: DISCORD_COMPONENT_TYPE_LABEL,
-        label: "商品連結或商品 ID",
-        description: "到 PartsRadarTW 商品頁按分享/複製連結，或複製網址列的 /products/...。",
+        label: "PartsRadarTW 商品",
+        description: "貼上商品頁完整網址，或輸入網址 /products/ 後面的商品 ID。",
         component: {
           type: DISCORD_COMPONENT_TYPE_TEXT_INPUT,
           custom_id: WATCH_PRODUCT_CUSTOM_ID,
@@ -275,8 +275,8 @@ export function createWatchModal({
       },
       {
         type: DISCORD_COMPONENT_TYPE_LABEL,
-        label: "目標價格",
-        description: "輸入希望提醒的價格，純數字即可，不要加 NT$、逗號或空格。",
+        label: "理想入手價格（新台幣）",
+        description: "輸入希望入手的價格，只填整數，不要加 NT$、逗號或空格。",
         component: {
           type: DISCORD_COMPONENT_TYPE_TEXT_INPUT,
           custom_id: WATCH_TARGET_PRICE_CUSTOM_ID,
@@ -303,12 +303,12 @@ export function createWatchEditModal({
 }): DiscordModal {
   return {
     custom_id: `${WATCH_EDIT_MODAL_CUSTOM_ID_PREFIX}${watchId}:${page}`,
-    title: "編輯目標價格",
+    title: "修改商品目標價",
     components: [
       {
         type: DISCORD_COMPONENT_TYPE_LABEL,
-        label: "新目標價格",
-        description: "只修改目前選取商品的目標價格，請輸入純數字。",
+        label: "新的目標價格（新台幣）",
+        description: "只會修改目前選取的商品；請填整數，不要加 NT$、逗號或空格。",
         component: {
           type: DISCORD_COMPONENT_TYPE_TEXT_INPUT,
           custom_id: WATCH_TARGET_PRICE_CUSTOM_ID,

@@ -479,7 +479,7 @@ async function handleModalSubmitInteraction({
           result,
           publicBaseUrl: options.publicBaseUrl,
           selectedWatchInput: `watch:${createResult.watch.id}`,
-          notice: "已保存目標價追蹤。",
+          notice: "已儲存商品目標價。",
         }),
       });
       return;
@@ -574,10 +574,10 @@ function formatWatchModalValidationMessage(
   const messages = [
     modal.action !== "create" || modal.productInputValid
       ? null
-      : "商品欄位需填 PartsRadarTW 商品頁連結或商品 ID。可到商品頁按分享/複製連結，或複製網址列的 `/products/...`。",
+      : "請貼上 PartsRadarTW 商品頁完整網址，或輸入網址 `/products/` 後面的商品 ID。",
     modal.targetPriceInputValid
       ? null
-      : `目標價格需為 1-${MAX_TARGET_PRICE.toLocaleString("en-US")} 的整數，請只填純數字。`,
+      : `目標價格需為 1-${MAX_TARGET_PRICE.toLocaleString("en-US")} 的新台幣整數，請不要輸入 NT$、逗號或空格。`,
   ].filter((message): message is string => message !== null);
 
   return messages.join("\n");
