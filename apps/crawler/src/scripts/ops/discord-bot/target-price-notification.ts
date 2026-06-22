@@ -184,7 +184,6 @@ export function createTargetPriceReachedMessage({
   const currentPrice = watch.product.currentPrice?.priceSnapshot.price;
   const currentCurrency = watch.product.currentPrice?.priceSnapshot.currency ?? watch.currency;
   const capturedAt = watch.product.currentPrice?.priceSnapshot.capturedAt;
-  const difference = Math.max(0, watch.targetPrice - (currentPrice ?? watch.targetPrice));
   const productName = formatDiscordBotText(watch.product.name, PRODUCT_NAME_MAX_LENGTH);
 
   return {
@@ -194,7 +193,7 @@ export function createTargetPriceReachedMessage({
         description: `[${escapeMarkdownLinkText(productName)}](${createProductUrl(
           publicBaseUrl,
           watch.product.id,
-        )})\n\n目前價格已低於或等於你設定的目標價。這項追蹤只會通知一次；修改目標價後才會重新啟用通知。`,
+        )})`,
         color: DISCORD_TARGET_PRICE_REACHED_COLOR,
         fields: [
           {
@@ -207,20 +206,12 @@ export function createTargetPriceReachedMessage({
             value: formatCurrency(watch.targetPrice, watch.currency),
             inline: true,
           },
-          {
-            name: "達標差額",
-            value:
-              difference === 0
-                ? "目前價格正好達到目標價。"
-                : `目前價格比目標價低 ${formatCurrency(difference, currentCurrency)}。`,
-          },
         ],
         footer: capturedAt
           ? {
               text: `價格資料時間：${formatTaipeiMinute(capturedAt)}`,
             }
           : undefined,
-        timestamp: capturedAt?.toISOString(),
       },
     ],
   };

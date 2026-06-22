@@ -531,7 +531,7 @@ Bot 目標：
 - 「開啟/修改每日報告」會開啟 modal，要求設定統計區間、最多列出商品數與每日私訊發送時間；`time` 使用台北時間 `HH:mm`。
 - 「關閉每日報告」會直接關閉每日價格報告 DM。
 - `/watch`：開啟 ephemeral 統合管理介面，分頁列出目前 Discord 使用者啟用中的目標價追蹤。使用者可按「新增追蹤」開啟表單，貼 PartsRadarTW 商品頁分享連結、網址列 `/products/<id>` URL 或站內商品 ID，並輸入純數字目標價格；也可從選單挑選既有追蹤後修改目標價，或經確認後移除。每頁最多 25 筆，介面不顯示資料庫 watch ID。
-- Bot daemon 會掃描啟用且尚未通知的 watch；當目前價格與 watch 幣別一致且小於等於目標價時，以 DM embed 發送商品名稱、目前價格、目標價格、差額、站內商品連結與價格資料時間。
+- Bot daemon 會掃描啟用且尚未通知的 watch；當目前價格與 watch 幣別一致且小於等於目標價時，以精簡 DM embed 發送商品名稱、目前價格、目標價格、站內商品連結與單一價格資料時間。
 - 同一 watch 成功發送後只通知一次；修改目標價或重新啟用 watch 會清除通知狀態。發送失敗或 Discord rate limit 不會標記成功，後續掃描仍可重試。
 - 每輪最多處理 25 筆達標 watch，並以 15 分鐘 notification claim lease 避免同時執行的 daemon 重複發送；程序在 claim 後中斷時，逾時 claim 可由後續掃描接手。
 - 每次目標價發送結果會寫入 `discord_notification_deliveries`，`kind=TARGET_PRICE`，供維運檢查成功、失敗與 rate limit 狀態。

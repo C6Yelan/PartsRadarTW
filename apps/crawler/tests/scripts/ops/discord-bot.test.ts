@@ -1228,18 +1228,17 @@ describe("sendDueTargetPriceNotifications", () => {
             description: expect.stringContaining(
               `https://partsradar.test/products/${WATCH_PRODUCT_ID}`,
             ),
-            fields: expect.arrayContaining([
-              expect.objectContaining({ name: "目前價格", value: "NT$15,000" }),
-              expect.objectContaining({ name: "目標價格", value: "NT$17,500" }),
-              expect.objectContaining({
-                name: "達標差額",
-                value: "目前價格比目標價低 NT$2,500。",
-              }),
-            ]),
+            fields: [
+              { name: "目前價格", value: "NT$15,000", inline: true },
+              { name: "目標價格", value: "NT$17,500", inline: true },
+            ],
           }),
         ],
       }),
     ]);
+    expect(sendDirectMessages.mock.calls[0]?.[1][0]?.embeds?.[0]).not.toHaveProperty("timestamp");
+    expect(JSON.stringify(sendDirectMessages.mock.calls[0]?.[1])).not.toContain("只會通知一次");
+    expect(JSON.stringify(sendDirectMessages.mock.calls[0]?.[1])).not.toContain("達標差額");
     expect(client.discordNotificationDelivery.create).toHaveBeenCalledWith({
       data: {
         discordUserId: "111122223333444455",
