@@ -40,6 +40,11 @@ export {
   sendDiscordRestRequest,
   sendInteractionResponse,
 } from "./discord-bot/rest";
+export type { TargetPriceNotificationSummary } from "./discord-bot/target-price-notification";
+export {
+  createTargetPriceReachedMessage,
+  sendDueTargetPriceNotifications,
+} from "./discord-bot/target-price-notification";
 export type {
   DiscordBotClient,
   DiscordBotEmbed,

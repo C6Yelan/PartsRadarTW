@@ -531,10 +531,10 @@ Bot 目標：
 - 「開啟/修改每日報告」會開啟 modal，要求設定統計區間、最多列出商品數與每日私訊發送時間；`time` 使用台北時間 `HH:mm`。
 - 「關閉每日報告」會直接關閉每日價格報告 DM。
 - `/watch`：開啟 ephemeral 統合管理介面，分頁列出目前 Discord 使用者啟用中的目標價追蹤。使用者可按「新增追蹤」開啟表單，貼 PartsRadarTW 商品頁分享連結、網址列 `/products/<id>` URL 或站內商品 ID，並輸入純數字目標價格；也可從選單挑選既有追蹤後修改目標價，或經確認後移除。每頁最多 25 筆，介面不顯示資料庫 watch ID。
-
-尚未實作：
-
-- 目標價達標 DM worker。
+- Bot daemon 會掃描啟用且尚未通知的 watch；當目前價格與 watch 幣別一致且小於等於目標價時，以 DM embed 發送商品名稱、目前價格、目標價格、差額、站內商品連結與價格資料時間。
+- 同一 watch 成功發送後只通知一次；修改目標價或重新啟用 watch 會清除通知狀態。發送失敗或 Discord rate limit 不會標記成功，後續掃描仍可重試。
+- 每輪最多處理 25 筆達標 watch，並以 15 分鐘 notification claim lease 避免同時執行的 daemon 重複發送；程序在 claim 後中斷時，逾時 claim 可由後續掃描接手。
+- 每次目標價發送結果會寫入 `discord_notification_deliveries`，`kind=TARGET_PRICE`，供維運檢查成功、失敗與 rate limit 狀態。
 
 目前設定：
 
@@ -543,7 +543,7 @@ Bot 目標：
 - `DISCORD_BOT_REGISTER_COMMANDS_ON_START`：daemon 啟動時是否註冊 slash command，預設 `true`。
 - `DISCORD_PRICE_REPORT_MAX_ITEMS`：`/price-report now` 最多列出的商品數，預設 50。
 - `DISCORD_BOT_COMMAND_COOLDOWN_SECONDS`：每位使用者手動指令 cooldown，預設 60。
-- `DISCORD_PRICE_REPORT_SCHEDULE_INTERVAL_SECONDS`：bot daemon 的 fallback 掃描上限，預設 300，允許 60 到 3600。每輪處理後會讀取下一筆啟用中的 `nextSendAt`；若時間早於此上限，daemon 會睡到該 due time 附近才醒來，最短 sleep 為 1 秒，避免高頻輪詢。
+- `DISCORD_PRICE_REPORT_SCHEDULE_INTERVAL_SECONDS`：bot daemon 的目標價掃描間隔與每日報告 fallback 掃描上限，預設 300 秒，允許 60 到 3600。每日報告若有更早的 `nextSendAt`，daemon 會睡到該 due time 附近才醒來；目標價仍依設定間隔掃描，最短 sleep 為 1 秒，避免高頻輪詢。
 
 啟動：
 
@@ -573,7 +573,7 @@ docker compose --profile discord-bot run --rm discord-bot \
 
 安全邊界：
 
-- `/price-report now` 只產生全站價格報告，可在指令所在頻道或私訊回覆；每日提醒與未來含個人追蹤清單或目標價設定的通知不得在公開頻道暴露。
+- `/price-report now` 只產生全站價格報告，可在指令所在頻道或私訊回覆；每日提醒與目標價達標通知只使用 DM，不得在公開頻道暴露個人追蹤資料。
 - Bot 只保存 Discord user id 與必要偏好，不建立網站帳號。
 - Bot token 只能放在 untracked `.env` 或部署 secret。
 - Bot 訊息不得包含 iBuy token、來源購買 URL、raw HTML、crawler error detail、DB/internal URL、raw IP 或 internal headers。

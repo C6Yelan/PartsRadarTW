@@ -246,21 +246,23 @@ model DiscordPriceReportSetting {
 }
 
 model DiscordTargetPriceWatch {
-  id             String                         @id @default(uuid()) @db.Uuid
-  discordUserId  String                         @map("discord_user_id") @db.Text
-  productId      String                         @map("product_id") @db.Uuid
-  product        Product                        @relation(fields: [productId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  targetPrice    Int                            @map("target_price")
-  currency       Currency                       @default(TWD)
-  enabled        Boolean                        @default(true)
-  lastNotifiedAt DateTime?                      @map("last_notified_at") @db.Timestamptz(6)
-  createdAt      DateTime                       @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime                       @updatedAt @map("updated_at") @db.Timestamptz(6)
-  deliveries     DiscordNotificationDelivery[]
+  id                    String                        @id @default(uuid()) @db.Uuid
+  discordUserId         String                        @map("discord_user_id") @db.Text
+  productId             String                        @map("product_id") @db.Uuid
+  product               Product                       @relation(fields: [productId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  targetPrice           Int                           @map("target_price")
+  currency              Currency                      @default(TWD)
+  enabled               Boolean                       @default(true)
+  lastNotifiedAt        DateTime?                     @map("last_notified_at") @db.Timestamptz(6)
+  notificationClaimedAt DateTime?                     @map("notification_claimed_at") @db.Timestamptz(6)
+  createdAt             DateTime                      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime                      @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deliveries            DiscordNotificationDelivery[]
 
   @@unique([discordUserId, productId], map: "discord_target_price_watches_discord_user_id_product_id_key")
   @@index([discordUserId, enabled], map: "discord_target_price_watches_user_enabled_idx")
   @@index([productId, enabled], map: "discord_target_price_watches_product_enabled_idx")
+  @@index([enabled, lastNotifiedAt, notificationClaimedAt], map: "discord_target_price_watches_notification_due_idx")
   @@map("discord_target_price_watches")
 }
 

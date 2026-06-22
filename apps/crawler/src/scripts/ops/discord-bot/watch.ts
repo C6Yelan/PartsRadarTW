@@ -219,6 +219,7 @@ export async function createTargetPriceWatch({
       currency,
       enabled: true,
       lastNotifiedAt: null,
+      notificationClaimedAt: null,
     },
     select: TARGET_PRICE_WATCH_SELECT,
   });
@@ -331,6 +332,7 @@ export async function updateTargetPriceWatch({
     data: {
       targetPrice,
       lastNotifiedAt: null,
+      notificationClaimedAt: null,
     },
   });
 

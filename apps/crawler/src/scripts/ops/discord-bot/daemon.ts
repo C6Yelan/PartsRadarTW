@@ -10,6 +10,7 @@ import {
 } from "./price-report";
 import { registerDiscordBotCommands } from "./registration";
 import { formatDiscordRestFailure, sendDiscordDirectMessages } from "./rest";
+import { sendDueTargetPriceNotifications } from "./target-price-notification";
 import type {
   DiscordBotClient,
   DiscordBotOptions,
@@ -52,7 +53,7 @@ export async function runDiscordBotDaemon({
 
   const shutdown = createShutdownController(logMessage);
   const cooldowns = new CommandCooldowns(options.commandCooldownSeconds);
-  const scheduledReportLoop = runScheduledPriceReportLoop({
+  const notificationLoop = runNotificationLoop({
     client,
     options,
     shutdown,
@@ -79,11 +80,11 @@ export async function runDiscordBotDaemon({
     }
   }
 
-  await scheduledReportLoop;
+  await notificationLoop;
   logMessage("Discord bot daemon stopped.");
 }
 
-async function runScheduledPriceReportLoop({
+async function runNotificationLoop({
   client,
   options,
   shutdown,
@@ -96,8 +97,40 @@ async function runScheduledPriceReportLoop({
   fetchImpl: FetchImpl;
   logMessage: (message: string) => void;
 }): Promise<void> {
+  const scanIntervalMs = options.priceReportScheduleIntervalSeconds * 1000;
+  let nextTargetPriceScanAtMs = 0;
+
   while (!shutdown.requested) {
-    let nextSleepMs = options.priceReportScheduleIntervalSeconds * 1000;
+    let nextSleepMs = scanIntervalMs;
+    const scanNow = new Date();
+
+    if (scanNow.getTime() >= nextTargetPriceScanAtMs) {
+      try {
+        const summary = await sendDueTargetPriceNotifications({
+          client,
+          publicBaseUrl: options.publicBaseUrl,
+          now: scanNow,
+          sendDirectMessages: (discordUserId, messages) =>
+            sendDiscordDirectMessages({
+              token: options.token,
+              apiBaseUrl: options.apiBaseUrl,
+              userId: discordUserId,
+              messages,
+              fetchImpl,
+            }),
+        });
+
+        if (summary.processedCount > 0) {
+          logMessage(
+            `Target price notifications processed. processed=${summary.processedCount} sent=${summary.sentCount} rateLimited=${summary.rateLimitedCount} failed=${summary.failedCount}`,
+          );
+        }
+      } catch (error) {
+        logMessage(`Target price notification scan failed: ${toSafeCliErrorMessage(error)}`);
+      } finally {
+        nextTargetPriceScanAtMs = Date.now() + scanIntervalMs;
+      }
+    }
 
     try {
       const now = new Date();
@@ -129,6 +162,8 @@ async function runScheduledPriceReportLoop({
     } catch (error) {
       logMessage(`Scheduled price report loop failed: ${toSafeCliErrorMessage(error)}`);
     }
+
+    nextSleepMs = Math.min(nextSleepMs, Math.max(1000, nextTargetPriceScanAtMs - Date.now()));
 
     await shutdown.sleep(nextSleepMs);
   }
