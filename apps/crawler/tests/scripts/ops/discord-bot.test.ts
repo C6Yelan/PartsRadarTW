@@ -323,7 +323,7 @@ describe("handleDiscordInteraction", () => {
       embeds: [
         expect.objectContaining({
           title: "商品目標價追蹤",
-          description: expect.stringContaining("目前尚未追蹤任何商品"),
+          description: expect.stringContaining("尚未追蹤商品"),
         }),
       ],
       components: [
@@ -673,7 +673,7 @@ describe("handleDiscordInteraction", () => {
       embeds: [
         expect.objectContaining({
           title: "商品目標價追蹤",
-          description: expect.stringContaining("記錄商品的理想入手價"),
+          description: expect.stringContaining("追蹤商品目標價"),
         }),
       ],
       components: expect.arrayContaining([
@@ -693,9 +693,9 @@ describe("handleDiscordInteraction", () => {
         }),
       ]),
     });
-    expect(requestBody.embeds[0].description).toContain("此設定頁面只有你看得到");
+    expect(requestBody.embeds[0].description).toContain("此頁面只有你看得到");
     expect(requestBody.embeds[0].description).toContain("**使用方式**");
-    expect(requestBody.embeds[0].description).toContain("請從下方選單選擇");
+    expect(requestBody.embeds[0].description).toContain("從選單選商品");
     expect(JSON.stringify(requestBody.embeds)).not.toContain(WATCH_ROW_ID);
   });
 
@@ -904,7 +904,7 @@ describe("handleDiscordInteraction", () => {
       title: "商品目標價追蹤",
       description: expect.stringContaining("已移除目標價追蹤"),
     });
-    expect(requestBody.embeds[0].description).toContain("目前尚未追蹤任何商品");
+    expect(requestBody.embeds[0].description).toContain("尚未追蹤商品");
   });
 
   it("refreshes the current watch manager page", async () => {
@@ -926,7 +926,7 @@ describe("handleDiscordInteraction", () => {
       embeds: [
         expect.objectContaining({
           title: "商品目標價追蹤",
-          description: expect.stringContaining("目前尚未追蹤任何商品"),
+          description: expect.stringContaining("尚未追蹤商品"),
         }),
       ],
     });

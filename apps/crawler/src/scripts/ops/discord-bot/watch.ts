@@ -31,10 +31,10 @@ const WATCH_MANAGER_PAGE_SIZE = 25;
 const WATCH_SELECT_LABEL_MAX_LENGTH = 100;
 const WATCH_SELECT_DESCRIPTION_MAX_LENGTH = 100;
 const WATCH_MANAGER_GUIDE =
-  "此功能用來記錄商品的理想入手價，並集中比較目前價格與目標價；目前價格會隨 PartsRadarTW 資料更新。此設定頁面只有你看得到。\n\n" +
+  "追蹤商品目標價，並與目前價格比較；此頁面只有你看得到。\n\n" +
   "**使用方式**\n" +
-  "1. 按「新增追蹤」，貼上 PartsRadarTW 商品頁網址並填寫目標價。\n" +
-  "2. 從下方選單選擇既有商品，即可修改目標價或移除追蹤。";
+  "新增：貼商品頁網址與目標價。\n" +
+  "管理：從選單選商品後編輯或移除。";
 
 const TARGET_PRICE_WATCH_PRODUCT_SELECT = {
   id: true,
@@ -497,10 +497,10 @@ export function createTargetPriceWatchManagerMessage({
   const managerState = selectedWatch
     ? `**目前選取的商品**\n[${escapeMarkdownLinkText(
         formatDiscordBotText(selectedWatch.product.name, PRODUCT_NAME_MAX_LENGTH),
-      )}](${createProductUrl(publicBaseUrl, selectedWatch.product.id)})\n\n可使用下方按鈕修改目標價或移除追蹤。`
+      )}](${createProductUrl(publicBaseUrl, selectedWatch.product.id)})\n\n可編輯目標價或移除追蹤。`
     : result.watches.length > 0
-      ? "**你的追蹤清單**\n請從下方選單選擇要查看或管理的商品。"
-      : "**你的追蹤清單**\n目前尚未追蹤任何商品，請按「新增追蹤」開始設定。";
+      ? "**你的追蹤清單**\n從選單選商品查看或管理。"
+      : "**你的追蹤清單**\n尚未追蹤商品，請按「新增追蹤」。";
   const description = [notice ? `**${notice}**` : null, WATCH_MANAGER_GUIDE, managerState]
     .filter((section): section is string => section !== null)
     .join("\n\n");
