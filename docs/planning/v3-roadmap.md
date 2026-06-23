@@ -39,15 +39,15 @@
 
 Discord bot 第一輪指令：
 
-- `/price-report settings`：查看目前報告設定，並透過按鈕與 modal 開啟、修改或關閉每日價格變動報告 DM；`time` 為台北時間 `HH:mm`。
-- `/price-report now`：立即在指令發出的頻道或私訊 context 產生一次報告，用於驗證設定與手動查看。
+- `/price-report settings`：查看目前報告設定，並透過按鈕與 modal 開啟、修改或關閉每日價格變動報告 DM；可設定統計區間、分類篩選、報告內容類型、上限與台北時間 `HH:mm`。
+- `/price-report now`：立即在指令發出的頻道或私訊 context 產生一次報告，用於驗證設定與手動查看；若已有啟用中的每日設定，未手動覆蓋的選項會沿用該設定。
 - `/watch`：開啟私密的統合管理介面，列出自己的啟用中追蹤；可由同一介面新增追蹤、選取商品後修改目標價，或經確認後移除追蹤。新增表單支援 PartsRadarTW 商品頁分享連結、網址列 `/products/<id>` URL 或站內商品 ID；清單每頁最多 25 筆，使用者不需輸入或查看 watch ID。
 
 價格變動報告第一版限制：
 
 - 第一個實作 slice 只開放每日報告；資料模型保留 `daily`、`every_12h`、`every_6h` 供後續擴充。
 - `window` 只支援 `24h`、`12h`、`6h`。
-- 第一個實作 slice 只支援全站 `all`；`watchlist` scope 等 `/watch` 系列完成後再開放。
+- `scope` 仍只支援全站 `all`；個人化以分類與內容類型篩選處理，不接 `/watch` 清單，避免和單品目標價追蹤耦合。
 - 時區固定 `Asia/Taipei`。
 - 每次最多列 50 筆，超過上限時顯示另有幾筆未列出。
 - 摘要內容以 embed 呈現，只為有資料的「價格變動」或「新增商品」產生 embed；摘要時間、統計數字與價格變動方向標題使用 Markdown emphasis 強化區隔；價格變動先分「降價」與「漲價」，商品列以單行顯示 signed 漲跌金額、舊價、新價、商品名稱與站內商品連結；新增商品以單行顯示目前價格、商品名稱與站內商品連結；小分類已顯示品牌時，商品名稱不重複開頭品牌。
@@ -107,6 +107,7 @@ Discord bot 第一輪指令：
 - public 價格變動清單不包含 secret、raw HTML、DB URL、internal headers、crawler stack trace、parse error raw content 或 raw IP。
 - 公開價格變動清單只列出本輪變價商品名稱、站內商品連結、舊價、新價與差額，並受 `PRICE_CHANGE_DISCORD_MAX_ITEMS` 上限控制。
 - Discord bot 可讓使用者開關個人價格變動報告，並可用 `/price-report now` 在指令所在 context 立即取得報告。
+- 個人價格變動報告可依零件分類與內容類型篩選，且不依賴 `/watch` 清單。
 - Discord bot 可讓使用者建立、查看與取消單品目標價提醒。
 - 目標價達標 DM 有去重，不會每輪 crawler 重複通知同一個已達標 watch。
 - 個人通知不需要網站登入，不在公開頻道暴露個人追蹤清單。

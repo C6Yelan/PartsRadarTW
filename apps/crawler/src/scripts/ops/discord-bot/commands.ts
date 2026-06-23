@@ -34,8 +34,15 @@ const PRICE_REPORT_SETTINGS_OPEN_CUSTOM_ID = "price-report:settings:open";
 const PRICE_REPORT_SETTINGS_DISABLE_CUSTOM_ID = "price-report:settings:disable";
 const PRICE_REPORT_SETTINGS_MODAL_CUSTOM_ID = "price-report:settings:modal";
 const PRICE_REPORT_SETTINGS_WINDOW_CUSTOM_ID = "price-report:settings:window";
+const PRICE_REPORT_SETTINGS_CATEGORIES_CUSTOM_ID = "price-report:settings:categories";
+const PRICE_REPORT_SETTINGS_EVENTS_CUSTOM_ID = "price-report:settings:events";
 const PRICE_REPORT_SETTINGS_MAX_ITEMS_CUSTOM_ID = "price-report:settings:max-items";
 const PRICE_REPORT_SETTINGS_TIME_CUSTOM_ID = "price-report:settings:time";
+const PRICE_REPORT_ALL_CATEGORIES_VALUE = "all";
+const PRICE_REPORT_EVENT_PRICE_DROPS_VALUE = "price_drops";
+const PRICE_REPORT_EVENT_PRICE_RISES_VALUE = "price_rises";
+const PRICE_REPORT_EVENT_NEW_PRODUCTS_VALUE = "new_products";
+const PRICE_REPORT_CATEGORY_OPTION_LIMIT = 25;
 const WATCH_CREATE_MODAL_CUSTOM_ID = "watch:create-modal";
 const WATCH_EDIT_MODAL_CUSTOM_ID_PREFIX = "watch:edit-modal:";
 const WATCH_PRODUCT_CUSTOM_ID = "watch:product";
@@ -123,7 +130,7 @@ export function parsePriceReportInteraction(
   if (subcommand.name === "now") {
     return {
       name: subcommand.name,
-      windowHours: parseWindowHours(windowOption?.value),
+      windowHours: windowOption ? parseWindowHours(windowOption.value) : null,
       maxItems: parseMaxItems(maxItemsOption?.value),
     };
   }
@@ -350,11 +357,35 @@ export function createPriceReportSettingsModal({
   windowHours,
   maxItems,
   timeValue,
+  categories,
+  categoryIgrps,
+  includePriceDrops,
+  includePriceRises,
+  includeNewProducts,
 }: {
   windowHours: number;
   maxItems: number;
   timeValue: string;
+  categories: Array<{ igrp: number; displayName: string }>;
+  categoryIgrps: number[];
+  includePriceDrops: boolean;
+  includePriceRises: boolean;
+  includeNewProducts: boolean;
 }): DiscordModal {
+  const selectedCategoryIgrps = new Set(categoryIgrps);
+  const categoryOptions = [
+    {
+      label: "全部分類",
+      value: PRICE_REPORT_ALL_CATEGORIES_VALUE,
+      default: selectedCategoryIgrps.size === 0,
+    },
+    ...categories.slice(0, PRICE_REPORT_CATEGORY_OPTION_LIMIT - 1).map((category) => ({
+      label: category.displayName,
+      value: String(category.igrp),
+      default: selectedCategoryIgrps.has(category.igrp),
+    })),
+  ];
+
   return {
     custom_id: PRICE_REPORT_SETTINGS_MODAL_CUSTOM_ID,
     title: "每日價格報告設定",
@@ -381,6 +412,51 @@ export function createPriceReportSettingsModal({
               label: "過去 6 小時",
               value: "6h",
               default: windowHours === 6,
+            },
+          ],
+        },
+      },
+      {
+        type: DISCORD_COMPONENT_TYPE_LABEL,
+        label: "分類篩選",
+        description: "選「全部分類」或勾選想看的零件分類。",
+        component: {
+          type: DISCORD_COMPONENT_TYPE_STRING_SELECT,
+          custom_id: PRICE_REPORT_SETTINGS_CATEGORIES_CUSTOM_ID,
+          required: true,
+          min_values: 1,
+          max_values: Math.min(
+            PRICE_REPORT_CATEGORY_OPTION_LIMIT,
+            Math.max(1, categoryOptions.length),
+          ),
+          options: categoryOptions,
+        },
+      },
+      {
+        type: DISCORD_COMPONENT_TYPE_LABEL,
+        label: "報告內容",
+        description: "至少選一種。",
+        component: {
+          type: DISCORD_COMPONENT_TYPE_STRING_SELECT,
+          custom_id: PRICE_REPORT_SETTINGS_EVENTS_CUSTOM_ID,
+          required: true,
+          min_values: 1,
+          max_values: 3,
+          options: [
+            {
+              label: "降價",
+              value: PRICE_REPORT_EVENT_PRICE_DROPS_VALUE,
+              default: includePriceDrops,
+            },
+            {
+              label: "漲價",
+              value: PRICE_REPORT_EVENT_PRICE_RISES_VALUE,
+              default: includePriceRises,
+            },
+            {
+              label: "新增商品",
+              value: PRICE_REPORT_EVENT_NEW_PRODUCTS_VALUE,
+              default: includeNewProducts,
             },
           ],
         },
@@ -452,12 +528,22 @@ export function parsePriceReportModalSubmit(
     interaction.data.components,
     PRICE_REPORT_SETTINGS_MAX_ITEMS_CUSTOM_ID,
   );
+  const categoryValues = readSubmittedComponentValues(
+    interaction.data.components,
+    PRICE_REPORT_SETTINGS_CATEGORIES_CUSTOM_ID,
+  );
+  const eventValues = readSubmittedComponentValues(
+    interaction.data.components,
+    PRICE_REPORT_SETTINGS_EVENTS_CUSTOM_ID,
+  );
   const timeValue = readSubmittedComponentValue(
     interaction.data.components,
     PRICE_REPORT_SETTINGS_TIME_CUSTOM_ID,
   );
   const windowHours = parseWindowHoursStrict(windowValue);
   const maxItems = parseMaxItemsInput(maxItemsValue);
+  const categoryIgrps = parseCategoryIgrps(categoryValues);
+  const events = parsePriceReportEvents(eventValues);
   const timeOfDay = parseTimeOfDay(timeValue);
 
   return {
@@ -465,6 +551,12 @@ export function parsePriceReportModalSubmit(
     windowInputValid: windowHours !== null,
     maxItems,
     maxItemsInputValid: maxItems !== null,
+    categoryIgrps: categoryIgrps ?? [],
+    categoryInputValid: categoryIgrps !== null,
+    includePriceDrops: events?.includePriceDrops ?? true,
+    includePriceRises: events?.includePriceRises ?? true,
+    includeNewProducts: events?.includeNewProducts ?? true,
+    eventInputValid: events !== null,
     timeOfDay,
     timeInputValid: timeOfDay !== null,
   };
@@ -559,6 +651,57 @@ function parseMaxItemsInput(value: unknown): number | null {
     : null;
 }
 
+function parseCategoryIgrps(values: unknown[]): number[] | null {
+  if (values.length === 0 || values.includes(PRICE_REPORT_ALL_CATEGORIES_VALUE)) {
+    return [];
+  }
+
+  const parsed: number[] = [];
+
+  for (const value of values) {
+    if (typeof value !== "string" || !/^[1-9][0-9]*$/.test(value)) {
+      return null;
+    }
+
+    const igrp = Number(value);
+
+    if (!Number.isSafeInteger(igrp)) {
+      return null;
+    }
+
+    if (!parsed.includes(igrp)) {
+      parsed.push(igrp);
+    }
+  }
+
+  return parsed;
+}
+
+function parsePriceReportEvents(values: unknown[]): {
+  includePriceDrops: boolean;
+  includePriceRises: boolean;
+  includeNewProducts: boolean;
+} | null {
+  const validValues = new Set([
+    PRICE_REPORT_EVENT_PRICE_DROPS_VALUE,
+    PRICE_REPORT_EVENT_PRICE_RISES_VALUE,
+    PRICE_REPORT_EVENT_NEW_PRODUCTS_VALUE,
+  ]);
+
+  if (
+    values.length === 0 ||
+    values.some((value) => typeof value !== "string" || !validValues.has(value))
+  ) {
+    return null;
+  }
+
+  return {
+    includePriceDrops: values.includes(PRICE_REPORT_EVENT_PRICE_DROPS_VALUE),
+    includePriceRises: values.includes(PRICE_REPORT_EVENT_PRICE_RISES_VALUE),
+    includeNewProducts: values.includes(PRICE_REPORT_EVENT_NEW_PRODUCTS_VALUE),
+  };
+}
+
 function parseTargetPriceInput(value: unknown): number | null {
   if (typeof value !== "string" || !/^(0|[1-9][0-9]*)$/.test(value.trim())) {
     return null;
@@ -613,4 +756,31 @@ function readSubmittedComponentValue(
   }
 
   return undefined;
+}
+
+function readSubmittedComponentValues(
+  components: DiscordInteractionComponent[] | undefined,
+  customId: string,
+): unknown[] {
+  for (const component of components ?? []) {
+    if (component.custom_id === customId) {
+      return component.values ?? (component.value === undefined ? [] : [component.value]);
+    }
+
+    if (component.component) {
+      const values = readSubmittedComponentValues([component.component], customId);
+
+      if (values.length > 0) {
+        return values;
+      }
+    }
+
+    const values = readSubmittedComponentValues(component.components, customId);
+
+    if (values.length > 0) {
+      return values;
+    }
+  }
+
+  return [];
 }

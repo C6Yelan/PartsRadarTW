@@ -2,12 +2,12 @@
 
 import type { DiscordPriceReportSetting } from "@partsradar/db";
 import {
-  readRecentPriceReport,
   type PriceChangeDiscordNotificationItem,
   type PriceReportNewProductItem,
   type PriceReportProductCategory,
   type PriceReportProductSubcategory,
   type RecentPriceReport,
+  readRecentPriceReport,
 } from "../price-change-discord-notification";
 import {
   DAY_MS,
@@ -34,12 +34,32 @@ import type {
 const TAIPEI_UTC_OFFSET_MS = 8 * HOUR_MS;
 const DISCORD_MESSAGE_MAX_EMBEDS = 10;
 
+export interface PriceReportCategoryOption {
+  igrp: number;
+  displayName: string;
+}
+
+export interface PriceReportFilters {
+  categoryIgrps: number[];
+  includePriceDrops: boolean;
+  includePriceRises: boolean;
+  includeNewProducts: boolean;
+}
+
+const DEFAULT_PRICE_REPORT_FILTERS: PriceReportFilters = {
+  categoryIgrps: [],
+  includePriceDrops: true,
+  includePriceRises: true,
+  includeNewProducts: true,
+};
+
 export async function sendPriceReportNow({
   client,
   discordUserId,
   windowHours,
   maxItems,
   publicBaseUrl,
+  filters = DEFAULT_PRICE_REPORT_FILTERS,
   now = new Date(),
   sendReportMessages,
 }: {
@@ -48,6 +68,7 @@ export async function sendPriceReportNow({
   windowHours: number;
   maxItems: number;
   publicBaseUrl: string;
+  filters?: PriceReportFilters;
   now?: Date;
   sendReportMessages: (messages: DiscordBotMessage[]) => Promise<DiscordBotMessageSendResult>;
 }): Promise<PriceReportNowResult> {
@@ -57,6 +78,7 @@ export async function sendPriceReportNow({
     windowHours,
     maxItems,
     publicBaseUrl,
+    filters,
     now,
     deliveryKind: "PRICE_REPORT_NOW",
     sendReportMessages,
@@ -69,6 +91,7 @@ async function sendPriceReport({
   windowHours,
   maxItems,
   publicBaseUrl,
+  filters,
   now,
   deliveryKind,
   sendReportMessages,
@@ -78,13 +101,19 @@ async function sendPriceReport({
   windowHours: number;
   maxItems: number;
   publicBaseUrl: string;
+  filters: PriceReportFilters;
   now: Date;
   deliveryKind: "PRICE_REPORT_NOW" | "SCHEDULED_PRICE_REPORT";
   sendReportMessages: (messages: DiscordBotMessage[]) => Promise<DiscordBotMessageSendResult>;
 }): Promise<PriceReportNowResult> {
   const since = new Date(now.getTime() - windowHours * HOUR_MS);
   const boundedMaxItems = clampPriceReportMaxItems(maxItems);
-  const report = await readRecentPriceReport(client, { since, until: now });
+  const normalizedFilters = normalizePriceReportFilters(filters);
+  const report = await readRecentPriceReport(client, {
+    since,
+    until: now,
+    filters: normalizedFilters,
+  });
   const listedCount = Math.min(
     report.priceChanges.length + report.newProducts.length,
     boundedMaxItems,
@@ -94,6 +123,7 @@ async function sendPriceReport({
     maxItems: boundedMaxItems,
     windowHours,
     generatedAt: now,
+    hasActiveFilters: hasActivePriceReportFilters(normalizedFilters),
   });
   const result = await sendReportMessages(messages);
 
@@ -148,6 +178,10 @@ export async function enableDailyPriceReport({
   discordUserId,
   windowHours,
   maxItems,
+  categoryIgrps = [],
+  includePriceDrops = true,
+  includePriceRises = true,
+  includeNewProducts = true,
   timeOfDay = null,
   now = new Date(),
 }: {
@@ -155,10 +189,20 @@ export async function enableDailyPriceReport({
   discordUserId: string;
   windowHours: number;
   maxItems: number;
+  categoryIgrps?: number[];
+  includePriceDrops?: boolean;
+  includePriceRises?: boolean;
+  includeNewProducts?: boolean;
   timeOfDay?: PriceReportTimeOfDay | null;
   now?: Date;
 }): Promise<DiscordPriceReportSetting> {
   const nextSendAt = calculateNextSendAt(now, "DAILY", timeOfDay);
+  const filters = normalizePriceReportFilters({
+    categoryIgrps,
+    includePriceDrops,
+    includePriceRises,
+    includeNewProducts,
+  });
 
   return client.discordPriceReportSetting.upsert({
     where: {
@@ -171,6 +215,10 @@ export async function enableDailyPriceReport({
       scope: "ALL",
       timezone: TIME_ZONE,
       maxItems: clampPriceReportMaxItems(maxItems),
+      categoryIgrps: filters.categoryIgrps,
+      includePriceDrops: filters.includePriceDrops,
+      includePriceRises: filters.includePriceRises,
+      includeNewProducts: filters.includeNewProducts,
       enabled: true,
       nextSendAt,
     },
@@ -180,6 +228,10 @@ export async function enableDailyPriceReport({
       scope: "ALL",
       timezone: TIME_ZONE,
       maxItems: clampPriceReportMaxItems(maxItems),
+      categoryIgrps: filters.categoryIgrps,
+      includePriceDrops: filters.includePriceDrops,
+      includePriceRises: filters.includePriceRises,
+      includeNewProducts: filters.includeNewProducts,
       enabled: true,
       nextSendAt,
     },
@@ -233,6 +285,7 @@ export async function sendDueScheduledPriceReports({
       windowHours: toWindowHours(setting.window),
       maxItems: clampPriceReportMaxItems(Math.min(setting.maxItems, options.priceReportMaxItems)),
       publicBaseUrl: options.publicBaseUrl,
+      filters: toPriceReportFilters(setting),
       now,
       deliveryKind: "SCHEDULED_PRICE_REPORT",
       sendReportMessages: (messages) => sendDirectMessages(setting.discordUserId, messages),
@@ -336,6 +389,23 @@ export async function readPriceReportSetting({
   });
 }
 
+export async function readPriceReportCategories({
+  client,
+}: {
+  client: DiscordBotClient;
+}): Promise<PriceReportCategoryOption[]> {
+  return client.sourceCategory.findMany({
+    where: {
+      enabled: true,
+    },
+    select: {
+      igrp: true,
+      displayName: true,
+    },
+    orderBy: [{ igrp: "asc" }, { displayName: "asc" }],
+  });
+}
+
 async function recordPriceReportDelivery({
   client,
   discordUserId,
@@ -375,6 +445,7 @@ function createPersonalPriceReportEmbedMessages(
     maxItems: number;
     windowHours: number;
     generatedAt: Date;
+    hasActiveFilters: boolean;
   },
 ): DiscordBotMessage[] {
   const listedPriceChanges = report.priceChanges.slice(0, options.maxItems);
@@ -400,6 +471,7 @@ function createPersonalPriceReportEmbedMessages(
     hiddenPriceChangeCount,
     hiddenNewProductCount,
     priceChangeMovementCounts: countPriceChangeMovements(report.priceChanges),
+    hasActiveFilters: options.hasActiveFilters,
   });
 
   return createReportMessages(embeds);
@@ -417,6 +489,7 @@ function createReportEmbeds({
   hiddenPriceChangeCount,
   hiddenNewProductCount,
   priceChangeMovementCounts,
+  hasActiveFilters,
 }: {
   priceChangeCount: number;
   newProductCount: number;
@@ -429,6 +502,7 @@ function createReportEmbeds({
   hiddenPriceChangeCount: number;
   hiddenNewProductCount: number;
   priceChangeMovementCounts: PriceChangeMovementCounts;
+  hasActiveFilters: boolean;
 }): DiscordBotEmbed[] {
   const timestamp = generatedAt.toISOString();
   const priceChangeGroups = createPriceChangeMovementGroups(listedPriceChanges, publicBaseUrl);
@@ -477,7 +551,9 @@ function createReportEmbeds({
   if (embeds.length === 0) {
     embeds.push({
       title: "PartsRadarTW 價格報告",
-      description: `過去 ${windowHours} 小時沒有價格變動或新增商品。`,
+      description: hasActiveFilters
+        ? `過去 ${windowHours} 小時沒有符合篩選的價格變動或新增商品。`
+        : `過去 ${windowHours} 小時沒有價格變動或新增商品。`,
       color: DISCORD_EMBED_COLOR,
       timestamp,
     });
@@ -727,9 +803,7 @@ function formatSubcategoryKey(subcategory: PriceReportProductSubcategory | null)
   return `${subcategory?.slug ?? "unknown"}:${subcategory?.displayName ?? "未分類"}`;
 }
 
-function formatReportSubcategoryHeading(
-  subcategory: PriceReportProductSubcategory | null,
-): string {
+function formatReportSubcategoryHeading(subcategory: PriceReportProductSubcategory | null): string {
   return `**${formatReportHeading(subcategory?.displayName ?? "未分類")}**`;
 }
 
@@ -893,18 +967,103 @@ function clampPriceReportMaxItems(value: number): number {
   return Math.min(Math.max(value, 1), MAX_PRICE_REPORT_ITEMS);
 }
 
-export function formatPriceReportSettingMessage(setting: DiscordPriceReportSetting | null): string {
+export function formatPriceReportSettingMessage(
+  setting: DiscordPriceReportSetting | null,
+  categories: PriceReportCategoryOption[] = [],
+): string {
   if (!setting?.enabled) {
     return "尚未開啟每日價格提醒。使用下方按鈕可開啟每日私訊報告。";
   }
 
+  const filters = toPriceReportFilters(setting);
   return [
     "每日價格提醒已開啟。",
     `統計區間：${formatWindowLabel(setting.window)}`,
+    `分類：${formatPriceReportCategoryFilterLabel(filters, categories)}`,
+    `內容：${formatPriceReportEventFilterLabel(filters)}`,
     `每次最多：${setting.maxItems} 筆`,
     `每日時間：${formatTaipeiTime(setting.nextSendAt)}`,
     `下一次：${formatTaipeiMinute(setting.nextSendAt)}`,
   ].join("\n");
+}
+
+export function toPriceReportFilters(
+  setting: Pick<
+    DiscordPriceReportSetting,
+    "categoryIgrps" | "includePriceDrops" | "includePriceRises" | "includeNewProducts"
+  > | null,
+): PriceReportFilters {
+  if (!setting) {
+    return DEFAULT_PRICE_REPORT_FILTERS;
+  }
+
+  return normalizePriceReportFilters({
+    categoryIgrps: setting.categoryIgrps,
+    includePriceDrops: setting.includePriceDrops,
+    includePriceRises: setting.includePriceRises,
+    includeNewProducts: setting.includeNewProducts,
+  });
+}
+
+export function normalizePriceReportFilters(filters: PriceReportFilters): PriceReportFilters {
+  const categoryIgrps = [...new Set(filters.categoryIgrps)]
+    .filter((igrp) => Number.isSafeInteger(igrp) && igrp > 0)
+    .sort((left, right) => left - right);
+  const includePriceDrops = filters.includePriceDrops;
+  const includePriceRises = filters.includePriceRises;
+  const includeNewProducts = filters.includeNewProducts;
+
+  if (!includePriceDrops && !includePriceRises && !includeNewProducts) {
+    return DEFAULT_PRICE_REPORT_FILTERS;
+  }
+
+  return {
+    categoryIgrps,
+    includePriceDrops,
+    includePriceRises,
+    includeNewProducts,
+  };
+}
+
+export function formatPriceReportCategoryFilterLabel(
+  filters: PriceReportFilters,
+  categories: PriceReportCategoryOption[] = [],
+): string {
+  if (filters.categoryIgrps.length === 0) {
+    return "全部分類";
+  }
+
+  const categoryNameByIgrp = new Map(
+    categories.map((category) => [category.igrp, category.displayName]),
+  );
+  const labels = filters.categoryIgrps.map(
+    (igrp) => categoryNameByIgrp.get(igrp) ?? `IGrp ${igrp}`,
+  );
+  const visibleLabels = labels.slice(0, 3);
+  const hiddenCount = labels.length - visibleLabels.length;
+
+  return hiddenCount > 0
+    ? `${visibleLabels.join("、")} 等 ${labels.length} 個分類`
+    : visibleLabels.join("、");
+}
+
+export function formatPriceReportEventFilterLabel(filters: PriceReportFilters): string {
+  const labels = [
+    filters.includePriceDrops ? "降價" : null,
+    filters.includePriceRises ? "漲價" : null,
+    filters.includeNewProducts ? "新增商品" : null,
+  ].filter((label): label is string => label !== null);
+
+  return labels.join("、");
+}
+
+function hasActivePriceReportFilters(filters: PriceReportFilters): boolean {
+  return (
+    filters.categoryIgrps.length > 0 ||
+    !filters.includePriceDrops ||
+    !filters.includePriceRises ||
+    !filters.includeNewProducts
+  );
 }
 
 export function formatWindowLabel(window: DiscordPriceReportSetting["window"]): string {

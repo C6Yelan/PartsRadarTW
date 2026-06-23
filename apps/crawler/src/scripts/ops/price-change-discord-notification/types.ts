@@ -45,6 +45,13 @@ export interface RecentPriceReport {
   newProducts: PriceReportNewProductItem[];
 }
 
+export interface RecentPriceReportFilters {
+  categoryIgrps?: number[];
+  includePriceDrops?: boolean;
+  includePriceRises?: boolean;
+  includeNewProducts?: boolean;
+}
+
 export type PriceChangeDiscordNotificationSkipReason =
   | "missing_webhook_url"
   | "no_price_changes"
@@ -127,6 +134,7 @@ export interface CrawlRunPriceChangeReadResult {
 export interface RecentPriceChangeOptions {
   since: Date;
   until?: Date;
+  filters?: RecentPriceReportFilters;
 }
 
 export interface PriceChangeReportMessageOptions {

@@ -137,24 +137,24 @@ model SourceCategory {
 }
 
 model Product {
-  id                    String          @id @default(uuid()) @db.Uuid
-  sourceCategoryId      String          @map("source_category_id") @db.Uuid
-  sourceCategory        SourceCategory  @relation(fields: [sourceCategoryId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  ibuyToken             String          @map("ibuy_token")
-  name                  String          @db.Text
-  normalizedName        String          @map("normalized_name") @db.Text
-  vendorSlug            String?         @map("vendor_slug") @db.Text
-  vendorName            String?         @map("vendor_name") @db.Text
-  primaryImageUrl       String?         @map("primary_image_url") @db.Text
-  primaryImageCheckedAt DateTime?       @map("primary_image_checked_at") @db.Timestamptz(6)
-  sourceUrl             String          @map("source_url") @db.Text
-  isActive              Boolean         @default(true) @map("is_active")
-  missingSince          DateTime?       @map("missing_since") @db.Timestamptz(6)
-  missingSeenCount      Int             @default(0) @map("missing_seen_count")
-  firstSeenAt           DateTime        @map("first_seen_at") @db.Timestamptz(6)
-  lastSeenAt            DateTime        @map("last_seen_at") @db.Timestamptz(6)
-  createdAt             DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt             DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                    String                        @id @default(uuid()) @db.Uuid
+  sourceCategoryId      String                        @map("source_category_id") @db.Uuid
+  sourceCategory        SourceCategory                @relation(fields: [sourceCategoryId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  ibuyToken             String                        @map("ibuy_token")
+  name                  String                        @db.Text
+  normalizedName        String                        @map("normalized_name") @db.Text
+  vendorSlug            String?                       @map("vendor_slug") @db.Text
+  vendorName            String?                       @map("vendor_name") @db.Text
+  primaryImageUrl       String?                       @map("primary_image_url") @db.Text
+  primaryImageCheckedAt DateTime?                     @map("primary_image_checked_at") @db.Timestamptz(6)
+  sourceUrl             String                        @map("source_url") @db.Text
+  isActive              Boolean                       @default(true) @map("is_active")
+  missingSince          DateTime?                     @map("missing_since") @db.Timestamptz(6)
+  missingSeenCount      Int                           @default(0) @map("missing_seen_count")
+  firstSeenAt           DateTime                      @map("first_seen_at") @db.Timestamptz(6)
+  lastSeenAt            DateTime                      @map("last_seen_at") @db.Timestamptz(6)
+  createdAt             DateTime                      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime                      @updatedAt @map("updated_at") @db.Timestamptz(6)
   currentPrice          CurrentPrice?
   priceSnapshots        PriceSnapshot[]
   linkHealthChecks      ProductLinkHealth[]
@@ -228,18 +228,22 @@ model ProductLinkHealth {
 }
 
 model DiscordPriceReportSetting {
-  id             String                     @id @default(uuid()) @db.Uuid
-  discordUserId  String                     @unique(map: "discord_price_report_settings_discord_user_id_key") @map("discord_user_id") @db.Text
-  interval       DiscordPriceReportInterval
-  window         DiscordPriceReportWindow
-  scope          DiscordPriceReportScope    @default(ALL)
-  timezone       String                     @default("Asia/Taipei") @db.Text
-  maxItems       Int                        @default(50) @map("max_items")
-  enabled        Boolean                    @default(true)
-  nextSendAt     DateTime?                  @map("next_send_at") @db.Timestamptz(6)
-  lastSentAt     DateTime?                  @map("last_sent_at") @db.Timestamptz(6)
-  createdAt      DateTime                   @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime                   @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                 String                     @id @default(uuid()) @db.Uuid
+  discordUserId      String                     @unique(map: "discord_price_report_settings_discord_user_id_key") @map("discord_user_id") @db.Text
+  interval           DiscordPriceReportInterval
+  window             DiscordPriceReportWindow
+  scope              DiscordPriceReportScope    @default(ALL)
+  timezone           String                     @default("Asia/Taipei") @db.Text
+  maxItems           Int                        @default(50) @map("max_items")
+  categoryIgrps      Int[]                      @default([]) @map("category_igrps")
+  includePriceDrops  Boolean                    @default(true) @map("include_price_drops")
+  includePriceRises  Boolean                    @default(true) @map("include_price_rises")
+  includeNewProducts Boolean                    @default(true) @map("include_new_products")
+  enabled            Boolean                    @default(true)
+  nextSendAt         DateTime?                  @map("next_send_at") @db.Timestamptz(6)
+  lastSentAt         DateTime?                  @map("last_sent_at") @db.Timestamptz(6)
+  createdAt          DateTime                   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime                   @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@index([enabled, nextSendAt], map: "discord_price_report_settings_enabled_next_send_at_idx")
   @@map("discord_price_report_settings")

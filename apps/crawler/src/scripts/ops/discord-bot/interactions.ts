@@ -26,8 +26,10 @@ import {
   formatPriceReportSettingMessage,
   formatTaipeiMinute,
   formatWindowLabel,
+  readPriceReportCategories,
   readPriceReportSetting,
   sendPriceReportNow,
+  toPriceReportFilters,
 } from "./price-report";
 import {
   deferInteractionMessageUpdate,
@@ -143,12 +145,20 @@ async function handleApplicationCommandInteraction({
         fetchImpl,
       });
 
+      const setting = await readPriceReportSetting({ client, discordUserId });
+      const activeSetting = setting?.enabled ? setting : null;
+
       await sendPriceReportNow({
         client,
         discordUserId,
-        windowHours: command.windowHours,
-        maxItems: command.maxItems ?? options.priceReportMaxItems,
+        windowHours: command.windowHours ?? resolveWindowHours(activeSetting?.window),
+        maxItems:
+          command.maxItems ??
+          (activeSetting
+            ? Math.min(activeSetting.maxItems, options.priceReportMaxItems)
+            : options.priceReportMaxItems),
         publicBaseUrl: options.publicBaseUrl,
+        filters: toPriceReportFilters(activeSetting),
         sendReportMessages: (messages) =>
           sendDiscordInteractionMessages({
             token: options.token,
@@ -163,6 +173,7 @@ async function handleApplicationCommandInteraction({
     }
 
     const setting = await readPriceReportSetting({ client, discordUserId });
+    const categories = await readPriceReportCategories({ client });
 
     await sendInteractionResponse({
       token: options.token,
@@ -170,7 +181,7 @@ async function handleApplicationCommandInteraction({
       interaction,
       fetchImpl,
       message: {
-        content: formatPriceReportSettingMessage(setting),
+        content: formatPriceReportSettingMessage(setting, categories),
         components: createPriceReportSettingsComponents(),
       },
     });
@@ -351,6 +362,8 @@ async function handleMessageComponentInteraction({
 
   if (component?.name === "open_settings_modal") {
     const setting = await readPriceReportSetting({ client, discordUserId });
+    const categories = await readPriceReportCategories({ client });
+    const filters = toPriceReportFilters(setting);
 
     await sendModalInteractionResponse({
       token: options.token,
@@ -361,6 +374,11 @@ async function handleMessageComponentInteraction({
         windowHours: resolveWindowHours(setting?.window),
         maxItems: setting?.maxItems ?? options.priceReportMaxItems,
         timeValue: formatTaipeiTimeInput(setting?.nextSendAt),
+        categories,
+        categoryIgrps: filters.categoryIgrps,
+        includePriceDrops: filters.includePriceDrops,
+        includePriceRises: filters.includePriceRises,
+        includeNewProducts: filters.includeNewProducts,
       }),
     });
     return;
@@ -504,7 +522,13 @@ async function handleModalSubmitInteraction({
     return;
   }
 
-  if (!modal.windowInputValid || !modal.maxItemsInputValid || !modal.timeInputValid) {
+  if (
+    !modal.windowInputValid ||
+    !modal.maxItemsInputValid ||
+    !modal.categoryInputValid ||
+    !modal.eventInputValid ||
+    !modal.timeInputValid
+  ) {
     await sendInteractionResponse({
       token: options.token,
       apiBaseUrl: options.apiBaseUrl,
@@ -520,6 +544,10 @@ async function handleModalSubmitInteraction({
     discordUserId,
     windowHours: modal.windowHours,
     maxItems: modal.maxItems ?? options.priceReportMaxItems,
+    categoryIgrps: modal.categoryIgrps,
+    includePriceDrops: modal.includePriceDrops,
+    includePriceRises: modal.includePriceRises,
+    includeNewProducts: modal.includeNewProducts,
     timeOfDay: modal.timeOfDay,
   });
 
@@ -610,15 +638,21 @@ function extractWatchId(watchInput: string | null): string | null {
 function formatPriceReportModalValidationMessage({
   windowInputValid,
   maxItemsInputValid,
+  categoryInputValid,
+  eventInputValid,
   timeInputValid,
 }: {
   windowInputValid: boolean;
   maxItemsInputValid: boolean;
+  categoryInputValid: boolean;
+  eventInputValid: boolean;
   timeInputValid: boolean;
 }): string {
   const messages = [
     windowInputValid ? null : "統計區間需為 `24h`、`12h` 或 `6h`。",
     maxItemsInputValid ? null : `最多商品數需為 1-${MAX_PRICE_REPORT_ITEMS} 的整數。`,
+    categoryInputValid ? null : "分類篩選無法辨識，請重新開啟設定視窗後再試一次。",
+    eventInputValid ? null : "報告內容至少要選擇一種：降價、漲價或新增商品。",
     timeInputValid ? null : "每日發送時間格式需為台北時間 HH:mm，例如 `09:30` 或 `21:00`。",
   ].filter((message): message is string => message !== null);
 

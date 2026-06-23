@@ -25,6 +25,7 @@ export type DiscordBotClient = PriceChangeDiscordClient &
     | "discordPriceReportSetting"
     | "discordTargetPriceWatch"
     | "product"
+    | "sourceCategory"
   >;
 
 export interface DiscordBotEmbedField {
@@ -110,6 +111,8 @@ export interface DiscordModalStringSelectComponent {
     default?: boolean;
   }>;
   required?: boolean;
+  min_values?: number;
+  max_values?: number;
 }
 
 export interface DiscordModalTextInputComponent {
@@ -284,7 +287,7 @@ export interface PriceReportTimeOfDay {
 export type ParsedPriceReportCommand =
   | {
       name: "now";
-      windowHours: number;
+      windowHours: number | null;
       maxItems: number | null;
     }
   | {
@@ -333,4 +336,10 @@ export interface ParsedPriceReportModal {
   maxItemsInputValid: boolean;
   timeOfDay: PriceReportTimeOfDay | null;
   timeInputValid: boolean;
+  categoryIgrps: number[];
+  categoryInputValid: boolean;
+  includePriceDrops: boolean;
+  includePriceRises: boolean;
+  includeNewProducts: boolean;
+  eventInputValid: boolean;
 }

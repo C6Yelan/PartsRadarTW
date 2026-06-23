@@ -153,6 +153,8 @@ Discord bot 只保存 Discord user id 與必要偏好，不建立網站帳號，
 - `scope`：`all` 或 `watchlist`
 - `timezone`，第一輪固定 `Asia/Taipei`
 - `max_items`
+- `category_igrps`：空陣列代表全部分類；非空陣列代表只列出指定 CoolPC `IGrp` 分類。
+- `include_price_drops` / `include_price_rises` / `include_new_products`：控制每日與手動報告要包含降價、漲價與新增商品。
 - `enabled`
 - nullable `next_send_at` / `last_sent_at`
 
@@ -182,8 +184,8 @@ Discord bot 只保存 Discord user id 與必要偏好，不建立網站帳號，
 
 規則：
 
-- `/price-report now` 會寫入 delivery log，但不建立 price report setting。
-- `/price-report settings` 的按鈕與 modal 讀寫 `discord_price_report_settings`；每日 DM 報告可在 modal 設定台北時間 `HH:mm`，下一次發送時間保存在 `next_send_at`。
+- `/price-report now` 會寫入 delivery log，但不建立 price report setting；若使用者已有啟用中的每日設定，未明確覆蓋的手動報告會沿用該設定的分類、內容類型與上限。
+- `/price-report settings` 的按鈕與 modal 讀寫 `discord_price_report_settings`；每日 DM 報告可在 modal 設定台北時間 `HH:mm`、分類篩選與內容類型篩選，下一次發送時間保存在 `next_send_at`。
 - `/watch` 統合管理介面會讀寫 `discord_target_price_watches`：以 PartsRadarTW 商品頁連結或站內商品 ID 新增追蹤、分頁讀取啟用中的追蹤、修改目標價，或經確認後停用追蹤；Discord component 內部使用完整 watch UUID，但不在使用者可見訊息顯示。
 - 目標價 worker 只讀取啟用、尚未成功通知且沒有有效 claim 的 watch；目前價格小於等於同幣別目標價時先取得 claim，再發送 DM。成功會寫入 `last_notified_at` 並清除 claim，因此同一設定只通知一次；修改或重新建立 watch 會重置兩欄，失敗或 rate limit 只清除 claim 供後續重試。
 - `error_message` 只保存安全摘要，不保存 token、source URL、raw HTML、DB URL、internal headers 或 raw IP。

@@ -516,19 +516,19 @@ Discord bot foundation 已開始實作，並和 webhook foundation 分開。Webh
 Bot 目標：
 
 - 個人目標價提醒：使用者追蹤單一商品，價格小於等於目標價時收到 DM。
-- 個人價格變動報告：使用者設定固定 interval / window / scope，定期收到特定時間段內實際變價商品報告。
+- 個人價格變動報告：使用者設定固定 interval / window / scope、分類篩選與內容類型篩選，定期收到特定時間段內實際變價商品報告。
 
 目前已實作：
 
 - `discord-bot` Compose profile 與 `pnpm ops:discord-bot` daemon entrypoint。
 - Discord slash command registration。
-- `/price-report now`：使用者手動要求最近 `24h` / `12h` / `6h` 價格報告，bot 會在指令發出的頻道或私訊 context 以 embed 回覆中文報告。
+- `/price-report now`：使用者手動要求最近 `24h` / `12h` / `6h` 價格報告，bot 會在指令發出的頻道或私訊 context 以 embed 回覆中文報告；若使用者已有啟用中的每日設定，未明確覆蓋的手動報告會沿用該設定的分類、內容類型與上限，方便立即預覽。
 - Slash command 只註冊 global command，供伺服器與 DM 使用，避免 Discord client 同時顯示 global 與 guild 的重複 `/price-report`。
 - `/price-report now` 報告只為有資料的「價格變動」或「新增商品」產生 embed；摘要時間、統計數字與價格變動方向標題使用 Markdown emphasis 強化區隔；價格變動 embed 先分「降價」與「漲價」，商品列以單行呈現 signed 漲跌金額、舊價、新價與站內商品連結；新增商品 embed 以單行呈現目前價格與站內商品連結；兩者都依 DB 的 `sourceCategory.displayName` 大分類與 `vendorName` 小分類分組，並在小分類已顯示品牌時移除商品名稱開頭重複品牌；兩邊都沒資料時才送一個空報告摘要。
 - `/price-report now` 每次最多列 `DISCORD_PRICE_REPORT_MAX_ITEMS` 筆，預設 50；上限套用在兩區合計列出的商品數；per-user cooldown 只套用在實際產生報告的 `now` 指令。
 - 每次 `/price-report now` 會寫入 `discord_notification_deliveries`，供後續去重、排程與維運檢視使用。
 - `/price-report settings`：查看每日價格報告設定，並提供「開啟/修改每日報告」與「關閉每日報告」按鈕。
-- 「開啟/修改每日報告」會開啟 modal，要求設定統計區間、最多列出商品數與每日私訊發送時間；`time` 使用台北時間 `HH:mm`。
+- 「開啟/修改每日報告」會開啟 modal，要求設定統計區間、分類篩選、報告內容類型、最多列出商品數與每日私訊發送時間；`time` 使用台北時間 `HH:mm`。分類空集合代表全部分類；報告內容至少包含降價、漲價或新增商品其中一種。
 - 「關閉每日報告」會直接關閉每日價格報告 DM。
 - `/watch`：開啟 ephemeral 統合管理介面，分頁列出目前 Discord 使用者啟用中的目標價追蹤。使用者可按「新增追蹤」開啟表單，貼 PartsRadarTW 商品頁分享連結、網址列 `/products/<id>` URL 或站內商品 ID，並輸入純數字目標價格；也可從選單挑選既有追蹤後修改目標價，或經確認後移除。每頁最多 25 筆，介面不顯示資料庫 watch ID。
 - Bot daemon 會掃描啟用且尚未通知的 watch；當目前價格與 watch 幣別一致且小於等於目標價時，以精簡 DM embed 發送商品名稱、目前價格、目標價格、站內商品連結與單一價格資料時間。
@@ -564,7 +564,7 @@ docker compose --profile discord-bot run --rm discord-bot \
 
 - 目前指令只開放每日報告；資料模型保留 `daily`、`every_12h`、`every_6h` 供後續擴充。
 - `window` 只支援 `24h`、`12h`、`6h`。
-- 目前只支援全站 `all`；`watchlist` scope 等 `/watch` 系列完成後再開放。
+- `scope` 仍只支援全站 `all`；個人化只做分類與內容類型篩選，不接 `/watch` 清單，避免將 price-report 與單品目標價追蹤耦合。
 - 時區固定 `Asia/Taipei`。
 - Price report 每次最多列 50 筆，超過上限時顯示另有幾筆未列出。
 - `/watch` 第一版支援 PartsRadarTW 商品頁分享連結、站內 `/products/<id>` URL 或站內商品 ID，不以原價屋 iBuy URL 作為主流程。

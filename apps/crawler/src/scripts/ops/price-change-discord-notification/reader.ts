@@ -9,6 +9,7 @@ import type {
   PriceReportNewProductItem,
   RecentPriceChangeOptions,
   RecentPriceReport,
+  RecentPriceReportFilters,
 } from "./types";
 
 export async function readCrawlRunPriceChanges(
@@ -134,9 +135,22 @@ export async function readRecentPriceChanges(
 
 export async function readRecentPriceReport(
   client: PriceChangeDiscordClient,
-  { since, until = new Date() }: RecentPriceChangeOptions,
+  { since, until = new Date(), filters = {} }: RecentPriceChangeOptions,
 ): Promise<RecentPriceReport> {
   if (since.getTime() >= until.getTime()) {
+    return {
+      priceChanges: [],
+      newProducts: [],
+    };
+  }
+
+  const normalizedFilters = normalizeRecentPriceReportFilters(filters);
+
+  if (
+    !normalizedFilters.includePriceDrops &&
+    !normalizedFilters.includePriceRises &&
+    !normalizedFilters.includeNewProducts
+  ) {
     return {
       priceChanges: [],
       newProducts: [],
@@ -149,6 +163,17 @@ export async function readRecentPriceReport(
         gte: since,
         lte: until,
       },
+      ...(normalizedFilters.categoryIgrps.length > 0
+        ? {
+            product: {
+              sourceCategory: {
+                igrp: {
+                  in: normalizedFilters.categoryIgrps,
+                },
+              },
+            },
+          }
+        : {}),
     },
     select: {
       id: true,
@@ -207,6 +232,10 @@ export async function readRecentPriceReport(
 
   for (const current of currentSnapshots) {
     if (!existingProductIds.has(current.productId)) {
+      if (!normalizedFilters.includeNewProducts) {
+        continue;
+      }
+
       const newProduct = newProductByProduct.get(current.productId);
 
       if (!newProduct) {
@@ -244,6 +273,15 @@ export async function readRecentPriceReport(
       continue;
     }
 
+    const delta = current.price - previous.price;
+
+    if (
+      (delta < 0 && !normalizedFilters.includePriceDrops) ||
+      (delta > 0 && !normalizedFilters.includePriceRises)
+    ) {
+      continue;
+    }
+
     latestChangeByProduct.set(current.productId, {
       productId: current.product.id,
       productName: current.product.name,
@@ -253,13 +291,26 @@ export async function readRecentPriceReport(
       currentPrice: current.price,
       currency: current.currency,
       changedAt: current.capturedAt,
-      delta: current.price - previous.price,
+      delta,
     });
   }
 
   return {
     priceChanges: [...latestChangeByProduct.values()].sort(comparePriceChanges),
     newProducts: [...newProductByProduct.values()].sort(compareNewProducts),
+  };
+}
+
+function normalizeRecentPriceReportFilters(
+  filters: RecentPriceReportFilters,
+): Required<RecentPriceReportFilters> {
+  return {
+    categoryIgrps: [...new Set(filters.categoryIgrps ?? [])]
+      .filter((igrp) => Number.isSafeInteger(igrp) && igrp > 0)
+      .sort((left, right) => left - right),
+    includePriceDrops: filters.includePriceDrops ?? true,
+    includePriceRises: filters.includePriceRises ?? true,
+    includeNewProducts: filters.includeNewProducts ?? true,
   };
 }
 

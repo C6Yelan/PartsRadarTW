@@ -26,6 +26,13 @@ const API_BASE_URL = "https://discord.test/api/v10";
 const PUBLIC_BASE_URL = "https://partsradar.test/";
 const WATCH_PRODUCT_ID = "11111111-1111-4111-8111-111111111111";
 const WATCH_ROW_ID = "22222222-2222-4222-8222-222222222222";
+const TEST_SOURCE_CATEGORIES = [
+  { igrp: 4, displayName: "CPU" },
+  { igrp: 5, displayName: "主機板" },
+  { igrp: 6, displayName: "記憶體" },
+  { igrp: 7, displayName: "SSD / HDD" },
+  { igrp: 12, displayName: "顯示卡" },
+] as const;
 
 describe("Discord bot options", () => {
   it("parses required bot settings and safe defaults", () => {
@@ -997,6 +1004,39 @@ describe("handleDiscordInteraction", () => {
     });
   });
 
+  it("shows daily report filter names in the settings summary", async () => {
+    const client = createDiscordBotClient(
+      [],
+      [
+        priceReportSetting({
+          id: "setting-1",
+          discordUserId: "111122223333444455",
+          categoryIgrps: [12, 7],
+          includePriceRises: false,
+          nextSendAt: new Date("2026-06-07T13:30:00.000Z"),
+        }),
+      ],
+    );
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createInteraction("settings"),
+    });
+
+    const requestBody = JSON.parse(
+      String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body),
+    );
+
+    expect(requestBody.data.content).toContain("分類：SSD / HDD、顯示卡");
+    expect(requestBody.data.content).toContain("內容：降價、新增商品");
+  });
+
   it("does not consume the price report cooldown for settings commands", async () => {
     const client = createDiscordBotClient([]);
     const cooldowns = new CommandCooldowns(60);
@@ -1040,6 +1080,8 @@ describe("handleDiscordInteraction", () => {
           discordUserId: "111122223333444455",
           window: "HOURS_12",
           maxItems: 12,
+          categoryIgrps: [12],
+          includeNewProducts: false,
           nextSendAt: new Date("2026-06-07T13:30:00.000Z"),
         }),
       ],
@@ -1070,6 +1112,25 @@ describe("handleDiscordInteraction", () => {
     expect(JSON.stringify(requestBody.data.components)).toContain('"value":"12"');
     expect(JSON.stringify(requestBody.data.components)).toContain('"value":"21:30"');
     expect(JSON.stringify(requestBody.data.components)).toContain('"value":"12h","default":true');
+    expect(JSON.stringify(requestBody.data.components)).toContain(
+      '"custom_id":"price-report:settings:categories"',
+    );
+    expect(JSON.stringify(requestBody.data.components)).toContain(
+      '"label":"顯示卡","value":"12","default":true',
+    );
+    expect(JSON.stringify(requestBody.data.components)).toContain(
+      '"label":"新增商品","value":"new_products","default":false',
+    );
+    expect(client.sourceCategory.findMany).toHaveBeenCalledWith({
+      where: {
+        enabled: true,
+      },
+      select: {
+        igrp: true,
+        displayName: true,
+      },
+      orderBy: [{ igrp: "asc" }, { displayName: "asc" }],
+    });
   });
 
   it("enables daily report settings from the settings modal", async () => {
@@ -1085,6 +1146,8 @@ describe("handleDiscordInteraction", () => {
       fetchImpl: fetchMock as typeof fetch,
       interaction: createSettingsModalSubmitInteraction({
         window: "6h",
+        categories: ["12", "7"],
+        events: ["price_drops", "new_products"],
         maxItems: "8",
         time: "21:30",
       }),
@@ -1095,11 +1158,19 @@ describe("handleDiscordInteraction", () => {
         create: expect.objectContaining({
           window: "HOURS_6",
           maxItems: 8,
+          categoryIgrps: [7, 12],
+          includePriceDrops: true,
+          includePriceRises: false,
+          includeNewProducts: true,
           enabled: true,
         }),
         update: expect.objectContaining({
           window: "HOURS_6",
           maxItems: 8,
+          categoryIgrps: [7, 12],
+          includePriceDrops: true,
+          includePriceRises: false,
+          includeNewProducts: true,
           enabled: true,
         }),
       }),
@@ -1529,6 +1600,110 @@ describe("sendPriceReportNow", () => {
     expect(description).not.toContain("續");
   });
 
+  it("filters price reports by category and event type", async () => {
+    const client = createDiscordBotClient([
+      snapshot({
+        id: "old-gpu",
+        productId: "product-gpu",
+        productName: "GPU A",
+        crawlRunId: "old-run",
+        price: 12_000,
+        capturedAt: "2026-06-06T01:00:00.000Z",
+        categoryIgrp: 12,
+        categoryName: "顯示卡",
+      }),
+      snapshot({
+        id: "new-gpu",
+        productId: "product-gpu",
+        productName: "GPU A",
+        crawlRunId: "new-run",
+        price: 10_990,
+        capturedAt: "2026-06-07T03:00:00.000Z",
+        categoryIgrp: 12,
+        categoryName: "顯示卡",
+      }),
+      snapshot({
+        id: "old-board",
+        productId: "product-board",
+        productName: "Board A",
+        crawlRunId: "old-run",
+        price: 6_000,
+        capturedAt: "2026-06-06T01:00:00.000Z",
+        categoryIgrp: 5,
+        categoryName: "主機板",
+      }),
+      snapshot({
+        id: "new-board",
+        productId: "product-board",
+        productName: "Board A",
+        crawlRunId: "new-run",
+        price: 6_500,
+        capturedAt: "2026-06-07T03:00:00.000Z",
+        categoryIgrp: 5,
+        categoryName: "主機板",
+      }),
+      snapshot({
+        id: "new-ssd",
+        productId: "product-ssd",
+        productName: "SSD B",
+        crawlRunId: "new-run",
+        price: 2_490,
+        capturedAt: "2026-06-07T03:30:00.000Z",
+        categoryIgrp: 7,
+        categoryName: "SSD / HDD",
+        vendorSlug: "samsung",
+        vendorName: "Samsung",
+      }),
+    ]);
+    const sendReportMessages = vi.fn(async (_messages: DiscordBotMessage[]) => ({
+      status: "sent" as const,
+      messageCount: 1,
+      httpStatuses: [200],
+    }));
+
+    await expect(
+      sendPriceReportNow({
+        client,
+        discordUserId: "111122223333444455",
+        windowHours: 24,
+        maxItems: 50,
+        publicBaseUrl: PUBLIC_BASE_URL,
+        filters: {
+          categoryIgrps: [12],
+          includePriceDrops: true,
+          includePriceRises: false,
+          includeNewProducts: false,
+        },
+        now: new Date("2026-06-07T05:00:00.000Z"),
+        sendReportMessages,
+      }),
+    ).resolves.toMatchObject({
+      status: "sent",
+      changeCount: 1,
+      newProductCount: 0,
+      listedCount: 1,
+    });
+
+    const reportMessage = sendReportMessages.mock.calls[0]?.[0][0];
+
+    expect(JSON.stringify(reportMessage)).toContain("GPU A");
+    expect(JSON.stringify(reportMessage)).not.toContain("Board A");
+    expect(JSON.stringify(reportMessage)).not.toContain("SSD B");
+    expect(client.priceSnapshot.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          product: {
+            sourceCategory: {
+              igrp: {
+                in: [12],
+              },
+            },
+          },
+        }),
+      }),
+    );
+  });
+
   it("enables daily report settings for a Discord user", async () => {
     const client = createDiscordBotClient([]);
     const setting = await enableDailyPriceReport({
@@ -1837,10 +2012,14 @@ function createComponentInteraction(customId: string): DiscordInteraction {
 
 function createSettingsModalSubmitInteraction({
   window = "24h",
+  categories = ["all"],
+  events = ["price_drops", "price_rises", "new_products"],
   maxItems = "50",
   time = "09:00",
 }: {
   window?: string;
+  categories?: string[];
+  events?: string[];
   maxItems?: string;
   time?: string;
 }): DiscordInteraction {
@@ -1857,6 +2036,22 @@ function createSettingsModalSubmitInteraction({
             type: 3,
             custom_id: "price-report:settings:window",
             values: [window],
+          },
+        },
+        {
+          type: 18,
+          component: {
+            type: 3,
+            custom_id: "price-report:settings:categories",
+            values: categories,
+          },
+        },
+        {
+          type: 18,
+          component: {
+            type: 3,
+            custom_id: "price-report:settings:events",
+            values: events,
           },
         },
         {
@@ -2032,11 +2227,20 @@ interface TestPriceReportSetting {
   scope: "ALL" | "WATCHLIST";
   timezone: string;
   maxItems: number;
+  categoryIgrps: number[];
+  includePriceDrops: boolean;
+  includePriceRises: boolean;
+  includeNewProducts: boolean;
   enabled: boolean;
   nextSendAt: Date | null;
   lastSentAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
+}
+
+interface TestSourceCategory {
+  igrp: number;
+  displayName: string;
 }
 
 interface TestTargetPriceWatch {
@@ -2099,6 +2303,10 @@ function priceReportSetting({
   interval = "DAILY",
   window = "HOURS_24",
   maxItems = 50,
+  categoryIgrps = [],
+  includePriceDrops = true,
+  includePriceRises = true,
+  includeNewProducts = true,
   enabled = true,
 }: {
   id: string;
@@ -2107,6 +2315,10 @@ function priceReportSetting({
   interval?: TestPriceReportSetting["interval"];
   window?: TestPriceReportSetting["window"];
   maxItems?: number;
+  categoryIgrps?: number[];
+  includePriceDrops?: boolean;
+  includePriceRises?: boolean;
+  includeNewProducts?: boolean;
   enabled?: boolean;
 }): TestPriceReportSetting {
   return {
@@ -2117,6 +2329,10 @@ function priceReportSetting({
     scope: "ALL",
     timezone: "Asia/Taipei",
     maxItems,
+    categoryIgrps,
+    includePriceDrops,
+    includePriceRises,
+    includeNewProducts,
     enabled,
     nextSendAt,
     lastSentAt: null,
@@ -2186,7 +2402,11 @@ function createDiscordBotClient(
   snapshots: TestSnapshot[],
   settings: TestPriceReportSetting[] = [],
   watches: TestTargetPriceWatch[] = [],
+  categories: TestSourceCategory[] = [...TEST_SOURCE_CATEGORIES],
 ): DiscordBotClient & {
+  sourceCategory: {
+    findMany: ReturnType<typeof vi.fn>;
+  };
   product: {
     findFirst: ReturnType<typeof vi.fn>;
   };
@@ -2219,8 +2439,25 @@ function createDiscordBotClient(
 
     return latestSnapshot ? toPrismaWatchProduct(latestSnapshot) : null;
   });
+  const sourceCategories = [
+    ...categories,
+    ...snapshots.map((item) => ({ igrp: item.categoryIgrp, displayName: item.categoryName })),
+  ].filter(
+    (category, index, allCategories) =>
+      allCategories.findIndex((item) => item.igrp === category.igrp) === index,
+  );
+  const sourceCategoryFindMany = vi.fn(
+    async (_args: {
+      where: { enabled: boolean };
+      select: { igrp: boolean; displayName: boolean };
+      orderBy: Array<Record<string, string>>;
+    }) => sourceCategories.sort((left, right) => left.igrp - right.igrp),
+  );
   const findMany = vi.fn(async (args: { where: Record<string, unknown> }) => {
     const where = args.where;
+    const categoryIgrpFilter =
+      (where.product as { sourceCategory?: { igrp?: { in?: number[] } } } | undefined)
+        ?.sourceCategory?.igrp?.in ?? [];
 
     if (
       !where.productId &&
@@ -2235,7 +2472,8 @@ function createDiscordBotClient(
         .filter(
           (snapshot) =>
             snapshot.capturedAt.getTime() >= capturedAtFilter.gte.getTime() &&
-            snapshot.capturedAt.getTime() <= capturedAtFilter.lte.getTime(),
+            snapshot.capturedAt.getTime() <= capturedAtFilter.lte.getTime() &&
+            (categoryIgrpFilter.length === 0 || categoryIgrpFilter.includes(snapshot.categoryIgrp)),
         )
         .sort(compareCapturedAtAsc)
         .map(toPrismaSnapshotWithProduct);
@@ -2347,6 +2585,10 @@ function createDiscordBotClient(
         | "scope"
         | "timezone"
         | "maxItems"
+        | "categoryIgrps"
+        | "includePriceDrops"
+        | "includePriceRises"
+        | "includeNewProducts"
         | "enabled"
         | "nextSendAt"
       >;
@@ -2531,6 +2773,9 @@ function createDiscordBotClient(
   );
 
   return {
+    sourceCategory: {
+      findMany: sourceCategoryFindMany,
+    },
     product: {
       findFirst: productFindFirst,
     },
@@ -2555,6 +2800,9 @@ function createDiscordBotClient(
       upsert: watchUpsert,
     },
   } as unknown as DiscordBotClient & {
+    sourceCategory: {
+      findMany: ReturnType<typeof vi.fn>;
+    };
     product: {
       findFirst: ReturnType<typeof vi.fn>;
     };
