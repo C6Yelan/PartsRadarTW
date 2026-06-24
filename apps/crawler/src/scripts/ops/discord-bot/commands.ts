@@ -403,18 +403,21 @@ export function createPriceReportSettingsComponents({
         },
       ],
     },
-    {
-      type: DISCORD_COMPONENT_TYPE_ACTION_ROW,
-      components: [
-        {
-          type: DISCORD_COMPONENT_TYPE_BUTTON,
-          style: DISCORD_BUTTON_STYLE_SECONDARY,
-          custom_id: PRICE_REPORT_SETTINGS_ALL_CATEGORIES_CUSTOM_ID,
-          label: allCategoriesSelected ? "已選全部分類" : "改為全部分類",
-          disabled: allCategoriesSelected,
-        },
-      ],
-    },
+    ...(allCategoriesSelected
+      ? []
+      : [
+          {
+            type: DISCORD_COMPONENT_TYPE_ACTION_ROW,
+            components: [
+              {
+                type: DISCORD_COMPONENT_TYPE_BUTTON,
+                style: DISCORD_BUTTON_STYLE_SECONDARY,
+                custom_id: PRICE_REPORT_SETTINGS_ALL_CATEGORIES_CUSTOM_ID,
+                label: "改為全部分類",
+              },
+            ],
+          } satisfies DiscordMessageComponent,
+        ]),
     {
       type: DISCORD_COMPONENT_TYPE_ACTION_ROW,
       components: [

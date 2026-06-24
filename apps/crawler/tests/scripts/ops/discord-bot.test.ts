@@ -1016,17 +1016,6 @@ describe("handleDiscordInteraction", () => {
             type: 1,
             components: [
               expect.objectContaining({
-                type: 2,
-                custom_id: "price-report:settings:all-categories",
-                label: "已選全部分類",
-                disabled: true,
-              }),
-            ],
-          },
-          {
-            type: 1,
-            components: [
-              expect.objectContaining({
                 type: 3,
                 custom_id: "price-report:settings:events",
                 placeholder: "報告內容",
@@ -1051,6 +1040,9 @@ describe("handleDiscordInteraction", () => {
         ],
       },
     });
+    expect(JSON.stringify(requestBody.data.components)).not.toContain(
+      "price-report:settings:all-categories",
+    );
   });
 
   it("shows daily report filter names in the settings summary", async () => {
@@ -1261,6 +1253,9 @@ describe("handleDiscordInteraction", () => {
     expect(String((fetchMock.mock.calls[1]?.[1] as RequestInit | undefined)?.body)).toContain(
       "分類：全部分類",
     );
+    expect(String((fetchMock.mock.calls[1]?.[1] as RequestInit | undefined)?.body)).not.toContain(
+      "price-report:settings:all-categories",
+    );
   });
 
   it("updates category choices from the settings panel", async () => {
@@ -1309,7 +1304,6 @@ describe("handleDiscordInteraction", () => {
       expect.objectContaining({
         custom_id: "price-report:settings:all-categories",
         label: "改為全部分類",
-        disabled: false,
       }),
     );
   });
