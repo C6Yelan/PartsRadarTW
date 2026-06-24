@@ -961,7 +961,7 @@ describe("handleDiscordInteraction", () => {
     expect(String(fetchMock.mock.calls[0]?.[1]?.body)).toContain("目標價格需為");
   });
 
-  it("sends settings management buttons from the settings command", async () => {
+  it("sends the settings panel from the settings command", async () => {
     const client = createDiscordBotClient([]);
     const fetchMock = vi.fn<typeof fetch>(
       async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
@@ -983,19 +983,62 @@ describe("handleDiscordInteraction", () => {
       type: 4,
       data: {
         content: expect.stringContaining("尚未開啟每日價格提醒"),
+        flags: 64,
         components: [
           {
             type: 1,
             components: [
               expect.objectContaining({
+                type: 3,
+                custom_id: "price-report:settings:window",
+                placeholder: "統計區間",
+              }),
+            ],
+          },
+          {
+            type: 1,
+            components: [
+              expect.objectContaining({
+                type: 3,
+                custom_id: "price-report:settings:categories",
+                placeholder: "分類篩選",
+                options: expect.arrayContaining([
+                  expect.objectContaining({
+                    label: "全部分類",
+                    value: "all",
+                    default: true,
+                  }),
+                  expect.objectContaining({
+                    label: "顯示卡",
+                    value: "12",
+                    default: true,
+                  }),
+                ]),
+              }),
+            ],
+          },
+          {
+            type: 1,
+            components: [
+              expect.objectContaining({
+                type: 3,
+                custom_id: "price-report:settings:events",
+                placeholder: "報告內容",
+              }),
+            ],
+          },
+          {
+            type: 1,
+            components: [
+              expect.objectContaining({
                 type: 2,
-                custom_id: "price-report:settings:open",
-                label: "開啟/修改每日報告",
+                custom_id: "price-report:settings:time-limit",
+                label: "時間與上限",
               }),
               expect.objectContaining({
                 type: 2,
-                custom_id: "price-report:settings:disable",
-                label: "關閉每日報告",
+                custom_id: "price-report:settings:enable",
+                label: "開啟每日報告",
               }),
             ],
           },
@@ -1071,7 +1114,7 @@ describe("handleDiscordInteraction", () => {
     );
   });
 
-  it("opens a daily report settings modal from the settings button", async () => {
+  it("opens a time and limit modal from the settings panel", async () => {
     const client = createDiscordBotClient(
       [],
       [
@@ -1095,7 +1138,7 @@ describe("handleDiscordInteraction", () => {
       options: createDiscordBotOptions(),
       cooldowns: new CommandCooldowns(60),
       fetchImpl: fetchMock as typeof fetch,
-      interaction: createComponentInteraction("price-report:settings:open"),
+      interaction: createComponentInteraction("price-report:settings:time-limit"),
     });
 
     const requestBody = JSON.parse(
@@ -1105,36 +1148,31 @@ describe("handleDiscordInteraction", () => {
     expect(requestBody).toMatchObject({
       type: 9,
       data: {
-        custom_id: "price-report:settings:modal",
-        title: "每日價格報告設定",
+        custom_id: "price-report:settings:time-limit-modal",
+        title: "每日報告時間與上限",
       },
     });
     expect(JSON.stringify(requestBody.data.components)).toContain('"value":"12"');
     expect(JSON.stringify(requestBody.data.components)).toContain('"value":"21:30"');
-    expect(JSON.stringify(requestBody.data.components)).toContain('"value":"12h","default":true');
-    expect(JSON.stringify(requestBody.data.components)).toContain(
-      '"custom_id":"price-report:settings:categories"',
+    expect(JSON.stringify(requestBody.data.components)).not.toContain(
+      "price-report:settings:categories",
     );
-    expect(JSON.stringify(requestBody.data.components)).toContain(
-      '"label":"顯示卡","value":"12","default":true',
-    );
-    expect(JSON.stringify(requestBody.data.components)).toContain(
-      '"label":"新增商品","value":"new_products","default":false',
-    );
-    expect(client.sourceCategory.findMany).toHaveBeenCalledWith({
-      where: {
-        enabled: true,
-      },
-      select: {
-        igrp: true,
-        displayName: true,
-      },
-      orderBy: [{ igrp: "asc" }, { displayName: "asc" }],
-    });
   });
 
-  it("enables daily report settings from the settings modal", async () => {
-    const client = createDiscordBotClient([]);
+  it("updates daily report time and item limit from the settings modal", async () => {
+    const client = createDiscordBotClient(
+      [],
+      [
+        priceReportSetting({
+          id: "setting-1",
+          discordUserId: "111122223333444455",
+          window: "HOURS_12",
+          categoryIgrps: [12],
+          includeNewProducts: false,
+          nextSendAt: new Date("2026-06-07T01:00:00.000Z"),
+        }),
+      ],
+    );
     const fetchMock = vi.fn<typeof fetch>(
       async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
     );
@@ -1145,9 +1183,6 @@ describe("handleDiscordInteraction", () => {
       cooldowns: new CommandCooldowns(60),
       fetchImpl: fetchMock as typeof fetch,
       interaction: createSettingsModalSubmitInteraction({
-        window: "6h",
-        categories: ["12", "7"],
-        events: ["price_drops", "new_products"],
         maxItems: "8",
         time: "21:30",
       }),
@@ -1156,27 +1191,102 @@ describe("handleDiscordInteraction", () => {
     expect(client.discordPriceReportSetting.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
         create: expect.objectContaining({
-          window: "HOURS_6",
+          window: "HOURS_12",
           maxItems: 8,
-          categoryIgrps: [7, 12],
+          categoryIgrps: [12],
           includePriceDrops: true,
-          includePriceRises: false,
-          includeNewProducts: true,
+          includePriceRises: true,
+          includeNewProducts: false,
           enabled: true,
         }),
         update: expect.objectContaining({
-          window: "HOURS_6",
+          window: "HOURS_12",
           maxItems: 8,
-          categoryIgrps: [7, 12],
+          categoryIgrps: [12],
           includePriceDrops: true,
-          includePriceRises: false,
-          includeNewProducts: true,
+          includePriceRises: true,
+          includeNewProducts: false,
           enabled: true,
         }),
       }),
     );
     expect(String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body)).toContain(
-      "已開啟每日價格提醒",
+      "已更新每日價格提醒",
+    );
+  });
+
+  it("stores all selected categories as the all-categories filter", async () => {
+    const client = createDiscordBotClient([]);
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createSelectComponentInteraction("price-report:settings:categories", [
+        "all",
+        ...TEST_SOURCE_CATEGORIES.map((category) => String(category.igrp)),
+      ]),
+    });
+
+    expect(client.discordPriceReportSetting.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          categoryIgrps: [],
+        }),
+        update: expect.objectContaining({
+          categoryIgrps: [],
+        }),
+      }),
+    );
+    expect(
+      JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body)),
+    ).toEqual({ type: 6 });
+  });
+
+  it("updates category choices from the settings panel", async () => {
+    const client = createDiscordBotClient([]);
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createSelectComponentInteraction("price-report:settings:categories", [
+        "all",
+        "7",
+        "12",
+      ]),
+    });
+
+    expect(client.discordPriceReportSetting.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          categoryIgrps: [7, 12],
+        }),
+        update: expect.objectContaining({
+          categoryIgrps: [7, 12],
+        }),
+      }),
+    );
+    const updatedBody = JSON.parse(
+      String((fetchMock.mock.calls[1]?.[1] as RequestInit | undefined)?.body),
+    );
+    const categorySelect = updatedBody.components[1].components[0];
+
+    expect(categorySelect.options).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ label: "全部分類", default: false }),
+        expect.objectContaining({ label: "SSD / HDD", default: true }),
+        expect.objectContaining({ label: "顯示卡", default: true }),
+        expect.objectContaining({ label: "CPU", default: false }),
+      ]),
     );
   });
 
@@ -1237,7 +1347,10 @@ describe("handleDiscordInteraction", () => {
         nextSendAt: null,
       },
     });
-    expect(String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body)).toContain(
+    expect(
+      JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body)),
+    ).toEqual({ type: 6 });
+    expect(String((fetchMock.mock.calls[1]?.[1] as RequestInit | undefined)?.body)).toContain(
       "已關閉每日價格提醒",
     );
   });
@@ -2010,16 +2123,28 @@ function createComponentInteraction(customId: string): DiscordInteraction {
   };
 }
 
+function createSelectComponentInteraction(customId: string, values: string[]): DiscordInteraction {
+  return {
+    id: "interaction-1",
+    token: "interaction-token",
+    type: 3,
+    data: {
+      custom_id: customId,
+      component_type: 3,
+      values,
+    },
+    member: {
+      user: {
+        id: "111122223333444455",
+      },
+    },
+  };
+}
+
 function createSettingsModalSubmitInteraction({
-  window = "24h",
-  categories = ["all"],
-  events = ["price_drops", "price_rises", "new_products"],
   maxItems = "50",
   time = "09:00",
 }: {
-  window?: string;
-  categories?: string[];
-  events?: string[];
   maxItems?: string;
   time?: string;
 }): DiscordInteraction {
@@ -2028,32 +2153,8 @@ function createSettingsModalSubmitInteraction({
     token: "interaction-token",
     type: 5,
     data: {
-      custom_id: "price-report:settings:modal",
+      custom_id: "price-report:settings:time-limit-modal",
       components: [
-        {
-          type: 18,
-          component: {
-            type: 3,
-            custom_id: "price-report:settings:window",
-            values: [window],
-          },
-        },
-        {
-          type: 18,
-          component: {
-            type: 3,
-            custom_id: "price-report:settings:categories",
-            values: categories,
-          },
-        },
-        {
-          type: 18,
-          component: {
-            type: 3,
-            custom_id: "price-report:settings:events",
-            values: events,
-          },
-        },
         {
           type: 18,
           component: {

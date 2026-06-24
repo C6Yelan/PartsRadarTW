@@ -312,10 +312,27 @@ export type ParsedWatchModal =
 
 export type ParsedPriceReportComponent =
   | {
-      name: "open_settings_modal";
+      name: "enable_daily_report";
     }
   | {
       name: "disable_daily_report";
+    }
+  | {
+      name: "open_time_limit_modal";
+    }
+  | {
+      name: "update_window";
+      windowHours: number;
+    }
+  | {
+      name: "update_categories";
+      values: string[];
+    }
+  | {
+      name: "update_events";
+      includePriceDrops: boolean;
+      includePriceRises: boolean;
+      includeNewProducts: boolean;
     };
 
 export type ParsedWatchComponent =
@@ -330,16 +347,8 @@ export type ParsedWatchComponent =
   | { action: "refresh" | "page"; page: number };
 
 export interface ParsedPriceReportModal {
-  windowHours: number;
-  windowInputValid: boolean;
   maxItems: number | null;
   maxItemsInputValid: boolean;
   timeOfDay: PriceReportTimeOfDay | null;
   timeInputValid: boolean;
-  categoryIgrps: number[];
-  categoryInputValid: boolean;
-  includePriceDrops: boolean;
-  includePriceRises: boolean;
-  includeNewProducts: boolean;
-  eventInputValid: boolean;
 }

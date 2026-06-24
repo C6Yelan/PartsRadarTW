@@ -5,6 +5,7 @@ import {
   DISCORD_APPLICATION_CONTEXT_GUILD,
   DISCORD_BUTTON_STYLE_DANGER,
   DISCORD_BUTTON_STYLE_PRIMARY,
+  DISCORD_BUTTON_STYLE_SECONDARY,
   DISCORD_COMMAND_TYPE_CHAT_INPUT,
   DISCORD_COMPONENT_TYPE_ACTION_ROW,
   DISCORD_COMPONENT_TYPE_BUTTON,
@@ -31,8 +32,10 @@ import type {
 } from "./types";
 
 const PRICE_REPORT_SETTINGS_OPEN_CUSTOM_ID = "price-report:settings:open";
+const PRICE_REPORT_SETTINGS_ENABLE_CUSTOM_ID = "price-report:settings:enable";
 const PRICE_REPORT_SETTINGS_DISABLE_CUSTOM_ID = "price-report:settings:disable";
-const PRICE_REPORT_SETTINGS_MODAL_CUSTOM_ID = "price-report:settings:modal";
+const PRICE_REPORT_SETTINGS_TIME_LIMIT_CUSTOM_ID = "price-report:settings:time-limit";
+const PRICE_REPORT_SETTINGS_TIME_LIMIT_MODAL_CUSTOM_ID = "price-report:settings:time-limit-modal";
 const PRICE_REPORT_SETTINGS_WINDOW_CUSTOM_ID = "price-report:settings:window";
 const PRICE_REPORT_SETTINGS_CATEGORIES_CUSTOM_ID = "price-report:settings:categories";
 const PRICE_REPORT_SETTINGS_EVENTS_CUSTOM_ID = "price-report:settings:events";
@@ -331,72 +334,48 @@ export function createWatchEditModal({
   };
 }
 
-export function createPriceReportSettingsComponents(): DiscordMessageComponent[] {
-  return [
-    {
-      type: DISCORD_COMPONENT_TYPE_ACTION_ROW,
-      components: [
-        {
-          type: DISCORD_COMPONENT_TYPE_BUTTON,
-          style: DISCORD_BUTTON_STYLE_PRIMARY,
-          custom_id: PRICE_REPORT_SETTINGS_OPEN_CUSTOM_ID,
-          label: "開啟/修改每日報告",
-        },
-        {
-          type: DISCORD_COMPONENT_TYPE_BUTTON,
-          style: DISCORD_BUTTON_STYLE_DANGER,
-          custom_id: PRICE_REPORT_SETTINGS_DISABLE_CUSTOM_ID,
-          label: "關閉每日報告",
-        },
-      ],
-    },
-  ];
-}
-
-export function createPriceReportSettingsModal({
+export function createPriceReportSettingsComponents({
   windowHours,
-  maxItems,
-  timeValue,
   categories,
   categoryIgrps,
   includePriceDrops,
   includePriceRises,
   includeNewProducts,
+  enabled,
 }: {
   windowHours: number;
-  maxItems: number;
-  timeValue: string;
   categories: Array<{ igrp: number; displayName: string }>;
   categoryIgrps: number[];
   includePriceDrops: boolean;
   includePriceRises: boolean;
   includeNewProducts: boolean;
-}): DiscordModal {
+  enabled: boolean;
+}): DiscordMessageComponent[] {
   const selectedCategoryIgrps = new Set(categoryIgrps);
+  const visibleCategories = categories.slice(0, PRICE_REPORT_CATEGORY_OPTION_LIMIT - 1);
   const categoryOptions = [
     {
       label: "全部分類",
       value: PRICE_REPORT_ALL_CATEGORIES_VALUE,
       default: selectedCategoryIgrps.size === 0,
     },
-    ...categories.slice(0, PRICE_REPORT_CATEGORY_OPTION_LIMIT - 1).map((category) => ({
+    ...visibleCategories.map((category) => ({
       label: category.displayName,
       value: String(category.igrp),
-      default: selectedCategoryIgrps.has(category.igrp),
+      default: selectedCategoryIgrps.size === 0 || selectedCategoryIgrps.has(category.igrp),
     })),
   ];
 
-  return {
-    custom_id: PRICE_REPORT_SETTINGS_MODAL_CUSTOM_ID,
-    title: "每日價格報告設定",
-    components: [
-      {
-        type: DISCORD_COMPONENT_TYPE_LABEL,
-        label: "統計區間",
-        component: {
+  return [
+    {
+      type: DISCORD_COMPONENT_TYPE_ACTION_ROW,
+      components: [
+        {
           type: DISCORD_COMPONENT_TYPE_STRING_SELECT,
           custom_id: PRICE_REPORT_SETTINGS_WINDOW_CUSTOM_ID,
-          required: true,
+          placeholder: "統計區間",
+          min_values: 1,
+          max_values: 1,
           options: [
             {
               label: "過去 24 小時",
@@ -415,15 +394,15 @@ export function createPriceReportSettingsModal({
             },
           ],
         },
-      },
-      {
-        type: DISCORD_COMPONENT_TYPE_LABEL,
-        label: "分類篩選",
-        description: "選「全部分類」或勾選想看的零件分類。",
-        component: {
+      ],
+    },
+    {
+      type: DISCORD_COMPONENT_TYPE_ACTION_ROW,
+      components: [
+        {
           type: DISCORD_COMPONENT_TYPE_STRING_SELECT,
           custom_id: PRICE_REPORT_SETTINGS_CATEGORIES_CUSTOM_ID,
-          required: true,
+          placeholder: "分類篩選",
           min_values: 1,
           max_values: Math.min(
             PRICE_REPORT_CATEGORY_OPTION_LIMIT,
@@ -431,15 +410,15 @@ export function createPriceReportSettingsModal({
           ),
           options: categoryOptions,
         },
-      },
-      {
-        type: DISCORD_COMPONENT_TYPE_LABEL,
-        label: "報告內容",
-        description: "至少選一種。",
-        component: {
+      ],
+    },
+    {
+      type: DISCORD_COMPONENT_TYPE_ACTION_ROW,
+      components: [
+        {
           type: DISCORD_COMPONENT_TYPE_STRING_SELECT,
           custom_id: PRICE_REPORT_SETTINGS_EVENTS_CUSTOM_ID,
-          required: true,
+          placeholder: "報告內容",
           min_values: 1,
           max_values: 3,
           options: [
@@ -460,7 +439,41 @@ export function createPriceReportSettingsModal({
             },
           ],
         },
-      },
+      ],
+    },
+    {
+      type: DISCORD_COMPONENT_TYPE_ACTION_ROW,
+      components: [
+        {
+          type: DISCORD_COMPONENT_TYPE_BUTTON,
+          style: DISCORD_BUTTON_STYLE_SECONDARY,
+          custom_id: PRICE_REPORT_SETTINGS_TIME_LIMIT_CUSTOM_ID,
+          label: "時間與上限",
+        },
+        {
+          type: DISCORD_COMPONENT_TYPE_BUTTON,
+          style: enabled ? DISCORD_BUTTON_STYLE_DANGER : DISCORD_BUTTON_STYLE_PRIMARY,
+          custom_id: enabled
+            ? PRICE_REPORT_SETTINGS_DISABLE_CUSTOM_ID
+            : PRICE_REPORT_SETTINGS_ENABLE_CUSTOM_ID,
+          label: enabled ? "關閉每日報告" : "開啟每日報告",
+        },
+      ],
+    },
+  ];
+}
+
+export function createPriceReportTimeLimitModal({
+  maxItems,
+  timeValue,
+}: {
+  maxItems: number;
+  timeValue: string;
+}): DiscordModal {
+  return {
+    custom_id: PRICE_REPORT_SETTINGS_TIME_LIMIT_MODAL_CUSTOM_ID,
+    title: "每日報告時間與上限",
+    components: [
       {
         type: DISCORD_COMPONENT_TYPE_LABEL,
         label: "最多列出的商品數",
@@ -498,16 +511,49 @@ export function createPriceReportSettingsModal({
 export function parsePriceReportComponentInteraction(
   interaction: DiscordInteraction,
 ): ParsedPriceReportComponent | null {
-  if (interaction.data?.custom_id === PRICE_REPORT_SETTINGS_OPEN_CUSTOM_ID) {
+  const customId = interaction.data?.custom_id;
+
+  if (customId === PRICE_REPORT_SETTINGS_OPEN_CUSTOM_ID) {
     return {
-      name: "open_settings_modal",
+      name: "open_time_limit_modal",
     };
   }
 
-  if (interaction.data?.custom_id === PRICE_REPORT_SETTINGS_DISABLE_CUSTOM_ID) {
+  if (customId === PRICE_REPORT_SETTINGS_ENABLE_CUSTOM_ID) {
+    return {
+      name: "enable_daily_report",
+    };
+  }
+
+  if (customId === PRICE_REPORT_SETTINGS_TIME_LIMIT_CUSTOM_ID) {
+    return {
+      name: "open_time_limit_modal",
+    };
+  }
+
+  if (customId === PRICE_REPORT_SETTINGS_DISABLE_CUSTOM_ID) {
     return {
       name: "disable_daily_report",
     };
+  }
+
+  if (customId === PRICE_REPORT_SETTINGS_WINDOW_CUSTOM_ID) {
+    const windowHours = parseWindowHoursStrict(interaction.data?.values?.[0]);
+
+    return windowHours ? { name: "update_window", windowHours } : null;
+  }
+
+  if (customId === PRICE_REPORT_SETTINGS_CATEGORIES_CUSTOM_ID) {
+    return {
+      name: "update_categories",
+      values: interaction.data?.values ?? [],
+    };
+  }
+
+  if (customId === PRICE_REPORT_SETTINGS_EVENTS_CUSTOM_ID) {
+    const events = parsePriceReportEvents(interaction.data?.values ?? []);
+
+    return events ? { name: "update_events", ...events } : null;
   }
 
   return null;
@@ -516,47 +562,32 @@ export function parsePriceReportComponentInteraction(
 export function parsePriceReportModalSubmit(
   interaction: DiscordInteraction,
 ): ParsedPriceReportModal | null {
-  if (interaction.data?.custom_id !== PRICE_REPORT_SETTINGS_MODAL_CUSTOM_ID) {
+  const data = interaction.data;
+
+  if (!data) {
     return null;
   }
 
-  const windowValue = readSubmittedComponentValue(
-    interaction.data.components,
-    PRICE_REPORT_SETTINGS_WINDOW_CUSTOM_ID,
-  );
+  const customId = data.custom_id;
+
+  if (customId !== PRICE_REPORT_SETTINGS_TIME_LIMIT_MODAL_CUSTOM_ID) {
+    return null;
+  }
+
   const maxItemsValue = readSubmittedComponentValue(
-    interaction.data.components,
+    data.components,
     PRICE_REPORT_SETTINGS_MAX_ITEMS_CUSTOM_ID,
   );
-  const categoryValues = readSubmittedComponentValues(
-    interaction.data.components,
-    PRICE_REPORT_SETTINGS_CATEGORIES_CUSTOM_ID,
-  );
-  const eventValues = readSubmittedComponentValues(
-    interaction.data.components,
-    PRICE_REPORT_SETTINGS_EVENTS_CUSTOM_ID,
-  );
   const timeValue = readSubmittedComponentValue(
-    interaction.data.components,
+    data.components,
     PRICE_REPORT_SETTINGS_TIME_CUSTOM_ID,
   );
-  const windowHours = parseWindowHoursStrict(windowValue);
   const maxItems = parseMaxItemsInput(maxItemsValue);
-  const categoryIgrps = parseCategoryIgrps(categoryValues);
-  const events = parsePriceReportEvents(eventValues);
   const timeOfDay = parseTimeOfDay(timeValue);
 
   return {
-    windowHours: windowHours ?? 24,
-    windowInputValid: windowHours !== null,
     maxItems,
     maxItemsInputValid: maxItems !== null,
-    categoryIgrps: categoryIgrps ?? [],
-    categoryInputValid: categoryIgrps !== null,
-    includePriceDrops: events?.includePriceDrops ?? true,
-    includePriceRises: events?.includePriceRises ?? true,
-    includeNewProducts: events?.includeNewProducts ?? true,
-    eventInputValid: events !== null,
     timeOfDay,
     timeInputValid: timeOfDay !== null,
   };
@@ -651,32 +682,6 @@ function parseMaxItemsInput(value: unknown): number | null {
     : null;
 }
 
-function parseCategoryIgrps(values: unknown[]): number[] | null {
-  if (values.length === 0 || values.includes(PRICE_REPORT_ALL_CATEGORIES_VALUE)) {
-    return [];
-  }
-
-  const parsed: number[] = [];
-
-  for (const value of values) {
-    if (typeof value !== "string" || !/^[1-9][0-9]*$/.test(value)) {
-      return null;
-    }
-
-    const igrp = Number(value);
-
-    if (!Number.isSafeInteger(igrp)) {
-      return null;
-    }
-
-    if (!parsed.includes(igrp)) {
-      parsed.push(igrp);
-    }
-  }
-
-  return parsed;
-}
-
 function parsePriceReportEvents(values: unknown[]): {
   includePriceDrops: boolean;
   includePriceRises: boolean;
@@ -756,31 +761,4 @@ function readSubmittedComponentValue(
   }
 
   return undefined;
-}
-
-function readSubmittedComponentValues(
-  components: DiscordInteractionComponent[] | undefined,
-  customId: string,
-): unknown[] {
-  for (const component of components ?? []) {
-    if (component.custom_id === customId) {
-      return component.values ?? (component.value === undefined ? [] : [component.value]);
-    }
-
-    if (component.component) {
-      const values = readSubmittedComponentValues([component.component], customId);
-
-      if (values.length > 0) {
-        return values;
-      }
-    }
-
-    const values = readSubmittedComponentValues(component.components, customId);
-
-    if (values.length > 0) {
-      return values;
-    }
-  }
-
-  return [];
 }

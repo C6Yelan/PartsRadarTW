@@ -2,7 +2,7 @@
 
 import {
   createPriceReportSettingsComponents,
-  createPriceReportSettingsModal,
+  createPriceReportTimeLimitModal,
   createWatchEditModal,
   createWatchModal,
   parsePriceReportComponentInteraction,
@@ -25,7 +25,7 @@ import {
   enableDailyPriceReport,
   formatPriceReportSettingMessage,
   formatTaipeiMinute,
-  formatWindowLabel,
+  type PriceReportCategoryOption,
   readPriceReportCategories,
   readPriceReportSetting,
   sendPriceReportNow,
@@ -39,7 +39,14 @@ import {
   sendInteractionResponse,
   sendModalInteractionResponse,
 } from "./rest";
-import type { DiscordBotClient, DiscordBotOptions, DiscordInteraction, FetchImpl } from "./types";
+import type {
+  DiscordBotClient,
+  DiscordBotMessage,
+  DiscordBotOptions,
+  DiscordInteraction,
+  FetchImpl,
+  PriceReportTimeOfDay,
+} from "./types";
 import {
   createTargetPriceWatch,
   createTargetPriceWatchManagerMessage,
@@ -172,18 +179,17 @@ async function handleApplicationCommandInteraction({
       return;
     }
 
-    const setting = await readPriceReportSetting({ client, discordUserId });
-    const categories = await readPriceReportCategories({ client });
+    const panel = await readPriceReportSettingsPanel({
+      client,
+      discordUserId,
+    });
 
     await sendInteractionResponse({
       token: options.token,
       apiBaseUrl: options.apiBaseUrl,
       interaction,
       fetchImpl,
-      message: {
-        content: formatPriceReportSettingMessage(setting, categories),
-        components: createPriceReportSettingsComponents(),
-      },
+      message: createPriceReportSettingsPanelMessage(panel),
     });
     return;
   }
@@ -360,38 +366,102 @@ async function handleMessageComponentInteraction({
     return;
   }
 
-  if (component?.name === "open_settings_modal") {
+  if (component?.name === "open_time_limit_modal") {
     const setting = await readPriceReportSetting({ client, discordUserId });
-    const categories = await readPriceReportCategories({ client });
-    const filters = toPriceReportFilters(setting);
 
     await sendModalInteractionResponse({
       token: options.token,
       apiBaseUrl: options.apiBaseUrl,
       interaction,
       fetchImpl,
-      modal: createPriceReportSettingsModal({
-        windowHours: resolveWindowHours(setting?.window),
+      modal: createPriceReportTimeLimitModal({
         maxItems: setting?.maxItems ?? options.priceReportMaxItems,
         timeValue: formatTaipeiTimeInput(setting?.nextSendAt),
-        categories,
-        categoryIgrps: filters.categoryIgrps,
-        includePriceDrops: filters.includePriceDrops,
-        includePriceRises: filters.includePriceRises,
-        includeNewProducts: filters.includeNewProducts,
       }),
     });
     return;
   }
 
-  const disabledCount = await disablePriceReport({ client, discordUserId });
-
-  await sendInteractionResponse({
+  await deferInteractionMessageUpdate({
     token: options.token,
     apiBaseUrl: options.apiBaseUrl,
     interaction,
     fetchImpl,
-    content: disabledCount > 0 ? "已關閉每日價格提醒。" : "目前沒有開啟每日價格提醒。",
+  });
+
+  let notice: string;
+
+  if (component?.name === "disable_daily_report") {
+    const disabledCount = await disablePriceReport({ client, discordUserId });
+    notice = disabledCount > 0 ? "已關閉每日價格提醒。" : "目前沒有開啟每日價格提醒。";
+  } else {
+    const currentPanel = await readPriceReportSettingsPanel({
+      client,
+      discordUserId,
+    });
+    const currentFilters = toPriceReportFilters(currentPanel.setting);
+    const categoryIgrps =
+      component?.name === "update_categories"
+        ? parsePriceReportCategorySelection(component.values, currentPanel.categories)
+        : currentFilters.categoryIgrps;
+
+    if (categoryIgrps === null) {
+      await editDeferredInteractionResponse({
+        token: options.token,
+        applicationId: options.applicationId,
+        apiBaseUrl: options.apiBaseUrl,
+        interaction,
+        fetchImpl,
+        message: createPriceReportSettingsPanelMessage({
+          ...currentPanel,
+          notice: "分類選擇無法辨識，請重新選擇。",
+        }),
+      });
+      return;
+    }
+
+    await enableDailyPriceReport({
+      client,
+      discordUserId,
+      windowHours:
+        component?.name === "update_window"
+          ? component.windowHours
+          : resolveWindowHours(currentPanel.setting?.window),
+      maxItems: currentPanel.setting?.maxItems ?? options.priceReportMaxItems,
+      categoryIgrps,
+      includePriceDrops:
+        component?.name === "update_events"
+          ? component.includePriceDrops
+          : currentFilters.includePriceDrops,
+      includePriceRises:
+        component?.name === "update_events"
+          ? component.includePriceRises
+          : currentFilters.includePriceRises,
+      includeNewProducts:
+        component?.name === "update_events"
+          ? component.includeNewProducts
+          : currentFilters.includeNewProducts,
+      timeOfDay: resolveTimeOfDay(currentPanel.setting?.nextSendAt),
+    });
+    notice =
+      component?.name === "enable_daily_report"
+        ? "已開啟每日價格提醒。"
+        : "已更新每日價格提醒設定。";
+  }
+
+  const panel = await readPriceReportSettingsPanel({
+    client,
+    discordUserId,
+    notice,
+  });
+
+  await editDeferredInteractionResponse({
+    token: options.token,
+    applicationId: options.applicationId,
+    apiBaseUrl: options.apiBaseUrl,
+    interaction,
+    fetchImpl,
+    message: createPriceReportSettingsPanelMessage(panel),
   });
 }
 
@@ -522,13 +592,7 @@ async function handleModalSubmitInteraction({
     return;
   }
 
-  if (
-    !modal.windowInputValid ||
-    !modal.maxItemsInputValid ||
-    !modal.categoryInputValid ||
-    !modal.eventInputValid ||
-    !modal.timeInputValid
-  ) {
+  if (!modal.maxItemsInputValid || !modal.timeInputValid) {
     await sendInteractionResponse({
       token: options.token,
       apiBaseUrl: options.apiBaseUrl,
@@ -539,16 +603,23 @@ async function handleModalSubmitInteraction({
     return;
   }
 
+  const currentSetting = await readPriceReportSetting({ client, discordUserId });
+  const currentFilters = toPriceReportFilters(currentSetting);
   const setting = await enableDailyPriceReport({
     client,
     discordUserId,
-    windowHours: modal.windowHours,
+    windowHours: resolveWindowHours(currentSetting?.window),
     maxItems: modal.maxItems ?? options.priceReportMaxItems,
-    categoryIgrps: modal.categoryIgrps,
-    includePriceDrops: modal.includePriceDrops,
-    includePriceRises: modal.includePriceRises,
-    includeNewProducts: modal.includeNewProducts,
+    categoryIgrps: currentFilters.categoryIgrps,
+    includePriceDrops: currentFilters.includePriceDrops,
+    includePriceRises: currentFilters.includePriceRises,
+    includeNewProducts: currentFilters.includeNewProducts,
     timeOfDay: modal.timeOfDay,
+  });
+  const panel = await readPriceReportSettingsPanel({
+    client,
+    discordUserId,
+    notice: `已更新每日價格提醒。下一次：${formatTaipeiMinute(setting.nextSendAt)}。`,
   });
 
   await sendInteractionResponse({
@@ -556,7 +627,7 @@ async function handleModalSubmitInteraction({
     apiBaseUrl: options.apiBaseUrl,
     interaction,
     fetchImpl,
-    content: `已開啟每日價格提醒。報告會以私訊發送，區間：${formatWindowLabel(setting.window)}，上限：${setting.maxItems} 筆，下一次：${formatTaipeiMinute(setting.nextSendAt)}。`,
+    message: createPriceReportSettingsPanelMessage(panel),
   });
 }
 
@@ -635,24 +706,96 @@ function extractWatchId(watchInput: string | null): string | null {
   return match?.[1] ?? null;
 }
 
+async function readPriceReportSettingsPanel({
+  client,
+  discordUserId,
+  notice,
+}: {
+  client: DiscordBotClient;
+  discordUserId: string;
+  notice?: string;
+}): Promise<{
+  setting: Awaited<ReturnType<typeof readPriceReportSetting>>;
+  categories: PriceReportCategoryOption[];
+  notice?: string;
+}> {
+  const [setting, categories] = await Promise.all([
+    readPriceReportSetting({ client, discordUserId }),
+    readPriceReportCategories({ client }),
+  ]);
+
+  return {
+    setting,
+    categories,
+    notice,
+  };
+}
+
+function createPriceReportSettingsPanelMessage({
+  setting,
+  categories,
+  notice,
+}: Awaited<ReturnType<typeof readPriceReportSettingsPanel>>): DiscordBotMessage {
+  const filters = toPriceReportFilters(setting);
+  const summary = formatPriceReportSettingMessage(setting, categories);
+  const content = notice ? `**${notice}**\n\n${summary}` : summary;
+
+  return {
+    content,
+    components: createPriceReportSettingsComponents({
+      windowHours: resolveWindowHours(setting?.window),
+      categories,
+      categoryIgrps: filters.categoryIgrps,
+      includePriceDrops: filters.includePriceDrops,
+      includePriceRises: filters.includePriceRises,
+      includeNewProducts: filters.includeNewProducts,
+      enabled: setting?.enabled ?? false,
+    }),
+  };
+}
+
+function parsePriceReportCategorySelection(
+  values: string[],
+  categories: PriceReportCategoryOption[],
+): number[] | null {
+  const visibleCategories = categories.slice(0, 24);
+  const visibleIgrps = new Set(visibleCategories.map((category) => category.igrp));
+  const selectedIgrps = new Set<number>();
+
+  for (const value of values) {
+    if (value === "all") {
+      continue;
+    }
+
+    if (!/^[1-9][0-9]*$/.test(value)) {
+      return null;
+    }
+
+    const igrp = Number(value);
+
+    if (!visibleIgrps.has(igrp)) {
+      return null;
+    }
+
+    selectedIgrps.add(igrp);
+  }
+
+  if (selectedIgrps.size === 0 || selectedIgrps.size === visibleIgrps.size) {
+    return [];
+  }
+
+  return [...selectedIgrps].sort((left, right) => left - right);
+}
+
 function formatPriceReportModalValidationMessage({
-  windowInputValid,
   maxItemsInputValid,
-  categoryInputValid,
-  eventInputValid,
   timeInputValid,
 }: {
-  windowInputValid: boolean;
   maxItemsInputValid: boolean;
-  categoryInputValid: boolean;
-  eventInputValid: boolean;
   timeInputValid: boolean;
 }): string {
   const messages = [
-    windowInputValid ? null : "統計區間需為 `24h`、`12h` 或 `6h`。",
     maxItemsInputValid ? null : `最多商品數需為 1-${MAX_PRICE_REPORT_ITEMS} 的整數。`,
-    categoryInputValid ? null : "分類篩選無法辨識，請重新開啟設定視窗後再試一次。",
-    eventInputValid ? null : "報告內容至少要選擇一種：降價、漲價或新增商品。",
     timeInputValid ? null : "每日發送時間格式需為台北時間 HH:mm，例如 `09:30` 或 `21:00`。",
   ].filter((message): message is string => message !== null);
 
@@ -669,6 +812,16 @@ function resolveWindowHours(window: string | undefined): number {
   }
 
   return 24;
+}
+
+function resolveTimeOfDay(value: Date | null | undefined): PriceReportTimeOfDay {
+  const [hourValue, minuteValue] = formatTaipeiTimeInput(value).split(":");
+  const hour = Number(hourValue);
+  const minute = Number(minuteValue);
+
+  return Number.isInteger(hour) && Number.isInteger(minute)
+    ? { hour, minute }
+    : { hour: 9, minute: 0 };
 }
 
 function formatTaipeiTimeInput(value: Date | null | undefined): string {
