@@ -1004,16 +1004,22 @@ describe("handleDiscordInteraction", () => {
                 placeholder: "分類篩選",
                 options: expect.arrayContaining([
                   expect.objectContaining({
-                    label: "全部分類",
-                    value: "all",
-                    default: true,
-                  }),
-                  expect.objectContaining({
                     label: "顯示卡",
                     value: "12",
                     default: true,
                   }),
                 ]),
+              }),
+            ],
+          },
+          {
+            type: 1,
+            components: [
+              expect.objectContaining({
+                type: 2,
+                custom_id: "price-report:settings:all-categories",
+                label: "已選全部分類",
+                disabled: true,
               }),
             ],
           },
@@ -1033,7 +1039,7 @@ describe("handleDiscordInteraction", () => {
               expect.objectContaining({
                 type: 2,
                 custom_id: "price-report:settings:time-limit",
-                label: "時間與上限",
+                label: "調整時間與上限",
               }),
               expect.objectContaining({
                 type: 2,
@@ -1215,8 +1221,18 @@ describe("handleDiscordInteraction", () => {
     );
   });
 
-  it("stores all selected categories as the all-categories filter", async () => {
-    const client = createDiscordBotClient([]);
+  it("resets category choices to all categories from the settings panel", async () => {
+    const client = createDiscordBotClient(
+      [],
+      [
+        priceReportSetting({
+          id: "setting-1",
+          discordUserId: "111122223333444455",
+          categoryIgrps: [7, 12],
+          nextSendAt: new Date("2026-06-07T13:30:00.000Z"),
+        }),
+      ],
+    );
     const fetchMock = vi.fn<typeof fetch>(
       async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
     );
@@ -1226,10 +1242,7 @@ describe("handleDiscordInteraction", () => {
       options: createDiscordBotOptions(),
       cooldowns: new CommandCooldowns(60),
       fetchImpl: fetchMock as typeof fetch,
-      interaction: createSelectComponentInteraction("price-report:settings:categories", [
-        "all",
-        ...TEST_SOURCE_CATEGORIES.map((category) => String(category.igrp)),
-      ]),
+      interaction: createComponentInteraction("price-report:settings:all-categories"),
     });
 
     expect(client.discordPriceReportSetting.upsert).toHaveBeenCalledWith(
@@ -1245,6 +1258,9 @@ describe("handleDiscordInteraction", () => {
     expect(
       JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body)),
     ).toEqual({ type: 6 });
+    expect(String((fetchMock.mock.calls[1]?.[1] as RequestInit | undefined)?.body)).toContain(
+      "分類：全部分類",
+    );
   });
 
   it("updates category choices from the settings panel", async () => {
@@ -1259,7 +1275,6 @@ describe("handleDiscordInteraction", () => {
       cooldowns: new CommandCooldowns(60),
       fetchImpl: fetchMock as typeof fetch,
       interaction: createSelectComponentInteraction("price-report:settings:categories", [
-        "all",
         "7",
         "12",
       ]),
@@ -1282,11 +1297,20 @@ describe("handleDiscordInteraction", () => {
 
     expect(categorySelect.options).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ label: "全部分類", default: false }),
         expect.objectContaining({ label: "SSD / HDD", default: true }),
         expect.objectContaining({ label: "顯示卡", default: true }),
         expect.objectContaining({ label: "CPU", default: false }),
       ]),
+    );
+    expect(categorySelect.options).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ label: "全部分類" })]),
+    );
+    expect(updatedBody.components[2].components[0]).toEqual(
+      expect.objectContaining({
+        custom_id: "price-report:settings:all-categories",
+        label: "改為全部分類",
+        disabled: false,
+      }),
     );
   });
 

@@ -38,10 +38,10 @@ const PRICE_REPORT_SETTINGS_TIME_LIMIT_CUSTOM_ID = "price-report:settings:time-l
 const PRICE_REPORT_SETTINGS_TIME_LIMIT_MODAL_CUSTOM_ID = "price-report:settings:time-limit-modal";
 const PRICE_REPORT_SETTINGS_WINDOW_CUSTOM_ID = "price-report:settings:window";
 const PRICE_REPORT_SETTINGS_CATEGORIES_CUSTOM_ID = "price-report:settings:categories";
+const PRICE_REPORT_SETTINGS_ALL_CATEGORIES_CUSTOM_ID = "price-report:settings:all-categories";
 const PRICE_REPORT_SETTINGS_EVENTS_CUSTOM_ID = "price-report:settings:events";
 const PRICE_REPORT_SETTINGS_MAX_ITEMS_CUSTOM_ID = "price-report:settings:max-items";
 const PRICE_REPORT_SETTINGS_TIME_CUSTOM_ID = "price-report:settings:time";
-const PRICE_REPORT_ALL_CATEGORIES_VALUE = "all";
 const PRICE_REPORT_EVENT_PRICE_DROPS_VALUE = "price_drops";
 const PRICE_REPORT_EVENT_PRICE_RISES_VALUE = "price_rises";
 const PRICE_REPORT_EVENT_NEW_PRODUCTS_VALUE = "new_products";
@@ -352,19 +352,13 @@ export function createPriceReportSettingsComponents({
   enabled: boolean;
 }): DiscordMessageComponent[] {
   const selectedCategoryIgrps = new Set(categoryIgrps);
-  const visibleCategories = categories.slice(0, PRICE_REPORT_CATEGORY_OPTION_LIMIT - 1);
-  const categoryOptions = [
-    {
-      label: "全部分類",
-      value: PRICE_REPORT_ALL_CATEGORIES_VALUE,
-      default: selectedCategoryIgrps.size === 0,
-    },
-    ...visibleCategories.map((category) => ({
-      label: category.displayName,
-      value: String(category.igrp),
-      default: selectedCategoryIgrps.size === 0 || selectedCategoryIgrps.has(category.igrp),
-    })),
-  ];
+  const allCategoriesSelected = selectedCategoryIgrps.size === 0;
+  const visibleCategories = categories.slice(0, PRICE_REPORT_CATEGORY_OPTION_LIMIT);
+  const categoryOptions = visibleCategories.map((category) => ({
+    label: category.displayName,
+    value: String(category.igrp),
+    default: allCategoriesSelected || selectedCategoryIgrps.has(category.igrp),
+  }));
 
   return [
     {
@@ -404,11 +398,20 @@ export function createPriceReportSettingsComponents({
           custom_id: PRICE_REPORT_SETTINGS_CATEGORIES_CUSTOM_ID,
           placeholder: "分類篩選",
           min_values: 1,
-          max_values: Math.min(
-            PRICE_REPORT_CATEGORY_OPTION_LIMIT,
-            Math.max(1, categoryOptions.length),
-          ),
+          max_values: Math.min(PRICE_REPORT_CATEGORY_OPTION_LIMIT, categoryOptions.length),
           options: categoryOptions,
+        },
+      ],
+    },
+    {
+      type: DISCORD_COMPONENT_TYPE_ACTION_ROW,
+      components: [
+        {
+          type: DISCORD_COMPONENT_TYPE_BUTTON,
+          style: DISCORD_BUTTON_STYLE_SECONDARY,
+          custom_id: PRICE_REPORT_SETTINGS_ALL_CATEGORIES_CUSTOM_ID,
+          label: allCategoriesSelected ? "已選全部分類" : "改為全部分類",
+          disabled: allCategoriesSelected,
         },
       ],
     },
@@ -448,7 +451,7 @@ export function createPriceReportSettingsComponents({
           type: DISCORD_COMPONENT_TYPE_BUTTON,
           style: DISCORD_BUTTON_STYLE_SECONDARY,
           custom_id: PRICE_REPORT_SETTINGS_TIME_LIMIT_CUSTOM_ID,
-          label: "時間與上限",
+          label: "調整時間與上限",
         },
         {
           type: DISCORD_COMPONENT_TYPE_BUTTON,
@@ -534,6 +537,12 @@ export function parsePriceReportComponentInteraction(
   if (customId === PRICE_REPORT_SETTINGS_DISABLE_CUSTOM_ID) {
     return {
       name: "disable_daily_report",
+    };
+  }
+
+  if (customId === PRICE_REPORT_SETTINGS_ALL_CATEGORIES_CUSTOM_ID) {
+    return {
+      name: "update_all_categories",
     };
   }
 

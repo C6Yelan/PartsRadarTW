@@ -329,6 +329,9 @@ export type ParsedPriceReportComponent =
       values: string[];
     }
   | {
+      name: "update_all_categories";
+    }
+  | {
       name: "update_events";
       includePriceDrops: boolean;
       includePriceRises: boolean;

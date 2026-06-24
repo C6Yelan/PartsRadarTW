@@ -403,7 +403,9 @@ async function handleMessageComponentInteraction({
     const categoryIgrps =
       component?.name === "update_categories"
         ? parsePriceReportCategorySelection(component.values, currentPanel.categories)
-        : currentFilters.categoryIgrps;
+        : component?.name === "update_all_categories"
+          ? []
+          : currentFilters.categoryIgrps;
 
     if (categoryIgrps === null) {
       await editDeferredInteractionResponse({
@@ -758,15 +760,11 @@ function parsePriceReportCategorySelection(
   values: string[],
   categories: PriceReportCategoryOption[],
 ): number[] | null {
-  const visibleCategories = categories.slice(0, 24);
+  const visibleCategories = categories.slice(0, 25);
   const visibleIgrps = new Set(visibleCategories.map((category) => category.igrp));
   const selectedIgrps = new Set<number>();
 
   for (const value of values) {
-    if (value === "all") {
-      continue;
-    }
-
     if (!/^[1-9][0-9]*$/.test(value)) {
       return null;
     }
