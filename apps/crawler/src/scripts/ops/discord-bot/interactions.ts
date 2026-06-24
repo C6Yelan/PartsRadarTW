@@ -13,6 +13,7 @@ import {
   parseWatchModalSubmit,
 } from "./commands";
 import {
+  DISCORD_EMBED_COLOR,
   DISCORD_INTERACTION_TYPE_APPLICATION_COMMAND,
   DISCORD_INTERACTION_TYPE_MESSAGE_COMPONENT,
   DISCORD_INTERACTION_TYPE_MODAL_SUBMIT,
@@ -23,8 +24,10 @@ import type { CommandCooldowns } from "./cooldowns";
 import {
   disablePriceReport,
   enableDailyPriceReport,
-  formatPriceReportSettingMessage,
+  formatPriceReportCategoryFilterLabel,
+  formatPriceReportEventFilterLabel,
   formatTaipeiMinute,
+  formatWindowLabel,
   type PriceReportCategoryOption,
   readPriceReportCategories,
   readPriceReportSetting,
@@ -41,6 +44,7 @@ import {
 } from "./rest";
 import type {
   DiscordBotClient,
+  DiscordBotEmbed,
   DiscordBotMessage,
   DiscordBotOptions,
   DiscordInteraction,
@@ -182,6 +186,7 @@ async function handleApplicationCommandInteraction({
     const panel = await readPriceReportSettingsPanel({
       client,
       discordUserId,
+      options,
     });
 
     await sendInteractionResponse({
@@ -398,6 +403,7 @@ async function handleMessageComponentInteraction({
     const currentPanel = await readPriceReportSettingsPanel({
       client,
       discordUserId,
+      options,
     });
     const currentFilters = toPriceReportFilters(currentPanel.setting);
     const categoryIgrps =
@@ -454,6 +460,7 @@ async function handleMessageComponentInteraction({
   const panel = await readPriceReportSettingsPanel({
     client,
     discordUserId,
+    options,
     notice,
   });
 
@@ -621,6 +628,7 @@ async function handleModalSubmitInteraction({
   const panel = await readPriceReportSettingsPanel({
     client,
     discordUserId,
+    options,
     notice: `已更新每日價格提醒。下一次：${formatTaipeiMinute(setting.nextSendAt)}。`,
   });
 
@@ -711,14 +719,17 @@ function extractWatchId(watchInput: string | null): string | null {
 async function readPriceReportSettingsPanel({
   client,
   discordUserId,
+  options,
   notice,
 }: {
   client: DiscordBotClient;
   discordUserId: string;
+  options: DiscordBotOptions;
   notice?: string;
 }): Promise<{
   setting: Awaited<ReturnType<typeof readPriceReportSetting>>;
   categories: PriceReportCategoryOption[];
+  options: DiscordBotOptions;
   notice?: string;
 }> {
   const [setting, categories] = await Promise.all([
@@ -729,6 +740,7 @@ async function readPriceReportSettingsPanel({
   return {
     setting,
     categories,
+    options,
     notice,
   };
 }
@@ -736,14 +748,13 @@ async function readPriceReportSettingsPanel({
 function createPriceReportSettingsPanelMessage({
   setting,
   categories,
+  options,
   notice,
 }: Awaited<ReturnType<typeof readPriceReportSettingsPanel>>): DiscordBotMessage {
   const filters = toPriceReportFilters(setting);
-  const summary = formatPriceReportSettingMessage(setting, categories);
-  const content = notice ? `**${notice}**\n\n${summary}` : summary;
 
   return {
-    content,
+    embeds: [createPriceReportSettingsEmbed({ setting, categories, options, notice })],
     components: createPriceReportSettingsComponents({
       windowHours: resolveWindowHours(setting?.window),
       categories,
@@ -753,6 +764,60 @@ function createPriceReportSettingsPanelMessage({
       includeNewProducts: filters.includeNewProducts,
       enabled: setting?.enabled ?? false,
     }),
+  };
+}
+
+function createPriceReportSettingsEmbed({
+  setting,
+  categories,
+  options,
+  notice,
+}: Awaited<ReturnType<typeof readPriceReportSettingsPanel>>): DiscordBotEmbed {
+  const enabled = setting?.enabled ?? false;
+  const filters = toPriceReportFilters(setting);
+  const description = [
+    notice ? `**${notice}**` : null,
+    enabled ? "每日價格提醒已開啟。" : "尚未開啟每日價格提醒。",
+  ]
+    .filter((line): line is string => line !== null)
+    .join("\n");
+
+  return {
+    title: "價格報告設定",
+    description,
+    color: DISCORD_EMBED_COLOR,
+    fields: [
+      {
+        name: "統計區間",
+        value: setting ? formatWindowLabel(setting.window) : "過去 24 小時",
+        inline: true,
+      },
+      {
+        name: "分類",
+        value: formatPriceReportCategoryFilterLabel(filters, categories),
+        inline: true,
+      },
+      {
+        name: "內容",
+        value: formatPriceReportEventFilterLabel(filters),
+        inline: true,
+      },
+      {
+        name: "每次最多",
+        value: `${setting?.maxItems ?? options.priceReportMaxItems} 筆`,
+        inline: true,
+      },
+      {
+        name: "每日時間",
+        value: formatTaipeiTimeInput(setting?.nextSendAt),
+        inline: true,
+      },
+      {
+        name: "下一次",
+        value: enabled && setting ? formatTaipeiMinute(setting.nextSendAt) : "啟用後排程",
+        inline: true,
+      },
+    ],
   };
 }
 

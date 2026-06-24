@@ -4,6 +4,7 @@ import {
   CommandCooldowns,
   calculateScheduledPriceReportSleepMs,
   type DiscordBotClient,
+  type DiscordBotEmbed,
   type DiscordBotMessage,
   type DiscordBotOptions,
   type DiscordInteraction,
@@ -982,8 +983,21 @@ describe("handleDiscordInteraction", () => {
     expect(requestBody).toMatchObject({
       type: 4,
       data: {
-        content: expect.stringContaining("尚未開啟每日價格提醒"),
         flags: 64,
+        embeds: [
+          expect.objectContaining({
+            title: "價格報告設定",
+            description: "尚未開啟每日價格提醒。",
+            fields: expect.arrayContaining([
+              expect.objectContaining({ name: "統計區間", value: "過去 24 小時" }),
+              expect.objectContaining({ name: "分類", value: "全部分類" }),
+              expect.objectContaining({ name: "內容", value: "降價、漲價、新增商品" }),
+              expect.objectContaining({ name: "每次最多", value: "50 筆" }),
+              expect.objectContaining({ name: "每日時間", value: "09:00" }),
+              expect.objectContaining({ name: "下一次", value: "啟用後排程" }),
+            ]),
+          }),
+        ],
         components: [
           {
             type: 1,
@@ -1040,6 +1054,7 @@ describe("handleDiscordInteraction", () => {
         ],
       },
     });
+    expect(requestBody.data).not.toHaveProperty("content");
     expect(JSON.stringify(requestBody.data.components)).not.toContain(
       "price-report:settings:all-categories",
     );
@@ -1074,8 +1089,10 @@ describe("handleDiscordInteraction", () => {
       String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body),
     );
 
-    expect(requestBody.data.content).toContain("分類：SSD / HDD、顯示卡");
-    expect(requestBody.data.content).toContain("內容：降價、新增商品");
+    const embed = readResponseEmbed(requestBody);
+
+    expect(readEmbedFieldValue(embed, "分類")).toBe("SSD / HDD、顯示卡");
+    expect(readEmbedFieldValue(embed, "內容")).toBe("降價、新增商品");
   });
 
   it("does not consume the price report cooldown for settings commands", async () => {
@@ -1250,9 +1267,11 @@ describe("handleDiscordInteraction", () => {
     expect(
       JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body)),
     ).toEqual({ type: 6 });
-    expect(String((fetchMock.mock.calls[1]?.[1] as RequestInit | undefined)?.body)).toContain(
-      "分類：全部分類",
+    const updatedBody = JSON.parse(
+      String((fetchMock.mock.calls[1]?.[1] as RequestInit | undefined)?.body),
     );
+
+    expect(readEmbedFieldValue(readResponseEmbed(updatedBody), "分類")).toBe("全部分類");
     expect(String((fetchMock.mock.calls[1]?.[1] as RequestInit | undefined)?.body)).not.toContain(
       "price-report:settings:all-categories",
     );
@@ -2096,6 +2115,23 @@ function createDiscordBotOptions(): DiscordBotOptions {
     commandCooldownSeconds: 60,
     priceReportScheduleIntervalSeconds: 300,
   };
+}
+
+function readResponseEmbed(body: {
+  data?: { embeds?: DiscordBotEmbed[] };
+  embeds?: DiscordBotEmbed[];
+}): DiscordBotEmbed {
+  const embed = body.data?.embeds?.[0] ?? body.embeds?.[0];
+
+  if (!embed) {
+    throw new Error("Expected response body to include an embed.");
+  }
+
+  return embed;
+}
+
+function readEmbedFieldValue(embed: DiscordBotEmbed, fieldName: string): string | undefined {
+  return embed.fields?.find((field) => field.name === fieldName)?.value;
 }
 
 function createInteraction(
