@@ -1218,8 +1218,13 @@ describe("handleDiscordInteraction", () => {
       },
     });
     expect(JSON.stringify(requestBody.data.components)).toContain('"value":"RTX 5090"');
-    expect(JSON.stringify(requestBody.data.components)).toContain(
-      "格式：空白=同組都要符合；逗號=任一組符合。例：RTX 5090, DDR5；留空代表不限。",
+    const keywordDescription = requestBody.data.components[0].description;
+    expect(keywordDescription).toBe(
+      [
+        "留空：不限制商品名稱。",
+        "空白：同一組關鍵字都要符合，例如 RTX 5090。",
+        "逗號：多組擇一符合，例如 RTX 5090, DDR5。",
+      ].join("\n"),
     );
   });
 
