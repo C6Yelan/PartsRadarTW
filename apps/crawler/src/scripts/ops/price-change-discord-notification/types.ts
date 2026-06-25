@@ -47,6 +47,7 @@ export interface RecentPriceReport {
 
 export interface RecentPriceReportFilters {
   categoryIgrps?: number[];
+  productKeyword?: string | null;
   includePriceDrops?: boolean;
   includePriceRises?: boolean;
   includeNewProducts?: boolean;

@@ -1,5 +1,6 @@
 // apps/crawler/src/scripts/ops/price-change-discord-notification/reader.ts
 
+import type { Prisma } from "@partsradar/db";
 import type {
   CrawlRunPriceChangeReadResult,
   CrawlRunPriceSnapshot,
@@ -145,6 +146,7 @@ export async function readRecentPriceReport(
   }
 
   const normalizedFilters = normalizeRecentPriceReportFilters(filters);
+  const productFilter = createRecentPriceReportProductFilter(normalizedFilters);
 
   if (
     !normalizedFilters.includePriceDrops &&
@@ -163,15 +165,9 @@ export async function readRecentPriceReport(
         gte: since,
         lte: until,
       },
-      ...(normalizedFilters.categoryIgrps.length > 0
+      ...(Object.keys(productFilter).length > 0
         ? {
-            product: {
-              sourceCategory: {
-                igrp: {
-                  in: normalizedFilters.categoryIgrps,
-                },
-              },
-            },
+            product: productFilter,
           }
         : {}),
     },
@@ -308,9 +304,63 @@ function normalizeRecentPriceReportFilters(
     categoryIgrps: [...new Set(filters.categoryIgrps ?? [])]
       .filter((igrp) => Number.isSafeInteger(igrp) && igrp > 0)
       .sort((left, right) => left - right),
+    productKeyword: normalizeProductKeyword(filters.productKeyword),
     includePriceDrops: filters.includePriceDrops ?? true,
     includePriceRises: filters.includePriceRises ?? true,
     includeNewProducts: filters.includeNewProducts ?? true,
+  };
+}
+
+function createRecentPriceReportProductFilter(
+  filters: Required<RecentPriceReportFilters>,
+): Prisma.ProductWhereInput {
+  const keywordFilter = filters.productKeyword
+    ? createProductKeywordFilter(filters.productKeyword)
+    : {};
+
+  return {
+    ...(filters.categoryIgrps.length > 0
+      ? {
+          sourceCategory: {
+            igrp: {
+              in: filters.categoryIgrps,
+            },
+          },
+        }
+      : {}),
+    ...keywordFilter,
+  };
+}
+
+function normalizeProductKeyword(value: string | null | undefined): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const keyword = value.trim().replace(/\s+/g, " ");
+
+  return keyword.length > 0 ? keyword : null;
+}
+
+function createProductKeywordFilter(keyword: string): Prisma.ProductWhereInput {
+  const tokens = keyword.split(" ").filter(Boolean);
+
+  if (tokens.length <= 1) {
+    return {
+      name: {
+        contains: keyword,
+        mode: "insensitive",
+      },
+    };
+  }
+
+  return {
+    AND: tokens.map((token) => ({
+      name: {
+        contains: token,
+        mode: "insensitive",
+      },
+    })),
   };
 }
 

@@ -236,6 +236,7 @@ model DiscordPriceReportSetting {
   timezone           String                     @default("Asia/Taipei") @db.Text
   maxItems           Int                        @default(50) @map("max_items")
   categoryIgrps      Int[]                      @default([]) @map("category_igrps")
+  productKeyword     String?                    @map("product_keyword") @db.Text
   includePriceDrops  Boolean                    @default(true) @map("include_price_drops")
   includePriceRises  Boolean                    @default(true) @map("include_price_rises")
   includeNewProducts Boolean                    @default(true) @map("include_new_products")

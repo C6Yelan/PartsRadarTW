@@ -701,7 +701,7 @@ describe("handleDiscordInteraction", () => {
         }),
       ]),
     });
-    expect(requestBody.embeds[0].description).toContain("此頁面只有你看得到");
+    expect(requestBody.embeds[0].description).not.toContain("此頁面只有你看得到");
     expect(requestBody.embeds[0].description).toContain("**使用方式**");
     expect(requestBody.embeds[0].description).toContain("從選單選商品");
     expect(JSON.stringify(requestBody.embeds)).not.toContain(WATCH_ROW_ID);
@@ -992,6 +992,7 @@ describe("handleDiscordInteraction", () => {
               expect.objectContaining({ name: "統計區間", value: "過去 24 小時" }),
               expect.objectContaining({ name: "分類", value: "全部分類" }),
               expect.objectContaining({ name: "內容", value: "降價、漲價、新增商品" }),
+              expect.objectContaining({ name: "商品關鍵字", value: "不限" }),
               expect.objectContaining({ name: "每次最多", value: "50 筆" }),
               expect.objectContaining({ name: "每日時間", value: "09:00" }),
               expect.objectContaining({ name: "下一次", value: "啟用後排程" }),
@@ -1041,6 +1042,11 @@ describe("handleDiscordInteraction", () => {
             components: [
               expect.objectContaining({
                 type: 2,
+                custom_id: "price-report:settings:keyword",
+                label: "調整關鍵字",
+              }),
+              expect.objectContaining({
+                type: 2,
                 custom_id: "price-report:settings:time-limit",
                 label: "調整時間與上限",
               }),
@@ -1068,6 +1074,7 @@ describe("handleDiscordInteraction", () => {
           id: "setting-1",
           discordUserId: "111122223333444455",
           categoryIgrps: [12, 7],
+          productKeyword: "RTX 5090",
           includePriceRises: false,
           nextSendAt: new Date("2026-06-07T13:30:00.000Z"),
         }),
@@ -1092,6 +1099,7 @@ describe("handleDiscordInteraction", () => {
     const embed = readResponseEmbed(requestBody);
 
     expect(readEmbedFieldValue(embed, "分類")).toBe("SSD / HDD、顯示卡");
+    expect(readEmbedFieldValue(embed, "商品關鍵字")).toBe("RTX 5090");
     expect(readEmbedFieldValue(embed, "內容")).toBe("降價、新增商品");
   });
 
@@ -1174,6 +1182,45 @@ describe("handleDiscordInteraction", () => {
     );
   });
 
+  it("opens a keyword modal from the settings panel", async () => {
+    const client = createDiscordBotClient(
+      [],
+      [
+        priceReportSetting({
+          id: "setting-1",
+          discordUserId: "111122223333444455",
+          productKeyword: "RTX 5090",
+          nextSendAt: new Date("2026-06-07T13:30:00.000Z"),
+        }),
+      ],
+    );
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createComponentInteraction("price-report:settings:keyword"),
+    });
+
+    const requestBody = JSON.parse(
+      String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body),
+    );
+
+    expect(requestBody).toMatchObject({
+      type: 9,
+      data: {
+        custom_id: "price-report:settings:keyword-modal",
+        title: "價格報告關鍵字",
+      },
+    });
+    expect(JSON.stringify(requestBody.data.components)).toContain('"value":"RTX 5090"');
+    expect(JSON.stringify(requestBody.data.components)).toContain("留空代表不限關鍵字");
+  });
+
   it("updates daily report time and item limit from the settings modal", async () => {
     const client = createDiscordBotClient(
       [],
@@ -1183,6 +1230,7 @@ describe("handleDiscordInteraction", () => {
           discordUserId: "111122223333444455",
           window: "HOURS_12",
           categoryIgrps: [12],
+          productKeyword: "RTX 5090",
           includeNewProducts: false,
           nextSendAt: new Date("2026-06-07T01:00:00.000Z"),
         }),
@@ -1209,6 +1257,7 @@ describe("handleDiscordInteraction", () => {
           window: "HOURS_12",
           maxItems: 8,
           categoryIgrps: [12],
+          productKeyword: "RTX 5090",
           includePriceDrops: true,
           includePriceRises: true,
           includeNewProducts: false,
@@ -1218,6 +1267,7 @@ describe("handleDiscordInteraction", () => {
           window: "HOURS_12",
           maxItems: 8,
           categoryIgrps: [12],
+          productKeyword: "RTX 5090",
           includePriceDrops: true,
           includePriceRises: true,
           includeNewProducts: false,
@@ -1228,6 +1278,105 @@ describe("handleDiscordInteraction", () => {
     expect(String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body)).toContain(
       "已更新每日價格提醒",
     );
+  });
+
+  it("updates the daily report product keyword from the settings modal", async () => {
+    const client = createDiscordBotClient(
+      [],
+      [
+        priceReportSetting({
+          id: "setting-1",
+          discordUserId: "111122223333444455",
+          window: "HOURS_12",
+          maxItems: 12,
+          categoryIgrps: [12],
+          includeNewProducts: false,
+          nextSendAt: new Date("2026-06-07T01:00:00.000Z"),
+        }),
+      ],
+    );
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createKeywordModalSubmitInteraction({ keyword: " RTX   5090 " }),
+    });
+
+    expect(client.discordPriceReportSetting.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          window: "HOURS_12",
+          maxItems: 12,
+          categoryIgrps: [12],
+          productKeyword: "RTX 5090",
+          includePriceDrops: true,
+          includePriceRises: true,
+          includeNewProducts: false,
+          enabled: true,
+        }),
+        update: expect.objectContaining({
+          window: "HOURS_12",
+          maxItems: 12,
+          categoryIgrps: [12],
+          productKeyword: "RTX 5090",
+          includePriceDrops: true,
+          includePriceRises: true,
+          includeNewProducts: false,
+          enabled: true,
+        }),
+      }),
+    );
+    const requestBody = JSON.parse(
+      String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body),
+    );
+
+    expect(readEmbedFieldValue(readResponseEmbed(requestBody), "商品關鍵字")).toBe("RTX 5090");
+  });
+
+  it("clears the daily report product keyword from the settings modal", async () => {
+    const client = createDiscordBotClient(
+      [],
+      [
+        priceReportSetting({
+          id: "setting-1",
+          discordUserId: "111122223333444455",
+          productKeyword: "RTX 5090",
+          nextSendAt: new Date("2026-06-07T01:00:00.000Z"),
+        }),
+      ],
+    );
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createKeywordModalSubmitInteraction({ keyword: "" }),
+    });
+
+    expect(client.discordPriceReportSetting.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          productKeyword: null,
+        }),
+        update: expect.objectContaining({
+          productKeyword: null,
+        }),
+      }),
+    );
+    const requestBody = JSON.parse(
+      String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body),
+    );
+
+    expect(readEmbedFieldValue(readResponseEmbed(requestBody), "商品關鍵字")).toBe("不限");
   });
 
   it("resets category choices to all categories from the settings panel", async () => {
@@ -1820,6 +1969,7 @@ describe("sendPriceReportNow", () => {
         publicBaseUrl: PUBLIC_BASE_URL,
         filters: {
           categoryIgrps: [12],
+          productKeyword: null,
           includePriceDrops: true,
           includePriceRises: false,
           includeNewProducts: false,
@@ -1849,6 +1999,89 @@ describe("sendPriceReportNow", () => {
               },
             },
           },
+        }),
+      }),
+    );
+  });
+
+  it("filters price reports by product keyword", async () => {
+    const client = createDiscordBotClient([
+      snapshot({
+        id: "old-rtx",
+        productId: "product-rtx",
+        productName: "華碩 ROG-RTX5090-O32G",
+        crawlRunId: "old-run",
+        price: 120_000,
+        capturedAt: "2026-06-06T01:00:00.000Z",
+      }),
+      snapshot({
+        id: "new-rtx",
+        productId: "product-rtx",
+        productName: "華碩 ROG-RTX5090-O32G",
+        crawlRunId: "new-run",
+        price: 118_000,
+        capturedAt: "2026-06-07T03:00:00.000Z",
+      }),
+      snapshot({
+        id: "old-rx",
+        productId: "product-rx",
+        productName: "華碩 PRIME-RX9070XT-O16G",
+        crawlRunId: "old-run",
+        price: 28_000,
+        capturedAt: "2026-06-06T01:00:00.000Z",
+      }),
+      snapshot({
+        id: "new-rx",
+        productId: "product-rx",
+        productName: "華碩 PRIME-RX9070XT-O16G",
+        crawlRunId: "new-run",
+        price: 27_000,
+        capturedAt: "2026-06-07T03:00:00.000Z",
+      }),
+    ]);
+    const sendReportMessages = vi.fn(async (_messages: DiscordBotMessage[]) => ({
+      status: "sent" as const,
+      messageCount: 1,
+      httpStatuses: [200],
+    }));
+
+    await expect(
+      sendPriceReportNow({
+        client,
+        discordUserId: "111122223333444455",
+        windowHours: 24,
+        maxItems: 50,
+        publicBaseUrl: PUBLIC_BASE_URL,
+        filters: {
+          categoryIgrps: [],
+          productKeyword: "RTX 5090",
+          includePriceDrops: true,
+          includePriceRises: true,
+          includeNewProducts: true,
+        },
+        now: new Date("2026-06-07T05:00:00.000Z"),
+        sendReportMessages,
+      }),
+    ).resolves.toMatchObject({
+      status: "sent",
+      changeCount: 1,
+      newProductCount: 0,
+      listedCount: 1,
+    });
+
+    const reportMessage = sendReportMessages.mock.calls[0]?.[0][0];
+
+    expect(JSON.stringify(reportMessage)).toContain("ROG-RTX5090-O32G");
+    expect(JSON.stringify(reportMessage)).not.toContain("PRIME-RX9070XT-O16G");
+    expect(client.priceSnapshot.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          product: expect.objectContaining({
+            AND: [
+              { name: { contains: "RTX", mode: "insensitive" } },
+              { name: { contains: "5090", mode: "insensitive" } },
+            ],
+          }),
         }),
       }),
     );
@@ -2235,6 +2468,32 @@ function createSettingsModalSubmitInteraction({
   };
 }
 
+function createKeywordModalSubmitInteraction({ keyword }: { keyword: string }): DiscordInteraction {
+  return {
+    id: "interaction-1",
+    token: "interaction-token",
+    type: 5,
+    data: {
+      custom_id: "price-report:settings:keyword-modal",
+      components: [
+        {
+          type: 18,
+          component: {
+            type: 4,
+            custom_id: "price-report:settings:keyword-input",
+            value: keyword,
+          },
+        },
+      ],
+    },
+    member: {
+      user: {
+        id: "111122223333444455",
+      },
+    },
+  };
+}
+
 function createWatchOpenInteraction(): DiscordInteraction {
   return {
     id: "interaction-1",
@@ -2383,6 +2642,7 @@ interface TestPriceReportSetting {
   timezone: string;
   maxItems: number;
   categoryIgrps: number[];
+  productKeyword: string | null;
   includePriceDrops: boolean;
   includePriceRises: boolean;
   includeNewProducts: boolean;
@@ -2396,6 +2656,18 @@ interface TestPriceReportSetting {
 interface TestSourceCategory {
   igrp: number;
   displayName: string;
+}
+
+interface TestProductWhere {
+  sourceCategory?: {
+    igrp?: {
+      in?: number[];
+    };
+  };
+  name?: {
+    contains?: string;
+  };
+  AND?: TestProductWhere[];
 }
 
 interface TestTargetPriceWatch {
@@ -2459,6 +2731,7 @@ function priceReportSetting({
   window = "HOURS_24",
   maxItems = 50,
   categoryIgrps = [],
+  productKeyword = null,
   includePriceDrops = true,
   includePriceRises = true,
   includeNewProducts = true,
@@ -2471,6 +2744,7 @@ function priceReportSetting({
   window?: TestPriceReportSetting["window"];
   maxItems?: number;
   categoryIgrps?: number[];
+  productKeyword?: string | null;
   includePriceDrops?: boolean;
   includePriceRises?: boolean;
   includeNewProducts?: boolean;
@@ -2485,6 +2759,7 @@ function priceReportSetting({
     timezone: "Asia/Taipei",
     maxItems,
     categoryIgrps,
+    productKeyword,
     includePriceDrops,
     includePriceRises,
     includeNewProducts,
@@ -2610,9 +2885,7 @@ function createDiscordBotClient(
   );
   const findMany = vi.fn(async (args: { where: Record<string, unknown> }) => {
     const where = args.where;
-    const categoryIgrpFilter =
-      (where.product as { sourceCategory?: { igrp?: { in?: number[] } } } | undefined)
-        ?.sourceCategory?.igrp?.in ?? [];
+    const productFilter = where.product as TestProductWhere | undefined;
 
     if (
       !where.productId &&
@@ -2628,7 +2901,7 @@ function createDiscordBotClient(
           (snapshot) =>
             snapshot.capturedAt.getTime() >= capturedAtFilter.gte.getTime() &&
             snapshot.capturedAt.getTime() <= capturedAtFilter.lte.getTime() &&
-            (categoryIgrpFilter.length === 0 || categoryIgrpFilter.includes(snapshot.categoryIgrp)),
+            matchesProductWhere(snapshot, productFilter),
         )
         .sort(compareCapturedAtAsc)
         .map(toPrismaSnapshotWithProduct);
@@ -2741,6 +3014,7 @@ function createDiscordBotClient(
         | "timezone"
         | "maxItems"
         | "categoryIgrps"
+        | "productKeyword"
         | "includePriceDrops"
         | "includePriceRises"
         | "includeNewProducts"
@@ -3041,6 +3315,29 @@ function toPrismaWatchListRecord(watch: TestTargetPriceWatch, snapshots: TestSna
           currentPrice: null,
         },
   };
+}
+
+function matchesProductWhere(snapshot: TestSnapshot, where: TestProductWhere | undefined): boolean {
+  if (!where) {
+    return true;
+  }
+
+  const categoryIgrps = where.sourceCategory?.igrp?.in ?? [];
+
+  if (categoryIgrps.length > 0 && !categoryIgrps.includes(snapshot.categoryIgrp)) {
+    return false;
+  }
+
+  const nameContains = where.name?.contains;
+
+  if (
+    nameContains &&
+    !snapshot.productName.toLocaleLowerCase().includes(nameContains.toLocaleLowerCase())
+  ) {
+    return false;
+  }
+
+  return (where.AND ?? []).every((condition) => matchesProductWhere(snapshot, condition));
 }
 
 function compareCapturedAtAsc(left: TestSnapshot, right: TestSnapshot): number {

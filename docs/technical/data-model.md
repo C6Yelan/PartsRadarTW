@@ -53,7 +53,7 @@ product_list_view
 | `price_snapshots` | 價格歷史 | 新商品或價格變動才新增；長期保留；`raw_snapshot_id` nullable，避免 raw snapshot 清理破壞價格歷史。 |
 | `current_prices` | 網站目前價格指標 | `product_id` 為主鍵；指向同商品的 `price_snapshots`；價格值從 snapshot 取得。 |
 | `product_link_health` | 商品外部連結健康狀態 | 每商品每 link kind 一筆；保存目前 URL、狀態、HTTP status、檢查時間、最後成功 / 失敗時間與連續失敗次數。 |
-| `discord_price_report_settings` | Discord 個人價格變動報告設定 | 每個 Discord user id 一筆；保存 interval、window、scope、timezone、max items、enabled 與下次/上次發送時間。 |
+| `discord_price_report_settings` | Discord 個人價格變動報告設定 | 每個 Discord user id 一筆；保存 interval、window、scope、timezone、max items、分類 / 商品名稱關鍵字 / 內容篩選、enabled 與下次/上次發送時間。 |
 | `discord_target_price_watches` | Discord 個人目標價追蹤 | 以 Discord user id + product 建立目標價追蹤；不建立網站帳號；達標通知狀態由 watch 與 delivery log 控制。 |
 | `discord_notification_deliveries` | Discord 通知發送紀錄 | 記錄手動 price report interaction 回覆、定期 price report 或 target price 通知的 kind、status、item count、message count、錯誤摘要與 delivery time；供去重、維運檢視與後續排程使用。 |
 | `crawl_runs` | 整輪 crawler 摘要 | 保存 status、start / finish、trigger、error、backoff；不保存分類結果 JSON 或可推得的 count cache。 |
@@ -154,6 +154,7 @@ Discord bot 只保存 Discord user id 與必要偏好，不建立網站帳號，
 - `timezone`，第一輪固定 `Asia/Taipei`
 - `max_items`
 - `category_igrps`：空陣列代表全部分類；非空陣列代表只列出指定 CoolPC `IGrp` 分類。
+- nullable `product_keyword`：商品名稱關鍵字；留空代表不限。查詢時以空白分詞做 AND 比對，例如 `RTX 5090` 可匹配商品名中的 `RTX5090`。
 - `include_price_drops` / `include_price_rises` / `include_new_products`：控制每日與手動報告要包含降價、漲價與新增商品。
 - `enabled`
 - nullable `next_send_at` / `last_sent_at`
@@ -184,8 +185,8 @@ Discord bot 只保存 Discord user id 與必要偏好，不建立網站帳號，
 
 規則：
 
-- `/price-report now` 會寫入 delivery log，但不建立 price report setting；若使用者已有啟用中的每日設定，未明確覆蓋的手動報告會沿用該設定的分類、內容類型與上限。
-- `/price-report settings` 的按鈕與 modal 讀寫 `discord_price_report_settings`；每日 DM 報告可在 modal 設定台北時間 `HH:mm`、分類篩選與內容類型篩選，下一次發送時間保存在 `next_send_at`。
+- `/price-report now` 會寫入 delivery log，但不建立 price report setting；若使用者已有啟用中的每日設定，未明確覆蓋的手動報告會沿用該設定的分類、商品名稱關鍵字、內容類型與上限。
+- `/price-report settings` 的按鈕與 modal 讀寫 `discord_price_report_settings`；每日 DM 報告可設定台北時間 `HH:mm`、分類篩選、商品名稱關鍵字與內容類型篩選，下一次發送時間保存在 `next_send_at`。
 - `/watch` 統合管理介面會讀寫 `discord_target_price_watches`：以 PartsRadarTW 商品頁連結或站內商品 ID 新增追蹤、分頁讀取啟用中的追蹤、修改目標價，或經確認後停用追蹤；Discord component 內部使用完整 watch UUID，但不在使用者可見訊息顯示。
 - 目標價 worker 只讀取啟用、尚未成功通知且沒有有效 claim 的 watch；目前價格小於等於同幣別目標價時先取得 claim，再發送 DM。成功會寫入 `last_notified_at` 並清除 claim，因此同一設定只通知一次；修改或重新建立 watch 會重置兩欄，失敗或 rate limit 只清除 claim 供後續重試。
 - `error_message` 只保存安全摘要，不保存 token、source URL、raw HTML、DB URL、internal headers 或 raw IP。

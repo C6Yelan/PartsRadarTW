@@ -1,6 +1,7 @@
 // apps/crawler/src/scripts/ops/discord-bot/interactions.ts
 
 import {
+  createPriceReportKeywordModal,
   createPriceReportSettingsComponents,
   createPriceReportTimeLimitModal,
   createWatchEditModal,
@@ -18,6 +19,7 @@ import {
   DISCORD_INTERACTION_TYPE_MESSAGE_COMPONENT,
   DISCORD_INTERACTION_TYPE_MODAL_SUBMIT,
   MAX_PRICE_REPORT_ITEMS,
+  MAX_PRICE_REPORT_KEYWORD_LENGTH,
   MAX_TARGET_PRICE,
 } from "./constants";
 import type { CommandCooldowns } from "./cooldowns";
@@ -26,6 +28,7 @@ import {
   enableDailyPriceReport,
   formatPriceReportCategoryFilterLabel,
   formatPriceReportEventFilterLabel,
+  formatPriceReportKeywordFilterLabel,
   formatTaipeiMinute,
   formatWindowLabel,
   type PriceReportCategoryOption,
@@ -387,6 +390,21 @@ async function handleMessageComponentInteraction({
     return;
   }
 
+  if (component?.name === "open_keyword_modal") {
+    const setting = await readPriceReportSetting({ client, discordUserId });
+
+    await sendModalInteractionResponse({
+      token: options.token,
+      apiBaseUrl: options.apiBaseUrl,
+      interaction,
+      fetchImpl,
+      modal: createPriceReportKeywordModal({
+        keywordValue: setting?.productKeyword ?? "",
+      }),
+    });
+    return;
+  }
+
   await deferInteractionMessageUpdate({
     token: options.token,
     apiBaseUrl: options.apiBaseUrl,
@@ -449,6 +467,7 @@ async function handleMessageComponentInteraction({
         component?.name === "update_events"
           ? component.includeNewProducts
           : currentFilters.includeNewProducts,
+      productKeyword: currentFilters.productKeyword,
       timeOfDay: resolveTimeOfDay(currentPanel.setting?.nextSendAt),
     });
     notice =
@@ -601,6 +620,51 @@ async function handleModalSubmitInteraction({
     return;
   }
 
+  if (modal.name === "keyword") {
+    if (!modal.productKeywordInputValid) {
+      await sendInteractionResponse({
+        token: options.token,
+        apiBaseUrl: options.apiBaseUrl,
+        interaction,
+        fetchImpl,
+        content: formatPriceReportModalValidationMessage(modal),
+      });
+      return;
+    }
+
+    const currentSetting = await readPriceReportSetting({ client, discordUserId });
+    const currentFilters = toPriceReportFilters(currentSetting);
+    await enableDailyPriceReport({
+      client,
+      discordUserId,
+      windowHours: resolveWindowHours(currentSetting?.window),
+      maxItems: currentSetting?.maxItems ?? options.priceReportMaxItems,
+      categoryIgrps: currentFilters.categoryIgrps,
+      includePriceDrops: currentFilters.includePriceDrops,
+      includePriceRises: currentFilters.includePriceRises,
+      includeNewProducts: currentFilters.includeNewProducts,
+      productKeyword: modal.productKeyword,
+      timeOfDay: resolveTimeOfDay(currentSetting?.nextSendAt),
+    });
+    const panel = await readPriceReportSettingsPanel({
+      client,
+      discordUserId,
+      options,
+      notice: modal.productKeyword
+        ? `已更新商品關鍵字：${modal.productKeyword}。`
+        : "已清除商品關鍵字篩選。",
+    });
+
+    await sendInteractionResponse({
+      token: options.token,
+      apiBaseUrl: options.apiBaseUrl,
+      interaction,
+      fetchImpl,
+      message: createPriceReportSettingsPanelMessage(panel),
+    });
+    return;
+  }
+
   if (!modal.maxItemsInputValid || !modal.timeInputValid) {
     await sendInteractionResponse({
       token: options.token,
@@ -623,6 +687,7 @@ async function handleModalSubmitInteraction({
     includePriceDrops: currentFilters.includePriceDrops,
     includePriceRises: currentFilters.includePriceRises,
     includeNewProducts: currentFilters.includeNewProducts,
+    productKeyword: currentFilters.productKeyword,
     timeOfDay: modal.timeOfDay,
   });
   const panel = await readPriceReportSettingsPanel({
@@ -803,6 +868,11 @@ function createPriceReportSettingsEmbed({
         inline: true,
       },
       {
+        name: "商品關鍵字",
+        value: formatPriceReportKeywordFilterLabel(filters),
+        inline: true,
+      },
+      {
         name: "每次最多",
         value: `${setting?.maxItems ?? options.priceReportMaxItems} 筆`,
         inline: true,
@@ -850,16 +920,16 @@ function parsePriceReportCategorySelection(
   return [...selectedIgrps].sort((left, right) => left - right);
 }
 
-function formatPriceReportModalValidationMessage({
-  maxItemsInputValid,
-  timeInputValid,
-}: {
-  maxItemsInputValid: boolean;
-  timeInputValid: boolean;
-}): string {
+function formatPriceReportModalValidationMessage(
+  modal: NonNullable<ReturnType<typeof parsePriceReportModalSubmit>>,
+): string {
+  if (modal.name === "keyword") {
+    return `商品關鍵字最多 ${MAX_PRICE_REPORT_KEYWORD_LENGTH} 個字。`;
+  }
+
   const messages = [
-    maxItemsInputValid ? null : `最多商品數需為 1-${MAX_PRICE_REPORT_ITEMS} 的整數。`,
-    timeInputValid ? null : "每日發送時間格式需為台北時間 HH:mm，例如 `09:30` 或 `21:00`。",
+    modal.maxItemsInputValid ? null : `最多商品數需為 1-${MAX_PRICE_REPORT_ITEMS} 的整數。`,
+    modal.timeInputValid ? null : "每日發送時間格式需為台北時間 HH:mm，例如 `09:30` 或 `21:00`。",
   ].filter((message): message is string => message !== null);
 
   return messages.join("\n");

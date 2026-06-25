@@ -16,6 +16,7 @@ import {
   HOUR_MS,
   MAX_DUE_PRICE_REPORT_SETTINGS_PER_CYCLE,
   MAX_PRICE_REPORT_ITEMS,
+  MAX_PRICE_REPORT_KEYWORD_LENGTH,
   PRODUCT_NAME_MAX_LENGTH,
   TIME_ZONE,
 } from "./constants";
@@ -41,6 +42,7 @@ export interface PriceReportCategoryOption {
 
 export interface PriceReportFilters {
   categoryIgrps: number[];
+  productKeyword: string | null;
   includePriceDrops: boolean;
   includePriceRises: boolean;
   includeNewProducts: boolean;
@@ -48,6 +50,7 @@ export interface PriceReportFilters {
 
 const DEFAULT_PRICE_REPORT_FILTERS: PriceReportFilters = {
   categoryIgrps: [],
+  productKeyword: null,
   includePriceDrops: true,
   includePriceRises: true,
   includeNewProducts: true,
@@ -179,6 +182,7 @@ export async function enableDailyPriceReport({
   windowHours,
   maxItems,
   categoryIgrps = [],
+  productKeyword = null,
   includePriceDrops = true,
   includePriceRises = true,
   includeNewProducts = true,
@@ -190,6 +194,7 @@ export async function enableDailyPriceReport({
   windowHours: number;
   maxItems: number;
   categoryIgrps?: number[];
+  productKeyword?: string | null;
   includePriceDrops?: boolean;
   includePriceRises?: boolean;
   includeNewProducts?: boolean;
@@ -199,6 +204,7 @@ export async function enableDailyPriceReport({
   const nextSendAt = calculateNextSendAt(now, "DAILY", timeOfDay);
   const filters = normalizePriceReportFilters({
     categoryIgrps,
+    productKeyword,
     includePriceDrops,
     includePriceRises,
     includeNewProducts,
@@ -216,6 +222,7 @@ export async function enableDailyPriceReport({
       timezone: TIME_ZONE,
       maxItems: clampPriceReportMaxItems(maxItems),
       categoryIgrps: filters.categoryIgrps,
+      productKeyword: filters.productKeyword,
       includePriceDrops: filters.includePriceDrops,
       includePriceRises: filters.includePriceRises,
       includeNewProducts: filters.includeNewProducts,
@@ -229,6 +236,7 @@ export async function enableDailyPriceReport({
       timezone: TIME_ZONE,
       maxItems: clampPriceReportMaxItems(maxItems),
       categoryIgrps: filters.categoryIgrps,
+      productKeyword: filters.productKeyword,
       includePriceDrops: filters.includePriceDrops,
       includePriceRises: filters.includePriceRises,
       includeNewProducts: filters.includeNewProducts,
@@ -980,6 +988,7 @@ export function formatPriceReportSettingMessage(
     "每日價格提醒已開啟。",
     `統計區間：${formatWindowLabel(setting.window)}`,
     `分類：${formatPriceReportCategoryFilterLabel(filters, categories)}`,
+    `商品關鍵字：${formatPriceReportKeywordFilterLabel(filters)}`,
     `內容：${formatPriceReportEventFilterLabel(filters)}`,
     `每次最多：${setting.maxItems} 筆`,
     `每日時間：${formatTaipeiTime(setting.nextSendAt)}`,
@@ -990,7 +999,11 @@ export function formatPriceReportSettingMessage(
 export function toPriceReportFilters(
   setting: Pick<
     DiscordPriceReportSetting,
-    "categoryIgrps" | "includePriceDrops" | "includePriceRises" | "includeNewProducts"
+    | "categoryIgrps"
+    | "productKeyword"
+    | "includePriceDrops"
+    | "includePriceRises"
+    | "includeNewProducts"
   > | null,
 ): PriceReportFilters {
   if (!setting) {
@@ -999,6 +1012,7 @@ export function toPriceReportFilters(
 
   return normalizePriceReportFilters({
     categoryIgrps: setting.categoryIgrps,
+    productKeyword: setting.productKeyword,
     includePriceDrops: setting.includePriceDrops,
     includePriceRises: setting.includePriceRises,
     includeNewProducts: setting.includeNewProducts,
@@ -1009,6 +1023,7 @@ export function normalizePriceReportFilters(filters: PriceReportFilters): PriceR
   const categoryIgrps = [...new Set(filters.categoryIgrps)]
     .filter((igrp) => Number.isSafeInteger(igrp) && igrp > 0)
     .sort((left, right) => left - right);
+  const productKeyword = normalizePriceReportProductKeyword(filters.productKeyword);
   const includePriceDrops = filters.includePriceDrops;
   const includePriceRises = filters.includePriceRises;
   const includeNewProducts = filters.includeNewProducts;
@@ -1019,6 +1034,7 @@ export function normalizePriceReportFilters(filters: PriceReportFilters): PriceR
 
   return {
     categoryIgrps,
+    productKeyword,
     includePriceDrops,
     includePriceRises,
     includeNewProducts,
@@ -1047,6 +1063,10 @@ export function formatPriceReportCategoryFilterLabel(
     : visibleLabels.join("、");
 }
 
+export function formatPriceReportKeywordFilterLabel(filters: PriceReportFilters): string {
+  return filters.productKeyword ?? "不限";
+}
+
 export function formatPriceReportEventFilterLabel(filters: PriceReportFilters): string {
   const labels = [
     filters.includePriceDrops ? "降價" : null,
@@ -1060,10 +1080,21 @@ export function formatPriceReportEventFilterLabel(filters: PriceReportFilters): 
 function hasActivePriceReportFilters(filters: PriceReportFilters): boolean {
   return (
     filters.categoryIgrps.length > 0 ||
+    filters.productKeyword !== null ||
     !filters.includePriceDrops ||
     !filters.includePriceRises ||
     !filters.includeNewProducts
   );
+}
+
+function normalizePriceReportProductKeyword(value: string | null | undefined): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const keyword = value.trim().replace(/\s+/g, " ");
+
+  return keyword.length > 0 && keyword.length <= MAX_PRICE_REPORT_KEYWORD_LENGTH ? keyword : null;
 }
 
 export function formatWindowLabel(window: DiscordPriceReportSetting["window"]): string {

@@ -31,7 +31,7 @@ const WATCH_MANAGER_PAGE_SIZE = 25;
 const WATCH_SELECT_LABEL_MAX_LENGTH = 100;
 const WATCH_SELECT_DESCRIPTION_MAX_LENGTH = 100;
 const WATCH_MANAGER_GUIDE =
-  "追蹤商品目標價，並與目前價格比較；此頁面只有你看得到。\n\n" +
+  "追蹤商品目標價，並與目前價格比較。\n\n" +
   "**使用方式**\n" +
   "新增：貼商品頁網址與目標價。\n" +
   "管理：從選單選商品後編輯或移除。";

@@ -17,6 +17,7 @@ import {
   DISCORD_OPTION_TYPE_SUBCOMMAND,
   DISCORD_TEXT_INPUT_STYLE_SHORT,
   MAX_PRICE_REPORT_ITEMS,
+  MAX_PRICE_REPORT_KEYWORD_LENGTH,
   MAX_TARGET_PRICE,
 } from "./constants";
 import type {
@@ -36,6 +37,9 @@ const PRICE_REPORT_SETTINGS_ENABLE_CUSTOM_ID = "price-report:settings:enable";
 const PRICE_REPORT_SETTINGS_DISABLE_CUSTOM_ID = "price-report:settings:disable";
 const PRICE_REPORT_SETTINGS_TIME_LIMIT_CUSTOM_ID = "price-report:settings:time-limit";
 const PRICE_REPORT_SETTINGS_TIME_LIMIT_MODAL_CUSTOM_ID = "price-report:settings:time-limit-modal";
+const PRICE_REPORT_SETTINGS_KEYWORD_CUSTOM_ID = "price-report:settings:keyword";
+const PRICE_REPORT_SETTINGS_KEYWORD_MODAL_CUSTOM_ID = "price-report:settings:keyword-modal";
+const PRICE_REPORT_SETTINGS_KEYWORD_INPUT_CUSTOM_ID = "price-report:settings:keyword-input";
 const PRICE_REPORT_SETTINGS_WINDOW_CUSTOM_ID = "price-report:settings:window";
 const PRICE_REPORT_SETTINGS_CATEGORIES_CUSTOM_ID = "price-report:settings:categories";
 const PRICE_REPORT_SETTINGS_ALL_CATEGORIES_CUSTOM_ID = "price-report:settings:all-categories";
@@ -453,6 +457,12 @@ export function createPriceReportSettingsComponents({
         {
           type: DISCORD_COMPONENT_TYPE_BUTTON,
           style: DISCORD_BUTTON_STYLE_SECONDARY,
+          custom_id: PRICE_REPORT_SETTINGS_KEYWORD_CUSTOM_ID,
+          label: "調整關鍵字",
+        },
+        {
+          type: DISCORD_COMPONENT_TYPE_BUTTON,
+          style: DISCORD_BUTTON_STYLE_SECONDARY,
           custom_id: PRICE_REPORT_SETTINGS_TIME_LIMIT_CUSTOM_ID,
           label: "調整時間與上限",
         },
@@ -514,6 +524,33 @@ export function createPriceReportTimeLimitModal({
   };
 }
 
+export function createPriceReportKeywordModal({
+  keywordValue,
+}: {
+  keywordValue: string;
+}): DiscordModal {
+  return {
+    custom_id: PRICE_REPORT_SETTINGS_KEYWORD_MODAL_CUSTOM_ID,
+    title: "價格報告關鍵字",
+    components: [
+      {
+        type: DISCORD_COMPONENT_TYPE_LABEL,
+        label: "商品名稱關鍵字",
+        description: "例如 RTX 5090；留空代表不限關鍵字。",
+        component: {
+          type: DISCORD_COMPONENT_TYPE_TEXT_INPUT,
+          custom_id: PRICE_REPORT_SETTINGS_KEYWORD_INPUT_CUSTOM_ID,
+          style: DISCORD_TEXT_INPUT_STYLE_SHORT,
+          max_length: MAX_PRICE_REPORT_KEYWORD_LENGTH,
+          required: false,
+          value: keywordValue,
+          placeholder: "RTX 5090",
+        },
+      },
+    ],
+  };
+}
+
 export function parsePriceReportComponentInteraction(
   interaction: DiscordInteraction,
 ): ParsedPriceReportComponent | null {
@@ -534,6 +571,12 @@ export function parsePriceReportComponentInteraction(
   if (customId === PRICE_REPORT_SETTINGS_TIME_LIMIT_CUSTOM_ID) {
     return {
       name: "open_time_limit_modal",
+    };
+  }
+
+  if (customId === PRICE_REPORT_SETTINGS_KEYWORD_CUSTOM_ID) {
+    return {
+      name: "open_keyword_modal",
     };
   }
 
@@ -582,27 +625,42 @@ export function parsePriceReportModalSubmit(
 
   const customId = data.custom_id;
 
-  if (customId !== PRICE_REPORT_SETTINGS_TIME_LIMIT_MODAL_CUSTOM_ID) {
-    return null;
+  if (customId === PRICE_REPORT_SETTINGS_TIME_LIMIT_MODAL_CUSTOM_ID) {
+    const maxItemsValue = readSubmittedComponentValue(
+      data.components,
+      PRICE_REPORT_SETTINGS_MAX_ITEMS_CUSTOM_ID,
+    );
+    const timeValue = readSubmittedComponentValue(
+      data.components,
+      PRICE_REPORT_SETTINGS_TIME_CUSTOM_ID,
+    );
+    const maxItems = parseMaxItemsInput(maxItemsValue);
+    const timeOfDay = parseTimeOfDay(timeValue);
+
+    return {
+      name: "time_limit",
+      maxItems,
+      maxItemsInputValid: maxItems !== null,
+      timeOfDay,
+      timeInputValid: timeOfDay !== null,
+    };
   }
 
-  const maxItemsValue = readSubmittedComponentValue(
-    data.components,
-    PRICE_REPORT_SETTINGS_MAX_ITEMS_CUSTOM_ID,
-  );
-  const timeValue = readSubmittedComponentValue(
-    data.components,
-    PRICE_REPORT_SETTINGS_TIME_CUSTOM_ID,
-  );
-  const maxItems = parseMaxItemsInput(maxItemsValue);
-  const timeOfDay = parseTimeOfDay(timeValue);
+  if (customId === PRICE_REPORT_SETTINGS_KEYWORD_MODAL_CUSTOM_ID) {
+    const productKeywordValue = readSubmittedComponentValue(
+      data.components,
+      PRICE_REPORT_SETTINGS_KEYWORD_INPUT_CUSTOM_ID,
+    );
+    const productKeyword = parseProductKeywordInput(productKeywordValue);
 
-  return {
-    maxItems,
-    maxItemsInputValid: maxItems !== null,
-    timeOfDay,
-    timeInputValid: timeOfDay !== null,
-  };
+    return {
+      name: "keyword",
+      productKeyword: productKeyword === undefined ? null : productKeyword,
+      productKeywordInputValid: productKeyword !== undefined,
+    };
+  }
+
+  return null;
 }
 
 export function parseWatchModalSubmit(interaction: DiscordInteraction): ParsedWatchModal | null {
@@ -692,6 +750,24 @@ function parseMaxItemsInput(value: unknown): number | null {
   return Number.isSafeInteger(maxItems) && maxItems >= 1 && maxItems <= MAX_PRICE_REPORT_ITEMS
     ? maxItems
     : null;
+}
+
+function parseProductKeywordInput(value: unknown): string | null | undefined {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const productKeyword = value.trim().replace(/\s+/g, " ");
+
+  if (productKeyword.length === 0) {
+    return null;
+  }
+
+  return productKeyword.length <= MAX_PRICE_REPORT_KEYWORD_LENGTH ? productKeyword : undefined;
 }
 
 function parsePriceReportEvents(values: unknown[]): {

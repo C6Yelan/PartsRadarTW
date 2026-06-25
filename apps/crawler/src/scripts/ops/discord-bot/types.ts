@@ -321,6 +321,9 @@ export type ParsedPriceReportComponent =
       name: "open_time_limit_modal";
     }
   | {
+      name: "open_keyword_modal";
+    }
+  | {
       name: "update_window";
       windowHours: number;
     }
@@ -349,9 +352,16 @@ export type ParsedWatchComponent =
     }
   | { action: "refresh" | "page"; page: number };
 
-export interface ParsedPriceReportModal {
-  maxItems: number | null;
-  maxItemsInputValid: boolean;
-  timeOfDay: PriceReportTimeOfDay | null;
-  timeInputValid: boolean;
-}
+export type ParsedPriceReportModal =
+  | {
+      name: "time_limit";
+      maxItems: number | null;
+      maxItemsInputValid: boolean;
+      timeOfDay: PriceReportTimeOfDay | null;
+      timeInputValid: boolean;
+    }
+  | {
+      name: "keyword";
+      productKeyword: string | null;
+      productKeywordInputValid: boolean;
+    };

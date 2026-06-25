@@ -7,14 +7,14 @@ import type {
 import {
   createPriceChangeDiscordMessages,
   createPriceChangeReportMessages,
+  type PriceChangeDiscordClient,
+  type PriceChangeDiscordNotificationItem,
   parsePriceChangeDiscordNotificationOptions,
-  readCrawlRunPriceChanges,
   readCrawlRunPriceChangeSummary,
+  readCrawlRunPriceChanges,
   readRecentPriceChanges,
   readRecentPriceReport,
   sendCrawlRunPriceChangeDiscordNotification,
-  type PriceChangeDiscordClient,
-  type PriceChangeDiscordNotificationItem,
 } from "../../../src/scripts/ops/price-change-discord-notification";
 
 const WEBHOOK_URL = "https://discord.com/api/webhooks/1234567890/token_ABC.def-ghi";
@@ -333,6 +333,74 @@ describe("readRecentPriceReport", () => {
       ],
     });
   });
+
+  it("filters recent reports by product keyword tokens", async () => {
+    const client = createPriceChangeClient([
+      snapshot({
+        id: "old-rtx",
+        productId: "rtx",
+        productName: "華碩 ROG-RTX5090-O32G",
+        crawlRunId: "old-run",
+        price: 120000,
+        capturedAt: "2026-06-07T01:00:00.000Z",
+      }),
+      snapshot({
+        id: "new-rtx",
+        productId: "rtx",
+        productName: "華碩 ROG-RTX5090-O32G",
+        crawlRunId: "new-run",
+        price: 118000,
+        capturedAt: "2026-06-07T03:00:00.000Z",
+      }),
+      snapshot({
+        id: "new-rtx-ti",
+        productId: "rtx-ti",
+        productName: "微星 RTX5090Ti 測試卡",
+        crawlRunId: "new-run",
+        price: 160000,
+        capturedAt: "2026-06-07T03:30:00.000Z",
+      }),
+      snapshot({
+        id: "old-rx",
+        productId: "rx",
+        productName: "華碩 PRIME-RX9070XT-O16G",
+        crawlRunId: "old-run",
+        price: 28000,
+        capturedAt: "2026-06-07T01:00:00.000Z",
+      }),
+      snapshot({
+        id: "new-rx",
+        productId: "rx",
+        productName: "華碩 PRIME-RX9070XT-O16G",
+        crawlRunId: "new-run",
+        price: 27000,
+        capturedAt: "2026-06-07T03:00:00.000Z",
+      }),
+    ]);
+
+    const report = await readRecentPriceReport(client, {
+      since: new Date("2026-06-07T02:00:00.000Z"),
+      until: new Date("2026-06-07T05:00:00.000Z"),
+      filters: {
+        productKeyword: "RTX 5090",
+      },
+    });
+
+    expect(report.priceChanges.map((item) => item.productId)).toEqual(["rtx"]);
+    expect(report.newProducts.map((item) => item.productId)).toEqual(["rtx-ti"]);
+    expect(client.priceSnapshot.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          product: expect.objectContaining({
+            AND: [
+              { name: { contains: "RTX", mode: "insensitive" } },
+              { name: { contains: "5090", mode: "insensitive" } },
+            ],
+          }),
+        }),
+      }),
+    );
+  });
 });
 
 describe("createPriceChangeDiscordMessages", () => {
@@ -364,9 +432,7 @@ describe("createPriceChangeDiscordMessages", () => {
       color: 0x2563eb,
       timestamp: "2026-06-07T02:00:00.000Z",
     });
-    expect(messages[0]?.embeds?.[0]?.description).toContain(
-      "Changes: 3. Listed: 2; 1 hidden",
-    );
+    expect(messages[0]?.embeds?.[0]?.description).toContain("Changes: 3. Listed: 2; 1 hidden");
     expect(messages[0]?.embeds?.[0]?.description).toContain("**顯示卡**\n**華碩**");
     expect(messages[0]?.embeds?.[0]?.description).toContain(
       "- [GPU A](https://partsradar.test/products/product-1) TWD 10,000 -> TWD 9,500 (-TWD 500)",
@@ -552,6 +618,18 @@ interface TestSnapshot {
   vendorName: string | null;
 }
 
+interface TestProductWhere {
+  sourceCategory?: {
+    igrp?: {
+      in?: number[];
+    };
+  };
+  name?: {
+    contains?: string;
+  };
+  AND?: TestProductWhere[];
+}
+
 function snapshot({
   id,
   productId,
@@ -657,12 +735,14 @@ function createPriceChangeClient(snapshots: TestSnapshot[]): PriceChangeDiscordC
       "lte" in where.capturedAt
     ) {
       const capturedAtFilter = where.capturedAt as { gte: Date; lte: Date };
+      const productFilter = where.product as TestProductWhere | undefined;
 
       return snapshots
         .filter(
           (snapshot) =>
             snapshot.capturedAt.getTime() >= capturedAtFilter.gte.getTime() &&
-            snapshot.capturedAt.getTime() <= capturedAtFilter.lte.getTime(),
+            snapshot.capturedAt.getTime() <= capturedAtFilter.lte.getTime() &&
+            matchesProductWhere(snapshot, productFilter),
         )
         .sort(compareCapturedAtAsc)
         .map(toPrismaSnapshotWithProduct);
@@ -718,6 +798,29 @@ function toPrismaSnapshotWithProduct(snapshot: TestSnapshot) {
       },
     },
   };
+}
+
+function matchesProductWhere(snapshot: TestSnapshot, where: TestProductWhere | undefined): boolean {
+  if (!where) {
+    return true;
+  }
+
+  const categoryIgrps = where.sourceCategory?.igrp?.in ?? [];
+
+  if (categoryIgrps.length > 0 && !categoryIgrps.includes(snapshot.categoryIgrp)) {
+    return false;
+  }
+
+  const nameContains = where.name?.contains;
+
+  if (
+    nameContains &&
+    !snapshot.productName.toLocaleLowerCase().includes(nameContains.toLocaleLowerCase())
+  ) {
+    return false;
+  }
+
+  return (where.AND ?? []).every((condition) => matchesProductWhere(snapshot, condition));
 }
 
 function compareCapturedAtAsc(left: TestSnapshot, right: TestSnapshot): number {

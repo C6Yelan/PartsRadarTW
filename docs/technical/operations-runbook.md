@@ -522,12 +522,13 @@ Bot 目標：
 
 - `discord-bot` Compose profile 與 `pnpm ops:discord-bot` daemon entrypoint。
 - Discord slash command registration。
-- `/price-report now`：使用者手動要求最近 `24h` / `12h` / `6h` 價格報告，bot 會在指令發出的頻道或私訊 context 以 embed 回覆中文報告；若使用者已有啟用中的每日設定，未明確覆蓋的手動報告會沿用該設定的分類、內容類型與上限，方便立即預覽。
+- `/price-report now`：使用者手動要求最近 `24h` / `12h` / `6h` 價格報告，bot 會在指令發出的頻道或私訊 context 以 embed 回覆中文報告；若使用者已有啟用中的每日設定，未明確覆蓋的手動報告會沿用該設定的分類、商品名稱關鍵字、內容類型與上限，方便立即預覽。
 - Slash command 只註冊 global command，供伺服器與 DM 使用，避免 Discord client 同時顯示 global 與 guild 的重複 `/price-report`。
 - `/price-report now` 報告只為有資料的「價格變動」或「新增商品」產生 embed；摘要時間、統計數字與價格變動方向標題使用 Markdown emphasis 強化區隔；價格變動 embed 先分「降價」與「漲價」，商品列以單行呈現 signed 漲跌金額、舊價、新價與站內商品連結；新增商品 embed 以單行呈現目前價格與站內商品連結；兩者都依 DB 的 `sourceCategory.displayName` 大分類與 `vendorName` 小分類分組，並在小分類已顯示品牌時移除商品名稱開頭重複品牌；兩邊都沒資料時才送一個空報告摘要。
 - `/price-report now` 每次最多列 `DISCORD_PRICE_REPORT_MAX_ITEMS` 筆，預設 50；上限套用在兩區合計列出的商品數；per-user cooldown 只套用在實際產生報告的 `now` 指令。
 - 每次 `/price-report now` 會寫入 `discord_notification_deliveries`，供後續去重、排程與維運檢視使用。
 - `/price-report settings`：開啟私密設定面板，以 embed 顯示每日價格報告狀態與目前設定，並用選單調整統計區間、分類篩選與報告內容類型；分類選單只列實際分類，部分分類狀態可按「改為全部分類」恢復不限制分類。
+- 「調整關鍵字」會開啟 modal，設定商品名稱關鍵字；留空代表不限。關鍵字以空白分詞做 AND 比對，例如 `RTX 5090` 可匹配商品名中的 `RTX5090`。
 - 「調整時間與上限」會開啟 modal，設定最多列出商品數與每日私訊發送時間；`time` 使用台北時間 `HH:mm`。報告內容至少包含降價、漲價或新增商品其中一種。
 - 「開啟每日報告」會依目前面板設定啟用每日 DM；「關閉每日報告」會直接關閉每日價格報告 DM。
 - `/watch`：開啟 ephemeral 統合管理介面，分頁列出目前 Discord 使用者啟用中的目標價追蹤。使用者可按「新增追蹤」開啟表單，貼 PartsRadarTW 商品頁分享連結、網址列 `/products/<id>` URL 或站內商品 ID，並輸入純數字目標價格；也可從選單挑選既有追蹤後修改目標價，或經確認後移除。每頁最多 25 筆，介面不顯示資料庫 watch ID。
@@ -564,7 +565,7 @@ docker compose --profile discord-bot run --rm discord-bot \
 
 - 目前指令只開放每日報告；資料模型保留 `daily`、`every_12h`、`every_6h` 供後續擴充。
 - `window` 只支援 `24h`、`12h`、`6h`。
-- `scope` 仍只支援全站 `all`；個人化只做分類與內容類型篩選，不接 `/watch` 清單，避免將 price-report 與單品目標價追蹤耦合。
+- `scope` 仍只支援全站 `all`；個人化只做分類、商品名稱關鍵字與內容類型篩選，不接 `/watch` 清單，避免將 price-report 與單品目標價追蹤耦合。
 - 時區固定 `Asia/Taipei`。
 - Price report 每次最多列 50 筆，超過上限時顯示另有幾筆未列出。
 - `/watch` 第一版支援 PartsRadarTW 商品頁分享連結、站內 `/products/<id>` URL 或站內商品 ID，不以原價屋 iBuy URL 作為主流程。
