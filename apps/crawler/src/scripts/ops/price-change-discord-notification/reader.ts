@@ -337,18 +337,32 @@ function normalizeProductKeyword(value: string | null | undefined): string | nul
     return null;
   }
 
-  const keyword = value.trim().replace(/\s+/g, " ");
+  const keyword = normalizeProductKeywordText(value);
 
   return keyword.length > 0 ? keyword : null;
 }
 
 function createProductKeywordFilter(keyword: string): Prisma.ProductWhereInput {
-  const tokens = keyword.split(" ").filter(Boolean);
+  const groups = parseProductKeywordGroups(keyword);
 
+  if (groups.length === 0) {
+    return {};
+  }
+
+  if (groups.length === 1) {
+    return createProductKeywordGroupFilter(groups[0] ?? []);
+  }
+
+  return {
+    OR: groups.map((tokens) => createProductKeywordGroupFilter(tokens)),
+  };
+}
+
+function createProductKeywordGroupFilter(tokens: string[]): Prisma.ProductWhereInput {
   if (tokens.length <= 1) {
     return {
       name: {
-        contains: keyword,
+        contains: tokens[0] ?? "",
         mode: "insensitive",
       },
     };
@@ -362,6 +376,22 @@ function createProductKeywordFilter(keyword: string): Prisma.ProductWhereInput {
       },
     })),
   };
+}
+
+function parseProductKeywordGroups(keyword: string): string[][] {
+  return keyword
+    .split(",")
+    .map((group) => group.trim().split(/\s+/).filter(Boolean))
+    .filter((tokens) => tokens.length > 0);
+}
+
+function normalizeProductKeywordText(value: string): string {
+  return value
+    .replace(/，/g, ",")
+    .split(",")
+    .map((group) => group.trim().replace(/\s+/g, " "))
+    .filter(Boolean)
+    .join(", ");
 }
 
 function toProductSubcategory(product: CrawlRunPriceSnapshot["product"]) {

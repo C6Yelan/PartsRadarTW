@@ -154,7 +154,7 @@ Discord bot 只保存 Discord user id 與必要偏好，不建立網站帳號，
 - `timezone`，第一輪固定 `Asia/Taipei`
 - `max_items`
 - `category_igrps`：空陣列代表全部分類；非空陣列代表只列出指定 CoolPC `IGrp` 分類。
-- nullable `product_keyword`：商品名稱關鍵字；留空代表不限。查詢時以空白分詞做 AND 比對，例如 `RTX 5090` 可匹配商品名中的 `RTX5090`。
+- nullable `product_keyword`：商品名稱關鍵字；留空代表不限。格式：空白=同組都要符合；逗號=任一組符合。例：`RTX 5090, DDR5` 代表 `(RTX AND 5090) OR DDR5`，可匹配商品名中的 `RTX5090` 或 `DDR5`。
 - `include_price_drops` / `include_price_rises` / `include_new_products`：控制每日與手動報告要包含降價、漲價與新增商品。
 - `enabled`
 - nullable `next_send_at` / `last_sent_at`

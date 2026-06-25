@@ -54,6 +54,8 @@ const WATCH_CREATE_MODAL_CUSTOM_ID = "watch:create-modal";
 const WATCH_EDIT_MODAL_CUSTOM_ID_PREFIX = "watch:edit-modal:";
 const WATCH_PRODUCT_CUSTOM_ID = "watch:product";
 const WATCH_TARGET_PRICE_CUSTOM_ID = "watch:target-price";
+const PRICE_REPORT_KEYWORD_FORMAT_DESCRIPTION =
+  "格式：空白=同組都要符合；逗號=任一組符合。例：RTX 5090, DDR5";
 export const WATCH_ADD_CUSTOM_ID = "watch:add";
 export const WATCH_SELECT_CUSTOM_ID_PREFIX = "watch:select:";
 export const WATCH_EDIT_CUSTOM_ID_PREFIX = "watch:edit:";
@@ -536,7 +538,7 @@ export function createPriceReportKeywordModal({
       {
         type: DISCORD_COMPONENT_TYPE_LABEL,
         label: "商品名稱關鍵字",
-        description: "例如 RTX 5090；留空代表不限關鍵字。",
+        description: `${PRICE_REPORT_KEYWORD_FORMAT_DESCRIPTION}；留空代表不限。`,
         component: {
           type: DISCORD_COMPONENT_TYPE_TEXT_INPUT,
           custom_id: PRICE_REPORT_SETTINGS_KEYWORD_INPUT_CUSTOM_ID,
@@ -544,7 +546,7 @@ export function createPriceReportKeywordModal({
           max_length: MAX_PRICE_REPORT_KEYWORD_LENGTH,
           required: false,
           value: keywordValue,
-          placeholder: "RTX 5090",
+          placeholder: "RTX 5090, DDR5",
         },
       },
     ],
@@ -761,13 +763,22 @@ function parseProductKeywordInput(value: unknown): string | null | undefined {
     return undefined;
   }
 
-  const productKeyword = value.trim().replace(/\s+/g, " ");
+  const productKeyword = normalizeProductKeywordInput(value);
 
   if (productKeyword.length === 0) {
     return null;
   }
 
   return productKeyword.length <= MAX_PRICE_REPORT_KEYWORD_LENGTH ? productKeyword : undefined;
+}
+
+function normalizeProductKeywordInput(value: string): string {
+  return value
+    .replace(/，/g, ",")
+    .split(",")
+    .map((group) => group.trim().replace(/\s+/g, " "))
+    .filter(Boolean)
+    .join(", ");
 }
 
 function parsePriceReportEvents(values: unknown[]): {

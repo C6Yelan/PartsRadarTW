@@ -1092,9 +1092,18 @@ function normalizePriceReportProductKeyword(value: string | null | undefined): s
     return null;
   }
 
-  const keyword = value.trim().replace(/\s+/g, " ");
+  const keyword = normalizePriceReportProductKeywordText(value);
 
   return keyword.length > 0 && keyword.length <= MAX_PRICE_REPORT_KEYWORD_LENGTH ? keyword : null;
+}
+
+function normalizePriceReportProductKeywordText(value: string): string {
+  return value
+    .replace(/，/g, ",")
+    .split(",")
+    .map((group) => group.trim().replace(/\s+/g, " "))
+    .filter(Boolean)
+    .join(", ");
 }
 
 export function formatWindowLabel(window: DiscordPriceReportSetting["window"]): string {

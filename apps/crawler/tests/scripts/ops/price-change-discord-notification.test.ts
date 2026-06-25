@@ -361,6 +361,16 @@ describe("readRecentPriceReport", () => {
         capturedAt: "2026-06-07T03:30:00.000Z",
       }),
       snapshot({
+        id: "new-ddr5",
+        productId: "ddr5",
+        productName: "芝奇 DDR5 6400 記憶體",
+        crawlRunId: "new-run",
+        price: 12000,
+        capturedAt: "2026-06-07T03:40:00.000Z",
+        categoryIgrp: 6,
+        categoryName: "記憶體",
+      }),
+      snapshot({
         id: "old-rx",
         productId: "rx",
         productName: "華碩 PRIME-RX9070XT-O16G",
@@ -382,19 +392,24 @@ describe("readRecentPriceReport", () => {
       since: new Date("2026-06-07T02:00:00.000Z"),
       until: new Date("2026-06-07T05:00:00.000Z"),
       filters: {
-        productKeyword: "RTX 5090",
+        productKeyword: "RTX 5090, DDR5",
       },
     });
 
     expect(report.priceChanges.map((item) => item.productId)).toEqual(["rtx"]);
-    expect(report.newProducts.map((item) => item.productId)).toEqual(["rtx-ti"]);
+    expect(report.newProducts.map((item) => item.productId)).toEqual(["ddr5", "rtx-ti"]);
     expect(client.priceSnapshot.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
           product: expect.objectContaining({
-            AND: [
-              { name: { contains: "RTX", mode: "insensitive" } },
-              { name: { contains: "5090", mode: "insensitive" } },
+            OR: [
+              {
+                AND: [
+                  { name: { contains: "RTX", mode: "insensitive" } },
+                  { name: { contains: "5090", mode: "insensitive" } },
+                ],
+              },
+              { name: { contains: "DDR5", mode: "insensitive" } },
             ],
           }),
         }),
@@ -628,6 +643,7 @@ interface TestProductWhere {
     contains?: string;
   };
   AND?: TestProductWhere[];
+  OR?: TestProductWhere[];
 }
 
 function snapshot({
@@ -820,7 +836,11 @@ function matchesProductWhere(snapshot: TestSnapshot, where: TestProductWhere | u
     return false;
   }
 
-  return (where.AND ?? []).every((condition) => matchesProductWhere(snapshot, condition));
+  if (!(where.AND ?? []).every((condition) => matchesProductWhere(snapshot, condition))) {
+    return false;
+  }
+
+  return !where.OR || where.OR.some((condition) => matchesProductWhere(snapshot, condition));
 }
 
 function compareCapturedAtAsc(left: TestSnapshot, right: TestSnapshot): number {

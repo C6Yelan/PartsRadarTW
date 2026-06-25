@@ -1218,7 +1218,9 @@ describe("handleDiscordInteraction", () => {
       },
     });
     expect(JSON.stringify(requestBody.data.components)).toContain('"value":"RTX 5090"');
-    expect(JSON.stringify(requestBody.data.components)).toContain("留空代表不限關鍵字");
+    expect(JSON.stringify(requestBody.data.components)).toContain(
+      "格式：空白=同組都要符合；逗號=任一組符合。例：RTX 5090, DDR5；留空代表不限。",
+    );
   });
 
   it("updates daily report time and item limit from the settings modal", async () => {
@@ -1304,7 +1306,7 @@ describe("handleDiscordInteraction", () => {
       options: createDiscordBotOptions(),
       cooldowns: new CommandCooldowns(60),
       fetchImpl: fetchMock as typeof fetch,
-      interaction: createKeywordModalSubmitInteraction({ keyword: " RTX   5090 " }),
+      interaction: createKeywordModalSubmitInteraction({ keyword: " RTX   5090，  DDR5 " }),
     });
 
     expect(client.discordPriceReportSetting.upsert).toHaveBeenCalledWith(
@@ -1313,7 +1315,7 @@ describe("handleDiscordInteraction", () => {
           window: "HOURS_12",
           maxItems: 12,
           categoryIgrps: [12],
-          productKeyword: "RTX 5090",
+          productKeyword: "RTX 5090, DDR5",
           includePriceDrops: true,
           includePriceRises: true,
           includeNewProducts: false,
@@ -1323,7 +1325,7 @@ describe("handleDiscordInteraction", () => {
           window: "HOURS_12",
           maxItems: 12,
           categoryIgrps: [12],
-          productKeyword: "RTX 5090",
+          productKeyword: "RTX 5090, DDR5",
           includePriceDrops: true,
           includePriceRises: true,
           includeNewProducts: false,
@@ -1335,7 +1337,9 @@ describe("handleDiscordInteraction", () => {
       String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body),
     );
 
-    expect(readEmbedFieldValue(readResponseEmbed(requestBody), "商品關鍵字")).toBe("RTX 5090");
+    expect(readEmbedFieldValue(readResponseEmbed(requestBody), "商品關鍵字")).toBe(
+      "RTX 5090, DDR5",
+    );
   });
 
   it("clears the daily report product keyword from the settings modal", async () => {
@@ -2038,6 +2042,16 @@ describe("sendPriceReportNow", () => {
         price: 27_000,
         capturedAt: "2026-06-07T03:00:00.000Z",
       }),
+      snapshot({
+        id: "new-ddr5",
+        productId: "product-ddr5",
+        productName: "芝奇 DDR5 6400 記憶體",
+        crawlRunId: "new-run",
+        price: 12_000,
+        capturedAt: "2026-06-07T04:00:00.000Z",
+        categoryIgrp: 6,
+        categoryName: "記憶體",
+      }),
     ]);
     const sendReportMessages = vi.fn(async (_messages: DiscordBotMessage[]) => ({
       status: "sent" as const,
@@ -2054,7 +2068,7 @@ describe("sendPriceReportNow", () => {
         publicBaseUrl: PUBLIC_BASE_URL,
         filters: {
           categoryIgrps: [],
-          productKeyword: "RTX 5090",
+          productKeyword: "RTX 5090, DDR5",
           includePriceDrops: true,
           includePriceRises: true,
           includeNewProducts: true,
@@ -2065,21 +2079,27 @@ describe("sendPriceReportNow", () => {
     ).resolves.toMatchObject({
       status: "sent",
       changeCount: 1,
-      newProductCount: 0,
-      listedCount: 1,
+      newProductCount: 1,
+      listedCount: 2,
     });
 
     const reportMessage = sendReportMessages.mock.calls[0]?.[0][0];
 
     expect(JSON.stringify(reportMessage)).toContain("ROG-RTX5090-O32G");
+    expect(JSON.stringify(reportMessage)).toContain("DDR5 6400");
     expect(JSON.stringify(reportMessage)).not.toContain("PRIME-RX9070XT-O16G");
     expect(client.priceSnapshot.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
           product: expect.objectContaining({
-            AND: [
-              { name: { contains: "RTX", mode: "insensitive" } },
-              { name: { contains: "5090", mode: "insensitive" } },
+            OR: [
+              {
+                AND: [
+                  { name: { contains: "RTX", mode: "insensitive" } },
+                  { name: { contains: "5090", mode: "insensitive" } },
+                ],
+              },
+              { name: { contains: "DDR5", mode: "insensitive" } },
             ],
           }),
         }),
@@ -2668,6 +2688,7 @@ interface TestProductWhere {
     contains?: string;
   };
   AND?: TestProductWhere[];
+  OR?: TestProductWhere[];
 }
 
 interface TestTargetPriceWatch {
@@ -3337,7 +3358,11 @@ function matchesProductWhere(snapshot: TestSnapshot, where: TestProductWhere | u
     return false;
   }
 
-  return (where.AND ?? []).every((condition) => matchesProductWhere(snapshot, condition));
+  if (!(where.AND ?? []).every((condition) => matchesProductWhere(snapshot, condition))) {
+    return false;
+  }
+
+  return !where.OR || where.OR.some((condition) => matchesProductWhere(snapshot, condition));
 }
 
 function compareCapturedAtAsc(left: TestSnapshot, right: TestSnapshot): number {
