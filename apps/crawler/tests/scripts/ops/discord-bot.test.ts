@@ -1218,14 +1218,25 @@ describe("handleDiscordInteraction", () => {
       },
     });
     expect(JSON.stringify(requestBody.data.components)).toContain('"value":"RTX 5090"');
-    const keywordDescription = requestBody.data.components[0].description;
-    expect(keywordDescription).toBe(
-      [
+    expect(requestBody.data.components[0]).toEqual({
+      type: 10,
+      content: [
+        "**格式說明**",
         "留空：不限制商品名稱。",
-        "空白：同一組關鍵字都要符合，例如 RTX 5090。",
-        "逗號：多組擇一符合，例如 RTX 5090, DDR5。",
+        "空白：同一組關鍵字都要符合，例如 `RTX 5090`。",
+        "逗號：多組擇一符合，例如 `RTX 5090, DDR5`。",
       ].join("\n"),
-    );
+    });
+    expect(requestBody.data.components[1]).toMatchObject({
+      type: 18,
+      label: "商品名稱關鍵字",
+      component: {
+        type: 4,
+        custom_id: "price-report:settings:keyword-input",
+        value: "RTX 5090",
+      },
+    });
+    expect(requestBody.data.components[1]).not.toHaveProperty("description");
   });
 
   it("updates daily report time and item limit from the settings modal", async () => {

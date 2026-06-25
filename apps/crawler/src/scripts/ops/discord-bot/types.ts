@@ -87,7 +87,12 @@ export interface DiscordModal {
   components: DiscordModalComponent[];
 }
 
-export type DiscordModalComponent = DiscordModalLabelComponent;
+export type DiscordModalComponent = DiscordModalLabelComponent | DiscordModalTextDisplayComponent;
+
+export interface DiscordModalTextDisplayComponent {
+  type: 10;
+  content: string;
+}
 
 export interface DiscordModalLabelComponent {
   type: 18;

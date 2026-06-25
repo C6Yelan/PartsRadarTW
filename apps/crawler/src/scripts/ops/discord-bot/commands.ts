@@ -11,6 +11,7 @@ import {
   DISCORD_COMPONENT_TYPE_BUTTON,
   DISCORD_COMPONENT_TYPE_LABEL,
   DISCORD_COMPONENT_TYPE_STRING_SELECT,
+  DISCORD_COMPONENT_TYPE_TEXT_DISPLAY,
   DISCORD_COMPONENT_TYPE_TEXT_INPUT,
   DISCORD_OPTION_TYPE_INTEGER,
   DISCORD_OPTION_TYPE_STRING,
@@ -55,9 +56,10 @@ const WATCH_EDIT_MODAL_CUSTOM_ID_PREFIX = "watch:edit-modal:";
 const WATCH_PRODUCT_CUSTOM_ID = "watch:product";
 const WATCH_TARGET_PRICE_CUSTOM_ID = "watch:target-price";
 const PRICE_REPORT_KEYWORD_FORMAT_DESCRIPTION =
+  "**格式說明**\n" +
   "留空：不限制商品名稱。\n" +
-  "空白：同一組關鍵字都要符合，例如 RTX 5090。\n" +
-  "逗號：多組擇一符合，例如 RTX 5090, DDR5。";
+  "空白：同一組關鍵字都要符合，例如 `RTX 5090`。\n" +
+  "逗號：多組擇一符合，例如 `RTX 5090, DDR5`。";
 export const WATCH_ADD_CUSTOM_ID = "watch:add";
 export const WATCH_SELECT_CUSTOM_ID_PREFIX = "watch:select:";
 export const WATCH_EDIT_CUSTOM_ID_PREFIX = "watch:edit:";
@@ -538,9 +540,12 @@ export function createPriceReportKeywordModal({
     title: "價格報告關鍵字",
     components: [
       {
+        type: DISCORD_COMPONENT_TYPE_TEXT_DISPLAY,
+        content: PRICE_REPORT_KEYWORD_FORMAT_DESCRIPTION,
+      },
+      {
         type: DISCORD_COMPONENT_TYPE_LABEL,
         label: "商品名稱關鍵字",
-        description: PRICE_REPORT_KEYWORD_FORMAT_DESCRIPTION,
         component: {
           type: DISCORD_COMPONENT_TYPE_TEXT_INPUT,
           custom_id: PRICE_REPORT_SETTINGS_KEYWORD_INPUT_CUSTOM_ID,
