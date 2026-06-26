@@ -41,6 +41,7 @@ const PRICE_REPORT_SETTINGS_TIME_LIMIT_MODAL_CUSTOM_ID = "price-report:settings:
 const PRICE_REPORT_SETTINGS_KEYWORD_CUSTOM_ID = "price-report:settings:keyword";
 const PRICE_REPORT_SETTINGS_KEYWORD_MODAL_CUSTOM_ID = "price-report:settings:keyword-modal";
 const PRICE_REPORT_SETTINGS_KEYWORD_INPUT_CUSTOM_ID = "price-report:settings:keyword-input";
+const PRICE_REPORT_SETTINGS_PREVIEW_CUSTOM_ID = "price-report:settings:preview";
 const PRICE_REPORT_SETTINGS_WINDOW_CUSTOM_ID = "price-report:settings:window";
 const PRICE_REPORT_SETTINGS_CATEGORIES_CUSTOM_ID = "price-report:settings:categories";
 const PRICE_REPORT_SETTINGS_ALL_CATEGORIES_CUSTOM_ID = "price-report:settings:all-categories";
@@ -463,6 +464,12 @@ export function createPriceReportSettingsComponents({
         {
           type: DISCORD_COMPONENT_TYPE_BUTTON,
           style: DISCORD_BUTTON_STYLE_SECONDARY,
+          custom_id: PRICE_REPORT_SETTINGS_PREVIEW_CUSTOM_ID,
+          label: "立即預覽",
+        },
+        {
+          type: DISCORD_COMPONENT_TYPE_BUTTON,
+          style: DISCORD_BUTTON_STYLE_SECONDARY,
           custom_id: PRICE_REPORT_SETTINGS_KEYWORD_CUSTOM_ID,
           label: "調整關鍵字",
         },
@@ -586,6 +593,12 @@ export function parsePriceReportComponentInteraction(
   if (customId === PRICE_REPORT_SETTINGS_KEYWORD_CUSTOM_ID) {
     return {
       name: "open_keyword_modal",
+    };
+  }
+
+  if (customId === PRICE_REPORT_SETTINGS_PREVIEW_CUSTOM_ID) {
+    return {
+      name: "preview_report",
     };
   }
 

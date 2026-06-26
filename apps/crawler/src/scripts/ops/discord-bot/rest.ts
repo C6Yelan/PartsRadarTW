@@ -133,6 +133,7 @@ export async function sendDiscordInteractionMessages({
   interaction,
   messages,
   fetchImpl = fetch,
+  ephemeral = false,
 }: {
   token: string;
   applicationId: string;
@@ -140,6 +141,7 @@ export async function sendDiscordInteractionMessages({
   interaction: DiscordInteraction;
   messages: DiscordBotMessage[];
   fetchImpl?: FetchImpl;
+  ephemeral?: boolean;
 }): Promise<DiscordBotMessageSendResult> {
   const httpStatuses: number[] = [];
 
@@ -155,7 +157,7 @@ export async function sendDiscordInteractionMessages({
       fetchImpl,
       method,
       path,
-      body: createDiscordMessagePayload(message),
+      body: createDiscordMessagePayload(message, ephemeral),
     });
 
     if (messageResult.status === "ok") {

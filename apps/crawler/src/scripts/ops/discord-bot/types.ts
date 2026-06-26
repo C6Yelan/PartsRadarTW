@@ -329,6 +329,9 @@ export type ParsedPriceReportComponent =
       name: "open_keyword_modal";
     }
   | {
+      name: "preview_report";
+    }
+  | {
       name: "update_window";
       windowHours: number;
     }

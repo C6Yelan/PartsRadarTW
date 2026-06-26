@@ -39,9 +39,9 @@
 
 Discord bot 第一輪指令：
 
-- `/price-report settings`：開啟私密設定面板，以 embed 顯示目前狀態，透過選單設定統計區間、分類篩選與報告內容類型，並可用「改為全部分類」按鈕重設分類篩選、用 modal 調整商品名稱關鍵字、上限與台北時間 `HH:mm`；同一面板可開啟或關閉每日價格變動報告 DM。
+- `/price-report settings`：開啟私密設定面板，以 embed 顯示目前狀態、最近一次每日報告 delivery 狀態與目前設定，透過選單設定統計區間、分類篩選與報告內容類型，並可用「改為全部分類」按鈕重設分類篩選、用 modal 調整商品名稱關鍵字、上限與台北時間 `HH:mm`；同一面板可私密預覽目前設定，也可開啟或關閉每日價格變動報告 DM。
 - `/price-report now`：立即在指令發出的頻道或私訊 context 產生一次報告，用於驗證設定與手動查看；若已有啟用中的每日設定，未手動覆蓋的選項會沿用該設定。
-- `/watch`：開啟私密的統合管理介面，列出自己的啟用中追蹤；可由同一介面新增追蹤、選取商品後修改目標價，或經確認後移除追蹤。新增表單支援 PartsRadarTW 商品頁分享連結、網址列 `/products/<id>` URL 或站內商品 ID；清單每頁最多 25 筆，使用者不需輸入或查看 watch ID。
+- `/watch`：開啟私密的統合管理介面，列出自己的啟用中追蹤；可由同一介面新增追蹤、選取商品後查看目前價格與價格資料時間、修改目標價，或經確認後移除追蹤。新增表單支援 PartsRadarTW 商品頁分享連結、網址列 `/products/<id>` URL 或站內商品 ID；清單每頁最多 25 筆，使用者不需輸入或查看 watch ID。
 
 價格變動報告第一版限制：
 
@@ -227,7 +227,7 @@ Discord bot 第一輪指令：
 - Watch / price-report 設定資料表、Discord user preference、notification delivery log。
 - DM 通知去重、cooldown / rate limit、secret 與訊息安全邊界。
 
-目前 bot personalized notification slice 已完成：`discord-bot` daemon、slash command registration、DM 可用的 global command、`/price-report now` embed 報告、`/price-report settings` 統合設定面板與每日 DM 報告設定（含分類、商品名稱關鍵字與內容類型篩選）、定期 due setting 發送、可新增 / 查看 / 編輯 / 確認移除的統合式 `/watch` 管理介面，以及價格小於等於目標價時只成功通知一次的 DM worker。發送結果會寫入 Discord notification delivery log；失敗與 rate limit 保留後續重試資格，短期 notification claim 避免同時執行造成重複通知。
+目前 bot personalized notification slice 已完成：`discord-bot` daemon、slash command registration、DM 可用的 global command、`/price-report now` embed 報告、`/price-report settings` 統合設定面板與每日 DM 報告設定（含分類、商品名稱關鍵字、內容類型篩選、最近一次每日報告狀態與私密立即預覽）、定期 due setting 發送、可新增 / 查看 / 編輯 / 確認移除且顯示價格資料時間的統合式 `/watch` 管理介面，以及價格小於等於目標價時只成功通知一次的 DM worker。發送結果會寫入 Discord notification delivery log；失敗與 rate limit 保留後續重試資格，短期 notification claim 避免同時執行造成重複通知。
 
 ### v3.2：維運檢視、外部監控與公開流量硬化
 

@@ -721,12 +721,21 @@ function formatWatchSummaryFields(watch: TargetPriceWatchListRecord): Array<{
 }> {
   const currentPrice = watch.product.currentPrice?.priceSnapshot.price ?? null;
   const currentCurrency = watch.product.currentPrice?.priceSnapshot.currency ?? watch.currency;
+  const priceSeenAt =
+    watch.product.currentPrice?.lastSeenAt ??
+    watch.product.currentPrice?.priceSnapshot.capturedAt ??
+    null;
 
   return [
     {
       name: "目前價格",
       value:
         currentPrice === null ? "目前價格未知" : formatTaiwanDollar(currentPrice, currentCurrency),
+      inline: true,
+    },
+    {
+      name: "價格資料時間",
+      value: priceSeenAt ? formatTaipeiMinute(priceSeenAt) : "尚無價格資料",
       inline: true,
     },
     {

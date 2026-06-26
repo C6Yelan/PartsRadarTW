@@ -299,6 +299,40 @@ describe("sendDiscordInteractionMessages", () => {
       },
     });
   });
+
+  it("can keep all interaction report chunks ephemeral", async () => {
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await expect(
+      sendDiscordInteractionMessages({
+        token: TOKEN,
+        applicationId: APPLICATION_ID,
+        apiBaseUrl: API_BASE_URL,
+        interaction: {
+          id: "interaction-1",
+          token: "interaction-token",
+          type: 2,
+        },
+        messages: [{ content: "Preview 1" }, { content: "Preview 2" }],
+        fetchImpl: fetchMock as typeof fetch,
+        ephemeral: true,
+      }),
+    ).resolves.toMatchObject({
+      status: "sent",
+      messageCount: 2,
+    });
+
+    const payloads = fetchMock.mock.calls.map(([, requestInit]) =>
+      JSON.parse(String((requestInit as RequestInit | undefined)?.body)),
+    );
+
+    expect(payloads).toEqual([
+      expect.objectContaining({ content: "Preview 1", flags: 64 }),
+      expect.objectContaining({ content: "Preview 2", flags: 64 }),
+    ]);
+  });
 });
 
 describe("handleDiscordInteraction", () => {
@@ -543,6 +577,12 @@ describe("handleDiscordInteraction", () => {
         expect.objectContaining({
           title: "商品目標價追蹤",
           description: expect.stringContaining("RTX 5070 測試卡"),
+          fields: expect.arrayContaining([
+            expect.objectContaining({
+              name: "價格資料時間",
+              value: "06/07 11:00 GMT+8",
+            }),
+          ]),
         }),
       ],
       components: expect.arrayContaining([
@@ -996,6 +1036,10 @@ describe("handleDiscordInteraction", () => {
               expect.objectContaining({ name: "每次最多", value: "50 筆" }),
               expect.objectContaining({ name: "每日時間", value: "09:00" }),
               expect.objectContaining({ name: "下一次", value: "啟用後排程" }),
+              expect.objectContaining({
+                name: "最近一次每日報告",
+                value: "尚無每日報告紀錄。",
+              }),
             ]),
           }),
         ],
@@ -1039,7 +1083,12 @@ describe("handleDiscordInteraction", () => {
           },
           {
             type: 1,
-            components: [
+            components: expect.arrayContaining([
+              expect.objectContaining({
+                type: 2,
+                custom_id: "price-report:settings:preview",
+                label: "立即預覽",
+              }),
               expect.objectContaining({
                 type: 2,
                 custom_id: "price-report:settings:keyword",
@@ -1055,7 +1104,7 @@ describe("handleDiscordInteraction", () => {
                 custom_id: "price-report:settings:enable",
                 label: "開啟每日報告",
               }),
-            ],
+            ]),
           },
         ],
       },
@@ -1103,6 +1152,71 @@ describe("handleDiscordInteraction", () => {
     expect(readEmbedFieldValue(embed, "內容")).toBe("降價、新增商品");
   });
 
+  it("shows the latest scheduled daily report delivery status in settings", async () => {
+    const client = createDiscordBotClient(
+      [],
+      [
+        priceReportSetting({
+          id: "setting-1",
+          discordUserId: "111122223333444455",
+          nextSendAt: new Date("2026-06-07T13:30:00.000Z"),
+        }),
+      ],
+      [],
+      [...TEST_SOURCE_CATEGORIES],
+      [
+        notificationDelivery({
+          id: "delivery-old",
+          discordUserId: "111122223333444455",
+          kind: "SCHEDULED_PRICE_REPORT",
+          status: "FAILED",
+          errorMessage: "old failure",
+          createdAt: new Date("2026-06-06T01:00:00.000Z"),
+        }),
+        notificationDelivery({
+          id: "delivery-new",
+          discordUserId: "111122223333444455",
+          kind: "SCHEDULED_PRICE_REPORT",
+          status: "SENT",
+          itemCount: 7,
+          messageCount: 2,
+          deliveredAt: new Date("2026-06-07T01:00:00.000Z"),
+          createdAt: new Date("2026-06-07T01:00:00.000Z"),
+        }),
+      ],
+    );
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createInteraction("settings"),
+    });
+
+    const requestBody = JSON.parse(
+      String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body),
+    );
+    const deliveryStatus = readEmbedFieldValue(readResponseEmbed(requestBody), "最近一次每日報告");
+
+    expect(deliveryStatus).toBe("成功：06/07 09:00 GMT+8，列出 7 筆，送出 2 則訊息。");
+    expect(client.discordNotificationDelivery.findFirst).toHaveBeenCalledWith({
+      where: {
+        discordUserId: "111122223333444455",
+        kind: "SCHEDULED_PRICE_REPORT",
+      },
+      select: expect.objectContaining({
+        status: true,
+        itemCount: true,
+        messageCount: true,
+      }),
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    });
+  });
+
   it("does not consume the price report cooldown for settings commands", async () => {
     const client = createDiscordBotClient([]);
     const cooldowns = new CommandCooldowns(60);
@@ -1135,6 +1249,90 @@ describe("handleDiscordInteraction", () => {
     expect(urls).toContain(
       `${API_BASE_URL}/webhooks/${APPLICATION_ID}/interaction-token/messages/@original`,
     );
+  });
+
+  it("previews the configured price report from the settings panel", async () => {
+    const now = new Date();
+    const oldCapturedAt = new Date(now.getTime() - 25 * 60 * 60 * 1000).toISOString();
+    const newCapturedAt = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
+    const client = createDiscordBotClient(
+      [
+        snapshot({
+          id: "preview-old",
+          productId: "preview-product",
+          productName: "華碩 RTX 5070 測試卡",
+          crawlRunId: "old-run",
+          price: 20_000,
+          capturedAt: oldCapturedAt,
+          categoryIgrp: 12,
+          categoryName: "顯示卡",
+        }),
+        snapshot({
+          id: "preview-new",
+          productId: "preview-product",
+          productName: "華碩 RTX 5070 測試卡",
+          crawlRunId: "new-run",
+          price: 18_990,
+          capturedAt: newCapturedAt,
+          categoryIgrp: 12,
+          categoryName: "顯示卡",
+        }),
+      ],
+      [
+        priceReportSetting({
+          id: "setting-1",
+          discordUserId: "111122223333444455",
+          categoryIgrps: [12],
+          productKeyword: "RTX 5070",
+          includeNewProducts: false,
+          enabled: false,
+          nextSendAt: null,
+        }),
+      ],
+    );
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createComponentInteraction("price-report:settings:preview"),
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({
+      type: 5,
+      data: { flags: 64 },
+    });
+
+    const previewBody = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body));
+
+    expect(fetchMock.mock.calls[1]?.[0]).toBe(
+      `${API_BASE_URL}/webhooks/${APPLICATION_ID}/interaction-token/messages/@original`,
+    );
+    expect(previewBody).toMatchObject({
+      flags: 64,
+      embeds: [
+        expect.objectContaining({
+          title: "PartsRadarTW 價格報告 - 價格變動",
+          description: expect.stringContaining("RTX 5070"),
+        }),
+      ],
+      allowed_mentions: {
+        parse: [],
+      },
+    });
+    expect(JSON.stringify(previewBody)).not.toContain("新增商品");
+    expect(client.discordNotificationDelivery.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        discordUserId: "111122223333444455",
+        kind: "PRICE_REPORT_NOW",
+        status: "SENT",
+      }),
+    });
   });
 
   it("opens a time and limit modal from the settings panel", async () => {
@@ -2720,6 +2918,21 @@ interface TestTargetPriceWatch {
   updatedAt: Date;
 }
 
+interface TestDiscordNotificationDelivery {
+  id: string;
+  discordUserId: string;
+  kind: "PRICE_REPORT_NOW" | "SCHEDULED_PRICE_REPORT" | "TARGET_PRICE";
+  status: "SENT" | "SKIPPED" | "FAILED" | "RATE_LIMITED";
+  productId: string | null;
+  targetPriceWatchId: string | null;
+  dedupeKey: string | null;
+  itemCount: number;
+  messageCount: number;
+  deliveredAt: Date | null;
+  errorMessage: string | null;
+  createdAt: Date;
+}
+
 function snapshot({
   id,
   productId,
@@ -2841,6 +3054,49 @@ function targetPriceWatch({
   };
 }
 
+function notificationDelivery({
+  id,
+  discordUserId,
+  kind,
+  status = "SENT",
+  productId = null,
+  targetPriceWatchId = null,
+  dedupeKey = null,
+  itemCount = 0,
+  messageCount = 0,
+  deliveredAt = null,
+  errorMessage = null,
+  createdAt = new Date("2026-06-07T00:00:00.000Z"),
+}: {
+  id: string;
+  discordUserId: string;
+  kind: TestDiscordNotificationDelivery["kind"];
+  status?: TestDiscordNotificationDelivery["status"];
+  productId?: string | null;
+  targetPriceWatchId?: string | null;
+  dedupeKey?: string | null;
+  itemCount?: number;
+  messageCount?: number;
+  deliveredAt?: Date | null;
+  errorMessage?: string | null;
+  createdAt?: Date;
+}): TestDiscordNotificationDelivery {
+  return {
+    id,
+    discordUserId,
+    kind,
+    status,
+    productId,
+    targetPriceWatchId,
+    dedupeKey,
+    itemCount,
+    messageCount,
+    deliveredAt,
+    errorMessage,
+    createdAt,
+  };
+}
+
 function createWatchManagerClient() {
   return createDiscordBotClient(
     [
@@ -2870,6 +3126,7 @@ function createDiscordBotClient(
   settings: TestPriceReportSetting[] = [],
   watches: TestTargetPriceWatch[] = [],
   categories: TestSourceCategory[] = [...TEST_SOURCE_CATEGORIES],
+  deliveries: TestDiscordNotificationDelivery[] = [],
 ): DiscordBotClient & {
   sourceCategory: {
     findMany: ReturnType<typeof vi.fn>;
@@ -2882,6 +3139,7 @@ function createDiscordBotClient(
   };
   discordNotificationDelivery: {
     create: ReturnType<typeof vi.fn>;
+    findFirst: ReturnType<typeof vi.fn>;
   };
   discordPriceReportSetting: {
     findFirst: ReturnType<typeof vi.fn>;
@@ -3237,6 +3495,64 @@ function createDiscordBotClient(
       return created;
     },
   );
+  const deliveryRows = [...deliveries];
+  const deliveryCreate = vi.fn(
+    async (args: {
+      data: Omit<TestDiscordNotificationDelivery, "id" | "createdAt"> & {
+        id?: string;
+        createdAt?: Date;
+      };
+    }) => {
+      const created: TestDiscordNotificationDelivery = {
+        id: args.data.id ?? `delivery-${deliveryRows.length + 1}`,
+        createdAt: args.data.createdAt ?? new Date("2026-06-07T00:00:00.000Z"),
+        ...args.data,
+        productId: args.data.productId ?? null,
+        targetPriceWatchId: args.data.targetPriceWatchId ?? null,
+        dedupeKey: args.data.dedupeKey ?? null,
+      };
+      deliveryRows.push(created);
+
+      return { id: created.id };
+    },
+  );
+  const deliveryFindFirst = vi.fn(
+    async (args: {
+      where: {
+        discordUserId?: string;
+        kind?: TestDiscordNotificationDelivery["kind"];
+      };
+      select?: Record<string, boolean>;
+    }) => {
+      const delivery = deliveryRows
+        .filter((row) => {
+          if (args.where.discordUserId && row.discordUserId !== args.where.discordUserId) {
+            return false;
+          }
+
+          return !args.where.kind || row.kind === args.where.kind;
+        })
+        .sort((left, right) => {
+          return (
+            right.createdAt.getTime() - left.createdAt.getTime() || right.id.localeCompare(left.id)
+          );
+        })[0];
+
+      if (!delivery) {
+        return null;
+      }
+
+      if (!args.select) {
+        return delivery;
+      }
+
+      return Object.fromEntries(
+        Object.entries(args.select)
+          .filter(([, selected]) => selected)
+          .map(([key]) => [key, delivery[key as keyof TestDiscordNotificationDelivery]]),
+      );
+    },
+  );
 
   return {
     sourceCategory: {
@@ -3249,7 +3565,8 @@ function createDiscordBotClient(
       findMany,
     },
     discordNotificationDelivery: {
-      create: vi.fn(async () => ({ id: "delivery-1" })),
+      create: deliveryCreate,
+      findFirst: deliveryFindFirst,
     },
     discordPriceReportSetting: {
       findFirst: settingFindFirst,
@@ -3277,6 +3594,7 @@ function createDiscordBotClient(
     };
     discordNotificationDelivery: {
       create: ReturnType<typeof vi.fn>;
+      findFirst: ReturnType<typeof vi.fn>;
     };
     discordPriceReportSetting: {
       findFirst: ReturnType<typeof vi.fn>;

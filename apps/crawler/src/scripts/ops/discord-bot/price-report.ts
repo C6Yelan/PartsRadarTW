@@ -1,6 +1,6 @@
 // apps/crawler/src/scripts/ops/discord-bot/price-report.ts
 
-import type { DiscordPriceReportSetting } from "@partsradar/db";
+import type { DiscordPriceReportSetting, Prisma } from "@partsradar/db";
 import {
   type PriceChangeDiscordNotificationItem,
   type PriceReportNewProductItem,
@@ -34,6 +34,19 @@ import type {
 
 const TAIPEI_UTC_OFFSET_MS = 8 * HOUR_MS;
 const DISCORD_MESSAGE_MAX_EMBEDS = 10;
+
+const PRICE_REPORT_DELIVERY_STATUS_SELECT = {
+  status: true,
+  itemCount: true,
+  messageCount: true,
+  errorMessage: true,
+  deliveredAt: true,
+  createdAt: true,
+} as const satisfies Prisma.DiscordNotificationDeliverySelect;
+
+export type PriceReportDeliveryStatus = Prisma.DiscordNotificationDeliveryGetPayload<{
+  select: typeof PRICE_REPORT_DELIVERY_STATUS_SELECT;
+}>;
 
 export interface PriceReportCategoryOption {
   igrp: number;
@@ -394,6 +407,23 @@ export async function readPriceReportSetting({
     where: {
       discordUserId,
     },
+  });
+}
+
+export async function readLatestScheduledPriceReportDelivery({
+  client,
+  discordUserId,
+}: {
+  client: DiscordBotClient;
+  discordUserId: string;
+}): Promise<PriceReportDeliveryStatus | null> {
+  return client.discordNotificationDelivery.findFirst({
+    where: {
+      discordUserId,
+      kind: "SCHEDULED_PRICE_REPORT",
+    },
+    select: PRICE_REPORT_DELIVERY_STATUS_SELECT,
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
   });
 }
 

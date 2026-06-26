@@ -32,6 +32,8 @@ import {
   formatTaipeiMinute,
   formatWindowLabel,
   type PriceReportCategoryOption,
+  type PriceReportDeliveryStatus,
+  readLatestScheduledPriceReportDelivery,
   readPriceReportCategories,
   readPriceReportSetting,
   sendPriceReportNow,
@@ -41,6 +43,7 @@ import {
   deferInteractionMessageUpdate,
   deferInteractionResponse,
   editDeferredInteractionResponse,
+  formatDiscordBotText,
   sendDiscordInteractionMessages,
   sendInteractionResponse,
   sendModalInteractionResponse,
@@ -94,6 +97,7 @@ export async function handleDiscordInteraction({
       client,
       interaction,
       options,
+      cooldowns,
       fetchImpl,
     });
     return;
@@ -234,11 +238,13 @@ async function handleMessageComponentInteraction({
   client,
   interaction,
   options,
+  cooldowns,
   fetchImpl,
 }: {
   client: DiscordBotClient;
   interaction: DiscordInteraction;
   options: DiscordBotOptions;
+  cooldowns: CommandCooldowns;
   fetchImpl: FetchImpl;
 }): Promise<void> {
   const component = parsePriceReportComponentInteraction(interaction);
@@ -253,6 +259,53 @@ async function handleMessageComponentInteraction({
 
   if (!discordUserId) {
     await sendMissingUserResponse({ interaction, options, fetchImpl });
+    return;
+  }
+
+  if (component?.name === "preview_report") {
+    const cooldown = cooldowns.consume(discordUserId, new Date());
+
+    if (!cooldown.allowed) {
+      await sendInteractionResponse({
+        token: options.token,
+        apiBaseUrl: options.apiBaseUrl,
+        interaction,
+        fetchImpl,
+        content: `請等待 ${cooldown.retryAfterSeconds} 秒後再產生下一份價格報告。`,
+      });
+      return;
+    }
+
+    await deferInteractionResponse({
+      token: options.token,
+      apiBaseUrl: options.apiBaseUrl,
+      interaction,
+      fetchImpl,
+      ephemeral: true,
+    });
+
+    const setting = await readPriceReportSetting({ client, discordUserId });
+
+    await sendPriceReportNow({
+      client,
+      discordUserId,
+      windowHours: resolveWindowHours(setting?.window),
+      maxItems: setting
+        ? Math.min(setting.maxItems, options.priceReportMaxItems)
+        : options.priceReportMaxItems,
+      publicBaseUrl: options.publicBaseUrl,
+      filters: toPriceReportFilters(setting),
+      sendReportMessages: (messages) =>
+        sendDiscordInteractionMessages({
+          token: options.token,
+          applicationId: options.applicationId,
+          apiBaseUrl: options.apiBaseUrl,
+          interaction,
+          messages,
+          fetchImpl,
+          ephemeral: true,
+        }),
+    });
     return;
   }
 
@@ -794,17 +847,20 @@ async function readPriceReportSettingsPanel({
 }): Promise<{
   setting: Awaited<ReturnType<typeof readPriceReportSetting>>;
   categories: PriceReportCategoryOption[];
+  latestDelivery: PriceReportDeliveryStatus | null;
   options: DiscordBotOptions;
   notice?: string;
 }> {
-  const [setting, categories] = await Promise.all([
+  const [setting, categories, latestDelivery] = await Promise.all([
     readPriceReportSetting({ client, discordUserId }),
     readPriceReportCategories({ client }),
+    readLatestScheduledPriceReportDelivery({ client, discordUserId }),
   ]);
 
   return {
     setting,
     categories,
+    latestDelivery,
     options,
     notice,
   };
@@ -813,13 +869,16 @@ async function readPriceReportSettingsPanel({
 function createPriceReportSettingsPanelMessage({
   setting,
   categories,
+  latestDelivery,
   options,
   notice,
 }: Awaited<ReturnType<typeof readPriceReportSettingsPanel>>): DiscordBotMessage {
   const filters = toPriceReportFilters(setting);
 
   return {
-    embeds: [createPriceReportSettingsEmbed({ setting, categories, options, notice })],
+    embeds: [
+      createPriceReportSettingsEmbed({ setting, categories, latestDelivery, options, notice }),
+    ],
     components: createPriceReportSettingsComponents({
       windowHours: resolveWindowHours(setting?.window),
       categories,
@@ -835,6 +894,7 @@ function createPriceReportSettingsPanelMessage({
 function createPriceReportSettingsEmbed({
   setting,
   categories,
+  latestDelivery,
   options,
   notice,
 }: Awaited<ReturnType<typeof readPriceReportSettingsPanel>>): DiscordBotEmbed {
@@ -887,8 +947,42 @@ function createPriceReportSettingsEmbed({
         value: enabled && setting ? formatTaipeiMinute(setting.nextSendAt) : "啟用後排程",
         inline: true,
       },
+      {
+        name: "最近一次每日報告",
+        value: formatPriceReportDeliveryStatus(latestDelivery),
+      },
     ],
   };
+}
+
+function formatPriceReportDeliveryStatus(delivery: PriceReportDeliveryStatus | null): string {
+  if (!delivery) {
+    return "尚無每日報告紀錄。";
+  }
+
+  const deliveredAt = formatTaipeiMinute(delivery.deliveredAt ?? delivery.createdAt);
+
+  if (delivery.status === "SENT") {
+    return `成功：${deliveredAt}，列出 ${delivery.itemCount} 筆，送出 ${delivery.messageCount} 則訊息。`;
+  }
+
+  if (delivery.status === "RATE_LIMITED") {
+    return `Discord 限流：${deliveredAt}，後續排程會再嘗試。`;
+  }
+
+  if (delivery.status === "FAILED") {
+    return `失敗：${deliveredAt}。${formatPriceReportDeliveryError(delivery.errorMessage)}`;
+  }
+
+  return `${delivery.status}：${deliveredAt}，列出 ${delivery.itemCount} 筆。`;
+}
+
+function formatPriceReportDeliveryError(errorMessage: string | null): string {
+  if (!errorMessage) {
+    return "沒有錯誤摘要。";
+  }
+
+  return formatDiscordBotText(errorMessage, 160);
 }
 
 function parsePriceReportCategorySelection(
