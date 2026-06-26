@@ -22,8 +22,22 @@ describe("collectOpsStatus", () => {
       displayReady: 8,
       missingImages: 0,
     });
+    expect(summary.discordBot.priceReportSettings).toEqual({
+      total: 2,
+      enabled: 1,
+      dueNow: 0,
+    });
+    expect(summary.discordBot.targetPriceWatches).toEqual({
+      active: 3,
+      notified: 1,
+      claimed: 0,
+    });
     expect(summary.checks.map((check) => [check.key, check.level])).toContainEqual([
       "link-health",
+      "ok",
+    ]);
+    expect(summary.checks.map((check) => [check.key, check.level])).toContainEqual([
+      "discord-bot-delivery",
       "ok",
     ]);
     expect(summary.runtimeSchedule.jobs.map((job) => job.key)).toEqual([
@@ -81,13 +95,40 @@ describe("collectOpsStatus", () => {
     ).toMatchObject({
       cadence: expect.stringContaining("每 12h 執行"),
     });
-    expect(summary.runtimeSchedule.jobs.find((job) => job.key === "production-smoke")).toMatchObject(
-      {
-        cadence: expect.stringContaining("每 2m 檢查"),
-      },
-    );
+    expect(
+      summary.runtimeSchedule.jobs.find((job) => job.key === "production-smoke"),
+    ).toMatchObject({
+      cadence: expect.stringContaining("每 2m 檢查"),
+    });
     expect(summary.runtimeSchedule.jobs.find((job) => job.key === "discord-bot")).toMatchObject({
       cadence: expect.stringContaining("每 3m 掃描"),
+      details: expect.arrayContaining([expect.stringContaining("立即預覽")]),
+    });
+  });
+
+  it("warns when recent Discord bot deliveries failed or hit rate limits", async () => {
+    const summary = await collectOpsStatus(
+      fakeOpsClient({
+        discordDeliveryCounts: {
+          TARGET_PRICE: {
+            FAILED: 1,
+          },
+          SCHEDULED_PRICE_REPORT: {
+            RATE_LIMITED: 1,
+          },
+        },
+      }),
+      {
+        now: () => NOW,
+        productImageStorageDir: "/images",
+        productImageExists: async () => true,
+      },
+    );
+
+    expect(summary.overallLevel).toBe("warn");
+    expect(summary.checks.find((check) => check.key === "discord-bot-delivery")).toMatchObject({
+      level: "warn",
+      message: "failed=1 rateLimited=1 in 24h",
     });
   });
 });
@@ -113,6 +154,14 @@ interface FakeOpsClientOptions {
   linkHealth?: Partial<
     Record<"SOURCE", Partial<Record<"OK" | "BROKEN" | "TEMPORARY_ERROR", number>>>
   >;
+  discordPriceReportSettings?: Partial<Record<"total" | "enabled" | "dueNow", number>>;
+  discordTargetPriceWatches?: Partial<Record<"active" | "notified" | "claimed", number>>;
+  discordDeliveryCounts?: Partial<
+    Record<
+      "PRICE_REPORT_NOW" | "SCHEDULED_PRICE_REPORT" | "TARGET_PRICE",
+      Partial<Record<"SENT" | "SKIPPED" | "FAILED" | "RATE_LIMITED", number>>
+    >
+  >;
 }
 
 function fakeOpsClient(options: FakeOpsClientOptions = {}): OpsStatusReadClient {
@@ -122,6 +171,41 @@ function fakeOpsClient(options: FakeOpsClientOptions = {}): OpsStatusReadClient 
       BROKEN: 0,
       TEMPORARY_ERROR: 0,
       ...options.linkHealth?.SOURCE,
+    },
+  };
+  const discordPriceReportSettings = {
+    total: 2,
+    enabled: 1,
+    dueNow: 0,
+    ...options.discordPriceReportSettings,
+  };
+  const discordTargetPriceWatches = {
+    active: 3,
+    notified: 1,
+    claimed: 0,
+    ...options.discordTargetPriceWatches,
+  };
+  const discordDeliveryCounts = {
+    PRICE_REPORT_NOW: {
+      SENT: 1,
+      SKIPPED: 0,
+      FAILED: 0,
+      RATE_LIMITED: 0,
+      ...options.discordDeliveryCounts?.PRICE_REPORT_NOW,
+    },
+    SCHEDULED_PRICE_REPORT: {
+      SENT: 1,
+      SKIPPED: 0,
+      FAILED: 0,
+      RATE_LIMITED: 0,
+      ...options.discordDeliveryCounts?.SCHEDULED_PRICE_REPORT,
+    },
+    TARGET_PRICE: {
+      SENT: 1,
+      SKIPPED: 0,
+      FAILED: 0,
+      RATE_LIMITED: 0,
+      ...options.discordDeliveryCounts?.TARGET_PRICE,
     },
   };
 
@@ -194,7 +278,10 @@ function fakeOpsClient(options: FakeOpsClientOptions = {}): OpsStatusReadClient 
         const kind = String(args.where?.linkKind ?? "");
         const status = args.where?.status;
 
-        if (kind === "SOURCE" && (status === "OK" || status === "BROKEN" || status === "TEMPORARY_ERROR")) {
+        if (
+          kind === "SOURCE" &&
+          (status === "OK" || status === "BROKEN" || status === "TEMPORARY_ERROR")
+        ) {
           return linkHealth[kind][status];
         }
 
@@ -204,6 +291,66 @@ function fakeOpsClient(options: FakeOpsClientOptions = {}): OpsStatusReadClient 
     rawSnapshot: {
       async count() {
         return 0;
+      },
+    },
+    discordPriceReportSetting: {
+      async count(args) {
+        const where = args.where ?? {};
+
+        if (where.enabled === true && where.nextSendAt) {
+          return discordPriceReportSettings.dueNow;
+        }
+
+        if (where.enabled === true) {
+          return discordPriceReportSettings.enabled;
+        }
+
+        return discordPriceReportSettings.total;
+      },
+    },
+    discordTargetPriceWatch: {
+      async count(args) {
+        const where = args.where ?? {};
+
+        if (where.enabled === true && where.lastNotifiedAt) {
+          return discordTargetPriceWatches.notified;
+        }
+
+        if (where.enabled === true && where.notificationClaimedAt) {
+          return discordTargetPriceWatches.claimed;
+        }
+
+        return discordTargetPriceWatches.active;
+      },
+    },
+    discordNotificationDelivery: {
+      async count(args) {
+        const kind = args.where?.kind;
+        const status = args.where?.status;
+
+        if (
+          typeof kind === "string" &&
+          typeof status === "string" &&
+          kind in discordDeliveryCounts &&
+          status in discordDeliveryCounts[kind]
+        ) {
+          return discordDeliveryCounts[kind][status];
+        }
+
+        return 0;
+      },
+      async findMany() {
+        return [
+          {
+            id: "delivery-1",
+            kind: "SCHEDULED_PRICE_REPORT",
+            status: "SENT",
+            itemCount: 5,
+            messageCount: 1,
+            deliveredAt: new Date("2026-06-07T11:30:00.000Z"),
+            createdAt: new Date("2026-06-07T11:30:00.000Z"),
+          },
+        ];
       },
     },
   };

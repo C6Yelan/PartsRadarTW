@@ -179,7 +179,7 @@ Discord bot 第一輪指令：
 
 範圍：
 
-- 建立管理者用內部維運檢視，用於查看 source freshness、crawl result、parse error count、suspected block、缺圖、link health temporary / broken count、raw snapshot retention 與 active product count。
+- 建立管理者用內部維運檢視，用於查看 source freshness、crawl result、parse error count、suspected block、缺圖、link health temporary / broken count、raw snapshot retention、active product count 與 Discord bot 個人化通知 delivery 聚合。
 - 第一輪使用 `ops-web` 內網 service 與 `/ops/status` page，公開 `web` 服務預設回 `404`。
 - `ops-web` 需維持 localhost / private tunnel 邊界，並要求 token；不得接到 public tunnel。
 - 保持資料品質檢視與使用者公開狀態頁分離。

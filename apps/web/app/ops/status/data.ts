@@ -50,10 +50,7 @@ const MILLISECONDS_PER_MINUTE = 60 * 1000;
 const MILLISECONDS_PER_HOUR = 60 * MILLISECONDS_PER_MINUTE;
 const MILLISECONDS_PER_DAY = 24 * MILLISECONDS_PER_HOUR;
 
-const SUCCESSFUL_SCHEDULED_STATUSES: CrawlRunStatus[] = [
-  "SUCCESS_CHANGED",
-  "SUCCESS_UNCHANGED",
-];
+const SUCCESSFUL_SCHEDULED_STATUSES: CrawlRunStatus[] = ["SUCCESS_CHANGED", "SUCCESS_UNCHANGED"];
 const LINK_KINDS = ["SOURCE"] as const;
 const LINK_STATUSES = ["OK", "BROKEN", "TEMPORARY_ERROR"] as const;
 
@@ -130,6 +127,22 @@ export const OPS_RECENT_CRAWL_RUN_QUERY = {
   },
 } as const satisfies Prisma.CrawlRunFindManyArgs;
 
+export const OPS_RECENT_DISCORD_DELIVERY_QUERY = {
+  take: 6,
+  orderBy: {
+    createdAt: "desc",
+  },
+  select: {
+    id: true,
+    kind: true,
+    status: true,
+    itemCount: true,
+    messageCount: true,
+    deliveredAt: true,
+    createdAt: true,
+  },
+} as const satisfies Prisma.DiscordNotificationDeliveryFindManyArgs;
+
 const OPS_DISPLAY_READY_PRODUCT_WHERE = {
   isActive: true,
   primaryImageUrl: {
@@ -161,6 +174,9 @@ type OpsLatestSuccessfulScheduledRunRecord = Prisma.CrawlRunGetPayload<{
 }>;
 type OpsRecentCrawlRunRecord = Prisma.CrawlRunGetPayload<{
   select: typeof OPS_RECENT_CRAWL_RUN_QUERY.select;
+}>;
+type OpsDiscordDeliveryRecord = Prisma.DiscordNotificationDeliveryGetPayload<{
+  select: typeof OPS_RECENT_DISCORD_DELIVERY_QUERY.select;
 }>;
 type OpsDisplayReadyProductRecord = Prisma.ProductGetPayload<{
   select: typeof OPS_DISPLAY_READY_PRODUCT_ID_QUERY.select;
@@ -216,6 +232,16 @@ export interface OpsStatusReadClient {
   rawSnapshot: {
     count(args: Prisma.RawSnapshotCountArgs): Promise<number>;
   };
+  discordPriceReportSetting: {
+    count(args: Prisma.DiscordPriceReportSettingCountArgs): Promise<number>;
+  };
+  discordTargetPriceWatch: {
+    count(args: Prisma.DiscordTargetPriceWatchCountArgs): Promise<number>;
+  };
+  discordNotificationDelivery: {
+    count(args: Prisma.DiscordNotificationDeliveryCountArgs): Promise<number>;
+    findMany(args: typeof OPS_RECENT_DISCORD_DELIVERY_QUERY): Promise<OpsDiscordDeliveryRecord[]>;
+  };
 }
 
 export interface OpsStatusCheck {
@@ -249,6 +275,33 @@ export interface OpsStatusRuntimeSchedule {
   policies: OpsStatusRuntimePolicy[];
 }
 
+export interface OpsStatusDiscordDeliveryKindSummary {
+  sent: number;
+  skipped: number;
+  failed: number;
+  rateLimited: number;
+}
+
+export interface OpsStatusDiscordBotSummary {
+  priceReportSettings: {
+    total: number;
+    enabled: number;
+    dueNow: number;
+  };
+  targetPriceWatches: {
+    active: number;
+    notified: number;
+    claimed: number;
+  };
+  recentDeliveries: {
+    windowHours: number;
+    priceReportNow: OpsStatusDiscordDeliveryKindSummary;
+    scheduledPriceReport: OpsStatusDiscordDeliveryKindSummary;
+    targetPrice: OpsStatusDiscordDeliveryKindSummary;
+  };
+  latestDeliveries: OpsDiscordDeliveryRecord[];
+}
+
 export interface OpsStatusSummary {
   generatedAt: Date;
   overallLevel: OpsStatusLevel;
@@ -276,6 +329,7 @@ export interface OpsStatusSummary {
   latestScheduledRun: OpsLatestScheduledRunRecord | null;
   latestSuccessfulScheduledRun: OpsLatestSuccessfulScheduledRunRecord | null;
   recentCrawlRuns: OpsRecentCrawlRunRecord[];
+  discordBot: OpsStatusDiscordBotSummary;
   thresholds: OpsStatusThresholds;
   runtimeSchedule: OpsStatusRuntimeSchedule;
 }
@@ -313,6 +367,16 @@ export function createPrismaOpsStatusClient(prisma: PrismaClient): OpsStatusRead
     rawSnapshot: {
       count: (args) => prisma.rawSnapshot.count(args),
     },
+    discordPriceReportSetting: {
+      count: (args) => prisma.discordPriceReportSetting.count(args),
+    },
+    discordTargetPriceWatch: {
+      count: (args) => prisma.discordTargetPriceWatch.count(args),
+    },
+    discordNotificationDelivery: {
+      count: (args) => prisma.discordNotificationDelivery.count(args),
+      findMany: (args) => prisma.discordNotificationDelivery.findMany(args),
+    },
   };
 }
 
@@ -342,6 +406,7 @@ export async function collectOpsStatus(
     invalidImageUrlCount,
     linkHealth,
     rawSnapshotRetention,
+    discordBot,
   ] = await Promise.all([
     client.sourceCategory.findMany(OPS_SOURCE_CATEGORY_QUERY),
     client.crawlRun.findLatestScheduled(),
@@ -379,6 +444,7 @@ export async function collectOpsStatus(
     }),
     collectLinkHealth(client),
     collectRawSnapshotRetention(client, thresholds, now),
+    collectDiscordBotStatus(client, thresholds, recentSince, now),
   ]);
   const missingImageCount = await countMissingImages(
     displayReadyProducts,
@@ -409,6 +475,7 @@ export async function collectOpsStatus(
     ),
     linkHealthCheck(linkHealth, thresholds),
     rawSnapshotRetentionCheck(rawSnapshotRetention, thresholds),
+    discordDeliveryCheck(discordBot, thresholds),
   ];
 
   return {
@@ -435,6 +502,7 @@ export async function collectOpsStatus(
     latestScheduledRun,
     latestSuccessfulScheduledRun,
     recentCrawlRuns,
+    discordBot,
     thresholds,
     runtimeSchedule: readOpsRuntimeSchedule(options.env ?? process.env, thresholds),
   };
@@ -582,10 +650,12 @@ export function readOpsRuntimeSchedule(
       {
         key: "discord-bot",
         label: "Discord bot",
-        cadence: `每 ${formatDuration(discordPriceReportScheduleIntervalSeconds)} 掃描 due 每日價格報告`,
+        cadence: `每 ${formatDuration(discordPriceReportScheduleIntervalSeconds)} 掃描 due 每日價格報告與目標價通知`,
         details: [
           `slash command 啟動註冊：${readBoolean(env.DISCORD_BOT_REGISTER_COMMANDS_ON_START, true) ? "啟用" : "停用"}`,
-          "目前只註冊 global command，settings 透過按鈕與 modal 管理每日報告",
+          "目前只註冊 global command，settings 透過選單、按鈕與 modal 管理每日報告",
+          "settings 顯示最近每日報告 delivery 狀態，立即預覽會寫入 PRICE_REPORT_NOW delivery log",
+          "/watch 使用私密管理介面新增、編輯、移除目標價追蹤",
         ],
       },
     ],
@@ -753,6 +823,123 @@ async function collectRawSnapshotRetention(
     expiredNormal,
     expiredAbnormal,
   };
+}
+
+async function collectDiscordBotStatus(
+  client: OpsStatusReadClient,
+  thresholds: OpsStatusThresholds,
+  recentSince: Date,
+  now: Date,
+): Promise<OpsStatusDiscordBotSummary> {
+  const [
+    totalPriceReportSettings,
+    enabledPriceReportSettings,
+    duePriceReportSettings,
+    activeTargetPriceWatches,
+    notifiedTargetPriceWatches,
+    claimedTargetPriceWatches,
+    priceReportNowDeliveries,
+    scheduledPriceReportDeliveries,
+    targetPriceDeliveries,
+    latestDeliveries,
+  ] = await Promise.all([
+    client.discordPriceReportSetting.count({}),
+    client.discordPriceReportSetting.count({
+      where: {
+        enabled: true,
+      },
+    }),
+    client.discordPriceReportSetting.count({
+      where: {
+        enabled: true,
+        nextSendAt: {
+          lte: now,
+        },
+      },
+    }),
+    client.discordTargetPriceWatch.count({
+      where: {
+        enabled: true,
+      },
+    }),
+    client.discordTargetPriceWatch.count({
+      where: {
+        enabled: true,
+        lastNotifiedAt: {
+          not: null,
+        },
+      },
+    }),
+    client.discordTargetPriceWatch.count({
+      where: {
+        enabled: true,
+        notificationClaimedAt: {
+          not: null,
+        },
+      },
+    }),
+    collectDiscordDeliveryKindSummary(client, "PRICE_REPORT_NOW", recentSince),
+    collectDiscordDeliveryKindSummary(client, "SCHEDULED_PRICE_REPORT", recentSince),
+    collectDiscordDeliveryKindSummary(client, "TARGET_PRICE", recentSince),
+    client.discordNotificationDelivery.findMany(OPS_RECENT_DISCORD_DELIVERY_QUERY),
+  ]);
+
+  return {
+    priceReportSettings: {
+      total: totalPriceReportSettings,
+      enabled: enabledPriceReportSettings,
+      dueNow: duePriceReportSettings,
+    },
+    targetPriceWatches: {
+      active: activeTargetPriceWatches,
+      notified: notifiedTargetPriceWatches,
+      claimed: claimedTargetPriceWatches,
+    },
+    recentDeliveries: {
+      windowHours: thresholds.recentWindowHours,
+      priceReportNow: priceReportNowDeliveries,
+      scheduledPriceReport: scheduledPriceReportDeliveries,
+      targetPrice: targetPriceDeliveries,
+    },
+    latestDeliveries,
+  };
+}
+
+async function collectDiscordDeliveryKindSummary(
+  client: OpsStatusReadClient,
+  kind: OpsDiscordDeliveryRecord["kind"],
+  recentSince: Date,
+): Promise<OpsStatusDiscordDeliveryKindSummary> {
+  const [sent, skipped, failed, rateLimited] = await Promise.all([
+    countDiscordDeliveries(client, kind, "SENT", recentSince),
+    countDiscordDeliveries(client, kind, "SKIPPED", recentSince),
+    countDiscordDeliveries(client, kind, "FAILED", recentSince),
+    countDiscordDeliveries(client, kind, "RATE_LIMITED", recentSince),
+  ]);
+
+  return {
+    sent,
+    skipped,
+    failed,
+    rateLimited,
+  };
+}
+
+async function countDiscordDeliveries(
+  client: OpsStatusReadClient,
+  kind: OpsDiscordDeliveryRecord["kind"],
+  status: OpsDiscordDeliveryRecord["status"],
+  recentSince: Date,
+): Promise<number> {
+  return client.discordNotificationDelivery.count({
+    where: {
+      kind,
+      status,
+      createdAt: {
+        gte: recentSince,
+      },
+    },
+  });
 }
 
 async function countActiveProductLinks(
@@ -941,6 +1128,26 @@ function rawSnapshotRetentionCheck(
     thresholds.rawSnapshotFailCount,
     `expired=${retention.expired} normal=${retention.expiredNormal} abnormal=${retention.expiredAbnormal}`,
   );
+}
+
+function discordDeliveryCheck(
+  discordBot: OpsStatusDiscordBotSummary,
+  thresholds: OpsStatusThresholds,
+): OpsStatusCheck {
+  const recent = discordBot.recentDeliveries;
+  const failed =
+    recent.priceReportNow.failed + recent.scheduledPriceReport.failed + recent.targetPrice.failed;
+  const rateLimited =
+    recent.priceReportNow.rateLimited +
+    recent.scheduledPriceReport.rateLimited +
+    recent.targetPrice.rateLimited;
+
+  return {
+    key: "discord-bot-delivery",
+    label: "Discord Bot 發送",
+    level: failed + rateLimited > 0 ? "warn" : "ok",
+    message: `failed=${failed} rateLimited=${rateLimited} in ${thresholds.recentWindowHours}h`,
+  };
 }
 
 function thresholdCheck(

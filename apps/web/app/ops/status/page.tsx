@@ -3,7 +3,12 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { extractBearerToken, isOpsStatusAccessAllowed } from "./access";
-import { collectOpsStatus, createPrismaOpsStatusClient, type OpsStatusLevel } from "./data";
+import {
+  collectOpsStatus,
+  createPrismaOpsStatusClient,
+  type OpsStatusLevel,
+  type OpsStatusSummary,
+} from "./data";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -25,6 +30,17 @@ const LEVEL_LABELS: Record<OpsStatusLevel, string> = {
   ok: "OK",
   warn: "WARN",
   fail: "FAIL",
+};
+const DISCORD_DELIVERY_KIND_LABELS: Record<string, string> = {
+  PRICE_REPORT_NOW: "立即報告 / 預覽",
+  SCHEDULED_PRICE_REPORT: "每日價格報告",
+  TARGET_PRICE: "目標價通知",
+};
+const DISCORD_DELIVERY_STATUS_LABELS: Record<string, string> = {
+  SENT: "sent",
+  SKIPPED: "skipped",
+  FAILED: "failed",
+  RATE_LIMITED: "rate limited",
 };
 
 const dateTimeFormatter = new Intl.DateTimeFormat("zh-TW", {
@@ -53,6 +69,7 @@ export default async function OpsStatusPage({ searchParams }: OpsStatusPageProps
     env: process.env,
     productImageStorageDir: process.env.PRODUCT_IMAGE_STORAGE_DIR,
   });
+  const discordDeliveryProblems = countDiscordDeliveryProblems(summary.discordBot);
 
   return (
     <main className="ops-status-shell">
@@ -70,6 +87,16 @@ export default async function OpsStatusPage({ searchParams }: OpsStatusPageProps
         <MetricTile label="Active 商品" value={formatNumber(summary.productCounts.active)} />
         <MetricTile label="可顯示商品" value={formatNumber(summary.productCounts.displayReady)} />
         <MetricTile label="缺圖快取" value={formatNumber(summary.productCounts.missingImages)} />
+        <MetricTile
+          label="每日報告啟用"
+          value={`${formatNumber(summary.discordBot.priceReportSettings.enabled)} / ${formatNumber(
+            summary.discordBot.priceReportSettings.total,
+          )}`}
+        />
+        <MetricTile
+          label="目標價追蹤"
+          value={formatNumber(summary.discordBot.targetPriceWatches.active)}
+        />
       </section>
 
       <section className="ops-check-grid" aria-label="status checks">
@@ -149,6 +176,78 @@ export default async function OpsStatusPage({ searchParams }: OpsStatusPageProps
             </div>
           </dl>
         </article>
+
+        <article className="ops-panel">
+          <h2>Discord Bot</h2>
+          <dl className="ops-stat-list">
+            <div>
+              <dt>每日報告設定</dt>
+              <dd>
+                {formatNumber(summary.discordBot.priceReportSettings.enabled)} /{" "}
+                {formatNumber(summary.discordBot.priceReportSettings.total)}
+              </dd>
+            </div>
+            <div>
+              <dt>待發每日報告</dt>
+              <dd>{formatNumber(summary.discordBot.priceReportSettings.dueNow)}</dd>
+            </div>
+            <div>
+              <dt>啟用中目標價</dt>
+              <dd>{formatNumber(summary.discordBot.targetPriceWatches.active)}</dd>
+            </div>
+            <div>
+              <dt>已通知目標價</dt>
+              <dd>{formatNumber(summary.discordBot.targetPriceWatches.notified)}</dd>
+            </div>
+            <div>
+              <dt>發送 claim 中</dt>
+              <dd>{formatNumber(summary.discordBot.targetPriceWatches.claimed)}</dd>
+            </div>
+            <div>
+              <dt>近期發送問題</dt>
+              <dd>{formatNumber(discordDeliveryProblems)}</dd>
+            </div>
+          </dl>
+        </article>
+      </section>
+
+      <section className="ops-table-panel" aria-labelledby="ops-discord-heading">
+        <div className="ops-section-heading">
+          <h2 id="ops-discord-heading">最近 Discord Deliveries</h2>
+          <p>只顯示發送類型、狀態、時間與數量，不輸出 user id 或錯誤內容。</p>
+        </div>
+        <div className="ops-table-scroll">
+          <table className="ops-table">
+            <thead>
+              <tr>
+                <th scope="col">Kind</th>
+                <th scope="col">Status</th>
+                <th scope="col">Created</th>
+                <th scope="col">Delivered</th>
+                <th scope="col">Items</th>
+                <th scope="col">Messages</th>
+              </tr>
+            </thead>
+            <tbody>
+              {summary.discordBot.latestDeliveries.length > 0 ? (
+                summary.discordBot.latestDeliveries.map((delivery) => (
+                  <tr key={delivery.id}>
+                    <td>{formatDiscordDeliveryKind(delivery.kind)}</td>
+                    <td>{formatDiscordDeliveryStatus(delivery.status)}</td>
+                    <td>{formatDateTime(delivery.createdAt)}</td>
+                    <td>{formatDateTime(delivery.deliveredAt)}</td>
+                    <td>{formatNumber(delivery.itemCount)}</td>
+                    <td>{formatNumber(delivery.messageCount)}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={6}>尚無 Discord delivery 紀錄</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <section className="ops-table-panel" aria-labelledby="ops-runs-heading">
@@ -254,6 +353,27 @@ function LinkHealthColumn({
       </div>
     </dl>
   );
+}
+
+function countDiscordDeliveryProblems(discordBot: OpsStatusSummary["discordBot"]): number {
+  const recent = discordBot.recentDeliveries;
+
+  return (
+    recent.priceReportNow.failed +
+    recent.priceReportNow.rateLimited +
+    recent.scheduledPriceReport.failed +
+    recent.scheduledPriceReport.rateLimited +
+    recent.targetPrice.failed +
+    recent.targetPrice.rateLimited
+  );
+}
+
+function formatDiscordDeliveryKind(kind: string): string {
+  return DISCORD_DELIVERY_KIND_LABELS[kind] ?? kind;
+}
+
+function formatDiscordDeliveryStatus(status: string): string {
+  return DISCORD_DELIVERY_STATUS_LABELS[status] ?? status.toLowerCase();
 }
 
 function formatDateTime(value: Date | null): string {

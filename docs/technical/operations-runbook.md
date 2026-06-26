@@ -419,9 +419,10 @@ SMOKE_PUBLIC_BASE_URL=https://partsradar.net
 - 外部抓取互斥策略：shared external-fetch lock、價格 crawler priority signal、maintenance 暫停延後，以及排程圖片補圖只處理本輪新增商品。
 - `source` link health 的 `ok`、`temporary_error`、`broken` 聚合。
 - raw snapshot retention drift。
+- Discord bot 個人化通知聚合：每日報告設定數、待發每日報告、啟用中目標價追蹤、已通知目標價、notification claim、近 24 小時 delivery failed / rate limited 訊號，以及最近 Discord delivery 的 kind / status / item count / message count / created / delivered 時間。
 - 最近 crawl runs 與 enabled source categories 的高層級時間資訊。
 
-狀態頁不顯示 raw HTML、parse error raw content、crawler stack trace、DB URL、token、raw IP 或 internal header dump。
+狀態頁不顯示 raw HTML、parse error raw content、crawler stack trace、DB URL、token、raw IP、internal header dump、Discord user id、商品 ID 或 delivery error message。
 
 啟用前先在部署主機 `.env` 設定：
 
