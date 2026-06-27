@@ -11,7 +11,12 @@
     "format": "biome format --write .",
     "test": "vitest run",
     "test:watch": "vitest",
+    "e2e": "playwright test",
+    "e2e:install": "playwright install chromium",
     "check": "pnpm typecheck && pnpm lint && pnpm build",
+    "monitor:public-smoke": "pnpm ops:production-smoke -- --public-only",
+    "backup:create": "bash scripts/ops/create-backup.sh",
+    "backup:restore-drill": "bash scripts/ops/restore-drill.sh",
     "ops:crawl-coolpc-daemon": "pnpm --filter @partsradar/crawler ops:crawl-coolpc-daemon",
     "ops:discord-bot": "pnpm --filter @partsradar/crawler ops:discord-bot",
     "ops:image-cache:backfill": "pnpm --filter @partsradar/crawler ops:image-cache:backfill",
@@ -37,6 +42,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.15",
+    "@playwright/test": "^1.61.1",
     "vitest": "^4.1.7"
   }
 }

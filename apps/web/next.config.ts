@@ -1,8 +1,9 @@
 // apps/web/next.config.ts
-import type { NextConfig } from "next";
+
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import type { NextConfig } from "next";
 
 const workspaceRoot = fileURLToPath(new URL("../..", import.meta.url));
 const workspaceEnvFile = join(workspaceRoot, ".env");
@@ -12,6 +13,10 @@ if (existsSync(workspaceEnvFile)) {
 }
 
 const isDevelopment = process.env.NODE_ENV !== "production";
+const cspMode = process.env.CSP_MODE === "report-only" ? "report-only" : "enforce";
+const cspReportUri = resolveCspReportUri(process.env.CSP_REPORT_URI);
+const cspHeaderName =
+  cspMode === "report-only" ? "Content-Security-Policy-Report-Only" : "Content-Security-Policy";
 const contentSecurityPolicy = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline'${isDevelopment ? " 'unsafe-eval'" : ""}`,
@@ -24,6 +29,7 @@ const contentSecurityPolicy = [
   "frame-ancestors 'none'",
   "form-action 'self'",
   ...(isDevelopment ? [] : ["upgrade-insecure-requests"]),
+  ...(cspReportUri ? [`report-uri ${cspReportUri}`] : []),
 ].join("; ");
 
 const nextConfig: NextConfig = {
@@ -35,7 +41,7 @@ const nextConfig: NextConfig = {
         source: "/:path*",
         headers: [
           {
-            key: "Content-Security-Policy",
+            key: cspHeaderName,
             value: contentSecurityPolicy,
           },
           {
@@ -60,5 +66,25 @@ const nextConfig: NextConfig = {
   },
   transpilePackages: ["@partsradar/db", "@partsradar/shared"],
 };
+
+function resolveCspReportUri(value: string | undefined): string | null {
+  const trimmedValue = value?.trim();
+
+  if (!trimmedValue) {
+    return null;
+  }
+
+  if (trimmedValue.startsWith("/")) {
+    return trimmedValue;
+  }
+
+  try {
+    const url = new URL(trimmedValue);
+
+    return url.protocol === "https:" ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
 
 export default nextConfig;

@@ -24,6 +24,8 @@ out/
 .next/
 .nuxt/
 coverage/
+playwright-report/
+test-results/
 *.tsbuildinfo
 
 # Python cache and virtualenv
@@ -40,6 +42,7 @@ venv/
 logs/
 tmp/
 temp/
+backups/
 .cache/
 .playwright-mcp/
 

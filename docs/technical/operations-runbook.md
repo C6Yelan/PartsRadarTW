@@ -306,6 +306,8 @@ docker compose --profile manual-crawler run --rm crawler \
 
 `smoke-daemon` 是第二版第一輪內部營運監控。它不抓原價屋資料、不寫入商品資料，也不公開內部監控頁；只定期檢查網站、API、crawler 資料流與本機維運狀態，並把結果輸出到 container log。
 
+外部監控的公開檢查範圍與 Uptime Kuma / Cloudflare 建議見 [External Monitoring](external-monitoring.md)。公開監控只看 public route / API；DB-backed 與 Discord bot delivery 訊號留在 `smoke-daemon`、admin webhook 與受保護的 `ops-web`。
+
 檢查項目：
 
 - 首頁 HTTP 200。
@@ -658,6 +660,42 @@ pnpm ops:production-smoke -- --public-only --base-url https://partsradar.net
 docker compose --profile scheduled-crawler run --rm smoke-daemon \
   pnpm ops:production-smoke -- --base-url http://web:3000
 ```
+
+## Backup And Restore Drill
+
+備份腳本預設讀取部署主機 repo 根目錄的 untracked `.env`，並透過 `docker compose` 存取 `postgres` service 與 named volumes。備份輸出會寫到 ignored `backups/<timestamp>/`。
+
+建立備份：
+
+```bash
+pnpm backup:create
+```
+
+預設內容：
+
+- `postgres.dump`：PostgreSQL custom-format dump。
+- `product-images.tgz`：`product_images` volume archive，若 volume 存在。
+- `SHA256SUMS`：備份檔校驗值。
+
+若需要把 raw snapshot volume 也封存：
+
+```bash
+BACKUP_INCLUDE_SNAPSHOTS=1 pnpm backup:create
+```
+
+還原演練不覆蓋正式 DB；它會建立 `${POSTGRES_DB}_restore_drill`，還原 dump、查詢基本表格，最後預設刪除臨時 DB：
+
+```bash
+pnpm backup:restore-drill -- backups/<timestamp>
+```
+
+若要保留演練 DB 供人工檢查：
+
+```bash
+KEEP_RESTORE_DRILL_DB=1 pnpm backup:restore-drill -- backups/<timestamp>
+```
+
+正式還原到 production DB 前，需先停 `web`、`crawler-daemon`、`maintenance-daemon`、`discord-bot` 與其他會寫 DB 的服務，並另外寫明該次事故的還原目標與資料時間點；不要把 restore-drill 腳本改成直接覆蓋正式 DB。
 
 ## Raw Snapshot Cleanup
 

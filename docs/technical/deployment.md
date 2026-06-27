@@ -148,6 +148,7 @@ PRODUCT_IMAGE_STORAGE_DIR=/var/lib/partsradar/product-images
 | `WEB_BIND_HOST` | Tunnel / reverse proxy 情境維持 `127.0.0.1` |
 | `API_READ_RATE_LIMIT_MAX` / `API_LIST_RATE_LIMIT_MAX` / `API_IMAGE_RATE_LIMIT_MAX` | Web API 每 window 的 read / list / image 限流額度 |
 | `API_RATE_LIMIT_WINDOW_SECONDS` / `API_RATE_LIMIT_CACHE_SIZE` | Web API 限流 window 與 bounded cache 大小 |
+| `CSP_MODE` / `CSP_REPORT_URI` | Web build 時的 CSP enforce / report-only 模式與可選回報端點 |
 | `SNAPSHOT_STORAGE_DIR` | container 內 snapshot path |
 | `PRODUCT_IMAGE_STORAGE_DIR` | container 內縮圖 path |
 | `CRAWLER_INTERVAL_SECONDS` / `CRAWLER_BACKOFF_SECONDS` / `CRAWLER_LOCK_RETRY_SECONDS` / `CRAWLER_CATEGORY_DELAY_MS` | scheduled crawler 節奏 |
@@ -203,6 +204,8 @@ Backup：
 - Product image cache 應備份或有明確重建計畫。
 - Raw snapshot 可依 retention 與容量決定備份範圍。
 - DB 與 image cache 還原時間點需盡量接近。
+- `pnpm backup:create` 會建立 PostgreSQL dump、product image volume archive 與 checksum；`BACKUP_INCLUDE_SNAPSHOTS=1` 時才額外封存 raw snapshots。
+- `pnpm backup:restore-drill -- backups/<timestamp>` 只還原到臨時 drill database，驗證 dump 可讀後預設刪除該臨時 DB，不覆蓋正式 DB。
 
 最小監控：
 

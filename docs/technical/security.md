@@ -103,7 +103,14 @@
 - `Permissions-Policy` 關閉不需要的 browser capability
 - 不回 `X-Powered-By`
 
-公開宣傳前需評估 stricter CSP、nonce / hash、`Report-Only` 觀察與最終圖片來源策略。
+公開宣傳前需評估 stricter CSP、nonce / hash 與最終圖片來源策略。`CSP_MODE=report-only` 可在 build web image 時改送 `Content-Security-Policy-Report-Only`，`CSP_REPORT_URI` 可加入 `report-uri`；正式收緊前先用 report-only 觀察，再 rebuild 回 `CSP_MODE=enforce`。`CSP_REPORT_URI` 只接受 path 或 `https://` URL，避免誤填非 HTTPS 回報端點。
+
+Cloudflare / edge baseline：
+
+- Cloudflare Tunnel 維持公開入口，主機不直接開 HTTP/HTTPS inbound port。
+- WAF / bot / rate limiting 先在 Cloudflare 觀察大量請求與異常 user agent，再調整 app-level limiter。
+- production smoke 會檢查公開 product list API 的 `X-RateLimit-*` 與 `X-RateLimit-Client-Source`；公開 HTTPS 若仍是 `clientSource=unknown`，需檢查 Cloudflare 是否傳遞 `CF-Connecting-IP` 或 `X-Forwarded-For`。
+- app-level limiter 仍是單 web container 保底；若未來增加多 replica，優先評估 Redis-backed limiter 或 edge-side rate limiting。
 
 ## 商品圖片安全
 

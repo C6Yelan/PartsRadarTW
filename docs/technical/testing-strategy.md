@@ -167,6 +167,7 @@ Private validation 先限 Docker / Compose / DB / web API，不公開流量、�
 | API | route / query tests，不暴露內部欄位 |
 | Web UI | `pnpm check`，手動或 Playwright 驗收 |
 | 部署 | Docker build、migration、seed、service smoke |
+| E2E | Playwright desktop / mobile smoke for public routes and APIs |
 
 ## Live Fetch 規則
 

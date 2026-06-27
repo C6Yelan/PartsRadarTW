@@ -35,5 +35,6 @@ docs/
 - [開發環境設定](technical/development-setup.md)
 - [部署設計](technical/deployment.md)
 - [Operations Runbook](technical/operations-runbook.md)
+- [外部監控](technical/external-monitoring.md)
 - [資安基準](technical/security.md)
 - [測試策略](technical/testing-strategy.md)

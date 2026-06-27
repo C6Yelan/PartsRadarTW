@@ -11,6 +11,7 @@ export default defineConfig({
       "**/build/**",
       "**/coverage/**",
       "**/out/**",
+      "apps/web/e2e/**",
     ],
   },
 });

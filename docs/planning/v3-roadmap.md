@@ -236,9 +236,11 @@ Discord bot 第一輪指令：
 ### v3.2：維運檢視、外部監控與公開流量硬化
 
 - 受保護的內網 ops status page 與資料品質維運檢視。
-- 外部監控整合第一輪。
+- 外部監控整合第一輪：已新增公開監控範圍文件與 `pnpm monitor:public-smoke` 入口。
 - 告警 cooldown / 去重、回復通知與 runbook 文件。
-- 更嚴格 CSP、Cloudflare / rate limit 調校、備份還原演練、Playwright CI、dependency / vulnerability baseline。
+- 備份還原演練：已新增 `pnpm backup:create` 與非破壞性的 `pnpm backup:restore-drill`。
+- Playwright CI：已新增 GitHub Actions Postgres-backed build/test/e2e smoke。
+- 更嚴格 CSP / Cloudflare / rate limit 調校：已新增 CSP report-only build mode 與 external monitoring / edge baseline 文件；dependency / vulnerability baseline 仍待補。
 
 ## 待決定
 
