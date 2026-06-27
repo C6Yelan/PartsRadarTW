@@ -196,19 +196,6 @@ export function isPriceHistoryResponse(value: unknown): value is PriceHistoryRes
   return isRecord(value) && Array.isArray(value.points);
 }
 
-export function isV2PriceMovement(value: unknown): value is {
-  rangeDays: 30;
-  deltaAmount: number | null;
-  deltaPercent: number | null;
-} {
-  return (
-    isRecord(value) &&
-    value.rangeDays === 30 &&
-    (typeof value.deltaAmount === "number" || value.deltaAmount === null) &&
-    (typeof value.deltaPercent === "number" || value.deltaPercent === null)
-  );
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }

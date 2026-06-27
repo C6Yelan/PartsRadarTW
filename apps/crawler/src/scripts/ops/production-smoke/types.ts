@@ -96,5 +96,10 @@ export interface SourceImageAnomalyRecord {
 
 export type ProductionSmokeClient = Pick<
   PrismaClient,
-  "crawlRun" | "parseError" | "product" | "productLinkHealth" | "rawSnapshot"
+  | "crawlRun"
+  | "discordNotificationDelivery"
+  | "parseError"
+  | "product"
+  | "productLinkHealth"
+  | "rawSnapshot"
 >;

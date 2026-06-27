@@ -311,10 +311,9 @@ docker compose --profile manual-crawler run --rm crawler \
 - 首頁 HTTP 200。
 - 第二版 `/build-list` route 可回應。
 - `/api/source-status` 可回應，且來源成功時間沒有過舊。
-- `/api/categories` 包含第二版第一批分類 `IGrp=8`、`IGrp=11`、`IGrp=16`。
+- `/api/categories` 可回應，且至少有一筆分類。
 - `/api/products?pageSize=1` 可回應且至少有一筆商品。
 - product list API 回傳可解析的 `X-RateLimit-*` 與 `X-RateLimit-Client-Source` headers。
-- 近 30 天降幅 / 增幅排序 API 可回應，且商品資料含 `priceMovement.rangeDays=30`。
 - 商品詳細 API 可回應。
 - 商品列表抽樣商品的 public product image API 可回應圖片內容。
 - 商品價格歷史 API 可回應。
@@ -325,6 +324,7 @@ docker compose --profile manual-crawler run --rm crawler \
 - active 商品缺圖數沒有超過門檻。
 - active 商品 source link health 的 broken 與 temporary error 數沒有超過門檻。
 - raw snapshot metadata 沒有明顯超過 retention grace。
+- 近 24 小時 Discord bot delivery failed / rate limited 沒有異常；若有會進入 `WARN`，並由 admin webhook 依既有 cooldown / dedupe 發送。
 
 Link health smoke 只統計 `source`。`source` 代表 public `source.url` 的原價屋查看 / 購買連結；原價屋來源列中的產品介紹連結已移除，不再進 DB、API、UI、link checker 或 smoke 門檻。`SMOKE_BROKEN_LINK_*` 與 `SMOKE_TEMPORARY_LINK_*` 舊變數仍可作為 local CLI / script fallback；Compose 新部署使用 `SMOKE_SOURCE_*_LINK_*`。
 
@@ -380,7 +380,7 @@ SMOKE_PUBLIC_BASE_URL=https://partsradar.net
 結果判讀：
 
 - `OK`：該項目前正常。
-- `WARN`：服務仍可用，但資料流或維運狀態需要觀察，例如來源成功時間偏舊、近期有 suspected block、source image anomaly、缺圖或壞連結超過警戒值。
+- `WARN`：服務仍可用，但資料流或維運狀態需要觀察，例如來源成功時間偏舊、近期有 suspected block、source image anomaly、缺圖、壞連結或 Discord bot delivery 失敗 / rate limit 超過警戒值。
 - `FAIL`：服務或資料流有明確失敗，例如 HTTP/API 掛掉、沒有 successful scheduled crawl、最新 crawler 疑似被擋、來源成功時間超過 fail 門檻。
 
 若 `product image api` 是 `FAIL`，代表商品列表已導出 `/api/product-images/...webp`，但公開圖片 API 無法回應圖片內容。優先檢查 `product_images` volume 是否有檔案、`PRODUCT_IMAGE_STORAGE_DIR` 是否正確、`storage-init` 是否已修權限，以及 `crawler-daemon` 新品圖片補圖或手動 image backfill 是否實際補過缺圖。
@@ -393,7 +393,7 @@ SMOKE_PUBLIC_BASE_URL=https://partsradar.net
 - `SMOKE_PRODUCT_IMAGE_SAMPLE_SIZE`：從 product list 抽查幾筆 public product image API，預設 5，最大 50。
 - `SMOKE_SOURCE_WARN_AFTER_MINUTES` / `SMOKE_SOURCE_FAIL_AFTER_MINUTES`：來源成功時間門檻，預設 60 / 120。
 - `SMOKE_CRAWLER_WARN_AFTER_MINUTES` / `SMOKE_CRAWLER_FAIL_AFTER_MINUTES`：successful scheduled crawler run 門檻，預設 90 / 180。
-- `SMOKE_RECENT_WINDOW_HOURS`：suspected block / parse error 統計窗口，預設 24。
+- `SMOKE_RECENT_WINDOW_HOURS`：suspected block / parse error / Discord bot delivery failed 與 rate limited 統計窗口，預設 24。
 - `SMOKE_PARSE_ERROR_WARN_COUNT` / `SMOKE_PARSE_ERROR_FAIL_COUNT`：parse error 門檻，預設 20 / 100。
 - `SMOKE_INVALID_IMAGE_URL_WARN_COUNT`：source image anomaly rows WARN 門檻，預設 2000；真正使用者可見影響仍由 active products / missing product images 判斷。
 - `SMOKE_MISSING_IMAGE_WARN_COUNT` / `SMOKE_MISSING_IMAGE_FAIL_COUNT`：缺圖門檻，預設 200 / 500。
@@ -469,7 +469,7 @@ http://127.0.0.1:3001/ops/status?token=<OPS_STATUS_TOKEN>
 
 ## Discord Webhook Notification Foundation
 
-目前已實作的 Discord webhook 通知基礎使用 incoming webhook。`crawler-daemon` 會在每輪 scheduled crawl 成功寫入價格變動後，以 embed 對公開頻道列出本輪變價商品與金額差；`smoke-daemon` 則在每輪 production smoke summary 後，依 notification policy 以 embed 對管理者頻道送出 `WARN` / `FAIL` / `RECOVERED` 通知。Discord bot foundation 與 slash command 行為另見下方 bot 小節。
+目前已實作的 Discord webhook 通知基礎使用 incoming webhook。`crawler-daemon` 會在每輪 scheduled crawl 成功寫入價格變動後，以 embed 對公開頻道列出本輪變價商品與金額差；`smoke-daemon` 則在每輪 production smoke summary 後，依 notification policy 以 embed 對管理者頻道送出 `WARN` / `FAIL` / `RECOVERED` 通知，包含近 24 小時 Discord bot delivery failed / rate limited 訊號。Discord bot foundation 與 slash command 行為另見下方 bot 小節。
 
 可選 secret：
 

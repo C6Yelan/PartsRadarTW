@@ -3,12 +3,11 @@
 import { access } from "node:fs/promises";
 import { join } from "node:path";
 import { CRAWL_RUN_STATUSES } from "../../../coolpc/crawl-run";
-import { PRODUCT_LINK_HEALTH_STATUSES, PRODUCT_LINK_KINDS } from "../product-link-checker/processor";
 import {
-  MILLISECONDS_PER_DAY,
-  MILLISECONDS_PER_HOUR,
-  REQUIRED_V2_CATEGORY_IGRPS,
-} from "./constants";
+  PRODUCT_LINK_HEALTH_STATUSES,
+  PRODUCT_LINK_KINDS,
+} from "../product-link-checker/processor";
+import { MILLISECONDS_PER_DAY, MILLISECONDS_PER_HOUR } from "./constants";
 import {
   fetchJson,
   fetchText,
@@ -19,7 +18,6 @@ import {
   isProductsResponse,
   isPublicHttpsUrl,
   isSourceStatusResponse,
-  isV2PriceMovement,
   readRateLimitHeaders,
 } from "./http";
 import {
@@ -62,6 +60,7 @@ export async function runProductionSmoke(
   checks.push(await checkMissingProductImages(client, options));
   checks.push(await checkLinkHealth(client, options));
   checks.push(await checkRawSnapshotRetention(client, options, now));
+  checks.push(await checkDiscordBotDeliveries(client, options, now));
 
   return {
     checkedAt: now,
@@ -116,7 +115,7 @@ async function checkPublicEndpoints(options: ProductionSmokeOptions): Promise<{
   );
 
   const categories = await fetchJson("/api/categories", options);
-  checks.push(checkV2Categories(categories));
+  checks.push(checkCategoriesApi(categories));
 
   const products = await fetchJson(
     `/api/products?pageSize=${options.productImageSampleSize}`,
@@ -131,8 +130,6 @@ async function checkPublicEndpoints(options: ProductionSmokeOptions): Promise<{
       : fail("product list api", products.ok ? "response has no product" : products.message),
   );
   checks.push(checkRateLimitHeaders(products, options));
-  checks.push(await checkPriceMovementSort("price_drop_desc", options));
-  checks.push(await checkPriceMovementSort("price_rise_desc", options));
 
   if (!productId) {
     checks.push(fail("product detail api", "skipped because product list returned no product"));
@@ -178,52 +175,24 @@ async function checkPublicEndpoints(options: ProductionSmokeOptions): Promise<{
   };
 }
 
-function checkV2Categories(
+function checkCategoriesApi(
   categoriesResult: Awaited<ReturnType<typeof fetchJson>>,
 ): SmokeCheckResult {
   if (!categoriesResult.ok) {
-    return fail("v2 categories api", categoriesResult.message);
+    return fail("categories api", categoriesResult.message);
   }
 
   if (!isCategoriesResponse(categoriesResult.body)) {
-    return fail("v2 categories api", "response shape is invalid");
+    return fail("categories api", "response shape is invalid");
   }
 
-  const igrps = new Set(categoriesResult.body.data.map((category) => category.igrp));
-  const missingIgrps = REQUIRED_V2_CATEGORY_IGRPS.filter((igrp) => !igrps.has(igrp));
+  const categoryCount = categoriesResult.body.data.length;
 
-  if (missingIgrps.length > 0) {
-    return fail("v2 categories api", `missing IGrp=${missingIgrps.join(",")}`);
+  if (categoryCount === 0) {
+    return fail("categories api", "response has no category");
   }
 
-  return ok("v2 categories api", `required IGrp=${REQUIRED_V2_CATEGORY_IGRPS.join(",")}`);
-}
-
-async function checkPriceMovementSort(
-  sort: "price_drop_desc" | "price_rise_desc",
-  options: ProductionSmokeOptions,
-): Promise<SmokeCheckResult> {
-  const result = await fetchJson(`/api/products?sort=${sort}&pageSize=1`, options);
-
-  if (!result.ok) {
-    return fail(`price movement sort ${sort}`, result.message);
-  }
-
-  if (!isProductsResponse(result.body)) {
-    return fail(`price movement sort ${sort}`, "response shape is invalid");
-  }
-
-  const firstProduct = result.body.data[0] ?? null;
-
-  if (!firstProduct) {
-    return fail(`price movement sort ${sort}`, "response has no product");
-  }
-
-  if (!isV2PriceMovement(firstProduct.priceMovement)) {
-    return fail(`price movement sort ${sort}`, "missing 30-day priceMovement data");
-  }
-
-  return ok(`price movement sort ${sort}`, `rangeDays=${firstProduct.priceMovement.rangeDays}`);
+  return ok("categories api", `categories=${categoryCount}`);
 }
 
 async function checkProductImageEndpoints(
@@ -651,6 +620,37 @@ async function checkRawSnapshotRetention(
     options.rawSnapshotFailCount,
     message,
   );
+}
+
+async function checkDiscordBotDeliveries(
+  client: ProductionSmokeClient,
+  options: ProductionSmokeOptions,
+  now: Date,
+): Promise<SmokeCheckResult> {
+  const since = new Date(now.getTime() - options.recentWindowHours * MILLISECONDS_PER_HOUR);
+  const [failedCount, rateLimitedCount] = await Promise.all([
+    client.discordNotificationDelivery.count({
+      where: {
+        status: "FAILED",
+        createdAt: {
+          gte: since,
+        },
+      },
+    }),
+    client.discordNotificationDelivery.count({
+      where: {
+        status: "RATE_LIMITED",
+        createdAt: {
+          gte: since,
+        },
+      },
+    }),
+  ]);
+  const message = `failed=${failedCount} rateLimited=${rateLimitedCount} in ${options.recentWindowHours}h`;
+
+  return failedCount + rateLimitedCount > 0
+    ? warn("discord bot deliveries", message)
+    : ok("discord bot deliveries", message);
 }
 
 function displayReadyProductWhere() {

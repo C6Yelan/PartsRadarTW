@@ -247,7 +247,7 @@ fix(web): remove unstable coolpc import tool
 
 - 已完成第一輪：production smoke command 與 `smoke-daemon`，目前以 container log 呈現 `OK` / `WARN` / `FAIL`。
 - 已完成第二輪：production smoke 會直接抽查 product list 的 public product image API，避免 DB 已有 `primary_image_url` 但 mounted image cache 缺檔時只靠較寬鬆的缺圖總數門檻才被發現。
-- 已完成第三輪：production smoke 會檢查第二版配單 routes、第二版第一批分類、近 30 天價格變動排序 API；`--public-only` 模式可在沒有部署主機 DB access 時驗證公開 HTTP routes / APIs 與 source freshness。
+- 已完成第三輪：production smoke 已改為長期檢查配單 route、categories / products / product detail / product image / price-history API、rate-limit headers 與 source freshness；第二版第一批分類與近 30 天排序改回驗收證據，不再作為長期 smoke 追蹤項目。
 - 第二版先維持 log 型監控，不新增告警通道。
 - 已完成部署驗收：`smoke-daemon` 最近檢查沒有未解釋的 `FAIL`；目前唯一 `WARN` 是來源連結 temporary 狀態觀察，不阻擋第二版 closeout。
 

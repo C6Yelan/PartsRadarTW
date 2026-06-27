@@ -1,7 +1,7 @@
 // apps/crawler/tests/scripts/ops/production-smoke.test.ts
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   parseProductionSmokeOptions,
@@ -227,6 +227,61 @@ describe("production smoke daemon Discord notifications", () => {
     });
   });
 
+  it("sends an admin WARN notification for Discord bot delivery issues", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-02T12:00:00.000Z"));
+    const { crawlerCwd, workspaceRoot } = await createWorkspace();
+    const imageDir = join(workspaceRoot, "product-images");
+    const stateFilePath = join(workspaceRoot, "storage", "ops", "smoke-discord-state.json");
+    await mkdir(imageDir);
+    await writeFile(join(imageDir, "product-1.webp"), "webp");
+    stubHealthyPublicApi();
+    const sendDiscordWebhook = vi.fn<SendDiscordWebhook>(
+      async () => ({ status: "sent", httpStatus: 204 }) as const,
+    );
+    const options = parseProductionSmokeDaemonOptions(
+      ["--run-once", "--initial-delay-seconds", "0", "--base-url", "https://partsradar.net"],
+      {
+        PRODUCT_IMAGE_STORAGE_DIR: imageDir,
+        DISCORD_ADMIN_WEBHOOK_URL,
+        SMOKE_DISCORD_STATE_FILE: stateFilePath,
+      },
+      crawlerCwd,
+    );
+
+    await runProductionSmokeDaemon({
+      client: createSmokeClient({
+        invalidImageErrorCount: 0,
+        trueParseErrorCount: 0,
+        discordDeliveryCounts: {
+          failed: 2,
+          rateLimited: 1,
+        },
+      }) as unknown as Parameters<typeof runProductionSmokeDaemon>[0]["client"],
+      options,
+      shutdown: idleShutdown(),
+      logMessage: vi.fn(),
+      sendDiscordWebhook,
+    });
+
+    const webhookCall = sendDiscordWebhook.mock.calls[0]?.[0];
+    if (!webhookCall) {
+      throw new Error("Expected Discord webhook sender call.");
+    }
+
+    expect(webhookCall.message.embeds?.[0]).toMatchObject({
+      title: "PartsRadarTW smoke WARN",
+    });
+    expect(webhookCall.message.embeds?.[0]?.description).toContain(
+      "- WARN discord bot deliveries: failed=2 rateLimited=1 in 24h",
+    );
+    await expect(readSmokeDiscordNotificationState(stateFilePath)).resolves.toMatchObject({
+      lastObservedStatus: "WARN",
+      lastNotificationKind: "WARN",
+      lastNotificationKey: "WARN:WARN:discord bot deliveries",
+    });
+  });
+
   it("does not send or write state when the admin webhook is not configured", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-06-02T12:00:00.000Z"));
@@ -325,19 +380,9 @@ describe("production smoke checks", () => {
           message: "HTTP 200",
         }),
         expect.objectContaining({
-          name: "v2 categories api",
+          name: "categories api",
           status: "OK",
-          message: "required IGrp=8,11,16",
-        }),
-        expect.objectContaining({
-          name: "price movement sort price_drop_desc",
-          status: "OK",
-          message: "rangeDays=30",
-        }),
-        expect.objectContaining({
-          name: "price movement sort price_rise_desc",
-          status: "OK",
-          message: "rangeDays=30",
+          message: "categories=11",
         }),
         expect.objectContaining({
           name: "product image api",
@@ -399,9 +444,9 @@ describe("production smoke checks", () => {
     );
   });
 
-  it("fails public-only checks when the v2 category expansion is missing", async () => {
+  it("fails public-only checks when categories API has no category", async () => {
     const { crawlerCwd } = await createWorkspace();
-    stubHealthyPublicApi({ categoryIgrps: [4, 5, 6, 7, 10, 12, 14, 15] });
+    stubHealthyPublicApi({ categoryIgrps: [] });
     const options = parseProductionSmokeOptions(["--public-only"], {}, crawlerCwd);
     const summary = await runProductionPublicSmoke(options, new Date("2026-06-02T12:00:00.000Z"));
 
@@ -409,32 +454,9 @@ describe("production smoke checks", () => {
     expect(summary.checks).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          name: "v2 categories api",
+          name: "categories api",
           status: "FAIL",
-          message: "missing IGrp=8,11,16",
-        }),
-      ]),
-    );
-  });
-
-  it("fails public-only checks when price movement sort omits v2 movement data", async () => {
-    const { crawlerCwd } = await createWorkspace();
-    stubHealthyPublicApi({ includePriceMovement: false });
-    const options = parseProductionSmokeOptions(["--public-only"], {}, crawlerCwd);
-    const summary = await runProductionPublicSmoke(options, new Date("2026-06-02T12:00:00.000Z"));
-
-    expect(summary.status).toBe("FAIL");
-    expect(summary.checks).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          name: "price movement sort price_drop_desc",
-          status: "FAIL",
-          message: "missing 30-day priceMovement data",
-        }),
-        expect.objectContaining({
-          name: "price movement sort price_rise_desc",
-          status: "FAIL",
-          message: "missing 30-day priceMovement data",
+          message: "response has no category",
         }),
       ]),
     );
@@ -487,19 +509,9 @@ describe("production smoke checks", () => {
           message: "HTTP 200",
         }),
         expect.objectContaining({
-          name: "v2 categories api",
+          name: "categories api",
           status: "OK",
-          message: "required IGrp=8,11,16",
-        }),
-        expect.objectContaining({
-          name: "price movement sort price_drop_desc",
-          status: "OK",
-          message: "rangeDays=30",
-        }),
-        expect.objectContaining({
-          name: "price movement sort price_rise_desc",
-          status: "OK",
-          message: "rangeDays=30",
+          message: "categories=11",
         }),
         expect.objectContaining({
           name: "product image api",
@@ -694,6 +706,44 @@ describe("production smoke checks", () => {
     );
   });
 
+  it("warns when recent Discord bot deliveries failed or were rate limited", async () => {
+    const { crawlerCwd, workspaceRoot } = await createWorkspace();
+    const imageDir = join(workspaceRoot, "product-images");
+    await mkdir(imageDir);
+    await writeFile(join(imageDir, "product-1.webp"), "webp");
+    stubHealthyPublicApi();
+    const options = parseProductionSmokeOptions(
+      [],
+      {
+        PRODUCT_IMAGE_STORAGE_DIR: imageDir,
+      },
+      crawlerCwd,
+    );
+    const summary = await runProductionSmoke(
+      createSmokeClient({
+        invalidImageErrorCount: 0,
+        trueParseErrorCount: 0,
+        discordDeliveryCounts: {
+          failed: 1,
+          rateLimited: 1,
+        },
+      }),
+      options,
+      new Date("2026-06-02T12:00:00.000Z"),
+    );
+
+    expect(summary.status).toBe("WARN");
+    expect(summary.checks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "discord bot deliveries",
+          status: "WARN",
+          message: "failed=1 rateLimited=1 in 24h",
+        }),
+      ]),
+    );
+  });
+
   it("still fails when true parse errors exceed the configured threshold", async () => {
     const { crawlerCwd, workspaceRoot } = await createWorkspace();
     const imageDir = join(workspaceRoot, "product-images");
@@ -751,7 +801,6 @@ async function createWorkspace(): Promise<{
 function stubHealthyPublicApi({
   buildListStatus = 200,
   categoryIgrps = [4, 5, 6, 7, 8, 10, 11, 12, 14, 15, 16],
-  includePriceMovement = true,
   imageStatus = 200,
   imageStatusByProductId = new Map<string, number>(),
   nullImageProductIds = new Set<string>(),
@@ -760,7 +809,6 @@ function stubHealthyPublicApi({
 }: {
   buildListStatus?: number;
   categoryIgrps?: number[];
-  includePriceMovement?: boolean;
   imageStatus?: number;
   imageStatusByProductId?: Map<string, number>;
   nullImageProductIds?: Set<string>;
@@ -806,15 +854,6 @@ function stubHealthyPublicApi({
                   : {
                       url: `/api/product-images/${id}.webp`,
                     },
-                ...(includePriceMovement
-                  ? {
-                      priceMovement: {
-                        rangeDays: 30,
-                        deltaAmount: null,
-                        deltaPercent: null,
-                      },
-                    }
-                  : {}),
               };
             }),
             pagination: { totalItems: 1 },
@@ -857,15 +896,20 @@ function stubHealthyPublicApi({
 function createSmokeClient({
   invalidImageErrorCount,
   trueParseErrorCount,
+  discordDeliveryCounts = {},
   linkHealthCounts = {},
 }: {
   invalidImageErrorCount: number;
   trueParseErrorCount: number;
-	  linkHealthCounts?: {
-	    sourceBroken?: number;
-	    sourceTemporary?: number;
-	  };
-	}) {
+  discordDeliveryCounts?: {
+    failed?: number;
+    rateLimited?: number;
+  };
+  linkHealthCounts?: {
+    sourceBroken?: number;
+    sourceTemporary?: number;
+  };
+}) {
   return {
     crawlRun: {
       findFirst: async ({ where }: { where: { status?: { in?: string[] } } }) =>
@@ -932,6 +976,19 @@ function createSmokeClient({
     },
     rawSnapshot: {
       count: async () => 0,
+    },
+    discordNotificationDelivery: {
+      count: async ({ where }: { where: { status?: "FAILED" | "RATE_LIMITED" } }) => {
+        if (where.status === "FAILED") {
+          return discordDeliveryCounts.failed ?? 0;
+        }
+
+        if (where.status === "RATE_LIMITED") {
+          return discordDeliveryCounts.rateLimited ?? 0;
+        }
+
+        return 0;
+      },
     },
   } as unknown as Parameters<typeof runProductionSmoke>[0];
 }

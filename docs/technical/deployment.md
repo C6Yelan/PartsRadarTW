@@ -206,11 +206,12 @@ Backup：
 
 最小監控：
 
-- `web`、`crawler-daemon`、`maintenance-daemon`、`postgres` 存活。
+- `web`、`crawler-daemon`、`maintenance-daemon`、`discord-bot`、`postgres` 存活。
 - 最近 successful crawl。
 - backoff 狀態。
 - snapshot / image cache 容量。
 - 商品圖片 API 404 / fallback 是否異常增加。
+- Discord bot notification delivery failed / rate limited 是否異常增加。
 
 ## Security And Rollback
 

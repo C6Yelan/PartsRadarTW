@@ -142,7 +142,10 @@ Discord bot 第一輪指令：
 範圍：
 
 - 評估並擇一或分階段導入 Uptime Kuma、Cloudflare monitoring、Grafana / Prometheus 或等價外部監控。
-- 監控公開首頁、主要 API、圖片 API、配單頁與 public-only smoke；不監控內網 `ops-web`。
+- 監控公開首頁、source-status、categories、商品列表 / 詳情 / 圖片 / 價格歷史 API、配單頁與 public-only smoke。
+- 外部公開監控不追硬編碼分類擴充、價格排序變體或個人化 Discord bot 細節；這些容易變成版本驗收或內部狀態噪音。
+- Bot 相關追蹤以內部 `smoke-daemon`、admin webhook 與受保護的 `ops-web` 為主，至少包含近 24 小時 Discord notification delivery failed / rate limited 聚合。
+- `ops-web` 不走公開監控；若外部工具需要看 ops 狀態，只能從 VPN / SSH tunnel / private network 搭配 `OPS_STATUS_TOKEN` 讀取。
 - 保留內部 `smoke-daemon` 作為 DB-backed / deployment-internal 檢查來源。
 - 建立監控設定、告警門檻與回復流程文件。
 
@@ -150,6 +153,7 @@ Discord bot 第一輪指令：
 
 - 外部監控能辨識 public route / API 掛掉，而不是只依賴 container health。
 - 外部監控不需要 DB access、不讀 `.env`，也不接觸 raw snapshot storage。
+- Discord bot delivery 失敗與 rate limit 可由 admin webhook 或 private ops status 看到，不需要公開狀態頁承載。
 - 監控告警與 Discord 管理者告警不互相洗版。
 
 ### 5. 分享配單連結（暫緩）

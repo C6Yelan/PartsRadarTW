@@ -6,7 +6,6 @@ export const DEFAULT_BASE_URL = "http://127.0.0.1:3000";
 export const DEFAULT_TIMEOUT_MS = 5000;
 export const DEFAULT_PRODUCT_IMAGE_STORAGE_DIR = "storage/product-images";
 export const DEFAULT_PRODUCT_IMAGE_SAMPLE_SIZE = 5;
-export const REQUIRED_V2_CATEGORY_IGRPS = [8, 11, 16] as const;
 export const DEFAULT_SOURCE_WARN_AFTER_MINUTES = 60;
 export const DEFAULT_SOURCE_FAIL_AFTER_MINUTES = 120;
 export const DEFAULT_CRAWLER_WARN_AFTER_MINUTES = 90;
