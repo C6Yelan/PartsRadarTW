@@ -15,8 +15,8 @@ export default defineConfig({
     timeout: 10_000,
   },
   fullyParallel: true,
-  retries: process.env.CI ? 2 : 0,
-  reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : [["list"]],
+  retries: 0,
+  reporter: [["list"]],
   use: {
     baseURL,
     trace: "on-first-retry",
@@ -24,7 +24,7 @@ export default defineConfig({
   webServer: shouldStartLocalServer
     ? {
         command: localServerCommand,
-        reuseExistingServer: !process.env.CI,
+        reuseExistingServer: true,
         timeout: 120_000,
         url: baseURL,
       }

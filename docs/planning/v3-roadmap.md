@@ -204,7 +204,7 @@ Discord bot 第一輪指令：
 - Cloudflare WAF / security rules / rate limiting 調校。
 - 評估 distributed / Redis-backed rate limiting；若仍單一 web container，需明確記錄限制。
 - 備份與還原演練：PostgreSQL、product image cache、必要 deployment config。
-- Playwright CI：穩定網域或可設定 `E2E_BASE_URL` 的 desktop / mobile smoke。
+- Playwright smoke：穩定網域或可設定 `E2E_BASE_URL` 的 desktop / mobile smoke，作為本機或部署前手動驗證。
 - 自動弱點掃描或 dependency audit baseline。
 
 完成條件：
@@ -239,7 +239,7 @@ Discord bot 第一輪指令：
 - 外部監控整合第一輪：已新增公開監控範圍文件與 `pnpm monitor:public-smoke` 入口。
 - 告警 cooldown / 去重、回復通知與 runbook 文件。
 - 備份還原演練：已新增 `pnpm backup:create` 與非破壞性的 `pnpm backup:restore-drill`。
-- Playwright CI：已新增 GitHub Actions Postgres-backed build/test/e2e smoke。
+- Playwright smoke：已新增本機 / 部署前可手動執行的 desktop / mobile e2e smoke；暫不加入自動 workflow。
 - 更嚴格 CSP / Cloudflare / rate limit 調校：已新增 CSP report-only build mode 與 external monitoring / edge baseline 文件；dependency / vulnerability baseline 仍待補。
 
 ## 待決定
