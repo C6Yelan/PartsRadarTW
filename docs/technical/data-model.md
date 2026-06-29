@@ -187,10 +187,10 @@ Discord bot 只保存 Discord user id 與必要偏好，不建立網站帳號，
 
 規則：
 
-- `/price-report now` 與 settings 面板的「立即預覽」會寫入 delivery log，但不建立 price report setting；若使用者已有設定，報告可沿用該設定的分類、商品名稱關鍵字、內容類型與上限。
+- `/price-report now` 與 settings 面板的「傳送預覽 DM」會寫入 delivery log，但不建立 price report setting；若使用者已有設定，報告可沿用該設定的分類、商品名稱關鍵字、內容類型與上限。預覽 DM 也用來驗證使用者是否可收到 bot 私訊。
 - `/price-report settings` 的按鈕與 modal 讀寫 `discord_price_report_settings`，並讀取最新 `scheduled_price_report` delivery log 顯示最近一次每日報告狀態；每日 DM 報告可設定台北時間 `HH:mm`、分類篩選、商品名稱關鍵字與內容類型篩選，下一次發送時間保存在 `next_send_at`。
 - `/watch` 統合管理介面會讀寫 `discord_target_price_watches`：以 PartsRadarTW 商品頁連結或站內商品 ID 新增追蹤、分頁讀取啟用中的追蹤、修改目標價，或經確認後停用追蹤；Discord component 內部使用完整 watch UUID，但不在使用者可見訊息顯示。
-- 目標價 worker 只讀取啟用、尚未成功通知且沒有有效 claim 的 watch；目前價格小於等於同幣別目標價時先取得 claim，再發送 DM。成功會寫入 `last_notified_at` 並清除 claim，因此同一設定只通知一次；修改或重新建立 watch 會重置兩欄，失敗或 rate limit 只清除 claim 供後續重試。
+- 目標價 worker 只讀取啟用、尚未成功通知且沒有有效 claim 的 watch；目前價格小於等於同幣別目標價時先取得 claim，再依 Discord user id 合併同輪達標項目後發送 DM。成功會寫入各 watch 的 `last_notified_at` 並清除 claim，因此同一設定只通知一次；修改或重新建立 watch 會重置兩欄，失敗或 rate limit 只清除 claim 供後續重試。
 - `error_message` 只保存安全摘要，不保存 token、source URL、raw HTML、DB URL、internal headers 或 raw IP。
 
 ## Crawler State

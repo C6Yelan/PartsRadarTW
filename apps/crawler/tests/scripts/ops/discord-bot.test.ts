@@ -1229,7 +1229,7 @@ describe("handleDiscordInteraction", () => {
               expect.objectContaining({
                 type: 2,
                 custom_id: "price-report:settings:preview",
-                label: "立即預覽",
+                label: "傳送預覽 DM",
               }),
               expect.objectContaining({
                 type: 2,
@@ -1439,7 +1439,7 @@ describe("handleDiscordInteraction", () => {
     );
   });
 
-  it("previews the configured price report from the settings panel", async () => {
+  it("sends the configured price report preview as a DM from the settings panel", async () => {
     const now = new Date();
     const oldCapturedAt = new Date(now.getTime() - 25 * 60 * 60 * 1000).toISOString();
     const newCapturedAt = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
@@ -1490,19 +1490,24 @@ describe("handleDiscordInteraction", () => {
       interaction: createComponentInteraction("price-report:settings:preview"),
     });
 
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
     expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({
       type: 5,
       data: { flags: 64 },
     });
 
-    const previewBody = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body));
+    const previewBody = JSON.parse(String(fetchMock.mock.calls[2]?.[1]?.body));
+    const settingsBody = JSON.parse(String(fetchMock.mock.calls[3]?.[1]?.body));
 
-    expect(fetchMock.mock.calls[1]?.[0]).toBe(
+    expect(fetchMock.mock.calls[1]?.[0]).toBe(`${API_BASE_URL}/users/@me/channels`);
+    expect(JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body))).toEqual({
+      recipient_id: "111122223333444455",
+    });
+    expect(fetchMock.mock.calls[2]?.[0]).toBe(`${API_BASE_URL}/channels/message/messages`);
+    expect(fetchMock.mock.calls[3]?.[0]).toBe(
       `${API_BASE_URL}/webhooks/${APPLICATION_ID}/interaction-token/messages/@original`,
     );
     expect(previewBody).toMatchObject({
-      flags: 64,
       embeds: [
         expect.objectContaining({
           title: "PartsRadarTW 價格報告 - 價格變動",
@@ -1513,12 +1518,70 @@ describe("handleDiscordInteraction", () => {
         parse: [],
       },
     });
+    expect(JSON.stringify(settingsBody)).toContain("已傳送預覽 DM");
     expect(JSON.stringify(previewBody)).not.toContain("新增商品");
     expect(client.discordNotificationDelivery.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         discordUserId: "111122223333444455",
         kind: "PRICE_REPORT_NOW",
         status: "SENT",
+      }),
+    });
+  });
+
+  it("shows a readable DM failure when the price report preview cannot be delivered", async () => {
+    const client = createDiscordBotClient(
+      [
+        snapshot({
+          id: "preview-new",
+          productId: "preview-product",
+          productName: "華碩 RTX 5070 測試卡",
+          crawlRunId: "new-run",
+          price: 18_990,
+          capturedAt: new Date().toISOString(),
+        }),
+      ],
+      [
+        priceReportSetting({
+          id: "setting-1",
+          discordUserId: "111122223333444455",
+          enabled: false,
+          nextSendAt: null,
+        }),
+      ],
+    );
+    const fetchMock = vi.fn<typeof fetch>(async (input) => {
+      if (String(input).endsWith("/users/@me/channels")) {
+        return new Response(
+          JSON.stringify({
+            code: 50007,
+            message: "Cannot send messages to this user",
+          }),
+          { status: 403 },
+        );
+      }
+
+      return new Response(JSON.stringify({ id: "message" }), { status: 200 });
+    });
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createComponentInteraction("price-report:settings:preview"),
+    });
+
+    const settingsBody = JSON.parse(String(fetchMock.mock.calls[2]?.[1]?.body));
+
+    expect(JSON.stringify(settingsBody)).toContain("我目前無法傳送私訊給你");
+    expect(JSON.stringify(settingsBody)).not.toContain("50007");
+    expect(JSON.stringify(settingsBody)).not.toContain("Cannot send messages");
+    expect(client.discordNotificationDelivery.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        discordUserId: "111122223333444455",
+        kind: "PRICE_REPORT_NOW",
+        status: "FAILED",
       }),
     });
   });
@@ -2046,6 +2109,158 @@ describe("sendDueTargetPriceNotifications", () => {
       failedCount: 0,
     });
     expect(sendDirectMessages).toHaveBeenCalledTimes(1);
+  });
+
+  it("combines same-user target price notifications into one DM digest", async () => {
+    const now = new Date("2026-06-07T05:00:00.000Z");
+    const secondProductId = "33333333-3333-4333-8333-333333333333";
+    const secondWatchId = "44444444-4444-4444-8444-444444444444";
+    const client = createDiscordBotClient(
+      [
+        snapshot({
+          id: "snapshot-target-1",
+          productId: WATCH_PRODUCT_ID,
+          productName: "RTX 5070 測試卡",
+          crawlRunId: "new-run",
+          price: 15_000,
+          capturedAt: "2026-06-07T04:55:00.000Z",
+        }),
+        snapshot({
+          id: "snapshot-target-2",
+          productId: secondProductId,
+          productName: "DDR5 64GB 測試記憶體",
+          crawlRunId: "new-run",
+          price: 4_500,
+          capturedAt: "2026-06-07T04:56:00.000Z",
+        }),
+      ],
+      [],
+      [
+        targetPriceWatch({
+          id: WATCH_ROW_ID,
+          discordUserId: "111122223333444455",
+          productId: WATCH_PRODUCT_ID,
+          targetPrice: 17_500,
+        }),
+        targetPriceWatch({
+          id: secondWatchId,
+          discordUserId: "111122223333444455",
+          productId: secondProductId,
+          targetPrice: 5_000,
+        }),
+      ],
+    );
+    const sendDirectMessages = vi.fn(
+      async (_discordUserId: string, messages: DiscordBotMessage[]) => ({
+        status: "sent" as const,
+        messageCount: messages.length,
+        httpStatuses: [200],
+      }),
+    );
+
+    await expect(
+      sendDueTargetPriceNotifications({
+        client,
+        publicBaseUrl: PUBLIC_BASE_URL,
+        now,
+        sendDirectMessages,
+      }),
+    ).resolves.toEqual({
+      scannedCount: 2,
+      dueCount: 2,
+      processedCount: 2,
+      sentCount: 2,
+      rateLimitedCount: 0,
+      failedCount: 0,
+    });
+
+    expect(sendDirectMessages).toHaveBeenCalledTimes(1);
+    expect(sendDirectMessages).toHaveBeenCalledWith("111122223333444455", [
+      expect.objectContaining({
+        embeds: [
+          expect.objectContaining({
+            title: "商品目標價達標",
+            description: expect.stringContaining("共有 **2** 項追蹤達到目標價格。"),
+          }),
+        ],
+      }),
+    ]);
+    const digest = JSON.stringify(sendDirectMessages.mock.calls[0]?.[1]);
+    expect(digest).toContain("RTX 5070 測試卡");
+    expect(digest).toContain("DDR5 64GB 測試記憶體");
+    expect(client.discordNotificationDelivery.create).toHaveBeenCalledTimes(2);
+    expect(client.discordNotificationDelivery.create).toHaveBeenNthCalledWith(1, {
+      data: expect.objectContaining({
+        kind: "TARGET_PRICE",
+        status: "SENT",
+        targetPriceWatchId: WATCH_ROW_ID,
+        messageCount: 1,
+      }),
+    });
+    expect(client.discordNotificationDelivery.create).toHaveBeenNthCalledWith(2, {
+      data: expect.objectContaining({
+        kind: "TARGET_PRICE",
+        status: "SENT",
+        targetPriceWatchId: secondWatchId,
+        messageCount: 1,
+      }),
+    });
+  });
+
+  it("splits long target price notification digests into multiple embeds", async () => {
+    const snapshots = Array.from({ length: 25 }, (_, index) => {
+      const suffix = String(index + 1).padStart(12, "0");
+
+      return snapshot({
+        id: `snapshot-target-${index + 1}`,
+        productId: `50000000-0000-4000-8000-${suffix}`,
+        productName: `超長商品名稱測試 ${index + 1} RTX 5090 WHITE OC 32GB GDDR7 三風扇 顯示卡 限量版本 搭優惠到月底`,
+        crawlRunId: "new-run",
+        price: 30_000 + index,
+        capturedAt: "2026-06-07T04:55:00.000Z",
+      });
+    });
+    const watches = snapshots.map((item, index) =>
+      targetPriceWatch({
+        id: `60000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
+        discordUserId: "111122223333444455",
+        productId: item.productId,
+        targetPrice: 35_000 + index,
+      }),
+    );
+    const client = createDiscordBotClient(snapshots, [], watches);
+    const sendDirectMessages = vi.fn(
+      async (_discordUserId: string, messages: DiscordBotMessage[]) => ({
+        status: "sent" as const,
+        messageCount: messages.length,
+        httpStatuses: [200],
+      }),
+    );
+
+    await expect(
+      sendDueTargetPriceNotifications({
+        client,
+        publicBaseUrl: PUBLIC_BASE_URL,
+        now: new Date("2026-06-07T05:00:00.000Z"),
+        sendDirectMessages,
+      }),
+    ).resolves.toMatchObject({
+      processedCount: 25,
+      sentCount: 25,
+    });
+
+    const messages = sendDirectMessages.mock.calls[0]?.[1] ?? [];
+    const embedCount = messages.reduce(
+      (count, message) => count + (message.embeds?.length ?? 0),
+      0,
+    );
+
+    expect(sendDirectMessages).toHaveBeenCalledTimes(1);
+    expect(embedCount).toBeGreaterThan(1);
+    expect(messages[0]?.embeds?.[0]?.title).toMatch(/^商品目標價達標 \(1\/[0-9]+\)$/);
+    expect(messages.at(-1)?.embeds?.at(-1)?.title).toBe(
+      `商品目標價達標 (${embedCount}/${embedCount})`,
+    );
   });
 
   it("does not send when the current price is above the target", async () => {

@@ -525,13 +525,13 @@ Bot 目標：
 
 - `discord-bot` Compose profile 與 `pnpm ops:discord-bot` daemon entrypoint。
 - Discord slash command registration。
-- `/price-report now`：使用者手動要求最近 `24h` / `12h` / `6h` 價格報告，bot 會在指令發出的頻道或私訊 context 以 embed 回覆中文報告；若使用者已有啟用中的每日設定，未明確覆蓋的手動報告會沿用該設定的分類、商品名稱關鍵字、內容類型與上限，方便立即預覽。
+- `/price-report now`：使用者手動要求最近 `24h` / `12h` / `6h` 價格報告，bot 會在指令發出的頻道或私訊 context 以 embed 回覆中文報告；若使用者已有啟用中的每日設定，未明確覆蓋的手動報告會沿用該設定的分類、商品名稱關鍵字、內容類型與上限，方便手動確認報告內容。
 - Slash command 只註冊 global command，供伺服器與 DM 使用，避免 Discord client 同時顯示 global 與 guild 的重複 `/price-report`。
 - `/price-report now` 報告只為有資料的「價格變動」或「新增商品」產生 embed；摘要時間、統計數字與價格變動方向標題使用 Markdown emphasis 強化區隔；價格變動 embed 先分「降價」與「漲價」，商品列以單行呈現 signed 漲跌金額、舊價、新價與站內商品連結；新增商品 embed 以單行呈現目前價格與站內商品連結；兩者都依 DB 的 `sourceCategory.displayName` 大分類與 `vendorName` 小分類分組，並在小分類已顯示品牌時移除商品名稱開頭重複品牌；兩邊都沒資料時才送一個空報告摘要。
-- `/price-report now` 每次最多列 `DISCORD_PRICE_REPORT_MAX_ITEMS` 筆，預設 50；上限套用在兩區合計列出的商品數；per-user cooldown 套用在實際產生報告的 `now` 指令與 settings 面板的「立即預覽」。
-- 每次 `/price-report now` 或 settings「立即預覽」會寫入 `discord_notification_deliveries`，供後續去重、排程與維運檢視使用。
+- `/price-report now` 每次最多列 `DISCORD_PRICE_REPORT_MAX_ITEMS` 筆，預設 50；上限套用在兩區合計列出的商品數；per-user cooldown 套用在實際產生報告的 `now` 指令與 settings 面板的「傳送預覽 DM」。
+- 每次 `/price-report now` 或 settings「傳送預覽 DM」會寫入 `discord_notification_deliveries`，供後續去重、排程與維運檢視使用。
 - `/price-report settings`：開啟私密設定面板，以 embed 顯示每日價格報告狀態、最近一次每日報告 delivery 狀態與目前設定，並用選單調整統計區間、分類篩選與報告內容類型；分類選單只列實際分類，部分分類狀態可按「改為全部分類」恢復不限制分類。
-- settings 面板的「立即預覽」會以目前設定產生一次私密報告，即使每日報告尚未啟用也可先確認篩選效果；多則 report chunks 也會維持 ephemeral。
+- settings 面板的「傳送預覽 DM」會以目前設定產生一次 DM 報告，即使每日報告尚未啟用也可先確認篩選效果與私訊可用性；多則 report chunks 會直接送到使用者 DM，settings 面板只回報送達狀態或可理解的失敗原因。
 - 「調整關鍵字」會開啟 modal，設定商品名稱關鍵字；留空代表不限。
   - 空白：同一組關鍵字都要符合，例如 `RTX 5090` 可匹配商品名中的 `RTX5090`。
   - 逗號：多組擇一符合，例如 `RTX 5090, DDR5` 代表 `(RTX AND 5090) OR DDR5`。

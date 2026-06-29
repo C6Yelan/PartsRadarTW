@@ -465,7 +465,7 @@ export function createPriceReportSettingsComponents({
           type: DISCORD_COMPONENT_TYPE_BUTTON,
           style: DISCORD_BUTTON_STYLE_SECONDARY,
           custom_id: PRICE_REPORT_SETTINGS_PREVIEW_CUSTOM_ID,
-          label: "立即預覽",
+          label: "傳送預覽 DM",
         },
         {
           type: DISCORD_COMPONENT_TYPE_BUTTON,

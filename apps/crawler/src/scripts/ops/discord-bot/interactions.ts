@@ -46,6 +46,7 @@ import {
   formatDiscordBotText,
   formatDiscordDeliveryFailureForUser,
   formatDiscordRateLimitForUser,
+  sendDiscordDirectMessages,
   sendDiscordInteractionMessages,
   sendInteractionResponse,
   sendModalInteractionResponse,
@@ -57,6 +58,7 @@ import type {
   DiscordBotOptions,
   DiscordInteraction,
   FetchImpl,
+  PriceReportNowResult,
   PriceReportTimeOfDay,
 } from "./types";
 import {
@@ -291,7 +293,7 @@ async function handleMessageComponentInteraction({
 
     const setting = await readPriceReportSetting({ client, discordUserId });
 
-    await sendPriceReportNow({
+    const previewResult = await sendPriceReportNow({
       client,
       discordUserId,
       windowHours: resolveWindowHours(setting?.window),
@@ -301,15 +303,28 @@ async function handleMessageComponentInteraction({
       publicBaseUrl: options.publicBaseUrl,
       filters: toPriceReportFilters(setting),
       sendReportMessages: (messages) =>
-        sendDiscordInteractionMessages({
+        sendDiscordDirectMessages({
           token: options.token,
-          applicationId: options.applicationId,
           apiBaseUrl: options.apiBaseUrl,
-          interaction,
+          userId: discordUserId,
           messages,
           fetchImpl,
-          ephemeral: true,
         }),
+    });
+    const panel = await readPriceReportSettingsPanel({
+      client,
+      discordUserId,
+      options,
+      notice: formatPriceReportPreviewDmNotice(previewResult),
+    });
+
+    await editDeferredInteractionResponse({
+      token: options.token,
+      applicationId: options.applicationId,
+      apiBaseUrl: options.apiBaseUrl,
+      interaction,
+      fetchImpl,
+      message: createPriceReportSettingsPanelMessage(panel),
     });
     return;
   }
@@ -1022,6 +1037,18 @@ function formatPriceReportDeliveryStatus(delivery: PriceReportDeliveryStatus | n
   }
 
   return `${delivery.status}：${deliveredAt}，列出 ${delivery.itemCount} 筆。`;
+}
+
+function formatPriceReportPreviewDmNotice(result: PriceReportNowResult): string {
+  if (result.status === "sent") {
+    return `已傳送預覽 DM：列出 ${result.listedCount} 筆，送出 ${result.messageCount} 則訊息。`;
+  }
+
+  if (result.status === "rate_limited") {
+    return formatDiscordRateLimitForUser();
+  }
+
+  return formatDiscordDeliveryFailureForUser(result.message);
 }
 
 function formatPriceReportDeliveryError(errorMessage: string | null): string {

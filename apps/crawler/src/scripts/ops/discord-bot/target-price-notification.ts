@@ -4,6 +4,7 @@ import type { Prisma } from "@partsradar/db";
 
 import { toSafeCliErrorMessage } from "../../shared/script-utils";
 import {
+  DISCORD_EMBED_DESCRIPTION_MAX_LENGTH,
   DISCORD_TARGET_PRICE_REACHED_COLOR,
   MAX_TARGET_PRICE_NOTIFICATIONS_PER_CYCLE,
   PRODUCT_NAME_MAX_LENGTH,
@@ -41,6 +42,8 @@ const TARGET_PRICE_NOTIFICATION_SELECT = {
 type TargetPriceNotificationWatch = Prisma.DiscordTargetPriceWatchGetPayload<{
   select: typeof TARGET_PRICE_NOTIFICATION_SELECT;
 }>;
+
+const DISCORD_MESSAGE_MAX_EMBEDS = 10;
 
 export interface TargetPriceNotificationSummary {
   scannedCount: number;
@@ -93,33 +96,52 @@ export async function sendDueTargetPriceNotifications({
     failedCount: 0,
   };
 
-  for (const watch of dueWatches) {
-    const claimed = await client.discordTargetPriceWatch.updateMany({
-      where: {
-        id: watch.id,
-        enabled: true,
-        lastNotifiedAt: null,
-        OR: [{ notificationClaimedAt: null }, { notificationClaimedAt: { lte: staleClaimBefore } }],
-      },
-      data: {
-        notificationClaimedAt: now,
-      },
-    });
+  for (const watches of groupTargetPriceWatchesByUser(dueWatches)) {
+    const claimedWatches: TargetPriceNotificationWatch[] = [];
 
-    if (claimed.count === 0) {
+    for (const watch of watches) {
+      const claimed = await client.discordTargetPriceWatch.updateMany({
+        where: {
+          id: watch.id,
+          enabled: true,
+          lastNotifiedAt: null,
+          OR: [
+            { notificationClaimedAt: null },
+            { notificationClaimedAt: { lte: staleClaimBefore } },
+          ],
+        },
+        data: {
+          notificationClaimedAt: now,
+        },
+      });
+
+      if (claimed.count === 0) {
+        continue;
+      }
+
+      summary.processedCount += 1;
+      claimedWatches.push(watch);
+    }
+
+    if (claimedWatches.length === 0) {
       continue;
     }
 
-    summary.processedCount += 1;
-    const message = createTargetPriceReachedMessage({ watch, publicBaseUrl });
+    const discordUserId = claimedWatches[0]?.discordUserId;
+
+    if (!discordUserId) {
+      continue;
+    }
+
+    const messages = createTargetPriceReachedMessages({ watches: claimedWatches, publicBaseUrl });
     let sendResult: DiscordBotMessageSendResult;
 
     try {
-      sendResult = await sendDirectMessages(watch.discordUserId, [message]);
+      sendResult = await sendDirectMessages(discordUserId, messages);
     } catch (error) {
       sendResult = {
         status: "failed",
-        messageCount: 1,
+        messageCount: messages.length,
         sentMessageCount: 0,
         httpStatus: null,
         message: toSafeCliErrorMessage(error),
@@ -127,44 +149,51 @@ export async function sendDueTargetPriceNotifications({
     }
 
     if (sendResult.status === "sent") {
-      summary.sentCount += 1;
-      await client.discordTargetPriceWatch.updateMany({
-        where: {
-          id: watch.id,
-          enabled: true,
-          lastNotifiedAt: null,
-          notificationClaimedAt: now,
-        },
-        data: {
-          lastNotifiedAt: now,
-          notificationClaimedAt: null,
-        },
-      });
+      summary.sentCount += claimedWatches.length;
+
+      for (const watch of claimedWatches) {
+        await client.discordTargetPriceWatch.updateMany({
+          where: {
+            id: watch.id,
+            enabled: true,
+            lastNotifiedAt: null,
+            notificationClaimedAt: now,
+          },
+          data: {
+            lastNotifiedAt: now,
+            notificationClaimedAt: null,
+          },
+        });
+      }
     } else {
       if (sendResult.status === "rate_limited") {
-        summary.rateLimitedCount += 1;
+        summary.rateLimitedCount += claimedWatches.length;
       } else {
-        summary.failedCount += 1;
+        summary.failedCount += claimedWatches.length;
       }
 
-      await client.discordTargetPriceWatch.updateMany({
-        where: {
-          id: watch.id,
-          lastNotifiedAt: null,
-          notificationClaimedAt: now,
-        },
-        data: {
-          notificationClaimedAt: null,
-        },
-      });
+      for (const watch of claimedWatches) {
+        await client.discordTargetPriceWatch.updateMany({
+          where: {
+            id: watch.id,
+            lastNotifiedAt: null,
+            notificationClaimedAt: now,
+          },
+          data: {
+            notificationClaimedAt: null,
+          },
+        });
+      }
     }
 
-    await recordTargetPriceNotificationDelivery({
-      client,
-      watch,
-      result: sendResult,
-      now,
-    });
+    for (const watch of claimedWatches) {
+      await recordTargetPriceNotificationDelivery({
+        client,
+        watch,
+        result: sendResult,
+        now,
+      });
+    }
 
     if (sendResult.status === "rate_limited") {
       break;
@@ -172,6 +201,29 @@ export async function sendDueTargetPriceNotifications({
   }
 
   return summary;
+}
+
+function createTargetPriceReachedMessages({
+  watches,
+  publicBaseUrl,
+}: {
+  watches: TargetPriceNotificationWatch[];
+  publicBaseUrl: string;
+}): DiscordBotMessage[] {
+  if (watches.length === 1 && watches[0]) {
+    return [createTargetPriceReachedMessage({ watch: watches[0], publicBaseUrl })];
+  }
+
+  const embeds = createTargetPriceReachedDigestEmbeds({ watches, publicBaseUrl });
+  const messages: DiscordBotMessage[] = [];
+
+  for (let index = 0; index < embeds.length; index += DISCORD_MESSAGE_MAX_EMBEDS) {
+    messages.push({
+      embeds: embeds.slice(index, index + DISCORD_MESSAGE_MAX_EMBEDS),
+    });
+  }
+
+  return messages;
 }
 
 export function createTargetPriceReachedMessage({
@@ -217,6 +269,84 @@ export function createTargetPriceReachedMessage({
   };
 }
 
+function createTargetPriceReachedDigestEmbeds({
+  watches,
+  publicBaseUrl,
+}: {
+  watches: TargetPriceNotificationWatch[];
+  publicBaseUrl: string;
+}): NonNullable<DiscordBotMessage["embeds"]> {
+  const lines = [
+    `共有 **${watches.length}** 項追蹤達到目標價格。`,
+    "",
+    ...watches.flatMap((watch) => formatTargetPriceDigestLines(watch, publicBaseUrl)),
+  ];
+  const descriptionChunks = createDescriptionChunks(lines);
+
+  return descriptionChunks.map((description, index) => ({
+    title:
+      descriptionChunks.length > 1
+        ? `商品目標價達標 (${index + 1}/${descriptionChunks.length})`
+        : "商品目標價達標",
+    description,
+    color: DISCORD_TARGET_PRICE_REACHED_COLOR,
+  }));
+}
+
+function formatTargetPriceDigestLines(
+  watch: TargetPriceNotificationWatch,
+  publicBaseUrl: string,
+): string[] {
+  const currentPrice = watch.product.currentPrice?.priceSnapshot.price;
+  const currentCurrency = watch.product.currentPrice?.priceSnapshot.currency ?? watch.currency;
+  const productName = formatDiscordBotText(watch.product.name, PRODUCT_NAME_MAX_LENGTH);
+
+  return [
+    `[${escapeMarkdownLinkText(productName)}](${createProductUrl(publicBaseUrl, watch.product.id)})`,
+    `目前 ${formatCurrency(currentPrice ?? watch.targetPrice, currentCurrency)} / 目標 ${formatCurrency(
+      watch.targetPrice,
+      watch.currency,
+    )}`,
+    "",
+  ];
+}
+
+function createDescriptionChunks(lines: string[]): string[] {
+  const chunks: string[] = [];
+  let current = "";
+
+  for (const line of lines) {
+    const formattedLine = formatDiscordBotText(line, DISCORD_EMBED_DESCRIPTION_MAX_LENGTH);
+    const next = current ? `${current}\n${formattedLine}` : formattedLine;
+
+    if (current && next.length > DISCORD_EMBED_DESCRIPTION_MAX_LENGTH) {
+      chunks.push(current);
+      current = formattedLine;
+      continue;
+    }
+
+    current = next;
+  }
+
+  if (current) {
+    chunks.push(current);
+  }
+
+  return chunks;
+}
+
+function groupTargetPriceWatchesByUser(
+  watches: TargetPriceNotificationWatch[],
+): TargetPriceNotificationWatch[][] {
+  const grouped = new Map<string, TargetPriceNotificationWatch[]>();
+
+  for (const watch of watches) {
+    grouped.set(watch.discordUserId, [...(grouped.get(watch.discordUserId) ?? []), watch]);
+  }
+
+  return [...grouped.values()];
+}
+
 function isTargetPriceReached(watch: TargetPriceNotificationWatch): boolean {
   const snapshot = watch.product.currentPrice?.priceSnapshot;
 
@@ -255,7 +385,7 @@ async function recordTargetPriceNotificationDelivery({
           ? `target-price:${watch.id}:${watch.updatedAt.toISOString()}`
           : null,
       itemCount: 1,
-      messageCount: 1,
+      messageCount: result.messageCount,
       deliveredAt: result.status === "sent" ? now : null,
       errorMessage: result.status === "failed" ? result.message : null,
     },
