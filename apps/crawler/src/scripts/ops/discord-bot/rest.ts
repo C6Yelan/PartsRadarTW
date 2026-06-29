@@ -27,6 +27,40 @@ import type {
   FetchImpl,
 } from "./types";
 
+export function formatDiscordDeliveryFailureForUser(errorMessage: string | null): string {
+  const issue = classifyDiscordDeliveryFailure(errorMessage);
+
+  if (issue === "dm_unavailable") {
+    return "我目前無法傳送私訊給你。請確認你允許此伺服器成員私訊，或先傳訊息給 PartsRadarTW bot 後再試一次。";
+  }
+
+  if (issue === "missing_access") {
+    return "我目前無法存取這個 Discord App 或指令。請伺服器管理員確認 PartsRadarTW bot 仍在伺服器中，且應用程式指令未被停用。";
+  }
+
+  if (issue === "missing_permissions") {
+    return "我目前缺少 Discord 要求的權限。請伺服器管理員確認 PartsRadarTW bot 的 App / 指令權限設定；公開安裝不需要 Administrator。";
+  }
+
+  if (issue === "invalid_token") {
+    return "Bot token 可能失效，請聯絡維運者。";
+  }
+
+  if (issue === "expired_interaction") {
+    return "Discord 指令回應已失效，請重新執行指令；若持續發生請聯絡維運者。";
+  }
+
+  if (!errorMessage?.trim()) {
+    return "通知失敗，但 Discord 沒有回傳可判讀的原因；系統已保留紀錄供維運檢查。";
+  }
+
+  return "Discord 回傳通知失敗；系統已保留紀錄供維運檢查。若持續發生，請重新邀請 bot 或聯絡維運者。";
+}
+
+export function formatDiscordRateLimitForUser(): string {
+  return "Discord 暫時限制訊息發送，系統會稍後重試。";
+}
+
 export async function sendDiscordDirectMessages({
   token,
   apiBaseUrl,
@@ -532,6 +566,40 @@ function formatDiscordApiError(httpStatus: number, body: unknown): string {
     details?.errors === undefined ? "" : ` errors=${serializeDiscordErrors(details.errors)}`;
 
   return `Discord API returned HTTP ${httpStatus}.${code}${message}${errors}`;
+}
+
+function classifyDiscordDeliveryFailure(
+  errorMessage: string | null,
+):
+  | "dm_unavailable"
+  | "missing_access"
+  | "missing_permissions"
+  | "invalid_token"
+  | "expired_interaction"
+  | "unknown" {
+  const normalized = errorMessage?.toLowerCase() ?? "";
+
+  if (normalized.includes("code=50007") || normalized.includes("cannot send messages")) {
+    return "dm_unavailable";
+  }
+
+  if (normalized.includes("code=50001") || normalized.includes("missing access")) {
+    return "missing_access";
+  }
+
+  if (normalized.includes("code=50013") || normalized.includes("missing permissions")) {
+    return "missing_permissions";
+  }
+
+  if (normalized.includes("http 401") || normalized.includes("unauthorized")) {
+    return "invalid_token";
+  }
+
+  if (normalized.includes("unknown interaction") || normalized.includes("code=10062")) {
+    return "expired_interaction";
+  }
+
+  return "unknown";
 }
 
 function serializeDiscordErrors(errors: unknown): string {

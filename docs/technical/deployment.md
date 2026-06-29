@@ -163,6 +163,15 @@ PRODUCT_IMAGE_STORAGE_DIR=/var/lib/partsradar/product-images
 | `CLOUDFLARE_TUNNEL_TOKEN` | Tunnel token |
 | `NODE_ENV` | production |
 
+Discord bot 權限：
+
+- 公開安裝 invite URL 使用 `scope=bot%20applications.commands` 與 `permissions=0`。
+- URL 格式：`https://discord.com/oauth2/authorize?client_id=<DISCORD_APPLICATION_ID>&scope=bot%20applications.commands&permissions=0`
+- Developer Portal 不需要開啟 privileged gateway intents；程式以 `intents: 0` 連線。
+- 不要求 `Administrator`、`Send Messages`、`Read Message History`、`Embed Links` 或 `Message Content Intent`。
+- Slash command interaction response 與使用者 DM 不需要伺服器管理權限；public / admin 廣播仍走 webhook，不改由 bot 主動在頻道發訊息。
+- 若使用者看不到指令，通常是 `applications.commands` 未安裝或伺服器整合設定限制；bot 收不到 interaction 時無法主動回覆，只能依安裝文件重新邀請或請伺服器管理員調整 Discord Integrations / App command permissions。
+
 規則：
 
 - `.env`、DB password、SSH key、Cloudflare token 不提交。

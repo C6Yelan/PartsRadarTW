@@ -22,7 +22,11 @@ import {
   MAX_TARGET_PRICE,
   PRODUCT_NAME_MAX_LENGTH,
 } from "./constants";
-import { formatDiscordBotText } from "./rest";
+import {
+  formatDiscordBotText,
+  formatDiscordDeliveryFailureForUser,
+  formatDiscordRateLimitForUser,
+} from "./rest";
 import type { DiscordBotClient, DiscordBotMessage } from "./types";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -77,6 +81,13 @@ const TARGET_PRICE_WATCH_LIST_SELECT = {
   },
 } as const satisfies Prisma.DiscordTargetPriceWatchSelect;
 
+const TARGET_PRICE_WATCH_DELIVERY_STATUS_SELECT = {
+  status: true,
+  errorMessage: true,
+  deliveredAt: true,
+  createdAt: true,
+} as const satisfies Prisma.DiscordNotificationDeliverySelect;
+
 type TargetPriceWatchProductRecord = Prisma.ProductGetPayload<{
   select: typeof TARGET_PRICE_WATCH_PRODUCT_SELECT;
 }>;
@@ -85,6 +96,9 @@ type SavedTargetPriceWatchRecord = Prisma.DiscordTargetPriceWatchGetPayload<{
 }>;
 type TargetPriceWatchListRecord = Prisma.DiscordTargetPriceWatchGetPayload<{
   select: typeof TARGET_PRICE_WATCH_LIST_SELECT;
+}>;
+export type TargetPriceWatchDeliveryStatus = Prisma.DiscordNotificationDeliveryGetPayload<{
+  select: typeof TARGET_PRICE_WATCH_DELIVERY_STATUS_SELECT;
 }>;
 
 export type CreateTargetPriceWatchResult =
@@ -386,6 +400,26 @@ export async function readTargetPriceWatch({
   };
 }
 
+export async function readLatestTargetPriceWatchDelivery({
+  client,
+  discordUserId,
+  watchId,
+}: {
+  client: DiscordBotClient;
+  discordUserId: string;
+  watchId: string;
+}): Promise<TargetPriceWatchDeliveryStatus | null> {
+  return client.discordNotificationDelivery.findFirst({
+    where: {
+      discordUserId,
+      kind: "TARGET_PRICE",
+      targetPriceWatchId: watchId,
+    },
+    select: TARGET_PRICE_WATCH_DELIVERY_STATUS_SELECT,
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+  });
+}
+
 async function disableTargetPriceWatchRecord({
   client,
   discordUserId,
@@ -485,11 +519,13 @@ export function createTargetPriceWatchManagerMessage({
   result,
   publicBaseUrl,
   selectedWatchInput = null,
+  selectedWatchDelivery = null,
   notice,
 }: {
   result: TargetPriceWatchlistResult;
   publicBaseUrl: string;
   selectedWatchInput?: string | null;
+  selectedWatchDelivery?: TargetPriceWatchDeliveryStatus | null;
   notice?: string;
 }): DiscordBotMessage {
   const selectedWatchId = normalizeWatchId(selectedWatchInput);
@@ -588,7 +624,9 @@ export function createTargetPriceWatchManagerMessage({
         title: "商品目標價追蹤",
         description,
         color: DISCORD_EMBED_COLOR,
-        fields: selectedWatch ? formatWatchSummaryFields(selectedWatch) : undefined,
+        fields: selectedWatch
+          ? formatWatchSummaryFields(selectedWatch, selectedWatchDelivery)
+          : undefined,
         footer: {
           text: `第 ${result.page + 1} 頁，每頁最多 ${WATCH_MANAGER_PAGE_SIZE} 筆`,
         },
@@ -714,7 +752,10 @@ function formatWatchSelectOption(
   };
 }
 
-function formatWatchSummaryFields(watch: TargetPriceWatchListRecord): Array<{
+function formatWatchSummaryFields(
+  watch: TargetPriceWatchListRecord,
+  delivery: TargetPriceWatchDeliveryStatus | null = null,
+): Array<{
   name: string;
   value: string;
   inline?: boolean;
@@ -726,7 +767,7 @@ function formatWatchSummaryFields(watch: TargetPriceWatchListRecord): Array<{
     watch.product.currentPrice?.priceSnapshot.capturedAt ??
     null;
 
-  return [
+  const fields = [
     {
       name: "目前價格",
       value:
@@ -753,6 +794,35 @@ function formatWatchSummaryFields(watch: TargetPriceWatchListRecord): Array<{
       }),
     },
   ];
+  const deliveryField = formatWatchNotificationDeliveryField(delivery);
+
+  return deliveryField ? [...fields, deliveryField] : fields;
+}
+
+function formatWatchNotificationDeliveryField(
+  delivery: TargetPriceWatchDeliveryStatus | null,
+): { name: string; value: string } | null {
+  if (!delivery || delivery.status === "SENT") {
+    return null;
+  }
+
+  const happenedAt = formatTaipeiMinute(delivery.deliveredAt ?? delivery.createdAt);
+
+  if (delivery.status === "RATE_LIMITED") {
+    return {
+      name: "最近一次通知",
+      value: `限流：${happenedAt}。\n${formatDiscordRateLimitForUser()}`,
+    };
+  }
+
+  if (delivery.status === "FAILED") {
+    return {
+      name: "最近一次通知",
+      value: `失敗：${happenedAt}。\n${formatDiscordDeliveryFailureForUser(delivery.errorMessage)}`,
+    };
+  }
+
+  return null;
 }
 
 function formatWatchStatus({

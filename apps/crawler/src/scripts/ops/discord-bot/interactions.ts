@@ -44,6 +44,8 @@ import {
   deferInteractionResponse,
   editDeferredInteractionResponse,
   formatDiscordBotText,
+  formatDiscordDeliveryFailureForUser,
+  formatDiscordRateLimitForUser,
   sendDiscordInteractionMessages,
   sendInteractionResponse,
   sendModalInteractionResponse,
@@ -63,6 +65,7 @@ import {
   createTargetPriceWatchRemovalConfirmationMessage,
   createTargetPriceWatchResponseMessage,
   disableTargetPriceWatch,
+  readLatestTargetPriceWatchDelivery,
   readTargetPriceWatch,
   readTargetPriceWatchlist,
   updateTargetPriceWatch,
@@ -223,7 +226,9 @@ async function handleApplicationCommandInteraction({
       apiBaseUrl: options.apiBaseUrl,
       interaction,
       fetchImpl,
-      message: createTargetPriceWatchManagerMessage({
+      message: await createTargetPriceWatchManagerMessageWithDelivery({
+        client,
+        discordUserId,
         result,
         publicBaseUrl: options.publicBaseUrl,
       }),
@@ -390,7 +395,9 @@ async function handleMessageComponentInteraction({
         apiBaseUrl: options.apiBaseUrl,
         interaction,
         fetchImpl,
-        message: createTargetPriceWatchManagerMessage({
+        message: await createTargetPriceWatchManagerMessageWithDelivery({
+          client,
+          discordUserId,
           result,
           publicBaseUrl: options.publicBaseUrl,
           notice:
@@ -418,7 +425,9 @@ async function handleMessageComponentInteraction({
       apiBaseUrl: options.apiBaseUrl,
       interaction,
       fetchImpl,
-      message: createTargetPriceWatchManagerMessage({
+      message: await createTargetPriceWatchManagerMessageWithDelivery({
+        client,
+        discordUserId,
         result,
         publicBaseUrl: options.publicBaseUrl,
         selectedWatchInput,
@@ -614,7 +623,9 @@ async function handleModalSubmitInteraction({
         apiBaseUrl: options.apiBaseUrl,
         interaction,
         fetchImpl,
-        message: createTargetPriceWatchManagerMessage({
+        message: await createTargetPriceWatchManagerMessageWithDelivery({
+          client,
+          discordUserId,
           result,
           publicBaseUrl: options.publicBaseUrl,
           selectedWatchInput:
@@ -644,7 +655,9 @@ async function handleModalSubmitInteraction({
         apiBaseUrl: options.apiBaseUrl,
         interaction,
         fetchImpl,
-        message: createTargetPriceWatchManagerMessage({
+        message: await createTargetPriceWatchManagerMessageWithDelivery({
+          client,
+          discordUserId,
           result,
           publicBaseUrl: options.publicBaseUrl,
           selectedWatchInput: `watch:${createResult.watch.id}`,
@@ -828,6 +841,40 @@ async function readWatchManagerPage({
   return result;
 }
 
+async function createTargetPriceWatchManagerMessageWithDelivery({
+  client,
+  discordUserId,
+  result,
+  publicBaseUrl,
+  selectedWatchInput = null,
+  notice,
+}: {
+  client: DiscordBotClient;
+  discordUserId: string;
+  result: Awaited<ReturnType<typeof readWatchManagerPage>>;
+  publicBaseUrl: string;
+  selectedWatchInput?: string | null;
+  notice?: string;
+}): Promise<DiscordBotMessage> {
+  const selectedWatchId = extractWatchId(selectedWatchInput);
+  const selectedWatchDelivery =
+    selectedWatchId && result.watches.some((watch) => watch.id === selectedWatchId)
+      ? await readLatestTargetPriceWatchDelivery({
+          client,
+          discordUserId,
+          watchId: selectedWatchId,
+        })
+      : null;
+
+  return createTargetPriceWatchManagerMessage({
+    result,
+    publicBaseUrl,
+    selectedWatchInput,
+    selectedWatchDelivery,
+    notice,
+  });
+}
+
 function extractWatchId(watchInput: string | null): string | null {
   const match = /^watch:([0-9a-f-]{36})$/i.exec(watchInput ?? "");
 
@@ -967,7 +1014,7 @@ function formatPriceReportDeliveryStatus(delivery: PriceReportDeliveryStatus | n
   }
 
   if (delivery.status === "RATE_LIMITED") {
-    return `Discord 限流：${deliveredAt}，後續排程會再嘗試。`;
+    return `Discord 限流：${deliveredAt}。${formatDiscordRateLimitForUser()}`;
   }
 
   if (delivery.status === "FAILED") {
@@ -978,11 +1025,7 @@ function formatPriceReportDeliveryStatus(delivery: PriceReportDeliveryStatus | n
 }
 
 function formatPriceReportDeliveryError(errorMessage: string | null): string {
-  if (!errorMessage) {
-    return "沒有錯誤摘要。";
-  }
-
-  return formatDiscordBotText(errorMessage, 160);
+  return formatDiscordBotText(formatDiscordDeliveryFailureForUser(errorMessage), 220);
 }
 
 function parsePriceReportCategorySelection(

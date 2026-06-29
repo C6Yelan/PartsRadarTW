@@ -14,6 +14,7 @@ import {
   parseDiscordBotOptions,
   readNextScheduledPriceReportDueAt,
   registerDiscordBotCommands,
+  runGatewaySession,
   sendDiscordDirectMessages,
   sendDiscordInteractionMessages,
   sendDueScheduledPriceReports,
@@ -121,8 +122,81 @@ describe("registerDiscordBotCommands", () => {
       "price-report",
       "watch",
     ]);
+    for (const command of registeredCommands) {
+      expect(command).not.toHaveProperty("default_member_permissions");
+      expect(command).not.toHaveProperty("permissions");
+    }
     expect(String(globalRequestInit.body)).not.toContain('"enable"');
     expect(String(globalRequestInit.body)).not.toContain('"disable"');
+    expect(String(globalRequestInit.body).toLowerCase()).not.toContain("administrator");
+  });
+});
+
+describe("runGatewaySession", () => {
+  it("identifies with no gateway intents", async () => {
+    class TestWebSocket {
+      static instance: TestWebSocket | null = null;
+
+      readonly readyState = 1;
+      readonly send = vi.fn();
+      readonly close = vi.fn((_code?: number, _reason?: string) => {
+        this.emit("close", {});
+      });
+      private readonly listeners = new Map<string, Array<(event: { data?: unknown }) => void>>();
+
+      constructor(readonly url: string) {
+        TestWebSocket.instance = this;
+      }
+
+      addEventListener(
+        type: "open" | "message" | "close" | "error",
+        listener: (event: { data?: unknown }) => void,
+      ): void {
+        this.listeners.set(type, [...(this.listeners.get(type) ?? []), listener]);
+      }
+
+      emit(type: "open" | "message" | "close" | "error", event: { data?: unknown }): void {
+        for (const listener of this.listeners.get(type) ?? []) {
+          listener(event);
+        }
+      }
+    }
+
+    const run = runGatewaySession({
+      client: createDiscordBotClient([]),
+      options: createDiscordBotOptions(),
+      shutdown: {
+        requested: false,
+        onStop: vi.fn(),
+        sleep: vi.fn(async () => undefined),
+      },
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: vi.fn() as typeof fetch,
+      WebSocketCtor: TestWebSocket,
+      logMessage: vi.fn(),
+    });
+    const socket = TestWebSocket.instance;
+
+    if (!socket) {
+      throw new Error("Expected test websocket to be created.");
+    }
+
+    socket.emit("message", {
+      data: JSON.stringify({ op: 10, d: { heartbeat_interval: 1000 } }),
+    });
+
+    const identifyPayload = JSON.parse(String(socket.send.mock.calls[0]?.[0]));
+
+    expect(identifyPayload).toMatchObject({
+      op: 2,
+      d: {
+        token: TOKEN,
+        intents: 0,
+      },
+    });
+
+    socket.emit("close", {});
+    await run;
   });
 });
 
@@ -607,6 +681,74 @@ describe("handleDiscordInteraction", () => {
           ]),
         }),
       ]),
+    });
+  });
+
+  it("shows a readable latest target-price notification failure for a selected watch", async () => {
+    const client = createDiscordBotClient(
+      [
+        snapshot({
+          id: "snapshot-watch-1",
+          productId: WATCH_PRODUCT_ID,
+          productName: "RTX 5070 測試卡",
+          crawlRunId: "new-run",
+          price: 18_990,
+          capturedAt: "2026-06-07T03:00:00.000Z",
+        }),
+      ],
+      [],
+      [
+        targetPriceWatch({
+          id: WATCH_ROW_ID,
+          discordUserId: "111122223333444455",
+          productId: WATCH_PRODUCT_ID,
+          targetPrice: 17_500,
+        }),
+      ],
+      [...TEST_SOURCE_CATEGORIES],
+      [
+        notificationDelivery({
+          id: "delivery-watch-failed",
+          discordUserId: "111122223333444455",
+          kind: "TARGET_PRICE",
+          status: "FAILED",
+          targetPriceWatchId: WATCH_ROW_ID,
+          errorMessage: "Discord API returned HTTP 403. code=50013 message=Missing Permissions",
+          createdAt: new Date("2026-06-07T01:00:00.000Z"),
+        }),
+      ],
+    );
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createWatchSelectInteraction(`watch:${WATCH_ROW_ID}`, 0),
+    });
+
+    const requestBody = JSON.parse(
+      String((fetchMock.mock.calls[1]?.[1] as RequestInit | undefined)?.body),
+    );
+    const latestNotification = readEmbedFieldValue(requestBody.embeds[0], "最近一次通知");
+
+    expect(latestNotification).toContain("我目前缺少 Discord 要求的權限");
+    expect(latestNotification).not.toContain("50013");
+    expect(latestNotification).not.toContain("Missing Permissions");
+    expect(client.discordNotificationDelivery.findFirst).toHaveBeenCalledWith({
+      where: {
+        discordUserId: "111122223333444455",
+        kind: "TARGET_PRICE",
+        targetPriceWatchId: WATCH_ROW_ID,
+      },
+      select: expect.objectContaining({
+        status: true,
+        errorMessage: true,
+      }),
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     });
   });
 
@@ -1215,6 +1357,52 @@ describe("handleDiscordInteraction", () => {
       }),
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     });
+  });
+
+  it("shows a readable DM permission hint for failed daily reports", async () => {
+    const client = createDiscordBotClient(
+      [],
+      [
+        priceReportSetting({
+          id: "setting-1",
+          discordUserId: "111122223333444455",
+          nextSendAt: new Date("2026-06-07T13:30:00.000Z"),
+        }),
+      ],
+      [],
+      [...TEST_SOURCE_CATEGORIES],
+      [
+        notificationDelivery({
+          id: "delivery-dm-failed",
+          discordUserId: "111122223333444455",
+          kind: "SCHEDULED_PRICE_REPORT",
+          status: "FAILED",
+          errorMessage:
+            "Discord API returned HTTP 403. code=50007 message=Cannot send messages to this user",
+          createdAt: new Date("2026-06-07T01:00:00.000Z"),
+        }),
+      ],
+    );
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createInteraction("settings"),
+    });
+
+    const requestBody = JSON.parse(
+      String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body),
+    );
+    const deliveryStatus = readEmbedFieldValue(readResponseEmbed(requestBody), "最近一次每日報告");
+
+    expect(deliveryStatus).toContain("我目前無法傳送私訊給你");
+    expect(deliveryStatus).not.toContain("50007");
+    expect(deliveryStatus).not.toContain("Cannot send messages");
   });
 
   it("does not consume the price report cooldown for settings commands", async () => {
@@ -3521,6 +3709,7 @@ function createDiscordBotClient(
       where: {
         discordUserId?: string;
         kind?: TestDiscordNotificationDelivery["kind"];
+        targetPriceWatchId?: string;
       };
       select?: Record<string, boolean>;
     }) => {
@@ -3530,7 +3719,14 @@ function createDiscordBotClient(
             return false;
           }
 
-          return !args.where.kind || row.kind === args.where.kind;
+          if (args.where.kind && row.kind !== args.where.kind) {
+            return false;
+          }
+
+          return (
+            !args.where.targetPriceWatchId ||
+            row.targetPriceWatchId === args.where.targetPriceWatchId
+          );
         })
         .sort((left, right) => {
           return (
