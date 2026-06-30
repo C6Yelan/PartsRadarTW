@@ -3,14 +3,11 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import DiscordTopbarLink from "../DiscordTopbarLink";
 import SiteDisclaimer from "../site-disclaimer";
 import { downloadBuildListExcel } from "./download";
 import { formatBuildListDateTime, formatBuildListPrice } from "./formatting";
-import {
-  BUILD_LIST_MAX_QUANTITY,
-  getBuildListLineSubtotal,
-  type BuildListItem,
-} from "./model";
+import { BUILD_LIST_MAX_QUANTITY, getBuildListLineSubtotal, type BuildListItem } from "./model";
 import { useBuildList } from "./use-build-list";
 
 const UNDO_TOAST_DURATION_MS = 7000;
@@ -79,13 +76,16 @@ export default function BuildListPageClient() {
   return (
     <div className="app-shell build-list-shell">
       <header className="topbar build-list-topbar">
-        <Link className="brand-lockup" href="/">
-          <span className="brand-mark" aria-hidden="true" />
-          <span>
-            <span className="brand-name">PartsRadarTW</span>
-            <span className="brand-subtitle">原價屋零件查詢</span>
-          </span>
-        </Link>
+        <div className="topbar-brand-area">
+          <Link className="brand-lockup" href="/">
+            <span className="brand-mark" aria-hidden="true" />
+            <span>
+              <span className="brand-name">PartsRadarTW</span>
+              <span className="brand-subtitle">原價屋零件查詢</span>
+            </span>
+          </Link>
+          <DiscordTopbarLink />
+        </div>
 
         <div className="build-list-title">
           <h1>配單</h1>
@@ -150,11 +150,7 @@ export default function BuildListPageClient() {
               </p>
 
               <div className="build-list-summary-actions">
-                <button
-                  className="control-button primary"
-                  type="button"
-                  onClick={downloadExcel}
-                >
+                <button className="control-button primary" type="button" onClick={downloadExcel}>
                   下載 Excel
                 </button>
                 <button
