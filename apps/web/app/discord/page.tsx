@@ -65,8 +65,15 @@ export default function DiscordPage() {
             </div>
           </div>
 
-          <aside className="discord-permission-panel" aria-label="權限需求">
-            <h3>安裝提醒</h3>
+          <aside className="discord-visual-panel" aria-label="Discord 指令操作示意圖">
+            <div
+              className="discord-visual-placeholder"
+              aria-label="指令操作示意圖準備中"
+              role="img"
+            >
+              <strong>指令操作示意圖</strong>
+              <span>圖片準備中</span>
+            </div>
             <p>若加入後看不到指令，請確認伺服器允許使用應用程式指令。</p>
           </aside>
         </section>

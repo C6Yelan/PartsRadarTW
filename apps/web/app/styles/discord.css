@@ -131,24 +131,47 @@
   opacity: 0.82;
 }
 
-.discord-permission-panel {
+.discord-visual-panel {
   display: grid;
   gap: 10px;
-  padding: 18px;
-  border: 1px solid rgba(143, 180, 204, 0.26);
-  border-radius: 8px;
-  background: rgba(7, 17, 25, 0.62);
+  align-content: start;
 }
 
-.discord-permission-panel h3 {
+.discord-visual-placeholder {
+  display: grid;
+  min-height: 220px;
+  aspect-ratio: 4 / 3;
+  place-items: center;
+  align-content: center;
+  gap: 8px;
+  padding: 22px;
+  border: 1px dashed rgba(143, 180, 204, 0.34);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(88, 101, 242, 0.14), rgba(7, 17, 25, 0.62)), rgba(11, 23, 32, 0.74);
+  color: var(--muted);
+  text-align: center;
+}
+
+.discord-visual-placeholder strong {
   margin: 0;
   color: var(--text-strong);
   font-size: 18px;
 }
 
-.discord-permission-panel p {
+.discord-visual-placeholder span,
+.discord-visual-panel p {
   margin: 0;
   color: var(--muted);
+}
+
+.discord-visual-placeholder span {
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.discord-visual-panel p {
+  font-size: 13px;
   line-height: 1.7;
 }
 
@@ -208,7 +231,7 @@
     grid-template-columns: 1fr;
   }
 
-  .discord-permission-panel {
+  .discord-visual-panel {
     max-width: 540px;
   }
 }
