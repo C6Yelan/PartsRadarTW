@@ -261,13 +261,19 @@ export default function ProductExplorer() {
   return (
     <div className="app-shell">
       <header className="topbar">
-        <Link className="brand-lockup" href="/" onClick={returnHome}>
-          <span className="brand-mark" aria-hidden="true" />
-          <span>
-            <span className="brand-name">PartsRadarTW</span>
-            <span className="brand-subtitle">原價屋零件查詢</span>
-          </span>
-        </Link>
+        <div className="topbar-brand-area">
+          <Link className="brand-lockup" href="/" onClick={returnHome}>
+            <span className="brand-mark" aria-hidden="true" />
+            <span>
+              <span className="brand-name">PartsRadarTW</span>
+              <span className="brand-subtitle">原價屋零件查詢</span>
+            </span>
+          </Link>
+          <Link className="discord-topbar-link" href="/discord" title="Discord 通知">
+            <DiscordLogoIcon />
+            <span className="sr-only">Discord 通知</span>
+          </Link>
+        </div>
 
         <form className="topbar-search" onSubmit={applyTextFilters}>
           <label className="sr-only" htmlFor="global-search">
@@ -354,21 +360,19 @@ export default function ProductExplorer() {
           </section>
         </div>
       </main>
-      <section className="discord-home-section" aria-labelledby="discord-home-title">
-        <div className="discord-home-copy">
-          <span className="eyebrow">Discord 通知</span>
-          <h2 id="discord-home-title">追蹤目標價與個人價格報告</h2>
-          <p>
-            邀請 PartsRadarTW bot 後，可在 Discord 使用 <code>/watch</code> 追蹤商品目標價，或用{" "}
-            <code>/price-report settings</code> 訂閱個人價格報告。
-          </p>
-        </div>
-        <Link className="control-button primary discord-home-link" href="/discord">
-          了解 Discord 通知
-        </Link>
-      </section>
       <FloatingBuildListLink summary={summary} />
       <SiteDisclaimer />
     </div>
+  );
+}
+
+function DiscordLogoIcon() {
+  return (
+    <svg className="discord-logo-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+      <path
+        d="M20.3 4.4A19.8 19.8 0 0 0 15.3 3c-.2.4-.5.9-.6 1.3a18.3 18.3 0 0 0-5.4 0C9.1 3.9 8.9 3.4 8.7 3a19.7 19.7 0 0 0-5 1.4C.5 9.1-.3 13.7.1 18.2a19.9 19.9 0 0 0 6.1 3.1c.5-.7.9-1.4 1.3-2.1-.7-.3-1.4-.6-2.1-1l.5-.4a14.2 14.2 0 0 0 12.1 0l.5.4c-.7.4-1.3.7-2.1 1 .4.7.8 1.4 1.3 2.1a19.9 19.9 0 0 0 6.1-3.1c.5-5.2-.8-9.8-3.5-13.8ZM8 15.3c-1.2 0-2.2-1.1-2.2-2.4s1-2.4 2.2-2.4 2.2 1.1 2.2 2.4-1 2.4-2.2 2.4Zm8 0c-1.2 0-2.2-1.1-2.2-2.4s1-2.4 2.2-2.4 2.2 1.1 2.2 2.4-1 2.4-2.2 2.4Z"
+        fill="currentColor"
+      />
+    </svg>
   );
 }

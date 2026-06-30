@@ -15,6 +15,7 @@ test.describe("public web smoke", () => {
     await page.goto("/");
     await expect(page.getByText("PartsRadarTW").first()).toBeVisible();
     await expect(page.getByRole("searchbox", { name: "搜尋商品名稱" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Discord 通知" })).toBeVisible();
     await expect(page.getByRole("region", { name: "商品列表" })).toBeVisible();
 
     await page.goto("/build-list");

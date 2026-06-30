@@ -40,11 +40,8 @@ export default function DiscordPage() {
         <section className="discord-hero" aria-labelledby="discord-title">
           <div className="discord-hero-copy">
             <span className="eyebrow">PartsRadarTW Discord bot</span>
-            <h2 id="discord-title">把商品價格變動帶到你的 Discord</h2>
-            <p>
-              Bot 提供目標價追蹤與個人價格報告。設定都在 Discord 內完成，網站不建立帳號，也不需要把
-              Discord 身分綁定到網站登入。
-            </p>
+            <h2 id="discord-title">Discord 價格通知</h2>
+            <p>邀請 bot 後，可在 Discord 追蹤商品目標價，或訂閱個人價格報告。</p>
             <div className="discord-actions">
               {hasInviteUrl ? (
                 <a
@@ -57,7 +54,7 @@ export default function DiscordPage() {
                 </a>
               ) : (
                 <span className="control-button primary is-disabled" aria-disabled="true">
-                  暫未開放邀請
+                  邀請連結準備中
                 </span>
               )}
               <a className="control-button secondary" href="#discord-commands">
@@ -67,36 +64,14 @@ export default function DiscordPage() {
           </div>
 
           <aside className="discord-permission-panel" aria-label="權限需求">
-            <h3>安裝權限</h3>
-            <p>
-              公開邀請使用 Discord application commands 與 bot scope，權限值為 0；不要求
-              Administrator、Message Content 或頻道管理權限。
-            </p>
-            <p>若伺服器限制應用程式指令，請由伺服器管理員允許 PartsRadarTW 的 slash command。</p>
+            <h3>安裝提醒</h3>
+            <p>不需要伺服器管理者權限。若看不到指令，請確認伺服器允許使用應用程式指令。</p>
           </aside>
-        </section>
-
-        <section className="discord-section" aria-labelledby="discord-features">
-          <h2 id="discord-features">可以做什麼</h2>
-          <ul className="discord-feature-list">
-            <li>
-              <strong>目標價追蹤</strong>
-              <span>指定商品與理想價格，達標後透過私訊通知。</span>
-            </li>
-            <li>
-              <strong>個人價格報告</strong>
-              <span>依分類、關鍵字與內容類型訂閱定期價格變動摘要。</span>
-            </li>
-            <li>
-              <strong>即時預覽</strong>
-              <span>先把報告傳到自己的 DM，確認私訊與篩選設定是否正常。</span>
-            </li>
-          </ul>
         </section>
 
         <section className="discord-section" id="discord-commands" aria-labelledby="commands-title">
           <h2 id="commands-title">指令說明</h2>
-          <p>加入機器人後，在 Discord 輸入以下 slash command 開始設定。</p>
+          <p>加入後在 Discord 輸入以下指令開始設定。</p>
           <ul className="discord-command-list">
             <li>
               <code>/watch</code>
@@ -109,21 +84,6 @@ export default function DiscordPage() {
             <li>
               <code>/price-report now</code>
               <span>立即產生一份符合目前設定的價格報告。</span>
-            </li>
-          </ul>
-        </section>
-
-        <section className="discord-section" aria-labelledby="discord-notes">
-          <h2 id="discord-notes">使用前確認</h2>
-          <ul className="discord-note-list">
-            <li>
-              <strong>私訊通知</strong>：目標價達標與定期報告會透過 Discord DM 發送。
-            </li>
-            <li>
-              <strong>資料來源</strong>：價格資料來自 PartsRadarTW 已整理的原價屋公開商品資訊。
-            </li>
-            <li>
-              <strong>邀請狀態</strong>：如果按鈕顯示暫未開放，代表站台尚未設定公開邀請網址。
             </li>
           </ul>
         </section>
