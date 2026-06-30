@@ -65,7 +65,7 @@ export default function DiscordPage() {
 
           <aside className="discord-permission-panel" aria-label="權限需求">
             <h3>安裝提醒</h3>
-            <p>不需要伺服器管理者權限。若看不到指令，請確認伺服器允許使用應用程式指令。</p>
+            <p>若加入後看不到指令，請確認伺服器允許使用應用程式指令。</p>
           </aside>
         </section>
 

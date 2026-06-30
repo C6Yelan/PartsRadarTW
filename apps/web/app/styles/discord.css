@@ -63,6 +63,12 @@
 
 .discord-back-link {
   justify-self: end;
+  min-width: 120px;
+  min-height: 42px;
+  padding: 0 16px;
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
 }
 
 .discord-page {
@@ -222,6 +228,7 @@
   }
 
   .discord-back-link {
+    min-width: 0;
     justify-self: stretch;
   }
 
