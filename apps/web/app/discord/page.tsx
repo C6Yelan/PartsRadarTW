@@ -30,13 +30,15 @@ export default function DiscordPage() {
           <h1>Discord 通知</h1>
           <span>個人追蹤與價格報告</span>
         </div>
-
-        <Link className="control-button secondary discord-back-link" href="/">
-          返回查詢
-        </Link>
       </header>
 
       <main className="discord-page">
+        <div className="discord-page-nav">
+          <Link className="back-link discord-back-link" href="/">
+            返回查詢
+          </Link>
+        </div>
+
         <section className="discord-hero" aria-labelledby="discord-title">
           <div className="discord-hero-copy">
             <span className="eyebrow">PartsRadarTW Discord bot</span>
