@@ -158,6 +158,7 @@ PRODUCT_IMAGE_STORAGE_DIR=/var/lib/partsradar/product-images
 | `EXTERNAL_FETCH_LOCK_DIR` / `EXTERNAL_FETCH_LOCK_STALE_SECONDS` / `EXTERNAL_FETCH_PRIORITY_TTL_SECONDS` | 外部抓取 shared lock 與 priority signal |
 | `RAW_SNAPSHOT_CLEANUP_INTERVAL_SECONDS` | cleanup daemon 節奏 |
 | `DISCORD_BOT_TOKEN` / `DISCORD_APPLICATION_ID` | Discord bot 個人化通知設定 |
+| `NEXT_PUBLIC_DISCORD_BOT_INVITE_URL` | 網站 `/discord` 邀請按鈕使用的公開 Discord bot invite URL；由 web runtime 讀取，不得放 token。 |
 | `DISCORD_BOT_REGISTER_COMMANDS_ON_START` / `DISCORD_PRICE_REPORT_MAX_ITEMS` / `DISCORD_BOT_COMMAND_COOLDOWN_SECONDS` / `DISCORD_PRICE_REPORT_SCHEDULE_INTERVAL_SECONDS` | Discord bot 指令註冊、報告列數、cooldown 與每日報告 fallback 掃描上限；近期待發報告會睡到 due time |
 | `CLOUDFLARED_IMAGE` | 固定版本 cloudflared image |
 | `CLOUDFLARE_TUNNEL_TOKEN` | Tunnel token |

@@ -337,9 +337,7 @@ export default function ProductExplorer() {
               products={products}
               productState={productState}
               onAddToBuildList={addProductToBuildList}
-              onDecreaseBuildListQuantity={(product) =>
-                decreaseBuildListItemQuantity(product.id)
-              }
+              onDecreaseBuildListQuantity={(product) => decreaseBuildListItemQuantity(product.id)}
             />
 
             <Pagination
@@ -356,6 +354,19 @@ export default function ProductExplorer() {
           </section>
         </div>
       </main>
+      <section className="discord-home-section" aria-labelledby="discord-home-title">
+        <div className="discord-home-copy">
+          <span className="eyebrow">Discord 通知</span>
+          <h2 id="discord-home-title">追蹤目標價與個人價格報告</h2>
+          <p>
+            邀請 PartsRadarTW bot 後，可在 Discord 使用 <code>/watch</code> 追蹤商品目標價，或用{" "}
+            <code>/price-report settings</code> 訂閱個人價格報告。
+          </p>
+        </div>
+        <Link className="control-button primary discord-home-link" href="/discord">
+          了解 Discord 通知
+        </Link>
+      </section>
       <FloatingBuildListLink summary={summary} />
       <SiteDisclaimer />
     </div>

@@ -20,6 +20,10 @@ test.describe("public web smoke", () => {
     await page.goto("/build-list");
     await expect(page.getByRole("heading", { exact: true, name: "配單" })).toBeVisible();
     await expect(page.getByText("配單目前沒有品項")).toBeVisible();
+
+    await page.goto("/discord");
+    await expect(page.getByRole("heading", { exact: true, name: "Discord 通知" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "指令說明" })).toBeVisible();
   });
 });
 
