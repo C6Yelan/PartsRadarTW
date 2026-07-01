@@ -181,17 +181,107 @@
   padding: 24px;
 }
 
-.discord-section h2 {
+.discord-section-heading {
+  display: grid;
+  gap: 7px;
+}
+
+.discord-section-heading h2 {
   margin: 0;
   color: var(--text-strong);
   font-size: 22px;
 }
 
-.discord-section > p {
+.discord-section-heading p {
   max-width: 720px;
-  margin: -8px 0 0;
+  margin: 0;
   color: var(--muted);
   line-height: 1.7;
+}
+
+.discord-admin-checklist {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.discord-admin-checklist li {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid rgba(33, 51, 64, 0.78);
+  border-radius: 8px;
+  background: rgba(11, 23, 32, 0.74);
+}
+
+.discord-check-number {
+  display: grid;
+  width: 30px;
+  aspect-ratio: 1;
+  place-items: center;
+  border: 1px solid rgba(143, 180, 204, 0.26);
+  border-radius: 999px;
+  background: rgba(88, 101, 242, 0.16);
+  color: var(--text-strong);
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.discord-admin-checklist h3,
+.discord-command-group h3,
+.discord-guide-copy h4 {
+  margin: 0;
+  color: var(--text-strong);
+}
+
+.discord-admin-checklist h3 {
+  font-size: 16px;
+  line-height: 1.35;
+}
+
+.discord-admin-checklist div {
+  display: grid;
+  gap: 8px;
+}
+
+.discord-admin-checklist code {
+  width: fit-content;
+  max-width: 100%;
+  padding: 4px 8px;
+  border: 1px solid rgba(143, 180, 204, 0.22);
+  border-radius: 6px;
+  background: rgba(3, 8, 13, 0.45);
+  color: var(--text-strong);
+  font-size: 13px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.discord-admin-checklist p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.discord-command-group {
+  display: grid;
+  gap: 12px;
+}
+
+.discord-command-group + .discord-command-group {
+  padding-top: 4px;
+  border-top: 1px solid rgba(33, 51, 64, 0.78);
+}
+
+.discord-command-group h3 {
+  font-size: 18px;
+  line-height: 1.35;
 }
 
 .discord-command-guide-list {
@@ -258,7 +348,7 @@
   font-weight: 850;
 }
 
-.discord-guide-copy h3 {
+.discord-guide-copy h4 {
   margin: 0;
   color: var(--text-strong);
   font-size: 19px;
@@ -296,6 +386,10 @@
     grid-template-columns: 1fr;
   }
 
+  .discord-admin-checklist {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .discord-visual-panel {
     max-width: 540px;
   }
@@ -327,6 +421,10 @@
   .discord-hero,
   .discord-section {
     padding: 18px;
+  }
+
+  .discord-admin-checklist {
+    grid-template-columns: 1fr;
   }
 
   .discord-actions {

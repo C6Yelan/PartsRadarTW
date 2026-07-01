@@ -5,14 +5,37 @@ import SiteDisclaimer from "../site-disclaimer";
 
 export const metadata: Metadata = {
   title: "Discord 通知 | PartsRadarTW",
-  description: "邀請 PartsRadarTW Discord bot，設定商品目標價追蹤與個人價格報告。",
+  description: "邀請 PartsRadarTW Discord bot，設定商品目標價追蹤、個人價格報告與伺服器公開報告。",
 };
 
 export const dynamic = "force-dynamic";
 
 const discordInviteUrl = process.env.NEXT_PUBLIC_DISCORD_BOT_INVITE_URL?.trim();
 
-const commandGuides = [
+const adminChecklist = [
+  {
+    title: "邀請機器人",
+    command: "邀請連結",
+    description: "使用本頁邀請按鈕將 PartsRadarTW bot 加入 Discord 伺服器。",
+  },
+  {
+    title: "開啟管理面板",
+    command: "/public-report manage",
+    description: "具備管理伺服器權限的成員可設定公開報告頻道與啟用狀態。",
+  },
+  {
+    title: "指定發送頻道",
+    command: "設為此頻道",
+    description: "在要接收公開價格報告的頻道按下按鈕，bot 會保存該頻道設定。",
+  },
+  {
+    title: "送出測試報告",
+    command: "/public-report test",
+    description: "確認 bot 在該頻道具備傳送訊息與嵌入連結權限。",
+  },
+] as const;
+
+const personalCommandGuides = [
   {
     command: "/watch",
     imageLabel: "/watch 管理面板介面圖準備中",
@@ -70,6 +93,42 @@ const commandGuides = [
   },
 ] as const;
 
+const serverCommandGuides = [
+  {
+    command: "/public-report status",
+    imageLabel: "公開報告狀態介面圖準備中",
+    imageTitle: "公開報告狀態",
+    points: [
+      "查看目前公開報告是否啟用、設定在哪個頻道。",
+      "同時會顯示最近一次公開報告的發送狀態。",
+      "這個指令只用來檢查狀態，不會改動設定。",
+    ],
+    title: "查看伺服器公開報告狀態",
+  },
+  {
+    command: "/public-report manage",
+    imageLabel: "公開報告管理面板介面圖準備中",
+    imageTitle: "公開報告管理面板",
+    points: [
+      "開啟公開價格報告設定面板。",
+      "可將目前頻道設為公開報告頻道，或暫停、啟用、清除設定。",
+      "公開報告會在排程爬蟲完成且有價格變動時發送。",
+    ],
+    title: "設定公開價格報告頻道",
+  },
+  {
+    command: "/public-report test",
+    imageLabel: "公開報告測試結果介面圖準備中",
+    imageTitle: "公開報告測試結果",
+    points: [
+      "立即送出一份測試公開報告到已設定的頻道。",
+      "若頻道權限不足，bot 會回覆需要補上的權限。",
+      "適合在設定頻道後確認報告能正常顯示。",
+    ],
+    title: "驗證公開報告是否可送出",
+  },
+] as const;
+
 export default function DiscordPage() {
   const hasInviteUrl = Boolean(discordInviteUrl);
 
@@ -86,7 +145,7 @@ export default function DiscordPage() {
 
         <div className="discord-topbar-title">
           <h1>Discord 通知</h1>
-          <span>個人追蹤與價格報告</span>
+          <span>個人追蹤與公開報告</span>
         </div>
       </header>
 
@@ -101,7 +160,7 @@ export default function DiscordPage() {
           <div className="discord-hero-copy">
             <span className="eyebrow">PartsRadarTW Discord bot</span>
             <h2 id="discord-title">Discord 價格通知</h2>
-            <p>邀請 bot 後，可在 Discord 追蹤商品目標價，或訂閱個人價格報告。</p>
+            <p>邀請 bot 後，可追蹤個人商品目標價，也能讓伺服器頻道接收公開價格報告。</p>
             <div className="discord-actions">
               {hasInviteUrl ? (
                 <a
@@ -117,6 +176,9 @@ export default function DiscordPage() {
                   邀請連結準備中
                 </span>
               )}
+              <a className="control-button secondary" href="#discord-admin">
+                管理者設定
+              </a>
               <a className="control-button secondary" href="#discord-commands">
                 查看指令說明
               </a>
@@ -132,40 +194,98 @@ export default function DiscordPage() {
               <strong>指令操作示意圖</strong>
               <span>圖片準備中</span>
             </div>
-            <p>若加入後看不到指令，請確認伺服器允許使用應用程式指令。</p>
+            <p>一般使用者可使用個人指令；公開報告管理指令只會顯示給具備管理伺服器權限的成員。</p>
           </aside>
         </section>
 
-        <section className="discord-section" id="discord-commands" aria-labelledby="commands-title">
-          <h2 id="commands-title">指令說明</h2>
-          <p>加入後依照下方步驟操作；圖片位置會補上 Discord 實際介面截圖。</p>
+        <section className="discord-section" id="discord-admin" aria-labelledby="admin-title">
+          <div className="discord-section-heading">
+            <span className="eyebrow">Server setup</span>
+            <h2 id="admin-title">管理者設定檢查</h2>
+            <p>公開價格報告只需要設定一次；完成後 bot 會自動把價格變動送到指定頻道。</p>
+          </div>
 
-          <div className="discord-command-guide-list">
-            {commandGuides.map((guide, index) => (
-              <article className="discord-command-guide" key={guide.imageLabel}>
-                <div className="discord-guide-media">
-                  <div
-                    className="discord-guide-placeholder"
-                    aria-label={guide.imageLabel}
-                    role="img"
-                  >
-                    <span>{guide.imageTitle}</span>
-                    <strong>圖片準備中</strong>
-                  </div>
+          <ol className="discord-admin-checklist">
+            {adminChecklist.map((item, index) => (
+              <li key={item.title}>
+                <span className="discord-check-number">{index + 1}</span>
+                <div>
+                  <h3>{item.title}</h3>
+                  <code>{item.command}</code>
+                  <p>{item.description}</p>
                 </div>
-
-                <div className="discord-guide-copy">
-                  <span className="discord-guide-step">步驟 {index + 1}</span>
-                  <h3>{guide.title}</h3>
-                  <code>{guide.command}</code>
-                  <ul>
-                    {guide.points.map((point) => (
-                      <li key={point}>{point}</li>
-                    ))}
-                  </ul>
-                </div>
-              </article>
+              </li>
             ))}
+          </ol>
+        </section>
+
+        <section className="discord-section" id="discord-commands" aria-labelledby="commands-title">
+          <div className="discord-section-heading">
+            <span className="eyebrow">Commands</span>
+            <h2 id="commands-title">指令說明</h2>
+            <p>圖片位置會補上 Discord 實際介面截圖；目前先以流程與填寫內容說明。</p>
+          </div>
+
+          <div className="discord-command-group">
+            <h3>個人通知</h3>
+            <div className="discord-command-guide-list">
+              {personalCommandGuides.map((guide, index) => (
+                <article className="discord-command-guide" key={guide.imageLabel}>
+                  <div className="discord-guide-media">
+                    <div
+                      className="discord-guide-placeholder"
+                      aria-label={guide.imageLabel}
+                      role="img"
+                    >
+                      <span>{guide.imageTitle}</span>
+                      <strong>圖片準備中</strong>
+                    </div>
+                  </div>
+
+                  <div className="discord-guide-copy">
+                    <span className="discord-guide-step">個人 {index + 1}</span>
+                    <h4>{guide.title}</h4>
+                    <code>{guide.command}</code>
+                    <ul>
+                      {guide.points.map((point) => (
+                        <li key={point}>{point}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+
+          <div className="discord-command-group">
+            <h3>伺服器公開報告</h3>
+            <div className="discord-command-guide-list">
+              {serverCommandGuides.map((guide, index) => (
+                <article className="discord-command-guide" key={guide.imageLabel}>
+                  <div className="discord-guide-media">
+                    <div
+                      className="discord-guide-placeholder"
+                      aria-label={guide.imageLabel}
+                      role="img"
+                    >
+                      <span>{guide.imageTitle}</span>
+                      <strong>圖片準備中</strong>
+                    </div>
+                  </div>
+
+                  <div className="discord-guide-copy">
+                    <span className="discord-guide-step">管理 {index + 1}</span>
+                    <h4>{guide.title}</h4>
+                    <code>{guide.command}</code>
+                    <ul>
+                      {guide.points.map((point) => (
+                        <li key={point}>{point}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </article>
+              ))}
+            </div>
           </div>
         </section>
       </main>
