@@ -24,7 +24,6 @@ export function parseDiscordBotOptions(
     publicBaseUrl: normalizePublicBaseUrl(
       env.PARTSRADAR_PUBLIC_BASE_URL ?? DEFAULT_PUBLIC_BASE_URL,
     ),
-    publicReportChannelId: readOptionalSnowflake(env, "DISCORD_PUBLIC_REPORT_CHANNEL_ID"),
     apiBaseUrl: normalizeHttpBaseUrl(
       env.DISCORD_API_BASE_URL ?? DEFAULT_DISCORD_API_BASE_URL,
       "DISCORD_API_BASE_URL",
@@ -77,20 +76,6 @@ function readRequiredSecret(env: NodeJS.ProcessEnv, key: string): string {
 
 function readRequiredSnowflake(env: NodeJS.ProcessEnv, key: string): string {
   const value = readRequiredSecret(env, key);
-
-  if (!DISCORD_SNOWFLAKE_PATTERN.test(value)) {
-    throw new Error(`${key} must be a Discord snowflake id.`);
-  }
-
-  return value;
-}
-
-function readOptionalSnowflake(env: NodeJS.ProcessEnv, key: string): string | null {
-  const value = env[key]?.trim();
-
-  if (!value || value.startsWith("replace_with_")) {
-    return null;
-  }
 
   if (!DISCORD_SNOWFLAKE_PATTERN.test(value)) {
     throw new Error(`${key} must be a Discord snowflake id.`);
@@ -206,7 +191,6 @@ Options:
 
 Environment:
   DISCORD_BOT_TOKEN, DISCORD_APPLICATION_ID, DISCORD_BOT_REGISTER_COMMANDS_ON_START,
-  DISCORD_PUBLIC_REPORT_CHANNEL_ID,
   DISCORD_PRICE_REPORT_MAX_ITEMS,
   DISCORD_BOT_COMMAND_COOLDOWN_SECONDS, DISCORD_PRICE_REPORT_SCHEDULE_INTERVAL_SECONDS,
   PARTSRADAR_PUBLIC_BASE_URL

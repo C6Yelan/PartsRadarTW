@@ -29,6 +29,7 @@ import type {
   ParsedPriceReportCommand,
   ParsedPriceReportComponent,
   ParsedPriceReportModal,
+  ParsedPublicReportComponent,
   ParsedWatchComponent,
   ParsedWatchModal,
 } from "./types";
@@ -52,6 +53,11 @@ const PRICE_REPORT_EVENT_PRICE_DROPS_VALUE = "price_drops";
 const PRICE_REPORT_EVENT_PRICE_RISES_VALUE = "price_rises";
 const PRICE_REPORT_EVENT_NEW_PRODUCTS_VALUE = "new_products";
 const PRICE_REPORT_CATEGORY_OPTION_LIMIT = 25;
+const PUBLIC_REPORT_SET_CHANNEL_CUSTOM_ID = "public-report:set-channel";
+const PUBLIC_REPORT_ENABLE_CUSTOM_ID = "public-report:enable";
+const PUBLIC_REPORT_DISABLE_CUSTOM_ID = "public-report:disable";
+const PUBLIC_REPORT_PREVIEW_CUSTOM_ID = "public-report:preview";
+const PUBLIC_REPORT_CLEAR_CUSTOM_ID = "public-report:clear";
 const WATCH_CREATE_MODAL_CUSTOM_ID = "watch:create-modal";
 const WATCH_EDIT_MODAL_CUSTOM_ID_PREFIX = "watch:edit-modal:";
 const WATCH_PRODUCT_CUSTOM_ID = "watch:product";
@@ -120,6 +126,16 @@ export function createWatchCommand(): Record<string, unknown> {
     type: DISCORD_COMMAND_TYPE_CHAT_INPUT,
     contexts: [DISCORD_APPLICATION_CONTEXT_GUILD, DISCORD_APPLICATION_CONTEXT_BOT_DM],
     dm_permission: true,
+  };
+}
+
+export function createPublicReportCommand(): Record<string, unknown> {
+  return {
+    name: "public-report",
+    description: "管理公開價格報告發送頻道。",
+    type: DISCORD_COMMAND_TYPE_CHAT_INPUT,
+    contexts: [DISCORD_APPLICATION_CONTEXT_GUILD],
+    dm_permission: false,
   };
 }
 
@@ -235,6 +251,10 @@ export function parseWatchComponentInteraction(
 
 export function parseWatchInteraction(interaction: DiscordInteraction): boolean {
   return interaction.data?.name === "watch";
+}
+
+export function parsePublicReportInteraction(interaction: DiscordInteraction): boolean {
+  return interaction.data?.name === "public-report";
 }
 
 function parseWatchActionCustomId(
@@ -492,6 +512,54 @@ export function createPriceReportSettingsComponents({
   ];
 }
 
+export function createPublicReportSettingsComponents({
+  hasChannel,
+  enabled,
+}: {
+  hasChannel: boolean;
+  enabled: boolean;
+}): DiscordMessageComponent[] {
+  return [
+    {
+      type: DISCORD_COMPONENT_TYPE_ACTION_ROW,
+      components: [
+        {
+          type: DISCORD_COMPONENT_TYPE_BUTTON,
+          style: DISCORD_BUTTON_STYLE_PRIMARY,
+          custom_id: PUBLIC_REPORT_SET_CHANNEL_CUSTOM_ID,
+          label: "設為此頻道",
+        },
+        {
+          type: DISCORD_COMPONENT_TYPE_BUTTON,
+          style: DISCORD_BUTTON_STYLE_SECONDARY,
+          custom_id: PUBLIC_REPORT_PREVIEW_CUSTOM_ID,
+          label: "發送測試",
+          disabled: !hasChannel,
+        },
+      ],
+    },
+    {
+      type: DISCORD_COMPONENT_TYPE_ACTION_ROW,
+      components: [
+        {
+          type: DISCORD_COMPONENT_TYPE_BUTTON,
+          style: enabled ? DISCORD_BUTTON_STYLE_DANGER : DISCORD_BUTTON_STYLE_PRIMARY,
+          custom_id: enabled ? PUBLIC_REPORT_DISABLE_CUSTOM_ID : PUBLIC_REPORT_ENABLE_CUSTOM_ID,
+          label: enabled ? "暫停公開報告" : "啟用公開報告",
+          disabled: !hasChannel,
+        },
+        {
+          type: DISCORD_COMPONENT_TYPE_BUTTON,
+          style: DISCORD_BUTTON_STYLE_DANGER,
+          custom_id: PUBLIC_REPORT_CLEAR_CUSTOM_ID,
+          label: "清除設定",
+          disabled: !hasChannel,
+        },
+      ],
+    },
+  ];
+}
+
 export function createPriceReportTimeLimitModal({
   maxItems,
   timeValue,
@@ -631,6 +699,34 @@ export function parsePriceReportComponentInteraction(
     const events = parsePriceReportEvents(interaction.data?.values ?? []);
 
     return events ? { name: "update_events", ...events } : null;
+  }
+
+  return null;
+}
+
+export function parsePublicReportComponentInteraction(
+  interaction: DiscordInteraction,
+): ParsedPublicReportComponent | null {
+  const customId = interaction.data?.custom_id;
+
+  if (customId === PUBLIC_REPORT_SET_CHANNEL_CUSTOM_ID) {
+    return { name: "set_channel" };
+  }
+
+  if (customId === PUBLIC_REPORT_ENABLE_CUSTOM_ID) {
+    return { name: "enable" };
+  }
+
+  if (customId === PUBLIC_REPORT_DISABLE_CUSTOM_ID) {
+    return { name: "disable" };
+  }
+
+  if (customId === PUBLIC_REPORT_PREVIEW_CUSTOM_ID) {
+    return { name: "preview" };
+  }
+
+  if (customId === PUBLIC_REPORT_CLEAR_CUSTOM_ID) {
+    return { name: "clear" };
   }
 
   return null;

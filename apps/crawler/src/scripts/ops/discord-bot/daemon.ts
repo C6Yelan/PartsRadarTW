@@ -155,7 +155,7 @@ async function runNotificationLoop({
 
       if (publicSummary.processedCount > 0) {
         logMessage(
-          `Public price reports processed. processed=${publicSummary.processedCount} sent=${publicSummary.sentCount} skipped=${publicSummary.skippedCount} rateLimited=${publicSummary.rateLimitedCount} failed=${publicSummary.failedCount}`,
+          `Public price reports processed. settings=${publicSummary.settingCount} processed=${publicSummary.processedCount} sent=${publicSummary.sentCount} skipped=${publicSummary.skippedCount} rateLimited=${publicSummary.rateLimitedCount} failed=${publicSummary.failedCount}`,
         );
       }
 

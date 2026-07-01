@@ -7,8 +7,10 @@ import { formatDiscordRestFailure } from "./discord-bot/rest";
 
 export {
   createPriceReportCommand,
+  createPublicReportCommand,
   createWatchCommand,
   parsePriceReportInteraction,
+  parsePublicReportInteraction,
   parseWatchInteraction,
 } from "./discord-bot/commands";
 export { CommandCooldowns } from "./discord-bot/cooldowns";
@@ -30,8 +32,21 @@ export {
   sendDueScheduledPriceReports,
   sendPriceReportNow,
 } from "./discord-bot/price-report";
-export type { PublicPriceReportSummary } from "./discord-bot/public-price-report";
-export { sendPendingPublicPriceReports } from "./discord-bot/public-price-report";
+export type {
+  PublicPriceReportDeliveryStatus,
+  PublicPriceReportPreviewResult,
+  PublicPriceReportSetting,
+  PublicPriceReportSummary,
+} from "./discord-bot/public-price-report";
+export {
+  clearPublicPriceReportSetting,
+  readLatestPublicPriceReportDelivery,
+  readPublicPriceReportSetting,
+  sendPendingPublicPriceReports,
+  sendPublicPriceReportPreview,
+  setPublicPriceReportChannel,
+  setPublicPriceReportEnabled,
+} from "./discord-bot/public-price-report";
 export { registerDiscordBotCommands } from "./discord-bot/registration";
 export {
   deferInteractionMessageUpdate,

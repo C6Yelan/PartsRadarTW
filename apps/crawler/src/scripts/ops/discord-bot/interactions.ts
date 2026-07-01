@@ -4,11 +4,14 @@ import {
   createPriceReportKeywordModal,
   createPriceReportSettingsComponents,
   createPriceReportTimeLimitModal,
+  createPublicReportSettingsComponents,
   createWatchEditModal,
   createWatchModal,
   parsePriceReportComponentInteraction,
   parsePriceReportInteraction,
   parsePriceReportModalSubmit,
+  parsePublicReportComponentInteraction,
+  parsePublicReportInteraction,
   parseWatchComponentInteraction,
   parseWatchInteraction,
   parseWatchModalSubmit,
@@ -40,6 +43,17 @@ import {
   toPriceReportFilters,
 } from "./price-report";
 import {
+  clearPublicPriceReportSetting,
+  type PublicPriceReportDeliveryStatus,
+  type PublicPriceReportPreviewResult,
+  type PublicPriceReportSetting,
+  readLatestPublicPriceReportDelivery,
+  readPublicPriceReportSetting,
+  sendPublicPriceReportPreview,
+  setPublicPriceReportChannel,
+  setPublicPriceReportEnabled,
+} from "./public-price-report";
+import {
   deferInteractionMessageUpdate,
   deferInteractionResponse,
   editDeferredInteractionResponse,
@@ -47,6 +61,7 @@ import {
   formatDiscordDeliveryFailureForUser,
   formatDiscordRateLimitForUser,
   sendDiscordDirectMessages,
+  sendDiscordChannelMessages,
   sendDiscordInteractionMessages,
   sendInteractionResponse,
   sendModalInteractionResponse,
@@ -133,8 +148,10 @@ async function handleApplicationCommandInteraction({
 }): Promise<void> {
   const command = parsePriceReportInteraction(interaction);
   const watchCommand = command ? false : parseWatchInteraction(interaction);
+  const publicReportCommand =
+    command || watchCommand ? false : parsePublicReportInteraction(interaction);
 
-  if (!command && !watchCommand) {
+  if (!command && !watchCommand && !publicReportCommand) {
     await sendUnsupportedInteractionResponse({ interaction, options, fetchImpl });
     return;
   }
@@ -211,6 +228,36 @@ async function handleApplicationCommandInteraction({
     return;
   }
 
+  if (publicReportCommand) {
+    const publicContext = readPublicReportInteractionContext(interaction);
+
+    if (!publicContext) {
+      await sendInteractionResponse({
+        token: options.token,
+        apiBaseUrl: options.apiBaseUrl,
+        interaction,
+        fetchImpl,
+        content: "公開價格報告只能在伺服器頻道中設定。",
+      });
+      return;
+    }
+
+    const panel = await readPublicPriceReportSettingsPanel({
+      client,
+      discordGuildId: publicContext.discordGuildId,
+      currentChannelId: publicContext.channelId,
+    });
+
+    await sendInteractionResponse({
+      token: options.token,
+      apiBaseUrl: options.apiBaseUrl,
+      interaction,
+      fetchImpl,
+      message: createPublicPriceReportSettingsPanelMessage(panel),
+    });
+    return;
+  }
+
   if (watchCommand) {
     await deferInteractionResponse({
       token: options.token,
@@ -255,9 +302,13 @@ async function handleMessageComponentInteraction({
   fetchImpl: FetchImpl;
 }): Promise<void> {
   const component = parsePriceReportComponentInteraction(interaction);
-  const watchComponent = component ? null : parseWatchComponentInteraction(interaction);
+  const publicReportComponent = component
+    ? null
+    : parsePublicReportComponentInteraction(interaction);
+  const watchComponent =
+    component || publicReportComponent ? null : parseWatchComponentInteraction(interaction);
 
-  if (!component && !watchComponent) {
+  if (!component && !publicReportComponent && !watchComponent) {
     await sendUnsupportedInteractionResponse({ interaction, options, fetchImpl });
     return;
   }
@@ -266,6 +317,146 @@ async function handleMessageComponentInteraction({
 
   if (!discordUserId) {
     await sendMissingUserResponse({ interaction, options, fetchImpl });
+    return;
+  }
+
+  if (publicReportComponent) {
+    const publicContext = readPublicReportInteractionContext(interaction);
+
+    if (!publicContext) {
+      await sendInteractionResponse({
+        token: options.token,
+        apiBaseUrl: options.apiBaseUrl,
+        interaction,
+        fetchImpl,
+        content: "公開價格報告只能在伺服器頻道中設定。",
+      });
+      return;
+    }
+
+    if (publicReportComponent.name === "preview") {
+      const cooldown = cooldowns.consume(discordUserId, new Date());
+
+      if (!cooldown.allowed) {
+        await sendInteractionResponse({
+          token: options.token,
+          apiBaseUrl: options.apiBaseUrl,
+          interaction,
+          fetchImpl,
+          content: `請等待 ${cooldown.retryAfterSeconds} 秒後再發送下一份測試報告。`,
+        });
+        return;
+      }
+
+      await deferInteractionResponse({
+        token: options.token,
+        apiBaseUrl: options.apiBaseUrl,
+        interaction,
+        fetchImpl,
+        ephemeral: true,
+      });
+
+      const setting = await readPublicPriceReportSetting({
+        client,
+        discordGuildId: publicContext.discordGuildId,
+      });
+
+      if (!setting) {
+        await editDeferredInteractionResponse({
+          token: options.token,
+          applicationId: options.applicationId,
+          apiBaseUrl: options.apiBaseUrl,
+          interaction,
+          fetchImpl,
+          content: "尚未設定公開報告頻道，請先按「設為此頻道」。",
+        });
+        return;
+      }
+
+      const previewResult = await sendPublicPriceReportPreview({
+        client,
+        channelId: setting.channelId,
+        publicBaseUrl: options.publicBaseUrl,
+        maxItems: options.priceReportMaxItems,
+        sendChannelMessages: (channelId, messages) =>
+          sendDiscordChannelMessages({
+            token: options.token,
+            apiBaseUrl: options.apiBaseUrl,
+            channelId,
+            messages,
+            fetchImpl,
+          }),
+      });
+
+      await editDeferredInteractionResponse({
+        token: options.token,
+        applicationId: options.applicationId,
+        apiBaseUrl: options.apiBaseUrl,
+        interaction,
+        fetchImpl,
+        content: formatPublicReportPreviewNotice(previewResult, setting.channelId),
+      });
+      return;
+    }
+
+    await deferInteractionMessageUpdate({
+      token: options.token,
+      apiBaseUrl: options.apiBaseUrl,
+      interaction,
+      fetchImpl,
+    });
+
+    let notice: string;
+
+    if (publicReportComponent.name === "set_channel") {
+      await setPublicPriceReportChannel({
+        client,
+        discordGuildId: publicContext.discordGuildId,
+        channelId: publicContext.channelId,
+        discordUserId,
+      });
+      notice = `已將公開報告頻道設為 <#${publicContext.channelId}>，並開啟公開報告。`;
+    } else if (publicReportComponent.name === "enable") {
+      const setting = await setPublicPriceReportEnabled({
+        client,
+        discordGuildId: publicContext.discordGuildId,
+        channelId: publicContext.channelId,
+        discordUserId,
+        enabled: true,
+      });
+      notice = `已啟用公開價格報告，發送頻道為 <#${setting.channelId}>。`;
+    } else if (publicReportComponent.name === "disable") {
+      const setting = await setPublicPriceReportEnabled({
+        client,
+        discordGuildId: publicContext.discordGuildId,
+        channelId: publicContext.channelId,
+        discordUserId,
+        enabled: false,
+      });
+      notice = `已暫停公開價格報告，設定頻道保留為 <#${setting.channelId}>。`;
+    } else {
+      const deletedCount = await clearPublicPriceReportSetting({
+        client,
+        discordGuildId: publicContext.discordGuildId,
+      });
+      notice = deletedCount > 0 ? "已清除公開價格報告設定。" : "目前沒有公開價格報告設定。";
+    }
+
+    const panel = await readPublicPriceReportSettingsPanel({
+      client,
+      discordGuildId: publicContext.discordGuildId,
+      currentChannelId: publicContext.channelId,
+      notice,
+    });
+
+    await editDeferredInteractionResponse({
+      token: options.token,
+      applicationId: options.applicationId,
+      apiBaseUrl: options.apiBaseUrl,
+      interaction,
+      fetchImpl,
+      message: createPublicPriceReportSettingsPanelMessage(panel),
+    });
     return;
   }
 
@@ -894,6 +1085,154 @@ function extractWatchId(watchInput: string | null): string | null {
   const match = /^watch:([0-9a-f-]{36})$/i.exec(watchInput ?? "");
 
   return match?.[1] ?? null;
+}
+
+function readPublicReportInteractionContext(
+  interaction: DiscordInteraction,
+): { discordGuildId: string; channelId: string } | null {
+  const discordGuildId = interaction.guild_id?.trim();
+  const channelId = interaction.channel_id?.trim();
+
+  return discordGuildId && channelId ? { discordGuildId, channelId } : null;
+}
+
+async function readPublicPriceReportSettingsPanel({
+  client,
+  discordGuildId,
+  currentChannelId,
+  notice,
+}: {
+  client: DiscordBotClient;
+  discordGuildId: string;
+  currentChannelId: string;
+  notice?: string;
+}): Promise<{
+  setting: PublicPriceReportSetting | null;
+  latestDelivery: PublicPriceReportDeliveryStatus | null;
+  currentChannelId: string;
+  notice?: string;
+}> {
+  const setting = await readPublicPriceReportSetting({ client, discordGuildId });
+  const latestDelivery = setting
+    ? await readLatestPublicPriceReportDelivery({ client, channelId: setting.channelId })
+    : null;
+
+  return {
+    setting,
+    latestDelivery,
+    currentChannelId,
+    notice,
+  };
+}
+
+function createPublicPriceReportSettingsPanelMessage({
+  setting,
+  latestDelivery,
+  currentChannelId,
+  notice,
+}: Awaited<ReturnType<typeof readPublicPriceReportSettingsPanel>>): DiscordBotMessage {
+  return {
+    embeds: [
+      createPublicPriceReportSettingsEmbed({
+        setting,
+        latestDelivery,
+        currentChannelId,
+        notice,
+      }),
+    ],
+    components: createPublicReportSettingsComponents({
+      hasChannel: setting !== null,
+      enabled: setting?.enabled ?? false,
+    }),
+  };
+}
+
+function createPublicPriceReportSettingsEmbed({
+  setting,
+  latestDelivery,
+  currentChannelId,
+  notice,
+}: Awaited<ReturnType<typeof readPublicPriceReportSettingsPanel>>): DiscordBotEmbed {
+  const description = [
+    notice ? `**${notice}**` : null,
+    "公開價格報告會在排程爬蟲完成且有價格變動時，自動發送到指定頻道。",
+  ]
+    .filter((line): line is string => line !== null)
+    .join("\n");
+
+  return {
+    title: "公開價格報告設定",
+    description,
+    color: DISCORD_EMBED_COLOR,
+    fields: [
+      {
+        name: "狀態",
+        value: setting ? (setting.enabled ? "已啟用" : "已暫停") : "尚未設定",
+        inline: true,
+      },
+      {
+        name: "發送頻道",
+        value: setting ? `<#${setting.channelId}>` : "尚未設定",
+        inline: true,
+      },
+      {
+        name: "目前頻道",
+        value: `<#${currentChannelId}>`,
+        inline: true,
+      },
+      {
+        name: "最近一次公開報告",
+        value: formatPublicReportDeliveryStatus(latestDelivery),
+      },
+    ],
+  };
+}
+
+function formatPublicReportDeliveryStatus(
+  delivery: PublicPriceReportDeliveryStatus | null,
+): string {
+  if (!delivery) {
+    return "尚無公開報告紀錄。";
+  }
+
+  const deliveredAt = formatTaipeiMinute(delivery.deliveredAt ?? delivery.createdAt);
+
+  if (delivery.status === "SENT") {
+    return `成功：${deliveredAt}，列出 ${delivery.itemCount} 筆，送出 ${delivery.messageCount} 則訊息。`;
+  }
+
+  if (delivery.status === "SKIPPED") {
+    return `略過：${deliveredAt}，本輪沒有價格變動。`;
+  }
+
+  if (delivery.status === "RATE_LIMITED") {
+    return `Discord 限流：${deliveredAt}。${formatDiscordRateLimitForUser()}`;
+  }
+
+  if (delivery.status === "FAILED") {
+    return `失敗：${deliveredAt}。${formatPriceReportDeliveryError(delivery.errorMessage)}`;
+  }
+
+  return `${delivery.status}：${deliveredAt}，列出 ${delivery.itemCount} 筆。`;
+}
+
+function formatPublicReportPreviewNotice(
+  result: PublicPriceReportPreviewResult,
+  channelId: string,
+): string {
+  if (result.status === "sent") {
+    return `已發送測試公開報告到 <#${channelId}>：列出 ${result.listedCount} 筆，送出 ${result.messageCount} 則訊息。`;
+  }
+
+  if (result.status === "skipped") {
+    return "過去 24 小時沒有價格變動，未發送測試報告。";
+  }
+
+  if (result.status === "rate_limited") {
+    return formatDiscordRateLimitForUser();
+  }
+
+  return formatDiscordDeliveryFailureForUser(result.message);
 }
 
 async function readPriceReportSettingsPanel({

@@ -9,7 +9,6 @@ export interface DiscordBotOptions {
   token: string;
   applicationId: string;
   publicBaseUrl: string;
-  publicReportChannelId: string | null;
   apiBaseUrl: string;
   gatewayUrl: string;
   registerCommands: boolean;
@@ -25,6 +24,7 @@ export type DiscordBotClient = PriceChangeDiscordClient &
     | "discordNotificationDelivery"
     | "discordPriceReportSetting"
     | "discordPublicPriceReportDelivery"
+    | "discordPublicPriceReportSetting"
     | "discordTargetPriceWatch"
     | "crawlRun"
     | "product"
@@ -222,6 +222,8 @@ export interface DiscordInteraction {
   id: string;
   token: string;
   type: number;
+  guild_id?: string;
+  channel_id?: string;
   data?: {
     name?: string;
     options?: DiscordInteractionOption[];
@@ -300,6 +302,23 @@ export type ParsedPriceReportCommand =
     }
   | {
       name: "settings";
+    };
+
+export type ParsedPublicReportComponent =
+  | {
+      name: "set_channel";
+    }
+  | {
+      name: "enable";
+    }
+  | {
+      name: "disable";
+    }
+  | {
+      name: "preview";
+    }
+  | {
+      name: "clear";
     };
 
 export type ParsedWatchModal =

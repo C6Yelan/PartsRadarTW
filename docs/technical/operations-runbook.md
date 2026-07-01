@@ -514,7 +514,8 @@ Bot 目標：
 
 - `discord-bot` Compose profile 與 `pnpm ops:discord-bot` daemon entrypoint。
 - Discord slash command registration。
-- Public price report：bot daemon 掃描 scheduled crawl 後尚未送出的 `crawlRunId`，讀取該輪新建立的 `price_snapshots`，和同商品上一筆 snapshot 比對，只有已有舊價且價格真的改變的商品會送到公開 Discord；第一批新品、沒有舊價的商品、同價更新不會送出。
+- `/public-report`：在伺服器頻道開啟公開價格報告設定面板，可將目前頻道設為公開報告頻道、啟用/暫停、發送測試報告或清除設定；頻道設定寫入 `discord_public_price_report_settings`，不再由主機端環境變數指定。
+- Public price report：bot daemon 讀取已啟用的 `discord_public_price_report_settings`，掃描 scheduled crawl 後尚未送出的 `crawlRunId`，讀取該輪新建立的 `price_snapshots`，和同商品上一筆 snapshot 比對，只有已有舊價且價格真的改變的商品會送到公開 Discord；第一批新品、沒有舊價的商品、同價更新不會送出。
 - Public price report 訊息使用 bot embed，依 DB 的 `sourceCategory.displayName` 大分類與 `vendorName` 小分類分組，列出 signed 漲跌金額、舊價、新價、商品名稱與站內商品連結。送達、略過、失敗與 rate limit 會寫入 `discord_public_price_report_deliveries`，以 `crawlRunId + channelId` 去重。
 - `/price-report now`：使用者手動要求最近 `24h` / `12h` / `6h` 價格報告，bot 會在指令發出的頻道或私訊 context 以 embed 回覆中文報告；若使用者已有啟用中的每日設定，未明確覆蓋的手動報告會沿用該設定的分類、商品名稱關鍵字、內容類型與上限，方便手動確認報告內容。
 - Slash command 只註冊 global command，供伺服器與 DM 使用，避免 Discord client 同時顯示 global 與 guild 的重複 `/price-report`。
@@ -538,7 +539,6 @@ Bot 目標：
 
 - `DISCORD_BOT_TOKEN`：Discord bot token，只能放在 untracked `.env` 或部署 secret。
 - `DISCORD_APPLICATION_ID`：Discord application id。
-- `DISCORD_PUBLIC_REPORT_CHANNEL_ID`：公開價格報告發送頻道；未設定時不送公開價格報告。
 - `DISCORD_BOT_REGISTER_COMMANDS_ON_START`：daemon 啟動時是否註冊 slash command，預設 `true`。
 - `DISCORD_PRICE_REPORT_MAX_ITEMS`：公開價格報告與 `/price-report now` 最多列出的商品數，預設 50。
 - `DISCORD_BOT_COMMAND_COOLDOWN_SECONDS`：每位使用者手動指令 cooldown，預設 60。

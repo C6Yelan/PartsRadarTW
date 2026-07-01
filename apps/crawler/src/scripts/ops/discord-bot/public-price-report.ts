@@ -1,8 +1,16 @@
 // apps/crawler/src/scripts/ops/discord-bot/public-price-report.ts
 
+import type { Prisma } from "@partsradar/db";
 import { CRAWL_RUN_STATUSES } from "../../../coolpc/crawl-run";
-import { readCrawlRunPriceChangeSummary } from "../price-change-discord-notification";
-import { MAX_DUE_PUBLIC_PRICE_REPORTS_PER_CYCLE } from "./constants";
+import {
+  readCrawlRunPriceChangeSummary,
+  readRecentPriceReport,
+} from "../price-change-discord-notification";
+import {
+  HOUR_MS,
+  MAX_DUE_PUBLIC_PRICE_REPORTS_PER_CYCLE,
+  MAX_DUE_PUBLIC_PRICE_REPORT_SETTINGS_PER_CYCLE,
+} from "./constants";
 import { createPublicPriceChangeReportMessages } from "./price-report";
 import type {
   DiscordBotClient,
@@ -12,6 +20,7 @@ import type {
 } from "./types";
 
 export interface PublicPriceReportSummary {
+  settingCount: number;
   processedCount: number;
   sentCount: number;
   skippedCount: number;
@@ -21,6 +30,66 @@ export interface PublicPriceReportSummary {
 
 type PublicPriceReportStatus = "SENT" | "SKIPPED" | "FAILED" | "RATE_LIMITED";
 
+const PUBLIC_PRICE_REPORT_SETTING_SELECT = {
+  id: true,
+  discordGuildId: true,
+  channelId: true,
+  enabled: true,
+  createdByDiscordUserId: true,
+  updatedByDiscordUserId: true,
+  createdAt: true,
+  updatedAt: true,
+} as const satisfies Prisma.DiscordPublicPriceReportSettingSelect;
+
+const PUBLIC_PRICE_REPORT_DELIVERY_STATUS_SELECT = {
+  status: true,
+  itemCount: true,
+  messageCount: true,
+  errorMessage: true,
+  deliveredAt: true,
+  createdAt: true,
+} as const satisfies Prisma.DiscordPublicPriceReportDeliverySelect;
+
+export type PublicPriceReportSetting = Prisma.DiscordPublicPriceReportSettingGetPayload<{
+  select: typeof PUBLIC_PRICE_REPORT_SETTING_SELECT;
+}>;
+
+export type PublicPriceReportDeliveryStatus = Prisma.DiscordPublicPriceReportDeliveryGetPayload<{
+  select: typeof PUBLIC_PRICE_REPORT_DELIVERY_STATUS_SELECT;
+}>;
+
+export type PublicPriceReportPreviewResult =
+  | {
+      status: "sent";
+      changeCount: number;
+      listedCount: number;
+      messageCount: number;
+    }
+  | {
+      status: "skipped";
+      changeCount: 0;
+      listedCount: 0;
+      messageCount: 0;
+    }
+  | {
+      status: "rate_limited";
+      changeCount: number;
+      listedCount: number;
+      messageCount: number;
+      sentMessageCount: number;
+      retryAfterMs: number;
+      global: boolean;
+    }
+  | {
+      status: "failed";
+      changeCount: number;
+      listedCount: number;
+      messageCount: number;
+      sentMessageCount: number;
+      httpStatus: number | null;
+      message: string;
+    };
+
 export async function sendPendingPublicPriceReports({
   client,
   options,
@@ -28,10 +97,7 @@ export async function sendPendingPublicPriceReports({
   sendChannelMessages,
 }: {
   client: DiscordBotClient;
-  options: Pick<
-    DiscordBotOptions,
-    "publicBaseUrl" | "publicReportChannelId" | "priceReportMaxItems"
-  >;
+  options: Pick<DiscordBotOptions, "publicBaseUrl" | "priceReportMaxItems">;
   now?: Date;
   sendChannelMessages: (
     channelId: string,
@@ -39,6 +105,7 @@ export async function sendPendingPublicPriceReports({
   ) => Promise<DiscordBotMessageSendResult>;
 }): Promise<PublicPriceReportSummary> {
   const summary: PublicPriceReportSummary = {
+    settingCount: 0,
     processedCount: 0,
     sentCount: 0,
     skippedCount: 0,
@@ -46,10 +113,262 @@ export async function sendPendingPublicPriceReports({
     failedCount: 0,
   };
 
-  if (!options.publicReportChannelId) {
-    return summary;
+  const settings = await client.discordPublicPriceReportSetting.findMany({
+    where: {
+      enabled: true,
+    },
+    select: {
+      discordGuildId: true,
+      channelId: true,
+    },
+    orderBy: [{ updatedAt: "asc" }, { id: "asc" }],
+    take: MAX_DUE_PUBLIC_PRICE_REPORT_SETTINGS_PER_CYCLE,
+  });
+
+  summary.settingCount = settings.length;
+
+  for (const setting of settings) {
+    const settingSummary = await sendPendingPublicPriceReportsForSetting({
+      client,
+      channelId: setting.channelId,
+      options,
+      now,
+      sendChannelMessages,
+    });
+
+    summary.processedCount += settingSummary.processedCount;
+    summary.sentCount += settingSummary.sentCount;
+    summary.skippedCount += settingSummary.skippedCount;
+    summary.rateLimitedCount += settingSummary.rateLimitedCount;
+    summary.failedCount += settingSummary.failedCount;
   }
 
+  return summary;
+}
+
+export async function readPublicPriceReportSetting({
+  client,
+  discordGuildId,
+}: {
+  client: DiscordBotClient;
+  discordGuildId: string;
+}): Promise<PublicPriceReportSetting | null> {
+  return client.discordPublicPriceReportSetting.findUnique({
+    where: {
+      discordGuildId,
+    },
+    select: PUBLIC_PRICE_REPORT_SETTING_SELECT,
+  });
+}
+
+export async function readLatestPublicPriceReportDelivery({
+  client,
+  channelId,
+}: {
+  client: DiscordBotClient;
+  channelId: string;
+}): Promise<PublicPriceReportDeliveryStatus | null> {
+  return client.discordPublicPriceReportDelivery.findFirst({
+    where: {
+      channelId,
+    },
+    select: PUBLIC_PRICE_REPORT_DELIVERY_STATUS_SELECT,
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+  });
+}
+
+export async function setPublicPriceReportChannel({
+  client,
+  discordGuildId,
+  channelId,
+  discordUserId,
+}: {
+  client: DiscordBotClient;
+  discordGuildId: string;
+  channelId: string;
+  discordUserId: string;
+}): Promise<PublicPriceReportSetting> {
+  return client.discordPublicPriceReportSetting.upsert({
+    where: {
+      discordGuildId,
+    },
+    create: {
+      discordGuildId,
+      channelId,
+      enabled: true,
+      createdByDiscordUserId: discordUserId,
+      updatedByDiscordUserId: discordUserId,
+    },
+    update: {
+      channelId,
+      enabled: true,
+      updatedByDiscordUserId: discordUserId,
+    },
+    select: PUBLIC_PRICE_REPORT_SETTING_SELECT,
+  });
+}
+
+export async function setPublicPriceReportEnabled({
+  client,
+  discordGuildId,
+  channelId,
+  discordUserId,
+  enabled,
+}: {
+  client: DiscordBotClient;
+  discordGuildId: string;
+  channelId: string;
+  discordUserId: string;
+  enabled: boolean;
+}): Promise<PublicPriceReportSetting> {
+  const current = await readPublicPriceReportSetting({ client, discordGuildId });
+
+  if (!current) {
+    return client.discordPublicPriceReportSetting.upsert({
+      where: {
+        discordGuildId,
+      },
+      create: {
+        discordGuildId,
+        channelId,
+        enabled,
+        createdByDiscordUserId: discordUserId,
+        updatedByDiscordUserId: discordUserId,
+      },
+      update: {
+        enabled,
+        updatedByDiscordUserId: discordUserId,
+      },
+      select: PUBLIC_PRICE_REPORT_SETTING_SELECT,
+    });
+  }
+
+  return client.discordPublicPriceReportSetting.update({
+    where: {
+      discordGuildId,
+    },
+    data: {
+      enabled,
+      updatedByDiscordUserId: discordUserId,
+    },
+    select: PUBLIC_PRICE_REPORT_SETTING_SELECT,
+  });
+}
+
+export async function clearPublicPriceReportSetting({
+  client,
+  discordGuildId,
+}: {
+  client: DiscordBotClient;
+  discordGuildId: string;
+}): Promise<number> {
+  const result = await client.discordPublicPriceReportSetting.deleteMany({
+    where: {
+      discordGuildId,
+    },
+  });
+
+  return result.count;
+}
+
+export async function sendPublicPriceReportPreview({
+  client,
+  channelId,
+  publicBaseUrl,
+  maxItems,
+  now = new Date(),
+  sendChannelMessages,
+}: {
+  client: DiscordBotClient;
+  channelId: string;
+  publicBaseUrl: string;
+  maxItems: number;
+  now?: Date;
+  sendChannelMessages: (
+    channelId: string,
+    messages: DiscordBotMessage[],
+  ) => Promise<DiscordBotMessageSendResult>;
+}): Promise<PublicPriceReportPreviewResult> {
+  const report = await readRecentPriceReport(client, {
+    since: new Date(now.getTime() - 24 * HOUR_MS),
+    until: now,
+    filters: {
+      includeNewProducts: false,
+    },
+  });
+  const messages = createPublicPriceChangeReportMessages(report.priceChanges, {
+    publicBaseUrl,
+    maxItems,
+    generatedAt: now,
+  });
+  const listedCount = Math.min(report.priceChanges.length, maxItems);
+
+  if (messages.length === 0) {
+    return {
+      status: "skipped",
+      changeCount: 0,
+      listedCount: 0,
+      messageCount: 0,
+    };
+  }
+
+  const result = await sendChannelMessages(channelId, messages);
+
+  if (result.status === "sent") {
+    return {
+      status: "sent",
+      changeCount: report.priceChanges.length,
+      listedCount,
+      messageCount: messages.length,
+    };
+  }
+
+  if (result.status === "rate_limited") {
+    return {
+      status: "rate_limited",
+      changeCount: report.priceChanges.length,
+      listedCount,
+      messageCount: messages.length,
+      sentMessageCount: result.sentMessageCount,
+      retryAfterMs: result.retryAfterMs,
+      global: result.global,
+    };
+  }
+
+  return {
+    status: "failed",
+    changeCount: report.priceChanges.length,
+    listedCount,
+    messageCount: messages.length,
+    sentMessageCount: result.sentMessageCount,
+    httpStatus: result.httpStatus,
+    message: result.message,
+  };
+}
+
+async function sendPendingPublicPriceReportsForSetting({
+  client,
+  channelId,
+  options,
+  now,
+  sendChannelMessages,
+}: {
+  client: DiscordBotClient;
+  channelId: string;
+  options: Pick<DiscordBotOptions, "publicBaseUrl" | "priceReportMaxItems">;
+  now: Date;
+  sendChannelMessages: (
+    channelId: string,
+    messages: DiscordBotMessage[],
+  ) => Promise<DiscordBotMessageSendResult>;
+}): Promise<Omit<PublicPriceReportSummary, "settingCount">> {
+  const summary = {
+    processedCount: 0,
+    sentCount: 0,
+    skippedCount: 0,
+    rateLimitedCount: 0,
+    failedCount: 0,
+  };
   const crawlRuns = await client.crawlRun.findMany({
     where: {
       triggerType: "SCHEDULED",
@@ -63,14 +382,14 @@ export async function sendPendingPublicPriceReports({
         {
           publicPriceReportDeliveries: {
             none: {
-              channelId: options.publicReportChannelId,
+              channelId,
             },
           },
         },
         {
           publicPriceReportDeliveries: {
             some: {
-              channelId: options.publicReportChannelId,
+              channelId,
               status: {
                 in: ["FAILED", "RATE_LIMITED"],
               },
@@ -91,7 +410,7 @@ export async function sendPendingPublicPriceReports({
 
     const result = await sendPublicPriceReportForCrawlRun({
       client,
-      channelId: options.publicReportChannelId,
+      channelId,
       crawlRunId: crawlRun.id,
       maxItems: options.priceReportMaxItems,
       publicBaseUrl: options.publicBaseUrl,

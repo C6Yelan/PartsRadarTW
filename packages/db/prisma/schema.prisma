@@ -313,6 +313,20 @@ model DiscordPublicPriceReportDelivery {
   @@map("discord_public_price_report_deliveries")
 }
 
+model DiscordPublicPriceReportSetting {
+  id                     String   @id @default(uuid()) @db.Uuid
+  discordGuildId         String   @unique(map: "discord_public_price_report_settings_guild_id_key") @map("discord_guild_id") @db.Text
+  channelId              String   @map("channel_id") @db.Text
+  enabled                Boolean  @default(true)
+  createdByDiscordUserId String   @map("created_by_discord_user_id") @db.Text
+  updatedByDiscordUserId String   @map("updated_by_discord_user_id") @db.Text
+  createdAt              DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([enabled, channelId], map: "discord_public_price_report_settings_enabled_channel_idx")
+  @@map("discord_public_price_report_settings")
+}
+
 model CrawlRun {
   id                          String                             @id @default(uuid()) @db.Uuid
   status                      CrawlRunStatus                     @default(RUNNING)

@@ -32,7 +32,7 @@
 
 第三版使用者向 Discord 功能集中在 bot；webhook 僅作為內部維運告警通道：
 
-- Public bot report：`discord-bot` 掃描 scheduled crawl 後尚未送出的價格變動，發送到 `DISCORD_PUBLIC_REPORT_CHANNEL_ID` 指定頻道；這是公開廣播，不是個人化訂閱。
+- Public bot report：`/public-report` 在 Discord 伺服器內設定發送頻道，`discord-bot` 掃描 scheduled crawl 後尚未送出的價格變動並發送到已啟用頻道；這是公開廣播，不是個人化訂閱。
 - Admin webhook：`smoke-daemon` 對管理者 Discord 頻道送出 `WARN` / `FAIL` / `RECOVERED`，不推給一般使用者。
 - Discord bot：處理 slash commands、手動價格報告回覆、個人目標價提醒與定期價格變動報告。
 - 分享入口：使用者貼上商品連結時，透過商品頁 Open Graph / canonical URL 提供安全摘要；目前不做分享配單 link preview。

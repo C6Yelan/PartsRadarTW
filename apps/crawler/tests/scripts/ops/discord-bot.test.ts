@@ -51,7 +51,6 @@ describe("Discord bot options", () => {
       token: TOKEN,
       applicationId: APPLICATION_ID,
       publicBaseUrl: "https://partsradar.test/",
-      publicReportChannelId: null,
       apiBaseUrl: "https://discord.com/api/v10",
       registerCommands: false,
       registerCommandsOnStart: true,
@@ -59,26 +58,6 @@ describe("Discord bot options", () => {
       commandCooldownSeconds: 60,
       priceReportScheduleIntervalSeconds: 300,
     });
-  });
-
-  it("reads an optional public report channel id", () => {
-    expect(
-      parseDiscordBotOptions([], {
-        DISCORD_BOT_TOKEN: TOKEN,
-        DISCORD_APPLICATION_ID: APPLICATION_ID,
-        DISCORD_PUBLIC_REPORT_CHANNEL_ID: "999988887777666655",
-      }),
-    ).toMatchObject({
-      publicReportChannelId: "999988887777666655",
-    });
-
-    expect(() =>
-      parseDiscordBotOptions([], {
-        DISCORD_BOT_TOKEN: TOKEN,
-        DISCORD_APPLICATION_ID: APPLICATION_ID,
-        DISCORD_PUBLIC_REPORT_CHANNEL_ID: "not-a-channel",
-      }),
-    ).toThrow("DISCORD_PUBLIC_REPORT_CHANNEL_ID must be a Discord snowflake id");
   });
 
   it("rejects missing token or invalid ids", () => {
@@ -93,7 +72,7 @@ describe("Discord bot options", () => {
 });
 
 describe("registerDiscordBotCommands", () => {
-  it("registers the global price-report and watch commands", async () => {
+  it("registers the global price-report, watch, and public-report commands", async () => {
     const fetchMock = vi.fn<typeof fetch>(
       async () => new Response(JSON.stringify([{ id: "command-1" }]), { status: 200 }),
     );
@@ -137,6 +116,12 @@ describe("registerDiscordBotCommands", () => {
         contexts: [0, 1],
         dm_permission: true,
       }),
+      expect.objectContaining({
+        name: "public-report",
+        description: "管理公開價格報告發送頻道。",
+        contexts: [0],
+        dm_permission: false,
+      }),
     ]);
     const registeredCommands = JSON.parse(String(globalRequestInit.body));
     expect(
@@ -145,6 +130,7 @@ describe("registerDiscordBotCommands", () => {
     expect(registeredCommands.map((command: { name: string }) => command.name)).toEqual([
       "price-report",
       "watch",
+      "public-report",
     ]);
     for (const command of registeredCommands) {
       expect(command).not.toHaveProperty("default_member_permissions");
@@ -2819,6 +2805,160 @@ describe("sendPriceReportNow", () => {
     expect(messages[0]?.embeds?.[0]?.fields).toBeUndefined();
   });
 
+  it("shows the public report settings panel from the public-report command", async () => {
+    const client = createDiscordBotClient([]);
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createPublicReportInteraction(),
+    });
+
+    const requestBody = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
+
+    expect(requestBody).toMatchObject({
+      type: 4,
+      data: {
+        flags: 64,
+        embeds: [
+          expect.objectContaining({
+            title: "公開價格報告設定",
+            description: expect.stringContaining("排程爬蟲完成且有價格變動"),
+            fields: expect.arrayContaining([
+              expect.objectContaining({ name: "狀態", value: "尚未設定" }),
+              expect.objectContaining({ name: "發送頻道", value: "尚未設定" }),
+              expect.objectContaining({ name: "目前頻道", value: "<#999988887777666655>" }),
+            ]),
+          }),
+        ],
+        components: expect.arrayContaining([
+          expect.objectContaining({
+            components: expect.arrayContaining([
+              expect.objectContaining({
+                custom_id: "public-report:set-channel",
+                label: "設為此頻道",
+              }),
+              expect.objectContaining({
+                custom_id: "public-report:preview",
+                disabled: true,
+              }),
+            ]),
+          }),
+        ]),
+      },
+    });
+  });
+
+  it("sets the current channel as the public report channel", async () => {
+    const client = createDiscordBotClient([]);
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createPublicReportButtonInteraction("public-report:set-channel"),
+    });
+
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({ type: 6 });
+    expect(client.discordPublicPriceReportSetting.upsert).toHaveBeenCalledWith({
+      where: {
+        discordGuildId: "guild-1",
+      },
+      create: expect.objectContaining({
+        discordGuildId: "guild-1",
+        channelId: "999988887777666655",
+        enabled: true,
+        createdByDiscordUserId: "111122223333444455",
+        updatedByDiscordUserId: "111122223333444455",
+      }),
+      update: expect.objectContaining({
+        channelId: "999988887777666655",
+        enabled: true,
+        updatedByDiscordUserId: "111122223333444455",
+      }),
+      select: expect.any(Object),
+    });
+
+    const updateBody = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body));
+    expect(JSON.stringify(updateBody.embeds)).toContain("已將公開報告頻道設為");
+    expect(JSON.stringify(updateBody.components)).toContain("public-report:preview");
+    expect(JSON.stringify(updateBody.components)).toContain("public-report:disable");
+  });
+
+  it("sends a public report preview to the configured channel", async () => {
+    const now = new Date();
+    const oldCapturedAt = new Date(now.getTime() - 25 * 60 * 60 * 1000).toISOString();
+    const newCapturedAt = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
+    const client = createDiscordBotClient(
+      [
+        snapshot({
+          id: "public-preview-old",
+          productId: "public-preview-product",
+          productName: "華碩 GPU A",
+          crawlRunId: "old-run",
+          price: 12_000,
+          capturedAt: oldCapturedAt,
+        }),
+        snapshot({
+          id: "public-preview-new",
+          productId: "public-preview-product",
+          productName: "華碩 GPU A",
+          crawlRunId: "new-run",
+          price: 10_990,
+          capturedAt: newCapturedAt,
+        }),
+      ],
+      [],
+      [],
+      [...TEST_SOURCE_CATEGORIES],
+      [],
+      [],
+      [],
+      [publicPriceReportSetting({ id: "public-setting-1" })],
+    );
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createPublicReportButtonInteraction("public-report:preview"),
+    });
+
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({
+      type: 5,
+      data: { flags: 64 },
+    });
+    expect(fetchMock.mock.calls[1]?.[0]).toBe(
+      `${API_BASE_URL}/channels/999988887777666655/messages`,
+    );
+    expect(JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body))).toMatchObject({
+      embeds: [
+        expect.objectContaining({
+          title: "PartsRadarTW 公開價格報告 - 價格變動",
+          description: expect.stringContaining("GPU A"),
+        }),
+      ],
+      allowed_mentions: {
+        parse: [],
+      },
+    });
+    const responseBody = JSON.parse(String(fetchMock.mock.calls[2]?.[1]?.body));
+    expect(responseBody.content).toContain("已發送測試公開報告到 <#999988887777666655>");
+  });
+
   it("sends pending public price reports to the configured channel", async () => {
     const client = createDiscordBotClient(
       [
@@ -2850,6 +2990,7 @@ describe("sendPriceReportNow", () => {
           finishedAt: new Date("2026-06-07T03:05:00.000Z"),
         }),
       ],
+      [publicPriceReportSetting({ id: "public-setting-1" })],
     );
     const sendChannelMessages = vi.fn(
       async (_channelId: string, _messages: DiscordBotMessage[]) => ({
@@ -2862,14 +3003,12 @@ describe("sendPriceReportNow", () => {
     await expect(
       sendPendingPublicPriceReports({
         client,
-        options: {
-          ...createDiscordBotOptions(),
-          publicReportChannelId: "999988887777666655",
-        },
+        options: createDiscordBotOptions(),
         now: new Date("2026-06-07T05:00:00.000Z"),
         sendChannelMessages,
       }),
     ).resolves.toEqual({
+      settingCount: 1,
       processedCount: 1,
       sentCount: 1,
       skippedCount: 0,
@@ -2914,7 +3053,7 @@ describe("sendPriceReportNow", () => {
     });
   });
 
-  it("skips public price reports when no channel is configured", async () => {
+  it("skips public price reports when no public report setting is configured", async () => {
     const client = createDiscordBotClient(
       [],
       [],
@@ -2934,6 +3073,7 @@ describe("sendPriceReportNow", () => {
         sendChannelMessages,
       }),
     ).resolves.toEqual({
+      settingCount: 0,
       processedCount: 0,
       sentCount: 0,
       skippedCount: 0,
@@ -2961,20 +3101,19 @@ describe("sendPriceReportNow", () => {
         }),
       ],
       [crawlRun({ id: "public-run-1" })],
+      [publicPriceReportSetting({ id: "public-setting-1" })],
     );
     const sendChannelMessages = vi.fn();
 
     await expect(
       sendPendingPublicPriceReports({
         client,
-        options: {
-          ...createDiscordBotOptions(),
-          publicReportChannelId: "999988887777666655",
-        },
+        options: createDiscordBotOptions(),
         now: new Date("2026-06-07T05:00:00.000Z"),
         sendChannelMessages,
       }),
     ).resolves.toEqual({
+      settingCount: 1,
       processedCount: 0,
       sentCount: 0,
       skippedCount: 0,
@@ -3242,7 +3381,6 @@ function createDiscordBotOptions(): DiscordBotOptions {
     gatewayUrl: "wss://discord.test/gateway",
     registerCommands: false,
     registerCommandsOnStart: true,
-    publicReportChannelId: null,
     priceReportMaxItems: 50,
     commandCooldownSeconds: 60,
     priceReportScheduleIntervalSeconds: 300,
@@ -3283,6 +3421,58 @@ function createInteraction(
           options: subcommandOptions,
         },
       ],
+    },
+    member: {
+      user: {
+        id: "111122223333444455",
+      },
+    },
+  };
+}
+
+function createPublicReportInteraction({
+  guildId = "guild-1",
+  channelId = "999988887777666655",
+}: {
+  guildId?: string;
+  channelId?: string;
+} = {}): DiscordInteraction {
+  return {
+    id: "interaction-1",
+    token: "interaction-token",
+    type: 2,
+    guild_id: guildId,
+    channel_id: channelId,
+    data: {
+      name: "public-report",
+    },
+    member: {
+      user: {
+        id: "111122223333444455",
+      },
+    },
+  };
+}
+
+function createPublicReportButtonInteraction(
+  customId: string,
+  {
+    guildId = "guild-1",
+    channelId = "999988887777666655",
+  }: {
+    guildId?: string;
+    channelId?: string;
+  } = {},
+): DiscordInteraction {
+  return {
+    id: "interaction-1",
+    token: "interaction-token",
+    type: 3,
+    guild_id: guildId,
+    channel_id: channelId,
+    data: {
+      custom_id: customId,
+      component_type: 2,
     },
     member: {
       user: {
@@ -3611,6 +3801,17 @@ interface TestDiscordPublicPriceReportDelivery {
   updatedAt: Date;
 }
 
+interface TestDiscordPublicPriceReportSetting {
+  id: string;
+  discordGuildId: string;
+  channelId: string;
+  enabled: boolean;
+  createdByDiscordUserId: string;
+  updatedByDiscordUserId: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 interface TestCrawlRun {
   id: string;
   status: "SUCCESS_CHANGED" | "SUCCESS_WITH_ERRORS" | "SUCCESS_UNCHANGED";
@@ -3819,6 +4020,37 @@ function publicPriceReportDelivery({
   };
 }
 
+function publicPriceReportSetting({
+  id,
+  discordGuildId = "guild-1",
+  channelId = "999988887777666655",
+  enabled = true,
+  createdByDiscordUserId = "111122223333444455",
+  updatedByDiscordUserId = "111122223333444455",
+  createdAt = new Date("2026-06-07T00:00:00.000Z"),
+  updatedAt = new Date("2026-06-07T00:00:00.000Z"),
+}: {
+  id: string;
+  discordGuildId?: string;
+  channelId?: string;
+  enabled?: boolean;
+  createdByDiscordUserId?: string;
+  updatedByDiscordUserId?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}): TestDiscordPublicPriceReportSetting {
+  return {
+    id,
+    discordGuildId,
+    channelId,
+    enabled,
+    createdByDiscordUserId,
+    updatedByDiscordUserId,
+    createdAt,
+    updatedAt,
+  };
+}
+
 function crawlRun({
   id,
   status = "SUCCESS_CHANGED",
@@ -3870,6 +4102,7 @@ function createDiscordBotClient(
   deliveries: TestDiscordNotificationDelivery[] = [],
   publicPriceReportDeliveries: TestDiscordPublicPriceReportDelivery[] = [],
   crawlRuns: TestCrawlRun[] = [],
+  publicPriceReportSettings: TestDiscordPublicPriceReportSetting[] = [],
 ): DiscordBotClient & {
   crawlRun: {
     findMany: ReturnType<typeof vi.fn>;
@@ -3888,6 +4121,14 @@ function createDiscordBotClient(
     findFirst: ReturnType<typeof vi.fn>;
   };
   discordPublicPriceReportDelivery: {
+    findFirst: ReturnType<typeof vi.fn>;
+    upsert: ReturnType<typeof vi.fn>;
+  };
+  discordPublicPriceReportSetting: {
+    deleteMany: ReturnType<typeof vi.fn>;
+    findMany: ReturnType<typeof vi.fn>;
+    findUnique: ReturnType<typeof vi.fn>;
+    update: ReturnType<typeof vi.fn>;
     upsert: ReturnType<typeof vi.fn>;
   };
   discordPriceReportSetting: {
@@ -4318,6 +4559,111 @@ function createDiscordBotClient(
     },
   );
   const publicDeliveryRows = [...publicPriceReportDeliveries];
+  const publicSettingRows = [...publicPriceReportSettings];
+  const publicSettingFindMany = vi.fn(
+    async (args: { where: { enabled?: boolean }; take?: number }) => {
+      const rows = publicSettingRows
+        .filter(
+          (setting) => args.where.enabled === undefined || setting.enabled === args.where.enabled,
+        )
+        .sort((left, right) => {
+          return (
+            left.updatedAt.getTime() - right.updatedAt.getTime() || left.id.localeCompare(right.id)
+          );
+        });
+
+      return typeof args.take === "number" ? rows.slice(0, args.take) : rows;
+    },
+  );
+  const publicSettingFindUnique = vi.fn(
+    async (args: { where: { discordGuildId: string } }) =>
+      publicSettingRows.find((setting) => setting.discordGuildId === args.where.discordGuildId) ??
+      null,
+  );
+  const publicSettingUpsert = vi.fn(
+    async (args: {
+      where: { discordGuildId: string };
+      create: Omit<TestDiscordPublicPriceReportSetting, "id" | "createdAt" | "updatedAt">;
+      update: Partial<TestDiscordPublicPriceReportSetting>;
+    }) => {
+      const existing = publicSettingRows.find(
+        (setting) => setting.discordGuildId === args.where.discordGuildId,
+      );
+
+      if (existing) {
+        Object.assign(existing, args.update, {
+          updatedAt: new Date("2026-06-07T00:00:00.000Z"),
+        });
+        return existing;
+      }
+
+      const created: TestDiscordPublicPriceReportSetting = {
+        id: `public-setting-${publicSettingRows.length + 1}`,
+        createdAt: new Date("2026-06-07T00:00:00.000Z"),
+        updatedAt: new Date("2026-06-07T00:00:00.000Z"),
+        ...args.create,
+      };
+      publicSettingRows.push(created);
+
+      return created;
+    },
+  );
+  const publicSettingUpdate = vi.fn(
+    async (args: {
+      where: { discordGuildId: string };
+      data: Partial<TestDiscordPublicPriceReportSetting>;
+    }) => {
+      const setting = publicSettingRows.find(
+        (row) => row.discordGuildId === args.where.discordGuildId,
+      );
+
+      if (!setting) {
+        throw new Error("Public report setting not found.");
+      }
+
+      Object.assign(setting, args.data, {
+        updatedAt: new Date("2026-06-07T00:00:00.000Z"),
+      });
+
+      return setting;
+    },
+  );
+  const publicSettingDeleteMany = vi.fn(async (args: { where: { discordGuildId: string } }) => {
+    const beforeCount = publicSettingRows.length;
+
+    for (let index = publicSettingRows.length - 1; index >= 0; index -= 1) {
+      if (publicSettingRows[index]?.discordGuildId === args.where.discordGuildId) {
+        publicSettingRows.splice(index, 1);
+      }
+    }
+
+    return { count: beforeCount - publicSettingRows.length };
+  });
+  const publicDeliveryFindFirst = vi.fn(
+    async (args: { where: { channelId: string }; select?: Record<string, boolean> }) => {
+      const delivery = publicDeliveryRows
+        .filter((row) => row.channelId === args.where.channelId)
+        .sort((left, right) => {
+          return (
+            right.createdAt.getTime() - left.createdAt.getTime() || right.id.localeCompare(left.id)
+          );
+        })[0];
+
+      if (!delivery) {
+        return null;
+      }
+
+      if (!args.select) {
+        return delivery;
+      }
+
+      return Object.fromEntries(
+        Object.entries(args.select)
+          .filter(([, selected]) => selected)
+          .map(([key]) => [key, delivery[key as keyof TestDiscordPublicPriceReportDelivery]]),
+      );
+    },
+  );
   const crawlRunFindMany = vi.fn(
     async (args: {
       where: {
@@ -4420,7 +4766,15 @@ function createDiscordBotClient(
       findFirst: deliveryFindFirst,
     },
     discordPublicPriceReportDelivery: {
+      findFirst: publicDeliveryFindFirst,
       upsert: publicDeliveryUpsert,
+    },
+    discordPublicPriceReportSetting: {
+      deleteMany: publicSettingDeleteMany,
+      findMany: publicSettingFindMany,
+      findUnique: publicSettingFindUnique,
+      update: publicSettingUpdate,
+      upsert: publicSettingUpsert,
     },
     discordPriceReportSetting: {
       findFirst: settingFindFirst,
@@ -4454,6 +4808,14 @@ function createDiscordBotClient(
       findFirst: ReturnType<typeof vi.fn>;
     };
     discordPublicPriceReportDelivery: {
+      findFirst: ReturnType<typeof vi.fn>;
+      upsert: ReturnType<typeof vi.fn>;
+    };
+    discordPublicPriceReportSetting: {
+      deleteMany: ReturnType<typeof vi.fn>;
+      findMany: ReturnType<typeof vi.fn>;
+      findUnique: ReturnType<typeof vi.fn>;
+      update: ReturnType<typeof vi.fn>;
       upsert: ReturnType<typeof vi.fn>;
     };
     discordPriceReportSetting: {
