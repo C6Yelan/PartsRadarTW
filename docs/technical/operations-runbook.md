@@ -514,7 +514,7 @@ Bot 目標：
 
 - `discord-bot` Compose profile 與 `pnpm ops:discord-bot` daemon entrypoint。
 - Discord slash command registration。
-- `/public-report`：在伺服器頻道開啟公開價格報告設定面板，可將目前頻道設為公開報告頻道、啟用/暫停、發送測試報告或清除設定；頻道設定寫入 `discord_public_price_report_settings`，不再由主機端環境變數指定。
+- `/public-report`：在伺服器頻道開啟公開價格報告設定面板，可將目前頻道設為公開報告頻道、啟用/暫停、發送測試報告或清除設定；只有具備管理伺服器或管理頻道權限的成員可調整。頻道設定寫入 `discord_public_price_report_settings`，不再由主機端環境變數指定。公開報告目標頻道需允許 bot 傳送訊息與嵌入連結。
 - Public price report：bot daemon 讀取已啟用的 `discord_public_price_report_settings`，掃描 scheduled crawl 後尚未送出的 `crawlRunId`，讀取該輪新建立的 `price_snapshots`，和同商品上一筆 snapshot 比對，只有已有舊價且價格真的改變的商品會送到公開 Discord；第一批新品、沒有舊價的商品、同價更新不會送出。
 - Public price report 訊息使用 bot embed，依 DB 的 `sourceCategory.displayName` 大分類與 `vendorName` 小分類分組，列出 signed 漲跌金額、舊價、新價、商品名稱與站內商品連結。送達、略過、失敗與 rate limit 會寫入 `discord_public_price_report_deliveries`，以 `crawlRunId + channelId` 去重。
 - `/price-report now`：使用者手動要求最近 `24h` / `12h` / `6h` 價格報告，bot 會在指令發出的頻道或私訊 context 以 embed 回覆中文報告；若使用者已有啟用中的每日設定，未明確覆蓋的手動報告會沿用該設定的分類、商品名稱關鍵字、內容類型與上限，方便手動確認報告內容。

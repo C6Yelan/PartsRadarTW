@@ -224,6 +224,7 @@ export interface DiscordInteraction {
   type: number;
   guild_id?: string;
   channel_id?: string;
+  app_permissions?: string;
   data?: {
     name?: string;
     options?: DiscordInteractionOption[];
@@ -234,6 +235,7 @@ export interface DiscordInteraction {
   };
   member?: {
     user?: DiscordUser;
+    permissions?: string;
   };
   user?: DiscordUser;
 }

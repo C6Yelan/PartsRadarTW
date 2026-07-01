@@ -21,6 +21,11 @@ import {
   DISCORD_INTERACTION_TYPE_APPLICATION_COMMAND,
   DISCORD_INTERACTION_TYPE_MESSAGE_COMPONENT,
   DISCORD_INTERACTION_TYPE_MODAL_SUBMIT,
+  DISCORD_PERMISSION_ADMINISTRATOR,
+  DISCORD_PERMISSION_EMBED_LINKS,
+  DISCORD_PERMISSION_MANAGE_CHANNELS,
+  DISCORD_PERMISSION_MANAGE_GUILD,
+  DISCORD_PERMISSION_SEND_MESSAGES,
   MAX_PRICE_REPORT_ITEMS,
   MAX_PRICE_REPORT_KEYWORD_LENGTH,
   MAX_TARGET_PRICE,
@@ -242,6 +247,11 @@ async function handleApplicationCommandInteraction({
       return;
     }
 
+    if (!canManagePublicReport(interaction)) {
+      await sendPublicReportPermissionDeniedResponse({ interaction, options, fetchImpl });
+      return;
+    }
+
     const panel = await readPublicPriceReportSettingsPanel({
       client,
       discordGuildId: publicContext.discordGuildId,
@@ -334,6 +344,11 @@ async function handleMessageComponentInteraction({
       return;
     }
 
+    if (!canManagePublicReport(interaction)) {
+      await sendPublicReportPermissionDeniedResponse({ interaction, options, fetchImpl });
+      return;
+    }
+
     if (publicReportComponent.name === "preview") {
       const cooldown = cooldowns.consume(discordUserId, new Date());
 
@@ -369,6 +384,23 @@ async function handleMessageComponentInteraction({
           interaction,
           fetchImpl,
           content: "尚未設定公開報告頻道，請先按「設為此頻道」。",
+        });
+        return;
+      }
+
+      const permissionNotice =
+        setting.channelId === publicContext.channelId
+          ? formatPublicReportBotPermissionNotice(interaction, setting.channelId)
+          : null;
+
+      if (permissionNotice) {
+        await editDeferredInteractionResponse({
+          token: options.token,
+          applicationId: options.applicationId,
+          apiBaseUrl: options.apiBaseUrl,
+          interaction,
+          fetchImpl,
+          content: permissionNotice,
         });
         return;
       }
@@ -409,6 +441,23 @@ async function handleMessageComponentInteraction({
     let notice: string;
 
     if (publicReportComponent.name === "set_channel") {
+      const permissionNotice = formatPublicReportBotPermissionNotice(
+        interaction,
+        publicContext.channelId,
+      );
+
+      if (permissionNotice) {
+        await editDeferredInteractionResponse({
+          token: options.token,
+          applicationId: options.applicationId,
+          apiBaseUrl: options.apiBaseUrl,
+          interaction,
+          fetchImpl,
+          content: permissionNotice,
+        });
+        return;
+      }
+
       await setPublicPriceReportChannel({
         client,
         discordGuildId: publicContext.discordGuildId,
@@ -1096,6 +1145,78 @@ function readPublicReportInteractionContext(
   return discordGuildId && channelId ? { discordGuildId, channelId } : null;
 }
 
+function canManagePublicReport(interaction: DiscordInteraction): boolean {
+  return hasAnyDiscordPermission(interaction.member?.permissions, [
+    DISCORD_PERMISSION_MANAGE_GUILD,
+    DISCORD_PERMISSION_MANAGE_CHANNELS,
+  ]);
+}
+
+async function sendPublicReportPermissionDeniedResponse({
+  interaction,
+  options,
+  fetchImpl,
+}: {
+  interaction: DiscordInteraction;
+  options: DiscordBotOptions;
+  fetchImpl: FetchImpl;
+}): Promise<void> {
+  await sendInteractionResponse({
+    token: options.token,
+    apiBaseUrl: options.apiBaseUrl,
+    interaction,
+    fetchImpl,
+    content: "只有具備「管理伺服器」或「管理頻道」權限的成員可以調整公開價格報告。",
+  });
+}
+
+function formatPublicReportBotPermissionNotice(
+  interaction: DiscordInteraction,
+  channelId: string,
+): string | null {
+  const appPermissions = interaction.app_permissions?.trim();
+
+  if (!appPermissions) {
+    return null;
+  }
+
+  const missing = [
+    hasDiscordPermission(appPermissions, DISCORD_PERMISSION_SEND_MESSAGES) ? null : "傳送訊息",
+    hasDiscordPermission(appPermissions, DISCORD_PERMISSION_EMBED_LINKS) ? null : "嵌入連結",
+  ].filter((permission): permission is string => permission !== null);
+
+  if (missing.length === 0) {
+    return null;
+  }
+
+  return `我目前無法在 <#${channelId}> 發送公開價格報告。請確認 PartsRadarTW bot 在該頻道具備「${missing.join("」與「")}」權限。`;
+}
+
+function hasAnyDiscordPermission(value: string | undefined, permissions: bigint[]): boolean {
+  return (
+    hasDiscordPermission(value, DISCORD_PERMISSION_ADMINISTRATOR) ||
+    permissions.some((permission) => hasDiscordPermission(value, permission))
+  );
+}
+
+function hasDiscordPermission(value: string | undefined, permission: bigint): boolean {
+  const bitset = parseDiscordPermissionBitset(value);
+
+  return bitset !== null && (bitset & permission) === permission;
+}
+
+function parseDiscordPermissionBitset(value: string | undefined): bigint | null {
+  if (!value || !/^(0|[1-9][0-9]*)$/.test(value)) {
+    return null;
+  }
+
+  try {
+    return BigInt(value);
+  } catch {
+    return null;
+  }
+}
+
 async function readPublicPriceReportSettingsPanel({
   client,
   discordGuildId,
@@ -1232,7 +1353,17 @@ function formatPublicReportPreviewNotice(
     return formatDiscordRateLimitForUser();
   }
 
+  if (isDiscordMissingPermissionsError(result.message)) {
+    return `我目前無法在 <#${channelId}> 發送公開價格報告。請確認 PartsRadarTW bot 在該頻道具備「傳送訊息」與「嵌入連結」權限。`;
+  }
+
   return formatDiscordDeliveryFailureForUser(result.message);
+}
+
+function isDiscordMissingPermissionsError(message: string | null): boolean {
+  const normalized = message?.toLowerCase() ?? "";
+
+  return normalized.includes("code=50013") || normalized.includes("missing permissions");
 }
 
 async function readPriceReportSettingsPanel({
