@@ -235,7 +235,6 @@ export interface DiscordInteraction {
   };
   member?: {
     user?: DiscordUser;
-    permissions?: string;
   };
   user?: DiscordUser;
 }
@@ -304,6 +303,17 @@ export type ParsedPriceReportCommand =
     }
   | {
       name: "settings";
+    };
+
+export type ParsedPublicReportCommand =
+  | {
+      name: "status";
+    }
+  | {
+      name: "manage";
+    }
+  | {
+      name: "test";
     };
 
 export type ParsedPublicReportComponent =

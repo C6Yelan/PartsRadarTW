@@ -21,10 +21,7 @@ import {
   DISCORD_INTERACTION_TYPE_APPLICATION_COMMAND,
   DISCORD_INTERACTION_TYPE_MESSAGE_COMPONENT,
   DISCORD_INTERACTION_TYPE_MODAL_SUBMIT,
-  DISCORD_PERMISSION_ADMINISTRATOR,
   DISCORD_PERMISSION_EMBED_LINKS,
-  DISCORD_PERMISSION_MANAGE_CHANNELS,
-  DISCORD_PERMISSION_MANAGE_GUILD,
   DISCORD_PERMISSION_SEND_MESSAGES,
   MAX_PRICE_REPORT_ITEMS,
   MAX_PRICE_REPORT_KEYWORD_LENGTH,
@@ -154,7 +151,7 @@ async function handleApplicationCommandInteraction({
   const command = parsePriceReportInteraction(interaction);
   const watchCommand = command ? false : parseWatchInteraction(interaction);
   const publicReportCommand =
-    command || watchCommand ? false : parsePublicReportInteraction(interaction);
+    command || watchCommand ? null : parsePublicReportInteraction(interaction);
 
   if (!command && !watchCommand && !publicReportCommand) {
     await sendUnsupportedInteractionResponse({ interaction, options, fetchImpl });
@@ -247,8 +244,17 @@ async function handleApplicationCommandInteraction({
       return;
     }
 
-    if (!canManagePublicReport(interaction)) {
-      await sendPublicReportPermissionDeniedResponse({ interaction, options, fetchImpl });
+    if (publicReportCommand.name === "test") {
+      await sendPublicReportTest({
+        client,
+        interaction,
+        options,
+        cooldowns,
+        fetchImpl,
+        discordUserId,
+        publicContext,
+        missingSettingMessage: "尚未設定公開報告頻道，請先使用 `/public-report manage` 設定。",
+      });
       return;
     }
 
@@ -263,7 +269,10 @@ async function handleApplicationCommandInteraction({
       apiBaseUrl: options.apiBaseUrl,
       interaction,
       fetchImpl,
-      message: createPublicPriceReportSettingsPanelMessage(panel),
+      message:
+        publicReportCommand.name === "status"
+          ? createPublicPriceReportStatusMessage(panel)
+          : createPublicPriceReportSettingsPanelMessage(panel),
     });
     return;
   }
@@ -344,89 +353,16 @@ async function handleMessageComponentInteraction({
       return;
     }
 
-    if (!canManagePublicReport(interaction)) {
-      await sendPublicReportPermissionDeniedResponse({ interaction, options, fetchImpl });
-      return;
-    }
-
     if (publicReportComponent.name === "preview") {
-      const cooldown = cooldowns.consume(discordUserId, new Date());
-
-      if (!cooldown.allowed) {
-        await sendInteractionResponse({
-          token: options.token,
-          apiBaseUrl: options.apiBaseUrl,
-          interaction,
-          fetchImpl,
-          content: `請等待 ${cooldown.retryAfterSeconds} 秒後再發送下一份測試報告。`,
-        });
-        return;
-      }
-
-      await deferInteractionResponse({
-        token: options.token,
-        apiBaseUrl: options.apiBaseUrl,
-        interaction,
-        fetchImpl,
-        ephemeral: true,
-      });
-
-      const setting = await readPublicPriceReportSetting({
+      await sendPublicReportTest({
         client,
-        discordGuildId: publicContext.discordGuildId,
-      });
-
-      if (!setting) {
-        await editDeferredInteractionResponse({
-          token: options.token,
-          applicationId: options.applicationId,
-          apiBaseUrl: options.apiBaseUrl,
-          interaction,
-          fetchImpl,
-          content: "尚未設定公開報告頻道，請先按「設為此頻道」。",
-        });
-        return;
-      }
-
-      const permissionNotice =
-        setting.channelId === publicContext.channelId
-          ? formatPublicReportBotPermissionNotice(interaction, setting.channelId)
-          : null;
-
-      if (permissionNotice) {
-        await editDeferredInteractionResponse({
-          token: options.token,
-          applicationId: options.applicationId,
-          apiBaseUrl: options.apiBaseUrl,
-          interaction,
-          fetchImpl,
-          content: permissionNotice,
-        });
-        return;
-      }
-
-      const previewResult = await sendPublicPriceReportPreview({
-        client,
-        channelId: setting.channelId,
-        publicBaseUrl: options.publicBaseUrl,
-        maxItems: options.priceReportMaxItems,
-        sendChannelMessages: (channelId, messages) =>
-          sendDiscordChannelMessages({
-            token: options.token,
-            apiBaseUrl: options.apiBaseUrl,
-            channelId,
-            messages,
-            fetchImpl,
-          }),
-      });
-
-      await editDeferredInteractionResponse({
-        token: options.token,
-        applicationId: options.applicationId,
-        apiBaseUrl: options.apiBaseUrl,
         interaction,
+        options,
+        cooldowns,
         fetchImpl,
-        content: formatPublicReportPreviewNotice(previewResult, setting.channelId),
+        discordUserId,
+        publicContext,
+        missingSettingMessage: "尚未設定公開報告頻道，請先按「設為此頻道」。",
       });
       return;
     }
@@ -1145,28 +1081,102 @@ function readPublicReportInteractionContext(
   return discordGuildId && channelId ? { discordGuildId, channelId } : null;
 }
 
-function canManagePublicReport(interaction: DiscordInteraction): boolean {
-  return hasAnyDiscordPermission(interaction.member?.permissions, [
-    DISCORD_PERMISSION_MANAGE_GUILD,
-    DISCORD_PERMISSION_MANAGE_CHANNELS,
-  ]);
-}
-
-async function sendPublicReportPermissionDeniedResponse({
+async function sendPublicReportTest({
+  client,
   interaction,
   options,
+  cooldowns,
   fetchImpl,
+  discordUserId,
+  publicContext,
+  missingSettingMessage,
 }: {
+  client: DiscordBotClient;
   interaction: DiscordInteraction;
   options: DiscordBotOptions;
+  cooldowns: CommandCooldowns;
   fetchImpl: FetchImpl;
+  discordUserId: string;
+  publicContext: { discordGuildId: string; channelId: string };
+  missingSettingMessage: string;
 }): Promise<void> {
-  await sendInteractionResponse({
+  const cooldown = cooldowns.consume(discordUserId, new Date());
+
+  if (!cooldown.allowed) {
+    await sendInteractionResponse({
+      token: options.token,
+      apiBaseUrl: options.apiBaseUrl,
+      interaction,
+      fetchImpl,
+      content: `請等待 ${cooldown.retryAfterSeconds} 秒後再發送下一份測試報告。`,
+    });
+    return;
+  }
+
+  await deferInteractionResponse({
     token: options.token,
     apiBaseUrl: options.apiBaseUrl,
     interaction,
     fetchImpl,
-    content: "只有具備「管理伺服器」或「管理頻道」權限的成員可以調整公開價格報告。",
+    ephemeral: true,
+  });
+
+  const setting = await readPublicPriceReportSetting({
+    client,
+    discordGuildId: publicContext.discordGuildId,
+  });
+
+  if (!setting) {
+    await editDeferredInteractionResponse({
+      token: options.token,
+      applicationId: options.applicationId,
+      apiBaseUrl: options.apiBaseUrl,
+      interaction,
+      fetchImpl,
+      content: missingSettingMessage,
+    });
+    return;
+  }
+
+  const permissionNotice =
+    setting.channelId === publicContext.channelId
+      ? formatPublicReportBotPermissionNotice(interaction, setting.channelId)
+      : null;
+
+  if (permissionNotice) {
+    await editDeferredInteractionResponse({
+      token: options.token,
+      applicationId: options.applicationId,
+      apiBaseUrl: options.apiBaseUrl,
+      interaction,
+      fetchImpl,
+      content: permissionNotice,
+    });
+    return;
+  }
+
+  const previewResult = await sendPublicPriceReportPreview({
+    client,
+    channelId: setting.channelId,
+    publicBaseUrl: options.publicBaseUrl,
+    maxItems: options.priceReportMaxItems,
+    sendChannelMessages: (channelId, messages) =>
+      sendDiscordChannelMessages({
+        token: options.token,
+        apiBaseUrl: options.apiBaseUrl,
+        channelId,
+        messages,
+        fetchImpl,
+      }),
+  });
+
+  await editDeferredInteractionResponse({
+    token: options.token,
+    applicationId: options.applicationId,
+    apiBaseUrl: options.apiBaseUrl,
+    interaction,
+    fetchImpl,
+    content: formatPublicReportPreviewNotice(previewResult, setting.channelId),
   });
 }
 
@@ -1190,13 +1200,6 @@ function formatPublicReportBotPermissionNotice(
   }
 
   return `我目前無法在 <#${channelId}> 發送公開價格報告。請確認 PartsRadarTW bot 在該頻道具備「${missing.join("」與「")}」權限。`;
-}
-
-function hasAnyDiscordPermission(value: string | undefined, permissions: bigint[]): boolean {
-  return (
-    hasDiscordPermission(value, DISCORD_PERMISSION_ADMINISTRATOR) ||
-    permissions.some((permission) => hasDiscordPermission(value, permission))
-  );
 }
 
 function hasDiscordPermission(value: string | undefined, permission: bigint): boolean {
@@ -1268,21 +1271,37 @@ function createPublicPriceReportSettingsPanelMessage({
   };
 }
 
+function createPublicPriceReportStatusMessage(
+  panel: Awaited<ReturnType<typeof readPublicPriceReportSettingsPanel>>,
+): DiscordBotMessage {
+  return {
+    embeds: [
+      createPublicPriceReportSettingsEmbed({
+        ...panel,
+        title: "公開價格報告狀態",
+        description: "目前公開價格報告的設定與最近一次發送紀錄。",
+      }),
+    ],
+  };
+}
+
 function createPublicPriceReportSettingsEmbed({
   setting,
   latestDelivery,
   currentChannelId,
   notice,
-}: Awaited<ReturnType<typeof readPublicPriceReportSettingsPanel>>): DiscordBotEmbed {
-  const description = [
-    notice ? `**${notice}**` : null,
-    "公開價格報告會在排程爬蟲完成且有價格變動時，自動發送到指定頻道。",
-  ]
+  title = "公開價格報告設定",
+  description: baseDescription = "公開價格報告會在排程爬蟲完成且有價格變動時，自動發送到指定頻道。",
+}: Awaited<ReturnType<typeof readPublicPriceReportSettingsPanel>> & {
+  title?: string;
+  description?: string;
+}): DiscordBotEmbed {
+  const description = [notice ? `**${notice}**` : null, baseDescription]
     .filter((line): line is string => line !== null)
     .join("\n");
 
   return {
-    title: "公開價格報告設定",
+    title,
     description,
     color: DISCORD_EMBED_COLOR,
     fields: [

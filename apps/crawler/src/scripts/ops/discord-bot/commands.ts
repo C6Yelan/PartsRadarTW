@@ -16,7 +16,6 @@ import {
   DISCORD_OPTION_TYPE_INTEGER,
   DISCORD_OPTION_TYPE_STRING,
   DISCORD_OPTION_TYPE_SUBCOMMAND,
-  DISCORD_PERMISSION_MANAGE_CHANNELS,
   DISCORD_PERMISSION_MANAGE_GUILD,
   DISCORD_TEXT_INPUT_STYLE_SHORT,
   MAX_PRICE_REPORT_ITEMS,
@@ -31,6 +30,7 @@ import type {
   ParsedPriceReportCommand,
   ParsedPriceReportComponent,
   ParsedPriceReportModal,
+  ParsedPublicReportCommand,
   ParsedPublicReportComponent,
   ParsedWatchComponent,
   ParsedWatchModal,
@@ -134,13 +134,28 @@ export function createWatchCommand(): Record<string, unknown> {
 export function createPublicReportCommand(): Record<string, unknown> {
   return {
     name: "public-report",
-    description: "管理公開價格報告發送頻道。",
+    description: "管理伺服器公開價格報告。",
     type: DISCORD_COMMAND_TYPE_CHAT_INPUT,
     contexts: [DISCORD_APPLICATION_CONTEXT_GUILD],
     dm_permission: false,
-    default_member_permissions: (
-      DISCORD_PERMISSION_MANAGE_CHANNELS | DISCORD_PERMISSION_MANAGE_GUILD
-    ).toString(),
+    default_member_permissions: DISCORD_PERMISSION_MANAGE_GUILD.toString(),
+    options: [
+      {
+        type: DISCORD_OPTION_TYPE_SUBCOMMAND,
+        name: "status",
+        description: "查看公開價格報告狀態。",
+      },
+      {
+        type: DISCORD_OPTION_TYPE_SUBCOMMAND,
+        name: "manage",
+        description: "設定公開價格報告頻道與啟用狀態。",
+      },
+      {
+        type: DISCORD_OPTION_TYPE_SUBCOMMAND,
+        name: "test",
+        description: "發送一份測試公開價格報告。",
+      },
+    ],
   };
 }
 
@@ -258,8 +273,26 @@ export function parseWatchInteraction(interaction: DiscordInteraction): boolean 
   return interaction.data?.name === "watch";
 }
 
-export function parsePublicReportInteraction(interaction: DiscordInteraction): boolean {
-  return interaction.data?.name === "public-report";
+export function parsePublicReportInteraction(
+  interaction: DiscordInteraction,
+): ParsedPublicReportCommand | null {
+  if (interaction.data?.name !== "public-report") {
+    return null;
+  }
+
+  const subcommand = interaction.data.options?.find(
+    (option) => option.type === DISCORD_OPTION_TYPE_SUBCOMMAND,
+  );
+
+  if (
+    subcommand?.name === "status" ||
+    subcommand?.name === "manage" ||
+    subcommand?.name === "test"
+  ) {
+    return { name: subcommand.name };
+  }
+
+  return null;
 }
 
 function parseWatchActionCustomId(

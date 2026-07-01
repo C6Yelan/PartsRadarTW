@@ -118,10 +118,15 @@ describe("registerDiscordBotCommands", () => {
       }),
       expect.objectContaining({
         name: "public-report",
-        description: "管理公開價格報告發送頻道。",
+        description: "管理伺服器公開價格報告。",
         contexts: [0],
         dm_permission: false,
-        default_member_permissions: "48",
+        default_member_permissions: "32",
+        options: [
+          expect.objectContaining({ name: "status" }),
+          expect.objectContaining({ name: "manage" }),
+          expect.objectContaining({ name: "test" }),
+        ],
       }),
     ]);
     const registeredCommands = JSON.parse(String(globalRequestInit.body));
@@ -2808,7 +2813,7 @@ describe("sendPriceReportNow", () => {
     expect(messages[0]?.embeds?.[0]?.fields).toBeUndefined();
   });
 
-  it("shows the public report settings panel from the public-report command", async () => {
+  it("shows the public report status from the public-report status command", async () => {
     const client = createDiscordBotClient([]);
     const fetchMock = vi.fn<typeof fetch>(
       async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
@@ -2819,7 +2824,43 @@ describe("sendPriceReportNow", () => {
       options: createDiscordBotOptions(),
       cooldowns: new CommandCooldowns(60),
       fetchImpl: fetchMock as typeof fetch,
-      interaction: createPublicReportInteraction(),
+      interaction: createPublicReportInteraction({ subcommandName: "status" }),
+    });
+
+    const requestBody = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
+
+    expect(requestBody).toMatchObject({
+      type: 4,
+      data: {
+        flags: 64,
+        embeds: [
+          expect.objectContaining({
+            title: "公開價格報告狀態",
+            description: expect.stringContaining("最近一次發送紀錄"),
+            fields: expect.arrayContaining([
+              expect.objectContaining({ name: "狀態", value: "尚未設定" }),
+              expect.objectContaining({ name: "發送頻道", value: "尚未設定" }),
+              expect.objectContaining({ name: "目前頻道", value: "<#999988887777666655>" }),
+            ]),
+          }),
+        ],
+      },
+    });
+    expect(requestBody.data.components).toBeUndefined();
+  });
+
+  it("shows the public report settings panel from the public-report manage command", async () => {
+    const client = createDiscordBotClient([]);
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createPublicReportInteraction({ subcommandName: "manage" }),
     });
 
     const requestBody = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
@@ -2855,33 +2896,6 @@ describe("sendPriceReportNow", () => {
         ]),
       },
     });
-  });
-
-  it("rejects public report management from users without server or channel management permissions", async () => {
-    const client = createDiscordBotClient([]);
-    const fetchMock = vi.fn<typeof fetch>(
-      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
-    );
-
-    await handleDiscordInteraction({
-      client,
-      options: createDiscordBotOptions(),
-      cooldowns: new CommandCooldowns(60),
-      fetchImpl: fetchMock as typeof fetch,
-      interaction: createPublicReportInteraction({ memberPermissions: "0" }),
-    });
-
-    const requestBody = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
-
-    expect(requestBody).toMatchObject({
-      type: 4,
-      data: {
-        flags: 64,
-        content: expect.stringContaining("管理伺服器"),
-      },
-    });
-    expect(String(fetchMock.mock.calls[0]?.[1]?.body)).toContain("管理頻道");
-    expect(client.discordPublicPriceReportSetting.findUnique).not.toHaveBeenCalled();
   });
 
   it("sets the current channel as the public report channel", async () => {
@@ -2948,6 +2962,60 @@ describe("sendPriceReportNow", () => {
     expect(responseBody.content).toContain("無法在 <#999988887777666655> 發送公開價格報告");
     expect(responseBody.content).toContain("嵌入連結");
     expect(responseBody.content).not.toContain("Administrator");
+  });
+
+  it("sends a public report preview from the public-report test command", async () => {
+    const now = new Date();
+    const oldCapturedAt = new Date(now.getTime() - 25 * 60 * 60 * 1000).toISOString();
+    const newCapturedAt = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
+    const client = createDiscordBotClient(
+      [
+        snapshot({
+          id: "public-test-old",
+          productId: "public-test-product",
+          productName: "華碩 GPU A",
+          crawlRunId: "old-run",
+          price: 12_000,
+          capturedAt: oldCapturedAt,
+        }),
+        snapshot({
+          id: "public-test-new",
+          productId: "public-test-product",
+          productName: "華碩 GPU A",
+          crawlRunId: "new-run",
+          price: 10_990,
+          capturedAt: newCapturedAt,
+        }),
+      ],
+      [],
+      [],
+      [...TEST_SOURCE_CATEGORIES],
+      [],
+      [],
+      [],
+      [publicPriceReportSetting({ id: "public-setting-1" })],
+    );
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createPublicReportInteraction({ subcommandName: "test" }),
+    });
+
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({
+      type: 5,
+      data: { flags: 64 },
+    });
+    expect(fetchMock.mock.calls[1]?.[0]).toBe(
+      `${API_BASE_URL}/channels/999988887777666655/messages`,
+    );
+    const responseBody = JSON.parse(String(fetchMock.mock.calls[2]?.[1]?.body));
+    expect(responseBody.content).toContain("已發送測試公開報告到 <#999988887777666655>");
   });
 
   it("sends a public report preview to the configured channel", async () => {
@@ -3553,12 +3621,12 @@ function createInteraction(
 function createPublicReportInteraction({
   guildId = "guild-1",
   channelId = "999988887777666655",
-  memberPermissions = "48",
+  subcommandName = "manage",
   appPermissions = "18432",
 }: {
   guildId?: string;
   channelId?: string;
-  memberPermissions?: string;
+  subcommandName?: "status" | "manage" | "test";
   appPermissions?: string;
 } = {}): DiscordInteraction {
   return {
@@ -3570,12 +3638,17 @@ function createPublicReportInteraction({
     app_permissions: appPermissions,
     data: {
       name: "public-report",
+      options: [
+        {
+          type: 1,
+          name: subcommandName,
+        },
+      ],
     },
     member: {
       user: {
         id: "111122223333444455",
       },
-      permissions: memberPermissions,
     },
   };
 }
@@ -3585,12 +3658,10 @@ function createPublicReportButtonInteraction(
   {
     guildId = "guild-1",
     channelId = "999988887777666655",
-    memberPermissions = "48",
     appPermissions = "18432",
   }: {
     guildId?: string;
     channelId?: string;
-    memberPermissions?: string;
     appPermissions?: string;
   } = {},
 ): DiscordInteraction {
@@ -3609,7 +3680,6 @@ function createPublicReportButtonInteraction(
       user: {
         id: "111122223333444455",
       },
-      permissions: memberPermissions,
     },
   };
 }
