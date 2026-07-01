@@ -8,8 +8,13 @@ import {
   readNextScheduledPriceReportDueAt,
   sendDueScheduledPriceReports,
 } from "./price-report";
+import { sendPendingPublicPriceReports } from "./public-price-report";
 import { registerDiscordBotCommands } from "./registration";
-import { formatDiscordRestFailure, sendDiscordDirectMessages } from "./rest";
+import {
+  formatDiscordRestFailure,
+  sendDiscordChannelMessages,
+  sendDiscordDirectMessages,
+} from "./rest";
 import { sendDueTargetPriceNotifications } from "./target-price-notification";
 import type {
   DiscordBotClient,
@@ -134,6 +139,26 @@ async function runNotificationLoop({
 
     try {
       const now = new Date();
+      const publicSummary = await sendPendingPublicPriceReports({
+        client,
+        options,
+        now,
+        sendChannelMessages: (channelId, messages) =>
+          sendDiscordChannelMessages({
+            token: options.token,
+            apiBaseUrl: options.apiBaseUrl,
+            channelId,
+            messages,
+            fetchImpl,
+          }),
+      });
+
+      if (publicSummary.processedCount > 0) {
+        logMessage(
+          `Public price reports processed. processed=${publicSummary.processedCount} sent=${publicSummary.sentCount} skipped=${publicSummary.skippedCount} rateLimited=${publicSummary.rateLimitedCount} failed=${publicSummary.failedCount}`,
+        );
+      }
+
       const summary = await sendDueScheduledPriceReports({
         client,
         options,

@@ -68,11 +68,6 @@ describe("CoolPC scheduled crawler daemon options", () => {
         timeoutMs: 18000,
         maxSourceBytes: 4194304,
       },
-      priceChangeDiscordNotification: {
-        publicWebhookUrl: null,
-        publicBaseUrl: "https://partsradar.net/",
-        maxItems: 50,
-      },
     });
   });
 
@@ -208,9 +203,6 @@ describe("CoolPC scheduled crawler daemon options", () => {
           ],
         };
       },
-      notifyPriceChanges: async () => {
-        calls.push("notify-price-changes");
-      },
       backfillNewProductImages: async ({ productIds }) => {
         expect(productIds).toEqual(["product-1"]);
         calls.push("backfill-new-product-images");
@@ -222,7 +214,6 @@ describe("CoolPC scheduled crawler daemon options", () => {
       "acquire-lock",
       "crawl-categories",
       "release-lock",
-      "notify-price-changes",
       "backfill-new-product-images",
     ]);
   });
@@ -281,16 +272,13 @@ describe("CoolPC scheduled crawler daemon options", () => {
           },
         ],
       }),
-      notifyPriceChanges: async () => {
-        calls.push("notify-price-changes");
-      },
       backfillNewProductImages: async () => {
         calls.push("backfill-new-product-images");
       },
     });
 
     expect(result).toEqual({ shouldBackoff: true });
-    expect(calls).toEqual(["release-lock", "notify-price-changes"]);
+    expect(calls).toEqual(["release-lock"]);
   });
 
   it("retries sooner when every category failed during fetch", async () => {
@@ -335,9 +323,6 @@ describe("CoolPC scheduled crawler daemon options", () => {
             },
           ],
         }),
-        notifyPriceChanges: async () => {
-          calls.push("notify-price-changes");
-        },
         backfillNewProductImages: async () => {
           calls.push("backfill-new-product-images");
         },
@@ -345,7 +330,7 @@ describe("CoolPC scheduled crawler daemon options", () => {
     );
 
     expect(result).toEqual({ shouldBackoff: true, retryAfterSeconds: 600 });
-    expect(calls).toEqual(["release-lock", "notify-price-changes"]);
+    expect(calls).toEqual(["release-lock"]);
   });
 });
 
@@ -379,11 +364,6 @@ function createDaemonOptions(overrides: Partial<CoolpcDaemonOptions> = {}): Cool
       maxDelayMs: 12000,
       timeoutMs: 15000,
       maxSourceBytes: 5 * 1024 * 1024,
-    },
-    priceChangeDiscordNotification: {
-      publicWebhookUrl: null,
-      publicBaseUrl: "https://partsradar.net/",
-      maxItems: 50,
     },
     ...overrides,
   };

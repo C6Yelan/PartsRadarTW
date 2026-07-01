@@ -19,6 +19,7 @@ export { parseDiscordBotOptions, printDiscordBotHelp } from "./discord-bot/optio
 export type { ScheduledPriceReportSummary } from "./discord-bot/price-report";
 export {
   calculateScheduledPriceReportSleepMs,
+  createPublicPriceChangeReportMessages,
   disablePriceReport,
   enableDailyPriceReport,
   formatPriceReportSettingMessage,
@@ -29,12 +30,15 @@ export {
   sendDueScheduledPriceReports,
   sendPriceReportNow,
 } from "./discord-bot/price-report";
+export type { PublicPriceReportSummary } from "./discord-bot/public-price-report";
+export { sendPendingPublicPriceReports } from "./discord-bot/public-price-report";
 export { registerDiscordBotCommands } from "./discord-bot/registration";
 export {
   deferInteractionMessageUpdate,
   deferInteractionResponse,
   formatDiscordBotText,
   formatDiscordRestFailure,
+  sendDiscordChannelMessages,
   sendDiscordDirectMessages,
   sendDiscordInteractionMessages,
   sendDiscordRestRequest,

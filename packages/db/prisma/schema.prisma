@@ -294,19 +294,39 @@ model DiscordNotificationDelivery {
   @@map("discord_notification_deliveries")
 }
 
+model DiscordPublicPriceReportDelivery {
+  id           String                    @id @default(uuid()) @db.Uuid
+  crawlRunId   String                    @map("crawl_run_id") @db.Uuid
+  crawlRun     CrawlRun                  @relation(fields: [crawlRunId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  channelId    String                    @map("channel_id") @db.Text
+  status       DiscordNotificationStatus
+  itemCount    Int                       @default(0) @map("item_count")
+  messageCount Int                       @default(0) @map("message_count")
+  errorMessage String?                   @map("error_message") @db.Text
+  deliveredAt  DateTime?                 @map("delivered_at") @db.Timestamptz(6)
+  createdAt    DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime                  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([crawlRunId, channelId], map: "discord_public_report_deliveries_run_channel_key")
+  @@index([channelId, createdAt], map: "discord_public_price_report_deliveries_channel_created_at_idx")
+  @@index([status, createdAt], map: "discord_public_price_report_deliveries_status_created_at_idx")
+  @@map("discord_public_price_report_deliveries")
+}
+
 model CrawlRun {
-  id              String                   @id @default(uuid()) @db.Uuid
-  status          CrawlRunStatus           @default(RUNNING)
-  startedAt       DateTime                 @default(now()) @map("started_at") @db.Timestamptz(6)
-  finishedAt      DateTime?                @map("finished_at") @db.Timestamptz(6)
-  triggerType     CrawlTriggerType         @map("trigger_type")
-  errorMessage    String?                  @map("error_message") @db.Text
-  backoffUntil    DateTime?                @map("backoff_until") @db.Timestamptz(6)
-  createdAt       DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
-  categoryResults CrawlRunCategoryResult[]
-  rawSnapshots    RawSnapshot[]
-  priceSnapshots  PriceSnapshot[]
-  parseErrors     ParseError[]
+  id                          String                             @id @default(uuid()) @db.Uuid
+  status                      CrawlRunStatus                     @default(RUNNING)
+  startedAt                   DateTime                           @default(now()) @map("started_at") @db.Timestamptz(6)
+  finishedAt                  DateTime?                          @map("finished_at") @db.Timestamptz(6)
+  triggerType                 CrawlTriggerType                   @map("trigger_type")
+  errorMessage                String?                            @map("error_message") @db.Text
+  backoffUntil                DateTime?                          @map("backoff_until") @db.Timestamptz(6)
+  createdAt                   DateTime                           @default(now()) @map("created_at") @db.Timestamptz(6)
+  categoryResults             CrawlRunCategoryResult[]
+  rawSnapshots                RawSnapshot[]
+  priceSnapshots              PriceSnapshot[]
+  parseErrors                 ParseError[]
+  publicPriceReportDeliveries DiscordPublicPriceReportDelivery[]
 
   @@index([startedAt], map: "crawl_runs_started_at_idx")
   @@index([status], map: "crawl_runs_status_idx")

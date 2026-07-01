@@ -2,12 +2,6 @@
 
 import type { PrismaClient } from "@partsradar/db";
 
-export interface PriceChangeDiscordNotificationOptions {
-  publicWebhookUrl: string | null;
-  publicBaseUrl: string;
-  maxItems: number;
-}
-
 export interface PriceChangeDiscordNotificationItem {
   productId: string;
   productName: string;
@@ -53,49 +47,6 @@ export interface RecentPriceReportFilters {
   includeNewProducts?: boolean;
 }
 
-export type PriceChangeDiscordNotificationSkipReason =
-  | "missing_webhook_url"
-  | "no_price_changes"
-  | "sender_skipped";
-
-export type PriceChangeDiscordNotificationResult =
-  | {
-      status: "skipped";
-      reason: PriceChangeDiscordNotificationSkipReason;
-      changeCount: number;
-      listedCount: number;
-      messageCount: number;
-      snapshotCount?: number;
-      unmatchedSnapshotCount?: number;
-      unchangedSnapshotCount?: number;
-      currencyMismatchCount?: number;
-    }
-  | {
-      status: "sent";
-      changeCount: number;
-      listedCount: number;
-      messageCount: number;
-      httpStatuses: number[];
-    }
-  | {
-      status: "rate_limited";
-      changeCount: number;
-      listedCount: number;
-      messageCount: number;
-      sentMessageCount: number;
-      retryAfterMs: number;
-      global: boolean;
-    }
-  | {
-      status: "failed";
-      changeCount: number;
-      listedCount: number;
-      messageCount: number;
-      sentMessageCount: number;
-      httpStatus: number | null;
-      message: string;
-    };
-
 export type PriceChangeDiscordClient = Pick<PrismaClient, "priceSnapshot">;
 
 export interface CrawlRunPriceSnapshot {
@@ -136,13 +87,4 @@ export interface RecentPriceChangeOptions {
   since: Date;
   until?: Date;
   filters?: RecentPriceReportFilters;
-}
-
-export interface PriceChangeReportMessageOptions {
-  publicBaseUrl: string;
-  maxItems: number;
-  title?: string;
-  browseLabel?: string;
-  hiddenLimitLabel?: string;
-  emptyMessage?: string;
 }

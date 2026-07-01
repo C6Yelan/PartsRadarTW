@@ -117,6 +117,28 @@ export async function sendDiscordDirectMessages({
     };
   }
 
+  return sendDiscordChannelMessages({
+    token,
+    apiBaseUrl,
+    channelId,
+    messages,
+    fetchImpl,
+  });
+}
+
+export async function sendDiscordChannelMessages({
+  token,
+  apiBaseUrl,
+  channelId,
+  messages,
+  fetchImpl = fetch,
+}: {
+  token: string;
+  apiBaseUrl: string;
+  channelId: string;
+  messages: DiscordBotMessage[];
+  fetchImpl?: FetchImpl;
+}): Promise<DiscordBotMessageSendResult> {
   const httpStatuses: number[] = [];
 
   for (const message of messages) {

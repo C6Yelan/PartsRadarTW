@@ -469,15 +469,13 @@ http://127.0.0.1:3001/ops/status?token=<OPS_STATUS_TOKEN>
 - 若需要遠端查看，優先用 SSH tunnel 或內網 VPN，不把 `ops-web` 暴露到 public tunnel。
 - `OPS_STATUS_TOKEN` 不得提交 Git，也不得放入公開文件、Discord 或 issue。
 
-## Discord Webhook Notification Foundation
+## Discord Admin Webhook Notification Foundation
 
-目前已實作的 Discord webhook 通知基礎使用 incoming webhook。`crawler-daemon` 會在每輪 scheduled crawl 成功寫入價格變動後，以 embed 對公開頻道列出本輪變價商品與金額差；`smoke-daemon` 則在每輪 production smoke summary 後，依 notification policy 以 embed 對管理者頻道送出 `WARN` / `FAIL` / `RECOVERED` 通知，包含近 24 小時 Discord bot delivery failed / rate limited 訊號。Discord bot foundation 與 slash command 行為另見下方 bot 小節。
+Discord webhook 僅保留給管理者告警。`smoke-daemon` 會在每輪 production smoke summary 後，依 notification policy 以 embed 對管理者頻道送出 `WARN` / `FAIL` / `RECOVERED` 通知，包含近 24 小時 Discord bot delivery failed / rate limited 訊號。公開價格報告由 Discord bot 發送，另見下方 bot 小節。
 
 可選 secret：
 
-- `DISCORD_PUBLIC_WEBHOOK_URL`：公開頻道 webhook，第一輪只用於公開價格變動清單。
 - `DISCORD_ADMIN_WEBHOOK_URL`：管理者頻道 webhook，可用於維運告警，但仍不得包含 secret、raw HTML、stack trace、raw IP、internal header dump 或完整 DB URL。
-- `PRICE_CHANGE_DISCORD_MAX_ITEMS`：單輪 crawler public Discord 變價通知最多列出的商品數，預設 50，可調高到 200。超過上限時只列出前 N 筆，訊息會標示被上限隱藏的筆數。
 - `SMOKE_DISCORD_STATE_FILE`：smoke Discord notification policy 狀態檔；local script 預設 `storage/ops/smoke-discord-state.json`，Compose `smoke-daemon` 預設 `/var/lib/partsradar/snapshots/ops/smoke-discord-state.json`，讓 dedupe state 留在 named volume。部署主機若曾設定 `SMOKE_DISCORD_STATE_FILE=storage/ops/smoke-discord-state.json`，建議移除該行或改成 container absolute path，避免 state 寫在 ephemeral container filesystem。
 - `SMOKE_DISCORD_COOLDOWN_SECONDS`：相同 smoke 異常通知的再次提醒間隔，預設 3600 秒。
 
@@ -491,16 +489,6 @@ http://127.0.0.1:3001/ops/status?token=<OPS_STATUS_TOKEN>
 - notifier policy 不得把 secret、raw HTML、stack trace、raw IP、internal header dump、完整 DB URL 或未整理的第三方來源內容傳給 sender。
 - Discord rate limit 不硬寫固定限制；sender 會回傳 `Retry-After` / `retry_after` 解析出的等待時間，後續 notifier policy 再決定何時重試。
 
-public price-change notification 行為：
-
-- `crawler-daemon` 每輪 scheduled crawl 結束後，用該輪 `crawlRunId` 讀取新建立的 `price_snapshots`，並和同商品上一筆 snapshot 比對。
-- `SUCCESS_CHANGED` 代表分類解析結果 hash 變動，可能是商品名稱、圖片、商品新增 / 消失或價格變動；它不等於一定有可發送的舊價 / 新價差。
-- 只有已有舊價且價格真的改變的商品會送到公開 Discord；第一批新品、沒有舊價的商品、同價更新不會送出。
-- `crawler-daemon` log 會列出每輪與每分類的 `priceSnapshots`，並在跳過通知時列出 `queriedSnapshots`、`unmatchedSnapshots`、`unchangedSnapshots` 與 `currencyMismatches`。若 `priceSnapshots > 0` 但 `unmatchedSnapshots > 0`，通常代表新品、商品 identity 改變或缺少同 product id 的前一筆價格。
-- 訊息使用 Discord embed，依 DB 的 `sourceCategory.displayName` 大分類與 `vendorName` 小分類分組，列出商品名稱、站內商品連結、舊價、新價與差額，時間以 Asia/Taipei 的 `MM/DD HH:MM GMT+8` 顯示。
-- 公開訊息不包含 iBuy token、來源購買 URL、raw HTML、crawler error detail、DB/internal URL 或維運 link-health/smoke 明細。
-- 沒有變價或未設定 `DISCORD_PUBLIC_WEBHOOK_URL` 時不送 Discord；public webhook 發送失敗或 rate limit 只寫安全 log，不會讓 crawler daemon 停止。
-
 smoke Discord notification policy 行為：
 
 - 未設定 `DISCORD_ADMIN_WEBHOOK_URL` 時略過通知，且不更新 notification state。
@@ -512,12 +500,13 @@ smoke Discord notification policy 行為：
 - Discord 發送失敗、rate limit 或 state file 寫入失敗只會寫入安全 log，不會讓 `smoke-daemon` 崩潰或停止後續檢查。
 - `--run-once` 也會走相同 policy，可用於主機端單次驗證。
 
-## Discord Bot Personalized Notifications
+## Discord Bot Notifications
 
-Discord bot foundation 已開始實作，並和 webhook foundation 分開。Webhook 只做公開價格變動廣播與 admin smoke 告警；Discord bot 才處理使用者 slash command 與個人化通知。手動報告會回覆在指令發出的 Discord context；每日價格提醒以 DM 發送。
+Discord bot 處理公開價格報告、使用者 slash command 與個人化通知。公開價格報告會發送到設定的伺服器頻道；手動報告會回覆在指令發出的 Discord context；每日價格提醒以 DM 發送。
 
 Bot 目標：
 
+- 公開價格報告：本輪 scheduled crawl 有既有商品價格變動時，由 bot 發送到指定公開頻道。
 - 個人目標價提醒：使用者追蹤單一商品，價格小於等於目標價時收到 DM。
 - 個人價格變動報告：使用者設定固定 interval / window / scope、分類篩選與內容類型篩選，定期收到特定時間段內實際變價商品報告。
 
@@ -525,6 +514,8 @@ Bot 目標：
 
 - `discord-bot` Compose profile 與 `pnpm ops:discord-bot` daemon entrypoint。
 - Discord slash command registration。
+- Public price report：bot daemon 掃描 scheduled crawl 後尚未送出的 `crawlRunId`，讀取該輪新建立的 `price_snapshots`，和同商品上一筆 snapshot 比對，只有已有舊價且價格真的改變的商品會送到公開 Discord；第一批新品、沒有舊價的商品、同價更新不會送出。
+- Public price report 訊息使用 bot embed，依 DB 的 `sourceCategory.displayName` 大分類與 `vendorName` 小分類分組，列出 signed 漲跌金額、舊價、新價、商品名稱與站內商品連結。送達、略過、失敗與 rate limit 會寫入 `discord_public_price_report_deliveries`，以 `crawlRunId + channelId` 去重。
 - `/price-report now`：使用者手動要求最近 `24h` / `12h` / `6h` 價格報告，bot 會在指令發出的頻道或私訊 context 以 embed 回覆中文報告；若使用者已有啟用中的每日設定，未明確覆蓋的手動報告會沿用該設定的分類、商品名稱關鍵字、內容類型與上限，方便手動確認報告內容。
 - Slash command 只註冊 global command，供伺服器與 DM 使用，避免 Discord client 同時顯示 global 與 guild 的重複 `/price-report`。
 - `/price-report now` 報告只為有資料的「價格變動」或「新增商品」產生 embed；摘要時間、統計數字與價格變動方向標題使用 Markdown emphasis 強化區隔；價格變動 embed 先分「降價」與「漲價」，商品列以單行呈現 signed 漲跌金額、舊價、新價與站內商品連結；新增商品 embed 以單行呈現目前價格與站內商品連結；兩者都依 DB 的 `sourceCategory.displayName` 大分類與 `vendorName` 小分類分組，並在小分類已顯示品牌時移除商品名稱開頭重複品牌；兩邊都沒資料時才送一個空報告摘要。
@@ -547,8 +538,9 @@ Bot 目標：
 
 - `DISCORD_BOT_TOKEN`：Discord bot token，只能放在 untracked `.env` 或部署 secret。
 - `DISCORD_APPLICATION_ID`：Discord application id。
+- `DISCORD_PUBLIC_REPORT_CHANNEL_ID`：公開價格報告發送頻道；未設定時不送公開價格報告。
 - `DISCORD_BOT_REGISTER_COMMANDS_ON_START`：daemon 啟動時是否註冊 slash command，預設 `true`。
-- `DISCORD_PRICE_REPORT_MAX_ITEMS`：`/price-report now` 最多列出的商品數，預設 50。
+- `DISCORD_PRICE_REPORT_MAX_ITEMS`：公開價格報告與 `/price-report now` 最多列出的商品數，預設 50。
 - `DISCORD_BOT_COMMAND_COOLDOWN_SECONDS`：每位使用者手動指令 cooldown，預設 60。
 - `DISCORD_PRICE_REPORT_SCHEDULE_INTERVAL_SECONDS`：bot daemon 的目標價掃描間隔與每日報告 fallback 掃描上限，預設 300 秒，允許 60 到 3600。每日報告若有更早的 `nextSendAt`，daemon 會睡到該 due time 附近才醒來；目標價仍依設定間隔掃描，最短 sleep 為 1 秒，避免高頻輪詢。
 

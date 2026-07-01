@@ -9,6 +9,7 @@ export interface DiscordBotOptions {
   token: string;
   applicationId: string;
   publicBaseUrl: string;
+  publicReportChannelId: string | null;
   apiBaseUrl: string;
   gatewayUrl: string;
   registerCommands: boolean;
@@ -23,7 +24,9 @@ export type DiscordBotClient = PriceChangeDiscordClient &
     PrismaClient,
     | "discordNotificationDelivery"
     | "discordPriceReportSetting"
+    | "discordPublicPriceReportDelivery"
     | "discordTargetPriceWatch"
+    | "crawlRun"
     | "product"
     | "sourceCategory"
   >;

@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   CommandCooldowns,
   calculateScheduledPriceReportSleepMs,
+  createPublicPriceChangeReportMessages,
   type DiscordBotClient,
   type DiscordBotEmbed,
   type DiscordBotMessage,
@@ -15,9 +16,11 @@ import {
   readNextScheduledPriceReportDueAt,
   registerDiscordBotCommands,
   runGatewaySession,
+  sendDiscordChannelMessages,
   sendDiscordDirectMessages,
   sendDiscordInteractionMessages,
   sendDueScheduledPriceReports,
+  sendPendingPublicPriceReports,
   sendDueTargetPriceNotifications,
   sendPriceReportNow,
 } from "../../../src/scripts/ops/discord-bot";
@@ -48,6 +51,7 @@ describe("Discord bot options", () => {
       token: TOKEN,
       applicationId: APPLICATION_ID,
       publicBaseUrl: "https://partsradar.test/",
+      publicReportChannelId: null,
       apiBaseUrl: "https://discord.com/api/v10",
       registerCommands: false,
       registerCommandsOnStart: true,
@@ -55,6 +59,26 @@ describe("Discord bot options", () => {
       commandCooldownSeconds: 60,
       priceReportScheduleIntervalSeconds: 300,
     });
+  });
+
+  it("reads an optional public report channel id", () => {
+    expect(
+      parseDiscordBotOptions([], {
+        DISCORD_BOT_TOKEN: TOKEN,
+        DISCORD_APPLICATION_ID: APPLICATION_ID,
+        DISCORD_PUBLIC_REPORT_CHANNEL_ID: "999988887777666655",
+      }),
+    ).toMatchObject({
+      publicReportChannelId: "999988887777666655",
+    });
+
+    expect(() =>
+      parseDiscordBotOptions([], {
+        DISCORD_BOT_TOKEN: TOKEN,
+        DISCORD_APPLICATION_ID: APPLICATION_ID,
+        DISCORD_PUBLIC_REPORT_CHANNEL_ID: "not-a-channel",
+      }),
+    ).toThrow("DISCORD_PUBLIC_REPORT_CHANNEL_ID must be a Discord snowflake id");
   });
 
   it("rejects missing token or invalid ids", () => {
@@ -270,6 +294,38 @@ describe("sendDiscordDirectMessages", () => {
       sentMessageCount: 0,
       retryAfterMs: 1250,
       global: true,
+    });
+  });
+});
+
+describe("sendDiscordChannelMessages", () => {
+  it("posts messages to a channel with mentions disabled", async () => {
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await expect(
+      sendDiscordChannelMessages({
+        token: TOKEN,
+        apiBaseUrl: API_BASE_URL,
+        channelId: "999988887777666655",
+        messages: [{ content: "Public report @everyone" }],
+        fetchImpl: fetchMock as typeof fetch,
+      }),
+    ).resolves.toEqual({
+      status: "sent",
+      messageCount: 1,
+      httpStatuses: [200],
+    });
+
+    const [url, request] = fetchMock.mock.calls[0] as [Parameters<typeof fetch>[0], RequestInit];
+    expect(String(url)).toBe(`${API_BASE_URL}/channels/999988887777666655/messages`);
+    expect(request.method).toBe("POST");
+    expect(JSON.parse(String(request.body))).toMatchObject({
+      content: "Public report @everyone",
+      allowed_mentions: {
+        parse: [],
+      },
     });
   });
 });
@@ -2210,10 +2266,11 @@ describe("sendDueTargetPriceNotifications", () => {
   it("splits long target price notification digests into multiple embeds", async () => {
     const snapshots = Array.from({ length: 25 }, (_, index) => {
       const suffix = String(index + 1).padStart(12, "0");
+      const productId = `50000000-0000-4000-8000-${suffix}-${"x".repeat(160)}`;
 
       return snapshot({
         id: `snapshot-target-${index + 1}`,
-        productId: `50000000-0000-4000-8000-${suffix}`,
+        productId,
         productName: `超長商品名稱測試 ${index + 1} RTX 5090 WHITE OC 32GB GDDR7 三風扇 顯示卡 限量版本 搭優惠到月底`,
         crawlRunId: "new-run",
         price: 30_000 + index,
@@ -2724,6 +2781,210 @@ describe("sendPriceReportNow", () => {
     );
   });
 
+  it("creates public price-change report messages with the bot embed format", () => {
+    const messages = createPublicPriceChangeReportMessages(
+      [
+        {
+          productId: "product-1",
+          productName: "華碩 GPU A",
+          category: { igrp: 12, displayName: "顯示卡" },
+          subcategory: { slug: "asus", displayName: "華碩" },
+          previousPrice: 12_000,
+          currentPrice: 10_990,
+          currency: "TWD",
+          changedAt: new Date("2026-06-07T03:00:00.000Z"),
+          delta: -1010,
+        },
+      ],
+      {
+        publicBaseUrl: PUBLIC_BASE_URL,
+        maxItems: 50,
+        generatedAt: new Date("2026-06-07T05:00:00.000Z"),
+      },
+    );
+
+    expect(messages).toEqual([
+      {
+        embeds: [
+          expect.objectContaining({
+            title: "PartsRadarTW 公開價格報告 - 價格變動",
+            description: expect.stringContaining("本輪更新：**降價 1**，**漲價 0**"),
+          }),
+        ],
+      },
+    ]);
+    expect(messages[0]?.embeds?.[0]?.description).toContain(
+      "\n__**降價 (1)**__\n**顯示卡**\n**華碩**\n- **-NT$1,010** NT$12,000 -> NT$10,990 [GPU A]",
+    );
+    expect(messages[0]?.embeds?.[0]?.fields).toBeUndefined();
+  });
+
+  it("sends pending public price reports to the configured channel", async () => {
+    const client = createDiscordBotClient(
+      [
+        snapshot({
+          id: "old-public-1",
+          productId: "product-public-1",
+          productName: "華碩 GPU A",
+          crawlRunId: "old-run",
+          price: 12_000,
+          capturedAt: "2026-06-06T01:00:00.000Z",
+        }),
+        snapshot({
+          id: "new-public-1",
+          productId: "product-public-1",
+          productName: "華碩 GPU A",
+          crawlRunId: "public-run-1",
+          price: 10_990,
+          capturedAt: "2026-06-07T03:00:00.000Z",
+        }),
+      ],
+      [],
+      [],
+      [...TEST_SOURCE_CATEGORIES],
+      [],
+      [],
+      [
+        crawlRun({
+          id: "public-run-1",
+          finishedAt: new Date("2026-06-07T03:05:00.000Z"),
+        }),
+      ],
+    );
+    const sendChannelMessages = vi.fn(
+      async (_channelId: string, _messages: DiscordBotMessage[]) => ({
+        status: "sent" as const,
+        messageCount: 1,
+        httpStatuses: [200],
+      }),
+    );
+
+    await expect(
+      sendPendingPublicPriceReports({
+        client,
+        options: {
+          ...createDiscordBotOptions(),
+          publicReportChannelId: "999988887777666655",
+        },
+        now: new Date("2026-06-07T05:00:00.000Z"),
+        sendChannelMessages,
+      }),
+    ).resolves.toEqual({
+      processedCount: 1,
+      sentCount: 1,
+      skippedCount: 0,
+      rateLimitedCount: 0,
+      failedCount: 0,
+    });
+
+    expect(sendChannelMessages).toHaveBeenCalledWith(
+      "999988887777666655",
+      expect.arrayContaining([
+        expect.objectContaining({
+          embeds: [
+            expect.objectContaining({
+              title: "PartsRadarTW 公開價格報告 - 價格變動",
+              description: expect.stringContaining("GPU A"),
+            }),
+          ],
+        }),
+      ]),
+    );
+    expect(client.discordPublicPriceReportDelivery.upsert).toHaveBeenCalledWith({
+      where: {
+        crawlRunId_channelId: {
+          crawlRunId: "public-run-1",
+          channelId: "999988887777666655",
+        },
+      },
+      create: expect.objectContaining({
+        crawlRunId: "public-run-1",
+        channelId: "999988887777666655",
+        status: "SENT",
+        itemCount: 1,
+        messageCount: 1,
+        deliveredAt: new Date("2026-06-07T05:00:00.000Z"),
+      }),
+      update: expect.objectContaining({
+        status: "SENT",
+        itemCount: 1,
+        messageCount: 1,
+        deliveredAt: new Date("2026-06-07T05:00:00.000Z"),
+      }),
+    });
+  });
+
+  it("skips public price reports when no channel is configured", async () => {
+    const client = createDiscordBotClient(
+      [],
+      [],
+      [],
+      [...TEST_SOURCE_CATEGORIES],
+      [],
+      [],
+      [crawlRun({ id: "public-run-1" })],
+    );
+    const sendChannelMessages = vi.fn();
+
+    await expect(
+      sendPendingPublicPriceReports({
+        client,
+        options: createDiscordBotOptions(),
+        now: new Date("2026-06-07T05:00:00.000Z"),
+        sendChannelMessages,
+      }),
+    ).resolves.toEqual({
+      processedCount: 0,
+      sentCount: 0,
+      skippedCount: 0,
+      rateLimitedCount: 0,
+      failedCount: 0,
+    });
+
+    expect(client.crawlRun.findMany).not.toHaveBeenCalled();
+    expect(sendChannelMessages).not.toHaveBeenCalled();
+  });
+
+  it("does not resend public reports that were already delivered", async () => {
+    const client = createDiscordBotClient(
+      [],
+      [],
+      [],
+      [...TEST_SOURCE_CATEGORIES],
+      [],
+      [
+        publicPriceReportDelivery({
+          id: "public-delivery-1",
+          crawlRunId: "public-run-1",
+          channelId: "999988887777666655",
+          status: "SENT",
+        }),
+      ],
+      [crawlRun({ id: "public-run-1" })],
+    );
+    const sendChannelMessages = vi.fn();
+
+    await expect(
+      sendPendingPublicPriceReports({
+        client,
+        options: {
+          ...createDiscordBotOptions(),
+          publicReportChannelId: "999988887777666655",
+        },
+        now: new Date("2026-06-07T05:00:00.000Z"),
+        sendChannelMessages,
+      }),
+    ).resolves.toEqual({
+      processedCount: 0,
+      sentCount: 0,
+      skippedCount: 0,
+      rateLimitedCount: 0,
+      failedCount: 0,
+    });
+
+    expect(sendChannelMessages).not.toHaveBeenCalled();
+  });
+
   it("enables daily report settings for a Discord user", async () => {
     const client = createDiscordBotClient([]);
     const setting = await enableDailyPriceReport({
@@ -2981,6 +3242,7 @@ function createDiscordBotOptions(): DiscordBotOptions {
     gatewayUrl: "wss://discord.test/gateway",
     registerCommands: false,
     registerCommandsOnStart: true,
+    publicReportChannelId: null,
     priceReportMaxItems: 50,
     commandCooldownSeconds: 60,
     priceReportScheduleIntervalSeconds: 300,
@@ -3336,6 +3598,26 @@ interface TestDiscordNotificationDelivery {
   createdAt: Date;
 }
 
+interface TestDiscordPublicPriceReportDelivery {
+  id: string;
+  crawlRunId: string;
+  channelId: string;
+  status: "SENT" | "SKIPPED" | "FAILED" | "RATE_LIMITED";
+  itemCount: number;
+  messageCount: number;
+  deliveredAt: Date | null;
+  errorMessage: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface TestCrawlRun {
+  id: string;
+  status: "SUCCESS_CHANGED" | "SUCCESS_WITH_ERRORS" | "SUCCESS_UNCHANGED";
+  triggerType: "SCHEDULED" | "MANUAL";
+  finishedAt: Date | null;
+}
+
 function snapshot({
   id,
   productId,
@@ -3500,6 +3782,62 @@ function notificationDelivery({
   };
 }
 
+function publicPriceReportDelivery({
+  id,
+  crawlRunId,
+  channelId,
+  status = "SENT",
+  itemCount = 0,
+  messageCount = 0,
+  deliveredAt = null,
+  errorMessage = null,
+  createdAt = new Date("2026-06-07T00:00:00.000Z"),
+  updatedAt = new Date("2026-06-07T00:00:00.000Z"),
+}: {
+  id: string;
+  crawlRunId: string;
+  channelId: string;
+  status?: TestDiscordPublicPriceReportDelivery["status"];
+  itemCount?: number;
+  messageCount?: number;
+  deliveredAt?: Date | null;
+  errorMessage?: string | null;
+  createdAt?: Date;
+  updatedAt?: Date;
+}): TestDiscordPublicPriceReportDelivery {
+  return {
+    id,
+    crawlRunId,
+    channelId,
+    status,
+    itemCount,
+    messageCount,
+    deliveredAt,
+    errorMessage,
+    createdAt,
+    updatedAt,
+  };
+}
+
+function crawlRun({
+  id,
+  status = "SUCCESS_CHANGED",
+  triggerType = "SCHEDULED",
+  finishedAt = new Date("2026-06-07T03:05:00.000Z"),
+}: {
+  id: string;
+  status?: TestCrawlRun["status"];
+  triggerType?: TestCrawlRun["triggerType"];
+  finishedAt?: Date | null;
+}): TestCrawlRun {
+  return {
+    id,
+    status,
+    triggerType,
+    finishedAt,
+  };
+}
+
 function createWatchManagerClient() {
   return createDiscordBotClient(
     [
@@ -3530,7 +3868,12 @@ function createDiscordBotClient(
   watches: TestTargetPriceWatch[] = [],
   categories: TestSourceCategory[] = [...TEST_SOURCE_CATEGORIES],
   deliveries: TestDiscordNotificationDelivery[] = [],
+  publicPriceReportDeliveries: TestDiscordPublicPriceReportDelivery[] = [],
+  crawlRuns: TestCrawlRun[] = [],
 ): DiscordBotClient & {
+  crawlRun: {
+    findMany: ReturnType<typeof vi.fn>;
+  };
   sourceCategory: {
     findMany: ReturnType<typeof vi.fn>;
   };
@@ -3543,6 +3886,9 @@ function createDiscordBotClient(
   discordNotificationDelivery: {
     create: ReturnType<typeof vi.fn>;
     findFirst: ReturnType<typeof vi.fn>;
+  };
+  discordPublicPriceReportDelivery: {
+    upsert: ReturnType<typeof vi.fn>;
   };
   discordPriceReportSetting: {
     findFirst: ReturnType<typeof vi.fn>;
@@ -3584,6 +3930,13 @@ function createDiscordBotClient(
   const findMany = vi.fn(async (args: { where: Record<string, unknown> }) => {
     const where = args.where;
     const productFilter = where.product as TestProductWhere | undefined;
+
+    if (typeof where.crawlRunId === "string") {
+      return snapshots
+        .filter((snapshot) => snapshot.crawlRunId === where.crawlRunId)
+        .sort(compareCapturedAtAsc)
+        .map(toPrismaSnapshotWithProduct);
+    }
 
     if (
       !where.productId &&
@@ -3964,8 +4317,95 @@ function createDiscordBotClient(
       );
     },
   );
+  const publicDeliveryRows = [...publicPriceReportDeliveries];
+  const crawlRunFindMany = vi.fn(
+    async (args: {
+      where: {
+        triggerType?: TestCrawlRun["triggerType"];
+        status?: { in: TestCrawlRun["status"][] };
+        finishedAt?: { not: null };
+        OR?: Array<{
+          publicPriceReportDeliveries?: {
+            none?: { channelId: string };
+            some?: {
+              channelId: string;
+              status: { in: TestDiscordPublicPriceReportDelivery["status"][] };
+            };
+          };
+        }>;
+      };
+      take?: number;
+    }) => {
+      const channelId = args.where.OR?.[0]?.publicPriceReportDeliveries?.none?.channelId;
+      const retryStatuses = args.where.OR?.[1]?.publicPriceReportDeliveries?.some?.status.in ?? [];
+
+      return crawlRuns
+        .filter((run) => {
+          if (args.where.triggerType && run.triggerType !== args.where.triggerType) {
+            return false;
+          }
+
+          if (args.where.status?.in && !args.where.status.in.includes(run.status)) {
+            return false;
+          }
+
+          if (args.where.finishedAt?.not === null && run.finishedAt === null) {
+            return false;
+          }
+
+          if (!channelId) {
+            return true;
+          }
+
+          const delivery = publicDeliveryRows.find(
+            (row) => row.crawlRunId === run.id && row.channelId === channelId,
+          );
+
+          return !delivery || retryStatuses.includes(delivery.status);
+        })
+        .sort((left, right) => {
+          return (
+            (left.finishedAt?.getTime() ?? 0) - (right.finishedAt?.getTime() ?? 0) ||
+            left.id.localeCompare(right.id)
+          );
+        })
+        .slice(0, args.take);
+    },
+  );
+  const publicDeliveryUpsert = vi.fn(
+    async (args: {
+      where: { crawlRunId_channelId: { crawlRunId: string; channelId: string } };
+      create: Omit<TestDiscordPublicPriceReportDelivery, "id" | "createdAt" | "updatedAt">;
+      update: Partial<TestDiscordPublicPriceReportDelivery>;
+    }) => {
+      const key = args.where.crawlRunId_channelId;
+      const existing = publicDeliveryRows.find(
+        (row) => row.crawlRunId === key.crawlRunId && row.channelId === key.channelId,
+      );
+
+      if (existing) {
+        Object.assign(existing, args.update, {
+          updatedAt: new Date("2026-06-07T00:00:00.000Z"),
+        });
+        return existing;
+      }
+
+      const created: TestDiscordPublicPriceReportDelivery = {
+        id: `public-delivery-${publicDeliveryRows.length + 1}`,
+        createdAt: new Date("2026-06-07T00:00:00.000Z"),
+        updatedAt: new Date("2026-06-07T00:00:00.000Z"),
+        ...args.create,
+      };
+      publicDeliveryRows.push(created);
+
+      return created;
+    },
+  );
 
   return {
+    crawlRun: {
+      findMany: crawlRunFindMany,
+    },
     sourceCategory: {
       findMany: sourceCategoryFindMany,
     },
@@ -3978,6 +4418,9 @@ function createDiscordBotClient(
     discordNotificationDelivery: {
       create: deliveryCreate,
       findFirst: deliveryFindFirst,
+    },
+    discordPublicPriceReportDelivery: {
+      upsert: publicDeliveryUpsert,
     },
     discordPriceReportSetting: {
       findFirst: settingFindFirst,
@@ -3994,6 +4437,9 @@ function createDiscordBotClient(
       upsert: watchUpsert,
     },
   } as unknown as DiscordBotClient & {
+    crawlRun: {
+      findMany: ReturnType<typeof vi.fn>;
+    };
     sourceCategory: {
       findMany: ReturnType<typeof vi.fn>;
     };
@@ -4006,6 +4452,9 @@ function createDiscordBotClient(
     discordNotificationDelivery: {
       create: ReturnType<typeof vi.fn>;
       findFirst: ReturnType<typeof vi.fn>;
+    };
+    discordPublicPriceReportDelivery: {
+      upsert: ReturnType<typeof vi.fn>;
     };
     discordPriceReportSetting: {
       findFirst: ReturnType<typeof vi.fn>;

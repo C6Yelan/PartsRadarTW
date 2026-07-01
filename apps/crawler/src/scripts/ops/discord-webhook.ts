@@ -90,7 +90,7 @@ type DiscordWebhookPayloadEmbed = NonNullable<DiscordWebhookPayload["embeds"]>[n
 
 export function readDiscordWebhookUrl(
   env: NodeJS.ProcessEnv,
-  key: "DISCORD_PUBLIC_WEBHOOK_URL" | "DISCORD_ADMIN_WEBHOOK_URL",
+  key: "DISCORD_ADMIN_WEBHOOK_URL",
 ): string | null {
   const value = env[key]?.trim();
 

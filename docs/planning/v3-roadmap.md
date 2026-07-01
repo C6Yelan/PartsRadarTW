@@ -1,11 +1,11 @@
 # 第三版 Roadmap
 
-本文件是第三版規劃的主要來源。第三版目前收斂成兩條產品主線與一條維運主線：商品頁分享 / Open Graph preview、Discord 通知能力，以及受保護的內網 ops status page / 管理者告警。Discord 通知分工為 webhook 做公開價格變動廣播與管理者告警，Discord bot 做個人化目標價提醒與個人價格變動報告。分享配單、公開服務狀態推播與公開服務狀態頁暫不作為近期主線；若未來需求明確，再另開較小設計 slice。
+本文件是第三版規劃的主要來源。第三版目前收斂成兩條產品主線與一條維運主線：商品頁分享 / Open Graph preview、Discord 通知能力，以及受保護的內網 ops status page / 管理者告警。Discord bot 負責公開價格變動報告與個人化通知；webhook 僅保留給管理者告警。分享配單、公開服務狀態推播與公開服務狀態頁暫不作為近期主線；若未來需求明確，再另開較小設計 slice。
 
 ## 目標
 
 - 讓商品詳細頁更容易分享，並讓外部平台透過 Open Graph 取得乾淨商品預覽。
-- 讓 Discord public webhook 提供有參考價值的公開價格變動清單，而不是低價值服務狀態噪音。
+- 讓 Discord bot 提供有參考價值的公開價格變動清單，而不是低價值服務狀態噪音。
 - 讓使用者可透過 Discord bot 設定個人目標價提醒，並在達標時收到 DM。
 - 讓使用者可透過 Discord bot 開啟固定時間個人價格變動報告，列出特定時間段內實際變價的商品，降低一直開網站追蹤的需求。
 - 保留網站 accountless；Discord 個人化通知只使用 Discord user id，不建立網站帳號或跨平台帳號綁定。
@@ -30,9 +30,9 @@
 
 ## 使用者向 Discord 判斷
 
-第三版使用者向 Discord 功能分成 webhook 與 bot：
+第三版使用者向 Discord 功能集中在 bot；webhook 僅作為內部維運告警通道：
 
-- Public webhook：`crawler-daemon` 在有商品價格變動時，用公開 webhook 列出本輪變價商品、舊價、新價與差額；這是公開廣播，不是個人化訂閱。
+- Public bot report：`discord-bot` 掃描 scheduled crawl 後尚未送出的價格變動，發送到 `DISCORD_PUBLIC_REPORT_CHANNEL_ID` 指定頻道；這是公開廣播，不是個人化訂閱。
 - Admin webhook：`smoke-daemon` 對管理者 Discord 頻道送出 `WARN` / `FAIL` / `RECOVERED`，不推給一般使用者。
 - Discord bot：處理 slash commands、手動價格報告回覆、個人目標價提醒與定期價格變動報告。
 - 分享入口：使用者貼上商品連結時，透過商品頁 Open Graph / canonical URL 提供安全摘要；目前不做分享配單 link preview。
@@ -95,17 +95,17 @@ Discord bot 第一輪指令：
 
 範圍：
 
-- Webhook 保留給 public 價格變動清單與 admin smoke 告警。
-- Discord bot 負責個人目標價提醒與個人價格變動報告。
+- Discord bot 負責 public 價格變動清單、個人目標價提醒與個人價格變動報告。
+- Webhook 僅保留給 admin smoke 告警。
 - 從現有 `production-smoke` / `smoke-daemon` 結果產生管理者告警，告警對象是維運者；支援 `FAIL`、需要人工注意的 `WARN`、恢復正常通知與 cooldown / 去重。
-- public webhook 內容只能包含安全摘要；管理者告警可包含檢查名稱、狀態、具體原因摘要與時間，不放要求人工翻閱的 runbook link。
+- public bot report 內容只能包含安全摘要；管理者告警可包含檢查名稱、狀態、具體原因摘要與時間，不放要求人工翻閱的 runbook link。
 - Discord webhook URL 與 bot token 只放在 untracked `.env` 或部署 secret，不提交 Git。
 - Discord bot 需要新增 daemon、slash command registration、watch / price-report 設定資料表與 notification delivery log。
 
 完成條件：
 
 - public 價格變動清單不包含 secret、raw HTML、DB URL、internal headers、crawler stack trace、parse error raw content 或 raw IP。
-- 公開價格變動清單只列出本輪變價商品名稱、站內商品連結、舊價、新價與差額，並受 `PRICE_CHANGE_DISCORD_MAX_ITEMS` 上限控制。
+- 公開價格變動清單只列出本輪變價商品名稱、站內商品連結、舊價、新價與差額，並受 `DISCORD_PRICE_REPORT_MAX_ITEMS` 上限控制。
 - Discord bot 可讓使用者開關個人價格變動報告，並可用 `/price-report now` 在指令所在 context 立即取得報告。
 - 個人價格變動報告可依零件分類與內容類型篩選，且不依賴 `/watch` 清單。
 - Discord bot 可讓使用者建立、查看與取消單品目標價提醒。

@@ -101,6 +101,40 @@ export async function sendPriceReportNow({
   });
 }
 
+export function createPublicPriceChangeReportMessages(
+  priceChanges: PriceChangeDiscordNotificationItem[],
+  options: {
+    publicBaseUrl: string;
+    maxItems: number;
+    generatedAt: Date;
+  },
+): DiscordBotMessage[] {
+  if (priceChanges.length === 0) {
+    return [];
+  }
+
+  const boundedMaxItems = clampPriceReportMaxItems(options.maxItems);
+  const listedPriceChanges = priceChanges.slice(0, boundedMaxItems);
+  const hiddenPriceChangeCount = priceChanges.length - listedPriceChanges.length;
+  const embeds = createReportSectionEmbeds({
+    title: "PartsRadarTW 公開價格報告 - 價格變動",
+    lines: [
+      `本輪更新：${formatPriceChangeSummary(countPriceChangeMovements(priceChanges))}`,
+      "",
+      ...formatPriceChangeSectionLines(
+        createPriceChangeMovementGroups(listedPriceChanges, options.publicBaseUrl),
+      ),
+    ],
+    footer: formatHiddenReportFooter({
+      hiddenPriceChangeCount,
+      hiddenNewProductCount: 0,
+    }),
+    timestamp: options.generatedAt.toISOString(),
+  });
+
+  return createReportMessages(embeds);
+}
+
 async function sendPriceReport({
   client,
   discordUserId,

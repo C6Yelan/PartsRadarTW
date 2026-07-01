@@ -27,13 +27,6 @@ import {
   requestExternalFetchPriority,
   tryAcquireExternalFetchLock,
 } from "./external-fetch-lock";
-import {
-  DEFAULT_PRICE_CHANGE_DISCORD_MAX_ITEMS,
-  MAX_PRICE_CHANGE_DISCORD_ITEMS,
-  parsePriceChangeDiscordNotificationOptions,
-  sendCrawlRunPriceChangeDiscordNotification,
-  type PriceChangeDiscordNotificationOptions,
-} from "./price-change-discord-notification";
 import type { BackfillSummary, ImageBackfillOptions } from "./image-cache-backfill/options";
 import {
   backfillImages,
@@ -87,7 +80,6 @@ export interface CoolpcDaemonOptions {
   prioritySignalTtlSeconds: number;
   runOnce: boolean;
   baseUrl?: string;
-  priceChangeDiscordNotification: PriceChangeDiscordNotificationOptions;
   newProductImageBackfill: NewProductImageBackfillOptions;
 }
 
@@ -204,7 +196,6 @@ export function parseDaemonOptions(
     }),
     runOnce: args.includes("--run-once"),
     baseUrl: validateCoolpcBaseUrl(env.COOLPC_BASE_URL),
-    priceChangeDiscordNotification: parsePriceChangeDiscordNotificationOptions(args, env),
     newProductImageBackfill,
   };
 }
@@ -323,7 +314,6 @@ export async function runScheduledCycle(
     requestPriority?: typeof requestExternalFetchPriority;
     clearPriority?: typeof clearExternalFetchPriority;
     crawlCategories?: typeof runCoolpcCategoryCrawl;
-    notifyPriceChanges?: typeof handlePriceChangeDiscordNotification;
     backfillNewProductImages?: NewProductImageBackfillHandler;
   } = {},
 ): Promise<ScheduledCycleResult> {
@@ -331,7 +321,6 @@ export async function runScheduledCycle(
   const requestPriority = dependencies.requestPriority ?? requestExternalFetchPriority;
   const clearPriority = dependencies.clearPriority ?? clearExternalFetchPriority;
   const crawlCategories = dependencies.crawlCategories ?? runCoolpcCategoryCrawl;
-  const notifyPriceChanges = dependencies.notifyPriceChanges ?? handlePriceChangeDiscordNotification;
   const backfillNewProductImages =
     dependencies.backfillNewProductImages ?? handleNewProductImageBackfill;
   const lock = await acquireLock({
@@ -399,13 +388,6 @@ export async function runScheduledCycle(
     );
   }
 
-  await notifyPriceChanges({
-    client,
-    crawlRunId: result.crawlRunId,
-    options: options.priceChangeDiscordNotification,
-    productWriteSummary,
-  });
-
   if (shouldBackoff) {
     if (productWriteSummary.createdProductIds.length > 0) {
       log(
@@ -469,9 +451,7 @@ async function handleNewProductImageBackfill({
   }
 }
 
-function createImageBackfillOptions(
-  options: NewProductImageBackfillOptions,
-): ImageBackfillOptions {
+function createImageBackfillOptions(options: NewProductImageBackfillOptions): ImageBackfillOptions {
   return {
     workspaceRoot: options.workspaceRoot,
     storageDir: options.storageDir,
@@ -494,56 +474,6 @@ function logNewProductImageBackfillSummary(
   log(
     `New product image backfill finished. createdProducts=${createdProductCount} selected=${summary.selected} cached=${summary.cached} reused=${summary.reused} skipped=${summary.skipped} invalid=${summary.invalid} failed=${summary.failed} liveFetches=${summary.liveFetches}`,
   );
-}
-
-async function handlePriceChangeDiscordNotification({
-  client,
-  crawlRunId,
-  options,
-  productWriteSummary,
-}: {
-  client: PrismaClient;
-  crawlRunId: string;
-  options: PriceChangeDiscordNotificationOptions;
-  productWriteSummary: ProductWriteSummaryTotals;
-}): Promise<void> {
-  try {
-    const result = await sendCrawlRunPriceChangeDiscordNotification({
-      client,
-      crawlRunId,
-      options,
-    });
-
-    if (result.status === "sent") {
-      log(
-        `Price change Discord notification sent. changes=${result.changeCount} listed=${result.listedCount} messages=${result.messageCount}`,
-      );
-      return;
-    }
-
-    if (result.status === "rate_limited") {
-      log(
-        `Price change Discord notification rate limited. changes=${result.changeCount} listed=${result.listedCount} sentMessages=${result.sentMessageCount}/${result.messageCount} retryAfterMs=${result.retryAfterMs} global=${result.global ? "yes" : "no"}`,
-      );
-      return;
-    }
-
-    if (result.status === "failed") {
-      log(
-        `Price change Discord notification failed. changes=${result.changeCount} listed=${result.listedCount} sentMessages=${result.sentMessageCount}/${result.messageCount} httpStatus=${result.httpStatus ?? "none"} message=${toSafeCliErrorMessage(result.message)}`,
-      );
-      return;
-    }
-
-    if (result.reason === "no_price_changes") {
-      log(
-        `Price change Discord notification skipped. reason=no_existing_product_price_changes priceSnapshots=${productWriteSummary.priceSnapshotCreatedCount} queriedSnapshots=${result.snapshotCount ?? 0} unmatchedSnapshots=${result.unmatchedSnapshotCount ?? 0} unchangedSnapshots=${result.unchangedSnapshotCount ?? 0} currencyMismatches=${result.currencyMismatchCount ?? 0}`,
-      );
-      return;
-    }
-  } catch (error) {
-    log(`Price change Discord notification failed before completion: ${toSafeErrorMessage(error)}`);
-  }
 }
 
 function printCycleSummary(
@@ -624,8 +554,7 @@ function isAllCategoryFetchFailed(result: RunCoolpcCrawlOnceResult): boolean {
   return (
     result.categoryResults.length > 0 &&
     result.categoryResults.every(
-      (categoryResult) =>
-        categoryResult.status === CRAWL_RUN_CATEGORY_RESULT_STATUSES.FETCH_FAILED,
+      (categoryResult) => categoryResult.status === CRAWL_RUN_CATEGORY_RESULT_STATUSES.FETCH_FAILED,
     )
   );
 }
@@ -746,9 +675,6 @@ Options:
   --priority-signal-ttl-seconds <sec>
                              Higher-priority external fetch signal TTL.
                              Default: ${DEFAULT_EXTERNAL_FETCH_PRIORITY_TTL_SECONDS}
-  --price-change-discord-max-items <n>
-                             Public Discord price-change rows per crawl.
-                             Default: ${DEFAULT_PRICE_CHANGE_DISCORD_MAX_ITEMS}, range: 1-${MAX_PRICE_CHANGE_DISCORD_ITEMS}
   --storage-dir <path>       Snapshot storage directory from the workspace root.
                              Default: ${DEFAULT_STORAGE_DIR}
 
@@ -759,8 +685,7 @@ Environment:
   CRAWLER_NEW_PRODUCT_IMAGE_TIMEOUT_MS, CRAWLER_NEW_PRODUCT_IMAGE_MAX_SOURCE_BYTES,
   SNAPSHOT_STORAGE_DIR, EXTERNAL_FETCH_LOCK_DIR, EXTERNAL_FETCH_LOCK_STALE_SECONDS,
   EXTERNAL_FETCH_PRIORITY_TTL_SECONDS,
-  PRODUCT_IMAGE_STORAGE_DIR, COOLPC_BASE_URL, DISCORD_PUBLIC_WEBHOOK_URL,
-  PARTSRADAR_PUBLIC_BASE_URL, PRICE_CHANGE_DISCORD_MAX_ITEMS
+  PRODUCT_IMAGE_STORAGE_DIR, COOLPC_BASE_URL
 `);
 }
 
