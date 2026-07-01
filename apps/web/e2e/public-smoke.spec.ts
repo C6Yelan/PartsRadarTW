@@ -27,6 +27,8 @@ test.describe("public web smoke", () => {
     await expect(page.getByRole("heading", { exact: true, name: "Discord 通知" })).toBeVisible();
     await expect(page.getByRole("img", { name: "指令操作示意圖準備中" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "指令說明" })).toBeVisible();
+    await expect(page.getByRole("img", { name: "/watch 管理面板介面圖準備中" })).toBeVisible();
+    await expect(page.getByRole("img", { name: "個人價格報告設定介面圖準備中" })).toBeVisible();
   });
 });
 
