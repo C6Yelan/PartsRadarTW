@@ -129,6 +129,29 @@ const serverCommandGuides = [
   },
 ] as const;
 
+const discordFaqItems = [
+  {
+    question: "看不到 bot 指令怎麼辦？",
+    answer:
+      "先確認邀請時有勾選應用程式指令，並重新開啟 Discord 指令選單；伺服器也可能限制特定身分組使用 app 指令。",
+  },
+  {
+    question: "為什麼 /public-report 不是每個人都看得到？",
+    answer:
+      "公開報告會改動伺服器頻道設定，因此只提供給具備管理伺服器權限的成員；一般成員仍可使用 /watch 與 /price-report。",
+  },
+  {
+    question: "公開報告可以只看特定商品嗎？",
+    answer:
+      "可以。管理者在 /public-report manage 面板中調整分類、降價或漲價、商品關鍵字與顯示上限，測試報告與自動報告都會套用同一組設定。",
+  },
+  {
+    question: "收不到個人私訊提醒怎麼辦？",
+    answer:
+      "請確認你允許該伺服器成員傳送私訊，或先從伺服器內對 bot 發出 /watch、/price-report now 重新確認互動。",
+  },
+] as const;
+
 export default function DiscordPage() {
   const hasInviteUrl = Boolean(discordInviteUrl);
 
@@ -286,6 +309,23 @@ export default function DiscordPage() {
                 </article>
               ))}
             </div>
+          </div>
+        </section>
+
+        <section className="discord-section" aria-labelledby="discord-faq-title">
+          <div className="discord-section-heading">
+            <span className="eyebrow">FAQ</span>
+            <h2 id="discord-faq-title">常見問題</h2>
+            <p>整理邀請 bot、設定公開報告與接收個人通知時最常遇到的狀況。</p>
+          </div>
+
+          <div className="discord-faq-list">
+            {discordFaqItems.map((item) => (
+              <article className="discord-faq-item" key={item.question}>
+                <h3>{item.question}</h3>
+                <p>{item.answer}</p>
+              </article>
+            ))}
           </div>
         </section>
       </main>

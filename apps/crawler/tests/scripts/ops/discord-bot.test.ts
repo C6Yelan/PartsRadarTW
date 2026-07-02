@@ -2938,6 +2938,164 @@ describe("sendPriceReportNow", () => {
     expect(JSON.stringify(updateBody.components)).toContain("public-report:disable");
   });
 
+  it("updates public report categories from the settings panel", async () => {
+    const client = createDiscordBotClient(
+      [],
+      [],
+      [],
+      [...TEST_SOURCE_CATEGORIES],
+      [],
+      [],
+      [],
+      [publicPriceReportSetting({ id: "public-setting-1" })],
+    );
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createPublicReportSelectInteraction("public-report:categories", ["12", "6"]),
+    });
+
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({ type: 6 });
+    expect(client.discordPublicPriceReportSetting.update).toHaveBeenCalledWith({
+      where: {
+        discordGuildId: "guild-1",
+      },
+      data: expect.objectContaining({
+        categoryIgrps: [6, 12],
+        includePriceDrops: true,
+        includePriceRises: true,
+        updatedByDiscordUserId: "111122223333444455",
+      }),
+      select: expect.any(Object),
+    });
+
+    const updateBody = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body));
+    expect(JSON.stringify(updateBody.embeds)).toContain("已更新公開價格報告設定");
+    expect(JSON.stringify(updateBody.embeds)).toContain("記憶體、顯示卡");
+    expect(JSON.stringify(updateBody.components)).toContain("改為全部分類");
+  });
+
+  it("updates public report event filters from the settings panel", async () => {
+    const client = createDiscordBotClient(
+      [],
+      [],
+      [],
+      [...TEST_SOURCE_CATEGORIES],
+      [],
+      [],
+      [],
+      [publicPriceReportSetting({ id: "public-setting-1" })],
+    );
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createPublicReportSelectInteraction("public-report:events", ["price_drops"]),
+    });
+
+    expect(client.discordPublicPriceReportSetting.update).toHaveBeenCalledWith({
+      where: {
+        discordGuildId: "guild-1",
+      },
+      data: expect.objectContaining({
+        includePriceDrops: true,
+        includePriceRises: false,
+      }),
+      select: expect.any(Object),
+    });
+
+    const updateBody = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body));
+    expect(JSON.stringify(updateBody.embeds)).toContain("降價");
+    expect(JSON.stringify(updateBody.embeds)).not.toContain("降價、漲價");
+  });
+
+  it("updates the public report display limit from the limit modal", async () => {
+    const client = createDiscordBotClient(
+      [],
+      [],
+      [],
+      [...TEST_SOURCE_CATEGORIES],
+      [],
+      [],
+      [],
+      [publicPriceReportSetting({ id: "public-setting-1" })],
+    );
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createPublicReportLimitModalSubmitInteraction({ maxItems: "12" }),
+    });
+
+    expect(client.discordPublicPriceReportSetting.update).toHaveBeenCalledWith({
+      where: {
+        discordGuildId: "guild-1",
+      },
+      data: expect.objectContaining({
+        maxItems: 12,
+      }),
+      select: expect.any(Object),
+    });
+
+    const responseBody = String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body);
+    expect(responseBody).toContain("已更新公開報告顯示上限：12 筆");
+    expect(responseBody).toContain("12 筆");
+  });
+
+  it("updates the public report product keyword from the keyword modal", async () => {
+    const client = createDiscordBotClient(
+      [],
+      [],
+      [],
+      [...TEST_SOURCE_CATEGORIES],
+      [],
+      [],
+      [],
+      [publicPriceReportSetting({ id: "public-setting-1" })],
+    );
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createPublicReportKeywordModalSubmitInteraction({ keyword: "RTX 5090, DDR5" }),
+    });
+
+    expect(client.discordPublicPriceReportSetting.update).toHaveBeenCalledWith({
+      where: {
+        discordGuildId: "guild-1",
+      },
+      data: expect.objectContaining({
+        productKeyword: "RTX 5090, DDR5",
+      }),
+      select: expect.any(Object),
+    });
+
+    const responseBody = String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body);
+    expect(responseBody).toContain("已更新公開報告關鍵字：RTX 5090, DDR5");
+    expect(responseBody).toContain("RTX 5090, DDR5");
+  });
+
   it("does not save the public report channel when the bot cannot embed messages there", async () => {
     const client = createDiscordBotClient([]);
     const fetchMock = vi.fn<typeof fetch>(
@@ -3081,6 +3239,130 @@ describe("sendPriceReportNow", () => {
     });
     const responseBody = JSON.parse(String(fetchMock.mock.calls[2]?.[1]?.body));
     expect(responseBody.content).toContain("已發送測試公開報告到 <#999988887777666655>");
+  });
+
+  it("applies public report filters to preview reports", async () => {
+    const now = new Date();
+    const oldCapturedAt = new Date(now.getTime() - 25 * 60 * 60 * 1000).toISOString();
+    const newCapturedAt = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
+    const client = createDiscordBotClient(
+      [
+        snapshot({
+          id: "public-filter-old-1",
+          productId: "public-filter-product-1",
+          productName: "華碩 RTX 5090 顯示卡",
+          crawlRunId: "old-run",
+          price: 99_990,
+          capturedAt: oldCapturedAt,
+          categoryIgrp: 12,
+          categoryName: "顯示卡",
+        }),
+        snapshot({
+          id: "public-filter-new-1",
+          productId: "public-filter-product-1",
+          productName: "華碩 RTX 5090 顯示卡",
+          crawlRunId: "new-run",
+          price: 95_990,
+          capturedAt: newCapturedAt,
+          categoryIgrp: 12,
+          categoryName: "顯示卡",
+        }),
+        snapshot({
+          id: "public-filter-old-rise",
+          productId: "public-filter-product-rise",
+          productName: "華碩 RTX 5090 OC 顯示卡",
+          crawlRunId: "old-run",
+          price: 95_990,
+          capturedAt: oldCapturedAt,
+          categoryIgrp: 12,
+          categoryName: "顯示卡",
+        }),
+        snapshot({
+          id: "public-filter-new-rise",
+          productId: "public-filter-product-rise",
+          productName: "華碩 RTX 5090 OC 顯示卡",
+          crawlRunId: "new-run",
+          price: 99_990,
+          capturedAt: newCapturedAt,
+          categoryIgrp: 12,
+          categoryName: "顯示卡",
+        }),
+        snapshot({
+          id: "public-filter-old-category",
+          productId: "public-filter-product-category",
+          productName: "華碩 RTX 5090 外接盒",
+          crawlRunId: "old-run",
+          price: 19_990,
+          capturedAt: oldCapturedAt,
+          categoryIgrp: 7,
+          categoryName: "SSD / HDD",
+        }),
+        snapshot({
+          id: "public-filter-new-category",
+          productId: "public-filter-product-category",
+          productName: "華碩 RTX 5090 外接盒",
+          crawlRunId: "new-run",
+          price: 18_990,
+          capturedAt: newCapturedAt,
+          categoryIgrp: 7,
+          categoryName: "SSD / HDD",
+        }),
+        snapshot({
+          id: "public-filter-old-keyword",
+          productId: "public-filter-product-keyword",
+          productName: "華碩 RTX 5080 顯示卡",
+          crawlRunId: "old-run",
+          price: 49_990,
+          capturedAt: oldCapturedAt,
+          categoryIgrp: 12,
+          categoryName: "顯示卡",
+        }),
+        snapshot({
+          id: "public-filter-new-keyword",
+          productId: "public-filter-product-keyword",
+          productName: "華碩 RTX 5080 顯示卡",
+          crawlRunId: "new-run",
+          price: 45_990,
+          capturedAt: newCapturedAt,
+          categoryIgrp: 12,
+          categoryName: "顯示卡",
+        }),
+      ],
+      [],
+      [],
+      [...TEST_SOURCE_CATEGORIES],
+      [],
+      [],
+      [],
+      [
+        publicPriceReportSetting({
+          id: "public-setting-1",
+          categoryIgrps: [12],
+          productKeyword: "RTX 5090",
+          includePriceDrops: true,
+          includePriceRises: false,
+        }),
+      ],
+    );
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createPublicReportInteraction({ subcommandName: "test" }),
+    });
+
+    const reportBody = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body));
+    const reportText = JSON.stringify(reportBody.embeds);
+
+    expect(reportText).toContain("RTX 5090 顯示卡");
+    expect(reportText).not.toContain("RTX 5090 OC");
+    expect(reportText).not.toContain("RTX 5090 外接盒");
+    expect(reportText).not.toContain("RTX 5080");
   });
 
   it("shows a channel permission hint when the public report preview send fails", async () => {
@@ -3239,6 +3521,126 @@ describe("sendPriceReportNow", () => {
         deliveredAt: new Date("2026-06-07T05:00:00.000Z"),
       }),
     });
+  });
+
+  it("applies public report filters to pending scheduled reports", async () => {
+    const client = createDiscordBotClient(
+      [
+        snapshot({
+          id: "old-filtered-public-1",
+          productId: "product-filtered-public-1",
+          productName: "華碩 RTX 5090 顯示卡",
+          crawlRunId: "old-run",
+          price: 99_990,
+          capturedAt: "2026-06-06T01:00:00.000Z",
+          categoryIgrp: 12,
+          categoryName: "顯示卡",
+        }),
+        snapshot({
+          id: "new-filtered-public-1",
+          productId: "product-filtered-public-1",
+          productName: "華碩 RTX 5090 顯示卡",
+          crawlRunId: "public-run-1",
+          price: 95_990,
+          capturedAt: "2026-06-07T03:00:00.000Z",
+          categoryIgrp: 12,
+          categoryName: "顯示卡",
+        }),
+        snapshot({
+          id: "old-filtered-public-rise",
+          productId: "product-filtered-public-rise",
+          productName: "華碩 RTX 5090 OC 顯示卡",
+          crawlRunId: "old-run",
+          price: 95_990,
+          capturedAt: "2026-06-06T01:00:00.000Z",
+          categoryIgrp: 12,
+          categoryName: "顯示卡",
+        }),
+        snapshot({
+          id: "new-filtered-public-rise",
+          productId: "product-filtered-public-rise",
+          productName: "華碩 RTX 5090 OC 顯示卡",
+          crawlRunId: "public-run-1",
+          price: 99_990,
+          capturedAt: "2026-06-07T03:00:00.000Z",
+          categoryIgrp: 12,
+          categoryName: "顯示卡",
+        }),
+        snapshot({
+          id: "old-filtered-public-keyword",
+          productId: "product-filtered-public-keyword",
+          productName: "華碩 RTX 5080 顯示卡",
+          crawlRunId: "old-run",
+          price: 49_990,
+          capturedAt: "2026-06-06T01:00:00.000Z",
+          categoryIgrp: 12,
+          categoryName: "顯示卡",
+        }),
+        snapshot({
+          id: "new-filtered-public-keyword",
+          productId: "product-filtered-public-keyword",
+          productName: "華碩 RTX 5080 顯示卡",
+          crawlRunId: "public-run-1",
+          price: 45_990,
+          capturedAt: "2026-06-07T03:00:00.000Z",
+          categoryIgrp: 12,
+          categoryName: "顯示卡",
+        }),
+      ],
+      [],
+      [],
+      [...TEST_SOURCE_CATEGORIES],
+      [],
+      [],
+      [
+        crawlRun({
+          id: "public-run-1",
+          finishedAt: new Date("2026-06-07T03:05:00.000Z"),
+        }),
+      ],
+      [
+        publicPriceReportSetting({
+          id: "public-setting-1",
+          categoryIgrps: [12],
+          productKeyword: "RTX 5090",
+          includePriceDrops: true,
+          includePriceRises: false,
+        }),
+      ],
+    );
+    const sendChannelMessages = vi.fn(
+      async (_channelId: string, _messages: DiscordBotMessage[]) => ({
+        status: "sent" as const,
+        messageCount: 1,
+        httpStatuses: [200],
+      }),
+    );
+
+    await expect(
+      sendPendingPublicPriceReports({
+        client,
+        options: createDiscordBotOptions(),
+        now: new Date("2026-06-07T05:00:00.000Z"),
+        sendChannelMessages,
+      }),
+    ).resolves.toMatchObject({
+      settingCount: 1,
+      processedCount: 1,
+      sentCount: 1,
+    });
+
+    const reportText = JSON.stringify(sendChannelMessages.mock.calls[0]?.[1]);
+
+    expect(reportText).toContain("RTX 5090 顯示卡");
+    expect(reportText).not.toContain("RTX 5090 OC");
+    expect(reportText).not.toContain("RTX 5080");
+    expect(client.discordPublicPriceReportDelivery.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          itemCount: 1,
+        }),
+      }),
+    );
   });
 
   it("skips public price reports when no public report setting is configured", async () => {
@@ -3684,6 +4086,111 @@ function createPublicReportButtonInteraction(
   };
 }
 
+function createPublicReportSelectInteraction(
+  customId: string,
+  values: string[],
+  {
+    guildId = "guild-1",
+    channelId = "999988887777666655",
+    appPermissions = "18432",
+  }: {
+    guildId?: string;
+    channelId?: string;
+    appPermissions?: string;
+  } = {},
+): DiscordInteraction {
+  return {
+    id: "interaction-1",
+    token: "interaction-token",
+    type: 3,
+    guild_id: guildId,
+    channel_id: channelId,
+    app_permissions: appPermissions,
+    data: {
+      custom_id: customId,
+      component_type: 3,
+      values,
+    },
+    member: {
+      user: {
+        id: "111122223333444455",
+      },
+    },
+  };
+}
+
+function createPublicReportLimitModalSubmitInteraction({
+  maxItems,
+  guildId = "guild-1",
+  channelId = "999988887777666655",
+}: {
+  maxItems: string;
+  guildId?: string;
+  channelId?: string;
+}): DiscordInteraction {
+  return {
+    id: "interaction-1",
+    token: "interaction-token",
+    type: 5,
+    guild_id: guildId,
+    channel_id: channelId,
+    data: {
+      custom_id: "public-report:limit-modal",
+      components: [
+        {
+          type: 18,
+          component: {
+            type: 4,
+            custom_id: "public-report:max-items",
+            value: maxItems,
+          },
+        },
+      ],
+    },
+    member: {
+      user: {
+        id: "111122223333444455",
+      },
+    },
+  };
+}
+
+function createPublicReportKeywordModalSubmitInteraction({
+  keyword,
+  guildId = "guild-1",
+  channelId = "999988887777666655",
+}: {
+  keyword: string;
+  guildId?: string;
+  channelId?: string;
+}): DiscordInteraction {
+  return {
+    id: "interaction-1",
+    token: "interaction-token",
+    type: 5,
+    guild_id: guildId,
+    channel_id: channelId,
+    data: {
+      custom_id: "public-report:keyword-modal",
+      components: [
+        {
+          type: 18,
+          component: {
+            type: 4,
+            custom_id: "public-report:keyword-input",
+            value: keyword,
+          },
+        },
+      ],
+    },
+    member: {
+      user: {
+        id: "111122223333444455",
+      },
+    },
+  };
+}
+
 function createComponentInteraction(customId: string): DiscordInteraction {
   return {
     id: "interaction-1",
@@ -4007,6 +4514,11 @@ interface TestDiscordPublicPriceReportSetting {
   id: string;
   discordGuildId: string;
   channelId: string;
+  maxItems: number;
+  categoryIgrps: number[];
+  productKeyword: string | null;
+  includePriceDrops: boolean;
+  includePriceRises: boolean;
   enabled: boolean;
   createdByDiscordUserId: string;
   updatedByDiscordUserId: string;
@@ -4226,6 +4738,11 @@ function publicPriceReportSetting({
   id,
   discordGuildId = "guild-1",
   channelId = "999988887777666655",
+  maxItems = 50,
+  categoryIgrps = [],
+  productKeyword = null,
+  includePriceDrops = true,
+  includePriceRises = true,
   enabled = true,
   createdByDiscordUserId = "111122223333444455",
   updatedByDiscordUserId = "111122223333444455",
@@ -4235,6 +4752,11 @@ function publicPriceReportSetting({
   id: string;
   discordGuildId?: string;
   channelId?: string;
+  maxItems?: number;
+  categoryIgrps?: number[];
+  productKeyword?: string | null;
+  includePriceDrops?: boolean;
+  includePriceRises?: boolean;
   enabled?: boolean;
   createdByDiscordUserId?: string;
   updatedByDiscordUserId?: string;
@@ -4245,6 +4767,11 @@ function publicPriceReportSetting({
     id,
     discordGuildId,
     channelId,
+    maxItems,
+    categoryIgrps,
+    productKeyword,
+    includePriceDrops,
+    includePriceRises,
     enabled,
     createdByDiscordUserId,
     updatedByDiscordUserId,
@@ -4785,7 +5312,27 @@ function createDiscordBotClient(
   const publicSettingUpsert = vi.fn(
     async (args: {
       where: { discordGuildId: string };
-      create: Omit<TestDiscordPublicPriceReportSetting, "id" | "createdAt" | "updatedAt">;
+      create: Omit<
+        TestDiscordPublicPriceReportSetting,
+        | "id"
+        | "maxItems"
+        | "categoryIgrps"
+        | "productKeyword"
+        | "includePriceDrops"
+        | "includePriceRises"
+        | "createdAt"
+        | "updatedAt"
+      > &
+        Partial<
+          Pick<
+            TestDiscordPublicPriceReportSetting,
+            | "maxItems"
+            | "categoryIgrps"
+            | "productKeyword"
+            | "includePriceDrops"
+            | "includePriceRises"
+          >
+        >;
       update: Partial<TestDiscordPublicPriceReportSetting>;
     }) => {
       const existing = publicSettingRows.find(
@@ -4801,6 +5348,11 @@ function createDiscordBotClient(
 
       const created: TestDiscordPublicPriceReportSetting = {
         id: `public-setting-${publicSettingRows.length + 1}`,
+        maxItems: 50,
+        categoryIgrps: [],
+        productKeyword: null,
+        includePriceDrops: true,
+        includePriceRises: true,
         createdAt: new Date("2026-06-07T00:00:00.000Z"),
         updatedAt: new Date("2026-06-07T00:00:00.000Z"),
         ...args.create,

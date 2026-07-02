@@ -4,6 +4,8 @@ import {
   createPriceReportKeywordModal,
   createPriceReportSettingsComponents,
   createPriceReportTimeLimitModal,
+  createPublicReportKeywordModal,
+  createPublicReportLimitModal,
   createPublicReportSettingsComponents,
   createWatchEditModal,
   createWatchModal,
@@ -12,6 +14,7 @@ import {
   parsePriceReportModalSubmit,
   parsePublicReportComponentInteraction,
   parsePublicReportInteraction,
+  parsePublicReportModalSubmit,
   parseWatchComponentInteraction,
   parseWatchInteraction,
   parseWatchModalSubmit,
@@ -36,6 +39,7 @@ import {
   formatPriceReportKeywordFilterLabel,
   formatTaipeiMinute,
   formatWindowLabel,
+  type PriceReportFilters,
   type PriceReportCategoryOption,
   type PriceReportDeliveryStatus,
   readLatestScheduledPriceReportDelivery,
@@ -54,6 +58,8 @@ import {
   sendPublicPriceReportPreview,
   setPublicPriceReportChannel,
   setPublicPriceReportEnabled,
+  toPublicPriceReportFilters,
+  updatePublicPriceReportFilters,
 } from "./public-price-report";
 import {
   deferInteractionMessageUpdate,
@@ -262,6 +268,7 @@ async function handleApplicationCommandInteraction({
       client,
       discordGuildId: publicContext.discordGuildId,
       currentChannelId: publicContext.channelId,
+      options,
     });
 
     await sendInteractionResponse({
@@ -353,6 +360,42 @@ async function handleMessageComponentInteraction({
       return;
     }
 
+    if (publicReportComponent.name === "open_keyword_modal") {
+      const setting = await readPublicPriceReportSetting({
+        client,
+        discordGuildId: publicContext.discordGuildId,
+      });
+
+      await sendModalInteractionResponse({
+        token: options.token,
+        apiBaseUrl: options.apiBaseUrl,
+        interaction,
+        fetchImpl,
+        modal: createPublicReportKeywordModal({
+          keywordValue: setting?.productKeyword ?? "",
+        }),
+      });
+      return;
+    }
+
+    if (publicReportComponent.name === "open_limit_modal") {
+      const setting = await readPublicPriceReportSetting({
+        client,
+        discordGuildId: publicContext.discordGuildId,
+      });
+
+      await sendModalInteractionResponse({
+        token: options.token,
+        apiBaseUrl: options.apiBaseUrl,
+        interaction,
+        fetchImpl,
+        modal: createPublicReportLimitModal({
+          maxItems: setting?.maxItems ?? options.priceReportMaxItems,
+        }),
+      });
+      return;
+    }
+
     if (publicReportComponent.name === "preview") {
       await sendPublicReportTest({
         client,
@@ -419,18 +462,79 @@ async function handleMessageComponentInteraction({
         enabled: false,
       });
       notice = `已暫停公開價格報告，設定頻道保留為 <#${setting.channelId}>。`;
-    } else {
+    } else if (publicReportComponent.name === "clear") {
       const deletedCount = await clearPublicPriceReportSetting({
         client,
         discordGuildId: publicContext.discordGuildId,
       });
       notice = deletedCount > 0 ? "已清除公開價格報告設定。" : "目前沒有公開價格報告設定。";
+    } else {
+      const currentPanel = await readPublicPriceReportSettingsPanel({
+        client,
+        discordGuildId: publicContext.discordGuildId,
+        currentChannelId: publicContext.channelId,
+        options,
+      });
+      const currentFilters = toPublicPriceReportFilters(currentPanel.setting);
+      const categoryIgrps =
+        publicReportComponent.name === "update_categories"
+          ? parsePriceReportCategorySelection(publicReportComponent.values, currentPanel.categories)
+          : publicReportComponent.name === "update_all_categories"
+            ? []
+            : currentFilters.categoryIgrps;
+
+      if (!currentPanel.setting) {
+        await editDeferredInteractionResponse({
+          token: options.token,
+          applicationId: options.applicationId,
+          apiBaseUrl: options.apiBaseUrl,
+          interaction,
+          fetchImpl,
+          message: createPublicPriceReportSettingsPanelMessage({
+            ...currentPanel,
+            notice: "請先將公開報告設為目前頻道。",
+          }),
+        });
+        return;
+      }
+
+      if (categoryIgrps === null) {
+        await editDeferredInteractionResponse({
+          token: options.token,
+          applicationId: options.applicationId,
+          apiBaseUrl: options.apiBaseUrl,
+          interaction,
+          fetchImpl,
+          message: createPublicPriceReportSettingsPanelMessage({
+            ...currentPanel,
+            notice: "分類選擇無法辨識，請重新選擇。",
+          }),
+        });
+        return;
+      }
+
+      await updatePublicPriceReportFilters({
+        client,
+        discordGuildId: publicContext.discordGuildId,
+        discordUserId,
+        categoryIgrps,
+        includePriceDrops:
+          publicReportComponent.name === "update_events"
+            ? publicReportComponent.includePriceDrops
+            : currentFilters.includePriceDrops,
+        includePriceRises:
+          publicReportComponent.name === "update_events"
+            ? publicReportComponent.includePriceRises
+            : currentFilters.includePriceRises,
+      });
+      notice = "已更新公開價格報告設定。";
     }
 
     const panel = await readPublicPriceReportSettingsPanel({
       client,
       discordGuildId: publicContext.discordGuildId,
       currentChannelId: publicContext.channelId,
+      options,
       notice,
     });
 
@@ -759,8 +863,9 @@ async function handleModalSubmitInteraction({
 }): Promise<void> {
   const modal = parsePriceReportModalSubmit(interaction);
   const watchModal = modal ? null : parseWatchModalSubmit(interaction);
+  const publicReportModal = modal || watchModal ? null : parsePublicReportModalSubmit(interaction);
 
-  if (!modal && !watchModal) {
+  if (!modal && !watchModal && !publicReportModal) {
     await sendUnsupportedInteractionResponse({ interaction, options, fetchImpl });
     return;
   }
@@ -868,6 +973,99 @@ async function handleModalSubmitInteraction({
         result: createResult,
         publicBaseUrl: options.publicBaseUrl,
       }),
+    });
+    return;
+  }
+
+  if (publicReportModal) {
+    const publicContext = readPublicReportInteractionContext(interaction);
+
+    if (!publicContext) {
+      await sendInteractionResponse({
+        token: options.token,
+        apiBaseUrl: options.apiBaseUrl,
+        interaction,
+        fetchImpl,
+        content: "公開價格報告只能在伺服器頻道中設定。",
+      });
+      return;
+    }
+
+    if (
+      (publicReportModal.name === "limit" && !publicReportModal.maxItemsInputValid) ||
+      (publicReportModal.name === "keyword" && !publicReportModal.productKeywordInputValid)
+    ) {
+      await sendInteractionResponse({
+        token: options.token,
+        apiBaseUrl: options.apiBaseUrl,
+        interaction,
+        fetchImpl,
+        content:
+          publicReportModal.name === "limit"
+            ? `最多商品數需為 1-${MAX_PRICE_REPORT_ITEMS} 的整數。`
+            : `商品關鍵字最多 ${MAX_PRICE_REPORT_KEYWORD_LENGTH} 個字。`,
+      });
+      return;
+    }
+
+    const currentPanel = await readPublicPriceReportSettingsPanel({
+      client,
+      discordGuildId: publicContext.discordGuildId,
+      currentChannelId: publicContext.channelId,
+      options,
+    });
+
+    if (!currentPanel.setting) {
+      await sendInteractionResponse({
+        token: options.token,
+        apiBaseUrl: options.apiBaseUrl,
+        interaction,
+        fetchImpl,
+        message: createPublicPriceReportSettingsPanelMessage({
+          ...currentPanel,
+          notice: "請先使用 /public-report manage 將公開報告設為目前頻道。",
+        }),
+      });
+      return;
+    }
+
+    const currentFilters = toPublicPriceReportFilters(currentPanel.setting);
+    const updatedSetting = await updatePublicPriceReportFilters({
+      client,
+      discordGuildId: publicContext.discordGuildId,
+      discordUserId,
+      maxItems:
+        publicReportModal.name === "limit"
+          ? (publicReportModal.maxItems ?? currentPanel.setting.maxItems)
+          : currentPanel.setting.maxItems,
+      categoryIgrps: currentFilters.categoryIgrps,
+      includePriceDrops: currentFilters.includePriceDrops,
+      includePriceRises: currentFilters.includePriceRises,
+      productKeyword:
+        publicReportModal.name === "keyword"
+          ? publicReportModal.productKeyword
+          : currentFilters.productKeyword,
+    });
+    const notice =
+      publicReportModal.name === "limit"
+        ? `已更新公開報告顯示上限：${updatedSetting?.maxItems ?? currentPanel.setting.maxItems} 筆。`
+        : publicReportModal.productKeyword
+          ? `已更新公開報告關鍵字：${publicReportModal.productKeyword}。`
+          : "已清除公開報告關鍵字篩選。";
+    const panel = await readPublicPriceReportSettingsPanel({
+      client,
+      discordGuildId: publicContext.discordGuildId,
+      currentChannelId: publicContext.channelId,
+      options,
+      notice,
+    });
+
+    await sendInteractionResponse({
+      token: options.token,
+      apiBaseUrl: options.apiBaseUrl,
+      interaction,
+      fetchImpl,
+      message: createPublicPriceReportSettingsPanelMessage(panel),
     });
     return;
   }
@@ -1159,7 +1357,8 @@ async function sendPublicReportTest({
     client,
     channelId: setting.channelId,
     publicBaseUrl: options.publicBaseUrl,
-    maxItems: options.priceReportMaxItems,
+    maxItems: Math.min(setting.maxItems, options.priceReportMaxItems),
+    filters: toPublicPriceReportFilters(setting),
     sendChannelMessages: (channelId, messages) =>
       sendDiscordChannelMessages({
         token: options.token,
@@ -1224,19 +1423,26 @@ async function readPublicPriceReportSettingsPanel({
   client,
   discordGuildId,
   currentChannelId,
+  options,
   notice,
 }: {
   client: DiscordBotClient;
   discordGuildId: string;
   currentChannelId: string;
+  options: DiscordBotOptions;
   notice?: string;
 }): Promise<{
   setting: PublicPriceReportSetting | null;
   latestDelivery: PublicPriceReportDeliveryStatus | null;
+  categories: PriceReportCategoryOption[];
+  options: DiscordBotOptions;
   currentChannelId: string;
   notice?: string;
 }> {
-  const setting = await readPublicPriceReportSetting({ client, discordGuildId });
+  const [setting, categories] = await Promise.all([
+    readPublicPriceReportSetting({ client, discordGuildId }),
+    readPriceReportCategories({ client }),
+  ]);
   const latestDelivery = setting
     ? await readLatestPublicPriceReportDelivery({ client, channelId: setting.channelId })
     : null;
@@ -1244,6 +1450,8 @@ async function readPublicPriceReportSettingsPanel({
   return {
     setting,
     latestDelivery,
+    categories,
+    options,
     currentChannelId,
     notice,
   };
@@ -1252,14 +1460,20 @@ async function readPublicPriceReportSettingsPanel({
 function createPublicPriceReportSettingsPanelMessage({
   setting,
   latestDelivery,
+  categories,
+  options,
   currentChannelId,
   notice,
 }: Awaited<ReturnType<typeof readPublicPriceReportSettingsPanel>>): DiscordBotMessage {
+  const filters = toPublicPriceReportFilters(setting);
+
   return {
     embeds: [
       createPublicPriceReportSettingsEmbed({
         setting,
         latestDelivery,
+        categories,
+        options,
         currentChannelId,
         notice,
       }),
@@ -1267,6 +1481,10 @@ function createPublicPriceReportSettingsPanelMessage({
     components: createPublicReportSettingsComponents({
       hasChannel: setting !== null,
       enabled: setting?.enabled ?? false,
+      categories,
+      categoryIgrps: filters.categoryIgrps,
+      includePriceDrops: filters.includePriceDrops,
+      includePriceRises: filters.includePriceRises,
     }),
   };
 }
@@ -1288,6 +1506,8 @@ function createPublicPriceReportStatusMessage(
 function createPublicPriceReportSettingsEmbed({
   setting,
   latestDelivery,
+  categories,
+  options,
   currentChannelId,
   notice,
   title = "公開價格報告設定",
@@ -1296,6 +1516,7 @@ function createPublicPriceReportSettingsEmbed({
   title?: string;
   description?: string;
 }): DiscordBotEmbed {
+  const filters = toPublicPriceReportFilters(setting);
   const description = [notice ? `**${notice}**` : null, baseDescription]
     .filter((line): line is string => line !== null)
     .join("\n");
@@ -1321,11 +1542,38 @@ function createPublicPriceReportSettingsEmbed({
         inline: true,
       },
       {
+        name: "分類",
+        value: formatPriceReportCategoryFilterLabel(filters, categories),
+        inline: true,
+      },
+      {
+        name: "內容",
+        value: formatPublicReportEventFilterLabel(filters),
+        inline: true,
+      },
+      {
+        name: "最多列出",
+        value: `${setting?.maxItems ?? options.priceReportMaxItems} 筆`,
+        inline: true,
+      },
+      {
+        name: "商品關鍵字",
+        value: formatPriceReportKeywordFilterLabel(filters),
+        inline: true,
+      },
+      {
         name: "最近一次公開報告",
         value: formatPublicReportDeliveryStatus(latestDelivery),
       },
     ],
   };
+}
+
+function formatPublicReportEventFilterLabel(filters: PriceReportFilters): string {
+  return formatPriceReportEventFilterLabel({
+    ...filters,
+    includeNewProducts: false,
+  });
 }
 
 function formatPublicReportDeliveryStatus(

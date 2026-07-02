@@ -61,6 +61,14 @@ export interface PriceReportFilters {
   includeNewProducts: boolean;
 }
 
+export interface PriceReportFilterSetting {
+  categoryIgrps: number[];
+  productKeyword: string | null;
+  includePriceDrops: boolean;
+  includePriceRises: boolean;
+  includeNewProducts: boolean;
+}
+
 const DEFAULT_PRICE_REPORT_FILTERS: PriceReportFilters = {
   categoryIgrps: [],
   productKeyword: null,
@@ -133,6 +141,31 @@ export function createPublicPriceChangeReportMessages(
   });
 
   return createReportMessages(embeds);
+}
+
+export function filterPriceChangesForReport(
+  priceChanges: PriceChangeDiscordNotificationItem[],
+  filters: PriceReportFilters,
+): PriceChangeDiscordNotificationItem[] {
+  const normalizedFilters = normalizePriceReportFilters(filters);
+  const categoryIgrps = new Set(normalizedFilters.categoryIgrps);
+  const keywordGroups = parseProductKeywordGroups(normalizedFilters.productKeyword);
+
+  return priceChanges.filter((change) => {
+    if (categoryIgrps.size > 0 && !categoryIgrps.has(change.category.igrp)) {
+      return false;
+    }
+
+    if (change.delta < 0 && !normalizedFilters.includePriceDrops) {
+      return false;
+    }
+
+    if (change.delta > 0 && !normalizedFilters.includePriceRises) {
+      return false;
+    }
+
+    return matchesProductKeywordGroups(change.productName, keywordGroups);
+  });
 }
 
 async function sendPriceReport({
@@ -1060,16 +1093,7 @@ export function formatPriceReportSettingMessage(
   ].join("\n");
 }
 
-export function toPriceReportFilters(
-  setting: Pick<
-    DiscordPriceReportSetting,
-    | "categoryIgrps"
-    | "productKeyword"
-    | "includePriceDrops"
-    | "includePriceRises"
-    | "includeNewProducts"
-  > | null,
-): PriceReportFilters {
+export function toPriceReportFilters(setting: PriceReportFilterSetting | null): PriceReportFilters {
   if (!setting) {
     return DEFAULT_PRICE_REPORT_FILTERS;
   }
@@ -1168,6 +1192,29 @@ function normalizePriceReportProductKeywordText(value: string): string {
     .map((group) => group.trim().replace(/\s+/g, " "))
     .filter(Boolean)
     .join(", ");
+}
+
+function parseProductKeywordGroups(keyword: string | null): string[][] {
+  if (!keyword) {
+    return [];
+  }
+
+  return keyword
+    .split(",")
+    .map((group) => group.trim().split(/\s+/).filter(Boolean))
+    .filter((tokens) => tokens.length > 0);
+}
+
+function matchesProductKeywordGroups(productName: string, groups: string[][]): boolean {
+  if (groups.length === 0) {
+    return true;
+  }
+
+  const normalizedName = productName.toLocaleLowerCase("zh-Hant");
+
+  return groups.some((tokens) =>
+    tokens.every((token) => normalizedName.includes(token.toLocaleLowerCase("zh-Hant"))),
+  );
 }
 
 export function formatWindowLabel(window: DiscordPriceReportSetting["window"]): string {

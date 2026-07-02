@@ -381,6 +381,37 @@
   color: var(--accent);
 }
 
+.discord-faq-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.discord-faq-item {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid rgba(33, 51, 64, 0.78);
+  border-radius: 8px;
+  background: rgba(11, 23, 32, 0.74);
+}
+
+.discord-faq-item h3 {
+  margin: 0;
+  color: var(--text-strong);
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+.discord-faq-item p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
 @media (max-width: 900px) {
   .discord-hero {
     grid-template-columns: 1fr;
@@ -424,6 +455,10 @@
   }
 
   .discord-admin-checklist {
+    grid-template-columns: 1fr;
+  }
+
+  .discord-faq-list {
     grid-template-columns: 1fr;
   }
 

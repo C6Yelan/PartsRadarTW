@@ -32,6 +32,8 @@ test.describe("public web smoke", () => {
     await expect(page.getByRole("img", { name: "/watch 管理面板介面圖準備中" })).toBeVisible();
     await expect(page.getByRole("img", { name: "個人價格報告設定介面圖準備中" })).toBeVisible();
     await expect(page.getByRole("img", { name: "公開報告管理面板介面圖準備中" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "常見問題" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "公開報告可以只看特定商品嗎？" })).toBeVisible();
   });
 });
 

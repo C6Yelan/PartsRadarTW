@@ -171,7 +171,7 @@ Discord bot 權限：
 - Developer Portal 不需要開啟 privileged gateway intents；程式以 `intents: 0` 連線。
 - 不要求 `Administrator`、`Read Message History` 或 `Message Content Intent`。
 - `/public-report` 註冊為管理者指令，只有具備管理伺服器權限的成員通常會在 Discord 指令清單看到；這是 command visibility 設定，不是 bot 安裝權限。
-- `/public-report status/manage/test` 分別用於查看狀態、調整公開報告頻道與發送測試報告。
+- `/public-report status/manage/test` 分別用於查看狀態、調整公開報告頻道與發送測試報告；管理面板可調整分類、降價 / 漲價、商品關鍵字與顯示上限。
 - 公開價格報告目標頻道需允許 bot `Send Messages` 與 `Embed Links`；若缺少權限，bot 會在 `/public-report test` 或面板測試流程回覆可讀中文提示。
 - Slash command interaction response 與使用者 DM 不需要伺服器管理權限；admin 維運告警仍走 admin webhook。
 - 若使用者看不到指令，通常是 `applications.commands` 未安裝或伺服器整合設定限制；bot 收不到 interaction 時無法主動回覆，只能依安裝文件重新邀請或請伺服器管理員調整 Discord Integrations / App command permissions。
@@ -208,6 +208,7 @@ Discord bot 權限：
 Migration：
 
 - 正式部署使用 `prisma migrate deploy` 或 root `pnpm db:deploy`。
+- `20260702093000_add_discord_public_report_filters` 會替 `discord_public_price_report_settings` 新增公開報告篩選欄位；部署後既有公開報告預設維持全部分類、降價與漲價、無關鍵字、最多 50 筆。
 - migration 失敗時不啟動新版服務。
 - schema 變更前需有備份與本機 / staging-like 驗證。
 

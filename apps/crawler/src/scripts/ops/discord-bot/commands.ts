@@ -32,6 +32,7 @@ import type {
   ParsedPriceReportModal,
   ParsedPublicReportCommand,
   ParsedPublicReportComponent,
+  ParsedPublicReportModal,
   ParsedWatchComponent,
   ParsedWatchModal,
 } from "./types";
@@ -60,6 +61,15 @@ const PUBLIC_REPORT_ENABLE_CUSTOM_ID = "public-report:enable";
 const PUBLIC_REPORT_DISABLE_CUSTOM_ID = "public-report:disable";
 const PUBLIC_REPORT_PREVIEW_CUSTOM_ID = "public-report:preview";
 const PUBLIC_REPORT_CLEAR_CUSTOM_ID = "public-report:clear";
+const PUBLIC_REPORT_CATEGORIES_CUSTOM_ID = "public-report:categories";
+const PUBLIC_REPORT_ALL_CATEGORIES_CUSTOM_ID = "public-report:all-categories";
+const PUBLIC_REPORT_EVENTS_CUSTOM_ID = "public-report:events";
+const PUBLIC_REPORT_KEYWORD_CUSTOM_ID = "public-report:keyword";
+const PUBLIC_REPORT_KEYWORD_MODAL_CUSTOM_ID = "public-report:keyword-modal";
+const PUBLIC_REPORT_KEYWORD_INPUT_CUSTOM_ID = "public-report:keyword-input";
+const PUBLIC_REPORT_LIMIT_CUSTOM_ID = "public-report:limit";
+const PUBLIC_REPORT_LIMIT_MODAL_CUSTOM_ID = "public-report:limit-modal";
+const PUBLIC_REPORT_MAX_ITEMS_CUSTOM_ID = "public-report:max-items";
 const WATCH_CREATE_MODAL_CUSTOM_ID = "watch:create-modal";
 const WATCH_EDIT_MODAL_CUSTOM_ID_PREFIX = "watch:edit-modal:";
 const WATCH_PRODUCT_CUSTOM_ID = "watch:product";
@@ -553,11 +563,89 @@ export function createPriceReportSettingsComponents({
 export function createPublicReportSettingsComponents({
   hasChannel,
   enabled,
+  categories,
+  categoryIgrps,
+  includePriceDrops,
+  includePriceRises,
 }: {
   hasChannel: boolean;
   enabled: boolean;
+  categories: Array<{ igrp: number; displayName: string }>;
+  categoryIgrps: number[];
+  includePriceDrops: boolean;
+  includePriceRises: boolean;
 }): DiscordMessageComponent[] {
+  const selectedCategoryIgrps = new Set(categoryIgrps);
+  const allCategoriesSelected = selectedCategoryIgrps.size === 0;
+  const visibleCategories = categories.slice(0, PRICE_REPORT_CATEGORY_OPTION_LIMIT);
+  const categoryOptions = visibleCategories.map((category) => ({
+    label: category.displayName,
+    value: String(category.igrp),
+    default: allCategoriesSelected || selectedCategoryIgrps.has(category.igrp),
+  }));
+  const categoryRows: DiscordMessageComponent[] =
+    categoryOptions.length === 0
+      ? []
+      : [
+          {
+            type: DISCORD_COMPONENT_TYPE_ACTION_ROW,
+            components: [
+              {
+                type: DISCORD_COMPONENT_TYPE_STRING_SELECT,
+                custom_id: PUBLIC_REPORT_CATEGORIES_CUSTOM_ID,
+                placeholder: "公開報告分類",
+                min_values: 1,
+                max_values: Math.min(PRICE_REPORT_CATEGORY_OPTION_LIMIT, categoryOptions.length),
+                options: categoryOptions,
+                disabled: !hasChannel,
+              },
+            ],
+          },
+        ];
+
   return [
+    ...categoryRows,
+    ...(allCategoriesSelected || categoryOptions.length === 0
+      ? []
+      : [
+          {
+            type: DISCORD_COMPONENT_TYPE_ACTION_ROW,
+            components: [
+              {
+                type: DISCORD_COMPONENT_TYPE_BUTTON,
+                style: DISCORD_BUTTON_STYLE_SECONDARY,
+                custom_id: PUBLIC_REPORT_ALL_CATEGORIES_CUSTOM_ID,
+                label: "改為全部分類",
+                disabled: !hasChannel,
+              },
+            ],
+          } satisfies DiscordMessageComponent,
+        ]),
+    {
+      type: DISCORD_COMPONENT_TYPE_ACTION_ROW,
+      components: [
+        {
+          type: DISCORD_COMPONENT_TYPE_STRING_SELECT,
+          custom_id: PUBLIC_REPORT_EVENTS_CUSTOM_ID,
+          placeholder: "公開報告內容",
+          min_values: 1,
+          max_values: 2,
+          options: [
+            {
+              label: "降價",
+              value: PRICE_REPORT_EVENT_PRICE_DROPS_VALUE,
+              default: includePriceDrops,
+            },
+            {
+              label: "漲價",
+              value: PRICE_REPORT_EVENT_PRICE_RISES_VALUE,
+              default: includePriceRises,
+            },
+          ],
+          disabled: !hasChannel,
+        },
+      ],
+    },
     {
       type: DISCORD_COMPONENT_TYPE_ACTION_ROW,
       components: [
@@ -572,6 +660,20 @@ export function createPublicReportSettingsComponents({
           style: DISCORD_BUTTON_STYLE_SECONDARY,
           custom_id: PUBLIC_REPORT_PREVIEW_CUSTOM_ID,
           label: "發送測試",
+          disabled: !hasChannel,
+        },
+        {
+          type: DISCORD_COMPONENT_TYPE_BUTTON,
+          style: DISCORD_BUTTON_STYLE_SECONDARY,
+          custom_id: PUBLIC_REPORT_KEYWORD_CUSTOM_ID,
+          label: "調整關鍵字",
+          disabled: !hasChannel,
+        },
+        {
+          type: DISCORD_COMPONENT_TYPE_BUTTON,
+          style: DISCORD_BUTTON_STYLE_SECONDARY,
+          custom_id: PUBLIC_REPORT_LIMIT_CUSTOM_ID,
+          label: "調整上限",
           disabled: !hasChannel,
         },
       ],
@@ -643,6 +745,30 @@ export function createPriceReportTimeLimitModal({
   };
 }
 
+export function createPublicReportLimitModal({ maxItems }: { maxItems: number }): DiscordModal {
+  return {
+    custom_id: PUBLIC_REPORT_LIMIT_MODAL_CUSTOM_ID,
+    title: "公開報告顯示上限",
+    components: [
+      {
+        type: DISCORD_COMPONENT_TYPE_LABEL,
+        label: "最多列出的商品數",
+        description: `1-${MAX_PRICE_REPORT_ITEMS}`,
+        component: {
+          type: DISCORD_COMPONENT_TYPE_TEXT_INPUT,
+          custom_id: PUBLIC_REPORT_MAX_ITEMS_CUSTOM_ID,
+          style: DISCORD_TEXT_INPUT_STYLE_SHORT,
+          min_length: 1,
+          max_length: 2,
+          required: true,
+          value: String(maxItems),
+          placeholder: "50",
+        },
+      },
+    ],
+  };
+}
+
 export function createPriceReportKeywordModal({
   keywordValue,
 }: {
@@ -662,6 +788,36 @@ export function createPriceReportKeywordModal({
         component: {
           type: DISCORD_COMPONENT_TYPE_TEXT_INPUT,
           custom_id: PRICE_REPORT_SETTINGS_KEYWORD_INPUT_CUSTOM_ID,
+          style: DISCORD_TEXT_INPUT_STYLE_SHORT,
+          max_length: MAX_PRICE_REPORT_KEYWORD_LENGTH,
+          required: false,
+          value: keywordValue,
+          placeholder: "RTX 5090, DDR5",
+        },
+      },
+    ],
+  };
+}
+
+export function createPublicReportKeywordModal({
+  keywordValue,
+}: {
+  keywordValue: string;
+}): DiscordModal {
+  return {
+    custom_id: PUBLIC_REPORT_KEYWORD_MODAL_CUSTOM_ID,
+    title: "公開報告關鍵字",
+    components: [
+      {
+        type: DISCORD_COMPONENT_TYPE_TEXT_DISPLAY,
+        content: PRICE_REPORT_KEYWORD_FORMAT_DESCRIPTION,
+      },
+      {
+        type: DISCORD_COMPONENT_TYPE_LABEL,
+        label: "商品名稱關鍵字",
+        component: {
+          type: DISCORD_COMPONENT_TYPE_TEXT_INPUT,
+          custom_id: PUBLIC_REPORT_KEYWORD_INPUT_CUSTOM_ID,
           style: DISCORD_TEXT_INPUT_STYLE_SHORT,
           max_length: MAX_PRICE_REPORT_KEYWORD_LENGTH,
           required: false,
@@ -767,6 +923,31 @@ export function parsePublicReportComponentInteraction(
     return { name: "clear" };
   }
 
+  if (customId === PUBLIC_REPORT_CATEGORIES_CUSTOM_ID) {
+    return {
+      name: "update_categories",
+      values: interaction.data?.values ?? [],
+    };
+  }
+
+  if (customId === PUBLIC_REPORT_ALL_CATEGORIES_CUSTOM_ID) {
+    return { name: "update_all_categories" };
+  }
+
+  if (customId === PUBLIC_REPORT_EVENTS_CUSTOM_ID) {
+    const events = parsePublicReportEvents(interaction.data?.values ?? []);
+
+    return events ? { name: "update_events", ...events } : null;
+  }
+
+  if (customId === PUBLIC_REPORT_KEYWORD_CUSTOM_ID) {
+    return { name: "open_keyword_modal" };
+  }
+
+  if (customId === PUBLIC_REPORT_LIMIT_CUSTOM_ID) {
+    return { name: "open_limit_modal" };
+  }
+
   return null;
 }
 
@@ -806,6 +987,46 @@ export function parsePriceReportModalSubmit(
     const productKeywordValue = readSubmittedComponentValue(
       data.components,
       PRICE_REPORT_SETTINGS_KEYWORD_INPUT_CUSTOM_ID,
+    );
+    const productKeyword = parseProductKeywordInput(productKeywordValue);
+
+    return {
+      name: "keyword",
+      productKeyword: productKeyword === undefined ? null : productKeyword,
+      productKeywordInputValid: productKeyword !== undefined,
+    };
+  }
+
+  return null;
+}
+
+export function parsePublicReportModalSubmit(
+  interaction: DiscordInteraction,
+): ParsedPublicReportModal | null {
+  const data = interaction.data;
+
+  if (!data) {
+    return null;
+  }
+
+  if (data.custom_id === PUBLIC_REPORT_LIMIT_MODAL_CUSTOM_ID) {
+    const maxItemsValue = readSubmittedComponentValue(
+      data.components,
+      PUBLIC_REPORT_MAX_ITEMS_CUSTOM_ID,
+    );
+    const maxItems = parseMaxItemsInput(maxItemsValue);
+
+    return {
+      name: "limit",
+      maxItems,
+      maxItemsInputValid: maxItems !== null,
+    };
+  }
+
+  if (data.custom_id === PUBLIC_REPORT_KEYWORD_MODAL_CUSTOM_ID) {
+    const productKeywordValue = readSubmittedComponentValue(
+      data.components,
+      PUBLIC_REPORT_KEYWORD_INPUT_CUSTOM_ID,
     );
     const productKeyword = parseProductKeywordInput(productKeywordValue);
 
@@ -957,6 +1178,28 @@ function parsePriceReportEvents(values: unknown[]): {
     includePriceDrops: values.includes(PRICE_REPORT_EVENT_PRICE_DROPS_VALUE),
     includePriceRises: values.includes(PRICE_REPORT_EVENT_PRICE_RISES_VALUE),
     includeNewProducts: values.includes(PRICE_REPORT_EVENT_NEW_PRODUCTS_VALUE),
+  };
+}
+
+function parsePublicReportEvents(values: unknown[]): {
+  includePriceDrops: boolean;
+  includePriceRises: boolean;
+} | null {
+  const validValues = new Set([
+    PRICE_REPORT_EVENT_PRICE_DROPS_VALUE,
+    PRICE_REPORT_EVENT_PRICE_RISES_VALUE,
+  ]);
+
+  if (
+    values.length === 0 ||
+    values.some((value) => typeof value !== "string" || !validValues.has(value))
+  ) {
+    return null;
+  }
+
+  return {
+    includePriceDrops: values.includes(PRICE_REPORT_EVENT_PRICE_DROPS_VALUE),
+    includePriceRises: values.includes(PRICE_REPORT_EVENT_PRICE_RISES_VALUE),
   };
 }
 

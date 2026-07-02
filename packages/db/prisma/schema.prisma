@@ -317,6 +317,11 @@ model DiscordPublicPriceReportSetting {
   id                     String   @id @default(uuid()) @db.Uuid
   discordGuildId         String   @unique(map: "discord_public_price_report_settings_guild_id_key") @map("discord_guild_id") @db.Text
   channelId              String   @map("channel_id") @db.Text
+  maxItems               Int      @default(50) @map("max_items")
+  categoryIgrps          Int[]    @default([]) @map("category_igrps")
+  productKeyword         String?  @map("product_keyword") @db.Text
+  includePriceDrops      Boolean  @default(true) @map("include_price_drops")
+  includePriceRises      Boolean  @default(true) @map("include_price_rises")
   enabled                Boolean  @default(true)
   createdByDiscordUserId String   @map("created_by_discord_user_id") @db.Text
   updatedByDiscordUserId String   @map("updated_by_discord_user_id") @db.Text

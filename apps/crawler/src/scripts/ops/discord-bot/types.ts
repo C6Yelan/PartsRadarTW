@@ -331,6 +331,24 @@ export type ParsedPublicReportComponent =
     }
   | {
       name: "clear";
+    }
+  | {
+      name: "update_categories";
+      values: string[];
+    }
+  | {
+      name: "update_all_categories";
+    }
+  | {
+      name: "update_events";
+      includePriceDrops: boolean;
+      includePriceRises: boolean;
+    }
+  | {
+      name: "open_keyword_modal";
+    }
+  | {
+      name: "open_limit_modal";
     };
 
 export type ParsedWatchModal =
@@ -401,6 +419,18 @@ export type ParsedPriceReportModal =
       maxItemsInputValid: boolean;
       timeOfDay: PriceReportTimeOfDay | null;
       timeInputValid: boolean;
+    }
+  | {
+      name: "keyword";
+      productKeyword: string | null;
+      productKeywordInputValid: boolean;
+    };
+
+export type ParsedPublicReportModal =
+  | {
+      name: "limit";
+      maxItems: number | null;
+      maxItemsInputValid: boolean;
     }
   | {
       name: "keyword";
