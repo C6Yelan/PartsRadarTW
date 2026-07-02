@@ -27,11 +27,22 @@ test.describe("public web smoke", () => {
     await expect(page.getByRole("heading", { exact: true, name: "Discord 通知" })).toBeVisible();
     await expect(page.getByRole("img", { name: "指令操作示意圖準備中" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "快速開始" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "開啟公開報告" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "指令說明" })).toBeVisible();
-    await expect(page.getByRole("img", { name: "/watch 追蹤面板截圖預留" })).toBeVisible();
+    const commandsSection = page.getByRole("region", { name: "指令說明" });
+    await expect(
+      commandsSection.getByRole("heading", { exact: true, name: "即時目標價提醒" }),
+    ).toBeVisible();
+    await expect(
+      commandsSection.getByRole("heading", { exact: true, name: "個人價格報告" }),
+    ).toBeVisible();
+    await expect(
+      commandsSection.getByRole("heading", { exact: true, name: "伺服器公開報告" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("img", { name: "/watch 即時目標價提醒面板截圖預留" }),
+    ).toBeVisible();
     await expect(page.getByRole("img", { name: "個人價格報告設定截圖預留" })).toBeVisible();
-    await expect(page.getByRole("img", { name: "公開報告管理面板截圖預留" })).toBeVisible();
+    await expect(page.getByRole("img", { name: "伺服器公開報告管理面板截圖預留" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "常見問題" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "一般成員能用哪些指令？" })).toBeVisible();
   });

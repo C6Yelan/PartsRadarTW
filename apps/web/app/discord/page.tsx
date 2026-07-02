@@ -5,7 +5,7 @@ import SiteDisclaimer from "../site-disclaimer";
 
 export const metadata: Metadata = {
   title: "Discord 通知 | PartsRadarTW",
-  description: "邀請 PartsRadarTW Discord bot，設定商品目標價追蹤、個人價格報告與伺服器公開報告。",
+  description: "邀請 PartsRadarTW Discord bot，設定即時目標價提醒、個人價格報告與伺服器公開報告。",
 };
 
 export const dynamic = "force-dynamic";
@@ -16,84 +16,88 @@ const quickStartSteps = [
   {
     title: "邀請機器人",
     command: "邀請連結",
-    description: "把 bot 加到伺服器後，成員即可使用個人通知指令。",
+    description: "成員可使用 /watch、/price-report；管理者可設定 /public-report。",
   },
   {
-    title: "設定個人追蹤",
+    title: "即時目標價提醒",
     command: "/watch",
-    description: "追蹤商品目標價，達標時由 bot 私訊提醒。",
+    description: "追蹤單一商品，價格更新後若達標就私訊提醒。",
   },
   {
-    title: "客製化報告",
+    title: "個人價格報告",
     command: "/price-report settings",
-    description: "選擇分類、關鍵字與顯示上限，建立自己的價格報告。",
+    description: "設定分類與關鍵字，定時或手動產生個人彙整報告。",
   },
   {
-    title: "開啟公開報告",
+    title: "伺服器公開報告",
     command: "/public-report manage",
-    description: "管理者指定頻道，讓伺服器自動收到公開價格報告。",
+    description: "管理者指定頻道，讓全伺服器看到公開彙整報告。",
   },
 ] as const;
 
-const personalCommandGuides = [
+const targetPriceCommandGuides = [
   {
     command: "/watch",
-    description: "查看追蹤清單，並從同一個面板新增、修改或移除目標價。",
-    imageLabel: "/watch 追蹤面板截圖預留",
-    imageTitle: "/watch 追蹤面板",
-    title: "管理商品目標價",
+    description: "查看追蹤清單，新增、修改或移除單一商品的目標價。",
+    imageLabel: "/watch 即時目標價提醒面板截圖預留",
+    imageTitle: "/watch 即時提醒面板",
+    title: "管理即時目標價提醒",
   },
   {
     command: "新增追蹤",
-    description: "貼上 PartsRadarTW 商品頁網址，填入目標價後儲存。",
+    description: "貼上商品頁網址並填入目標價；價格更新後達標會私訊你。",
     imageLabel: "新增追蹤視窗截圖預留",
     imageTitle: "新增追蹤視窗",
-    title: "新增目標價提醒",
+    title: "新增即時提醒",
   },
+] as const;
+
+const personalReportCommandGuides = [
   {
     command: "/price-report settings",
-    description: "設定分類、商品關鍵字、內容類型與顯示上限。",
+    description: "設定只屬於自己的分類、商品關鍵字、內容類型與顯示上限。",
     imageLabel: "個人價格報告設定截圖預留",
-    imageTitle: "價格報告設定",
+    imageTitle: "個人報告設定",
     title: "設定個人價格報告",
   },
   {
     command: "/price-report now",
-    description: "用目前設定立即產生一次報告，方便確認篩選結果。",
-    imageLabel: "立即產生價格報告截圖預留",
-    imageTitle: "立即產生報告",
-    title: "預覽價格報告",
+    description: "用目前設定手動產生一次 DM 報告，確認篩選結果是否正確。",
+    imageLabel: "個人價格報告預覽截圖預留",
+    imageTitle: "個人報告預覽",
+    title: "預覽個人價格報告",
   },
 ] as const;
 
-const serverCommandGuides = [
+const serverReportCommandGuides = [
   {
     command: "/public-report manage",
-    description: "設定發送頻道、分類、關鍵字與啟用狀態。",
-    imageLabel: "公開報告管理面板截圖預留",
-    imageTitle: "公開報告管理面板",
-    title: "設定公開報告",
+    description: "管理者設定公開頻道、分類、關鍵字與啟用狀態。",
+    imageLabel: "伺服器公開報告管理面板截圖預留",
+    imageTitle: "伺服器公開報告管理",
+    title: "設定伺服器公開報告",
   },
   {
     command: "/public-report test",
-    description: "送出測試報告，確認頻道權限與 embed 顯示正常。",
-    imageLabel: "公開報告測試截圖預留",
-    imageTitle: "公開報告測試",
-    title: "測試公開報告",
+    description: "送出測試報告，確認公開頻道權限與 embed 顯示正常。",
+    imageLabel: "伺服器公開報告測試截圖預留",
+    imageTitle: "伺服器公開報告測試",
+    title: "測試伺服器公開報告",
   },
   {
     command: "/public-report status",
-    description: "查看公開報告啟用狀態、頻道與最近一次發送結果。",
-    imageLabel: "公開報告狀態截圖預留",
-    imageTitle: "公開報告狀態",
-    title: "檢查目前設定",
+    description: "查看伺服器公開報告的啟用狀態、頻道與最近一次發送結果。",
+    imageLabel: "伺服器公開報告狀態截圖預留",
+    imageTitle: "伺服器公開報告狀態",
+    title: "檢查伺服器公開報告",
   },
 ] as const;
 
 const discordFaqItems = [
   {
     question: "一般成員能用哪些指令？",
-    answer: "一般成員可使用 /watch 與 /price-report；公開報告管理指令只提供給管理者。",
+    answer:
+      "一般成員可使用 /watch 即時目標價提醒與 /price-report 個人價格報告；/public-report 只提供給管理者。",
   },
   {
     question: "看不到 /public-report 怎麼辦？",
@@ -136,7 +140,7 @@ export default function DiscordPage() {
           <div className="discord-hero-copy">
             <span className="eyebrow">PartsRadarTW Discord bot</span>
             <h2 id="discord-title">Discord 價格通知</h2>
-            <p>用 Discord 接收目標價提醒、個人價格報告與伺服器公開報告。</p>
+            <p>用 Discord 接收即時目標價提醒、個人價格報告與伺服器公開報告。</p>
             <div className="discord-actions">
               {hasInviteUrl ? (
                 <a
@@ -178,7 +182,7 @@ export default function DiscordPage() {
           <div className="discord-section-heading">
             <span className="eyebrow">Quick start</span>
             <h2 id="quick-start-title">快速開始</h2>
-            <p>先完成邀請，再依需求設定個人通知或伺服器公開報告。</p>
+            <p>先完成邀請，再依需求選擇即時提醒、個人報告或公開報告。</p>
           </div>
 
           <ol className="discord-step-list">
@@ -199,16 +203,18 @@ export default function DiscordPage() {
           <div className="discord-section-heading">
             <span className="eyebrow">Commands</span>
             <h2 id="commands-title">指令說明</h2>
-            <p>每個主要操作都保留截圖位置；補圖後可直接形成完整圖文教學。</p>
+            <p>
+              /watch 是即時達標提醒；/price-report 是個人彙整；/public-report 是伺服器公開彙整。
+            </p>
           </div>
 
           <div className="discord-command-group">
-            <h3>個人通知</h3>
+            <h3>即時目標價提醒</h3>
             <p className="discord-command-group-summary">
-              一般使用者用這組指令追蹤商品與產生個人價格報告。
+              追蹤單一商品。價格資料更新後若達到目標價，bot 會私訊通知你。
             </p>
             <div className="discord-command-guide-list">
-              {personalCommandGuides.map((guide, index) => (
+              {targetPriceCommandGuides.map((guide, index) => (
                 <article className="discord-command-guide" key={guide.imageLabel}>
                   <div className="discord-guide-media">
                     <div
@@ -222,7 +228,37 @@ export default function DiscordPage() {
                   </div>
 
                   <div className="discord-guide-copy">
-                    <span className="discord-guide-step">個人 {index + 1}</span>
+                    <span className="discord-guide-step">提醒 {index + 1}</span>
+                    <h4>{guide.title}</h4>
+                    <code>{guide.command}</code>
+                    <p>{guide.description}</p>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+
+          <div className="discord-command-group">
+            <h3>個人價格報告</h3>
+            <p className="discord-command-group-summary">
+              依你的分類、關鍵字與上限產生私訊彙整報告；通常不是即時通知。
+            </p>
+            <div className="discord-command-guide-list">
+              {personalReportCommandGuides.map((guide, index) => (
+                <article className="discord-command-guide" key={guide.imageLabel}>
+                  <div className="discord-guide-media">
+                    <div
+                      className="discord-guide-placeholder"
+                      aria-label={guide.imageLabel}
+                      role="img"
+                    >
+                      <span>{guide.imageTitle}</span>
+                      <strong>預留截圖位置</strong>
+                    </div>
+                  </div>
+
+                  <div className="discord-guide-copy">
+                    <span className="discord-guide-step">報告 {index + 1}</span>
                     <h4>{guide.title}</h4>
                     <code>{guide.command}</code>
                     <p>{guide.description}</p>
@@ -235,10 +271,10 @@ export default function DiscordPage() {
           <div className="discord-command-group" id="discord-admin">
             <h3>伺服器公開報告</h3>
             <p className="discord-command-group-summary">
-              管理者用這組指令指定頻道、測試權限並查看目前狀態。
+              管理者指定公開頻道，讓整個伺服器看到自動產生的價格彙整。
             </p>
             <div className="discord-command-guide-list">
-              {serverCommandGuides.map((guide, index) => (
+              {serverReportCommandGuides.map((guide, index) => (
                 <article className="discord-command-guide" key={guide.imageLabel}>
                   <div className="discord-guide-media">
                     <div
