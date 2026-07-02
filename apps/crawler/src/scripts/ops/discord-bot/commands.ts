@@ -19,6 +19,7 @@ import {
   DISCORD_PERMISSION_MANAGE_GUILD,
   DISCORD_TEXT_INPUT_STYLE_SHORT,
   MAX_PRICE_REPORT_ITEMS,
+  MAX_PRICE_REPORT_KEYWORD_GROUPS,
   MAX_PRICE_REPORT_KEYWORD_LENGTH,
   MAX_TARGET_PRICE,
 } from "./constants";
@@ -78,7 +79,7 @@ const PRICE_REPORT_KEYWORD_FORMAT_DESCRIPTION =
   "**格式說明**\n" +
   "留空：不限制商品名稱。\n" +
   "空白：同一組關鍵字都要符合，例如 `RTX 5090`。\n" +
-  "逗號：多組擇一符合，例如 `RTX 5090, DDR5`。";
+  `逗號：多組擇一符合，最多 ${MAX_PRICE_REPORT_KEYWORD_GROUPS} 組，例如 \`RTX 5090, DDR5\`。`;
 export const WATCH_ADD_CUSTOM_ID = "watch:add";
 export const WATCH_SELECT_CUSTOM_ID_PREFIX = "watch:select:";
 export const WATCH_EDIT_CUSTOM_ID_PREFIX = "watch:edit:";
@@ -1144,7 +1145,10 @@ function parseProductKeywordInput(value: unknown): string | null | undefined {
     return null;
   }
 
-  return productKeyword.length <= MAX_PRICE_REPORT_KEYWORD_LENGTH ? productKeyword : undefined;
+  return productKeyword.length <= MAX_PRICE_REPORT_KEYWORD_LENGTH &&
+    countProductKeywordGroups(productKeyword) <= MAX_PRICE_REPORT_KEYWORD_GROUPS
+    ? productKeyword
+    : undefined;
 }
 
 function normalizeProductKeywordInput(value: string): string {
@@ -1154,6 +1158,10 @@ function normalizeProductKeywordInput(value: string): string {
     .map((group) => group.trim().replace(/\s+/g, " "))
     .filter(Boolean)
     .join(", ");
+}
+
+function countProductKeywordGroups(keyword: string): number {
+  return keyword.split(",").filter((group) => group.trim().length > 0).length;
 }
 
 function parsePriceReportEvents(values: unknown[]): {

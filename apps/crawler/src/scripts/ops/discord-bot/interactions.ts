@@ -27,6 +27,7 @@ import {
   DISCORD_PERMISSION_EMBED_LINKS,
   DISCORD_PERMISSION_SEND_MESSAGES,
   MAX_PRICE_REPORT_ITEMS,
+  MAX_PRICE_REPORT_KEYWORD_GROUPS,
   MAX_PRICE_REPORT_KEYWORD_LENGTH,
   MAX_TARGET_PRICE,
 } from "./constants";
@@ -1003,7 +1004,7 @@ async function handleModalSubmitInteraction({
         content:
           publicReportModal.name === "limit"
             ? `最多商品數需為 1-${MAX_PRICE_REPORT_ITEMS} 的整數。`
-            : `商品關鍵字最多 ${MAX_PRICE_REPORT_KEYWORD_LENGTH} 個字。`,
+            : formatPriceReportKeywordValidationMessage(),
       });
       return;
     }
@@ -1825,7 +1826,7 @@ function formatPriceReportModalValidationMessage(
   modal: NonNullable<ReturnType<typeof parsePriceReportModalSubmit>>,
 ): string {
   if (modal.name === "keyword") {
-    return `商品關鍵字最多 ${MAX_PRICE_REPORT_KEYWORD_LENGTH} 個字。`;
+    return formatPriceReportKeywordValidationMessage();
   }
 
   const messages = [
@@ -1834,6 +1835,10 @@ function formatPriceReportModalValidationMessage(
   ].filter((message): message is string => message !== null);
 
   return messages.join("\n");
+}
+
+function formatPriceReportKeywordValidationMessage(): string {
+  return `商品關鍵字最多 ${MAX_PRICE_REPORT_KEYWORD_LENGTH} 個字，且最多 ${MAX_PRICE_REPORT_KEYWORD_GROUPS} 組。`;
 }
 
 function resolveWindowHours(window: string | undefined): number {

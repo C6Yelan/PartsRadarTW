@@ -17,6 +17,7 @@ import {
   HOUR_MS,
   MAX_DUE_PRICE_REPORT_SETTINGS_PER_CYCLE,
   MAX_PRICE_REPORT_ITEMS,
+  MAX_PRICE_REPORT_KEYWORD_GROUPS,
   MAX_PRICE_REPORT_KEYWORD_LENGTH,
   PRODUCT_NAME_MAX_LENGTH,
   SCHEDULED_PRICE_REPORT_RETRY_DELAY_MS,
@@ -1269,7 +1270,11 @@ function normalizePriceReportProductKeyword(value: string | null | undefined): s
 
   const keyword = normalizePriceReportProductKeywordText(value);
 
-  return keyword.length > 0 && keyword.length <= MAX_PRICE_REPORT_KEYWORD_LENGTH ? keyword : null;
+  return keyword.length > 0 &&
+    keyword.length <= MAX_PRICE_REPORT_KEYWORD_LENGTH &&
+    parseProductKeywordGroups(keyword).length <= MAX_PRICE_REPORT_KEYWORD_GROUPS
+    ? keyword
+    : null;
 }
 
 function normalizePriceReportProductKeywordText(value: string): string {

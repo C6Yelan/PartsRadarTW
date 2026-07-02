@@ -20,6 +20,7 @@ import {
   DISCORD_COMPONENT_TYPE_STRING_SELECT,
   DISCORD_EMBED_COLOR,
   MAX_TARGET_PRICE,
+  MAX_TARGET_PRICE_WATCHES_PER_USER,
   PRODUCT_NAME_MAX_LENGTH,
 } from "./constants";
 import {
@@ -38,7 +39,7 @@ const WATCH_MANAGER_GUIDE =
   "追蹤商品目標價，並與目前價格比較。\n\n" +
   "**使用方式**\n" +
   "新增：貼商品頁網址與目標價。\n" +
-  "管理：從選單選商品後編輯或移除。";
+  `管理：從選單選商品後編輯或移除，每人最多 ${MAX_TARGET_PRICE_WATCHES_PER_USER} 項。`;
 
 const TARGET_PRICE_WATCH_PRODUCT_SELECT = {
   id: true,
@@ -113,6 +114,10 @@ export type CreateTargetPriceWatchResult =
   | {
       status: "product_not_found";
       productId: string;
+    }
+  | {
+      status: "watch_limit_reached";
+      maxWatches: number;
     }
   | {
       status: "saved";
@@ -216,6 +221,28 @@ export async function createTargetPriceWatch({
     };
   }
 
+  const existingActiveWatch = await client.discordTargetPriceWatch.findFirst({
+    where: {
+      discordUserId,
+      productId,
+      enabled: true,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (
+    !existingActiveWatch &&
+    (await countActiveTargetPriceWatches({ client, discordUserId })) >=
+      MAX_TARGET_PRICE_WATCHES_PER_USER
+  ) {
+    return {
+      status: "watch_limit_reached",
+      maxWatches: MAX_TARGET_PRICE_WATCHES_PER_USER,
+    };
+  }
+
   const currentPrice = product.currentPrice.priceSnapshot.price;
   const currency = product.currentPrice.priceSnapshot.currency;
   const watch = await client.discordTargetPriceWatch.upsert({
@@ -253,6 +280,27 @@ export async function createTargetPriceWatch({
     capturedAt: product.currentPrice.priceSnapshot.capturedAt,
     reached: currentPrice <= targetPrice,
   };
+}
+
+async function countActiveTargetPriceWatches({
+  client,
+  discordUserId,
+}: {
+  client: DiscordBotClient;
+  discordUserId: string;
+}): Promise<number> {
+  const watches = await client.discordTargetPriceWatch.findMany({
+    where: {
+      discordUserId,
+      enabled: true,
+    },
+    select: {
+      id: true,
+    },
+    take: MAX_TARGET_PRICE_WATCHES_PER_USER,
+  });
+
+  return watches.length;
 }
 
 export async function readTargetPriceWatchlist({
@@ -483,6 +531,12 @@ export function createTargetPriceWatchResponseMessage({
   if (result.status === "product_not_found") {
     return {
       content: "找不到可追蹤的商品。請確認商品頁網址或商品 ID 正確，且該商品目前仍有價格資料。",
+    };
+  }
+
+  if (result.status === "watch_limit_reached") {
+    return {
+      content: `你已達到最多 ${result.maxWatches} 個商品追蹤。請先在 /watch 移除不需要的追蹤，再新增商品。`,
     };
   }
 

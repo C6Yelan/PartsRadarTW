@@ -24,7 +24,12 @@ import {
   sendDueTargetPriceNotifications,
   sendPriceReportNow,
 } from "../../../src/scripts/ops/discord-bot";
-import { DISCORD_MESSAGE_EMBED_TOTAL_MAX_LENGTH } from "../../../src/scripts/ops/discord-bot/constants";
+import {
+  DISCORD_MESSAGE_EMBED_TOTAL_MAX_LENGTH,
+  MAX_PRICE_REPORT_KEYWORD_GROUPS,
+  MAX_PRICE_REPORT_KEYWORD_LENGTH,
+  MAX_TARGET_PRICE_WATCHES_PER_USER,
+} from "../../../src/scripts/ops/discord-bot/constants";
 
 const TOKEN = "test_bot_token";
 const APPLICATION_ID = "123456789012345678";
@@ -674,6 +679,119 @@ describe("handleDiscordInteraction", () => {
       ],
     });
     expect(requestBody.embeds[0].description).toContain("已儲存商品目標價");
+  });
+
+  it("rejects a new watch when the user reaches the watch limit", async () => {
+    const watches = Array.from({ length: MAX_TARGET_PRICE_WATCHES_PER_USER }, (_, index) => {
+      const suffix = String(index + 1).padStart(12, "0");
+
+      return targetPriceWatch({
+        id: `30000000-0000-4000-8000-${suffix}`,
+        discordUserId: "111122223333444455",
+        productId: `40000000-0000-4000-8000-${suffix}`,
+        targetPrice: 17_500,
+      });
+    });
+    const client = createDiscordBotClient(
+      [
+        snapshot({
+          id: "snapshot-watch-new",
+          productId: WATCH_PRODUCT_ID,
+          productName: "RTX 5070 測試卡",
+          crawlRunId: "new-run",
+          price: 18_990,
+          capturedAt: "2026-06-07T03:00:00.000Z",
+        }),
+      ],
+      [],
+      watches,
+    );
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createWatchModalSubmitInteraction({
+        productInput: `https://partsradar.test/products/${WATCH_PRODUCT_ID}`,
+        targetPrice: "17500",
+      }),
+    });
+
+    const responseBody = String((fetchMock.mock.calls[1]?.[1] as RequestInit | undefined)?.body);
+
+    expect(responseBody).toContain(`最多 ${MAX_TARGET_PRICE_WATCHES_PER_USER} 個商品追蹤`);
+    expect(responseBody).toContain("請先在 /watch 移除不需要的追蹤");
+    expect(client.discordTargetPriceWatch.upsert).not.toHaveBeenCalled();
+  });
+
+  it("updates an existing watch even when the user reaches the watch limit", async () => {
+    const otherWatches = Array.from(
+      { length: MAX_TARGET_PRICE_WATCHES_PER_USER - 1 },
+      (_, index) => {
+        const suffix = String(index + 1).padStart(12, "0");
+
+        return targetPriceWatch({
+          id: `50000000-0000-4000-8000-${suffix}`,
+          discordUserId: "111122223333444455",
+          productId: `60000000-0000-4000-8000-${suffix}`,
+          targetPrice: 17_500,
+        });
+      },
+    );
+    const client = createDiscordBotClient(
+      [
+        snapshot({
+          id: "snapshot-watch-existing",
+          productId: WATCH_PRODUCT_ID,
+          productName: "RTX 5070 測試卡",
+          crawlRunId: "new-run",
+          price: 18_990,
+          capturedAt: "2026-06-07T03:00:00.000Z",
+        }),
+      ],
+      [],
+      [
+        targetPriceWatch({
+          id: WATCH_ROW_ID,
+          discordUserId: "111122223333444455",
+          productId: WATCH_PRODUCT_ID,
+          targetPrice: 17_500,
+        }),
+        ...otherWatches,
+      ],
+    );
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createWatchModalSubmitInteraction({
+        productInput: `https://partsradar.test/products/${WATCH_PRODUCT_ID}`,
+        targetPrice: "16500",
+      }),
+    });
+
+    expect(client.discordTargetPriceWatch.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          discordUserId_productId: {
+            discordUserId: "111122223333444455",
+            productId: WATCH_PRODUCT_ID,
+          },
+        },
+        update: expect.objectContaining({
+          targetPrice: 16_500,
+        }),
+      }),
+    );
   });
 
   it("selects a watch and enables its edit and remove actions", async () => {
@@ -1727,7 +1845,7 @@ describe("handleDiscordInteraction", () => {
         "**格式說明**",
         "留空：不限制商品名稱。",
         "空白：同一組關鍵字都要符合，例如 `RTX 5090`。",
-        "逗號：多組擇一符合，例如 `RTX 5090, DDR5`。",
+        `逗號：多組擇一符合，最多 ${MAX_PRICE_REPORT_KEYWORD_GROUPS} 組，例如 \`RTX 5090, DDR5\`。`,
       ].join("\n"),
     });
     expect(requestBody.data.components[1]).toMatchObject({
@@ -1859,6 +1977,29 @@ describe("handleDiscordInteraction", () => {
     expect(readEmbedFieldValue(readResponseEmbed(requestBody), "商品關鍵字")).toBe(
       "RTX 5090, DDR5",
     );
+  });
+
+  it("rejects daily report keywords with too many groups", async () => {
+    const client = createDiscordBotClient([]);
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createKeywordModalSubmitInteraction({
+        keyword: "RTX 5090, DDR5, SSD, RAM, CPU, GPU",
+      }),
+    });
+
+    const requestBody = String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body);
+
+    expect(requestBody).toContain(`最多 ${MAX_PRICE_REPORT_KEYWORD_LENGTH} 個字`);
+    expect(requestBody).toContain(`最多 ${MAX_PRICE_REPORT_KEYWORD_GROUPS} 組`);
+    expect(client.discordPriceReportSetting.upsert).not.toHaveBeenCalled();
   });
 
   it("clears the daily report product keyword from the settings modal", async () => {
@@ -3198,6 +3339,38 @@ describe("sendPriceReportNow", () => {
     const responseBody = String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body);
     expect(responseBody).toContain("已更新公開報告關鍵字：RTX 5090, DDR5");
     expect(responseBody).toContain("RTX 5090, DDR5");
+  });
+
+  it("rejects public report keywords with too many groups", async () => {
+    const client = createDiscordBotClient(
+      [],
+      [],
+      [],
+      [...TEST_SOURCE_CATEGORIES],
+      [],
+      [],
+      [],
+      [publicPriceReportSetting({ id: "public-setting-1" })],
+    );
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createPublicReportKeywordModalSubmitInteraction({
+        keyword: "RTX 5090, DDR5, SSD, RAM, CPU, GPU",
+      }),
+    });
+
+    const responseBody = String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body);
+
+    expect(responseBody).toContain(`最多 ${MAX_PRICE_REPORT_KEYWORD_LENGTH} 個字`);
+    expect(responseBody).toContain(`最多 ${MAX_PRICE_REPORT_KEYWORD_GROUPS} 組`);
+    expect(client.discordPublicPriceReportSetting.update).not.toHaveBeenCalled();
   });
 
   it("does not save the public report channel when the bot cannot embed messages there", async () => {
