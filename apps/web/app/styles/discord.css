@@ -137,42 +137,36 @@
   align-content: start;
 }
 
-.discord-visual-placeholder {
+.discord-visual-frame {
+  box-sizing: border-box;
   display: grid;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
   min-height: 220px;
-  aspect-ratio: 4 / 3;
+  aspect-ratio: 16 / 9;
   place-items: center;
-  align-content: center;
-  gap: 8px;
-  padding: 22px;
-  border: 1px dashed rgba(143, 180, 204, 0.34);
+  overflow: hidden;
+  padding: 12px;
+  border: 1px solid rgba(143, 180, 204, 0.24);
   border-radius: 8px;
-  background:
-    linear-gradient(135deg, rgba(88, 101, 242, 0.14), rgba(7, 17, 25, 0.62)), rgba(11, 23, 32, 0.74);
-  color: var(--muted);
-  text-align: center;
-}
-
-.discord-visual-placeholder strong {
-  margin: 0;
-  color: var(--text-strong);
-  font-size: 18px;
-}
-
-.discord-visual-placeholder span,
-.discord-visual-panel p {
-  margin: 0;
-  color: var(--muted);
-}
-
-.discord-visual-placeholder span {
-  font-size: 13px;
-  font-weight: 750;
+  background: rgba(3, 8, 13, 0.45);
 }
 
 .discord-visual-panel p {
+  margin: 0;
+  color: var(--muted);
   font-size: 13px;
   line-height: 1.7;
+}
+
+.discord-visual-image {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
 }
 
 .discord-section {
@@ -316,31 +310,38 @@
   min-width: 0;
 }
 
-.discord-guide-placeholder {
+.discord-guide-frame {
+  box-sizing: border-box;
   display: grid;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
   min-height: 180px;
-  aspect-ratio: 16 / 10;
+  aspect-ratio: 1;
   place-items: center;
-  align-content: center;
-  gap: 8px;
-  padding: 18px;
-  border: 1px dashed rgba(143, 180, 204, 0.34);
+  overflow: hidden;
+  padding: 12px;
+  border: 1px solid rgba(143, 180, 204, 0.24);
   border-radius: 8px;
-  background:
-    linear-gradient(135deg, rgba(88, 101, 242, 0.12), rgba(7, 17, 25, 0.72)), rgba(9, 19, 27, 0.78);
-  color: var(--muted);
-  text-align: center;
+  background: rgba(3, 8, 13, 0.45);
 }
 
-.discord-guide-placeholder span {
-  color: var(--text-strong);
-  font-size: 15px;
-  font-weight: 850;
+.discord-guide-frame.is-portrait {
+  aspect-ratio: 3 / 4;
+  min-height: 260px;
 }
 
-.discord-guide-placeholder strong {
-  color: var(--muted);
-  font-size: 13px;
+.discord-guide-frame.is-landscape {
+  aspect-ratio: 4 / 3;
+}
+
+.discord-guide-image {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
 }
 
 .discord-guide-copy {

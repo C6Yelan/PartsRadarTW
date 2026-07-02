@@ -1,5 +1,6 @@
 // apps/web/app/discord/page.tsx
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import SiteDisclaimer from "../site-disclaimer";
 
@@ -11,6 +12,13 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 const discordInviteUrl = process.env.NEXT_PUBLIC_DISCORD_BOT_INVITE_URL?.trim();
+
+const heroScreenshot = {
+  alt: "Discord 指令選單截圖",
+  height: 377,
+  src: "/images/discord/commands-screenshot.png",
+  width: 1218,
+} as const;
 
 const quickStartSteps = [
   {
@@ -39,15 +47,25 @@ const targetPriceCommandGuides = [
   {
     command: "/watch",
     description: "查看追蹤清單，新增、修改或移除單一商品的目標價。",
-    imageLabel: "/watch 即時目標價提醒面板截圖預留",
-    imageTitle: "/watch 即時提醒面板",
+    image: {
+      alt: "/watch 即時目標價提醒面板截圖",
+      height: 530,
+      orientation: "square",
+      src: "/images/discord/watch-command-setting.png",
+      width: 534,
+    },
     title: "管理即時目標價提醒",
   },
   {
     command: "新增追蹤",
     description: "貼上商品頁網址並填入目標價；價格更新後達標會私訊你。",
-    imageLabel: "新增追蹤視窗截圖預留",
-    imageTitle: "新增追蹤視窗",
+    image: {
+      alt: "新增追蹤視窗截圖",
+      height: 456,
+      orientation: "square",
+      src: "/images/discord/watch-add-new-product.png",
+      width: 477,
+    },
     title: "新增即時提醒",
   },
 ] as const;
@@ -56,15 +74,25 @@ const personalReportCommandGuides = [
   {
     command: "/price-report settings",
     description: "設定只屬於自己的分類、商品關鍵字、內容類型與顯示上限。",
-    imageLabel: "個人價格報告設定截圖預留",
-    imageTitle: "個人報告設定",
+    image: {
+      alt: "個人價格報告設定截圖",
+      height: 580,
+      orientation: "portrait",
+      src: "/images/discord/price-report-settings.png",
+      width: 463,
+    },
     title: "設定個人價格報告",
   },
   {
     command: "/price-report now",
     description: "用目前設定手動產生一次 DM 報告，確認篩選結果是否正確。",
-    imageLabel: "個人價格報告預覽截圖預留",
-    imageTitle: "個人報告預覽",
+    image: {
+      alt: "個人價格報告預覽截圖",
+      height: 760,
+      orientation: "portrait",
+      src: "/images/discord/price-report-now.png",
+      width: 532,
+    },
     title: "預覽個人價格報告",
   },
 ] as const;
@@ -73,22 +101,37 @@ const serverReportCommandGuides = [
   {
     command: "/public-report manage",
     description: "管理者設定公開頻道、分類、關鍵字與啟用狀態。",
-    imageLabel: "伺服器公開報告管理面板截圖預留",
-    imageTitle: "伺服器公開報告管理",
+    image: {
+      alt: "伺服器公開報告管理面板截圖",
+      height: 571,
+      orientation: "portrait",
+      src: "/images/discord/public-report-manage.png",
+      width: 490,
+    },
     title: "設定伺服器公開報告",
   },
   {
     command: "/public-report test",
     description: "送出測試報告，確認公開頻道權限與 embed 顯示正常。",
-    imageLabel: "伺服器公開報告測試截圖預留",
-    imageTitle: "伺服器公開報告測試",
+    image: {
+      alt: "伺服器公開報告測試截圖",
+      height: 761,
+      orientation: "portrait",
+      src: "/images/discord/public-report-test.png",
+      width: 526,
+    },
     title: "測試伺服器公開報告",
   },
   {
     command: "/public-report status",
     description: "查看伺服器公開報告的啟用狀態、頻道與最近一次發送結果。",
-    imageLabel: "伺服器公開報告狀態截圖預留",
-    imageTitle: "伺服器公開報告狀態",
+    image: {
+      alt: "伺服器公開報告狀態截圖",
+      height: 314,
+      orientation: "landscape",
+      src: "/images/discord/public-report-status.png",
+      width: 372,
+    },
     title: "檢查伺服器公開報告",
   },
 ] as const;
@@ -166,15 +209,17 @@ export default function DiscordPage() {
           </div>
 
           <aside className="discord-visual-panel" aria-label="Discord 指令操作示意圖">
-            <div
-              className="discord-visual-placeholder"
-              aria-label="指令操作示意圖準備中"
-              role="img"
-            >
-              <strong>Discord 指令截圖</strong>
-              <span>預留圖片位置</span>
+            <div className="discord-visual-frame">
+              <Image
+                alt={heroScreenshot.alt}
+                className="discord-visual-image"
+                height={heroScreenshot.height}
+                priority
+                src={heroScreenshot.src}
+                width={heroScreenshot.width}
+              />
             </div>
-            <p>後續可補上實際 Discord 操作畫面，讓使用者直接對照按鈕與表單。</p>
+            <p>使用 Discord 指令選單即可找到 PartsRadarTW 的提醒與報告功能。</p>
           </aside>
         </section>
 
@@ -215,15 +260,17 @@ export default function DiscordPage() {
             </p>
             <div className="discord-command-guide-list">
               {targetPriceCommandGuides.map((guide, index) => (
-                <article className="discord-command-guide" key={guide.imageLabel}>
+                <article className="discord-command-guide" key={guide.image.alt}>
                   <div className="discord-guide-media">
-                    <div
-                      className="discord-guide-placeholder"
-                      aria-label={guide.imageLabel}
-                      role="img"
-                    >
-                      <span>{guide.imageTitle}</span>
-                      <strong>預留截圖位置</strong>
+                    <div className={`discord-guide-frame is-${guide.image.orientation}`}>
+                      <Image
+                        alt={guide.image.alt}
+                        className="discord-guide-image"
+                        height={guide.image.height}
+                        loading="eager"
+                        src={guide.image.src}
+                        width={guide.image.width}
+                      />
                     </div>
                   </div>
 
@@ -245,15 +292,17 @@ export default function DiscordPage() {
             </p>
             <div className="discord-command-guide-list">
               {personalReportCommandGuides.map((guide, index) => (
-                <article className="discord-command-guide" key={guide.imageLabel}>
+                <article className="discord-command-guide" key={guide.image.alt}>
                   <div className="discord-guide-media">
-                    <div
-                      className="discord-guide-placeholder"
-                      aria-label={guide.imageLabel}
-                      role="img"
-                    >
-                      <span>{guide.imageTitle}</span>
-                      <strong>預留截圖位置</strong>
+                    <div className={`discord-guide-frame is-${guide.image.orientation}`}>
+                      <Image
+                        alt={guide.image.alt}
+                        className="discord-guide-image"
+                        height={guide.image.height}
+                        loading="eager"
+                        src={guide.image.src}
+                        width={guide.image.width}
+                      />
                     </div>
                   </div>
 
@@ -275,15 +324,17 @@ export default function DiscordPage() {
             </p>
             <div className="discord-command-guide-list">
               {serverReportCommandGuides.map((guide, index) => (
-                <article className="discord-command-guide" key={guide.imageLabel}>
+                <article className="discord-command-guide" key={guide.image.alt}>
                   <div className="discord-guide-media">
-                    <div
-                      className="discord-guide-placeholder"
-                      aria-label={guide.imageLabel}
-                      role="img"
-                    >
-                      <span>{guide.imageTitle}</span>
-                      <strong>預留截圖位置</strong>
+                    <div className={`discord-guide-frame is-${guide.image.orientation}`}>
+                      <Image
+                        alt={guide.image.alt}
+                        className="discord-guide-image"
+                        height={guide.image.height}
+                        loading="eager"
+                        src={guide.image.src}
+                        width={guide.image.width}
+                      />
                     </div>
                   </div>
 
