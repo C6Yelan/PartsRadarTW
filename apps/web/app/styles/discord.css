@@ -1,3 +1,4 @@
+/* apps/web/app/styles/discord.css */
 .topbar-brand-area {
   display: flex;
   min-width: 0;
@@ -84,7 +85,7 @@
 
 .discord-hero {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 460px);
   gap: 28px;
   align-items: center;
   padding: clamp(22px, 4vw, 40px);
@@ -143,14 +144,7 @@
   width: 100%;
   min-width: 0;
   max-width: 100%;
-  min-height: 220px;
-  aspect-ratio: 16 / 9;
   place-items: center;
-  overflow: hidden;
-  padding: 12px;
-  border: 1px solid rgba(143, 180, 204, 0.24);
-  border-radius: 8px;
-  background: rgba(3, 8, 13, 0.45);
 }
 
 .discord-visual-panel p {
@@ -162,10 +156,9 @@
 
 .discord-visual-image {
   display: block;
-  width: auto;
+  width: 100%;
   height: auto;
   max-width: 100%;
-  max-height: 100%;
   object-fit: contain;
 }
 
@@ -295,7 +288,7 @@
 
 .discord-command-guide {
   display: grid;
-  grid-template-columns: minmax(220px, 360px) minmax(0, 1fr);
+  grid-template-columns: minmax(300px, 460px) minmax(0, 1fr);
   gap: 18px;
   align-items: stretch;
   min-width: 0;
@@ -307,6 +300,7 @@
 
 .discord-guide-media {
   display: grid;
+  align-items: start;
   min-width: 0;
 }
 
@@ -316,31 +310,22 @@
   width: 100%;
   min-width: 0;
   max-width: 100%;
-  min-height: 180px;
-  aspect-ratio: 1;
   place-items: center;
-  overflow: hidden;
-  padding: 12px;
-  border: 1px solid rgba(143, 180, 204, 0.24);
-  border-radius: 8px;
-  background: rgba(3, 8, 13, 0.45);
 }
 
 .discord-guide-frame.is-portrait {
-  aspect-ratio: 3 / 4;
-  min-height: 260px;
+  max-width: 430px;
 }
 
 .discord-guide-frame.is-landscape {
-  aspect-ratio: 4 / 3;
+  max-width: 100%;
 }
 
 .discord-guide-image {
   display: block;
-  width: auto;
+  width: 100%;
   height: auto;
   max-width: 100%;
-  max-height: 100%;
   object-fit: contain;
 }
 

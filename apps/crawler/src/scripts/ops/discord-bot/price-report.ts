@@ -178,6 +178,7 @@ async function sendPriceReport({
   publicBaseUrl,
   filters,
   now,
+  since,
   deliveryKind,
   sendReportMessages,
 }: {
@@ -188,14 +189,15 @@ async function sendPriceReport({
   publicBaseUrl: string;
   filters: PriceReportFilters;
   now: Date;
+  since?: Date;
   deliveryKind: "PRICE_REPORT_NOW" | "SCHEDULED_PRICE_REPORT";
   sendReportMessages: (messages: DiscordBotMessage[]) => Promise<DiscordBotMessageSendResult>;
 }): Promise<PriceReportNowResult> {
-  const since = new Date(now.getTime() - windowHours * HOUR_MS);
+  const reportSince = since ?? new Date(now.getTime() - windowHours * HOUR_MS);
   const boundedMaxItems = clampPriceReportMaxItems(maxItems);
   const normalizedFilters = normalizePriceReportFilters(filters);
   const report = await readRecentPriceReport(client, {
-    since,
+    since: reportSince,
     until: now,
     filters: normalizedFilters,
   });
@@ -310,6 +312,7 @@ export async function enableDailyPriceReport({
       includeNewProducts: filters.includeNewProducts,
       enabled: true,
       nextSendAt,
+      notificationCursorAt: now,
     },
     update: {
       interval: "DAILY",
@@ -324,6 +327,7 @@ export async function enableDailyPriceReport({
       includeNewProducts: filters.includeNewProducts,
       enabled: true,
       nextSendAt,
+      notificationCursorAt: now,
     },
   });
 }
@@ -377,6 +381,11 @@ export async function sendDueScheduledPriceReports({
       publicBaseUrl: options.publicBaseUrl,
       filters: toPriceReportFilters(setting),
       now,
+      since: resolvePriceReportSince({
+        now,
+        windowHours: toWindowHours(setting.window),
+        cursorAt: setting.notificationCursorAt ?? setting.createdAt,
+      }),
       deliveryKind: "SCHEDULED_PRICE_REPORT",
       sendReportMessages: (messages) => sendDirectMessages(setting.discordUserId, messages),
     });
@@ -395,6 +404,7 @@ export async function sendDueScheduledPriceReports({
       },
       data: {
         lastSentAt: result.status === "sent" ? now : setting.lastSentAt,
+        ...(result.status === "sent" ? { notificationCursorAt: now } : {}),
         nextSendAt: calculateNextScheduledPriceReportSendAtAfterDelivery({
           now,
           setting,
@@ -467,6 +477,24 @@ export async function disablePriceReport({
   });
 
   return result.count;
+}
+
+function resolvePriceReportSince({
+  now,
+  windowHours,
+  cursorAt,
+}: {
+  now: Date;
+  windowHours: number;
+  cursorAt: Date | null;
+}): Date {
+  const windowStart = new Date(now.getTime() - windowHours * HOUR_MS);
+
+  if (!cursorAt || cursorAt.getTime() <= windowStart.getTime()) {
+    return windowStart;
+  }
+
+  return cursorAt;
 }
 
 export async function readPriceReportSetting({

@@ -228,23 +228,24 @@ model ProductLinkHealth {
 }
 
 model DiscordPriceReportSetting {
-  id                 String                     @id @default(uuid()) @db.Uuid
-  discordUserId      String                     @unique(map: "discord_price_report_settings_discord_user_id_key") @map("discord_user_id") @db.Text
-  interval           DiscordPriceReportInterval
-  window             DiscordPriceReportWindow
-  scope              DiscordPriceReportScope    @default(ALL)
-  timezone           String                     @default("Asia/Taipei") @db.Text
-  maxItems           Int                        @default(50) @map("max_items")
-  categoryIgrps      Int[]                      @default([]) @map("category_igrps")
-  productKeyword     String?                    @map("product_keyword") @db.Text
-  includePriceDrops  Boolean                    @default(true) @map("include_price_drops")
-  includePriceRises  Boolean                    @default(true) @map("include_price_rises")
-  includeNewProducts Boolean                    @default(true) @map("include_new_products")
-  enabled            Boolean                    @default(true)
-  nextSendAt         DateTime?                  @map("next_send_at") @db.Timestamptz(6)
-  lastSentAt         DateTime?                  @map("last_sent_at") @db.Timestamptz(6)
-  createdAt          DateTime                   @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt          DateTime                   @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                   String                     @id @default(uuid()) @db.Uuid
+  discordUserId        String                     @unique(map: "discord_price_report_settings_discord_user_id_key") @map("discord_user_id") @db.Text
+  interval             DiscordPriceReportInterval
+  window               DiscordPriceReportWindow
+  scope                DiscordPriceReportScope    @default(ALL)
+  timezone             String                     @default("Asia/Taipei") @db.Text
+  maxItems             Int                        @default(50) @map("max_items")
+  categoryIgrps        Int[]                      @default([]) @map("category_igrps")
+  productKeyword       String?                    @map("product_keyword") @db.Text
+  includePriceDrops    Boolean                    @default(true) @map("include_price_drops")
+  includePriceRises    Boolean                    @default(true) @map("include_price_rises")
+  includeNewProducts   Boolean                    @default(true) @map("include_new_products")
+  enabled              Boolean                    @default(true)
+  nextSendAt           DateTime?                  @map("next_send_at") @db.Timestamptz(6)
+  lastSentAt           DateTime?                  @map("last_sent_at") @db.Timestamptz(6)
+  notificationCursorAt DateTime?                  @map("notification_cursor_at") @db.Timestamptz(6)
+  createdAt            DateTime                   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime                   @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@index([enabled, nextSendAt], map: "discord_price_report_settings_enabled_next_send_at_idx")
   @@map("discord_price_report_settings")
@@ -260,6 +261,7 @@ model DiscordTargetPriceWatch {
   enabled               Boolean                       @default(true)
   lastNotifiedAt        DateTime?                     @map("last_notified_at") @db.Timestamptz(6)
   notificationClaimedAt DateTime?                     @map("notification_claimed_at") @db.Timestamptz(6)
+  notificationCursorAt  DateTime?                     @map("notification_cursor_at") @db.Timestamptz(6)
   createdAt             DateTime                      @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt             DateTime                      @updatedAt @map("updated_at") @db.Timestamptz(6)
   deliveries            DiscordNotificationDelivery[]
@@ -314,19 +316,20 @@ model DiscordPublicPriceReportDelivery {
 }
 
 model DiscordPublicPriceReportSetting {
-  id                     String   @id @default(uuid()) @db.Uuid
-  discordGuildId         String   @unique(map: "discord_public_price_report_settings_guild_id_key") @map("discord_guild_id") @db.Text
-  channelId              String   @map("channel_id") @db.Text
-  maxItems               Int      @default(50) @map("max_items")
-  categoryIgrps          Int[]    @default([]) @map("category_igrps")
-  productKeyword         String?  @map("product_keyword") @db.Text
-  includePriceDrops      Boolean  @default(true) @map("include_price_drops")
-  includePriceRises      Boolean  @default(true) @map("include_price_rises")
-  enabled                Boolean  @default(true)
-  createdByDiscordUserId String   @map("created_by_discord_user_id") @db.Text
-  updatedByDiscordUserId String   @map("updated_by_discord_user_id") @db.Text
-  createdAt              DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt              DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                     String    @id @default(uuid()) @db.Uuid
+  discordGuildId         String    @unique(map: "discord_public_price_report_settings_guild_id_key") @map("discord_guild_id") @db.Text
+  channelId              String    @map("channel_id") @db.Text
+  maxItems               Int       @default(50) @map("max_items")
+  categoryIgrps          Int[]     @default([]) @map("category_igrps")
+  productKeyword         String?   @map("product_keyword") @db.Text
+  includePriceDrops      Boolean   @default(true) @map("include_price_drops")
+  includePriceRises      Boolean   @default(true) @map("include_price_rises")
+  enabled                Boolean   @default(true)
+  notificationCursorAt   DateTime? @map("notification_cursor_at") @db.Timestamptz(6)
+  createdByDiscordUserId String    @map("created_by_discord_user_id") @db.Text
+  updatedByDiscordUserId String    @map("updated_by_discord_user_id") @db.Text
+  createdAt              DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@index([enabled, channelId], map: "discord_public_price_report_settings_enabled_channel_idx")
   @@map("discord_public_price_report_settings")

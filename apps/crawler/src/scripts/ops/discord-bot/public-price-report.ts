@@ -48,6 +48,7 @@ const PUBLIC_PRICE_REPORT_SETTING_SELECT = {
   includePriceDrops: true,
   includePriceRises: true,
   enabled: true,
+  notificationCursorAt: true,
   createdByDiscordUserId: true,
   updatedByDiscordUserId: true,
   createdAt: true,
@@ -200,11 +201,13 @@ export async function setPublicPriceReportChannel({
   discordGuildId,
   channelId,
   discordUserId,
+  now = new Date(),
 }: {
   client: DiscordBotClient;
   discordGuildId: string;
   channelId: string;
   discordUserId: string;
+  now?: Date;
 }): Promise<PublicPriceReportSetting> {
   return client.discordPublicPriceReportSetting.upsert({
     where: {
@@ -214,12 +217,14 @@ export async function setPublicPriceReportChannel({
       discordGuildId,
       channelId,
       enabled: true,
+      notificationCursorAt: now,
       createdByDiscordUserId: discordUserId,
       updatedByDiscordUserId: discordUserId,
     },
     update: {
       channelId,
       enabled: true,
+      notificationCursorAt: now,
       updatedByDiscordUserId: discordUserId,
     },
     select: PUBLIC_PRICE_REPORT_SETTING_SELECT,
@@ -232,12 +237,14 @@ export async function setPublicPriceReportEnabled({
   channelId,
   discordUserId,
   enabled,
+  now = new Date(),
 }: {
   client: DiscordBotClient;
   discordGuildId: string;
   channelId: string;
   discordUserId: string;
   enabled: boolean;
+  now?: Date;
 }): Promise<PublicPriceReportSetting> {
   const current = await readPublicPriceReportSetting({ client, discordGuildId });
 
@@ -250,11 +257,13 @@ export async function setPublicPriceReportEnabled({
         discordGuildId,
         channelId,
         enabled,
+        notificationCursorAt: enabled ? now : null,
         createdByDiscordUserId: discordUserId,
         updatedByDiscordUserId: discordUserId,
       },
       update: {
         enabled,
+        ...(enabled ? { notificationCursorAt: now } : {}),
         updatedByDiscordUserId: discordUserId,
       },
       select: PUBLIC_PRICE_REPORT_SETTING_SELECT,
@@ -267,6 +276,7 @@ export async function setPublicPriceReportEnabled({
     },
     data: {
       enabled,
+      ...(enabled ? { notificationCursorAt: now } : {}),
       updatedByDiscordUserId: discordUserId,
     },
     select: PUBLIC_PRICE_REPORT_SETTING_SELECT,
@@ -282,6 +292,7 @@ export async function updatePublicPriceReportFilters({
   productKeyword,
   includePriceDrops,
   includePriceRises,
+  now = new Date(),
 }: {
   client: DiscordBotClient;
   discordGuildId: string;
@@ -291,6 +302,7 @@ export async function updatePublicPriceReportFilters({
   productKeyword?: string | null;
   includePriceDrops?: boolean;
   includePriceRises?: boolean;
+  now?: Date;
 }): Promise<PublicPriceReportSetting | null> {
   const current = await readPublicPriceReportSetting({ client, discordGuildId });
 
@@ -318,6 +330,7 @@ export async function updatePublicPriceReportFilters({
       productKeyword: filters.productKeyword,
       includePriceDrops: filters.includePriceDrops,
       includePriceRises: filters.includePriceRises,
+      notificationCursorAt: now,
       updatedByDiscordUserId: discordUserId,
     },
     select: PUBLIC_PRICE_REPORT_SETTING_SELECT,
@@ -464,6 +477,7 @@ async function sendPendingPublicPriceReportsForSetting({
     rateLimitedCount: 0,
     failedCount: 0,
   };
+  const cursorAt = setting.notificationCursorAt ?? setting.createdAt;
   const crawlRuns = await client.crawlRun.findMany({
     where: {
       triggerType: "SCHEDULED",
@@ -472,6 +486,7 @@ async function sendPendingPublicPriceReportsForSetting({
       },
       finishedAt: {
         not: null,
+        gt: cursorAt,
       },
       OR: [
         {

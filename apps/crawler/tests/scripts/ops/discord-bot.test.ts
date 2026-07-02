@@ -630,6 +630,7 @@ describe("handleDiscordInteraction", () => {
         targetPrice: 17_500,
         currency: "TWD",
         enabled: true,
+        notificationCursorAt: expect.any(Date),
       },
       update: {
         targetPrice: 17_500,
@@ -637,6 +638,7 @@ describe("handleDiscordInteraction", () => {
         enabled: true,
         lastNotifiedAt: null,
         notificationClaimedAt: null,
+        notificationCursorAt: expect.any(Date),
       },
       select: expect.objectContaining({
         id: true,
@@ -1034,6 +1036,7 @@ describe("handleDiscordInteraction", () => {
         targetPrice: 16_500,
         lastNotifiedAt: null,
         notificationClaimedAt: null,
+        notificationCursorAt: expect.any(Date),
       },
     });
     const requestBody = JSON.parse(
@@ -2339,6 +2342,52 @@ describe("sendDueTargetPriceNotifications", () => {
     expect(client.discordNotificationDelivery.create).not.toHaveBeenCalled();
   });
 
+  it("does not notify for a target price reached before the watch cursor", async () => {
+    const client = createDiscordBotClient(
+      [
+        snapshot({
+          id: "snapshot-target-1",
+          productId: WATCH_PRODUCT_ID,
+          productName: "RTX 5070 測試卡",
+          crawlRunId: "old-run",
+          price: 15_000,
+          capturedAt: "2026-06-07T04:55:00.000Z",
+        }),
+      ],
+      [],
+      [
+        targetPriceWatch({
+          id: WATCH_ROW_ID,
+          discordUserId: "111122223333444455",
+          productId: WATCH_PRODUCT_ID,
+          targetPrice: 17_500,
+          notificationCursorAt: new Date("2026-06-07T05:00:00.000Z"),
+        }),
+      ],
+    );
+    const sendDirectMessages = vi.fn();
+
+    await expect(
+      sendDueTargetPriceNotifications({
+        client,
+        publicBaseUrl: PUBLIC_BASE_URL,
+        now: new Date("2026-06-07T05:05:00.000Z"),
+        sendDirectMessages,
+      }),
+    ).resolves.toEqual({
+      scannedCount: 1,
+      dueCount: 0,
+      processedCount: 0,
+      sentCount: 0,
+      rateLimitedCount: 0,
+      failedCount: 0,
+    });
+
+    expect(sendDirectMessages).not.toHaveBeenCalled();
+    expect(client.discordTargetPriceWatch.updateMany).not.toHaveBeenCalled();
+    expect(client.discordNotificationDelivery.create).not.toHaveBeenCalled();
+  });
+
   it("releases a failed delivery claim so a later scan can retry", async () => {
     const client = createDiscordBotClient(
       [
@@ -3578,6 +3627,66 @@ describe("sendPriceReportNow", () => {
     });
   });
 
+  it("does not backfill public reports from crawl runs before the setting cursor", async () => {
+    const client = createDiscordBotClient(
+      [
+        snapshot({
+          id: "old-public-1",
+          productId: "product-public-1",
+          productName: "華碩 GPU A",
+          crawlRunId: "old-run",
+          price: 12_000,
+          capturedAt: "2026-06-06T01:00:00.000Z",
+        }),
+        snapshot({
+          id: "new-public-1",
+          productId: "product-public-1",
+          productName: "華碩 GPU A",
+          crawlRunId: "public-run-1",
+          price: 10_990,
+          capturedAt: "2026-06-07T03:00:00.000Z",
+        }),
+      ],
+      [],
+      [],
+      [...TEST_SOURCE_CATEGORIES],
+      [],
+      [],
+      [
+        crawlRun({
+          id: "public-run-1",
+          finishedAt: new Date("2026-06-07T03:05:00.000Z"),
+        }),
+      ],
+      [
+        publicPriceReportSetting({
+          id: "public-setting-1",
+          notificationCursorAt: new Date("2026-06-07T04:00:00.000Z"),
+        }),
+      ],
+    );
+    const sendChannelMessages = vi.fn();
+
+    await expect(
+      sendPendingPublicPriceReports({
+        client,
+        options: createDiscordBotOptions(),
+        now: new Date("2026-06-07T05:00:00.000Z"),
+        sendChannelMessages,
+      }),
+    ).resolves.toEqual({
+      settingCount: 1,
+      processedCount: 0,
+      sentCount: 0,
+      skippedCount: 0,
+      rateLimitedCount: 0,
+      failedCount: 0,
+    });
+
+    expect(sendChannelMessages).not.toHaveBeenCalled();
+    expect(client.discordPublicPriceReportDelivery.upsert).not.toHaveBeenCalled();
+  });
+
   it("applies public report filters to pending scheduled reports", async () => {
     const client = createDiscordBotClient(
       [
@@ -3889,6 +3998,82 @@ describe("sendPriceReportNow", () => {
       },
       data: {
         lastSentAt: new Date("2026-06-07T05:00:00.000Z"),
+        notificationCursorAt: new Date("2026-06-07T05:00:00.000Z"),
+        nextSendAt: new Date("2026-06-08T04:59:00.000Z"),
+      },
+    });
+  });
+
+  it("does not backfill scheduled reports before the setting cursor", async () => {
+    const client = createDiscordBotClient(
+      [
+        snapshot({
+          id: "old-1",
+          productId: "product-1",
+          productName: "GPU A",
+          crawlRunId: "old-run",
+          price: 12000,
+          capturedAt: "2026-06-06T01:00:00.000Z",
+        }),
+        snapshot({
+          id: "new-1",
+          productId: "product-1",
+          productName: "GPU A",
+          crawlRunId: "new-run",
+          price: 10990,
+          capturedAt: "2026-06-07T03:00:00.000Z",
+        }),
+      ],
+      [
+        priceReportSetting({
+          id: "setting-1",
+          discordUserId: "111122223333444455",
+          nextSendAt: new Date("2026-06-07T04:59:00.000Z"),
+          notificationCursorAt: new Date("2026-06-07T04:00:00.000Z"),
+        }),
+      ],
+    );
+    const sendDirectMessages = vi.fn(
+      async (_discordUserId: string, _messages: DiscordBotMessage[]) => ({
+        status: "sent" as const,
+        messageCount: 1,
+        httpStatuses: [200],
+      }),
+    );
+
+    await expect(
+      sendDueScheduledPriceReports({
+        client,
+        options: {
+          publicBaseUrl: PUBLIC_BASE_URL,
+          priceReportMaxItems: 50,
+        },
+        now: new Date("2026-06-07T05:00:00.000Z"),
+        sendDirectMessages,
+      }),
+    ).resolves.toEqual({
+      processedCount: 1,
+      sentCount: 1,
+      rateLimitedCount: 0,
+      failedCount: 0,
+    });
+
+    expect(JSON.stringify(sendDirectMessages.mock.calls[0]?.[1])).not.toContain("GPU A");
+    expect(client.discordNotificationDelivery.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        discordUserId: "111122223333444455",
+        kind: "SCHEDULED_PRICE_REPORT",
+        status: "SENT",
+        itemCount: 0,
+      }),
+    });
+    expect(client.discordPriceReportSetting.update).toHaveBeenCalledWith({
+      where: {
+        id: "setting-1",
+      },
+      data: {
+        lastSentAt: new Date("2026-06-07T05:00:00.000Z"),
+        notificationCursorAt: new Date("2026-06-07T05:00:00.000Z"),
         nextSendAt: new Date("2026-06-08T04:59:00.000Z"),
       },
     });
@@ -3938,6 +4123,7 @@ describe("sendPriceReportNow", () => {
       },
       data: {
         lastSentAt: new Date("2026-06-07T05:00:00.000Z"),
+        notificationCursorAt: new Date("2026-06-07T05:00:00.000Z"),
         nextSendAt: new Date("2026-06-08T01:30:00.000Z"),
       },
     });
@@ -4639,6 +4825,7 @@ interface TestPriceReportSetting {
   enabled: boolean;
   nextSendAt: Date | null;
   lastSentAt: Date | null;
+  notificationCursorAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -4670,6 +4857,7 @@ interface TestTargetPriceWatch {
   enabled: boolean;
   lastNotifiedAt: Date | null;
   notificationClaimedAt: Date | null;
+  notificationCursorAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -4712,6 +4900,7 @@ interface TestDiscordPublicPriceReportSetting {
   includePriceDrops: boolean;
   includePriceRises: boolean;
   enabled: boolean;
+  notificationCursorAt: Date | null;
   createdByDiscordUserId: string;
   updatedByDiscordUserId: string;
   createdAt: Date;
@@ -4770,6 +4959,7 @@ function priceReportSetting({
   discordUserId,
   nextSendAt,
   lastSentAt = null,
+  notificationCursorAt = new Date("2026-06-07T00:00:00.000Z"),
   interval = "DAILY",
   window = "HOURS_24",
   maxItems = 50,
@@ -4784,6 +4974,7 @@ function priceReportSetting({
   discordUserId: string;
   nextSendAt: Date | null;
   lastSentAt?: Date | null;
+  notificationCursorAt?: Date | null;
   interval?: TestPriceReportSetting["interval"];
   window?: TestPriceReportSetting["window"];
   maxItems?: number;
@@ -4810,6 +5001,7 @@ function priceReportSetting({
     enabled,
     nextSendAt,
     lastSentAt,
+    notificationCursorAt,
     createdAt: new Date("2026-06-07T00:00:00.000Z"),
     updatedAt: new Date("2026-06-07T00:00:00.000Z"),
   };
@@ -4824,6 +5016,7 @@ function targetPriceWatch({
   enabled = true,
   lastNotifiedAt = null,
   notificationClaimedAt = null,
+  notificationCursorAt = new Date("2026-06-07T00:00:00.000Z"),
 }: {
   id: string;
   discordUserId: string;
@@ -4833,6 +5026,7 @@ function targetPriceWatch({
   enabled?: boolean;
   lastNotifiedAt?: Date | null;
   notificationClaimedAt?: Date | null;
+  notificationCursorAt?: Date | null;
 }): TestTargetPriceWatch {
   return {
     id,
@@ -4843,6 +5037,7 @@ function targetPriceWatch({
     enabled,
     lastNotifiedAt,
     notificationClaimedAt,
+    notificationCursorAt,
     createdAt: new Date("2026-06-07T00:00:00.000Z"),
     updatedAt: new Date("2026-06-07T00:00:00.000Z"),
   };
@@ -4938,6 +5133,7 @@ function publicPriceReportSetting({
   includePriceDrops = true,
   includePriceRises = true,
   enabled = true,
+  notificationCursorAt = new Date("2026-06-07T00:00:00.000Z"),
   createdByDiscordUserId = "111122223333444455",
   updatedByDiscordUserId = "111122223333444455",
   createdAt = new Date("2026-06-07T00:00:00.000Z"),
@@ -4952,6 +5148,7 @@ function publicPriceReportSetting({
   includePriceDrops?: boolean;
   includePriceRises?: boolean;
   enabled?: boolean;
+  notificationCursorAt?: Date | null;
   createdByDiscordUserId?: string;
   updatedByDiscordUserId?: string;
   createdAt?: Date;
@@ -4967,6 +5164,7 @@ function publicPriceReportSetting({
     includePriceDrops,
     includePriceRises,
     enabled,
+    notificationCursorAt,
     createdByDiscordUserId,
     updatedByDiscordUserId,
     createdAt,
@@ -5235,6 +5433,7 @@ function createDiscordBotClient(
         | "includeNewProducts"
         | "enabled"
         | "nextSendAt"
+        | "notificationCursorAt"
       >;
       update: Partial<TestPriceReportSetting>;
     }) => {
@@ -5388,7 +5587,12 @@ function createDiscordBotClient(
       where: { discordUserId_productId: { discordUserId: string; productId: string } };
       create: Pick<
         TestTargetPriceWatch,
-        "discordUserId" | "productId" | "targetPrice" | "currency" | "enabled"
+        | "discordUserId"
+        | "productId"
+        | "targetPrice"
+        | "currency"
+        | "enabled"
+        | "notificationCursorAt"
       >;
       update: Partial<TestTargetPriceWatch>;
     }) => {
@@ -5525,6 +5729,7 @@ function createDiscordBotClient(
             | "productKeyword"
             | "includePriceDrops"
             | "includePriceRises"
+            | "notificationCursorAt"
           >
         >;
       update: Partial<TestDiscordPublicPriceReportSetting>;
@@ -5617,7 +5822,7 @@ function createDiscordBotClient(
       where: {
         triggerType?: TestCrawlRun["triggerType"];
         status?: { in: TestCrawlRun["status"][] };
-        finishedAt?: { not: null };
+        finishedAt?: { not: null; gt?: Date };
         OR?: Array<{
           publicPriceReportDeliveries?: {
             none?: { channelId: string };
@@ -5644,6 +5849,14 @@ function createDiscordBotClient(
           }
 
           if (args.where.finishedAt?.not === null && run.finishedAt === null) {
+            return false;
+          }
+
+          if (
+            args.where.finishedAt?.gt &&
+            (run.finishedAt === null ||
+              run.finishedAt.getTime() <= args.where.finishedAt.gt.getTime())
+          ) {
             return false;
           }
 
@@ -5831,6 +6044,7 @@ function toPrismaWatchListRecord(watch: TestTargetPriceWatch, snapshots: TestSna
     currency: watch.currency,
     enabled: watch.enabled,
     lastNotifiedAt: watch.lastNotifiedAt,
+    notificationCursorAt: watch.notificationCursorAt,
     updatedAt: watch.updatedAt,
     product: latestSnapshot
       ? toPrismaWatchProduct(latestSnapshot)

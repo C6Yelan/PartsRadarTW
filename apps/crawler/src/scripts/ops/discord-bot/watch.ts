@@ -65,6 +65,7 @@ const TARGET_PRICE_WATCH_SELECT = {
   currency: true,
   enabled: true,
   lastNotifiedAt: true,
+  notificationCursorAt: true,
 } as const satisfies Prisma.DiscordTargetPriceWatchSelect;
 
 const TARGET_PRICE_WATCH_LIST_SELECT = {
@@ -75,6 +76,7 @@ const TARGET_PRICE_WATCH_LIST_SELECT = {
   currency: true,
   enabled: true,
   lastNotifiedAt: true,
+  notificationCursorAt: true,
   updatedAt: true,
   product: {
     select: TARGET_PRICE_WATCH_PRODUCT_SELECT,
@@ -167,11 +169,13 @@ export async function createTargetPriceWatch({
   discordUserId,
   productInput,
   targetPrice,
+  now = new Date(),
 }: {
   client: DiscordBotClient;
   discordUserId: string;
   productInput: string | null;
   targetPrice: number | null;
+  now?: Date;
 }): Promise<CreateTargetPriceWatchResult> {
   const productId = productInput ? normalizeWatchProductReference(productInput) : null;
 
@@ -227,6 +231,7 @@ export async function createTargetPriceWatch({
       targetPrice,
       currency,
       enabled: true,
+      notificationCursorAt: now,
     },
     update: {
       targetPrice,
@@ -234,6 +239,7 @@ export async function createTargetPriceWatch({
       enabled: true,
       lastNotifiedAt: null,
       notificationClaimedAt: null,
+      notificationCursorAt: now,
     },
     select: TARGET_PRICE_WATCH_SELECT,
   });
@@ -310,11 +316,13 @@ export async function updateTargetPriceWatch({
   discordUserId,
   watchInput,
   targetPrice,
+  now = new Date(),
 }: {
   client: DiscordBotClient;
   discordUserId: string;
   watchInput: string | null;
   targetPrice: number | null;
+  now?: Date;
 }): Promise<UpdateTargetPriceWatchResult> {
   if (
     !targetPrice ||
@@ -347,6 +355,7 @@ export async function updateTargetPriceWatch({
       targetPrice,
       lastNotifiedAt: null,
       notificationClaimedAt: null,
+      notificationCursorAt: now,
     },
   });
 
@@ -358,6 +367,7 @@ export async function updateTargetPriceWatch({
           ...result.watch,
           targetPrice,
           lastNotifiedAt: null,
+          notificationCursorAt: now,
         },
       };
 }

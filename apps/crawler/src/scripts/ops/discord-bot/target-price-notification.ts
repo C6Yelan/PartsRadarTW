@@ -19,6 +19,7 @@ const TARGET_PRICE_NOTIFICATION_SELECT = {
   productId: true,
   targetPrice: true,
   currency: true,
+  notificationCursorAt: true,
   updatedAt: true,
   product: {
     select: {
@@ -353,6 +354,8 @@ function isTargetPriceReached(watch: TargetPriceNotificationWatch): boolean {
   return (
     snapshot !== undefined &&
     snapshot.currency === watch.currency &&
+    (!watch.notificationCursorAt ||
+      snapshot.capturedAt.getTime() > watch.notificationCursorAt.getTime()) &&
     snapshot.price <= watch.targetPrice
   );
 }
