@@ -199,7 +199,7 @@
   line-height: 1.7;
 }
 
-.discord-admin-checklist {
+.discord-step-list {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
@@ -208,7 +208,7 @@
   list-style: none;
 }
 
-.discord-admin-checklist li {
+.discord-step-list li {
   display: grid;
   gap: 12px;
   align-content: start;
@@ -219,7 +219,7 @@
   background: rgba(11, 23, 32, 0.74);
 }
 
-.discord-check-number {
+.discord-step-number {
   display: grid;
   width: 30px;
   aspect-ratio: 1;
@@ -232,24 +232,24 @@
   font-weight: 850;
 }
 
-.discord-admin-checklist h3,
+.discord-step-list h3,
 .discord-command-group h3,
 .discord-guide-copy h4 {
   margin: 0;
   color: var(--text-strong);
 }
 
-.discord-admin-checklist h3 {
+.discord-step-list h3 {
   font-size: 16px;
   line-height: 1.35;
 }
 
-.discord-admin-checklist div {
+.discord-step-list div {
   display: grid;
   gap: 8px;
 }
 
-.discord-admin-checklist code {
+.discord-step-list code {
   width: fit-content;
   max-width: 100%;
   padding: 4px 8px;
@@ -262,7 +262,7 @@
   overflow-wrap: anywhere;
 }
 
-.discord-admin-checklist p {
+.discord-step-list p {
   margin: 0;
   color: var(--muted);
   font-size: 14px;
@@ -282,6 +282,14 @@
 .discord-command-group h3 {
   font-size: 18px;
   line-height: 1.35;
+}
+
+.discord-command-group-summary {
+  max-width: 720px;
+  margin: -4px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.65;
 }
 
 .discord-command-guide-list {
@@ -368,17 +376,11 @@
   overflow-wrap: anywhere;
 }
 
-.discord-guide-copy ul {
-  display: grid;
-  gap: 6px;
+.discord-guide-copy p {
   margin: 0;
-  padding-left: 18px;
   color: var(--muted);
-  line-height: 1.65;
-}
-
-.discord-guide-copy li::marker {
-  color: var(--accent);
+  font-size: 14px;
+  line-height: 1.7;
 }
 
 .discord-faq-list {
@@ -417,7 +419,7 @@
     grid-template-columns: 1fr;
   }
 
-  .discord-admin-checklist {
+  .discord-step-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -454,7 +456,7 @@
     padding: 18px;
   }
 
-  .discord-admin-checklist {
+  .discord-step-list {
     grid-template-columns: 1fr;
   }
 
