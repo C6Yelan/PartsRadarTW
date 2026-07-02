@@ -13,6 +13,7 @@ import {
   DAY_MS,
   DISCORD_EMBED_COLOR,
   DISCORD_EMBED_DESCRIPTION_MAX_LENGTH,
+  DISCORD_MESSAGE_EMBED_TOTAL_MAX_LENGTH,
   HOUR_MS,
   MAX_DUE_PRICE_REPORT_SETTINGS_PER_CYCLE,
   MAX_PRICE_REPORT_ITEMS,
@@ -716,14 +717,51 @@ function createReportDescriptionChunks(lines: string[]): string[] {
 
 function createReportMessages(embeds: DiscordBotEmbed[]): DiscordBotMessage[] {
   const messages: DiscordBotMessage[] = [];
+  let currentEmbeds: DiscordBotEmbed[] = [];
+  let currentEmbedTextLength = 0;
 
-  for (let index = 0; index < embeds.length; index += DISCORD_MESSAGE_MAX_EMBEDS) {
+  for (const embed of embeds) {
+    const embedTextLength = calculateEmbedTextLength(embed);
+    const shouldStartNextMessage =
+      currentEmbeds.length > 0 &&
+      (currentEmbeds.length >= DISCORD_MESSAGE_MAX_EMBEDS ||
+        currentEmbedTextLength + embedTextLength > DISCORD_MESSAGE_EMBED_TOTAL_MAX_LENGTH);
+
+    if (shouldStartNextMessage) {
+      messages.push({
+        embeds: currentEmbeds,
+      });
+      currentEmbeds = [];
+      currentEmbedTextLength = 0;
+    }
+
+    currentEmbeds.push(embed);
+    currentEmbedTextLength += embedTextLength;
+  }
+
+  if (currentEmbeds.length > 0) {
     messages.push({
-      embeds: embeds.slice(index, index + DISCORD_MESSAGE_MAX_EMBEDS),
+      embeds: currentEmbeds,
     });
   }
 
   return messages;
+}
+
+function calculateEmbedTextLength(embed: DiscordBotEmbed): number {
+  return (
+    textLength(embed.title) +
+    textLength(embed.description) +
+    textLength(embed.footer?.text) +
+    (embed.fields ?? []).reduce(
+      (total, field) => total + textLength(field.name) + textLength(field.value),
+      0,
+    )
+  );
+}
+
+function textLength(value: string | undefined): number {
+  return value?.length ?? 0;
 }
 
 interface GroupedReportLineItem {

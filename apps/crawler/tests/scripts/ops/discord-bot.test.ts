@@ -24,6 +24,7 @@ import {
   sendDueTargetPriceNotifications,
   sendPriceReportNow,
 } from "../../../src/scripts/ops/discord-bot";
+import { DISCORD_MESSAGE_EMBED_TOTAL_MAX_LENGTH } from "../../../src/scripts/ops/discord-bot/constants";
 
 const TOKEN = "test_bot_token";
 const APPLICATION_ID = "123456789012345678";
@@ -2571,6 +2572,60 @@ describe("sendPriceReportNow", () => {
     expect(description).not.toContain("續");
   });
 
+  it("splits long price reports by Discord message embed size", async () => {
+    const snapshots = Array.from({ length: 50 }, (_, index) =>
+      snapshot({
+        id: `long-new-${index}`,
+        productId: `long-product-${index}`,
+        productName: `Long New Product ${index} ${"A".repeat(120)}`,
+        crawlRunId: "new-run",
+        price: 1000 + index,
+        capturedAt: `2026-06-07T03:${String(index).padStart(2, "0")}:00.000Z`,
+      }),
+    );
+    const client = createDiscordBotClient(snapshots);
+    const sendReportMessages = vi.fn(async (messages: DiscordBotMessage[]) => ({
+      status: "sent" as const,
+      messageCount: messages.length,
+      httpStatuses: messages.map(() => 200),
+    }));
+
+    await expect(
+      sendPriceReportNow({
+        client,
+        discordUserId: "111122223333444455",
+        windowHours: 24,
+        maxItems: 50,
+        publicBaseUrl: PUBLIC_BASE_URL,
+        now: new Date("2026-06-07T05:00:00.000Z"),
+        sendReportMessages,
+      }),
+    ).resolves.toMatchObject({
+      status: "sent",
+      newProductCount: 50,
+      listedCount: 50,
+    });
+
+    const reportMessages = sendReportMessages.mock.calls[0]?.[0] ?? [];
+
+    expect(reportMessages.length).toBeGreaterThan(1);
+    expect(JSON.stringify(reportMessages)).toContain("Long New Product 49");
+
+    for (const message of reportMessages) {
+      expect(message.embeds?.length ?? 0).toBeLessThanOrEqual(10);
+      expect(calculateMessageEmbedTextLength(message)).toBeLessThanOrEqual(
+        DISCORD_MESSAGE_EMBED_TOTAL_MAX_LENGTH,
+      );
+    }
+    expect(client.discordNotificationDelivery.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        status: "SENT",
+        itemCount: 50,
+        messageCount: reportMessages.length,
+      }),
+    });
+  });
+
   it("filters price reports by category and event type", async () => {
     const client = createDiscordBotClient([
       snapshot({
@@ -3992,6 +4047,25 @@ function readResponseEmbed(body: {
 
 function readEmbedFieldValue(embed: DiscordBotEmbed, fieldName: string): string | undefined {
   return embed.fields?.find((field) => field.name === fieldName)?.value;
+}
+
+function calculateMessageEmbedTextLength(message: DiscordBotMessage): number {
+  return (message.embeds ?? []).reduce(
+    (total, embed) =>
+      total +
+      textLength(embed.title) +
+      textLength(embed.description) +
+      textLength(embed.footer?.text) +
+      (embed.fields ?? []).reduce(
+        (fieldTotal, field) => fieldTotal + textLength(field.name) + textLength(field.value),
+        0,
+      ),
+    0,
+  );
+}
+
+function textLength(value: string | undefined): number {
+  return value?.length ?? 0;
 }
 
 function createInteraction(
