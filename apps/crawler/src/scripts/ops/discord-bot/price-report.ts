@@ -19,6 +19,7 @@ import {
   MAX_PRICE_REPORT_ITEMS,
   MAX_PRICE_REPORT_KEYWORD_LENGTH,
   PRODUCT_NAME_MAX_LENGTH,
+  SCHEDULED_PRICE_REPORT_RETRY_DELAY_MS,
   TIME_ZONE,
 } from "./constants";
 import { formatDiscordBotText } from "./rest";
@@ -394,7 +395,11 @@ export async function sendDueScheduledPriceReports({
       },
       data: {
         lastSentAt: result.status === "sent" ? now : setting.lastSentAt,
-        nextSendAt: calculateNextSendAtAfterScheduledRun(now, setting),
+        nextSendAt: calculateNextScheduledPriceReportSendAtAfterDelivery({
+          now,
+          setting,
+          delivered: result.status === "sent",
+        }),
       },
     });
   }
@@ -1058,6 +1063,22 @@ function calculateNextSendAtAfterScheduledRun(
   }
 
   return nextSendAt;
+}
+
+function calculateNextScheduledPriceReportSendAtAfterDelivery({
+  now,
+  setting,
+  delivered,
+}: {
+  now: Date;
+  setting: Pick<DiscordPriceReportSetting, "interval" | "nextSendAt">;
+  delivered: boolean;
+}): Date {
+  if (delivered) {
+    return calculateNextSendAtAfterScheduledRun(now, setting);
+  }
+
+  return new Date(now.getTime() + SCHEDULED_PRICE_REPORT_RETRY_DELAY_MS);
 }
 
 function calculateNextDailySendAt(now: Date, timeOfDay: PriceReportTimeOfDay): Date {

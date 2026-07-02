@@ -326,7 +326,7 @@ docker compose --profile manual-crawler run --rm crawler \
 - active 商品缺圖數沒有超過門檻。
 - active 商品 source link health 的 broken 與 temporary error 數沒有超過門檻。
 - raw snapshot metadata 沒有明顯超過 retention grace。
-- 近 24 小時 Discord bot delivery failed / rate limited 沒有異常；若有會進入 `WARN`，並由 admin webhook 依既有 cooldown / dedupe 發送。
+- 近 24 小時 Discord bot delivery 最新狀態沒有未恢復的 failed / rate limited；若同一通知串後續已成功，舊失敗不再觸發 `WARN`。
 
 Link health smoke 只統計 `source`。`source` 代表 public `source.url` 的原價屋查看 / 購買連結；原價屋來源列中的產品介紹連結已移除，不再進 DB、API、UI、link checker 或 smoke 門檻。`SMOKE_BROKEN_LINK_*` 與 `SMOKE_TEMPORARY_LINK_*` 舊變數仍可作為 local CLI / script fallback；Compose 新部署使用 `SMOKE_SOURCE_*_LINK_*`。
 
@@ -382,7 +382,7 @@ SMOKE_PUBLIC_BASE_URL=https://partsradar.net
 結果判讀：
 
 - `OK`：該項目前正常。
-- `WARN`：服務仍可用，但資料流或維運狀態需要觀察，例如來源成功時間偏舊、近期有 suspected block、source image anomaly、缺圖、壞連結或 Discord bot delivery 失敗 / rate limit 超過警戒值。
+- `WARN`：服務仍可用，但資料流或維運狀態需要觀察，例如來源成功時間偏舊、近期有 suspected block、source image anomaly、缺圖、壞連結或 Discord bot delivery 最新狀態仍是失敗 / rate limit。
 - `FAIL`：服務或資料流有明確失敗，例如 HTTP/API 掛掉、沒有 successful scheduled crawl、最新 crawler 疑似被擋、來源成功時間超過 fail 門檻。
 
 若 `product image api` 是 `FAIL`，代表商品列表已導出 `/api/product-images/...webp`，但公開圖片 API 無法回應圖片內容。優先檢查 `product_images` volume 是否有檔案、`PRODUCT_IMAGE_STORAGE_DIR` 是否正確、`storage-init` 是否已修權限，以及 `crawler-daemon` 新品圖片補圖或手動 image backfill 是否實際補過缺圖。
@@ -395,7 +395,7 @@ SMOKE_PUBLIC_BASE_URL=https://partsradar.net
 - `SMOKE_PRODUCT_IMAGE_SAMPLE_SIZE`：從 product list 抽查幾筆 public product image API，預設 5，最大 50。
 - `SMOKE_SOURCE_WARN_AFTER_MINUTES` / `SMOKE_SOURCE_FAIL_AFTER_MINUTES`：來源成功時間門檻，預設 60 / 120。
 - `SMOKE_CRAWLER_WARN_AFTER_MINUTES` / `SMOKE_CRAWLER_FAIL_AFTER_MINUTES`：successful scheduled crawler run 門檻，預設 90 / 180。
-- `SMOKE_RECENT_WINDOW_HOURS`：suspected block / parse error / Discord bot delivery failed 與 rate limited 統計窗口，預設 24。
+- `SMOKE_RECENT_WINDOW_HOURS`：suspected block / parse error / Discord bot delivery 最新狀態檢查窗口，預設 24。
 - `SMOKE_PARSE_ERROR_WARN_COUNT` / `SMOKE_PARSE_ERROR_FAIL_COUNT`：parse error 門檻，預設 20 / 100。
 - `SMOKE_INVALID_IMAGE_URL_WARN_COUNT`：source image anomaly rows WARN 門檻，預設 2000；真正使用者可見影響仍由 active products / missing product images 判斷。
 - `SMOKE_MISSING_IMAGE_WARN_COUNT` / `SMOKE_MISSING_IMAGE_FAIL_COUNT`：缺圖門檻，預設 200 / 500。
@@ -421,7 +421,7 @@ SMOKE_PUBLIC_BASE_URL=https://partsradar.net
 - 外部抓取互斥策略：shared external-fetch lock、價格 crawler priority signal、maintenance 暫停延後，以及排程圖片補圖只處理本輪新增商品。
 - `source` link health 的 `ok`、`temporary_error`、`broken` 聚合。
 - raw snapshot retention drift。
-- Discord bot 個人化通知聚合：每日報告設定數、待發每日報告、啟用中目標價追蹤、已通知目標價、notification claim、近 24 小時 delivery failed / rate limited 訊號，以及最近 Discord delivery 的 kind / status / item count / message count / created / delivered 時間。
+- Discord bot 個人化通知聚合：每日報告設定數、待發每日報告、啟用中目標價追蹤、已通知目標價、notification claim、近 24 小時 delivery 最新狀態訊號，以及最近 Discord delivery 的 kind / status / item count / message count / created / delivered 時間。
 - 最近 crawl runs 與 enabled source categories 的高層級時間資訊。
 
 狀態頁不顯示 raw HTML、parse error raw content、crawler stack trace、DB URL、token、raw IP、internal header dump、Discord user id、商品 ID 或 delivery error message。
@@ -471,7 +471,7 @@ http://127.0.0.1:3001/ops/status?token=<OPS_STATUS_TOKEN>
 
 ## Discord Admin Webhook Notification Foundation
 
-Discord webhook 僅保留給管理者告警。`smoke-daemon` 會在每輪 production smoke summary 後，依 notification policy 以 embed 對管理者頻道送出 `WARN` / `FAIL` / `RECOVERED` 通知，包含近 24 小時 Discord bot delivery failed / rate limited 訊號。公開價格報告由 Discord bot 發送，另見下方 bot 小節。
+Discord webhook 僅保留給管理者告警。`smoke-daemon` 會在每輪 production smoke summary 後，依 notification policy 以 embed 對管理者頻道送出 `WARN` / `FAIL` / `RECOVERED` 通知，包含近 24 小時仍未被後續成功覆蓋的 Discord bot delivery failed / rate limited 訊號。公開價格報告由 Discord bot 發送，另見下方 bot 小節。
 
 可選 secret：
 
@@ -522,6 +522,7 @@ Bot 目標：
 - `/price-report now` 報告只為有資料的「價格變動」或「新增商品」產生 embed；摘要時間、統計數字與價格變動方向標題使用 Markdown emphasis 強化區隔；價格變動 embed 先分「降價」與「漲價」，商品列以單行呈現 signed 漲跌金額、舊價、新價與站內商品連結；新增商品 embed 以單行呈現目前價格與站內商品連結；兩者都依 DB 的 `sourceCategory.displayName` 大分類與 `vendorName` 小分類分組，並在小分類已顯示品牌時移除商品名稱開頭重複品牌；兩邊都沒資料時才送一個空報告摘要。
 - `/price-report now` 每次最多列 `DISCORD_PRICE_REPORT_MAX_ITEMS` 筆，預設 50；上限套用在兩區合計列出的商品數；per-user cooldown 套用在實際產生報告的 `now` 指令與 settings 面板的「傳送預覽 DM」。
 - 每次 `/price-report now` 或 settings「傳送預覽 DM」會寫入 `discord_notification_deliveries`，供後續去重、排程與維運檢視使用。
+- 排程每日 DM 若發送失敗或遇到 Discord rate limit，會保留上次成功時間並在 10 分鐘後重試；後續成功後才推進到下一個正式每日時間。
 - `/price-report settings`：開啟私密設定面板，以 embed 顯示每日價格報告狀態、最近一次每日報告 delivery 狀態與目前設定，並用選單調整統計區間、分類篩選與報告內容類型；分類選單只列實際分類，部分分類狀態可按「改為全部分類」恢復不限制分類。
 - settings 面板的「傳送預覽 DM」會以目前設定產生一次 DM 報告，即使每日報告尚未啟用也可先確認篩選效果與私訊可用性；多則 report chunks 會直接送到使用者 DM，settings 面板只回報送達狀態或可理解的失敗原因。
 - 「調整關鍵字」會開啟 modal，設定商品名稱關鍵字；留空代表不限。

@@ -783,6 +783,53 @@ describe("production smoke checks", () => {
       ]),
     );
   });
+
+  it("does not warn when a later successful Discord bot delivery resolves the failure", async () => {
+    const { crawlerCwd, workspaceRoot } = await createWorkspace();
+    const imageDir = join(workspaceRoot, "product-images");
+    await mkdir(imageDir);
+    await writeFile(join(imageDir, "product-1.webp"), "webp");
+    stubHealthyPublicApi();
+    const options = parseProductionSmokeOptions(
+      [],
+      {
+        PRODUCT_IMAGE_STORAGE_DIR: imageDir,
+      },
+      crawlerCwd,
+    );
+    const summary = await runProductionSmoke(
+      createSmokeClient({
+        invalidImageErrorCount: 0,
+        trueParseErrorCount: 0,
+        discordDeliveryRecords: [
+          {
+            id: "delivery-scheduled-success",
+            discordUserId: "discord-user-1",
+            kind: "SCHEDULED_PRICE_REPORT",
+            status: "SENT",
+            targetPriceWatchId: null,
+            createdAt: new Date("2026-06-02T11:10:00.000Z"),
+          },
+          {
+            id: "delivery-scheduled-failed",
+            discordUserId: "discord-user-1",
+            kind: "SCHEDULED_PRICE_REPORT",
+            status: "FAILED",
+            targetPriceWatchId: null,
+            createdAt: new Date("2026-06-02T11:00:00.000Z"),
+          },
+        ],
+      }),
+      options,
+      new Date("2026-06-02T12:00:00.000Z"),
+    );
+
+    expect(summary.checks.find((check) => check.name === "discord bot deliveries")).toMatchObject({
+      status: "OK",
+      message: "failed=0 rateLimited=0 in 24h",
+    });
+    expect(summary.status).toBe("OK");
+  });
 });
 
 async function createWorkspace(): Promise<{
@@ -897,6 +944,7 @@ function createSmokeClient({
   invalidImageErrorCount,
   trueParseErrorCount,
   discordDeliveryCounts = {},
+  discordDeliveryRecords,
   linkHealthCounts = {},
 }: {
   invalidImageErrorCount: number;
@@ -905,6 +953,14 @@ function createSmokeClient({
     failed?: number;
     rateLimited?: number;
   };
+  discordDeliveryRecords?: Array<{
+    id: string;
+    discordUserId: string;
+    kind: "PRICE_REPORT_NOW" | "SCHEDULED_PRICE_REPORT" | "TARGET_PRICE";
+    status: "SENT" | "SKIPPED" | "FAILED" | "RATE_LIMITED";
+    targetPriceWatchId: string | null;
+    createdAt: Date;
+  }>;
   linkHealthCounts?: {
     sourceBroken?: number;
     sourceTemporary?: number;
@@ -989,6 +1045,25 @@ function createSmokeClient({
 
         return 0;
       },
+      findMany: async () =>
+        discordDeliveryRecords ?? [
+          ...Array.from({ length: discordDeliveryCounts.failed ?? 0 }, (_, index) => ({
+            id: `discord-failed-${index + 1}`,
+            discordUserId: `discord-user-failed-${index + 1}`,
+            kind: "SCHEDULED_PRICE_REPORT" as const,
+            status: "FAILED" as const,
+            targetPriceWatchId: null,
+            createdAt: new Date(`2026-06-02T11:${String(50 - index).padStart(2, "0")}:00.000Z`),
+          })),
+          ...Array.from({ length: discordDeliveryCounts.rateLimited ?? 0 }, (_, index) => ({
+            id: `discord-rate-limited-${index + 1}`,
+            discordUserId: `discord-user-rate-limited-${index + 1}`,
+            kind: "SCHEDULED_PRICE_REPORT" as const,
+            status: "RATE_LIMITED" as const,
+            targetPriceWatchId: null,
+            createdAt: new Date(`2026-06-02T11:${String(40 - index).padStart(2, "0")}:00.000Z`),
+          })),
+        ],
     },
   } as unknown as Parameters<typeof runProductionSmoke>[0];
 }

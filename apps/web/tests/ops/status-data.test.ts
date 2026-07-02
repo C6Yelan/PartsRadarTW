@@ -131,6 +131,47 @@ describe("collectOpsStatus", () => {
       message: "failed=1 rateLimited=1 in 24h",
     });
   });
+
+  it("does not warn when later Discord bot deliveries resolve earlier failures", async () => {
+    const summary = await collectOpsStatus(
+      fakeOpsClient({
+        discordDeliveryRecords: [
+          {
+            id: "delivery-success",
+            discordUserId: "discord-user-1",
+            kind: "SCHEDULED_PRICE_REPORT",
+            status: "SENT",
+            targetPriceWatchId: null,
+            itemCount: 5,
+            messageCount: 1,
+            deliveredAt: new Date("2026-06-07T11:20:00.000Z"),
+            createdAt: new Date("2026-06-07T11:20:00.000Z"),
+          },
+          {
+            id: "delivery-failed",
+            discordUserId: "discord-user-1",
+            kind: "SCHEDULED_PRICE_REPORT",
+            status: "FAILED",
+            targetPriceWatchId: null,
+            itemCount: 5,
+            messageCount: 1,
+            deliveredAt: null,
+            createdAt: new Date("2026-06-07T11:10:00.000Z"),
+          },
+        ],
+      }),
+      {
+        now: () => NOW,
+        productImageStorageDir: "/images",
+        productImageExists: async () => true,
+      },
+    );
+
+    expect(summary.checks.find((check) => check.key === "discord-bot-delivery")).toMatchObject({
+      level: "ok",
+      message: "failed=0 rateLimited=0 in 24h",
+    });
+  });
 });
 
 describe("readOpsStatusThresholds", () => {
@@ -162,6 +203,17 @@ interface FakeOpsClientOptions {
       Partial<Record<"SENT" | "SKIPPED" | "FAILED" | "RATE_LIMITED", number>>
     >
   >;
+  discordDeliveryRecords?: Array<{
+    id: string;
+    discordUserId: string;
+    kind: "PRICE_REPORT_NOW" | "SCHEDULED_PRICE_REPORT" | "TARGET_PRICE";
+    status: "SENT" | "SKIPPED" | "FAILED" | "RATE_LIMITED";
+    targetPriceWatchId: string | null;
+    itemCount: number;
+    messageCount: number;
+    deliveredAt: Date | null;
+    createdAt: Date;
+  }>;
 }
 
 function fakeOpsClient(options: FakeOpsClientOptions = {}): OpsStatusReadClient {
@@ -208,6 +260,8 @@ function fakeOpsClient(options: FakeOpsClientOptions = {}): OpsStatusReadClient 
       ...options.discordDeliveryCounts?.TARGET_PRICE,
     },
   };
+  const discordDeliveryRecords =
+    options.discordDeliveryRecords ?? createDiscordDeliveryRecords(discordDeliveryCounts);
 
   return {
     sourceCategory: {
@@ -340,18 +394,39 @@ function fakeOpsClient(options: FakeOpsClientOptions = {}): OpsStatusReadClient 
         return 0;
       },
       async findMany() {
-        return [
-          {
-            id: "delivery-1",
-            kind: "SCHEDULED_PRICE_REPORT",
-            status: "SENT",
-            itemCount: 5,
-            messageCount: 1,
-            deliveredAt: new Date("2026-06-07T11:30:00.000Z"),
-            createdAt: new Date("2026-06-07T11:30:00.000Z"),
-          },
-        ];
+        return discordDeliveryRecords;
       },
     },
   };
+}
+
+function createDiscordDeliveryRecords(
+  counts: Record<
+    "PRICE_REPORT_NOW" | "SCHEDULED_PRICE_REPORT" | "TARGET_PRICE",
+    Record<"SENT" | "SKIPPED" | "FAILED" | "RATE_LIMITED", number>
+  >,
+) {
+  const records: NonNullable<FakeOpsClientOptions["discordDeliveryRecords"]> = [];
+  let sequence = 0;
+
+  for (const [kind, statuses] of Object.entries(counts)) {
+    for (const [status, count] of Object.entries(statuses)) {
+      for (let index = 0; index < count; index += 1) {
+        sequence += 1;
+        records.push({
+          id: `delivery-${sequence}`,
+          discordUserId: `discord-user-${sequence}`,
+          kind: kind as (typeof records)[number]["kind"],
+          status: status as (typeof records)[number]["status"],
+          targetPriceWatchId: kind === "TARGET_PRICE" ? `target-watch-${sequence}` : null,
+          itemCount: 5,
+          messageCount: 1,
+          deliveredAt: status === "SENT" ? new Date("2026-06-07T11:30:00.000Z") : null,
+          createdAt: new Date(`2026-06-07T11:${String(30 - sequence).padStart(2, "0")}:00.000Z`),
+        });
+      }
+    }
+  }
+
+  return records;
 }

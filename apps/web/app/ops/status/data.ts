@@ -143,6 +143,16 @@ export const OPS_RECENT_DISCORD_DELIVERY_QUERY = {
   },
 } as const satisfies Prisma.DiscordNotificationDeliveryFindManyArgs;
 
+const OPS_DISCORD_DELIVERY_HEALTH_SCAN_LIMIT = 500;
+const OPS_DISCORD_DELIVERY_HEALTH_SELECT = {
+  id: true,
+  discordUserId: true,
+  kind: true,
+  status: true,
+  targetPriceWatchId: true,
+  createdAt: true,
+} as const satisfies Prisma.DiscordNotificationDeliverySelect;
+
 const OPS_DISPLAY_READY_PRODUCT_WHERE = {
   isActive: true,
   primaryImageUrl: {
@@ -177,6 +187,9 @@ type OpsRecentCrawlRunRecord = Prisma.CrawlRunGetPayload<{
 }>;
 type OpsDiscordDeliveryRecord = Prisma.DiscordNotificationDeliveryGetPayload<{
   select: typeof OPS_RECENT_DISCORD_DELIVERY_QUERY.select;
+}>;
+type OpsDiscordDeliveryHealthRecord = Prisma.DiscordNotificationDeliveryGetPayload<{
+  select: typeof OPS_DISCORD_DELIVERY_HEALTH_SELECT;
 }>;
 type OpsDisplayReadyProductRecord = Prisma.ProductGetPayload<{
   select: typeof OPS_DISPLAY_READY_PRODUCT_ID_QUERY.select;
@@ -240,7 +253,7 @@ export interface OpsStatusReadClient {
   };
   discordNotificationDelivery: {
     count(args: Prisma.DiscordNotificationDeliveryCountArgs): Promise<number>;
-    findMany(args: typeof OPS_RECENT_DISCORD_DELIVERY_QUERY): Promise<OpsDiscordDeliveryRecord[]>;
+    findMany(args: Prisma.DiscordNotificationDeliveryFindManyArgs): Promise<unknown[]>;
   };
 }
 
@@ -838,9 +851,7 @@ async function collectDiscordBotStatus(
     activeTargetPriceWatches,
     notifiedTargetPriceWatches,
     claimedTargetPriceWatches,
-    priceReportNowDeliveries,
-    scheduledPriceReportDeliveries,
-    targetPriceDeliveries,
+    deliveryHealthRecords,
     latestDeliveries,
   ] = await Promise.all([
     client.discordPriceReportSetting.count({}),
@@ -878,11 +889,10 @@ async function collectDiscordBotStatus(
         },
       },
     }),
-    collectDiscordDeliveryKindSummary(client, "PRICE_REPORT_NOW", recentSince),
-    collectDiscordDeliveryKindSummary(client, "SCHEDULED_PRICE_REPORT", recentSince),
-    collectDiscordDeliveryKindSummary(client, "TARGET_PRICE", recentSince),
+    readDiscordDeliveryHealthRecords(client, recentSince),
     client.discordNotificationDelivery.findMany(OPS_RECENT_DISCORD_DELIVERY_QUERY),
   ]);
+  const deliverySummaries = summarizeLatestDiscordDeliveryStatusesByKind(deliveryHealthRecords);
 
   return {
     priceReportSettings: {
@@ -897,49 +907,87 @@ async function collectDiscordBotStatus(
     },
     recentDeliveries: {
       windowHours: thresholds.recentWindowHours,
-      priceReportNow: priceReportNowDeliveries,
-      scheduledPriceReport: scheduledPriceReportDeliveries,
-      targetPrice: targetPriceDeliveries,
+      priceReportNow: deliverySummaries.PRICE_REPORT_NOW,
+      scheduledPriceReport: deliverySummaries.SCHEDULED_PRICE_REPORT,
+      targetPrice: deliverySummaries.TARGET_PRICE,
     },
-    latestDeliveries,
+    latestDeliveries: latestDeliveries as OpsDiscordDeliveryRecord[],
   };
 }
 
-async function collectDiscordDeliveryKindSummary(
+async function readDiscordDeliveryHealthRecords(
   client: OpsStatusReadClient,
-  kind: OpsDiscordDeliveryRecord["kind"],
   recentSince: Date,
-): Promise<OpsStatusDiscordDeliveryKindSummary> {
-  const [sent, skipped, failed, rateLimited] = await Promise.all([
-    countDiscordDeliveries(client, kind, "SENT", recentSince),
-    countDiscordDeliveries(client, kind, "SKIPPED", recentSince),
-    countDiscordDeliveries(client, kind, "FAILED", recentSince),
-    countDiscordDeliveries(client, kind, "RATE_LIMITED", recentSince),
-  ]);
-
-  return {
-    sent,
-    skipped,
-    failed,
-    rateLimited,
-  };
-}
-
-async function countDiscordDeliveries(
-  client: OpsStatusReadClient,
-  kind: OpsDiscordDeliveryRecord["kind"],
-  status: OpsDiscordDeliveryRecord["status"],
-  recentSince: Date,
-): Promise<number> {
-  return client.discordNotificationDelivery.count({
+): Promise<OpsDiscordDeliveryHealthRecord[]> {
+  return client.discordNotificationDelivery.findMany({
     where: {
-      kind,
-      status,
       createdAt: {
         gte: recentSince,
       },
     },
-  });
+    select: OPS_DISCORD_DELIVERY_HEALTH_SELECT,
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    take: OPS_DISCORD_DELIVERY_HEALTH_SCAN_LIMIT,
+  }) as Promise<OpsDiscordDeliveryHealthRecord[]>;
+}
+
+function summarizeLatestDiscordDeliveryStatusesByKind(
+  records: OpsDiscordDeliveryHealthRecord[],
+): Record<OpsDiscordDeliveryHealthRecord["kind"], OpsStatusDiscordDeliveryKindSummary> {
+  const summaries = {
+    PRICE_REPORT_NOW: createEmptyDiscordDeliverySummary(),
+    SCHEDULED_PRICE_REPORT: createEmptyDiscordDeliverySummary(),
+    TARGET_PRICE: createEmptyDiscordDeliverySummary(),
+  };
+  const latestByStream = new Map<string, OpsDiscordDeliveryHealthRecord>();
+
+  for (const record of [...records].sort(compareDiscordDeliveryHealthRecordsDesc)) {
+    const key = toDiscordDeliveryStreamKey(record);
+
+    if (!latestByStream.has(key)) {
+      latestByStream.set(key, record);
+    }
+  }
+
+  for (const record of latestByStream.values()) {
+    const summary = summaries[record.kind];
+
+    if (record.status === "SENT") {
+      summary.sent += 1;
+    } else if (record.status === "SKIPPED") {
+      summary.skipped += 1;
+    } else if (record.status === "FAILED") {
+      summary.failed += 1;
+    } else {
+      summary.rateLimited += 1;
+    }
+  }
+
+  return summaries;
+}
+
+function createEmptyDiscordDeliverySummary(): OpsStatusDiscordDeliveryKindSummary {
+  return {
+    sent: 0,
+    skipped: 0,
+    failed: 0,
+    rateLimited: 0,
+  };
+}
+
+function compareDiscordDeliveryHealthRecordsDesc(
+  left: OpsDiscordDeliveryHealthRecord,
+  right: OpsDiscordDeliveryHealthRecord,
+): number {
+  return right.createdAt.getTime() - left.createdAt.getTime() || right.id.localeCompare(left.id);
+}
+
+function toDiscordDeliveryStreamKey(record: OpsDiscordDeliveryHealthRecord): string {
+  if (record.kind === "TARGET_PRICE") {
+    return `${record.kind}:${record.discordUserId}:${record.targetPriceWatchId ?? record.id}`;
+  }
+
+  return `${record.kind}:${record.discordUserId}`;
 }
 
 async function countActiveProductLinks(
