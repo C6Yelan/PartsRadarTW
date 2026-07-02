@@ -88,6 +88,8 @@ export const WATCH_REMOVE_CONFIRM_CUSTOM_ID_PREFIX = "watch:remove-confirm:";
 export const WATCH_REMOVE_CANCEL_CUSTOM_ID_PREFIX = "watch:remove-cancel:";
 export const WATCH_REFRESH_CUSTOM_ID_PREFIX = "watch:refresh:";
 export const WATCH_PAGE_CUSTOM_ID_PREFIX = "watch:page:";
+export const WATCH_BULK_REMOVE_CUSTOM_ID_PREFIX = "watch:bulk-remove:";
+export const WATCH_BULK_REMOVE_SELECT_CUSTOM_ID_PREFIX = "watch:bulk-remove-select:";
 
 export function createPriceReportCommand(): Record<string, unknown> {
   return {
@@ -241,6 +243,24 @@ export function parseWatchComponentInteraction(
 
   if (remove) {
     return { action: "remove", watchInput: remove.watchInput, page: remove.page };
+  }
+
+  if (customId?.startsWith(WATCH_BULK_REMOVE_CUSTOM_ID_PREFIX)) {
+    return {
+      action: "bulk_remove",
+      page: parsePage(customId.slice(WATCH_BULK_REMOVE_CUSTOM_ID_PREFIX.length)),
+    };
+  }
+
+  if (customId?.startsWith(WATCH_BULK_REMOVE_SELECT_CUSTOM_ID_PREFIX)) {
+    return {
+      action: "bulk_remove_select",
+      watchInputs: (interaction.data?.values ?? [])
+        .filter((value): value is string => typeof value === "string")
+        .map((value) => value.trim())
+        .filter(Boolean),
+      page: parsePage(customId.slice(WATCH_BULK_REMOVE_SELECT_CUSTOM_ID_PREFIX.length)),
+    };
   }
 
   const confirmRemove = parseWatchActionCustomId(customId, WATCH_REMOVE_CONFIRM_CUSTOM_ID_PREFIX);
@@ -568,6 +588,7 @@ export function createPublicReportSettingsComponents({
   categoryIgrps,
   includePriceDrops,
   includePriceRises,
+  includeNewProducts,
 }: {
   hasChannel: boolean;
   enabled: boolean;
@@ -575,6 +596,7 @@ export function createPublicReportSettingsComponents({
   categoryIgrps: number[];
   includePriceDrops: boolean;
   includePriceRises: boolean;
+  includeNewProducts: boolean;
 }): DiscordMessageComponent[] {
   const selectedCategoryIgrps = new Set(categoryIgrps);
   const allCategoriesSelected = selectedCategoryIgrps.size === 0;
@@ -630,7 +652,7 @@ export function createPublicReportSettingsComponents({
           custom_id: PUBLIC_REPORT_EVENTS_CUSTOM_ID,
           placeholder: "公開報告內容",
           min_values: 1,
-          max_values: 2,
+          max_values: 3,
           options: [
             {
               label: "降價",
@@ -641,6 +663,11 @@ export function createPublicReportSettingsComponents({
               label: "漲價",
               value: PRICE_REPORT_EVENT_PRICE_RISES_VALUE,
               default: includePriceRises,
+            },
+            {
+              label: "新增商品",
+              value: PRICE_REPORT_EVENT_NEW_PRODUCTS_VALUE,
+              default: includeNewProducts,
             },
           ],
           disabled: !hasChannel,
@@ -1192,10 +1219,12 @@ function parsePriceReportEvents(values: unknown[]): {
 function parsePublicReportEvents(values: unknown[]): {
   includePriceDrops: boolean;
   includePriceRises: boolean;
+  includeNewProducts: boolean;
 } | null {
   const validValues = new Set([
     PRICE_REPORT_EVENT_PRICE_DROPS_VALUE,
     PRICE_REPORT_EVENT_PRICE_RISES_VALUE,
+    PRICE_REPORT_EVENT_NEW_PRODUCTS_VALUE,
   ]);
 
   if (
@@ -1208,6 +1237,7 @@ function parsePublicReportEvents(values: unknown[]): {
   return {
     includePriceDrops: values.includes(PRICE_REPORT_EVENT_PRICE_DROPS_VALUE),
     includePriceRises: values.includes(PRICE_REPORT_EVENT_PRICE_RISES_VALUE),
+    includeNewProducts: values.includes(PRICE_REPORT_EVENT_NEW_PRODUCTS_VALUE),
   };
 }
 

@@ -324,6 +324,7 @@ model DiscordPublicPriceReportSetting {
   productKeyword         String?   @map("product_keyword") @db.Text
   includePriceDrops      Boolean   @default(true) @map("include_price_drops")
   includePriceRises      Boolean   @default(true) @map("include_price_rises")
+  includeNewProducts     Boolean   @default(false) @map("include_new_products")
   enabled                Boolean   @default(true)
   notificationCursorAt   DateTime? @map("notification_cursor_at") @db.Timestamptz(6)
   createdByDiscordUserId String    @map("created_by_discord_user_id") @db.Text

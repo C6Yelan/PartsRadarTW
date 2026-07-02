@@ -53,6 +53,7 @@ export async function readCrawlRunPriceChangeSummary(
   if (currentSnapshots.length === 0) {
     return {
       changes: [],
+      newProducts: [],
       snapshotCount: 0,
       unmatchedSnapshotCount: 0,
       unchangedSnapshotCount: 0,
@@ -81,6 +82,7 @@ export async function readCrawlRunPriceChangeSummary(
   })) as PreviousPriceSnapshot[];
   const previousByProduct = groupPreviousSnapshots(previousSnapshots);
   const changes: PriceChangeDiscordNotificationItem[] = [];
+  const newProductByProduct = new Map<string, PriceReportNewProductItem>();
   let unmatchedSnapshotCount = 0;
   let unchangedSnapshotCount = 0;
   let currencyMismatchCount = 0;
@@ -92,6 +94,28 @@ export async function readCrawlRunPriceChangeSummary(
 
     if (!previous) {
       unmatchedSnapshotCount += 1;
+      const newProduct = newProductByProduct.get(current.productId);
+
+      if (!newProduct) {
+        newProductByProduct.set(current.productId, {
+          productId: current.product.id,
+          productName: current.product.name,
+          category: current.product.sourceCategory,
+          subcategory: toProductSubcategory(current.product),
+          currentPrice: current.price,
+          currency: current.currency,
+          firstSeenAt: current.capturedAt,
+        });
+      } else {
+        newProductByProduct.set(current.productId, {
+          ...newProduct,
+          productName: current.product.name,
+          category: current.product.sourceCategory,
+          subcategory: toProductSubcategory(current.product),
+          currentPrice: current.price,
+          currency: current.currency,
+        });
+      }
       continue;
     }
 
@@ -120,6 +144,7 @@ export async function readCrawlRunPriceChangeSummary(
 
   return {
     changes: changes.sort(comparePriceChanges),
+    newProducts: [...newProductByProduct.values()].sort(compareNewProducts),
     snapshotCount: currentSnapshots.length,
     unmatchedSnapshotCount,
     unchangedSnapshotCount,

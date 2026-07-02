@@ -4,6 +4,7 @@ import {
   CommandCooldowns,
   calculateScheduledPriceReportSleepMs,
   createPublicPriceChangeReportMessages,
+  createPublicPriceReportMessages,
   type DiscordBotClient,
   type DiscordBotEmbed,
   type DiscordBotMessage,
@@ -37,6 +38,8 @@ const API_BASE_URL = "https://discord.test/api/v10";
 const PUBLIC_BASE_URL = "https://partsradar.test/";
 const WATCH_PRODUCT_ID = "11111111-1111-4111-8111-111111111111";
 const WATCH_ROW_ID = "22222222-2222-4222-8222-222222222222";
+const WATCH_SECOND_PRODUCT_ID = "44444444-4444-4444-8444-444444444444";
+const WATCH_SECOND_ROW_ID = "33333333-3333-4333-8333-333333333333";
 const TEST_SOURCE_CATEGORIES = [
   { igrp: 4, displayName: "CPU" },
   { igrp: 5, displayName: "主機板" },
@@ -1265,6 +1268,105 @@ describe("handleDiscordInteraction", () => {
     expect(requestBody.embeds[0]).toMatchObject({
       title: "商品目標價追蹤",
       description: expect.stringContaining("已移除目標價追蹤"),
+    });
+    expect(requestBody.embeds[0].description).toContain("尚未追蹤商品");
+  });
+
+  it("opens a batch removal picker from the watch manager", async () => {
+    const client = createBatchWatchManagerClient();
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createWatchButtonInteraction("watch:bulk-remove:0"),
+    });
+
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({ type: 6 });
+    const requestBody = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body));
+
+    expect(requestBody).toMatchObject({
+      embeds: [
+        expect.objectContaining({
+          title: "批次移除目標價追蹤",
+          description: expect.stringContaining("選擇要移除的商品"),
+        }),
+      ],
+      components: [
+        {
+          type: 1,
+          components: [
+            expect.objectContaining({
+              custom_id: "watch:bulk-remove-select:0",
+              min_values: 1,
+              max_values: 2,
+              options: expect.arrayContaining([
+                expect.objectContaining({ label: "RTX 5070 測試卡" }),
+                expect.objectContaining({ label: "DDR5 6400 測試記憶體" }),
+              ]),
+            }),
+          ],
+        },
+        {
+          type: 1,
+          components: [
+            expect.objectContaining({
+              custom_id: "watch:refresh:0",
+              label: "返回設定",
+            }),
+          ],
+        },
+      ],
+    });
+    expect(JSON.stringify(requestBody.embeds)).not.toContain(WATCH_ROW_ID);
+    expect(JSON.stringify(requestBody.embeds)).not.toContain(WATCH_SECOND_ROW_ID);
+  });
+
+  it("batch removes selected target price watches and refreshes the manager", async () => {
+    const client = createBatchWatchManagerClient();
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createWatchBulkRemoveSelectInteraction(
+        [`watch:${WATCH_ROW_ID}`, `watch:${WATCH_SECOND_ROW_ID}`],
+        0,
+      ),
+    });
+
+    expect(client.discordTargetPriceWatch.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: WATCH_ROW_ID,
+        discordUserId: "111122223333444455",
+        enabled: true,
+      },
+      data: {
+        enabled: false,
+      },
+    });
+    expect(client.discordTargetPriceWatch.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: WATCH_SECOND_ROW_ID,
+        discordUserId: "111122223333444455",
+        enabled: true,
+      },
+      data: {
+        enabled: false,
+      },
+    });
+    const requestBody = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body));
+    expect(requestBody.embeds[0]).toMatchObject({
+      title: "商品目標價追蹤",
+      description: expect.stringContaining("已批次移除 2 項目標價追蹤"),
     });
     expect(requestBody.embeds[0].description).toContain("尚未追蹤商品");
   });
@@ -3058,6 +3160,44 @@ describe("sendPriceReportNow", () => {
     expect(messages[0]?.embeds?.[0]?.fields).toBeUndefined();
   });
 
+  it("creates public report messages with new products", () => {
+    const messages = createPublicPriceReportMessages(
+      {
+        priceChanges: [],
+        newProducts: [
+          {
+            productId: "product-new-1",
+            productName: "華碩 RTX 5090 新品顯示卡",
+            category: { igrp: 12, displayName: "顯示卡" },
+            subcategory: { slug: "asus", displayName: "華碩" },
+            currentPrice: 99_990,
+            currency: "TWD",
+            firstSeenAt: new Date("2026-06-07T03:00:00.000Z"),
+          },
+        ],
+      },
+      {
+        publicBaseUrl: PUBLIC_BASE_URL,
+        maxItems: 50,
+        generatedAt: new Date("2026-06-07T05:00:00.000Z"),
+      },
+    );
+
+    expect(messages).toEqual([
+      {
+        embeds: [
+          expect.objectContaining({
+            title: "PartsRadarTW 公開價格報告 - 新增商品",
+            description: expect.stringContaining("本輪更新：**1 個新增商品**"),
+          }),
+        ],
+      },
+    ]);
+    expect(messages[0]?.embeds?.[0]?.description).toContain(
+      "\n**顯示卡**\n**華碩**\n- **NT$99,990** [RTX 5090 新品顯示卡]",
+    );
+  });
+
   it("shows the public report status from the public-report status command", async () => {
     const client = createDiscordBotClient([]);
     const fetchMock = vi.fn<typeof fetch>(
@@ -3117,7 +3257,7 @@ describe("sendPriceReportNow", () => {
         embeds: [
           expect.objectContaining({
             title: "公開價格報告設定",
-            description: expect.stringContaining("排程爬蟲完成且有價格變動"),
+            description: expect.stringContaining("價格變動或新增商品"),
             fields: expect.arrayContaining([
               expect.objectContaining({ name: "狀態", value: "尚未設定" }),
               expect.objectContaining({ name: "發送頻道", value: "尚未設定" }),
@@ -3256,6 +3396,7 @@ describe("sendPriceReportNow", () => {
       data: expect.objectContaining({
         includePriceDrops: true,
         includePriceRises: false,
+        includeNewProducts: false,
       }),
       select: expect.any(Object),
     });
@@ -3263,6 +3404,48 @@ describe("sendPriceReportNow", () => {
     const updateBody = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body));
     expect(JSON.stringify(updateBody.embeds)).toContain("降價");
     expect(JSON.stringify(updateBody.embeds)).not.toContain("降價、漲價");
+  });
+
+  it("allows public reports to include new products", async () => {
+    const client = createDiscordBotClient(
+      [],
+      [],
+      [],
+      [...TEST_SOURCE_CATEGORIES],
+      [],
+      [],
+      [],
+      [publicPriceReportSetting({ id: "public-setting-1" })],
+    );
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createPublicReportSelectInteraction("public-report:events", [
+        "price_drops",
+        "new_products",
+      ]),
+    });
+
+    expect(client.discordPublicPriceReportSetting.update).toHaveBeenCalledWith({
+      where: {
+        discordGuildId: "guild-1",
+      },
+      data: expect.objectContaining({
+        includePriceDrops: true,
+        includePriceRises: false,
+        includeNewProducts: true,
+      }),
+      select: expect.any(Object),
+    });
+
+    const updateBody = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body));
+    expect(JSON.stringify(updateBody.embeds)).toContain("降價、新增商品");
   });
 
   it("updates the public report display limit from the limit modal", async () => {
@@ -3798,6 +3981,70 @@ describe("sendPriceReportNow", () => {
         deliveredAt: new Date("2026-06-07T05:00:00.000Z"),
       }),
     });
+  });
+
+  it("sends pending public reports for new products when enabled", async () => {
+    const client = createDiscordBotClient(
+      [
+        snapshot({
+          id: "new-public-product-1",
+          productId: "product-public-new-1",
+          productName: "華碩 RTX 5090 新品顯示卡",
+          crawlRunId: "public-run-1",
+          price: 99_990,
+          capturedAt: "2026-06-07T03:00:00.000Z",
+        }),
+      ],
+      [],
+      [],
+      [...TEST_SOURCE_CATEGORIES],
+      [],
+      [],
+      [
+        crawlRun({
+          id: "public-run-1",
+          finishedAt: new Date("2026-06-07T03:05:00.000Z"),
+        }),
+      ],
+      [
+        publicPriceReportSetting({
+          id: "public-setting-1",
+          includeNewProducts: true,
+        }),
+      ],
+    );
+    const sendChannelMessages = vi.fn(
+      async (_channelId: string, _messages: DiscordBotMessage[]) => ({
+        status: "sent" as const,
+        messageCount: 1,
+        httpStatuses: [200],
+      }),
+    );
+
+    await expect(
+      sendPendingPublicPriceReports({
+        client,
+        options: createDiscordBotOptions(),
+        now: new Date("2026-06-07T05:00:00.000Z"),
+        sendChannelMessages,
+      }),
+    ).resolves.toMatchObject({
+      settingCount: 1,
+      processedCount: 1,
+      sentCount: 1,
+    });
+
+    const reportText = JSON.stringify(sendChannelMessages.mock.calls[0]?.[1]);
+
+    expect(reportText).toContain("PartsRadarTW 公開價格報告 - 新增商品");
+    expect(reportText).toContain("RTX 5090 新品顯示卡");
+    expect(client.discordPublicPriceReportDelivery.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          itemCount: 1,
+        }),
+      }),
+    );
   });
 
   it("does not backfill public reports from crawl runs before the setting cursor", async () => {
@@ -4934,6 +5181,27 @@ function createWatchSelectInteraction(watchInput: string, page: number): Discord
   };
 }
 
+function createWatchBulkRemoveSelectInteraction(
+  watchInputs: string[],
+  page: number,
+): DiscordInteraction {
+  return {
+    id: "interaction-1",
+    token: "interaction-token",
+    type: 3,
+    data: {
+      custom_id: `watch:bulk-remove-select:${page}`,
+      component_type: 3,
+      values: watchInputs,
+    },
+    member: {
+      user: {
+        id: "111122223333444455",
+      },
+    },
+  };
+}
+
 function createWatchEditModalSubmitInteraction({
   watchId,
   targetPrice,
@@ -5072,6 +5340,7 @@ interface TestDiscordPublicPriceReportSetting {
   productKeyword: string | null;
   includePriceDrops: boolean;
   includePriceRises: boolean;
+  includeNewProducts: boolean;
   enabled: boolean;
   notificationCursorAt: Date | null;
   createdByDiscordUserId: string;
@@ -5305,6 +5574,7 @@ function publicPriceReportSetting({
   productKeyword = null,
   includePriceDrops = true,
   includePriceRises = true,
+  includeNewProducts = false,
   enabled = true,
   notificationCursorAt = new Date("2026-06-07T00:00:00.000Z"),
   createdByDiscordUserId = "111122223333444455",
@@ -5320,6 +5590,7 @@ function publicPriceReportSetting({
   productKeyword?: string | null;
   includePriceDrops?: boolean;
   includePriceRises?: boolean;
+  includeNewProducts?: boolean;
   enabled?: boolean;
   notificationCursorAt?: Date | null;
   createdByDiscordUserId?: string;
@@ -5336,6 +5607,7 @@ function publicPriceReportSetting({
     productKeyword,
     includePriceDrops,
     includePriceRises,
+    includeNewProducts,
     enabled,
     notificationCursorAt,
     createdByDiscordUserId,
@@ -5383,6 +5655,44 @@ function createWatchManagerClient() {
         discordUserId: "111122223333444455",
         productId: WATCH_PRODUCT_ID,
         targetPrice: 17_500,
+      }),
+    ],
+  );
+}
+
+function createBatchWatchManagerClient() {
+  return createDiscordBotClient(
+    [
+      snapshot({
+        id: "snapshot-watch-1",
+        productId: WATCH_PRODUCT_ID,
+        productName: "RTX 5070 測試卡",
+        crawlRunId: "new-run",
+        price: 18_990,
+        capturedAt: "2026-06-07T03:00:00.000Z",
+      }),
+      snapshot({
+        id: "snapshot-watch-2",
+        productId: WATCH_SECOND_PRODUCT_ID,
+        productName: "DDR5 6400 測試記憶體",
+        crawlRunId: "new-run",
+        price: 8_990,
+        capturedAt: "2026-06-07T03:00:00.000Z",
+      }),
+    ],
+    [],
+    [
+      targetPriceWatch({
+        id: WATCH_ROW_ID,
+        discordUserId: "111122223333444455",
+        productId: WATCH_PRODUCT_ID,
+        targetPrice: 17_500,
+      }),
+      targetPriceWatch({
+        id: WATCH_SECOND_ROW_ID,
+        discordUserId: "111122223333444455",
+        productId: WATCH_SECOND_PRODUCT_ID,
+        targetPrice: 8_500,
       }),
     ],
   );
@@ -5891,6 +6201,7 @@ function createDiscordBotClient(
         | "productKeyword"
         | "includePriceDrops"
         | "includePriceRises"
+        | "includeNewProducts"
         | "createdAt"
         | "updatedAt"
       > &
@@ -5902,6 +6213,7 @@ function createDiscordBotClient(
             | "productKeyword"
             | "includePriceDrops"
             | "includePriceRises"
+            | "includeNewProducts"
             | "notificationCursorAt"
           >
         >;
@@ -5925,6 +6237,7 @@ function createDiscordBotClient(
         productKeyword: null,
         includePriceDrops: true,
         includePriceRises: true,
+        includeNewProducts: false,
         createdAt: new Date("2026-06-07T00:00:00.000Z"),
         updatedAt: new Date("2026-06-07T00:00:00.000Z"),
         ...args.create,

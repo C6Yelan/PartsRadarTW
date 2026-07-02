@@ -13,12 +13,11 @@ import {
   MAX_PRICE_REPORT_ITEMS,
 } from "./constants";
 import {
-  createPublicPriceChangeReportMessages,
+  createPublicPriceReportMessages,
+  filterNewProductsForReport,
   filterPriceChangesForReport,
   normalizePriceReportFilters,
   type PriceReportFilters,
-  type PriceReportFilterSetting,
-  toPriceReportFilters,
 } from "./price-report";
 import type {
   DiscordBotClient,
@@ -47,6 +46,7 @@ const PUBLIC_PRICE_REPORT_SETTING_SELECT = {
   productKeyword: true,
   includePriceDrops: true,
   includePriceRises: true,
+  includeNewProducts: true,
   enabled: true,
   notificationCursorAt: true,
   createdByDiscordUserId: true,
@@ -84,18 +84,21 @@ export type PublicPriceReportPreviewResult =
   | {
       status: "sent";
       changeCount: number;
+      newProductCount: number;
       listedCount: number;
       messageCount: number;
     }
   | {
       status: "skipped";
       changeCount: 0;
+      newProductCount: 0;
       listedCount: 0;
       messageCount: 0;
     }
   | {
       status: "rate_limited";
       changeCount: number;
+      newProductCount: number;
       listedCount: number;
       messageCount: number;
       sentMessageCount: number;
@@ -105,6 +108,7 @@ export type PublicPriceReportPreviewResult =
   | {
       status: "failed";
       changeCount: number;
+      newProductCount: number;
       listedCount: number;
       messageCount: number;
       sentMessageCount: number;
@@ -292,6 +296,7 @@ export async function updatePublicPriceReportFilters({
   productKeyword,
   includePriceDrops,
   includePriceRises,
+  includeNewProducts,
   now = new Date(),
 }: {
   client: DiscordBotClient;
@@ -302,6 +307,7 @@ export async function updatePublicPriceReportFilters({
   productKeyword?: string | null;
   includePriceDrops?: boolean;
   includePriceRises?: boolean;
+  includeNewProducts?: boolean;
   now?: Date;
 }): Promise<PublicPriceReportSetting | null> {
   const current = await readPublicPriceReportSetting({ client, discordGuildId });
@@ -311,13 +317,13 @@ export async function updatePublicPriceReportFilters({
   }
 
   const currentFilters = toPublicPriceReportFilters(current);
-  const filters = normalizePriceReportFilters({
+  const filters = normalizePublicPriceReportFilters({
     ...currentFilters,
     categoryIgrps: categoryIgrps ?? currentFilters.categoryIgrps,
     productKeyword: productKeyword === undefined ? currentFilters.productKeyword : productKeyword,
     includePriceDrops: includePriceDrops ?? currentFilters.includePriceDrops,
     includePriceRises: includePriceRises ?? currentFilters.includePriceRises,
-    includeNewProducts: false,
+    includeNewProducts: includeNewProducts ?? currentFilters.includeNewProducts,
   });
 
   return client.discordPublicPriceReportSetting.update({
@@ -330,6 +336,7 @@ export async function updatePublicPriceReportFilters({
       productKeyword: filters.productKeyword,
       includePriceDrops: filters.includePriceDrops,
       includePriceRises: filters.includePriceRises,
+      includeNewProducts: filters.includeNewProducts,
       notificationCursorAt: now,
       updatedByDiscordUserId: discordUserId,
     },
@@ -376,22 +383,20 @@ export async function sendPublicPriceReportPreview({
   const report = await readRecentPriceReport(client, {
     since: new Date(now.getTime() - 24 * HOUR_MS),
     until: now,
-    filters: {
-      ...filters,
-      includeNewProducts: false,
-    },
+    filters,
   });
-  const messages = createPublicPriceChangeReportMessages(report.priceChanges, {
+  const messages = createPublicPriceReportMessages(report, {
     publicBaseUrl,
     maxItems,
     generatedAt: now,
   });
-  const listedCount = Math.min(report.priceChanges.length, maxItems);
+  const listedCount = Math.min(report.priceChanges.length + report.newProducts.length, maxItems);
 
   if (messages.length === 0) {
     return {
       status: "skipped",
       changeCount: 0,
+      newProductCount: 0,
       listedCount: 0,
       messageCount: 0,
     };
@@ -403,6 +408,7 @@ export async function sendPublicPriceReportPreview({
     return {
       status: "sent",
       changeCount: report.priceChanges.length,
+      newProductCount: report.newProducts.length,
       listedCount,
       messageCount: messages.length,
     };
@@ -412,6 +418,7 @@ export async function sendPublicPriceReportPreview({
     return {
       status: "rate_limited",
       changeCount: report.priceChanges.length,
+      newProductCount: report.newProducts.length,
       listedCount,
       messageCount: messages.length,
       sentMessageCount: result.sentMessageCount,
@@ -423,6 +430,7 @@ export async function sendPublicPriceReportPreview({
   return {
     status: "failed",
     changeCount: report.priceChanges.length,
+    newProductCount: report.newProducts.length,
     listedCount,
     messageCount: messages.length,
     sentMessageCount: result.sentMessageCount,
@@ -434,24 +442,36 @@ export async function sendPublicPriceReportPreview({
 export function toPublicPriceReportFilters(
   setting: Pick<
     PublicPriceReportSetting,
-    "categoryIgrps" | "productKeyword" | "includePriceDrops" | "includePriceRises"
+    | "categoryIgrps"
+    | "productKeyword"
+    | "includePriceDrops"
+    | "includePriceRises"
+    | "includeNewProducts"
   > | null,
 ): PriceReportFilters {
   if (!setting) {
     return DEFAULT_PUBLIC_PRICE_REPORT_FILTERS;
   }
 
-  return toPriceReportFilters({
+  return normalizePublicPriceReportFilters({
     categoryIgrps: setting.categoryIgrps,
     productKeyword: setting.productKeyword,
     includePriceDrops: setting.includePriceDrops,
     includePriceRises: setting.includePriceRises,
-    includeNewProducts: false,
-  } satisfies PriceReportFilterSetting);
+    includeNewProducts: setting.includeNewProducts,
+  });
 }
 
 function clampPublicPriceReportMaxItems(value: number): number {
   return Math.min(Math.max(value, 1), MAX_PRICE_REPORT_ITEMS);
+}
+
+function normalizePublicPriceReportFilters(filters: PriceReportFilters): PriceReportFilters {
+  if (!filters.includePriceDrops && !filters.includePriceRises && !filters.includeNewProducts) {
+    return DEFAULT_PUBLIC_PRICE_REPORT_FILTERS;
+  }
+
+  return normalizePriceReportFilters(filters);
 }
 
 async function sendPendingPublicPriceReportsForSetting({
@@ -563,13 +583,12 @@ async function sendPublicPriceReportForCrawlRun({
   ) => Promise<DiscordBotMessageSendResult>;
 }): Promise<PublicPriceReportStatus> {
   const readResult = await readCrawlRunPriceChangeSummary(client, crawlRunId);
-  const changes = filterPriceChangesForReport(
-    readResult.changes,
-    toPublicPriceReportFilters(setting),
-  );
+  const filters = toPublicPriceReportFilters(setting);
+  const changes = filterPriceChangesForReport(readResult.changes, filters);
+  const newProducts = filterNewProductsForReport(readResult.newProducts, filters);
   const channelId = setting.channelId;
 
-  if (changes.length === 0) {
+  if (changes.length === 0 && newProducts.length === 0) {
     await recordPublicPriceReportDelivery({
       client,
       crawlRunId,
@@ -578,19 +597,22 @@ async function sendPublicPriceReportForCrawlRun({
       itemCount: 0,
       messageCount: 0,
       deliveredAt: null,
-      errorMessage: "no_price_changes",
+      errorMessage: "no_report_items",
     });
 
     return "SKIPPED";
   }
 
-  const messages = createPublicPriceChangeReportMessages(changes, {
-    publicBaseUrl,
-    maxItems,
-    generatedAt: now,
-  });
+  const messages = createPublicPriceReportMessages(
+    { priceChanges: changes, newProducts },
+    {
+      publicBaseUrl,
+      maxItems,
+      generatedAt: now,
+    },
+  );
   const result = await sendChannelMessages(channelId, messages);
-  const itemCount = Math.min(changes.length, maxItems);
+  const itemCount = Math.min(changes.length + newProducts.length, maxItems);
 
   if (result.status === "sent") {
     await recordPublicPriceReportDelivery({

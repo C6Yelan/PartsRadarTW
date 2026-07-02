@@ -22,6 +22,7 @@ export type { ScheduledPriceReportSummary } from "./discord-bot/price-report";
 export {
   calculateScheduledPriceReportSleepMs,
   createPublicPriceChangeReportMessages,
+  createPublicPriceReportMessages,
   disablePriceReport,
   enableDailyPriceReport,
   formatPriceReportSettingMessage,

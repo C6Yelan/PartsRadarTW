@@ -3,6 +3,8 @@
 import type { Prisma } from "@partsradar/db";
 import {
   WATCH_ADD_CUSTOM_ID,
+  WATCH_BULK_REMOVE_CUSTOM_ID_PREFIX,
+  WATCH_BULK_REMOVE_SELECT_CUSTOM_ID_PREFIX,
   WATCH_EDIT_CUSTOM_ID_PREFIX,
   WATCH_PAGE_CUSTOM_ID_PREFIX,
   WATCH_REFRESH_CUSTOM_ID_PREFIX,
@@ -28,7 +30,7 @@ import {
   formatDiscordDeliveryFailureForUser,
   formatDiscordRateLimitForUser,
 } from "./rest";
-import type { DiscordBotClient, DiscordBotMessage } from "./types";
+import type { DiscordBotClient, DiscordBotMessage, DiscordButtonComponent } from "./types";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const WATCH_SELECT_VALUE_PREFIX = "watch:";
@@ -147,6 +149,11 @@ export type DisableTargetPriceWatchResult =
       status: "disabled";
       watch: TargetPriceWatchListRecord;
     };
+
+export interface DisableTargetPriceWatchesResult {
+  disabledCount: number;
+  unavailableCount: number;
+}
 
 export type TargetPriceWatchLookupResult =
   | {
@@ -357,6 +364,39 @@ export async function disableTargetPriceWatch({
     discordUserId,
     watch: result.watch,
   });
+}
+
+export async function disableTargetPriceWatches({
+  client,
+  discordUserId,
+  watchInputs,
+}: {
+  client: DiscordBotClient;
+  discordUserId: string;
+  watchInputs: string[];
+}): Promise<DisableTargetPriceWatchesResult> {
+  const uniqueWatchInputs = [...new Set(watchInputs)];
+  let disabledCount = 0;
+  let unavailableCount = 0;
+
+  for (const watchInput of uniqueWatchInputs) {
+    const result = await disableTargetPriceWatch({
+      client,
+      discordUserId,
+      watchInput,
+    });
+
+    if (result.status === "disabled") {
+      disabledCount += 1;
+    } else {
+      unavailableCount += 1;
+    }
+  }
+
+  return {
+    disabledCount,
+    unavailableCount,
+  };
 }
 
 export async function updateTargetPriceWatch({
@@ -624,40 +664,52 @@ export function createTargetPriceWatchManagerMessage({
     });
   }
 
+  const actionButtons: DiscordButtonComponent[] = [
+    {
+      type: DISCORD_COMPONENT_TYPE_BUTTON,
+      style: DISCORD_BUTTON_STYLE_PRIMARY,
+      custom_id: WATCH_ADD_CUSTOM_ID,
+      label: "新增追蹤",
+    },
+    {
+      type: DISCORD_COMPONENT_TYPE_BUTTON,
+      style: DISCORD_BUTTON_STYLE_SECONDARY,
+      custom_id: selectedWatch
+        ? `${WATCH_EDIT_CUSTOM_ID_PREFIX}${selectedWatch.id}:${selectedWatch.targetPrice}:${result.page}`
+        : `${WATCH_EDIT_CUSTOM_ID_PREFIX}none:0:${result.page}`,
+      label: "編輯目標價",
+      disabled: selectedWatch === null,
+    },
+    {
+      type: DISCORD_COMPONENT_TYPE_BUTTON,
+      style: DISCORD_BUTTON_STYLE_DANGER,
+      custom_id: selectedWatch
+        ? `${WATCH_REMOVE_CUSTOM_ID_PREFIX}${selectedWatch.id}:${result.page}`
+        : `${WATCH_REMOVE_CUSTOM_ID_PREFIX}none:${result.page}`,
+      label: "移除追蹤",
+      disabled: selectedWatch === null,
+    },
+  ];
+
+  if (result.watches.length > 0) {
+    actionButtons.push({
+      type: DISCORD_COMPONENT_TYPE_BUTTON,
+      style: DISCORD_BUTTON_STYLE_DANGER,
+      custom_id: `${WATCH_BULK_REMOVE_CUSTOM_ID_PREFIX}${result.page}`,
+      label: "批次移除",
+    });
+  }
+
+  actionButtons.push({
+    type: DISCORD_COMPONENT_TYPE_BUTTON,
+    style: DISCORD_BUTTON_STYLE_SECONDARY,
+    custom_id: `${WATCH_REFRESH_CUSTOM_ID_PREFIX}${result.page}`,
+    label: "重新整理",
+  });
+
   components.push({
     type: DISCORD_COMPONENT_TYPE_ACTION_ROW,
-    components: [
-      {
-        type: DISCORD_COMPONENT_TYPE_BUTTON,
-        style: DISCORD_BUTTON_STYLE_PRIMARY,
-        custom_id: WATCH_ADD_CUSTOM_ID,
-        label: "新增追蹤",
-      },
-      {
-        type: DISCORD_COMPONENT_TYPE_BUTTON,
-        style: DISCORD_BUTTON_STYLE_SECONDARY,
-        custom_id: selectedWatch
-          ? `${WATCH_EDIT_CUSTOM_ID_PREFIX}${selectedWatch.id}:${selectedWatch.targetPrice}:${result.page}`
-          : `${WATCH_EDIT_CUSTOM_ID_PREFIX}none:0:${result.page}`,
-        label: "編輯目標價",
-        disabled: selectedWatch === null,
-      },
-      {
-        type: DISCORD_COMPONENT_TYPE_BUTTON,
-        style: DISCORD_BUTTON_STYLE_DANGER,
-        custom_id: selectedWatch
-          ? `${WATCH_REMOVE_CUSTOM_ID_PREFIX}${selectedWatch.id}:${result.page}`
-          : `${WATCH_REMOVE_CUSTOM_ID_PREFIX}none:${result.page}`,
-        label: "移除追蹤",
-        disabled: selectedWatch === null,
-      },
-      {
-        type: DISCORD_COMPONENT_TYPE_BUTTON,
-        style: DISCORD_BUTTON_STYLE_SECONDARY,
-        custom_id: `${WATCH_REFRESH_CUSTOM_ID_PREFIX}${result.page}`,
-        label: "重新整理",
-      },
-    ],
+    components: actionButtons,
   });
 
   if (result.hasPreviousPage || result.hasNextPage) {
@@ -697,6 +749,78 @@ export function createTargetPriceWatchManagerMessage({
       },
     ],
     components,
+  };
+}
+
+export function createTargetPriceWatchBulkRemovalMessage({
+  result,
+  page,
+}: {
+  result: TargetPriceWatchlistResult;
+  page: number;
+}): DiscordBotMessage {
+  if (result.watches.length === 0) {
+    return {
+      embeds: [
+        {
+          title: "批次移除目標價追蹤",
+          description: "目前沒有可移除的追蹤商品。",
+          color: DISCORD_EMBED_COLOR,
+        },
+      ],
+      components: [
+        {
+          type: DISCORD_COMPONENT_TYPE_ACTION_ROW,
+          components: [
+            {
+              type: DISCORD_COMPONENT_TYPE_BUTTON,
+              style: DISCORD_BUTTON_STYLE_SECONDARY,
+              custom_id: `${WATCH_REFRESH_CUSTOM_ID_PREFIX}${page}`,
+              label: "返回設定",
+            },
+          ],
+        },
+      ],
+    };
+  }
+
+  return {
+    embeds: [
+      {
+        title: "批次移除目標價追蹤",
+        description: "從下方清單選擇要移除的商品。送出選擇後，這些商品會從你的追蹤清單移除。",
+        color: DISCORD_EMBED_COLOR,
+        footer: {
+          text: `第 ${result.page + 1} 頁，每頁最多 ${WATCH_MANAGER_PAGE_SIZE} 筆`,
+        },
+      },
+    ],
+    components: [
+      {
+        type: DISCORD_COMPONENT_TYPE_ACTION_ROW,
+        components: [
+          {
+            type: DISCORD_COMPONENT_TYPE_STRING_SELECT,
+            custom_id: `${WATCH_BULK_REMOVE_SELECT_CUSTOM_ID_PREFIX}${result.page}`,
+            placeholder: "選擇要批次移除的商品",
+            min_values: 1,
+            max_values: result.watches.length,
+            options: result.watches.map((watch) => formatWatchSelectOption(watch, false)),
+          },
+        ],
+      },
+      {
+        type: DISCORD_COMPONENT_TYPE_ACTION_ROW,
+        components: [
+          {
+            type: DISCORD_COMPONENT_TYPE_BUTTON,
+            style: DISCORD_BUTTON_STYLE_SECONDARY,
+            custom_id: `${WATCH_REFRESH_CUSTOM_ID_PREFIX}${page}`,
+            label: "返回設定",
+          },
+        ],
+      },
+    ],
   };
 }
 

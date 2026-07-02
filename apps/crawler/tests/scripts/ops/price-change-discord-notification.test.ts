@@ -132,6 +132,23 @@ describe("readCrawlRunPriceChangeSummary", () => {
 
     await expect(readCrawlRunPriceChangeSummary(client, "target-run")).resolves.toEqual({
       changes: [],
+      newProducts: [
+        {
+          productId: "product-1",
+          productName: "First Seen RAM",
+          category: {
+            igrp: 12,
+            displayName: "顯示卡",
+          },
+          subcategory: {
+            slug: "asus",
+            displayName: "華碩",
+          },
+          currentPrice: 1990,
+          currency: "TWD",
+          firstSeenAt: new Date("2026-06-07T02:00:00.000Z"),
+        },
+      ],
       snapshotCount: 1,
       unmatchedSnapshotCount: 1,
       unchangedSnapshotCount: 0,

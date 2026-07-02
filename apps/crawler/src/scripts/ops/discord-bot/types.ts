@@ -343,6 +343,7 @@ export type ParsedPublicReportComponent =
       name: "update_events";
       includePriceDrops: boolean;
       includePriceRises: boolean;
+      includeNewProducts: boolean;
     }
   | {
       name: "open_keyword_modal";
@@ -405,6 +406,8 @@ export type ParsedWatchComponent =
   | { action: "add" }
   | { action: "select"; watchInput: string | null; page: number }
   | { action: "edit"; watchInput: string | null; targetPrice: number | null; page: number }
+  | { action: "bulk_remove"; page: number }
+  | { action: "bulk_remove_select"; watchInputs: string[]; page: number }
   | {
       action: "remove" | "confirm_remove" | "cancel_remove";
       watchInput: string | null;

@@ -40,7 +40,6 @@ import {
   formatPriceReportKeywordFilterLabel,
   formatTaipeiMinute,
   formatWindowLabel,
-  type PriceReportFilters,
   type PriceReportCategoryOption,
   type PriceReportDeliveryStatus,
   readLatestScheduledPriceReportDelivery,
@@ -87,10 +86,12 @@ import type {
 } from "./types";
 import {
   createTargetPriceWatch,
+  createTargetPriceWatchBulkRemovalMessage,
   createTargetPriceWatchManagerMessage,
   createTargetPriceWatchRemovalConfirmationMessage,
   createTargetPriceWatchResponseMessage,
   disableTargetPriceWatch,
+  disableTargetPriceWatches,
   readLatestTargetPriceWatchDelivery,
   readTargetPriceWatch,
   readTargetPriceWatchlist,
@@ -527,6 +528,10 @@ async function handleMessageComponentInteraction({
           publicReportComponent.name === "update_events"
             ? publicReportComponent.includePriceRises
             : currentFilters.includePriceRises,
+        includeNewProducts:
+          publicReportComponent.name === "update_events"
+            ? publicReportComponent.includeNewProducts
+            : currentFilters.includeNewProducts,
       });
       notice = "已更新公開價格報告設定。";
     }
@@ -700,6 +705,60 @@ async function handleMessageComponentInteraction({
             disabled.status === "disabled"
               ? "已移除目標價追蹤。"
               : "追蹤已不存在，清單已重新整理。",
+        }),
+      });
+      return;
+    }
+
+    if (watchComponent.action === "bulk_remove") {
+      const result = await readWatchManagerPage({
+        client,
+        discordUserId,
+        page: watchComponent.page,
+      });
+
+      await editDeferredInteractionResponse({
+        token: options.token,
+        applicationId: options.applicationId,
+        apiBaseUrl: options.apiBaseUrl,
+        interaction,
+        fetchImpl,
+        message: createTargetPriceWatchBulkRemovalMessage({
+          result,
+          page: watchComponent.page,
+        }),
+      });
+      return;
+    }
+
+    if (watchComponent.action === "bulk_remove_select") {
+      const disabled = await disableTargetPriceWatches({
+        client,
+        discordUserId,
+        watchInputs: watchComponent.watchInputs,
+      });
+      const result = await readWatchManagerPage({
+        client,
+        discordUserId,
+        page: watchComponent.page,
+      });
+      const notice =
+        disabled.disabledCount > 0
+          ? `已批次移除 ${disabled.disabledCount} 項目標價追蹤。`
+          : "選取的追蹤已不存在，清單已重新整理。";
+
+      await editDeferredInteractionResponse({
+        token: options.token,
+        applicationId: options.applicationId,
+        apiBaseUrl: options.apiBaseUrl,
+        interaction,
+        fetchImpl,
+        message: await createTargetPriceWatchManagerMessageWithDelivery({
+          client,
+          discordUserId,
+          result,
+          publicBaseUrl: options.publicBaseUrl,
+          notice,
         }),
       });
       return;
@@ -1042,6 +1101,7 @@ async function handleModalSubmitInteraction({
       categoryIgrps: currentFilters.categoryIgrps,
       includePriceDrops: currentFilters.includePriceDrops,
       includePriceRises: currentFilters.includePriceRises,
+      includeNewProducts: currentFilters.includeNewProducts,
       productKeyword:
         publicReportModal.name === "keyword"
           ? publicReportModal.productKeyword
@@ -1486,6 +1546,7 @@ function createPublicPriceReportSettingsPanelMessage({
       categoryIgrps: filters.categoryIgrps,
       includePriceDrops: filters.includePriceDrops,
       includePriceRises: filters.includePriceRises,
+      includeNewProducts: filters.includeNewProducts,
     }),
   };
 }
@@ -1512,7 +1573,8 @@ function createPublicPriceReportSettingsEmbed({
   currentChannelId,
   notice,
   title = "公開價格報告設定",
-  description: baseDescription = "公開價格報告會在排程爬蟲完成且有價格變動時，自動發送到指定頻道。",
+  description:
+    baseDescription = "公開價格報告會在排程爬蟲完成且有符合設定的價格變動或新增商品時，自動發送到指定頻道。",
 }: Awaited<ReturnType<typeof readPublicPriceReportSettingsPanel>> & {
   title?: string;
   description?: string;
@@ -1549,7 +1611,7 @@ function createPublicPriceReportSettingsEmbed({
       },
       {
         name: "內容",
-        value: formatPublicReportEventFilterLabel(filters),
+        value: formatPriceReportEventFilterLabel(filters),
         inline: true,
       },
       {
@@ -1570,13 +1632,6 @@ function createPublicPriceReportSettingsEmbed({
   };
 }
 
-function formatPublicReportEventFilterLabel(filters: PriceReportFilters): string {
-  return formatPriceReportEventFilterLabel({
-    ...filters,
-    includeNewProducts: false,
-  });
-}
-
 function formatPublicReportDeliveryStatus(
   delivery: PublicPriceReportDeliveryStatus | null,
 ): string {
@@ -1591,7 +1646,7 @@ function formatPublicReportDeliveryStatus(
   }
 
   if (delivery.status === "SKIPPED") {
-    return `略過：${deliveredAt}，本輪沒有價格變動。`;
+    return `略過：${deliveredAt}，本輪沒有符合設定的公開報告內容。`;
   }
 
   if (delivery.status === "RATE_LIMITED") {
@@ -1614,7 +1669,7 @@ function formatPublicReportPreviewNotice(
   }
 
   if (result.status === "skipped") {
-    return "過去 24 小時沒有價格變動，未發送測試報告。";
+    return "過去 24 小時沒有符合設定的公開報告內容，未發送測試報告。";
   }
 
   if (result.status === "rate_limited") {

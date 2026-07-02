@@ -77,6 +77,7 @@ export interface PreviousPriceSnapshot {
 
 export interface CrawlRunPriceChangeReadResult {
   changes: PriceChangeDiscordNotificationItem[];
+  newProducts: PriceReportNewProductItem[];
   snapshotCount: number;
   unmatchedSnapshotCount: number;
   unchangedSnapshotCount: number;

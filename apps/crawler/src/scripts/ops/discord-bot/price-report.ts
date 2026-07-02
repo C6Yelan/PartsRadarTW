@@ -120,28 +120,83 @@ export function createPublicPriceChangeReportMessages(
     generatedAt: Date;
   },
 ): DiscordBotMessage[] {
-  if (priceChanges.length === 0) {
+  return createPublicPriceReportMessages(
+    {
+      priceChanges,
+      newProducts: [],
+    },
+    options,
+  );
+}
+
+export function createPublicPriceReportMessages(
+  report: Pick<RecentPriceReport, "priceChanges" | "newProducts">,
+  options: {
+    publicBaseUrl: string;
+    maxItems: number;
+    generatedAt: Date;
+  },
+): DiscordBotMessage[] {
+  if (report.priceChanges.length === 0 && report.newProducts.length === 0) {
     return [];
   }
 
   const boundedMaxItems = clampPriceReportMaxItems(options.maxItems);
-  const listedPriceChanges = priceChanges.slice(0, boundedMaxItems);
-  const hiddenPriceChangeCount = priceChanges.length - listedPriceChanges.length;
-  const embeds = createReportSectionEmbeds({
-    title: "PartsRadarTW 公開價格報告 - 價格變動",
-    lines: [
-      `本輪更新：${formatPriceChangeSummary(countPriceChangeMovements(priceChanges))}`,
-      "",
-      ...formatPriceChangeSectionLines(
-        createPriceChangeMovementGroups(listedPriceChanges, options.publicBaseUrl),
-      ),
-    ],
-    footer: formatHiddenReportFooter({
-      hiddenPriceChangeCount,
-      hiddenNewProductCount: 0,
-    }),
-    timestamp: options.generatedAt.toISOString(),
-  });
+  const listedPriceChanges = report.priceChanges.slice(0, boundedMaxItems);
+  const remainingItemLimit = Math.max(0, boundedMaxItems - listedPriceChanges.length);
+  const listedNewProducts = report.newProducts.slice(0, remainingItemLimit);
+  const hiddenPriceChangeCount = report.priceChanges.length - listedPriceChanges.length;
+  const hiddenNewProductCount = report.newProducts.length - listedNewProducts.length;
+  const timestamp = options.generatedAt.toISOString();
+  const embeds: DiscordBotEmbed[] = [];
+
+  if (report.priceChanges.length > 0) {
+    embeds.push(
+      ...createReportSectionEmbeds({
+        title: "PartsRadarTW 公開價格報告 - 價格變動",
+        lines: [
+          `本輪更新：${formatPriceChangeSummary(countPriceChangeMovements(report.priceChanges))}`,
+          "",
+          ...formatPriceChangeSectionLines(
+            createPriceChangeMovementGroups(listedPriceChanges, options.publicBaseUrl),
+          ),
+        ],
+        footer: formatHiddenReportFooter({
+          hiddenPriceChangeCount,
+          hiddenNewProductCount: 0,
+        }),
+        timestamp,
+      }),
+    );
+  }
+
+  if (report.newProducts.length > 0) {
+    embeds.push(
+      ...createReportSectionEmbeds({
+        title: "PartsRadarTW 公開價格報告 - 新增商品",
+        lines: [
+          `本輪更新：**${report.newProducts.length} 個新增商品**`,
+          "",
+          ...formatNewProductSectionLines(
+            formatGroupedReportLines(
+              listedNewProducts.map((product) => ({
+                category: product.category,
+                subcategory: product.subcategory,
+                line: formatNewProductEmbedLine(product, options.publicBaseUrl),
+              })),
+            ),
+            listedNewProducts.length,
+            report.newProducts.length,
+          ),
+        ],
+        footer: formatHiddenReportFooter({
+          hiddenPriceChangeCount: 0,
+          hiddenNewProductCount,
+        }),
+        timestamp,
+      }),
+    );
+  }
 
   return createReportMessages(embeds);
 }
@@ -168,6 +223,27 @@ export function filterPriceChangesForReport(
     }
 
     return matchesProductKeywordGroups(change.productName, keywordGroups);
+  });
+}
+
+export function filterNewProductsForReport(
+  newProducts: PriceReportNewProductItem[],
+  filters: PriceReportFilters,
+): PriceReportNewProductItem[] {
+  const normalizedFilters = normalizePriceReportFilters(filters);
+  const categoryIgrps = new Set(normalizedFilters.categoryIgrps);
+  const keywordGroups = parseProductKeywordGroups(normalizedFilters.productKeyword);
+
+  if (!normalizedFilters.includeNewProducts) {
+    return [];
+  }
+
+  return newProducts.filter((product) => {
+    if (categoryIgrps.size > 0 && !categoryIgrps.has(product.category.igrp)) {
+      return false;
+    }
+
+    return matchesProductKeywordGroups(product.productName, keywordGroups);
   });
 }
 
