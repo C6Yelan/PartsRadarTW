@@ -1,17 +1,22 @@
 // apps/crawler/src/scripts/ops/discord-bot/watch.ts
 
+import { randomUUID } from "node:crypto";
 import type { Prisma } from "@partsradar/db";
 import {
   WATCH_ADD_CUSTOM_ID,
+  WATCH_BULK_REMOVE_CANCEL_CUSTOM_ID_PREFIX,
+  WATCH_BULK_REMOVE_CONFIRM_CUSTOM_ID_PREFIX,
   WATCH_BULK_REMOVE_CUSTOM_ID_PREFIX,
   WATCH_BULK_REMOVE_SELECT_CUSTOM_ID_PREFIX,
   WATCH_EDIT_CUSTOM_ID_PREFIX,
+  WATCH_FILTER_CUSTOM_ID_PREFIX,
   WATCH_PAGE_CUSTOM_ID_PREFIX,
   WATCH_REFRESH_CUSTOM_ID_PREFIX,
   WATCH_REMOVE_CANCEL_CUSTOM_ID_PREFIX,
   WATCH_REMOVE_CONFIRM_CUSTOM_ID_PREFIX,
   WATCH_REMOVE_CUSTOM_ID_PREFIX,
   WATCH_SELECT_CUSTOM_ID_PREFIX,
+  WATCH_SORT_CUSTOM_ID_PREFIX,
 } from "./commands";
 import {
   DISCORD_BUTTON_STYLE_DANGER,
@@ -30,13 +35,20 @@ import {
   formatDiscordDeliveryFailureForUser,
   formatDiscordRateLimitForUser,
 } from "./rest";
-import type { DiscordBotClient, DiscordBotMessage, DiscordButtonComponent } from "./types";
+import type {
+  DiscordBotClient,
+  DiscordBotMessage,
+  DiscordButtonComponent,
+  TargetPriceWatchSortKey,
+  TargetPriceWatchStatusFilter,
+} from "./types";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const WATCH_SELECT_VALUE_PREFIX = "watch:";
 const WATCH_MANAGER_PAGE_SIZE = 25;
 const WATCH_SELECT_LABEL_MAX_LENGTH = 100;
 const WATCH_SELECT_DESCRIPTION_MAX_LENGTH = 100;
+const WATCH_BULK_REMOVAL_CONFIRMATION_TTL_MS = 5 * 60 * 1000;
 const WATCH_MANAGER_GUIDE =
   "追蹤商品目標價，並與目前價格比較。\n\n" +
   "**使用方式**\n" +
@@ -134,9 +146,36 @@ export type CreateTargetPriceWatchResult =
 export interface TargetPriceWatchlistResult {
   watches: TargetPriceWatchListRecord[];
   page: number;
+  statusFilter: TargetPriceWatchStatusFilter;
+  sortKey: TargetPriceWatchSortKey;
+  totalCount: number;
+  filteredCount: number;
   hasPreviousPage: boolean;
   hasNextPage: boolean;
 }
+
+interface TargetPriceWatchBulkRemovalConfirmation {
+  discordUserId: string;
+  watchInputs: string[];
+  page: number;
+  statusFilter: TargetPriceWatchStatusFilter;
+  sortKey: TargetPriceWatchSortKey;
+  expiresAt: number;
+}
+
+export type TargetPriceWatchBulkRemovalConfirmationResult =
+  | {
+      status: "found";
+      watchInputs: string[];
+      page: number;
+      statusFilter: TargetPriceWatchStatusFilter;
+      sortKey: TargetPriceWatchSortKey;
+    }
+  | {
+      status: "not_found" | "expired" | "wrong_user";
+    };
+
+const WATCH_BULK_REMOVAL_CONFIRMATIONS = new Map<string, TargetPriceWatchBulkRemovalConfirmation>();
 
 export type DisableTargetPriceWatchResult =
   | {
@@ -314,30 +353,161 @@ export async function readTargetPriceWatchlist({
   client,
   discordUserId,
   page = 0,
+  statusFilter = "all",
+  sortKey = "recent",
 }: {
   client: DiscordBotClient;
   discordUserId: string;
   page?: number;
+  statusFilter?: TargetPriceWatchStatusFilter;
+  sortKey?: TargetPriceWatchSortKey;
 }): Promise<TargetPriceWatchlistResult> {
   const boundedPage = Number.isSafeInteger(page) && page > 0 ? page : 0;
+  const normalizedStatusFilter = normalizeWatchStatusFilter(statusFilter);
+  const normalizedSortKey = normalizeWatchSortKey(sortKey);
   const watches = await client.discordTargetPriceWatch.findMany({
     where: {
       discordUserId,
       enabled: true,
     },
     orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
-    skip: boundedPage * WATCH_MANAGER_PAGE_SIZE,
-    take: WATCH_MANAGER_PAGE_SIZE + 1,
+    take: MAX_TARGET_PRICE_WATCHES_PER_USER + 1,
     select: TARGET_PRICE_WATCH_LIST_SELECT,
   });
-  const listedWatches = watches.slice(0, WATCH_MANAGER_PAGE_SIZE);
+  const filteredWatches = watches.filter((watch) =>
+    matchesWatchStatusFilter(watch, normalizedStatusFilter),
+  );
+  const sortedWatches = sortTargetPriceWatches(filteredWatches, normalizedSortKey);
+  const pageStart = boundedPage * WATCH_MANAGER_PAGE_SIZE;
+  const listedWatches = sortedWatches.slice(pageStart, pageStart + WATCH_MANAGER_PAGE_SIZE);
 
   return {
     watches: listedWatches,
     page: boundedPage,
+    statusFilter: normalizedStatusFilter,
+    sortKey: normalizedSortKey,
+    totalCount: watches.length,
+    filteredCount: filteredWatches.length,
     hasPreviousPage: boundedPage > 0,
-    hasNextPage: watches.length > WATCH_MANAGER_PAGE_SIZE,
+    hasNextPage: sortedWatches.length > pageStart + WATCH_MANAGER_PAGE_SIZE,
   };
+}
+
+function normalizeWatchStatusFilter(
+  statusFilter: TargetPriceWatchStatusFilter,
+): TargetPriceWatchStatusFilter {
+  return statusFilter === "reached" || statusFilter === "unreached" ? statusFilter : "all";
+}
+
+function normalizeWatchSortKey(sortKey: TargetPriceWatchSortKey): TargetPriceWatchSortKey {
+  return sortKey === "target" || sortKey === "current" ? sortKey : "recent";
+}
+
+function matchesWatchStatusFilter(
+  watch: TargetPriceWatchListRecord,
+  statusFilter: TargetPriceWatchStatusFilter,
+): boolean {
+  if (statusFilter === "all") {
+    return true;
+  }
+
+  const reached = isWatchTargetReached(watch);
+
+  return statusFilter === "reached" ? reached : !reached;
+}
+
+function sortTargetPriceWatches(
+  watches: TargetPriceWatchListRecord[],
+  sortKey: TargetPriceWatchSortKey,
+): TargetPriceWatchListRecord[] {
+  const sortedWatches = [...watches];
+
+  if (sortKey === "target") {
+    return sortedWatches.sort(
+      (left, right) =>
+        left.targetPrice - right.targetPrice ||
+        right.updatedAt.getTime() - left.updatedAt.getTime() ||
+        left.id.localeCompare(right.id),
+    );
+  }
+
+  if (sortKey === "current") {
+    return sortedWatches.sort((left, right) => {
+      const leftPrice = getWatchCurrentPrice(left);
+      const rightPrice = getWatchCurrentPrice(right);
+
+      if (leftPrice === null && rightPrice === null) {
+        return left.id.localeCompare(right.id);
+      }
+
+      if (leftPrice === null) {
+        return 1;
+      }
+
+      if (rightPrice === null) {
+        return -1;
+      }
+
+      return leftPrice - rightPrice || left.id.localeCompare(right.id);
+    });
+  }
+
+  return sortedWatches.sort(
+    (left, right) =>
+      right.updatedAt.getTime() - left.updatedAt.getTime() || left.id.localeCompare(right.id),
+  );
+}
+
+function isWatchTargetReached(watch: TargetPriceWatchListRecord): boolean {
+  const currentPrice = getWatchCurrentPrice(watch);
+
+  return currentPrice !== null && currentPrice <= watch.targetPrice;
+}
+
+function getWatchCurrentPrice(watch: TargetPriceWatchListRecord): number | null {
+  return watch.product.currentPrice?.priceSnapshot.price ?? null;
+}
+
+function formatWatchListState({
+  page,
+  statusFilter,
+  sortKey,
+}: {
+  page: number;
+  statusFilter: TargetPriceWatchStatusFilter;
+  sortKey: TargetPriceWatchSortKey;
+}): string {
+  return `${page}:${statusFilter}:${sortKey}`;
+}
+
+function formatWatchListDisplayState(result: TargetPriceWatchlistResult): string {
+  return `顯示：${formatWatchStatusFilterLabel(result.statusFilter)}；排序：${formatWatchSortLabel(
+    result.sortKey,
+  )}；符合 ${result.filteredCount}/${result.totalCount} 項`;
+}
+
+function formatWatchStatusFilterLabel(statusFilter: TargetPriceWatchStatusFilter): string {
+  if (statusFilter === "reached") {
+    return "已達標";
+  }
+
+  if (statusFilter === "unreached") {
+    return "未達標";
+  }
+
+  return "全部";
+}
+
+function formatWatchSortLabel(sortKey: TargetPriceWatchSortKey): string {
+  if (sortKey === "target") {
+    return "目標價低到高";
+  }
+
+  if (sortKey === "current") {
+    return "目前價格低到高";
+  }
+
+  return "最近更新";
 }
 
 export async function disableTargetPriceWatch({
@@ -397,6 +567,87 @@ export async function disableTargetPriceWatches({
     disabledCount,
     unavailableCount,
   };
+}
+
+export function createTargetPriceWatchBulkRemovalConfirmation({
+  discordUserId,
+  watchInputs,
+  page,
+  statusFilter,
+  sortKey,
+  now = new Date(),
+}: {
+  discordUserId: string;
+  watchInputs: string[];
+  page: number;
+  statusFilter: TargetPriceWatchStatusFilter;
+  sortKey: TargetPriceWatchSortKey;
+  now?: Date;
+}): string {
+  pruneExpiredBulkRemovalConfirmations(now);
+
+  const token = randomUUID();
+  WATCH_BULK_REMOVAL_CONFIRMATIONS.set(token, {
+    discordUserId,
+    watchInputs: [...new Set(watchInputs)],
+    page,
+    statusFilter,
+    sortKey,
+    expiresAt: now.getTime() + WATCH_BULK_REMOVAL_CONFIRMATION_TTL_MS,
+  });
+
+  return token;
+}
+
+export function consumeTargetPriceWatchBulkRemovalConfirmation({
+  token,
+  discordUserId,
+  now = new Date(),
+}: {
+  token: string | null;
+  discordUserId: string;
+  now?: Date;
+}): TargetPriceWatchBulkRemovalConfirmationResult {
+  pruneExpiredBulkRemovalConfirmations(now);
+
+  if (!token) {
+    return { status: "not_found" };
+  }
+
+  const confirmation = WATCH_BULK_REMOVAL_CONFIRMATIONS.get(token);
+
+  if (!confirmation) {
+    return { status: "not_found" };
+  }
+
+  if (confirmation.expiresAt <= now.getTime()) {
+    WATCH_BULK_REMOVAL_CONFIRMATIONS.delete(token);
+    return { status: "expired" };
+  }
+
+  if (confirmation.discordUserId !== discordUserId) {
+    return { status: "wrong_user" };
+  }
+
+  WATCH_BULK_REMOVAL_CONFIRMATIONS.delete(token);
+
+  return {
+    status: "found",
+    watchInputs: confirmation.watchInputs,
+    page: confirmation.page,
+    statusFilter: confirmation.statusFilter,
+    sortKey: confirmation.sortKey,
+  };
+}
+
+function pruneExpiredBulkRemovalConfirmations(now: Date): void {
+  const nowMs = now.getTime();
+
+  for (const [token, confirmation] of WATCH_BULK_REMOVAL_CONFIRMATIONS) {
+    if (confirmation.expiresAt <= nowMs) {
+      WATCH_BULK_REMOVAL_CONFIRMATIONS.delete(token);
+    }
+  }
 }
 
 export async function updateTargetPriceWatch({
@@ -634,14 +885,22 @@ export function createTargetPriceWatchManagerMessage({
 }): DiscordBotMessage {
   const selectedWatchId = normalizeWatchId(selectedWatchInput);
   const selectedWatch = result.watches.find((watch) => watch.id === selectedWatchId) ?? null;
+  const state = formatWatchListState(result);
   const managerState = selectedWatch
     ? `**目前選取的商品**\n[${escapeMarkdownLinkText(
         formatDiscordBotText(selectedWatch.product.name, PRODUCT_NAME_MAX_LENGTH),
       )}](${createProductUrl(publicBaseUrl, selectedWatch.product.id)})\n\n可編輯目標價或移除追蹤。`
-    : result.watches.length > 0
+    : result.filteredCount > 0
       ? "**你的追蹤清單**\n從選單選商品查看或管理。"
-      : "**你的追蹤清單**\n尚未追蹤商品，請按「新增追蹤」。";
-  const description = [notice ? `**${notice}**` : null, WATCH_MANAGER_GUIDE, managerState]
+      : result.totalCount > 0
+        ? "**你的追蹤清單**\n目前篩選沒有符合商品，可調整篩選條件。"
+        : "**你的追蹤清單**\n尚未追蹤商品，請按「新增追蹤」。";
+  const description = [
+    notice ? `**${notice}**` : null,
+    WATCH_MANAGER_GUIDE,
+    result.totalCount > 0 ? formatWatchListDisplayState(result) : null,
+    managerState,
+  ]
     .filter((section): section is string => section !== null)
     .join("\n\n");
   const components: NonNullable<DiscordBotMessage["components"]> = [];
@@ -652,13 +911,80 @@ export function createTargetPriceWatchManagerMessage({
       components: [
         {
           type: DISCORD_COMPONENT_TYPE_STRING_SELECT,
-          custom_id: `${WATCH_SELECT_CUSTOM_ID_PREFIX}${result.page}`,
+          custom_id: `${WATCH_SELECT_CUSTOM_ID_PREFIX}${state}`,
           placeholder: "選擇要管理的商品",
           min_values: 1,
           max_values: 1,
           options: result.watches.map((watch) =>
             formatWatchSelectOption(watch, watch.id === selectedWatch?.id),
           ),
+        },
+      ],
+    });
+  }
+
+  if (result.totalCount > 0) {
+    components.push({
+      type: DISCORD_COMPONENT_TYPE_ACTION_ROW,
+      components: [
+        {
+          type: DISCORD_COMPONENT_TYPE_STRING_SELECT,
+          custom_id: `${WATCH_FILTER_CUSTOM_ID_PREFIX}${state}`,
+          placeholder: "篩選追蹤狀態",
+          min_values: 1,
+          max_values: 1,
+          options: [
+            {
+              label: "全部",
+              value: "all",
+              description: "顯示所有目標價追蹤",
+              default: result.statusFilter === "all" || undefined,
+            },
+            {
+              label: "已達標",
+              value: "reached",
+              description: "目前價格低於或等於目標價",
+              default: result.statusFilter === "reached" || undefined,
+            },
+            {
+              label: "未達標",
+              value: "unreached",
+              description: "尚未達標或目前價格未知",
+              default: result.statusFilter === "unreached" || undefined,
+            },
+          ],
+        },
+      ],
+    });
+    components.push({
+      type: DISCORD_COMPONENT_TYPE_ACTION_ROW,
+      components: [
+        {
+          type: DISCORD_COMPONENT_TYPE_STRING_SELECT,
+          custom_id: `${WATCH_SORT_CUSTOM_ID_PREFIX}${state}`,
+          placeholder: "調整排序",
+          min_values: 1,
+          max_values: 1,
+          options: [
+            {
+              label: "最近更新",
+              value: "recent",
+              description: "最近修改的追蹤排在前面",
+              default: result.sortKey === "recent" || undefined,
+            },
+            {
+              label: "目標價低到高",
+              value: "target",
+              description: "依設定的目標價格排序",
+              default: result.sortKey === "target" || undefined,
+            },
+            {
+              label: "目前價格低到高",
+              value: "current",
+              description: "目前價格未知會排在最後",
+              default: result.sortKey === "current" || undefined,
+            },
+          ],
         },
       ],
     });
@@ -675,8 +1001,8 @@ export function createTargetPriceWatchManagerMessage({
       type: DISCORD_COMPONENT_TYPE_BUTTON,
       style: DISCORD_BUTTON_STYLE_SECONDARY,
       custom_id: selectedWatch
-        ? `${WATCH_EDIT_CUSTOM_ID_PREFIX}${selectedWatch.id}:${selectedWatch.targetPrice}:${result.page}`
-        : `${WATCH_EDIT_CUSTOM_ID_PREFIX}none:0:${result.page}`,
+        ? `${WATCH_EDIT_CUSTOM_ID_PREFIX}${selectedWatch.id}:${selectedWatch.targetPrice}:${state}`
+        : `${WATCH_EDIT_CUSTOM_ID_PREFIX}none:0:${state}`,
       label: "編輯目標價",
       disabled: selectedWatch === null,
     },
@@ -684,8 +1010,8 @@ export function createTargetPriceWatchManagerMessage({
       type: DISCORD_COMPONENT_TYPE_BUTTON,
       style: DISCORD_BUTTON_STYLE_DANGER,
       custom_id: selectedWatch
-        ? `${WATCH_REMOVE_CUSTOM_ID_PREFIX}${selectedWatch.id}:${result.page}`
-        : `${WATCH_REMOVE_CUSTOM_ID_PREFIX}none:${result.page}`,
+        ? `${WATCH_REMOVE_CUSTOM_ID_PREFIX}${selectedWatch.id}:${state}`
+        : `${WATCH_REMOVE_CUSTOM_ID_PREFIX}none:${state}`,
       label: "移除追蹤",
       disabled: selectedWatch === null,
     },
@@ -695,7 +1021,7 @@ export function createTargetPriceWatchManagerMessage({
     actionButtons.push({
       type: DISCORD_COMPONENT_TYPE_BUTTON,
       style: DISCORD_BUTTON_STYLE_DANGER,
-      custom_id: `${WATCH_BULK_REMOVE_CUSTOM_ID_PREFIX}${result.page}`,
+      custom_id: `${WATCH_BULK_REMOVE_CUSTOM_ID_PREFIX}${state}`,
       label: "批次移除",
     });
   }
@@ -703,7 +1029,7 @@ export function createTargetPriceWatchManagerMessage({
   actionButtons.push({
     type: DISCORD_COMPONENT_TYPE_BUTTON,
     style: DISCORD_BUTTON_STYLE_SECONDARY,
-    custom_id: `${WATCH_REFRESH_CUSTOM_ID_PREFIX}${result.page}`,
+    custom_id: `${WATCH_REFRESH_CUSTOM_ID_PREFIX}${state}`,
     label: "重新整理",
   });
 
@@ -719,14 +1045,22 @@ export function createTargetPriceWatchManagerMessage({
         {
           type: DISCORD_COMPONENT_TYPE_BUTTON,
           style: DISCORD_BUTTON_STYLE_SECONDARY,
-          custom_id: `${WATCH_PAGE_CUSTOM_ID_PREFIX}${Math.max(0, result.page - 1)}`,
+          custom_id: `${WATCH_PAGE_CUSTOM_ID_PREFIX}${formatWatchListState({
+            page: Math.max(0, result.page - 1),
+            statusFilter: result.statusFilter,
+            sortKey: result.sortKey,
+          })}`,
           label: "上一頁",
           disabled: !result.hasPreviousPage,
         },
         {
           type: DISCORD_COMPONENT_TYPE_BUTTON,
           style: DISCORD_BUTTON_STYLE_SECONDARY,
-          custom_id: `${WATCH_PAGE_CUSTOM_ID_PREFIX}${result.page + 1}`,
+          custom_id: `${WATCH_PAGE_CUSTOM_ID_PREFIX}${formatWatchListState({
+            page: result.page + 1,
+            statusFilter: result.statusFilter,
+            sortKey: result.sortKey,
+          })}`,
           label: "下一頁",
           disabled: !result.hasNextPage,
         },
@@ -759,6 +1093,12 @@ export function createTargetPriceWatchBulkRemovalMessage({
   result: TargetPriceWatchlistResult;
   page: number;
 }): DiscordBotMessage {
+  const state = formatWatchListState({
+    page,
+    statusFilter: result.statusFilter,
+    sortKey: result.sortKey,
+  });
+
   if (result.watches.length === 0) {
     return {
       embeds: [
@@ -775,7 +1115,7 @@ export function createTargetPriceWatchBulkRemovalMessage({
             {
               type: DISCORD_COMPONENT_TYPE_BUTTON,
               style: DISCORD_BUTTON_STYLE_SECONDARY,
-              custom_id: `${WATCH_REFRESH_CUSTOM_ID_PREFIX}${page}`,
+              custom_id: `${WATCH_REFRESH_CUSTOM_ID_PREFIX}${state}`,
               label: "返回設定",
             },
           ],
@@ -788,7 +1128,7 @@ export function createTargetPriceWatchBulkRemovalMessage({
     embeds: [
       {
         title: "批次移除目標價追蹤",
-        description: "從下方清單選擇要移除的商品。送出選擇後，這些商品會從你的追蹤清單移除。",
+        description: "從下方清單選擇要移除的商品。送出選擇後會先顯示確認頁，按下確認後才會移除。",
         color: DISCORD_EMBED_COLOR,
         footer: {
           text: `第 ${result.page + 1} 頁，每頁最多 ${WATCH_MANAGER_PAGE_SIZE} 筆`,
@@ -801,7 +1141,7 @@ export function createTargetPriceWatchBulkRemovalMessage({
         components: [
           {
             type: DISCORD_COMPONENT_TYPE_STRING_SELECT,
-            custom_id: `${WATCH_BULK_REMOVE_SELECT_CUSTOM_ID_PREFIX}${result.page}`,
+            custom_id: `${WATCH_BULK_REMOVE_SELECT_CUSTOM_ID_PREFIX}${formatWatchListState(result)}`,
             placeholder: "選擇要批次移除的商品",
             min_values: 1,
             max_values: result.watches.length,
@@ -815,7 +1155,73 @@ export function createTargetPriceWatchBulkRemovalMessage({
           {
             type: DISCORD_COMPONENT_TYPE_BUTTON,
             style: DISCORD_BUTTON_STYLE_SECONDARY,
-            custom_id: `${WATCH_REFRESH_CUSTOM_ID_PREFIX}${page}`,
+            custom_id: `${WATCH_REFRESH_CUSTOM_ID_PREFIX}${state}`,
+            label: "返回設定",
+          },
+        ],
+      },
+    ],
+  };
+}
+
+export function createTargetPriceWatchBulkRemovalConfirmationMessage({
+  result,
+  selectedWatchInputs,
+  publicBaseUrl,
+  token,
+}: {
+  result: TargetPriceWatchlistResult;
+  selectedWatchInputs: string[];
+  publicBaseUrl: string;
+  token: string;
+}): DiscordBotMessage {
+  const selectedWatchIds = new Set(
+    selectedWatchInputs
+      .map((watchInput) => normalizeWatchId(watchInput))
+      .filter((watchId): watchId is string => watchId !== null),
+  );
+  const selectedWatches = result.watches.filter((watch) => selectedWatchIds.has(watch.id));
+  const descriptionLines =
+    selectedWatches.length > 0
+      ? selectedWatches.map((watch) => {
+          const productName = formatDiscordBotText(watch.product.name, PRODUCT_NAME_MAX_LENGTH);
+
+          return `- [${escapeMarkdownLinkText(productName)}](${createProductUrl(
+            publicBaseUrl,
+            watch.product.id,
+          )})`;
+        })
+      : ["找不到這批追蹤，請返回設定重新整理。"];
+
+  return {
+    embeds: [
+      {
+        title: "確認批次移除目標價追蹤",
+        description: [
+          `你即將移除 ${selectedWatches.length} 項目標價追蹤：`,
+          "",
+          ...descriptionLines,
+          "",
+          "按下「確認移除」後才會生效。",
+        ].join("\n"),
+        color: DISCORD_EMBED_COLOR,
+      },
+    ],
+    components: [
+      {
+        type: DISCORD_COMPONENT_TYPE_ACTION_ROW,
+        components: [
+          {
+            type: DISCORD_COMPONENT_TYPE_BUTTON,
+            style: DISCORD_BUTTON_STYLE_DANGER,
+            custom_id: `${WATCH_BULK_REMOVE_CONFIRM_CUSTOM_ID_PREFIX}${token}`,
+            label: "確認移除",
+            disabled: selectedWatches.length === 0,
+          },
+          {
+            type: DISCORD_COMPONENT_TYPE_BUTTON,
+            style: DISCORD_BUTTON_STYLE_SECONDARY,
+            custom_id: `${WATCH_BULK_REMOVE_CANCEL_CUSTOM_ID_PREFIX}${token}`,
             label: "返回設定",
           },
         ],
@@ -828,10 +1234,14 @@ export function createTargetPriceWatchRemovalConfirmationMessage({
   result,
   publicBaseUrl,
   page,
+  statusFilter = "all",
+  sortKey = "recent",
 }: {
   result: TargetPriceWatchLookupResult;
   publicBaseUrl: string;
   page: number;
+  statusFilter?: TargetPriceWatchStatusFilter;
+  sortKey?: TargetPriceWatchSortKey;
 }): DiscordBotMessage {
   if (result.status === "invalid_reference") {
     return {
@@ -846,6 +1256,7 @@ export function createTargetPriceWatchRemovalConfirmationMessage({
   }
 
   const productName = formatDiscordBotText(result.watch.product.name, PRODUCT_NAME_MAX_LENGTH);
+  const state = formatWatchListState({ page, statusFilter, sortKey });
 
   return {
     embeds: [
@@ -869,13 +1280,13 @@ export function createTargetPriceWatchRemovalConfirmationMessage({
           {
             type: DISCORD_COMPONENT_TYPE_BUTTON,
             style: DISCORD_BUTTON_STYLE_DANGER,
-            custom_id: `${WATCH_REMOVE_CONFIRM_CUSTOM_ID_PREFIX}${result.watch.id}:${page}`,
+            custom_id: `${WATCH_REMOVE_CONFIRM_CUSTOM_ID_PREFIX}${result.watch.id}:${state}`,
             label: "確認移除",
           },
           {
             type: DISCORD_COMPONENT_TYPE_BUTTON,
             style: DISCORD_BUTTON_STYLE_SECONDARY,
-            custom_id: `${WATCH_REMOVE_CANCEL_CUSTOM_ID_PREFIX}${result.watch.id}:${page}`,
+            custom_id: `${WATCH_REMOVE_CANCEL_CUSTOM_ID_PREFIX}${result.watch.id}:${state}`,
             label: "返回設定",
           },
         ],

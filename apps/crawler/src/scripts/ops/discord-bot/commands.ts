@@ -36,6 +36,8 @@ import type {
   ParsedPublicReportModal,
   ParsedWatchComponent,
   ParsedWatchModal,
+  TargetPriceWatchSortKey,
+  TargetPriceWatchStatusFilter,
 } from "./types";
 
 const PRICE_REPORT_SETTINGS_OPEN_CUSTOM_ID = "price-report:settings:open";
@@ -88,8 +90,12 @@ export const WATCH_REMOVE_CONFIRM_CUSTOM_ID_PREFIX = "watch:remove-confirm:";
 export const WATCH_REMOVE_CANCEL_CUSTOM_ID_PREFIX = "watch:remove-cancel:";
 export const WATCH_REFRESH_CUSTOM_ID_PREFIX = "watch:refresh:";
 export const WATCH_PAGE_CUSTOM_ID_PREFIX = "watch:page:";
+export const WATCH_FILTER_CUSTOM_ID_PREFIX = "watch:filter:";
+export const WATCH_SORT_CUSTOM_ID_PREFIX = "watch:sort:";
 export const WATCH_BULK_REMOVE_CUSTOM_ID_PREFIX = "watch:bulk-remove:";
 export const WATCH_BULK_REMOVE_SELECT_CUSTOM_ID_PREFIX = "watch:bulk-remove-select:";
+export const WATCH_BULK_REMOVE_CONFIRM_CUSTOM_ID_PREFIX = "watch:bulk-remove-confirm:";
+export const WATCH_BULK_REMOVE_CANCEL_CUSTOM_ID_PREFIX = "watch:bulk-remove-cancel:";
 
 export function createPriceReportCommand(): Record<string, unknown> {
   return {
@@ -172,6 +178,23 @@ export function createPublicReportCommand(): Record<string, unknown> {
   };
 }
 
+export function createBotCommand(): Record<string, unknown> {
+  return {
+    name: "bot",
+    description: "查看 PartsRadarTW Discord bot 使用說明。",
+    type: DISCORD_COMMAND_TYPE_CHAT_INPUT,
+    contexts: [DISCORD_APPLICATION_CONTEXT_GUILD, DISCORD_APPLICATION_CONTEXT_BOT_DM],
+    dm_permission: true,
+    options: [
+      {
+        type: DISCORD_OPTION_TYPE_SUBCOMMAND,
+        name: "help",
+        description: "查看 watch、price-report、public-report 的使用方式。",
+      },
+    ],
+  };
+}
+
 export function parsePriceReportInteraction(
   interaction: DiscordInteraction,
 ): ParsedPriceReportCommand | null {
@@ -217,14 +240,14 @@ export function parseWatchComponentInteraction(
   }
 
   if (customId?.startsWith(WATCH_SELECT_CUSTOM_ID_PREFIX)) {
-    const page = parsePage(customId.slice(WATCH_SELECT_CUSTOM_ID_PREFIX.length));
+    const state = parseWatchListState(customId.slice(WATCH_SELECT_CUSTOM_ID_PREFIX.length));
     const selectedValue = interaction.data?.values?.[0];
 
     return {
       action: "select",
       watchInput:
         typeof selectedValue === "string" && selectedValue.trim() ? selectedValue.trim() : null,
-      page,
+      ...state,
     };
   }
 
@@ -236,19 +259,27 @@ export function parseWatchComponentInteraction(
       watchInput: edit.watchInput,
       targetPrice: edit.targetPrice,
       page: edit.page,
+      statusFilter: edit.statusFilter,
+      sortKey: edit.sortKey,
     };
   }
 
   const remove = parseWatchActionCustomId(customId, WATCH_REMOVE_CUSTOM_ID_PREFIX);
 
   if (remove) {
-    return { action: "remove", watchInput: remove.watchInput, page: remove.page };
+    return {
+      action: "remove",
+      watchInput: remove.watchInput,
+      page: remove.page,
+      statusFilter: remove.statusFilter,
+      sortKey: remove.sortKey,
+    };
   }
 
   if (customId?.startsWith(WATCH_BULK_REMOVE_CUSTOM_ID_PREFIX)) {
     return {
       action: "bulk_remove",
-      page: parsePage(customId.slice(WATCH_BULK_REMOVE_CUSTOM_ID_PREFIX.length)),
+      ...parseWatchListState(customId.slice(WATCH_BULK_REMOVE_CUSTOM_ID_PREFIX.length)),
     };
   }
 
@@ -259,7 +290,45 @@ export function parseWatchComponentInteraction(
         .filter((value): value is string => typeof value === "string")
         .map((value) => value.trim())
         .filter(Boolean),
-      page: parsePage(customId.slice(WATCH_BULK_REMOVE_SELECT_CUSTOM_ID_PREFIX.length)),
+      ...parseWatchListState(customId.slice(WATCH_BULK_REMOVE_SELECT_CUSTOM_ID_PREFIX.length)),
+    };
+  }
+
+  if (customId?.startsWith(WATCH_BULK_REMOVE_CONFIRM_CUSTOM_ID_PREFIX)) {
+    return {
+      action: "bulk_remove_confirm",
+      token: parseWatchToken(customId.slice(WATCH_BULK_REMOVE_CONFIRM_CUSTOM_ID_PREFIX.length)),
+    };
+  }
+
+  if (customId?.startsWith(WATCH_BULK_REMOVE_CANCEL_CUSTOM_ID_PREFIX)) {
+    return {
+      action: "bulk_remove_cancel",
+      token: parseWatchToken(customId.slice(WATCH_BULK_REMOVE_CANCEL_CUSTOM_ID_PREFIX.length)),
+    };
+  }
+
+  if (customId?.startsWith(WATCH_FILTER_CUSTOM_ID_PREFIX)) {
+    const state = parseWatchListState(customId.slice(WATCH_FILTER_CUSTOM_ID_PREFIX.length));
+    const selectedValue = interaction.data?.values?.[0];
+
+    return {
+      action: "filter",
+      page: 0,
+      statusFilter: parseWatchStatusFilter(selectedValue) ?? state.statusFilter,
+      sortKey: state.sortKey,
+    };
+  }
+
+  if (customId?.startsWith(WATCH_SORT_CUSTOM_ID_PREFIX)) {
+    const state = parseWatchListState(customId.slice(WATCH_SORT_CUSTOM_ID_PREFIX.length));
+    const selectedValue = interaction.data?.values?.[0];
+
+    return {
+      action: "sort",
+      page: 0,
+      statusFilter: state.statusFilter,
+      sortKey: parseWatchSortKey(selectedValue) ?? state.sortKey,
     };
   }
 
@@ -270,6 +339,8 @@ export function parseWatchComponentInteraction(
       action: "confirm_remove",
       watchInput: confirmRemove.watchInput,
       page: confirmRemove.page,
+      statusFilter: confirmRemove.statusFilter,
+      sortKey: confirmRemove.sortKey,
     };
   }
 
@@ -280,20 +351,22 @@ export function parseWatchComponentInteraction(
       action: "cancel_remove",
       watchInput: cancelRemove.watchInput,
       page: cancelRemove.page,
+      statusFilter: cancelRemove.statusFilter,
+      sortKey: cancelRemove.sortKey,
     };
   }
 
   if (customId?.startsWith(WATCH_REFRESH_CUSTOM_ID_PREFIX)) {
     return {
       action: "refresh",
-      page: parsePage(customId.slice(WATCH_REFRESH_CUSTOM_ID_PREFIX.length)),
+      ...parseWatchListState(customId.slice(WATCH_REFRESH_CUSTOM_ID_PREFIX.length)),
     };
   }
 
   if (customId?.startsWith(WATCH_PAGE_CUSTOM_ID_PREFIX)) {
     return {
       action: "page",
-      page: parsePage(customId.slice(WATCH_PAGE_CUSTOM_ID_PREFIX.length)),
+      ...parseWatchListState(customId.slice(WATCH_PAGE_CUSTOM_ID_PREFIX.length)),
     };
   }
 
@@ -302,6 +375,18 @@ export function parseWatchComponentInteraction(
 
 export function parseWatchInteraction(interaction: DiscordInteraction): boolean {
   return interaction.data?.name === "watch";
+}
+
+export function parseBotInteraction(interaction: DiscordInteraction): "help" | null {
+  if (interaction.data?.name !== "bot") {
+    return null;
+  }
+
+  const subcommand = interaction.data.options?.find(
+    (option) => option.type === DISCORD_OPTION_TYPE_SUBCOMMAND,
+  );
+
+  return subcommand?.name === "help" ? "help" : null;
 }
 
 export function parsePublicReportInteraction(
@@ -330,7 +415,13 @@ function parseWatchActionCustomId(
   customId: string | undefined,
   prefix: string,
   includesTargetPrice = false,
-): { watchInput: string | null; targetPrice: number | null; page: number } | null {
+): {
+  watchInput: string | null;
+  targetPrice: number | null;
+  page: number;
+  statusFilter: TargetPriceWatchStatusFilter;
+  sortKey: TargetPriceWatchSortKey;
+} | null {
   if (!customId?.startsWith(prefix)) {
     return null;
   }
@@ -338,13 +429,41 @@ function parseWatchActionCustomId(
   const segments = customId.slice(prefix.length).split(":");
   const watchId = segments[0]?.trim();
   const targetPrice = includesTargetPrice ? parseTargetPriceInput(segments[1]) : null;
-  const page = parsePage(segments[includesTargetPrice ? 2 : 1]);
+  const state = parseWatchListState(segments.slice(includesTargetPrice ? 2 : 1).join(":"));
 
   return {
     watchInput: watchId ? `watch:${watchId}` : null,
     targetPrice,
-    page,
+    ...state,
   };
+}
+
+function parseWatchListState(value: string | undefined): {
+  page: number;
+  statusFilter: TargetPriceWatchStatusFilter;
+  sortKey: TargetPriceWatchSortKey;
+} {
+  const [pageValue, filterValue, sortValue] = typeof value === "string" ? value.split(":") : [];
+
+  return {
+    page: parsePage(pageValue),
+    statusFilter: parseWatchStatusFilter(filterValue) ?? "all",
+    sortKey: parseWatchSortKey(sortValue) ?? "recent",
+  };
+}
+
+function parseWatchStatusFilter(value: unknown): TargetPriceWatchStatusFilter | null {
+  return value === "all" || value === "reached" || value === "unreached" ? value : null;
+}
+
+function parseWatchSortKey(value: unknown): TargetPriceWatchSortKey | null {
+  return value === "recent" || value === "target" || value === "current" ? value : null;
+}
+
+function parseWatchToken(value: string | undefined): string | null {
+  const token = value?.trim() ?? "";
+
+  return /^[0-9a-f-]{36}$/i.test(token) ? token : null;
 }
 
 function parsePage(value: unknown): number {
@@ -406,13 +525,17 @@ export function createWatchEditModal({
   watchId,
   targetPrice,
   page,
+  statusFilter = "all",
+  sortKey = "recent",
 }: {
   watchId: string;
   targetPrice: number;
   page: number;
+  statusFilter?: TargetPriceWatchStatusFilter;
+  sortKey?: TargetPriceWatchSortKey;
 }): DiscordModal {
   return {
-    custom_id: `${WATCH_EDIT_MODAL_CUSTOM_ID_PREFIX}${watchId}:${page}`,
+    custom_id: `${WATCH_EDIT_MODAL_CUSTOM_ID_PREFIX}${watchId}:${page}:${statusFilter}:${sortKey}`,
     title: "修改商品目標價",
     components: [
       {
@@ -1093,7 +1216,7 @@ export function parseWatchModalSubmit(interaction: DiscordInteraction): ParsedWa
   }
 
   if (customId?.startsWith(WATCH_EDIT_MODAL_CUSTOM_ID_PREFIX)) {
-    const [watchId, pageValue] = customId
+    const [watchId, pageValue, filterValue, sortValue] = customId
       .slice(WATCH_EDIT_MODAL_CUSTOM_ID_PREFIX.length)
       .split(":");
 
@@ -1101,6 +1224,8 @@ export function parseWatchModalSubmit(interaction: DiscordInteraction): ParsedWa
       action: "edit",
       watchInput: watchId ? `watch:${watchId}` : null,
       page: parsePage(pageValue),
+      statusFilter: parseWatchStatusFilter(filterValue) ?? "all",
+      sortKey: parseWatchSortKey(sortValue) ?? "recent",
       targetPrice,
       targetPriceInputValid: targetPrice !== null,
     };

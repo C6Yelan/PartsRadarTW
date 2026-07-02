@@ -40,6 +40,7 @@ const WATCH_PRODUCT_ID = "11111111-1111-4111-8111-111111111111";
 const WATCH_ROW_ID = "22222222-2222-4222-8222-222222222222";
 const WATCH_SECOND_PRODUCT_ID = "44444444-4444-4444-8444-444444444444";
 const WATCH_SECOND_ROW_ID = "33333333-3333-4333-8333-333333333333";
+const WATCH_DEFAULT_STATE = "0:all:recent";
 const TEST_SOURCE_CATEGORIES = [
   { igrp: 4, displayName: "CPU" },
   { igrp: 5, displayName: "主機板" },
@@ -81,7 +82,7 @@ describe("Discord bot options", () => {
 });
 
 describe("registerDiscordBotCommands", () => {
-  it("registers the global price-report, watch, and public-report commands", async () => {
+  it("registers the global price-report, watch, public-report, and bot commands", async () => {
     const fetchMock = vi.fn<typeof fetch>(
       async () => new Response(JSON.stringify([{ id: "command-1" }]), { status: 200 }),
     );
@@ -137,6 +138,13 @@ describe("registerDiscordBotCommands", () => {
           expect.objectContaining({ name: "test" }),
         ],
       }),
+      expect.objectContaining({
+        name: "bot",
+        description: "查看 PartsRadarTW Discord bot 使用說明。",
+        contexts: [0, 1],
+        dm_permission: true,
+        options: [expect.objectContaining({ name: "help" })],
+      }),
     ]);
     const registeredCommands = JSON.parse(String(globalRequestInit.body));
     expect(
@@ -146,6 +154,7 @@ describe("registerDiscordBotCommands", () => {
       "price-report",
       "watch",
       "public-report",
+      "bot",
     ]);
     for (const command of registeredCommands.filter(
       (command: { name: string }) => command.name !== "public-report",
@@ -469,6 +478,46 @@ describe("sendDiscordInteractionMessages", () => {
 });
 
 describe("handleDiscordInteraction", () => {
+  it("responds to bot help with an ephemeral Traditional Chinese embed", async () => {
+    const client = createDiscordBotClient([]);
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createBotHelpInteraction(),
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(client.discordTargetPriceWatch.findMany).not.toHaveBeenCalled();
+    expect(client.discordPriceReportSetting.findUnique).not.toHaveBeenCalled();
+    expect(client.discordPublicPriceReportSetting.findUnique).not.toHaveBeenCalled();
+
+    const requestBody = JSON.parse(
+      String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body),
+    );
+    const embed = readResponseEmbed(requestBody);
+
+    expect(requestBody).toMatchObject({
+      type: 4,
+      data: {
+        flags: 64,
+      },
+    });
+    expect(embed).toMatchObject({
+      title: "PartsRadarTW Discord bot 說明",
+      description: expect.stringContaining("**/watch**"),
+    });
+    expect(embed.description).toContain("個人商品目標價追蹤");
+    expect(embed.description).toContain("個人價格報告");
+    expect(embed.description).toContain("伺服器公開價格報告");
+    expect(embed.description).toContain("管理伺服器");
+  });
+
   it("opens an empty target price watch manager from the watch command", async () => {
     const client = createDiscordBotClient([]);
     const fetchMock = vi.fn<typeof fetch>(
@@ -506,17 +555,22 @@ describe("handleDiscordInteraction", () => {
           type: 1,
           components: [
             expect.objectContaining({ custom_id: "watch:add", label: "新增追蹤" }),
-            expect.objectContaining({ custom_id: "watch:edit:none:0:0", disabled: true }),
-            expect.objectContaining({ custom_id: "watch:remove:none:0", disabled: true }),
-            expect.objectContaining({ custom_id: "watch:refresh:0" }),
+            expect.objectContaining({
+              custom_id: `watch:edit:none:0:${WATCH_DEFAULT_STATE}`,
+              disabled: true,
+            }),
+            expect.objectContaining({
+              custom_id: `watch:remove:none:${WATCH_DEFAULT_STATE}`,
+              disabled: true,
+            }),
+            expect.objectContaining({ custom_id: `watch:refresh:${WATCH_DEFAULT_STATE}` }),
           ],
         },
       ],
     });
     expect(client.discordTargetPriceWatch.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        skip: 0,
-        take: 26,
+        take: MAX_TARGET_PRICE_WATCHES_PER_USER + 1,
       }),
     );
   });
@@ -837,7 +891,7 @@ describe("handleDiscordInteraction", () => {
         expect.objectContaining({
           components: [
             expect.objectContaining({
-              custom_id: "watch:select:0",
+              custom_id: `watch:select:${WATCH_DEFAULT_STATE}`,
               options: [expect.objectContaining({ value: `watch:${WATCH_ROW_ID}`, default: true })],
             }),
           ],
@@ -845,11 +899,11 @@ describe("handleDiscordInteraction", () => {
         expect.objectContaining({
           components: expect.arrayContaining([
             expect.objectContaining({
-              custom_id: `watch:edit:${WATCH_ROW_ID}:17500:0`,
+              custom_id: `watch:edit:${WATCH_ROW_ID}:17500:${WATCH_DEFAULT_STATE}`,
               disabled: false,
             }),
             expect.objectContaining({
-              custom_id: `watch:remove:${WATCH_ROW_ID}:0`,
+              custom_id: `watch:remove:${WATCH_ROW_ID}:${WATCH_DEFAULT_STATE}`,
               disabled: false,
             }),
           ]),
@@ -937,7 +991,9 @@ describe("handleDiscordInteraction", () => {
       options: createDiscordBotOptions(),
       cooldowns: new CommandCooldowns(60),
       fetchImpl: fetchMock as typeof fetch,
-      interaction: createWatchButtonInteraction(`watch:edit:${WATCH_ROW_ID}:17500:0`),
+      interaction: createWatchButtonInteraction(
+        `watch:edit:${WATCH_ROW_ID}:17500:${WATCH_DEFAULT_STATE}`,
+      ),
     });
 
     const requestBody = JSON.parse(
@@ -947,7 +1003,7 @@ describe("handleDiscordInteraction", () => {
     expect(requestBody).toMatchObject({
       type: 9,
       data: {
-        custom_id: `watch:edit-modal:${WATCH_ROW_ID}:0`,
+        custom_id: `watch:edit-modal:${WATCH_ROW_ID}:${WATCH_DEFAULT_STATE}`,
         title: "修改商品目標價",
         components: [
           expect.objectContaining({
@@ -1044,7 +1100,7 @@ describe("handleDiscordInteraction", () => {
         expect.objectContaining({
           components: [
             expect.objectContaining({
-              custom_id: "watch:select:0",
+              custom_id: `watch:select:${WATCH_DEFAULT_STATE}`,
               options: [
                 expect.objectContaining({
                   label: "RTX 5070 測試卡",
@@ -1099,12 +1155,12 @@ describe("handleDiscordInteraction", () => {
 
     const firstPage = JSON.parse(String(firstPageFetch.mock.calls[1]?.[1]?.body));
     expect(firstPage.components[0].components[0]).toMatchObject({
-      custom_id: "watch:select:0",
+      custom_id: `watch:select:${WATCH_DEFAULT_STATE}`,
       options: expect.any(Array),
     });
     expect(firstPage.components[0].components[0].options).toHaveLength(25);
-    expect(firstPage.components[2].components).toContainEqual(
-      expect.objectContaining({ custom_id: "watch:page:1", disabled: false }),
+    expect(findMessageComponent(firstPage, "watch:page:1:all:recent")).toEqual(
+      expect.objectContaining({ disabled: false }),
     );
 
     const secondPageFetch = vi.fn<typeof fetch>(
@@ -1115,18 +1171,79 @@ describe("handleDiscordInteraction", () => {
       options: createDiscordBotOptions(),
       cooldowns: new CommandCooldowns(60),
       fetchImpl: secondPageFetch as typeof fetch,
-      interaction: createWatchButtonInteraction("watch:page:1"),
+      interaction: createWatchButtonInteraction("watch:page:1:all:recent"),
     });
 
     const secondPage = JSON.parse(String(secondPageFetch.mock.calls[1]?.[1]?.body));
     expect(secondPage.components[0].components[0]).toMatchObject({
-      custom_id: "watch:select:1",
+      custom_id: "watch:select:1:all:recent",
       options: expect.any(Array),
     });
     expect(secondPage.components[0].components[0].options).toHaveLength(1);
-    expect(secondPage.components[2].components).toContainEqual(
-      expect.objectContaining({ custom_id: "watch:page:0", disabled: false }),
+    expect(findMessageComponent(secondPage, `watch:page:${WATCH_DEFAULT_STATE}`)).toEqual(
+      expect.objectContaining({ disabled: false }),
     );
+  });
+
+  it("filters target price watches by reached status", async () => {
+    const client = createSortableWatchManagerClient();
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createWatchStateSelectInteraction(
+        `watch:filter:${WATCH_DEFAULT_STATE}`,
+        "reached",
+      ),
+    });
+
+    const requestBody = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body));
+    const productSelect = requestBody.components[0].components[0];
+
+    expect(requestBody.embeds[0].description).toContain("顯示：已達標");
+    expect(productSelect).toMatchObject({
+      custom_id: "watch:select:0:reached:recent",
+      options: [
+        expect.objectContaining({
+          label: "DDR5 6400 測試記憶體",
+          value: `watch:${WATCH_SECOND_ROW_ID}`,
+        }),
+      ],
+    });
+    expect(findMessageComponent(requestBody, "watch:filter:0:reached:recent")).toBeDefined();
+  });
+
+  it("sorts target price watches by current price", async () => {
+    const client = createSortableWatchManagerClient();
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createWatchStateSelectInteraction(
+        `watch:sort:${WATCH_DEFAULT_STATE}`,
+        "current",
+      ),
+    });
+
+    const requestBody = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body));
+    const productSelect = requestBody.components[0].components[0];
+
+    expect(requestBody.embeds[0].description).toContain("排序：目前價格低到高");
+    expect(productSelect.custom_id).toBe("watch:select:0:all:current");
+    expect(productSelect.options.map((option: { label: string }) => option.label)).toEqual([
+      "DDR5 6400 測試記憶體",
+      "RTX 5070 測試卡",
+    ]);
   });
 
   it("updates a selected watch from the edit form", async () => {
@@ -1178,7 +1295,9 @@ describe("handleDiscordInteraction", () => {
       options: createDiscordBotOptions(),
       cooldowns: new CommandCooldowns(60),
       fetchImpl: fetchMock as typeof fetch,
-      interaction: createWatchButtonInteraction(`watch:remove:${WATCH_ROW_ID}:0`),
+      interaction: createWatchButtonInteraction(
+        `watch:remove:${WATCH_ROW_ID}:${WATCH_DEFAULT_STATE}`,
+      ),
     });
 
     expect(client.discordTargetPriceWatch.updateMany).not.toHaveBeenCalled();
@@ -1196,11 +1315,11 @@ describe("handleDiscordInteraction", () => {
           type: 1,
           components: [
             expect.objectContaining({
-              custom_id: `watch:remove-confirm:${WATCH_ROW_ID}:0`,
+              custom_id: `watch:remove-confirm:${WATCH_ROW_ID}:${WATCH_DEFAULT_STATE}`,
               label: "確認移除",
             }),
             expect.objectContaining({
-              custom_id: `watch:remove-cancel:${WATCH_ROW_ID}:0`,
+              custom_id: `watch:remove-cancel:${WATCH_ROW_ID}:${WATCH_DEFAULT_STATE}`,
               label: "返回設定",
             }),
           ],
@@ -1223,7 +1342,9 @@ describe("handleDiscordInteraction", () => {
       options: createDiscordBotOptions(),
       cooldowns: new CommandCooldowns(60),
       fetchImpl: fetchMock as typeof fetch,
-      interaction: createWatchButtonInteraction(`watch:remove-cancel:${WATCH_ROW_ID}:0`),
+      interaction: createWatchButtonInteraction(
+        `watch:remove-cancel:${WATCH_ROW_ID}:${WATCH_DEFAULT_STATE}`,
+      ),
     });
 
     expect(client.discordTargetPriceWatch.updateMany).not.toHaveBeenCalled();
@@ -1232,12 +1353,12 @@ describe("handleDiscordInteraction", () => {
       value: `watch:${WATCH_ROW_ID}`,
       default: true,
     });
-    expect(requestBody.components[1].components).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ custom_id: `watch:edit:${WATCH_ROW_ID}:17500:0` }),
-        expect.objectContaining({ custom_id: `watch:remove:${WATCH_ROW_ID}:0` }),
-      ]),
-    );
+    expect(
+      findMessageComponent(requestBody, `watch:edit:${WATCH_ROW_ID}:17500:${WATCH_DEFAULT_STATE}`),
+    ).toBeDefined();
+    expect(
+      findMessageComponent(requestBody, `watch:remove:${WATCH_ROW_ID}:${WATCH_DEFAULT_STATE}`),
+    ).toBeDefined();
   });
 
   it("removes a watch after confirmation and refreshes the manager", async () => {
@@ -1251,7 +1372,9 @@ describe("handleDiscordInteraction", () => {
       options: createDiscordBotOptions(),
       cooldowns: new CommandCooldowns(60),
       fetchImpl: fetchMock as typeof fetch,
-      interaction: createWatchButtonInteraction(`watch:remove-confirm:${WATCH_ROW_ID}:0`),
+      interaction: createWatchButtonInteraction(
+        `watch:remove-confirm:${WATCH_ROW_ID}:${WATCH_DEFAULT_STATE}`,
+      ),
     });
 
     expect(client.discordTargetPriceWatch.updateMany).toHaveBeenCalledWith({
@@ -1283,7 +1406,7 @@ describe("handleDiscordInteraction", () => {
       options: createDiscordBotOptions(),
       cooldowns: new CommandCooldowns(60),
       fetchImpl: fetchMock as typeof fetch,
-      interaction: createWatchButtonInteraction("watch:bulk-remove:0"),
+      interaction: createWatchButtonInteraction(`watch:bulk-remove:${WATCH_DEFAULT_STATE}`),
     });
 
     expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({ type: 6 });
@@ -1301,7 +1424,7 @@ describe("handleDiscordInteraction", () => {
           type: 1,
           components: [
             expect.objectContaining({
-              custom_id: "watch:bulk-remove-select:0",
+              custom_id: `watch:bulk-remove-select:${WATCH_DEFAULT_STATE}`,
               min_values: 1,
               max_values: 2,
               options: expect.arrayContaining([
@@ -1315,7 +1438,7 @@ describe("handleDiscordInteraction", () => {
           type: 1,
           components: [
             expect.objectContaining({
-              custom_id: "watch:refresh:0",
+              custom_id: `watch:refresh:${WATCH_DEFAULT_STATE}`,
               label: "返回設定",
             }),
           ],
@@ -1328,7 +1451,7 @@ describe("handleDiscordInteraction", () => {
 
   it("batch removes selected target price watches and refreshes the manager", async () => {
     const client = createBatchWatchManagerClient();
-    const fetchMock = vi.fn<typeof fetch>(
+    const selectFetchMock = vi.fn<typeof fetch>(
       async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
     );
 
@@ -1336,11 +1459,37 @@ describe("handleDiscordInteraction", () => {
       client,
       options: createDiscordBotOptions(),
       cooldowns: new CommandCooldowns(60),
-      fetchImpl: fetchMock as typeof fetch,
+      fetchImpl: selectFetchMock as typeof fetch,
       interaction: createWatchBulkRemoveSelectInteraction(
         [`watch:${WATCH_ROW_ID}`, `watch:${WATCH_SECOND_ROW_ID}`],
         0,
       ),
+    });
+
+    expect(client.discordTargetPriceWatch.updateMany).not.toHaveBeenCalled();
+    const confirmationBody = JSON.parse(String(selectFetchMock.mock.calls[1]?.[1]?.body));
+    expect(confirmationBody.embeds[0]).toMatchObject({
+      title: "確認批次移除目標價追蹤",
+      description: expect.stringContaining("你即將移除 2 項目標價追蹤"),
+    });
+    expect(JSON.stringify(confirmationBody.embeds)).not.toContain(WATCH_ROW_ID);
+    const confirmButton = findMessageComponentByPrefix(
+      confirmationBody,
+      "watch:bulk-remove-confirm:",
+    );
+    expect(confirmButton).toMatchObject({
+      label: "確認移除",
+    });
+
+    const confirmFetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: confirmFetchMock as typeof fetch,
+      interaction: createWatchButtonInteraction(confirmButton?.custom_id ?? ""),
     });
 
     expect(client.discordTargetPriceWatch.updateMany).toHaveBeenCalledWith({
@@ -1363,7 +1512,7 @@ describe("handleDiscordInteraction", () => {
         enabled: false,
       },
     });
-    const requestBody = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body));
+    const requestBody = JSON.parse(String(confirmFetchMock.mock.calls[1]?.[1]?.body));
     expect(requestBody.embeds[0]).toMatchObject({
       title: "商品目標價追蹤",
       description: expect.stringContaining("已批次移除 2 項目標價追蹤"),
@@ -4773,6 +4922,24 @@ function readEmbedFieldValue(embed: DiscordBotEmbed, fieldName: string): string 
   return embed.fields?.find((field) => field.name === fieldName)?.value;
 }
 
+function findMessageComponent(
+  body: DiscordBotMessage,
+  customId: string,
+): NonNullable<DiscordBotMessage["components"]>[number]["components"][number] | undefined {
+  return body.components
+    ?.flatMap((row) => row.components)
+    .find((component) => component.custom_id === customId);
+}
+
+function findMessageComponentByPrefix(
+  body: DiscordBotMessage,
+  customIdPrefix: string,
+): NonNullable<DiscordBotMessage["components"]>[number]["components"][number] | undefined {
+  return body.components
+    ?.flatMap((row) => row.components)
+    .find((component) => component.custom_id.startsWith(customIdPrefix));
+}
+
 function calculateMessageEmbedTextLength(message: DiscordBotMessage): number {
   return (message.embeds ?? []).reduce(
     (total, embed) =>
@@ -4807,6 +4974,28 @@ function createInteraction(
           type: 1,
           name: subcommandName,
           options: subcommandOptions,
+        },
+      ],
+    },
+    member: {
+      user: {
+        id: "111122223333444455",
+      },
+    },
+  };
+}
+
+function createBotHelpInteraction(): DiscordInteraction {
+  return {
+    id: "interaction-1",
+    token: "interaction-token",
+    type: 2,
+    data: {
+      name: "bot",
+      options: [
+        {
+          type: 1,
+          name: "help",
         },
       ],
     },
@@ -5163,13 +5352,18 @@ function createWatchButtonInteraction(customId: string): DiscordInteraction {
   };
 }
 
-function createWatchSelectInteraction(watchInput: string, page: number): DiscordInteraction {
+function createWatchSelectInteraction(
+  watchInput: string,
+  page: number,
+  statusFilter = "all",
+  sortKey = "recent",
+): DiscordInteraction {
   return {
     id: "interaction-1",
     token: "interaction-token",
     type: 3,
     data: {
-      custom_id: `watch:select:${page}`,
+      custom_id: `watch:select:${page}:${statusFilter}:${sortKey}`,
       component_type: 3,
       values: [watchInput],
     },
@@ -5184,15 +5378,35 @@ function createWatchSelectInteraction(watchInput: string, page: number): Discord
 function createWatchBulkRemoveSelectInteraction(
   watchInputs: string[],
   page: number,
+  statusFilter = "all",
+  sortKey = "recent",
 ): DiscordInteraction {
   return {
     id: "interaction-1",
     token: "interaction-token",
     type: 3,
     data: {
-      custom_id: `watch:bulk-remove-select:${page}`,
+      custom_id: `watch:bulk-remove-select:${page}:${statusFilter}:${sortKey}`,
       component_type: 3,
       values: watchInputs,
+    },
+    member: {
+      user: {
+        id: "111122223333444455",
+      },
+    },
+  };
+}
+
+function createWatchStateSelectInteraction(customId: string, value: string): DiscordInteraction {
+  return {
+    id: "interaction-1",
+    token: "interaction-token",
+    type: 3,
+    data: {
+      custom_id: customId,
+      component_type: 3,
+      values: [value],
     },
     member: {
       user: {
@@ -5206,17 +5420,21 @@ function createWatchEditModalSubmitInteraction({
   watchId,
   targetPrice,
   page,
+  statusFilter = "all",
+  sortKey = "recent",
 }: {
   watchId: string;
   targetPrice: string;
   page: number;
+  statusFilter?: string;
+  sortKey?: string;
 }): DiscordInteraction {
   return {
     id: "interaction-1",
     token: "interaction-token",
     type: 5,
     data: {
-      custom_id: `watch:edit-modal:${watchId}:${page}`,
+      custom_id: `watch:edit-modal:${watchId}:${page}:${statusFilter}:${sortKey}`,
       components: [
         {
           type: 18,
@@ -5459,6 +5677,7 @@ function targetPriceWatch({
   lastNotifiedAt = null,
   notificationClaimedAt = null,
   notificationCursorAt = new Date("2026-06-07T00:00:00.000Z"),
+  updatedAt = new Date("2026-06-07T00:00:00.000Z"),
 }: {
   id: string;
   discordUserId: string;
@@ -5469,6 +5688,7 @@ function targetPriceWatch({
   lastNotifiedAt?: Date | null;
   notificationClaimedAt?: Date | null;
   notificationCursorAt?: Date | null;
+  updatedAt?: Date;
 }): TestTargetPriceWatch {
   return {
     id,
@@ -5481,7 +5701,7 @@ function targetPriceWatch({
     notificationClaimedAt,
     notificationCursorAt,
     createdAt: new Date("2026-06-07T00:00:00.000Z"),
-    updatedAt: new Date("2026-06-07T00:00:00.000Z"),
+    updatedAt,
   };
 }
 
@@ -5693,6 +5913,46 @@ function createBatchWatchManagerClient() {
         discordUserId: "111122223333444455",
         productId: WATCH_SECOND_PRODUCT_ID,
         targetPrice: 8_500,
+      }),
+    ],
+  );
+}
+
+function createSortableWatchManagerClient() {
+  return createDiscordBotClient(
+    [
+      snapshot({
+        id: "snapshot-watch-1",
+        productId: WATCH_PRODUCT_ID,
+        productName: "RTX 5070 測試卡",
+        crawlRunId: "new-run",
+        price: 18_990,
+        capturedAt: "2026-06-07T03:00:00.000Z",
+      }),
+      snapshot({
+        id: "snapshot-watch-2",
+        productId: WATCH_SECOND_PRODUCT_ID,
+        productName: "DDR5 6400 測試記憶體",
+        crawlRunId: "new-run",
+        price: 8_990,
+        capturedAt: "2026-06-07T03:00:00.000Z",
+      }),
+    ],
+    [],
+    [
+      targetPriceWatch({
+        id: WATCH_ROW_ID,
+        discordUserId: "111122223333444455",
+        productId: WATCH_PRODUCT_ID,
+        targetPrice: 17_500,
+        updatedAt: new Date("2026-06-07T02:00:00.000Z"),
+      }),
+      targetPriceWatch({
+        id: WATCH_SECOND_ROW_ID,
+        discordUserId: "111122223333444455",
+        productId: WATCH_SECOND_PRODUCT_ID,
+        targetPrice: 9_500,
+        updatedAt: new Date("2026-06-07T01:00:00.000Z"),
       }),
     ],
   );

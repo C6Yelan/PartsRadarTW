@@ -6,9 +6,11 @@ import { registerDiscordBotCommands } from "./discord-bot/registration";
 import { formatDiscordRestFailure } from "./discord-bot/rest";
 
 export {
+  createBotCommand,
   createPriceReportCommand,
   createPublicReportCommand,
   createWatchCommand,
+  parseBotInteraction,
   parsePriceReportInteraction,
   parsePublicReportInteraction,
   parseWatchInteraction,

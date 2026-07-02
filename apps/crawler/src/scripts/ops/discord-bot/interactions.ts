@@ -9,6 +9,7 @@ import {
   createPublicReportSettingsComponents,
   createWatchEditModal,
   createWatchModal,
+  parseBotInteraction,
   parsePriceReportComponentInteraction,
   parsePriceReportInteraction,
   parsePriceReportModalSubmit,
@@ -83,9 +84,14 @@ import type {
   FetchImpl,
   PriceReportNowResult,
   PriceReportTimeOfDay,
+  TargetPriceWatchSortKey,
+  TargetPriceWatchStatusFilter,
 } from "./types";
 import {
+  consumeTargetPriceWatchBulkRemovalConfirmation,
   createTargetPriceWatch,
+  createTargetPriceWatchBulkRemovalConfirmation,
+  createTargetPriceWatchBulkRemovalConfirmationMessage,
   createTargetPriceWatchBulkRemovalMessage,
   createTargetPriceWatchManagerMessage,
   createTargetPriceWatchRemovalConfirmationMessage,
@@ -156,13 +162,25 @@ async function handleApplicationCommandInteraction({
   cooldowns: CommandCooldowns;
   fetchImpl: FetchImpl;
 }): Promise<void> {
+  const botCommand = parseBotInteraction(interaction);
   const command = parsePriceReportInteraction(interaction);
-  const watchCommand = command ? false : parseWatchInteraction(interaction);
+  const watchCommand = command || botCommand ? false : parseWatchInteraction(interaction);
   const publicReportCommand =
-    command || watchCommand ? null : parsePublicReportInteraction(interaction);
+    command || watchCommand || botCommand ? null : parsePublicReportInteraction(interaction);
 
-  if (!command && !watchCommand && !publicReportCommand) {
+  if (!botCommand && !command && !watchCommand && !publicReportCommand) {
     await sendUnsupportedInteractionResponse({ interaction, options, fetchImpl });
+    return;
+  }
+
+  if (botCommand === "help") {
+    await sendInteractionResponse({
+      token: options.token,
+      apiBaseUrl: options.apiBaseUrl,
+      interaction,
+      fetchImpl,
+      message: createBotHelpMessage(),
+    });
     return;
   }
 
@@ -314,6 +332,27 @@ async function handleApplicationCommandInteraction({
   }
 
   await sendUnsupportedInteractionResponse({ interaction, options, fetchImpl });
+}
+
+function createBotHelpMessage(): DiscordBotMessage {
+  return {
+    embeds: [
+      {
+        title: "PartsRadarTW Discord bot 說明",
+        color: DISCORD_EMBED_COLOR,
+        description: [
+          "**/watch**",
+          "個人商品目標價追蹤。新增商品頁網址與目標價格後，價格達標時會私訊通知你，也可以集中查看目前追蹤狀態。",
+          "",
+          "**/price-report**",
+          "個人價格報告。可以立即產生近期價格變動報告，也能設定每日私訊報告與篩選條件。",
+          "",
+          "**/public-report**",
+          "伺服器公開價格報告。可設定固定頻道發送公開報告；只有具備「管理伺服器」權限的成員可以管理。",
+        ].join("\n"),
+      },
+    ],
+  };
 }
 
 async function handleMessageComponentInteraction({
@@ -643,6 +682,8 @@ async function handleMessageComponentInteraction({
         watchId,
         targetPrice: watchComponent.targetPrice,
         page: watchComponent.page,
+        statusFilter: watchComponent.statusFilter,
+        sortKey: watchComponent.sortKey,
       }),
     });
     return;
@@ -673,6 +714,8 @@ async function handleMessageComponentInteraction({
           result: lookup,
           publicBaseUrl: options.publicBaseUrl,
           page: watchComponent.page,
+          statusFilter: watchComponent.statusFilter,
+          sortKey: watchComponent.sortKey,
         }),
       });
       return;
@@ -688,6 +731,8 @@ async function handleMessageComponentInteraction({
         client,
         discordUserId,
         page: watchComponent.page,
+        statusFilter: watchComponent.statusFilter,
+        sortKey: watchComponent.sortKey,
       });
 
       await editDeferredInteractionResponse({
@@ -715,6 +760,8 @@ async function handleMessageComponentInteraction({
         client,
         discordUserId,
         page: watchComponent.page,
+        statusFilter: watchComponent.statusFilter,
+        sortKey: watchComponent.sortKey,
       });
 
       await editDeferredInteractionResponse({
@@ -732,20 +779,69 @@ async function handleMessageComponentInteraction({
     }
 
     if (watchComponent.action === "bulk_remove_select") {
-      const disabled = await disableTargetPriceWatches({
-        client,
-        discordUserId,
-        watchInputs: watchComponent.watchInputs,
-      });
       const result = await readWatchManagerPage({
         client,
         discordUserId,
         page: watchComponent.page,
+        statusFilter: watchComponent.statusFilter,
+        sortKey: watchComponent.sortKey,
+      });
+      const token = createTargetPriceWatchBulkRemovalConfirmation({
+        discordUserId,
+        watchInputs: watchComponent.watchInputs,
+        page: result.page,
+        statusFilter: result.statusFilter,
+        sortKey: result.sortKey,
+      });
+
+      await editDeferredInteractionResponse({
+        token: options.token,
+        applicationId: options.applicationId,
+        apiBaseUrl: options.apiBaseUrl,
+        interaction,
+        fetchImpl,
+        message: createTargetPriceWatchBulkRemovalConfirmationMessage({
+          result,
+          publicBaseUrl: options.publicBaseUrl,
+          selectedWatchInputs: watchComponent.watchInputs,
+          token,
+        }),
+      });
+      return;
+    }
+
+    if (
+      watchComponent.action === "bulk_remove_confirm" ||
+      watchComponent.action === "bulk_remove_cancel"
+    ) {
+      const confirmation = consumeTargetPriceWatchBulkRemovalConfirmation({
+        token: watchComponent.token,
+        discordUserId,
+      });
+      const shouldRemove =
+        watchComponent.action === "bulk_remove_confirm" && confirmation.status === "found";
+      const disabled = shouldRemove
+        ? await disableTargetPriceWatches({
+            client,
+            discordUserId,
+            watchInputs: confirmation.watchInputs,
+          })
+        : null;
+      const result = await readWatchManagerPage({
+        client,
+        discordUserId,
+        page: confirmation.status === "found" ? confirmation.page : 0,
+        statusFilter: confirmation.status === "found" ? confirmation.statusFilter : "all",
+        sortKey: confirmation.status === "found" ? confirmation.sortKey : "recent",
       });
       const notice =
-        disabled.disabledCount > 0
-          ? `已批次移除 ${disabled.disabledCount} 項目標價追蹤。`
-          : "選取的追蹤已不存在，清單已重新整理。";
+        confirmation.status !== "found"
+          ? "批次移除確認已失效，請重新選擇。"
+          : watchComponent.action === "bulk_remove_cancel"
+            ? "已取消批次移除。"
+            : disabled && disabled.disabledCount > 0
+              ? `已批次移除 ${disabled.disabledCount} 項目標價追蹤。`
+              : "選取的追蹤已不存在，清單已重新整理。";
 
       await editDeferredInteractionResponse({
         token: options.token,
@@ -764,10 +860,24 @@ async function handleMessageComponentInteraction({
       return;
     }
 
+    if (
+      watchComponent.action !== "select" &&
+      watchComponent.action !== "cancel_remove" &&
+      watchComponent.action !== "refresh" &&
+      watchComponent.action !== "page" &&
+      watchComponent.action !== "filter" &&
+      watchComponent.action !== "sort"
+    ) {
+      await sendUnsupportedInteractionResponse({ interaction, options, fetchImpl });
+      return;
+    }
+
     const result = await readWatchManagerPage({
       client,
       discordUserId,
       page: watchComponent.page,
+      statusFilter: watchComponent.statusFilter,
+      sortKey: watchComponent.sortKey,
     });
     const selectedWatchInput =
       watchComponent.action === "select" || watchComponent.action === "cancel_remove"
@@ -971,6 +1081,8 @@ async function handleModalSubmitInteraction({
         client,
         discordUserId,
         page: watchModal.page,
+        statusFilter: watchModal.statusFilter,
+        sortKey: watchModal.sortKey,
       });
 
       await editDeferredInteractionResponse({
@@ -1277,15 +1389,31 @@ async function readWatchManagerPage({
   client,
   discordUserId,
   page,
+  statusFilter = "all",
+  sortKey = "recent",
 }: {
   client: DiscordBotClient;
   discordUserId: string;
   page: number;
+  statusFilter?: TargetPriceWatchStatusFilter;
+  sortKey?: TargetPriceWatchSortKey;
 }) {
-  const result = await readTargetPriceWatchlist({ client, discordUserId, page });
+  const result = await readTargetPriceWatchlist({
+    client,
+    discordUserId,
+    page,
+    statusFilter,
+    sortKey,
+  });
 
   if (result.watches.length === 0 && result.hasPreviousPage) {
-    return readWatchManagerPage({ client, discordUserId, page: page - 1 });
+    return readWatchManagerPage({
+      client,
+      discordUserId,
+      page: page - 1,
+      statusFilter: result.statusFilter,
+      sortKey: result.sortKey,
+    });
   }
 
   return result;
@@ -1429,6 +1557,7 @@ async function sendPublicReportTest({
         fetchImpl,
       }),
   });
+  const categories = await readPriceReportCategories({ client });
 
   await editDeferredInteractionResponse({
     token: options.token,
@@ -1436,7 +1565,7 @@ async function sendPublicReportTest({
     apiBaseUrl: options.apiBaseUrl,
     interaction,
     fetchImpl,
-    content: formatPublicReportPreviewNotice(previewResult, setting.channelId),
+    content: formatPublicReportPreviewNotice(previewResult, setting.channelId, setting, categories),
   });
 }
 
@@ -1559,7 +1688,7 @@ function createPublicPriceReportStatusMessage(
       createPublicPriceReportSettingsEmbed({
         ...panel,
         title: "公開價格報告狀態",
-        description: "目前公開價格報告的設定與最近一次發送紀錄。",
+        description: "目前即時公開價格報告的設定與最近一次發送紀錄。",
       }),
     ],
   };
@@ -1574,7 +1703,7 @@ function createPublicPriceReportSettingsEmbed({
   notice,
   title = "公開價格報告設定",
   description:
-    baseDescription = "公開價格報告會在排程爬蟲完成且有符合設定的價格變動或新增商品時，自動發送到指定頻道。",
+    baseDescription = "即時公開價格報告會在排程爬蟲完成且有符合設定的價格變動或新增商品時，自動發送到指定頻道。",
 }: Awaited<ReturnType<typeof readPublicPriceReportSettingsPanel>> & {
   title?: string;
   description?: string;
@@ -1591,7 +1720,11 @@ function createPublicPriceReportSettingsEmbed({
     fields: [
       {
         name: "狀態",
-        value: setting ? (setting.enabled ? "已啟用" : "已暫停") : "尚未設定",
+        value: setting
+          ? setting.enabled
+            ? "已啟用，自動發送中"
+            : "已暫停，不會自動發送"
+          : "尚未設定",
         inline: true,
       },
       {
@@ -1628,6 +1761,11 @@ function createPublicPriceReportSettingsEmbed({
         name: "最近一次公開報告",
         value: formatPublicReportDeliveryStatus(latestDelivery),
       },
+      {
+        name: "重試行為",
+        value:
+          "失敗或 Discord 限流的排程公開報告會在下一輪 bot 掃描時重試；已成功或已略過的輪次不會重送。",
+      },
     ],
   };
 }
@@ -1646,15 +1784,15 @@ function formatPublicReportDeliveryStatus(
   }
 
   if (delivery.status === "SKIPPED") {
-    return `略過：${deliveredAt}，本輪沒有符合設定的公開報告內容。`;
+    return `略過：${deliveredAt}，本輪沒有符合設定的公開報告內容，不會重送。`;
   }
 
   if (delivery.status === "RATE_LIMITED") {
-    return `Discord 限流：${deliveredAt}。${formatDiscordRateLimitForUser()}`;
+    return `Discord 限流：${deliveredAt}。${formatDiscordRateLimitForUser()} 下一輪掃描會重試。`;
   }
 
   if (delivery.status === "FAILED") {
-    return `失敗：${deliveredAt}。${formatPriceReportDeliveryError(delivery.errorMessage)}`;
+    return `失敗：${deliveredAt}。${formatPriceReportDeliveryError(delivery.errorMessage)} 下一輪掃描會重試。`;
   }
 
   return `${delivery.status}：${deliveredAt}，列出 ${delivery.itemCount} 筆。`;
@@ -1663,13 +1801,17 @@ function formatPublicReportDeliveryStatus(
 function formatPublicReportPreviewNotice(
   result: PublicPriceReportPreviewResult,
   channelId: string,
+  setting: PublicPriceReportSetting,
+  categories: PriceReportCategoryOption[],
 ): string {
+  const settingSummary = formatPublicReportSettingSummary(setting, categories);
+
   if (result.status === "sent") {
-    return `已發送測試公開報告到 <#${channelId}>：列出 ${result.listedCount} 筆，送出 ${result.messageCount} 則訊息。`;
+    return `已發送測試公開報告到 <#${channelId}>：價格變動 ${result.changeCount}，新增商品 ${result.newProductCount}，列出 ${result.listedCount} 筆，送出 ${result.messageCount} 則訊息。\n${settingSummary}`;
   }
 
   if (result.status === "skipped") {
-    return "過去 24 小時沒有符合設定的公開報告內容，未發送測試報告。";
+    return `過去 24 小時沒有符合設定的公開報告內容，未發送測試報告。\n${settingSummary}`;
   }
 
   if (result.status === "rate_limited") {
@@ -1681,6 +1823,20 @@ function formatPublicReportPreviewNotice(
   }
 
   return formatDiscordDeliveryFailureForUser(result.message);
+}
+
+function formatPublicReportSettingSummary(
+  setting: PublicPriceReportSetting,
+  categories: PriceReportCategoryOption[],
+): string {
+  const filters = toPublicPriceReportFilters(setting);
+
+  return `套用設定：分類 ${formatPriceReportCategoryFilterLabel(
+    filters,
+    categories,
+  )}；內容 ${formatPriceReportEventFilterLabel(filters)}；關鍵字 ${formatPriceReportKeywordFilterLabel(
+    filters,
+  )}；最多 ${setting.maxItems} 筆。`;
 }
 
 function isDiscordMissingPermissionsError(message: string | null): boolean {

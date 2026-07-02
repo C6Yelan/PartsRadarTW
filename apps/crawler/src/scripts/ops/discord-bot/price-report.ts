@@ -155,7 +155,7 @@ export function createPublicPriceReportMessages(
       ...createReportSectionEmbeds({
         title: "PartsRadarTW 公開價格報告 - 價格變動",
         lines: [
-          `本輪更新：${formatPriceChangeSummary(countPriceChangeMovements(report.priceChanges))}`,
+          `本輪更新：${formatPublicPriceReportSummary(report)}`,
           "",
           ...formatPriceChangeSectionLines(
             createPriceChangeMovementGroups(listedPriceChanges, options.publicBaseUrl),
@@ -959,6 +959,18 @@ function formatPriceChangeSummary(counts: PriceChangeMovementCounts): string {
 
   if (counts.other > 0) {
     parts.push(`**其他變動 ${counts.other}**`);
+  }
+
+  return parts.join("，");
+}
+
+function formatPublicPriceReportSummary(
+  report: Pick<RecentPriceReport, "priceChanges" | "newProducts">,
+): string {
+  const parts = [formatPriceChangeSummary(countPriceChangeMovements(report.priceChanges))];
+
+  if (report.newProducts.length > 0) {
+    parts.push(`**新增商品 ${report.newProducts.length}**`);
   }
 
   return parts.join("，");

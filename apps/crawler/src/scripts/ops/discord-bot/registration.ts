@@ -1,6 +1,7 @@
 // apps/crawler/src/scripts/ops/discord-bot/registration.ts
 
 import {
+  createBotCommand,
   createPriceReportCommand,
   createPublicReportCommand,
   createWatchCommand,
@@ -22,6 +23,11 @@ export async function registerDiscordBotCommands({
     fetchImpl,
     method: "PUT",
     path: `/applications/${applicationId}/commands`,
-    body: [createPriceReportCommand(), createWatchCommand(), createPublicReportCommand()],
+    body: [
+      createPriceReportCommand(),
+      createWatchCommand(),
+      createPublicReportCommand(),
+      createBotCommand(),
+    ],
   });
 }
