@@ -1,63 +1,19 @@
 "use client";
 // apps/web/app/products/[id]/price-history/chart.tsx
 
-import { useEffect, useState } from "react";
 import {
   formatCompactDate,
-  formatPointSource,
-  formatPrice,
-  formatSignedPercent,
-  formatTooltipDate,
   getInsufficientDataMessage,
   getPointAriaLabel,
 } from "./format";
 import type {
-  ChartConfig,
-  ChartMarker,
   ChartModel,
-  ChartPoint,
   HistoryViewSummary,
   PriceHistoryRangeDays,
   PriceHistoryRangeKey,
 } from "./types";
-
-const DESKTOP_CHART_CONFIG = {
-  width: 640,
-  height: 196,
-  padding: {
-    top: 12,
-    right: 24,
-    bottom: 30,
-    left: 50,
-  },
-} as const satisfies ChartConfig;
-
-const MOBILE_CHART_CONFIG = {
-  width: 300,
-  height: 260,
-  padding: {
-    top: 20,
-    right: 22,
-    bottom: 36,
-    left: 50,
-  },
-} as const satisfies ChartConfig;
-
-export function useChartConfig() {
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    const mediaQuery = window.matchMedia("(max-width: 760px)");
-    const updateChartConfig = () => setIsMobile(mediaQuery.matches);
-
-    updateChartConfig();
-    mediaQuery.addEventListener("change", updateChartConfig);
-
-    return () => mediaQuery.removeEventListener("change", updateChartConfig);
-  }, []);
-
-  return isMobile ? MOBILE_CHART_CONFIG : DESKTOP_CHART_CONFIG;
-}
+import { FixedChartMarker, HistoryTooltip } from "./chart/overlays";
+export { useChartConfig } from "./chart/chart-config";
 
 export function PriceHistoryChart({
   activePointKey,
@@ -177,44 +133,4 @@ function formatChartAriaLabel(
   rangeDays: PriceHistoryRangeDays | null,
 ) {
   return range === "all" ? "全部時間價格走勢圖" : `近 ${rangeDays} 天價格走勢圖`;
-}
-
-function FixedChartMarker({
-  chartConfig,
-  marker,
-}: {
-  chartConfig: ChartConfig;
-  marker: ChartMarker;
-}) {
-  return (
-    <div
-      className={`history-chart-marker is-${marker.tone}`}
-      style={{
-        left: `${(marker.point.x / chartConfig.width) * 100}%`,
-        top: `${(marker.point.y / chartConfig.height) * 100}%`,
-      }}
-    >
-      <span>{marker.label}</span>
-      <strong>{formatPrice(marker.point.amount)}</strong>
-    </div>
-  );
-}
-
-function HistoryTooltip({
-  chartConfig,
-  point,
-}: {
-  chartConfig: ChartConfig;
-  point: ChartPoint;
-}) {
-  const left = `${Math.min(Math.max((point.x / chartConfig.width) * 100, 12), 88)}%`;
-  const top = `${(point.y / chartConfig.height) * 100}%`;
-
-  return (
-    <div className="history-tooltip" style={{ left, top }}>
-      <span>{formatTooltipDate(point.observedAt)}</span>
-      <strong>{formatPrice(point.amount)}</strong>
-      <small>{`${formatPointSource(point.source)} · ${formatSignedPercent(point.percentChange)}`}</small>
-    </div>
-  );
 }

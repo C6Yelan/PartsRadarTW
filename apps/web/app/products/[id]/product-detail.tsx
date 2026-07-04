@@ -2,63 +2,14 @@
 // apps/web/app/products/[id]/product-detail.tsx
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import FloatingBuildListLink from "../../build-list/FloatingBuildListLink";
-import { BUILD_LIST_MAX_QUANTITY, toBuildListProduct } from "../../build-list/model";
-import { useBuildList } from "../../build-list/use-build-list";
 import SiteDisclaimer from "../../site-disclaimer";
-import PriceHistoryPanel, {
-  type PriceHistoryLoadState,
-  type PriceHistoryRange,
-  type ProductPriceHistoryBody,
-} from "./price-history-panel";
-import {
-  createProductShareUrl,
-  formatProductShareStatus,
-  shareProductUrl,
-  toVisibleProductShareStatus,
-  type ProductShareStatus,
-} from "./product-share";
-
-type LoadState = "idle" | "loading" | "ready" | "not-found" | "error";
-type ProductLinkHealthStatus = "ok" | "broken" | "temporary_error";
-
-interface ProductLinkHealth {
-  status: ProductLinkHealthStatus;
-  checkedAt: string;
-  httpStatus: number | null;
-}
-
-interface ProductDetailBody {
-  id: string;
-  name: string;
-  category: {
-    id: string;
-    igrp: number;
-    displayName: string;
-    sourceName: string;
-  };
-  image: {
-    url: string;
-    alt: string;
-  } | null;
-  price: {
-    amount: number;
-    currency: "TWD";
-    capturedAt: string;
-    lastSeenAt: string;
-  };
-  source: {
-    name: "coolpc";
-    url: string;
-    health: ProductLinkHealth | null;
-  };
-  status: {
-    isActive: boolean;
-    missingSince: string | null;
-  };
-  lastSeenAt: string;
-}
+import ProductDetailActions from "./detail/ProductDetailActions";
+import ProductDetailFacts from "./detail/ProductDetailFacts";
+import ProductDetailMedia from "./detail/ProductDetailMedia";
+import LinkHealthNotice from "./detail/link-health-notice";
+import { useProductDetailViewModel } from "./detail/use-product-detail-view-model";
+import PriceHistoryPanel from "./price-history-panel";
 
 export default function ProductDetail({
   productId,
@@ -67,151 +18,17 @@ export default function ProductDetail({
   productId: string;
   returnHref: string;
 }) {
-  const [state, setState] = useState<LoadState>("idle");
-  const [product, setProduct] = useState<ProductDetailBody | null>(null);
-  const [historyState, setHistoryState] = useState<PriceHistoryLoadState>("idle");
-  const [priceHistory, setPriceHistory] = useState<ProductPriceHistoryBody | null>(null);
-  const [historyRange, setHistoryRange] = useState<PriceHistoryRange>(90);
-  const [imageError, setImageError] = useState(false);
-  const [shareStatus, setShareStatus] = useState<ProductShareStatus>(null);
-  const {
-    addBuildListProduct,
-    quantityByProductId,
-    removeBuildListItem,
-    summary,
-    setBuildListItemQuantity,
-  } = useBuildList();
-  const currentBuildListQuantity = product ? (quantityByProductId.get(product.id) ?? 0) : 0;
-  const canIncreaseBuildListQuantity = currentBuildListQuantity < BUILD_LIST_MAX_QUANTITY;
-  const returnLabel = returnHref.startsWith("/build-list") ? "返回配單" : "返回查詢";
-
-  useEffect(() => {
-    const controller = new AbortController();
-    setState("loading");
-    setHistoryState("idle");
-    setImageError(false);
-    setShareStatus(null);
-    setProduct(null);
-    setPriceHistory(null);
-    setHistoryRange(90);
-
-    async function loadProductDetail() {
-      try {
-        const productResponse = await fetch(`/api/products/${productId}`, {
-          signal: controller.signal,
-        });
-
-        if (productResponse.status === 404) {
-          setState("not-found");
-          return;
-        }
-
-        if (!productResponse.ok) {
-          throw new Error("Failed to load product.");
-        }
-
-        const nextProduct = (await productResponse.json()) as ProductDetailBody;
-        setProduct(nextProduct);
-        setState("ready");
-      } catch (error: unknown) {
-        if (error instanceof DOMException && error.name === "AbortError") {
-          return;
-        }
-
-        setState("error");
-      }
-    }
-
-    void loadProductDetail();
-
-    return () => controller.abort();
-  }, [productId]);
-
-  useEffect(() => {
-    if (!product) {
-      return;
-    }
-
-    const controller = new AbortController();
-    setHistoryState("loading");
-
-    async function loadPriceHistory() {
-      try {
-        const historyResponse = await fetch(
-          `/api/products/${productId}/price-history?${toPriceHistoryRangeQuery(historyRange)}`,
-          {
-            signal: controller.signal,
-          },
-        );
-
-        if (historyResponse.status === 404) {
-          setHistoryState("unavailable");
-          return;
-        }
-
-        if (!historyResponse.ok) {
-          throw new Error("Failed to load price history.");
-        }
-
-        setPriceHistory((await historyResponse.json()) as ProductPriceHistoryBody);
-        setHistoryState("ready");
-      } catch (error: unknown) {
-        if (error instanceof DOMException && error.name === "AbortError") {
-          return;
-        }
-
-        setHistoryState("error");
-      }
-    }
-
-    void loadPriceHistory();
-
-    return () => controller.abort();
-  }, [product, productId, historyRange]);
-
-  function addCurrentProductToBuildList() {
-    if (!product) {
-      return;
-    }
-
-    addBuildListProduct(toBuildListProduct(product));
-  }
-
-  function decreaseCurrentProductBuildListQuantity() {
-    if (!product || currentBuildListQuantity <= 0) {
-      return;
-    }
-
-    if (currentBuildListQuantity === 1) {
-      removeBuildListItem(product.id);
-      return;
-    }
-
-    setBuildListItemQuantity(product.id, currentBuildListQuantity - 1);
-  }
-
-  async function shareCurrentProduct() {
-    if (!product) {
-      return;
-    }
-
-    const result = await shareProductUrl({
-      navigatorRef: navigator,
-      title: product.name,
-      text: `${product.name} - ${formatPrice(product.price.amount)}`,
-      url: createProductShareUrl(window.location.origin, product.id),
-    });
-
-    setShareStatus(toVisibleProductShareStatus(result));
-  }
-
-  const shareStatusMessage = formatProductShareStatus(shareStatus);
+  const viewModel = useProductDetailViewModel({
+    productId,
+    returnHref,
+  });
+  const { product, state } = viewModel.productLoad;
 
   return (
     <main className="detail-shell">
       <div className="detail-topbar">
-        <Link className="back-link" href={returnHref}>
-          {returnLabel}
+        <Link className="back-link" href={viewModel.navigation.returnHref}>
+          {viewModel.navigation.returnLabel}
         </Link>
         {state === "ready" && product ? (
           <span className="detail-category-chip">{product.category.displayName}</span>
@@ -242,191 +59,44 @@ export default function ProductDetail({
 
       {state === "ready" && product ? (
         <section className="detail-layout">
-          <div className="detail-media">
-            {!product.image || imageError ? (
-              <div className="detail-image-fallback" aria-label="圖片暫時無法顯示" role="img">
-                <span className="image-fallback-copy">
-                  <strong>圖片暫時無法顯示</strong>
-                  <small>{product.category.displayName}</small>
-                </span>
-              </div>
-            ) : (
-              // biome-ignore lint/performance/noImgElement: Product images are served by the local API; plain img keeps the fallback path direct.
-              <img
-                alt={product.image.alt}
-                draggable={false}
-                referrerPolicy="no-referrer"
-                src={product.image.url}
-                onContextMenu={(event) => event.preventDefault()}
-                onError={() => setImageError(true)}
-              />
-            )}
-          </div>
+          <ProductDetailMedia
+            imageError={viewModel.media.imageError}
+            product={product}
+            onImageError={viewModel.media.onImageError}
+          />
 
           <div className="detail-content">
             <h1>{product.name}</h1>
 
-            {!product.status.isActive ? (
-              <div className="quiet-alert warning" role="status">
-                這項商品目前沒有出現在原價屋列表，可能已下架或暫時無法確認。
-              </div>
-            ) : null}
-
-            <div className="price-block">
-              <span>目前價格</span>
-              <strong>{formatPrice(product.price.amount)}</strong>
-            </div>
-
-            <dl className="detail-facts">
-              <div>
-                <dt>價格資料更新</dt>
-                <dd>{formatDateTime(product.price.lastSeenAt)}</dd>
-              </div>
-              {!product.status.isActive ? (
-                <div>
-                  <dt>最後在原價屋看到</dt>
-                  <dd>{formatDateTime(product.lastSeenAt)}</dd>
-                </div>
-              ) : null}
-              <div>
-                <dt>上架狀態</dt>
-                <dd>{product.status.isActive ? "目前上架" : "可能已下架"}</dd>
-              </div>
-            </dl>
-
-            <div className="detail-actions">
-              <div className="detail-primary-actions">
-                {currentBuildListQuantity > 0 ? (
-                  <fieldset className="build-list-quantity-control build-list-detail-quantity">
-                    <legend className="sr-only">{product.name} 配單數量</legend>
-                    <button
-                      aria-label={
-                        currentBuildListQuantity === 1
-                          ? `從配單移除 ${product.name}`
-                          : `減少 ${product.name} 的配單數量`
-                      }
-                      className="build-list-step-button"
-                      title={currentBuildListQuantity === 1 ? "移除配單" : "減少數量"}
-                      type="button"
-                      onClick={decreaseCurrentProductBuildListQuantity}
-                    >
-                      −
-                    </button>
-                    <span className="build-list-quantity-value">{currentBuildListQuantity}</span>
-                    <button
-                      aria-label={`增加 ${product.name} 的配單數量`}
-                      className="build-list-step-button"
-                      disabled={!canIncreaseBuildListQuantity}
-                      title={
-                        canIncreaseBuildListQuantity
-                          ? "增加數量"
-                          : `最多 ${BUILD_LIST_MAX_QUANTITY} 件`
-                      }
-                      type="button"
-                      onClick={addCurrentProductToBuildList}
-                    >
-                      +
-                    </button>
-                  </fieldset>
-                ) : (
-                  <button
-                    className="build-list-detail-action"
-                    type="button"
-                    onClick={addCurrentProductToBuildList}
-                  >
-                    加入配單
-                  </button>
-                )}
-              </div>
-              <div className="detail-link-actions">
-                <a
-                  aria-label="前往原價屋查看／購買，開新分頁"
-                  className={toExternalActionClassName(product.source.health)}
-                  href={product.source.url}
-                  rel="noreferrer"
-                  target="_blank"
-                >
-                  前往購買
-                </a>
-                <button
-                  aria-label="分享商品連結"
-                  className="detail-share-action"
-                  type="button"
-                  onClick={shareCurrentProduct}
-                >
-                  分享
-                </button>
-              </div>
-              {shareStatusMessage ? (
-                <p className="detail-share-status" aria-live="polite">
-                  {shareStatusMessage}
-                </p>
-              ) : null}
-            </div>
-            {renderLinkHealthNotice(product)}
+            <ProductDetailFacts product={product} />
+            <ProductDetailActions
+              canIncreaseBuildListQuantity={viewModel.buildList.canIncreaseBuildListQuantity}
+              currentBuildListQuantity={viewModel.buildList.currentBuildListQuantity}
+              productName={product.name}
+              shareStatusMessage={viewModel.share.statusMessage}
+              sourceHealth={product.source.health}
+              sourceUrl={product.source.url}
+              onAddToBuildList={viewModel.buildList.addCurrentProductToBuildList}
+              onDecreaseBuildListQuantity={
+                viewModel.buildList.decreaseCurrentProductBuildListQuantity
+              }
+              onShare={viewModel.share.shareCurrentProduct}
+            />
+            <LinkHealthNotice product={product} />
           </div>
         </section>
       ) : null}
 
       {state === "ready" && product ? (
         <PriceHistoryPanel
-          history={priceHistory}
-          selectedRange={historyRange}
-          state={historyState}
-          onRangeChange={setHistoryRange}
+          history={viewModel.priceHistory.history}
+          selectedRange={viewModel.priceHistory.selectedRange}
+          state={viewModel.priceHistory.state}
+          onRangeChange={viewModel.priceHistory.onRangeChange}
         />
       ) : null}
-      <FloatingBuildListLink summary={summary} />
+      <FloatingBuildListLink summary={viewModel.buildList.summary} />
       <SiteDisclaimer />
     </main>
   );
-}
-
-function toPriceHistoryRangeQuery(range: PriceHistoryRange) {
-  return range === "all" ? "range=all" : `days=${range}`;
-}
-
-function formatPrice(amount: number) {
-  return `NT$ ${new Intl.NumberFormat("zh-TW").format(amount)}`;
-}
-
-function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat("zh-TW", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(new Date(value));
-}
-
-function toExternalActionClassName(health: ProductLinkHealth | null) {
-  return ["external-action", health && health.status !== "ok" ? "needs-link-check" : null]
-    .filter(Boolean)
-    .join(" ");
-}
-
-function renderLinkHealthNotice(product: ProductDetailBody) {
-  const notices = [toLinkHealthNotice("原價屋連結", product.source.health)].filter(
-    (notice): notice is string => Boolean(notice),
-  );
-
-  if (notices.length === 0) {
-    return null;
-  }
-
-  return (
-    <p className="link-health-note" role="status">
-      {notices.join("　")}
-    </p>
-  );
-}
-
-function toLinkHealthNotice(label: string, health: ProductLinkHealth | null) {
-  if (!health || health.status === "ok") {
-    return null;
-  }
-
-  return health.status === "broken" ? `${label}可能已失效` : `${label}暫時無法確認`;
 }

@@ -1,0 +1,164 @@
+"use client";
+// apps/web/app/product-explorer/use-product-explorer-view-model.ts
+
+import { useEffect, useMemo } from "react";
+import { useProductExplorerActions } from "./actions/use-product-explorer-actions";
+import {
+  useCategories,
+  usePendingPageScroll,
+  useProductExplorerQuery,
+  useProducts,
+  useResponsiveFiltersOpen,
+} from "./hooks";
+import { DEFAULT_QUERY, getVisiblePages, toUrl } from "./query-state";
+import { useProductBuildListActions } from "./use-product-build-list-actions";
+
+export function useProductExplorerViewModel() {
+  const { isReady, query, draft, formError, setDraft, setFormError, commitQuery } =
+    useProductExplorerQuery();
+  const { categories, categoryState } = useCategories();
+  const { products, productState } = useProducts(isReady, query);
+  const { filtersOpen, keepDesktopFiltersOpen, syncFiltersOpenFromToggle } =
+    useResponsiveFiltersOpen();
+  const { resultsPanelRef, schedulePageScroll } = usePendingPageScroll(productState, products);
+  const buildList = useProductBuildListActions();
+
+  useEffect(() => {
+    if (!isReady || categoryState !== "ready" || categories.length === 0) {
+      return;
+    }
+
+    const categoryIgrps = new Set(categories.map((category) => String(category.igrp)));
+    if (query.igrp && categoryIgrps.has(query.igrp)) {
+      return;
+    }
+
+    commitQuery(
+      {
+        ...query,
+        igrp: String(categories[0].igrp),
+        vendors: DEFAULT_QUERY.vendors,
+        page: 1,
+      },
+      {
+        replace: true,
+      },
+    );
+  }, [categories, categoryState, commitQuery, isReady, query]);
+
+  const selectedCategoryName = useMemo(() => {
+    if (!query.igrp) {
+      return "選擇分類";
+    }
+
+    return (
+      categories.find((category) => String(category.igrp) === query.igrp)?.displayName ??
+      `IGrp ${query.igrp}`
+    );
+  }, [categories, query.igrp]);
+
+  const totalItems = products?.pagination.totalItems ?? 0;
+  const totalPages = products?.pagination.totalPages ?? 0;
+  const visiblePages = getVisiblePages(query.page, totalPages);
+  const shouldShowPageJump = totalPages > 10;
+  const productListReturnTo = toUrl(query);
+  const vendorOptions =
+    productState === "ready" && query.igrp ? (products?.meta.vendors ?? []) : [];
+  const selectedVendorOptions = useMemo(
+    () => vendorOptions.filter((option) => query.vendors.includes(option.slug)),
+    [query.vendors, vendorOptions],
+  );
+  const hasActiveFilters =
+    query.q !== DEFAULT_QUERY.q ||
+    query.minPrice !== DEFAULT_QUERY.minPrice ||
+    query.maxPrice !== DEFAULT_QUERY.maxPrice ||
+    query.status !== DEFAULT_QUERY.status ||
+    query.vendors.length > 0;
+  const actions = useProductExplorerActions({
+    categories,
+    commitQuery,
+    draft,
+    query,
+    schedulePageScroll,
+    setDraft,
+    setFormError,
+    totalPages,
+    vendorOptions,
+  });
+
+  return {
+    header: {
+      draft,
+      products,
+      actions: {
+        clearSearchDraft: actions.clearSearchDraft,
+        returnHome: actions.returnHome,
+        updateSearchDraft: actions.updateSearchDraft,
+        applyTextFilters: actions.applyTextFilters,
+      },
+    },
+    filters: {
+      categories,
+      categoryState,
+      filtersOpen,
+      selectedIgrp: query.igrp,
+      actions: {
+        updateCategoryFilter: actions.updateCategoryFilter,
+        keepDesktopFiltersOpen,
+        syncFiltersOpenFromToggle,
+      },
+    },
+    results: {
+      panel: {
+        ref: resultsPanelRef,
+      },
+      toolbar: {
+        draft,
+        formError,
+        hasActiveFilters,
+        query,
+        selectedCategoryName,
+        selectedVendorOptions,
+        totalItems,
+        vendorOptions,
+      },
+      table: {
+        buildListQuantities: buildList.quantities,
+        productListReturnTo,
+        products,
+        productState,
+      },
+      pagination: {
+        page: query.page,
+        pageJumpValue: actions.pageJumpValue,
+        productState,
+        shouldShowPageJump,
+        totalPages,
+        visiblePages,
+      },
+      actions: {
+        toolbar: {
+          clearVendors: () => actions.updateQuery({ vendors: DEFAULT_QUERY.vendors }),
+          draftChange: setDraft,
+          pageSizeChange: (pageSize: number) => actions.updateQuery({ pageSize }),
+          resetFilters: actions.resetFilters,
+          sortChange: (sort: typeof query.sort) => actions.updateQuery({ sort }),
+          statusChange: (status: typeof query.status) => actions.updateQuery({ status }),
+          toggleVendor: actions.toggleVendorFilter,
+        },
+        table: {
+          addToBuildList: buildList.addProductToBuildList,
+          decreaseBuildListQuantity: buildList.decreaseBuildListItemQuantity,
+        },
+        pagination: {
+          goToPage: actions.goToPage,
+          jumpSubmit: actions.jumpToPage,
+          pageJumpValueChange: actions.setPageJumpValue,
+        },
+      },
+    },
+    buildList: {
+      summary: buildList.summary,
+    },
+  };
+}

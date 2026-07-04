@@ -1,0 +1,97 @@
+"use client";
+// apps/web/app/products/[id]/detail/ProductDetailActions.tsx
+
+import { BUILD_LIST_MAX_QUANTITY } from "../../../build-list/model";
+import type { ProductLinkHealth } from "./types";
+
+export default function ProductDetailActions({
+  canIncreaseBuildListQuantity,
+  currentBuildListQuantity,
+  onAddToBuildList,
+  onDecreaseBuildListQuantity,
+  onShare,
+  productName,
+  shareStatusMessage,
+  sourceHealth,
+  sourceUrl,
+}: {
+  canIncreaseBuildListQuantity: boolean;
+  currentBuildListQuantity: number;
+  onAddToBuildList: () => void;
+  onDecreaseBuildListQuantity: () => void;
+  onShare: () => void;
+  productName: string;
+  shareStatusMessage: string | null;
+  sourceHealth: ProductLinkHealth | null;
+  sourceUrl: string;
+}) {
+  return (
+    <div className="detail-actions">
+      <div className="detail-primary-actions">
+        {currentBuildListQuantity > 0 ? (
+          <fieldset className="build-list-quantity-control build-list-detail-quantity">
+            <legend className="sr-only">{productName} 配單數量</legend>
+            <button
+              aria-label={
+                currentBuildListQuantity === 1
+                  ? `從配單移除 ${productName}`
+                  : `減少 ${productName} 的配單數量`
+              }
+              className="build-list-step-button"
+              title={currentBuildListQuantity === 1 ? "移除配單" : "減少數量"}
+              type="button"
+              onClick={onDecreaseBuildListQuantity}
+            >
+              −
+            </button>
+            <span className="build-list-quantity-value">{currentBuildListQuantity}</span>
+            <button
+              aria-label={`增加 ${productName} 的配單數量`}
+              className="build-list-step-button"
+              disabled={!canIncreaseBuildListQuantity}
+              title={canIncreaseBuildListQuantity ? "增加數量" : `最多 ${BUILD_LIST_MAX_QUANTITY} 件`}
+              type="button"
+              onClick={onAddToBuildList}
+            >
+              +
+            </button>
+          </fieldset>
+        ) : (
+          <button className="build-list-detail-action" type="button" onClick={onAddToBuildList}>
+            加入配單
+          </button>
+        )}
+      </div>
+      <div className="detail-link-actions">
+        <a
+          aria-label="前往原價屋查看／購買，開新分頁"
+          className={toExternalActionClassName(sourceHealth)}
+          href={sourceUrl}
+          rel="noreferrer"
+          target="_blank"
+        >
+          前往購買
+        </a>
+        <button
+          aria-label="分享商品連結"
+          className="detail-share-action"
+          type="button"
+          onClick={onShare}
+        >
+          分享
+        </button>
+      </div>
+      {shareStatusMessage ? (
+        <p className="detail-share-status" aria-live="polite">
+          {shareStatusMessage}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function toExternalActionClassName(health: ProductLinkHealth | null) {
+  return ["external-action", health && health.status !== "ok" ? "needs-link-check" : null]
+    .filter(Boolean)
+    .join(" ");
+}

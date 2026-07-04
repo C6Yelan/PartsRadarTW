@@ -6,7 +6,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { ApiRequestError, fetchCategories, fetchProducts } from "./api";
 import {
   DEFAULT_QUERY,
   normalizeVendorValues,
@@ -15,7 +14,10 @@ import {
   toUrl,
   validatePriceRange,
 } from "./query-state";
-import type { CategoryItem, LoadState, ProductsResponse, QueryState } from "./types";
+import type { LoadState, ProductsResponse, QueryState } from "./types";
+
+export { useCategories } from "./data/use-categories";
+export { useProducts } from "./data/use-products";
 
 const DESKTOP_FILTER_MEDIA_QUERY_VALUE = "(min-width: 761px)";
 
@@ -142,75 +144,6 @@ export function useResponsiveFiltersOpen() {
     filtersOpen,
     keepDesktopFiltersOpen,
     syncFiltersOpenFromToggle,
-  };
-}
-
-export function useCategories() {
-  const [categories, setCategories] = useState<CategoryItem[]>([]);
-  const [categoryState, setCategoryState] = useState<LoadState>("idle");
-
-  useEffect(() => {
-    const controller = new AbortController();
-    setCategoryState("loading");
-
-    fetchCategories(controller.signal)
-      .then((items) => {
-        setCategories(items);
-        setCategoryState("ready");
-      })
-      .catch((error: unknown) => {
-        if (error instanceof DOMException && error.name === "AbortError") {
-          return;
-        }
-
-        setCategoryState("error");
-      });
-
-    return () => controller.abort();
-  }, []);
-
-  return {
-    categories,
-    categoryState,
-  };
-}
-
-export function useProducts(isReady: boolean, query: QueryState) {
-  const [products, setProducts] = useState<ProductsResponse | null>(null);
-  const [productState, setProductState] = useState<LoadState>("idle");
-
-  useEffect(() => {
-    if (!isReady || !query.igrp) {
-      return;
-    }
-
-    const controller = new AbortController();
-    setProductState("loading");
-
-    fetchProducts(query, controller.signal)
-      .then((body) => {
-        setProducts(body);
-        setProductState("ready");
-      })
-      .catch((error: unknown) => {
-        if (error instanceof DOMException && error.name === "AbortError") {
-          return;
-        }
-
-        if (error instanceof ApiRequestError && error.code === "rate_limited") {
-          setProductState("rate_limited");
-          return;
-        }
-
-        setProductState("error");
-      });
-
-    return () => controller.abort();
-  }, [isReady, query]);
-
-  return {
-    products,
-    productState,
   };
 }
 
