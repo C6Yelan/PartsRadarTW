@@ -5,22 +5,16 @@ import { relative } from "node:path";
 import type { Prisma, PrismaClient } from "@partsradar/db";
 import { createPublicProductImagePath } from "@partsradar/shared";
 import {
-  DEFAULT_COOLPC_CATEGORY_DELAY_MS,
   assertSeededCategories,
   runCoolpcCategoryCrawl,
 } from "../../coolpc/live-crawl";
 import { CRAWL_TRIGGER_TYPES, type RunCoolpcCrawlOnceResult } from "../../coolpc/crawl-run";
 import {
-  getNumberArg,
-  getStringArg,
   loadWorkspaceEnv,
-  resolveRelativeToWorkspace,
-  resolveWorkspaceRoot,
   toSafeCliErrorMessage,
 } from "../shared/script-utils";
+import { parseOptions, type CrawlOptions } from "./crawl-coolpc-once/options";
 
-const CONFIRM_LIVE_FETCH_FLAG = "--confirm-live-fetch";
-const DEFAULT_STORAGE_DIR = "temp/coolpc-manual-crawl/snapshots";
 const DEFAULT_PAGE_SIZE = 5;
 const MANUAL_CRAWL_USER_AGENT =
   "PartsRadarTW manual crawler smoke (+https://github.com/C6Yelan/PartsRadarTW)";
@@ -59,13 +53,6 @@ const PUBLIC_PRODUCT_SMOKE_FIELDS = {
     },
   },
 } satisfies Prisma.ProductSelect;
-
-interface CrawlOptions {
-  workspaceRoot: string;
-  fromRawDir: string | null;
-  storageDir: string;
-  delayMs: number;
-}
 
 interface DbCounts {
   products: number;
@@ -275,53 +262,6 @@ function printCountDelta(label: string, before: number, after: number): void {
   const sign = delta >= 0 ? "+" : "";
 
   console.log(`- ${label}: ${after} (${sign}${delta})`);
-}
-
-function parseOptions(args: string[]): CrawlOptions {
-  if (args.includes("--help")) {
-    printHelp();
-    process.exit(0);
-  }
-
-  const workspaceRoot = resolveWorkspaceRoot();
-  const fromRawDirArg = getStringArg(args, "--from-raw-dir");
-  const fromRawDir = fromRawDirArg
-    ? resolveRelativeToWorkspace(workspaceRoot, fromRawDirArg)
-    : null;
-
-  if (!fromRawDir && !args.includes(CONFIRM_LIVE_FETCH_FLAG)) {
-    throw new Error(
-      `Refusing live CoolPC fetch. Re-run with ${CONFIRM_LIVE_FETCH_FLAG} because this command contacts the source site and must stay manual-only.`,
-    );
-  }
-
-  return {
-    workspaceRoot,
-    fromRawDir,
-    storageDir: resolveRelativeToWorkspace(
-      workspaceRoot,
-      getStringArg(args, "--storage-dir") ??
-        process.env.SNAPSHOT_STORAGE_DIR ??
-        DEFAULT_STORAGE_DIR,
-    ),
-    delayMs: getNumberArg(args, "--delay-ms", DEFAULT_COOLPC_CATEGORY_DELAY_MS),
-  };
-}
-
-function printHelp(): void {
-  console.log(`Usage:
-  pnpm --filter @partsradar/crawler manual:crawl-coolpc-once -- --from-raw-dir <path>
-  pnpm --filter @partsradar/crawler manual:crawl-coolpc-once -- --confirm-live-fetch [options]
-
-Options:
-  --from-raw-dir <path>      Replay saved raw HTML from the workspace root.
-                             Expected files: igrp-4.html, igrp-5.html, ...
-  --confirm-live-fetch       Required for live CoolPC requests.
-  --delay-ms <ms>            Delay between live category requests.
-                             Default: ${DEFAULT_COOLPC_CATEGORY_DELAY_MS}
-  --storage-dir <path>       Snapshot storage directory from the workspace root.
-                             Default: ${DEFAULT_STORAGE_DIR}
-`);
 }
 
 main().catch((error) => {

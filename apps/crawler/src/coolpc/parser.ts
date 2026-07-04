@@ -1,7 +1,6 @@
 // apps/crawler/src/coolpc/parser.ts
 import { load } from "cheerio";
 import { decode } from "iconv-lite";
-import { classifyProductVendor } from "@partsradar/shared";
 import { extractCoolpcProductCandidates } from "./parser/candidates";
 import { validateCoolpcCategoryPage } from "./parser/content-validation";
 import {
@@ -21,6 +20,7 @@ import {
   normalizeCoolpcProductImageUrl,
   sanitizeCoolpcSourceUrl,
 } from "./parser/urls";
+import { classifyProductVendor } from "./vendor-classification";
 
 export type {
   ContentValidationResult,

@@ -1,11 +1,14 @@
 // apps/crawler/src/coolpc/raw-snapshot-cleanup.ts
-import { lstat, unlink } from "node:fs/promises";
-import { isAbsolute, relative, resolve } from "node:path";
 import type { PrismaClient } from "@partsradar/db";
 import {
   RAW_SNAPSHOT_CONTENT_STATUSES,
   type RawSnapshotContentStatusValue,
 } from "./raw-snapshot-writer";
+import {
+  deleteCompressedHtmlFiles,
+  preflightCompressedHtmlFiles,
+  validateCompressedHtmlPaths,
+} from "./raw-snapshot-cleanup/files";
 
 export const DEFAULT_RAW_SNAPSHOT_NORMAL_RETENTION_DAYS = 30;
 export const DEFAULT_RAW_SNAPSHOT_ABNORMAL_RETENTION_DAYS = 90;
@@ -261,89 +264,10 @@ async function findReferencedCompressedHtmlPaths(
   );
 }
 
-async function deleteCompressedHtmlFiles(
-  storageDir: string,
-  compressedHtmlPaths: string[],
-): Promise<{ deleted: number; missing: number }> {
-  let deleted = 0;
-  let missing = 0;
-
-  for (const relativePath of compressedHtmlPaths) {
-    try {
-      await unlink(resolveCompressedHtmlPath(storageDir, relativePath));
-      deleted += 1;
-    } catch (error) {
-      if (isNodeError(error) && error.code === "ENOENT") {
-        missing += 1;
-        continue;
-      }
-
-      throw error;
-    }
-  }
-
-  return { deleted, missing };
-}
-
-async function preflightCompressedHtmlFiles(
-  storageDir: string,
-  compressedHtmlPaths: string[],
-): Promise<void> {
-  for (const relativePath of compressedHtmlPaths) {
-    const outputPath = resolveCompressedHtmlPath(storageDir, relativePath);
-
-    try {
-      const stats = await lstat(outputPath);
-
-      if (!stats.isFile()) {
-        throw new Error(
-          `Refusing to delete raw snapshot path because it is not a regular file: ${relativePath}`,
-        );
-      }
-    } catch (error) {
-      if (isNodeError(error) && error.code === "ENOENT") {
-        continue;
-      }
-
-      throw error;
-    }
-  }
-}
-
 function validateRetentionDays(value: number, label: string): void {
   if (!Number.isSafeInteger(value) || value <= 0) {
     throw new Error(`${label} must be a positive integer.`);
   }
-}
-
-function validateCompressedHtmlPaths(storageDir: string, compressedHtmlPaths: string[]): void {
-  for (const relativePath of compressedHtmlPaths) {
-    resolveCompressedHtmlPath(storageDir, relativePath);
-  }
-}
-
-function resolveCompressedHtmlPath(storageDir: string, relativePath: string): string {
-  if (!relativePath) {
-    throw new Error("Raw snapshot compressed_html_path must not be empty.");
-  }
-
-  if (isAbsolute(relativePath)) {
-    throw new Error(`Refusing to delete absolute raw snapshot path: ${relativePath}`);
-  }
-
-  const root = resolve(storageDir);
-  const outputPath = resolve(root, relativePath);
-  const relativeOutputPath = relative(root, outputPath);
-
-  if (relativeOutputPath === "") {
-    throw new Error(`Refusing to delete raw snapshot storage root: ${relativePath}`);
-  }
-
-  if (relativeOutputPath.startsWith("..") || isAbsolute(relativeOutputPath)) {
-    throw new Error(`Refusing to delete raw snapshot path outside storage dir: ${relativePath}`);
-  }
-
-  return outputPath;
 }
 
 function subtractDays(date: Date, days: number): Date {
@@ -366,8 +290,4 @@ function chunk<T>(values: T[], size: number): T[][] {
   }
 
   return chunks;
-}
-
-function isNodeError(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && "code" in error;
 }
