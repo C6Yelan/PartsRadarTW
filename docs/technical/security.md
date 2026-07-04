@@ -158,7 +158,7 @@ https://www.coolpc.com.tw/eachview.php?IGrp={分類編號}
 
 - 不接受公開使用者輸入 URL。
 - production base URL 只允許 `https://www.coolpc.com.tw`。
-- daemon 預設不隨 `docker compose up -d` 啟動，只能透過 `scheduled-crawler` profile。
+- crawler / maintenance daemon 預設不隨 `docker compose up -d` 啟動，只能透過 `compose.crawler.yml` 的 `scheduled-crawler` profile。
 - daemon command 保留 `--confirm-live-fetch`。
 - 不對外開 port，不提供 HTTP trigger。
 - interval / backoff 不低於 60 秒，分類間 delay 不低於 3000 ms。

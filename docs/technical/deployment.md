@@ -37,6 +37,8 @@
 | `crawler-daemon` | scheduled CoolPC crawl + new-product image cache follow-up |
 | `maintenance-daemon` | scheduled link health check |
 | `raw-snapshot-cleanup-daemon` | scheduled raw snapshot cleanup |
+| `smoke-daemon` | scheduled production smoke and admin webhook notification |
+| `ops-web` | protected internal `/ops/status` page |
 | `discord-bot` | Discord slash command bot for personal DM notifications |
 | `postgres` | 商品、價格、crawler 狀態與 metadata |
 | `cloudflared` | Cloudflare Tunnel public entry |
@@ -50,7 +52,7 @@
 
 ## Compose 口徑
 
-正式部署與本機 PostgreSQL 開發共用 `compose.yml`。
+正式部署與本機 PostgreSQL 開發共用 `compose.yml` 作為 core runtime；crawler / maintenance daemons 放在 `compose.crawler.yml`，ops / smoke / Discord bot 放在 `compose.ops.yml`，public tunnel 放在 `compose.tunnel.yml`。
 
 預設 app stack：
 
@@ -63,17 +65,21 @@
 
 - `manual-crawler`
 - `scheduled-crawler`
+- `ops`
+- `discord-bot`
 - `public-tunnel`
 
 規則：
 
 - `storage-init` 以 root 執行一次性 `mkdir` / `chown`，只修正 mounted storage volume 權限，不跑 crawler、不連 DB。
 - Docker named volume 會覆蓋 image build 階段對 mount point 做過的 `chown`；初次部署或重建 volume 後需讓 `storage-init` 成功完成。
-- `web`、`crawler`、`crawler-daemon`、`maintenance-daemon` 與 `raw-snapshot-cleanup-daemon` 都等 `storage-init` 成功後才啟動；長時間 runtime 仍使用非 root user。
+- `web`、`crawler`、`crawler-daemon`、`maintenance-daemon`、`raw-snapshot-cleanup-daemon`、`ops-web` 與 `smoke-daemon` 都等 `storage-init` 成功後才啟動；長時間 runtime 仍使用非 root user。
+- `crawler`、`crawler-daemon`、`maintenance-daemon` 與 `raw-snapshot-cleanup-daemon` 放在 `compose.crawler.yml`；啟動時需搭配 `-f compose.yml -f compose.crawler.yml`。
+- `ops-web`、`smoke-daemon` 與 `discord-bot` 放在 `compose.ops.yml`；啟動時需搭配 `-f compose.yml -f compose.ops.yml`。
 - `crawler` 預設 command 是 help，避免 `docker compose up` 意外 live fetch。
 - `crawler-daemon` 與 `maintenance-daemon` 只在 `scheduled-crawler` profile 啟動，且 command 保留 `--confirm-live-fetch`。
 - `crawler-daemon` 與 `maintenance-daemon` 共用 `EXTERNAL_FETCH_LOCK_DIR`，避免定期價格抓取與連結檢查同時打外部來源；價格 crawler 到點時會發出短效 priority signal，讓 maintenance link health 在安全邊界暫停並延後幾分鐘繼續。新品圖片快取只在每輪價格 crawl 完成並釋放 lock 後針對本輪新增商品執行，既有缺圖修復仍使用手動 backfill 工具。
-- `cloudflared` 只在 `public-tunnel` profile 啟動。
+- `cloudflared` 放在 `compose.tunnel.yml`，只在 `public-tunnel` profile 啟動。
 - `COOLPC_BASE_URL` 在 production Compose 固定為 `https://www.coolpc.com.tw`。
 - `web` 預設綁 `127.0.0.1:${WEB_PORT:-3000}`；公開流量走 Cloudflare Tunnel。
 - `POSTGRES_*` 在 Compose 中必填，不使用 development fallback。
@@ -180,7 +186,7 @@ Discord bot 權限：
 
 - `.env`、DB password、SSH key、Cloudflare token 不提交。
 - `.env.example` 只能放欄位與非敏感 placeholder。
-- 未啟用 `public-tunnel` 時仍可能需要非空 placeholder，因 Compose 會先解析整份檔案。
+- 未載入 `compose.tunnel.yml` 時不需要 Cloudflare Tunnel placeholder；真正啟動 tunnel 前必須換成固定版本 image 與真實 token。
 
 ## Deployment Flow
 
@@ -197,11 +203,12 @@ Discord bot 權限：
 9. 啟動 `web`。
 10. private validation `/api/source-status`。
 11. 視需要先手動跑 product image backfill。
-12. 啟動 `scheduled-crawler` profile 中的 `crawler-daemon`、`maintenance-daemon` 與 `raw-snapshot-cleanup-daemon`。
-13. 若啟用 Discord 個人化通知，設定 bot secret 後啟動 `discord-bot` profile。
-14. 建立 Cloudflare remotely-managed tunnel。
-15. 啟動 `public-tunnel` profile。
-16. 驗證正式網域、API、圖片 API、crawler、maintenance、Discord bot 與資料狀態。
+12. 以 `compose.crawler.yml` 啟動 `scheduled-crawler` profile 中的 `crawler-daemon`、`maintenance-daemon` 與 `raw-snapshot-cleanup-daemon`。
+13. 以 `compose.ops.yml` 啟動 `ops` profile 中的 `smoke-daemon` 與視需要啟動 `ops-web`。
+14. 若啟用 Discord 個人化通知，設定 bot secret 後以 `compose.ops.yml` 啟動 `discord-bot` profile。
+15. 建立 Cloudflare remotely-managed tunnel。
+16. 以 `compose.tunnel.yml` 啟動 `public-tunnel` profile。
+17. 驗證正式網域、API、圖片 API、crawler、maintenance、smoke、ops status、Discord bot 與資料狀態。
 
 ## Migration / Backup / Monitoring
 
@@ -223,7 +230,7 @@ Backup：
 
 最小監控：
 
-- `web`、`crawler-daemon`、`maintenance-daemon`、`discord-bot`、`postgres` 存活。
+- `web`、`crawler-daemon`、`maintenance-daemon`、`smoke-daemon`、`discord-bot`、`postgres` 存活。
 - 最近 successful crawl。
 - backoff 狀態。
 - snapshot / image cache 容量。

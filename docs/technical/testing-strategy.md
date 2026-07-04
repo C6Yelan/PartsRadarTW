@@ -1,6 +1,6 @@
 # 測試策略
 
-第一版測試以 Vitest、TypeScript typecheck、Biome、Next.js build、Docker / API smoke 與必要的瀏覽器驗證為主。實際連線原價屋只能手動或明確 profile 執行，不進常規測試。
+測試以 Vitest、TypeScript typecheck、Biome、Next.js build、Docker / API smoke 與必要的瀏覽器驗證為主。實際連線原價屋只能手動或明確 profile 執行，不進常規測試。
 
 ## 目標
 
@@ -9,7 +9,8 @@
 - 商品 identity、價格歷史、current price 與 missing / inactive 規則正確。
 - API query validation、排序、分頁、狀態與錯誤處理符合 contract。
 - Web UI 能呈現 active、inactive、stale、unavailable 與錯誤狀態。
-- 每個 phase / refactor slice 都有清楚驗收點。
+- 每個 refactor slice 都有清楚驗收點。
+- `pnpm test` 失敗應代表產品契約、資料安全或核心流程有風險；純樣式 / governance policy 不放在常規 Vitest。
 
 ## 工具
 
@@ -17,12 +18,23 @@
 | --- | --- |
 | Vitest | parser、資料流、API logic、shared utils |
 | TypeScript typecheck | 型別正確性 |
-| Biome | lint / format |
+| Biome | lint / format；程式風格與 unused import 類問題由這裡處理 |
 | Next.js build | production build 編譯 |
 | Docker Compose smoke | 部署與 service wiring |
 | Playwright | 影響可見 UI / route / CSS 的大型重構驗證 |
 
 不在第一版常規導入大型視覺回歸、壓力測試或每次打 live CoolPC 的 E2E。
+
+## Test Entrypoints
+
+Root scripts separate daily signal from heavier operational detail:
+
+- `pnpm test` / `pnpm test:core`: core parser, data-flow, API, build-list, product UI helpers, and shared package tests.
+- `pnpm test:ops`: ops / maintenance / smoke / daemon tests that are not Discord bot specific.
+- `pnpm test:discord`: Discord bot command, report, delivery, cooldown, and notification tests.
+- `pnpm test:all`: full Vitest regression.
+
+No entrypoint performs live CoolPC fetches or real Discord API calls.
 
 ## Fixtures
 
@@ -56,6 +68,18 @@ Runtime folders such as `apps/web/app/api/` and `apps/crawler/src/coolpc/` shoul
 `.test.ts` files or fake clients. Put local fake clients under the nearest `tests/**/support/`
 folder instead of adding new `test-support/` directories inside runtime source.
 
+Policy-style scans are not product tests. Do not add repo-wide source layout rules, path-comment
+requirements, or broad text scans to `pnpm test` unless they directly protect a security boundary.
+
+Discord bot fake clients are split by contract boundary under
+`apps/crawler/tests/scripts/ops/discord-bot/support-*`:
+
+- price report reader delegates
+- delivery recorder delegates
+- public report setting / delivery delegates
+- price report setting delegates
+- target watch delegates
+
 ## Crawler Tests
 
 Parser / validation 至少覆蓋：
@@ -85,7 +109,7 @@ Scheduled crawler 至少覆蓋：
 - 沒有 `--confirm-live-fetch` 時拒絕啟動。
 - interval、backoff、category delay 有下限。
 - Compose 預設不啟動 `crawler-daemon`。
-- `scheduled-crawler` profile 才包含 daemon，且不開 host ports。
+- crawler daemon 只在 `compose.crawler.yml` 的 `scheduled-crawler` profile 中啟動，且不開 host ports。
 - `crawler-daemon` 與 `maintenance-daemon` 共用 external fetch lock，避免同時抓外部來源。
 - `maintenance-daemon` 沒有 `--confirm-live-fetch` 或 `--dry-run` 時拒絕啟動；run-once / loop failure behavior 需有測試。
 
@@ -100,7 +124,12 @@ Scheduled crawler 至少覆蓋：
 - 商品不存在 `404`。
 - inactive 商品詳細仍可 `200`。
 - `/api/source-status` 的 `ok`、`stale`、`unavailable` 與分類聚合。
-- web runtime source 不含 `console.*`，避免 browser console 洩漏 internal state。
+- web runtime source 不含 `console.*`，避免 browser console 洩漏 internal state；此規則由 Biome `noConsole` 限定在 `apps/web/app` runtime source 執行，不放在 Vitest。
+
+Build-list tests are grouped by public boundary:
+
+- `apps/web/tests/build-list/model-storage.test.ts`: model normalization, quantity rules, localStorage persistence.
+- `apps/web/tests/build-list/export.test.ts`: worksheet rows, generated workbook / download, export date formatting.
 
 不可暴露：
 
@@ -154,9 +183,9 @@ Private validation 先限 Docker / Compose / DB / web API，不公開流量、�
 - CSP / security headers。
 - crawler 成功資料寫入或明確失敗證據。
 
-## Phase Closeout
+## Slice Closeout
 
-每個階段至少執行對應檢查：
+每個切片至少執行對應檢查：
 
 | 階段 | 最小檢查 |
 | --- | --- |

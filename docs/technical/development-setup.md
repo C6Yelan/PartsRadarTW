@@ -61,7 +61,7 @@ docs/
 - `apps/web`：Next.js 網站與 Route Handlers。
 - `apps/crawler`：獨立 crawler process。
 - `packages/db`：Prisma schema、migration 與 database client。
-- `packages/shared`：共用型別、分類設定與資料驗證。
+- `packages/shared`：跨 package 的來源 identity、公開 URL helper 與來源分類 contract。
 
 ## 環境變數
 

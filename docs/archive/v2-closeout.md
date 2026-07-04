@@ -1,4 +1,6 @@
-# 第二版 Roadmap
+# 第二版 Closeout
+
+本文件是第二版歷史 closeout 與驗收紀錄，不是 current runtime contract。現行行為以程式碼、migration、`docs/planning/product-boundary.md` 與 `docs/technical/` 內 current contract 為準。
 
 本文件記錄第二版網站規劃。第二版不是帳號系統、通知系統或完整菜單推薦工具，而是把第一版查詢網站升級成更能理解價格變化、整理配單、維持正常瀏覽體驗與維運公開服務的版本。
 
@@ -30,7 +32,7 @@
 - 只從商品標題萃取的規格副標。
 - 第三版 Roadmap 已接手的維運通知、服務狀態頁與外部監控能力。
 
-第二版非目標的後續處理以 [第三版 Roadmap](v3-roadmap.md) 或另行產品 / 資安設計為準，不從第二版自然延伸。
+第二版非目標的後續處理以 [第三版 Roadmap](../planning/v3-roadmap.md) 或另行產品 / 資安設計為準，不從第二版自然延伸。
 
 ## 進入條件
 
@@ -294,7 +296,7 @@ fix(web): remove unstable coolpc import tool
 
 ## 第三版方向
 
-第三版已另立 [第三版 Roadmap](v3-roadmap.md)。目前第三版範圍已改以商品分享 / Open Graph、Discord webhook 公開變價廣播、Discord 管理者告警、Discord bot 個人目標價提醒與個人價格變動報告、內網 ops status page、外部監控與公開流量硬化為主；分享配單與公開服務狀態頁暫緩。未列入項目與非目標不再於本文件重複，均以第三版 Roadmap 為準。
+第三版已另立 [第三版 Roadmap](../planning/v3-roadmap.md)。目前第三版範圍已改以商品分享 / Open Graph、Discord bot 公開變價廣播、Discord 管理者告警、Discord bot 個人目標價提醒與個人價格變動報告、內網 ops status page、外部監控與公開流量硬化為主；分享配單與公開服務狀態頁暫緩。未列入項目與非目標不再於本文件重複，均以第三版 Roadmap 為準。
 
 ## GitHub Release 策略
 

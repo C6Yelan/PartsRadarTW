@@ -125,7 +125,7 @@ docs/
 - `apps/web`：Next.js 網站與查詢 API。
 - `apps/crawler`：獨立 crawler process。
 - `packages/db`：Prisma schema、migration 與資料庫 client。
-- `packages/shared`：共用型別、常數、資料驗證與來源分類設定。
+- `packages/shared`：跨 package 的來源 identity、公開 URL helper 與來源分類 contract。
 - `docs`：產品、規劃與技術文件。
 
 實際目錄可在專案初始化時依工具限制微調，但責任邊界應維持一致。

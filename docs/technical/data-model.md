@@ -2,6 +2,11 @@
 
 `packages/db/prisma/schema.prisma` 是實際 schema 來源。本文件只保留第一版資料模型的設計口徑、核心關聯與表格責任。
 
+Migration files under `packages/db/prisma/migrations/` are append-only production
+history. Historical filenames may mention features that were later removed, but
+the current product contract is defined by `schema.prisma` and this document. Do
+not delete, squash, or rewrite historical migrations for cleanup-only reasons.
+
 ## 設計口徑
 
 - PostgreSQL + Prisma。
@@ -39,9 +44,6 @@ crawl_runs
   -> raw_snapshots
   -> price_snapshots
   -> parse_errors
-
-product_list_view
-  <- products + source_categories + current_prices + price_snapshots
 ```
 
 ## Core Tables
@@ -234,22 +236,19 @@ Parse error：
 
 ## Read Projection
 
-第一版提供普通 SQL view：
-
-```text
-product_list_view
-```
+目前第一版商品列表 API 直接用 Prisma join 讀核心表，沒有在
+`schema.prisma` 定義 SQL view 或 materialized view。若未來新增 read
+projection，必須可由 migration 重建，且不能成為 domain truth。
 
 用途：
 
 - 給商品列表 API 使用接近 UI 的 read shape。
 - 投影分類、`igrp`、目前價格、幣別、價格時間與主圖欄位。
-- 可刪除後由 migration 重建。
 
 規則：
 
-- Crawler 不寫 view。
-- `source_name` 在 view 中代表原價屋分類名稱，不是資料來源 enum。
+- Crawler 不寫 read projection 或 API query helper。
+- `source_categories.source_name` 代表資料來源名稱；第一版固定 `coolpc`。
 - API 若需要資料來源名稱，第一版固定回傳 `coolpc`。
 - 第一版不使用 materialized view；效能不足時再評估 refresh strategy 或 cache。
 
@@ -257,7 +256,7 @@ product_list_view
 
 網站主要讀取：
 
-- `product_list_view` 或等價 join。
+- `products` + `source_categories` + `current_prices` + `price_snapshots` join。
 - `source_categories`
 - 站內商品圖片 API。
 

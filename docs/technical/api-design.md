@@ -4,7 +4,7 @@ API 只服務自家 Next.js 網站，不承諾第三方公開 API。所有 endpo
 
 ## 原則
 
-- API 讀核心表、`product_list_view` 或等價 join；projection 不是資料真相來源。
+- API 讀核心表並用 join 組出網站 read shape；若未來新增 projection，也不是資料真相來源。
 - 商品價格以整數 TWD 回傳。
 - 時間欄位使用 ISO 8601 字串。
 - crawler 失敗時仍回傳最後一次成功處理的有效資料。

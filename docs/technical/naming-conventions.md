@@ -44,3 +44,9 @@
 - `source.url`：public 商品 response 的查看 / 購買連結。內部新變數應叫 `purchaseUrl`。
 - price-history point 的 `source`：表示價格觀測點來源，例如 `price_snapshot` 或 `current_price_confirmation`。若未來調整 public API，可考慮改成 `observationType`，但不得在未版本化的情況下直接破壞既有 response。
 - DB enum `ProductLinkKind.SOURCE`：目前 map 到 `source`，但語意是 public `source.url` link health，不是 `products.source_url`。
+
+## File Path Comments
+
+Repo-relative path comments are optional. They may be useful in larger generated files, but they are not required for small files and are not enforced by `pnpm test`.
+
+Prefer clear folder boundaries, file names, exports, and editor / git path context over mandatory source comments. Moving a file should not require unrelated test updates just to refresh a comment.

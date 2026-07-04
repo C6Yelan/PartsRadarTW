@@ -1,6 +1,6 @@
-# 實作 Roadmap
+# Implementation Roadmap History
 
-本文件只保留第一版開發順序與 phase gate。已完成 phase 的細節證據不留在 current docs；需要考古時看 Git history。技術規則以 `docs/technical/` 為準。
+本文件保留第一版開發順序與 phase gate，是歷史背景，不是 current runtime contract。現行技術規則以 `docs/technical/` 為準。
 
 ## 原則
 
@@ -71,7 +71,7 @@
 
 完成條件：
 
-- 新商品、價格變動、價格未變、商品消失都符合 [資料流設計](data-flow.md)。
+- 新商品、價格變動、價格未變、商品消失都符合 [資料流設計](../planning/data-flow.md)。
 - 疑似攔截不更新正式商品與價格。
 - `success_unchanged` 仍更新分類成功檢查時間。
 - data-flow 測試通過。
@@ -174,7 +174,7 @@
 
 ## Phase 8：後續功能評估
 
-第二版方向以 [第二版 Roadmap](v2-roadmap.md) 為準。已確認第二版不做帳號、登入、收藏、個人價格提醒或使用者導向通知。
+第二版已完成，歷史範圍與驗收紀錄見 [第二版 Closeout](v2-closeout.md)。已確認第二版不做帳號、登入、收藏、個人價格提醒或使用者導向通知。
 
 候選方向：
 

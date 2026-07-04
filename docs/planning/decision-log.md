@@ -20,7 +20,7 @@
 | 第二版第一批分類擴充啟用 `IGrp=8/11/16` | 第一批先啟用外接儲存 `IGrp=8`、水冷 `IGrp=11`、風扇 / 配件 `IGrp=16`。這三類已可由 parser 取得 token、名稱、價格、來源連結與圖片欄位，並通過 manual live validation / raw snapshot replay；其他分類仍需另行盤點驗證。 |
 | 第二版配單採 accountless client-side state | 配單只作為一次性整理購買清單，不建立帳號、不保存伺服器端個人菜單、不做購物車、下單、自動購買、相容性檢查或自動推薦配單。配單可使用 localStorage 保存，匯出 Excel 時每件商品需附原價屋查看 / 購買網址。 |
 | 正常瀏覽不應被 API limiter 誤傷 | 公開 API 仍保留 app-level abuse guard，但正常使用者快速切分類、翻頁、排序與載入商品圖片時不應輕易觸發 `429`。第二版需確認 production rate limit env、client identity header、list / read / image 額度與前端多餘 request。 |
-| 第三版範圍與順序已收斂 | 第三版近期主線收斂為商品頁分享 / Open Graph preview、public Discord 價格變動清單、Discord 管理者告警、Discord bot 個人目標價提醒、Discord bot 個人價格變動報告、外部監控、受保護的內網 ops status page、資料品質檢視與公開流量硬化；分享配單、公開服務狀態推播與公開狀態頁暫緩，詳細範圍以 [第三版 Roadmap](v3-roadmap.md) 為準。 |
+| 第三版範圍與順序已收斂 | 第三版近期主線收斂為商品頁分享 / Open Graph preview、Discord bot 公開價格變動清單、Discord 管理者告警、Discord bot 個人目標價提醒、Discord bot 個人價格變動報告、外部監控、受保護的內網 ops status page、資料品質檢視與公開流量硬化；分享配單、公開服務狀態推播與公開狀態頁暫緩，詳細範圍以 [第三版 Roadmap](v3-roadmap.md) 為準。 |
 | 第一版需要保留原始來源脈絡 | 商品資料應顯示原價屋資料來源、更新時間，並能讓使用者回到原始頁面確認最新資訊。 |
 | 第一版商品圖片是必要資料 | 商品列表與商品詳細頁都需要主要商品圖片；圖片 URL 需由 crawler 從原價屋公開頁面解析、驗證與正規化後寫入資料庫，再由 API 回傳給 Web UI。缺圖只能作為容錯或資料完整性風險，不是第一版 happy path。 |
 | CoolPC 商品圖片 selector 與 allowlist | 2026-05-28 以 saved raw HTML 與 manual live validation 驗證，第一版目標分類的商品列附近可由 `<img src="/eval/{IGrp}/{filename}">` 取得主要圖片。實作只接受可正規化為 `https://www.coolpc.com.tw/eval/{IGrp}/{filename}.{jpg|jpeg|png|gif|webp}` 的 URL；`/eval/{IGrp}/`、缺副檔名或外部網域需記錄為 `invalid_image_url` 類 validation issue，不進入正式商品資料。`parse_errors.raw_image_url` 只保留原始圖片 URL 供內部 debug 與 validation，不暴露到公開 API/UI。 |

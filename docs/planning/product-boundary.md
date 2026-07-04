@@ -30,6 +30,8 @@ PartsRadarTW 是一個以原價屋資料為唯一來源的電腦零組件價格�
 
 這不等於網站帳號化價格追蹤。網站仍維持 accountless；第三版 Discord bot 可用 Discord user id 建立低成本個人通知，但必須處理退訂、防濫用、通知頻率、去重與資料新鮮度邊界。
 
+Discord 個人化只使用 Discord user id 與必要偏好設定，不建立網站帳號，也不把 Discord 使用者綁定到網站使用者。除非未來另行完成產品與資安設計，網站仍不加入登入、帳號綁定、收藏清單或網站內個人提醒。
+
 ## 明確不做的功能
 
 第一版不包含：
@@ -53,8 +55,8 @@ PartsRadarTW 是一個以原價屋資料為唯一來源的電腦零組件價格�
 
 ## 後續功能
 
-第二版功能以價格歷史、價格變動探索、商品連結健康檢查、正常瀏覽限流調整、原價屋分類擴充、配單與 Excel 匯出為主；詳細範圍以 [第二版 Roadmap](v2-roadmap.md) 為準。
+第二版功能以價格歷史、價格變動探索、商品連結健康檢查、正常瀏覽限流調整、原價屋分類擴充、配單與 Excel 匯出為主；歷史範圍與驗收紀錄見 [第二版 Closeout](../archive/v2-closeout.md)。
 
-第三版功能以商品分享 / Open Graph、Discord webhook 公開變價廣播、Discord 管理者告警、Discord bot 個人目標價提醒、Discord bot 個人價格變動報告、內網 ops status page、外部監控與公開流量成長硬化為主；詳細範圍與非目標以 [第三版 Roadmap](v3-roadmap.md) 為準。
+第三版功能以商品分享 / Open Graph、Discord bot 公開變價廣播、Discord 管理者告警、Discord bot 個人目標價提醒、Discord bot 個人價格變動報告、內網 ops status page、外部監控與公開流量成長硬化為主；詳細範圍與非目標以 [第三版 Roadmap](v3-roadmap.md) 為準。
 
 後續功能的前提是資料流已足夠穩定，可以可靠辨識商品、更新價格並呈現價格變化。若未來要突破 Roadmap 非目標，必須另行建立產品與資安規劃。

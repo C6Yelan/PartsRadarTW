@@ -37,7 +37,7 @@ https://www.coolpc.com.tw/eachview.php?IGrp={分類編號}
 - 疑似被攔截時立即停止當輪。
 - 連續失敗進入 backoff；若整輪所有分類都是 fetch failed，先用較短 retry 間隔重新嘗試，避免瞬斷直接等待完整 backoff。
 - 不在 Next.js request / API route 執行。
-- 只寫 domain truth tables，不寫 `product_list_view`。
+- 只寫 domain truth tables，不寫 read projection 或網站 API query helper。
 
 ## Fetch
 

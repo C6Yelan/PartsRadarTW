@@ -42,7 +42,7 @@ source_categories
   -> parser
   -> parsed item validation
   -> products / price_snapshots / current_prices
-  -> product_list_view or equivalent join
+  -> API join / read shape
   -> API
   -> Web UI
 ```
@@ -60,11 +60,13 @@ Domain truth tables：
 - `raw_snapshots`
 - `parse_errors`
 
-Read projection：
+Read shape：
 
-- `product_list_view`
+- 目前由 API 透過 `products`、`source_categories`、`current_prices` 與
+  `price_snapshots` join 組成。
 
-Projection 只服務 API / UI 查詢，可由核心表重建；crawler 不寫 projection。
+若未來新增 projection，只服務 API / UI 查詢，必須可由核心表重建；
+crawler 不寫 projection。
 
 ## Raw Snapshot
 
@@ -225,7 +227,7 @@ Parse failed：
 
 網站讀取：
 
-- `product_list_view` 或等價 join。
+- `products` + `source_categories` + `current_prices` + `price_snapshots` join。
 - `source_categories`。
 - 站內商品圖片 API。
 

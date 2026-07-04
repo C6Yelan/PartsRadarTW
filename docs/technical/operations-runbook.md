@@ -28,7 +28,7 @@ docker compose up --build --force-recreate storage-init
 docker compose up -d --build --force-recreate
 docker compose ps -a
 curl -i http://127.0.0.1:3000/api/source-status
-docker compose --profile manual-crawler run --rm crawler
+docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler run --rm crawler
 ```
 
 成功標準：
@@ -81,7 +81,7 @@ http://127.0.0.1:3000
 - `mkdir -p /var/lib/partsradar/snapshots /var/lib/partsradar/product-images`
 - `chown -R node:node /var/lib/partsradar/snapshots /var/lib/partsradar/product-images`
 
-它不連 DB、不抓 CoolPC、不跑 crawler，也不長期維持 root runtime。`web`、`crawler`、`crawler-daemon` 與 `raw-snapshot-cleanup-daemon` 都會等 `storage-init` 成功完成後才啟動。
+它不連 DB、不抓 CoolPC、不跑 crawler，也不長期維持 root runtime。`web`、`crawler`、`crawler-daemon`、`maintenance-daemon`、`raw-snapshot-cleanup-daemon`、`ops-web` 與 `smoke-daemon` 都會等 `storage-init` 成功完成後才啟動。
 
 初次部署、重建 volume、或懷疑 owner 錯誤時可手動重跑：
 
@@ -100,7 +100,7 @@ EACCES: permission denied, open '/var/lib/partsradar/snapshots/coolpc/<hash>.htm
 先檢查 mounted volume owner 是否為 `node:node`：
 
 ```bash
-docker compose --profile manual-crawler run --rm --no-deps crawler \
+docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler run --rm --no-deps crawler \
   sh -lc 'ls -ld /var/lib/partsradar/snapshots /var/lib/partsradar/product-images'
 ```
 
@@ -134,20 +134,20 @@ CLOUDFLARE_TUNNEL_TOKEN=<cloudflare tunnel token>
 啟動 tunnel：
 
 ```bash
-docker compose --profile public-tunnel up -d cloudflared
-docker compose --profile public-tunnel ps cloudflared
+docker compose -f compose.yml -f compose.tunnel.yml --profile public-tunnel up -d cloudflared
+docker compose -f compose.yml -f compose.tunnel.yml --profile public-tunnel ps cloudflared
 ```
 
 關閉 tunnel：
 
 ```bash
-docker compose --profile public-tunnel stop cloudflared
+docker compose -f compose.yml -f compose.tunnel.yml --profile public-tunnel stop cloudflared
 ```
 
 驗證：
 
 ```bash
-docker compose --profile public-tunnel logs --tail=100 cloudflared
+docker compose -f compose.yml -f compose.tunnel.yml --profile public-tunnel logs --tail=100 cloudflared
 curl -I http://<domain>/
 curl -I https://<domain>/
 curl -i https://<domain>/api/source-status
@@ -181,14 +181,14 @@ curl -i https://<domain>/api/source-status
 啟動：
 
 ```bash
-docker compose --profile scheduled-crawler up -d crawler-daemon
-docker compose --profile scheduled-crawler ps crawler-daemon
+docker compose -f compose.yml -f compose.crawler.yml --profile scheduled-crawler up -d crawler-daemon
+docker compose -f compose.yml -f compose.crawler.yml --profile scheduled-crawler ps crawler-daemon
 ```
 
 查看 log：
 
 ```bash
-docker compose --profile scheduled-crawler logs --tail=100 crawler-daemon
+docker compose -f compose.yml -f compose.crawler.yml --profile scheduled-crawler logs --tail=100 crawler-daemon
 ```
 
 若該輪有新品且 crawl 結果不需 backoff，log 會在價格 crawl summary 與 Discord 通知後顯示 `Starting new product image backfill` / `New product image backfill finished`。這段 follow-up 不會持有 external fetch lock，也不會掃描既有缺圖商品；若該輪疑似被擋或需要 backoff，會略過新品補圖。
@@ -196,7 +196,7 @@ docker compose --profile scheduled-crawler logs --tail=100 crawler-daemon
 停止：
 
 ```bash
-docker compose --profile scheduled-crawler stop crawler-daemon
+docker compose -f compose.yml -f compose.crawler.yml --profile scheduled-crawler stop crawler-daemon
 ```
 
 安全規則：
@@ -214,8 +214,8 @@ docker compose --profile scheduled-crawler stop crawler-daemon
 驗證：
 
 ```bash
-docker compose --profile scheduled-crawler config --services
-docker compose --profile scheduled-crawler logs --tail=100 crawler-daemon
+docker compose -f compose.yml -f compose.crawler.yml --profile scheduled-crawler config --services
+docker compose -f compose.yml -f compose.crawler.yml --profile scheduled-crawler logs --tail=100 crawler-daemon
 curl -i https://<domain>/api/source-status
 ```
 
@@ -226,7 +226,7 @@ curl -i https://<domain>/api/source-status
 先看 persisted link health 診斷報表。這個 report 只讀 DB，不發送外部 request，也不列出原始 URL 或產品明細；它用來判讀 `source` 查看 / 購買連結的狀態、HTTP status 與 `failure_count` 分布：
 
 ```bash
-docker compose --profile manual-crawler run --rm crawler \
+docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler run --rm crawler \
   pnpm ops:product-links:report
 ```
 
@@ -238,14 +238,14 @@ docker compose --profile manual-crawler run --rm crawler \
 先跑小批次 dry-run，確認候選數與 log 內容：
 
 ```bash
-docker compose --profile manual-crawler run --rm crawler \
+docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler run --rm crawler \
   pnpm ops:product-links:check -- --dry-run --limit 25
 ```
 
 確認後再跑 live check。live 模式必須明確加 `--confirm-live-fetch`，並保留 request delay。正式跑預設會檢查所有超過 48 小時未確認或 URL 已變更的候選連結，`--limit` 只作為小批次測試或緊急限量使用：
 
 ```bash
-docker compose --profile manual-crawler run --rm crawler \
+docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler run --rm crawler \
   pnpm ops:product-links:check -- --confirm-live-fetch
 ```
 
@@ -273,14 +273,14 @@ docker compose --profile manual-crawler run --rm crawler \
 啟動：
 
 ```bash
-docker compose --profile scheduled-crawler up -d maintenance-daemon
-docker compose --profile scheduled-crawler ps maintenance-daemon
+docker compose -f compose.yml -f compose.crawler.yml --profile scheduled-crawler up -d maintenance-daemon
+docker compose -f compose.yml -f compose.crawler.yml --profile scheduled-crawler ps maintenance-daemon
 ```
 
 查看 log：
 
 ```bash
-docker compose --profile scheduled-crawler logs --tail=100 maintenance-daemon
+docker compose -f compose.yml -f compose.crawler.yml --profile scheduled-crawler logs --tail=100 maintenance-daemon
 ```
 
 常用設定：
@@ -298,7 +298,7 @@ docker compose --profile scheduled-crawler logs --tail=100 maintenance-daemon
 單次 dry-run 驗證：
 
 ```bash
-docker compose --profile manual-crawler run --rm crawler \
+docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler run --rm crawler \
   pnpm ops:maintenance-daemon -- --dry-run --run-once --initial-delay-seconds 0
 ```
 
@@ -342,21 +342,21 @@ SMOKE_SOURCE_TEMPORARY_LINK_FAIL_COUNT=500
 啟動：
 
 ```bash
-docker compose --profile scheduled-crawler up -d smoke-daemon
-docker compose --profile scheduled-crawler ps smoke-daemon
+docker compose -f compose.yml -f compose.ops.yml --profile ops up -d smoke-daemon
+docker compose -f compose.yml -f compose.ops.yml --profile ops ps smoke-daemon
 ```
 
 查看 log：
 
 ```bash
-docker compose --profile scheduled-crawler logs --tail=100 smoke-daemon
-docker compose --profile scheduled-crawler logs -f smoke-daemon
+docker compose -f compose.yml -f compose.ops.yml --profile ops logs --tail=100 smoke-daemon
+docker compose -f compose.yml -f compose.ops.yml --profile ops logs -f smoke-daemon
 ```
 
 單次驗證：
 
 ```bash
-docker compose --profile scheduled-crawler run --rm smoke-daemon \
+docker compose -f compose.yml -f compose.ops.yml --profile ops run --rm smoke-daemon \
   pnpm ops:production-smoke -- --base-url http://web:3000
 ```
 
@@ -437,8 +437,8 @@ OPS_STATUS_TOKEN=replace_with_random_ops_status_token
 啟動：
 
 ```bash
-docker compose --profile ops up -d ops-web
-docker compose --profile ops ps ops-web
+docker compose -f compose.yml -f compose.ops.yml --profile ops up -d ops-web
+docker compose -f compose.yml -f compose.ops.yml --profile ops ps ops-web
 ```
 
 驗證 public `web` 沒有公開狀態頁：
@@ -548,15 +548,15 @@ Bot 目標：
 啟動：
 
 ```bash
-docker compose --profile discord-bot up -d discord-bot
-docker compose --profile discord-bot ps discord-bot
-docker compose --profile discord-bot logs --tail=100 discord-bot
+docker compose -f compose.yml -f compose.ops.yml --profile discord-bot up -d discord-bot
+docker compose -f compose.yml -f compose.ops.yml --profile discord-bot ps discord-bot
+docker compose -f compose.yml -f compose.ops.yml --profile discord-bot logs --tail=100 discord-bot
 ```
 
 只註冊 slash command 並退出：
 
 ```bash
-docker compose --profile discord-bot run --rm discord-bot \
+docker compose -f compose.yml -f compose.ops.yml --profile discord-bot run --rm discord-bot \
   pnpm --filter @partsradar/crawler ops:discord-bot -- --register-commands
 ```
 
@@ -623,24 +623,24 @@ curl -I http://127.0.0.1:3000/build-list
 若本機 route 已是 `HTTP 200`，但公開網域仍是 `HTTP 404`，檢查 `cloudflared` 是否連到目前 compose network 中的 `web:3000`，並重啟 tunnel：
 
 ```bash
-docker compose --profile public-tunnel logs --tail=100 cloudflared
-docker compose --profile public-tunnel up -d cloudflared
+docker compose -f compose.yml -f compose.tunnel.yml --profile public-tunnel logs --tail=100 cloudflared
+docker compose -f compose.yml -f compose.tunnel.yml --profile public-tunnel up -d cloudflared
 curl -I https://partsradar.net/build-list
 ```
 
 若 `source freshness` 失敗，先確認 scheduled crawler 正常啟動並查看最近 log：
 
 ```bash
-docker compose --profile scheduled-crawler up -d crawler-daemon
-docker compose --profile scheduled-crawler ps crawler-daemon
-docker compose --profile scheduled-crawler logs --tail=100 crawler-daemon
+docker compose -f compose.yml -f compose.crawler.yml --profile scheduled-crawler up -d crawler-daemon
+docker compose -f compose.yml -f compose.crawler.yml --profile scheduled-crawler ps crawler-daemon
+docker compose -f compose.yml -f compose.crawler.yml --profile scheduled-crawler logs --tail=100 crawler-daemon
 curl -i https://partsradar.net/api/source-status
 ```
 
 若需要立即恢復 freshness，且確認沒有其他 live fetch 或 maintenance task 正在持有 external fetch lock，可手動跑一次低速 crawl。不要把此命令做成公開 API 或常駐入口：
 
 ```bash
-docker compose --profile manual-crawler run --rm crawler \
+docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler run --rm crawler \
   pnpm manual:crawl-coolpc-once -- --confirm-live-fetch --delay-ms 8000
 ```
 
@@ -650,7 +650,7 @@ docker compose --profile manual-crawler run --rm crawler \
 
 ```bash
 pnpm ops:production-smoke -- --public-only --base-url https://partsradar.net
-docker compose --profile scheduled-crawler run --rm smoke-daemon \
+docker compose -f compose.yml -f compose.ops.yml --profile ops run --rm smoke-daemon \
   pnpm ops:production-smoke -- --base-url http://web:3000
 ```
 
@@ -695,10 +695,10 @@ KEEP_RESTORE_DRILL_DB=1 pnpm backup:restore-drill -- backups/<timestamp>
 Raw snapshot cleanup 預設只做 dry run。Production 環境應透過 `crawler` container 執行，確保使用 container 內的 `DATABASE_URL`、`SNAPSHOT_STORAGE_DIR` 與 mounted snapshot volume：
 
 ```bash
-docker compose --profile manual-crawler run --rm --no-deps crawler \
+docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler run --rm --no-deps crawler \
   pnpm --filter @partsradar/crawler ops:raw-snapshots:cleanup
 
-docker compose --profile manual-crawler run --rm --no-deps crawler \
+docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler run --rm --no-deps crawler \
   pnpm --filter @partsradar/crawler ops:raw-snapshots:cleanup -- --confirm-delete
 ```
 
@@ -711,15 +711,15 @@ pnpm ops:raw-snapshots:cleanup
 cleanup 會依 `SNAPSHOT_STORAGE_DIR` 找到 raw snapshot 壓縮檔，刪除超過保留期限的 metadata，並只移除不再被任何保留中 snapshot metadata 參照的 gzip 檔案。執行前應確認 manual crawler、scheduled crawler 與 raw replay 沒有同時寫入 raw snapshot storage。若要先驗證目前資料是否會產生 candidates，可暫時用較短 retention 做 dry run：
 
 ```bash
-docker compose --profile manual-crawler run --rm --no-deps crawler \
+docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler run --rm --no-deps crawler \
   pnpm --filter @partsradar/crawler ops:raw-snapshots:cleanup -- \
   --normal-retention-days 1 --abnormal-retention-days 1
 ```
 
-Production 也會透過 `scheduled-crawler` profile 啟動 `raw-snapshot-cleanup-daemon`，預設每 24 小時執行一次正式 cleanup：
+Production 也會透過 `compose.crawler.yml` 的 `scheduled-crawler` profile 啟動 `raw-snapshot-cleanup-daemon`，預設每 24 小時執行一次正式 cleanup：
 
 ```bash
-docker compose --profile scheduled-crawler up -d raw-snapshot-cleanup-daemon
+docker compose -f compose.yml -f compose.crawler.yml --profile scheduled-crawler up -d raw-snapshot-cleanup-daemon
 ```
 
 `raw-snapshot-cleanup-daemon` 會明確帶 `--confirm-delete`，但仍沿用同一套 30 / 90 天保留規則、path 防呆與 shared gzip reference 檢查。若要調整執行頻率，可設定 `RAW_SNAPSHOT_CLEANUP_INTERVAL_SECONDS`；允許範圍是 3600 到 604800 秒。
@@ -731,22 +731,22 @@ docker compose --profile scheduled-crawler up -d raw-snapshot-cleanup-daemon
 先跑小批次 dry-run：
 
 ```bash
-docker compose --profile manual-crawler run --rm crawler pnpm ops:image-cache:backfill -- --dry-run --limit 20
+docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler run --rm crawler pnpm ops:image-cache:backfill -- --dry-run --limit 20
 ```
 
 若 public smoke 的 `product image api` 失敗，且失敗商品集中在第二版新增分類，先用分類限縮補圖，避免一開始就全量抓取。第二版第一批新增分類是 `IGrp=8`、`IGrp=11`、`IGrp=16`：
 
 ```bash
-docker compose --profile manual-crawler run --rm crawler pnpm ops:image-cache:backfill -- --dry-run --igrp 16 --limit 20
-docker compose --profile manual-crawler run --rm crawler pnpm ops:image-cache:backfill -- --dry-run --igrp 11 --limit 20
-docker compose --profile manual-crawler run --rm crawler pnpm ops:image-cache:backfill -- --dry-run --igrp 8 --limit 20
+docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler run --rm crawler pnpm ops:image-cache:backfill -- --dry-run --igrp 16 --limit 20
+docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler run --rm crawler pnpm ops:image-cache:backfill -- --dry-run --igrp 11 --limit 20
+docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler run --rm crawler pnpm ops:image-cache:backfill -- --dry-run --igrp 8 --limit 20
 ```
 
 確認候選與 storage path 正常後，再用低速 live fetch 分類補跑。每次只跑一個分類，確認 tmux session 結束與 log summary 後，再換下一個分類，避免同時對來源站送出多批 image requests：
 
 ```bash
 mkdir -p logs/deployment
-tmux new-session -d -s product-image-backfill-igrp16 -c "$PWD" 'docker compose --profile manual-crawler run --rm crawler pnpm ops:image-cache:backfill -- --confirm-live-fetch --igrp 16 --min-delay-ms 5000 --max-delay-ms 12000 2>&1 | tee logs/deployment/product-image-backfill-igrp16.log'
+tmux new-session -d -s product-image-backfill-igrp16 -c "$PWD" 'docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler run --rm crawler pnpm ops:image-cache:backfill -- --confirm-live-fetch --igrp 16 --min-delay-ms 5000 --max-delay-ms 12000 2>&1 | tee logs/deployment/product-image-backfill-igrp16.log'
 tmux ls
 ```
 
@@ -755,7 +755,7 @@ tmux ls
 每個分類完成後，重跑 public smoke 或至少抽查列表圖片 API；`product image api` 不應再是 `HTTP 404`：
 
 ```bash
-docker compose --profile scheduled-crawler run --rm smoke-daemon \
+docker compose -f compose.yml -f compose.ops.yml --profile ops run --rm smoke-daemon \
   pnpm ops:production-smoke -- --base-url https://partsradar.net
 ```
 
@@ -763,7 +763,7 @@ docker compose --profile scheduled-crawler run --rm smoke-daemon \
 
 ```bash
 mkdir -p logs/deployment
-tmux new-session -d -s product-image-backfill -c "$PWD" 'docker compose --profile manual-crawler run --rm crawler pnpm ops:image-cache:backfill -- --confirm-live-fetch --min-delay-ms 3000 --max-delay-ms 5000 2>&1 | tee logs/deployment/product-image-backfill.log'
+tmux new-session -d -s product-image-backfill -c "$PWD" 'docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler run --rm crawler pnpm ops:image-cache:backfill -- --confirm-live-fetch --min-delay-ms 3000 --max-delay-ms 5000 2>&1 | tee logs/deployment/product-image-backfill.log'
 tmux ls
 ```
 
