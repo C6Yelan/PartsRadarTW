@@ -1,0 +1,279 @@
+// apps/crawler/src/scripts/ops/discord-bot/interactions/public-report-settings/messages.ts
+
+import { createPublicReportSettingsComponents } from "../../commands";
+import {
+  DISCORD_EMBED_COLOR,
+  DISCORD_PERMISSION_EMBED_LINKS,
+  DISCORD_PERMISSION_SEND_MESSAGES,
+} from "../../constants";
+import {
+  formatPriceReportCategoryFilterLabel,
+  formatPriceReportEventFilterLabel,
+  formatPriceReportKeywordFilterLabel,
+  formatTaipeiMinute,
+  type PriceReportCategoryOption,
+} from "../../price-report";
+import {
+  type PublicPriceReportDeliveryStatus,
+  type PublicPriceReportPreviewResult,
+  type PublicPriceReportSetting,
+  toPublicPriceReportFilters,
+} from "../../public-price-report";
+import {
+  formatDiscordDeliveryFailureForUser,
+  formatDiscordRateLimitForUser,
+} from "../../rest";
+import type {
+  DiscordBotEmbed,
+  DiscordBotMessage,
+  DiscordBotOptions,
+  DiscordInteraction,
+} from "../../types";
+import { formatPriceReportDeliveryError } from "../price-report-settings";
+
+export interface PublicPriceReportSettingsPanel {
+  setting: PublicPriceReportSetting | null;
+  latestDelivery: PublicPriceReportDeliveryStatus | null;
+  categories: PriceReportCategoryOption[];
+  options: DiscordBotOptions;
+  currentChannelId: string;
+  notice?: string;
+}
+
+export function createPublicPriceReportSettingsPanelMessage({
+  setting,
+  latestDelivery,
+  categories,
+  options,
+  currentChannelId,
+  notice,
+}: PublicPriceReportSettingsPanel): DiscordBotMessage {
+  const filters = toPublicPriceReportFilters(setting);
+
+  return {
+    embeds: [
+      createPublicPriceReportSettingsEmbed({
+        setting,
+        latestDelivery,
+        categories,
+        options,
+        currentChannelId,
+        notice,
+      }),
+    ],
+    components: createPublicReportSettingsComponents({
+      hasChannel: setting !== null,
+      enabled: setting?.enabled ?? false,
+      categories,
+      categoryIgrps: filters.categoryIgrps,
+      includePriceDrops: filters.includePriceDrops,
+      includePriceRises: filters.includePriceRises,
+      includeNewProducts: filters.includeNewProducts,
+    }),
+  };
+}
+
+export function createPublicPriceReportStatusMessage(
+  panel: PublicPriceReportSettingsPanel,
+): DiscordBotMessage {
+  return {
+    embeds: [
+      createPublicPriceReportSettingsEmbed({
+        ...panel,
+        title: "公開價格報告狀態",
+        description: "目前即時公開價格報告的設定與最近一次發送紀錄。",
+      }),
+    ],
+  };
+}
+
+export function formatPublicReportBotPermissionNotice(
+  interaction: DiscordInteraction,
+  channelId: string,
+): string | null {
+  const appPermissions = interaction.app_permissions?.trim();
+
+  if (!appPermissions) {
+    return null;
+  }
+
+  const missing = [
+    hasDiscordPermission(appPermissions, DISCORD_PERMISSION_SEND_MESSAGES) ? null : "傳送訊息",
+    hasDiscordPermission(appPermissions, DISCORD_PERMISSION_EMBED_LINKS) ? null : "嵌入連結",
+  ].filter((permission): permission is string => permission !== null);
+
+  if (missing.length === 0) {
+    return null;
+  }
+
+  return `我目前無法在 <#${channelId}> 發送公開價格報告。請確認 PartsRadarTW bot 在該頻道具備「${missing.join("」與「")}」權限。`;
+}
+
+export function formatPublicReportPreviewNotice(
+  result: PublicPriceReportPreviewResult,
+  channelId: string,
+  setting: PublicPriceReportSetting,
+  categories: PriceReportCategoryOption[],
+): string {
+  const settingSummary = formatPublicReportSettingSummary(setting, categories);
+
+  if (result.status === "sent") {
+    return `已發送測試公開報告到 <#${channelId}>：價格變動 ${result.changeCount}，新增商品 ${result.newProductCount}，列出 ${result.listedCount} 筆，送出 ${result.messageCount} 則訊息。\n${settingSummary}`;
+  }
+
+  if (result.status === "skipped") {
+    return `過去 24 小時沒有符合設定的公開報告內容，未發送測試報告。\n${settingSummary}`;
+  }
+
+  if (result.status === "rate_limited") {
+    return formatDiscordRateLimitForUser();
+  }
+
+  if (isDiscordMissingPermissionsError(result.message)) {
+    return `我目前無法在 <#${channelId}> 發送公開價格報告。請確認 PartsRadarTW bot 在該頻道具備「傳送訊息」與「嵌入連結」權限。`;
+  }
+
+  return formatDiscordDeliveryFailureForUser(result.message);
+}
+
+function createPublicPriceReportSettingsEmbed({
+  setting,
+  latestDelivery,
+  categories,
+  options,
+  currentChannelId,
+  notice,
+  title = "公開價格報告設定",
+  description:
+    baseDescription = "即時公開價格報告會在排程爬蟲完成且有符合設定的價格變動或新增商品時，自動發送到指定頻道。",
+}: PublicPriceReportSettingsPanel & {
+  title?: string;
+  description?: string;
+}): DiscordBotEmbed {
+  const filters = toPublicPriceReportFilters(setting);
+  const description = [notice ? `**${notice}**` : null, baseDescription]
+    .filter((line): line is string => line !== null)
+    .join("\n");
+
+  return {
+    title,
+    description,
+    color: DISCORD_EMBED_COLOR,
+    fields: [
+      {
+        name: "狀態",
+        value: setting
+          ? setting.enabled
+            ? "已啟用，自動發送中"
+            : "已暫停，不會自動發送"
+          : "尚未設定",
+        inline: true,
+      },
+      {
+        name: "發送頻道",
+        value: setting ? `<#${setting.channelId}>` : "尚未設定",
+        inline: true,
+      },
+      {
+        name: "目前頻道",
+        value: `<#${currentChannelId}>`,
+        inline: true,
+      },
+      {
+        name: "分類",
+        value: formatPriceReportCategoryFilterLabel(filters, categories),
+        inline: true,
+      },
+      {
+        name: "內容",
+        value: formatPriceReportEventFilterLabel(filters),
+        inline: true,
+      },
+      {
+        name: "最多列出",
+        value: `${setting?.maxItems ?? options.priceReportMaxItems} 筆`,
+        inline: true,
+      },
+      {
+        name: "商品關鍵字",
+        value: formatPriceReportKeywordFilterLabel(filters),
+        inline: true,
+      },
+      {
+        name: "最近一次公開報告",
+        value: formatPublicReportDeliveryStatus(latestDelivery),
+      },
+      {
+        name: "重試行為",
+        value:
+          "失敗或 Discord 限流的排程公開報告會在下一輪 bot 掃描時重試；已成功或已略過的輪次不會重送。",
+      },
+    ],
+  };
+}
+
+function formatPublicReportDeliveryStatus(
+  delivery: PublicPriceReportDeliveryStatus | null,
+): string {
+  if (!delivery) {
+    return "尚無公開報告紀錄。";
+  }
+
+  const deliveredAt = formatTaipeiMinute(delivery.deliveredAt ?? delivery.createdAt);
+
+  if (delivery.status === "SENT") {
+    return `成功：${deliveredAt}，列出 ${delivery.itemCount} 筆，送出 ${delivery.messageCount} 則訊息。`;
+  }
+
+  if (delivery.status === "SKIPPED") {
+    return `略過：${deliveredAt}，本輪沒有符合設定的公開報告內容，不會重送。`;
+  }
+
+  if (delivery.status === "RATE_LIMITED") {
+    return `Discord 限流：${deliveredAt}。${formatDiscordRateLimitForUser()} 下一輪掃描會重試。`;
+  }
+
+  if (delivery.status === "FAILED") {
+    return `失敗：${deliveredAt}。${formatPriceReportDeliveryError(delivery.errorMessage)} 下一輪掃描會重試。`;
+  }
+
+  return `${delivery.status}：${deliveredAt}，列出 ${delivery.itemCount} 筆。`;
+}
+
+function formatPublicReportSettingSummary(
+  setting: PublicPriceReportSetting,
+  categories: PriceReportCategoryOption[],
+): string {
+  const filters = toPublicPriceReportFilters(setting);
+
+  return `套用設定：分類 ${formatPriceReportCategoryFilterLabel(
+    filters,
+    categories,
+  )}；內容 ${formatPriceReportEventFilterLabel(filters)}；關鍵字 ${formatPriceReportKeywordFilterLabel(
+    filters,
+  )}；最多 ${setting.maxItems} 筆。`;
+}
+
+function hasDiscordPermission(value: string | undefined, permission: bigint): boolean {
+  const bitset = parseDiscordPermissionBitset(value);
+
+  return bitset !== null && (bitset & permission) === permission;
+}
+
+function parseDiscordPermissionBitset(value: string | undefined): bigint | null {
+  if (!value || !/^(0|[1-9][0-9]*)$/.test(value)) {
+    return null;
+  }
+
+  try {
+    return BigInt(value);
+  } catch {
+    return null;
+  }
+}
+
+function isDiscordMissingPermissionsError(message: string | null): boolean {
+  const normalized = message?.toLowerCase() ?? "";
+
+  return normalized.includes("code=50013") || normalized.includes("missing permissions");
+}

@@ -1,0 +1,232 @@
+// apps/crawler/src/scripts/ops/discord-bot/interactions/application-command.ts
+
+import {
+  parseBotInteraction,
+  parsePriceReportInteraction,
+  parsePublicReportInteraction,
+  parseWatchInteraction,
+} from "../commands";
+import type { CommandCooldowns } from "../cooldowns";
+import {
+  readPriceReportSetting,
+  sendPriceReportNow,
+  toPriceReportFilters,
+} from "../price-report";
+import {
+  deferInteractionResponse,
+  editDeferredInteractionResponse,
+  sendDiscordInteractionMessages,
+  sendInteractionResponse,
+} from "../rest";
+import type {
+  DiscordBotClient,
+  DiscordBotOptions,
+  DiscordInteraction,
+  FetchImpl,
+} from "../types";
+import { createBotHelpMessage } from "./bot-help";
+import {
+  createPriceReportSettingsPanelMessage,
+  readPriceReportSettingsPanel,
+  resolveWindowHours,
+} from "./price-report-settings";
+import {
+  createPublicPriceReportSettingsPanelMessage,
+  createPublicPriceReportStatusMessage,
+  readPublicPriceReportSettingsPanel,
+  readPublicReportInteractionContext,
+  sendPublicReportTest,
+} from "./public-report-settings";
+import {
+  sendMissingUserResponse,
+  sendUnsupportedInteractionResponse,
+} from "./responses";
+import {
+  createTargetPriceWatchManagerMessageWithDelivery,
+  readWatchManagerPage,
+} from "./watch-manager";
+
+export async function handleApplicationCommandInteraction({
+  client,
+  interaction,
+  options,
+  cooldowns,
+  fetchImpl,
+}: {
+  client: DiscordBotClient;
+  interaction: DiscordInteraction;
+  options: DiscordBotOptions;
+  cooldowns: CommandCooldowns;
+  fetchImpl: FetchImpl;
+}): Promise<void> {
+  const botCommand = parseBotInteraction(interaction);
+  const command = parsePriceReportInteraction(interaction);
+  const watchCommand = command || botCommand ? false : parseWatchInteraction(interaction);
+  const publicReportCommand =
+    command || watchCommand || botCommand ? null : parsePublicReportInteraction(interaction);
+
+  if (!botCommand && !command && !watchCommand && !publicReportCommand) {
+    await sendUnsupportedInteractionResponse({ interaction, options, fetchImpl });
+    return;
+  }
+
+  if (botCommand === "help") {
+    await sendInteractionResponse({
+      token: options.token,
+      apiBaseUrl: options.apiBaseUrl,
+      interaction,
+      fetchImpl,
+      message: createBotHelpMessage(),
+    });
+    return;
+  }
+
+  const discordUserId = interaction.member?.user?.id ?? interaction.user?.id;
+
+  if (!discordUserId) {
+    await sendMissingUserResponse({ interaction, options, fetchImpl });
+    return;
+  }
+
+  if (command) {
+    if (command.name === "now") {
+      const cooldown = cooldowns.consume(discordUserId, new Date());
+
+      if (!cooldown.allowed) {
+        await sendInteractionResponse({
+          token: options.token,
+          apiBaseUrl: options.apiBaseUrl,
+          interaction,
+          fetchImpl,
+          content: `請等待 ${cooldown.retryAfterSeconds} 秒後再產生下一份價格報告。`,
+        });
+        return;
+      }
+
+      await deferInteractionResponse({
+        token: options.token,
+        apiBaseUrl: options.apiBaseUrl,
+        interaction,
+        fetchImpl,
+      });
+
+      const setting = await readPriceReportSetting({ client, discordUserId });
+      const activeSetting = setting?.enabled ? setting : null;
+
+      await sendPriceReportNow({
+        client,
+        discordUserId,
+        windowHours: command.windowHours ?? resolveWindowHours(activeSetting?.window),
+        maxItems:
+          command.maxItems ??
+          (activeSetting
+            ? Math.min(activeSetting.maxItems, options.priceReportMaxItems)
+            : options.priceReportMaxItems),
+        publicBaseUrl: options.publicBaseUrl,
+        filters: toPriceReportFilters(activeSetting),
+        sendReportMessages: (messages) =>
+          sendDiscordInteractionMessages({
+            token: options.token,
+            applicationId: options.applicationId,
+            apiBaseUrl: options.apiBaseUrl,
+            interaction,
+            messages,
+            fetchImpl,
+          }),
+      });
+      return;
+    }
+
+    const panel = await readPriceReportSettingsPanel({
+      client,
+      discordUserId,
+      options,
+    });
+
+    await sendInteractionResponse({
+      token: options.token,
+      apiBaseUrl: options.apiBaseUrl,
+      interaction,
+      fetchImpl,
+      message: createPriceReportSettingsPanelMessage(panel),
+    });
+    return;
+  }
+
+  if (publicReportCommand) {
+    const publicContext = readPublicReportInteractionContext(interaction);
+
+    if (!publicContext) {
+      await sendInteractionResponse({
+        token: options.token,
+        apiBaseUrl: options.apiBaseUrl,
+        interaction,
+        fetchImpl,
+        content: "公開價格報告只能在伺服器頻道中設定。",
+      });
+      return;
+    }
+
+    if (publicReportCommand.name === "test") {
+      await sendPublicReportTest({
+        client,
+        interaction,
+        options,
+        cooldowns,
+        fetchImpl,
+        discordUserId,
+        publicContext,
+        missingSettingMessage: "尚未設定公開報告頻道，請先使用 `/public-report manage` 設定。",
+      });
+      return;
+    }
+
+    const panel = await readPublicPriceReportSettingsPanel({
+      client,
+      discordGuildId: publicContext.discordGuildId,
+      currentChannelId: publicContext.channelId,
+      options,
+    });
+
+    await sendInteractionResponse({
+      token: options.token,
+      apiBaseUrl: options.apiBaseUrl,
+      interaction,
+      fetchImpl,
+      message:
+        publicReportCommand.name === "status"
+          ? createPublicPriceReportStatusMessage(panel)
+          : createPublicPriceReportSettingsPanelMessage(panel),
+    });
+    return;
+  }
+
+  if (watchCommand) {
+    await deferInteractionResponse({
+      token: options.token,
+      apiBaseUrl: options.apiBaseUrl,
+      interaction,
+      fetchImpl,
+      ephemeral: true,
+    });
+
+    const result = await readWatchManagerPage({ client, discordUserId, page: 0 });
+
+    await editDeferredInteractionResponse({
+      token: options.token,
+      applicationId: options.applicationId,
+      apiBaseUrl: options.apiBaseUrl,
+      interaction,
+      fetchImpl,
+      message: await createTargetPriceWatchManagerMessageWithDelivery({
+        client,
+        discordUserId,
+        result,
+        publicBaseUrl: options.publicBaseUrl,
+      }),
+    });
+    return;
+  }
+
+  await sendUnsupportedInteractionResponse({ interaction, options, fetchImpl });
+}
