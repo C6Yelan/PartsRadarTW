@@ -595,7 +595,7 @@ fix(web): remove unstable coolpc import tool
 
 - `web` / `postgres` healthy。
 - `storage-init` / `migrate` / `seed` exit 0。
-- `crawler-daemon` / `maintenance-daemon` / `smoke-daemon` / `raw-snapshot-cleanup-daemon` 持續執行。
+- `crawler-daemon` / `smoke-daemon` / `raw-snapshot-cleanup-daemon` 持續執行；若啟用 `maintenance` profile，`maintenance-daemon` 也需持續執行。
 - `/build-list` local / public 都回 `HTTP 200`。
 - `/tools/coolpc-import` local / public 都回 `HTTP 404`。
 - `/tools/coolpc-import.user.js` local / public 都回 `HTTP 404`。

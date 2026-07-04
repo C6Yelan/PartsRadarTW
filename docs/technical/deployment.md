@@ -166,7 +166,8 @@ PRODUCT_IMAGE_STORAGE_DIR=/var/lib/partsradar/product-images
 | `RAW_SNAPSHOT_CLEANUP_INTERVAL_SECONDS` | cleanup daemon 節奏 |
 | `DISCORD_BOT_TOKEN` / `DISCORD_APPLICATION_ID` | Discord bot token 與 application id；公開價格報告頻道由 `/public-report` 指令設定 |
 | `NEXT_PUBLIC_DISCORD_BOT_INVITE_URL` | 網站 `/discord` 邀請按鈕使用的公開 Discord bot invite URL；由 web runtime 讀取，不得放 token。 |
-| `DISCORD_BOT_REGISTER_COMMANDS_ON_START` / `DISCORD_PRICE_REPORT_MAX_ITEMS` / `DISCORD_BOT_COMMAND_COOLDOWN_SECONDS` / `DISCORD_PRICE_REPORT_SCHEDULE_INTERVAL_SECONDS` | Discord bot 指令註冊、報告列數、cooldown 與每日報告 fallback 掃描上限；近期待發報告會睡到 due time |
+| `DISCORD_BOT_REGISTER_COMMANDS_ON_START` / `DISCORD_FEATURE_PUBLIC_REPORTS_ENABLED` / `DISCORD_FEATURE_PERSONAL_REPORTS_ENABLED` / `DISCORD_FEATURE_TARGET_WATCHES_ENABLED` | Discord bot 指令註冊與 public / personal / target watch 子功能 runtime flags；flags 預設 `true`，可作為 emergency kill switch |
+| `DISCORD_PRICE_REPORT_MAX_ITEMS` / `DISCORD_BOT_COMMAND_COOLDOWN_SECONDS` / `DISCORD_PRICE_REPORT_SCHEDULE_INTERVAL_SECONDS` | Discord bot 報告列數、cooldown 與每日報告 fallback 掃描上限；近期待發報告會睡到 due time |
 | `CLOUDFLARED_IMAGE` | 固定版本 cloudflared image |
 | `CLOUDFLARE_TUNNEL_TOKEN` | Tunnel token |
 | `NODE_ENV` | production |
@@ -232,7 +233,7 @@ Backup：
 
 最小監控：
 
-- `web`、`crawler-daemon`、`maintenance-daemon`、`smoke-daemon`、`discord-bot`、`postgres` 存活。
+- `web`、`crawler-daemon`、`smoke-daemon`、`discord-bot`、`postgres` 存活；若啟用 `maintenance` profile，另確認 `maintenance-daemon` 存活。
 - 最近 successful crawl。
 - backoff 狀態。
 - snapshot / image cache 容量。
