@@ -1,4 +1,13 @@
 // apps/web/app/build-list/model.ts
+import {
+  isRecord,
+  normalizeIsoDate,
+  toHttpUrl,
+  toImageUrl,
+  toNonEmptyString,
+  toNumber,
+} from "./model/validation";
+
 export const BUILD_LIST_MAX_QUANTITY = 99;
 
 export interface BuildListProduct {
@@ -281,56 +290,4 @@ function normalizeBuildListImage(value: unknown, fallbackAlt: string) {
     url,
     alt: typeof value.alt === "string" && value.alt.trim() ? value.alt.trim() : fallbackAlt,
   };
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function toNonEmptyString(value: unknown) {
-  return typeof value === "string" && value.trim() ? value : null;
-}
-
-function toNumber(value: unknown) {
-  return typeof value === "number" ? value : Number.NaN;
-}
-
-function normalizeIsoDate(value: unknown) {
-  if (typeof value !== "string") {
-    return null;
-  }
-
-  const date = new Date(value);
-
-  return Number.isNaN(date.getTime()) ? null : date.toISOString();
-}
-
-function toHttpUrl(value: unknown) {
-  if (typeof value !== "string") {
-    return null;
-  }
-
-  const trimmedValue = value.trim();
-
-  try {
-    const url = new URL(trimmedValue);
-
-    return url.protocol === "http:" || url.protocol === "https:" ? url.toString() : null;
-  } catch {
-    return null;
-  }
-}
-
-function toImageUrl(value: unknown) {
-  if (typeof value !== "string") {
-    return null;
-  }
-
-  const trimmedValue = value.trim();
-
-  if (trimmedValue.startsWith("/") && !trimmedValue.startsWith("//")) {
-    return trimmedValue;
-  }
-
-  return toHttpUrl(trimmedValue);
 }
