@@ -1,0 +1,21 @@
+/* apps/web/app/styles/product-detail/media.css */
+.detail-media {
+  display: grid;
+  min-height: 440px;
+  place-items: center;
+  padding: 26px;
+}
+
+.detail-media img,
+.detail-image-fallback {
+  width: min(100%, 360px);
+  aspect-ratio: 1;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+.detail-media img {
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
+}

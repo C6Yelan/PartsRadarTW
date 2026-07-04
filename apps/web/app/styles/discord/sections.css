@@ -1,0 +1,94 @@
+/* apps/web/app/styles/discord/sections.css */
+.discord-section {
+  display: grid;
+  gap: 18px;
+  padding: 24px;
+}
+
+.discord-section-heading {
+  display: grid;
+  gap: 7px;
+}
+
+.discord-section-heading h2 {
+  margin: 0;
+  color: var(--text-strong);
+  font-size: 22px;
+}
+
+.discord-section-heading p {
+  max-width: 720px;
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.discord-step-list {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.discord-step-list li {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid rgba(33, 51, 64, 0.78);
+  border-radius: 8px;
+  background: rgba(11, 23, 32, 0.74);
+}
+
+.discord-step-number {
+  display: grid;
+  width: 30px;
+  aspect-ratio: 1;
+  place-items: center;
+  border: 1px solid rgba(143, 180, 204, 0.26);
+  border-radius: 999px;
+  background: rgba(88, 101, 242, 0.16);
+  color: var(--text-strong);
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.discord-step-list h3,
+.discord-command-group h3,
+.discord-guide-copy h4 {
+  margin: 0;
+  color: var(--text-strong);
+}
+
+.discord-step-list h3 {
+  font-size: 16px;
+  line-height: 1.35;
+}
+
+.discord-step-list div {
+  display: grid;
+  gap: 8px;
+}
+
+.discord-step-list code {
+  width: fit-content;
+  max-width: 100%;
+  padding: 4px 8px;
+  border: 1px solid rgba(143, 180, 204, 0.22);
+  border-radius: 6px;
+  background: rgba(3, 8, 13, 0.45);
+  color: var(--text-strong);
+  font-size: 13px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.discord-step-list p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.65;
+}

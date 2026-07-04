@@ -1,0 +1,98 @@
+/* apps/web/app/styles/build-list/responsive.css */
+@media (max-width: 900px) {
+  .topbar.build-list-topbar {
+    grid-template-areas:
+      "brand brand"
+      "title back";
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px 12px;
+  }
+
+  .build-list-topbar .brand-lockup {
+    grid-area: brand;
+  }
+
+  .build-list-title {
+    justify-items: start;
+    text-align: left;
+  }
+
+  .build-list-back-link {
+    justify-self: end;
+    align-self: center;
+    white-space: nowrap;
+  }
+
+  .build-list-topbar .build-list-title {
+    grid-area: title;
+    min-width: 0;
+  }
+
+  .build-list-topbar .build-list-back-link {
+    grid-area: back;
+  }
+
+  .build-list-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .build-list-summary {
+    position: static;
+    order: -1;
+  }
+}
+
+@media (max-width: 760px) {
+  .build-list-page {
+    width: min(100% - 28px, 1600px);
+    padding-top: 14px;
+  }
+
+  .build-list-item {
+    grid-template-columns: 64px minmax(0, 1fr);
+    grid-template-areas:
+      "image main"
+      "controls controls";
+    align-items: start;
+    gap: 12px 14px;
+    padding: 14px;
+  }
+
+  .build-list-item-image {
+    grid-area: image;
+    width: 64px;
+  }
+
+  .build-list-item-main {
+    grid-area: main;
+  }
+
+  .build-list-item-controls {
+    grid-area: controls;
+    display: flex;
+    width: 100%;
+    gap: 6px;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .quantity-stepper {
+    flex: 0 0 122px;
+    grid-template-columns: 32px minmax(0, 1fr) 32px;
+  }
+
+  .quantity-stepper button,
+  .quantity-stepper input {
+    min-height: 36px;
+  }
+
+  .quantity-stepper input {
+    line-height: 36px;
+  }
+
+  .build-list-remove-button {
+    flex: 0 0 auto;
+    min-height: 36px;
+    padding: 0 10px;
+  }
+}

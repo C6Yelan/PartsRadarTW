@@ -1,0 +1,33 @@
+/* apps/web/app/styles/product-detail/states.css */
+.link-health-note {
+  margin: -8px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.detail-loading,
+.detail-empty {
+  display: grid;
+  min-height: 320px;
+  gap: 16px;
+  place-items: center;
+  padding: 32px;
+  text-align: center;
+}
+
+.skeleton-box.detail-image {
+  width: min(100%, 280px);
+  aspect-ratio: 1;
+}
+
+.skeleton-box.detail-title {
+  width: min(100%, 520px);
+  height: 34px;
+}
+
+.skeleton-box.detail-line {
+  width: min(100%, 360px);
+  height: 18px;
+}

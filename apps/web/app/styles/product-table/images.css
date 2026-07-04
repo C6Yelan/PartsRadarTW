@@ -1,0 +1,46 @@
+/* apps/web/app/styles/product-table/images.css */
+.product-image {
+  width: 58px;
+  aspect-ratio: 1;
+  object-fit: contain;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: #0a141c;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
+}
+
+.product-image.fallback,
+.detail-image-fallback {
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  background: linear-gradient(135deg, rgba(143, 180, 204, 0.11), transparent), #0a141c;
+  color: var(--muted);
+  text-align: center;
+}
+
+.image-fallback-copy {
+  display: grid;
+  max-width: 100%;
+  gap: 3px;
+  padding: 8px;
+}
+
+.image-fallback-copy strong,
+.image-fallback-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.image-fallback-copy strong {
+  color: var(--accent-strong);
+  font-size: 12px;
+}
+
+.image-fallback-copy small {
+  color: var(--faint);
+  font-size: 10px;
+}

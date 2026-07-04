@@ -1,0 +1,62 @@
+/* apps/web/app/styles/product-toolbar/results.css */
+.results-panel {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.results-toolbar {
+  display: grid;
+  gap: 16px;
+  align-items: start;
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--border);
+}
+
+.results-toolbar h1 {
+  margin: 2px 0 0;
+  color: var(--text-strong);
+  font-size: 20px;
+  line-height: 1.25;
+}
+
+.results-heading-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.results-title {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: baseline;
+}
+
+.results-title span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.results-reset-button {
+  flex: 0 0 auto;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease;
+}
+
+.results-reset-button:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+  color: var(--text);
+}

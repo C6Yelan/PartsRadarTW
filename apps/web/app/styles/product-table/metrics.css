@@ -1,0 +1,59 @@
+/* apps/web/app/styles/product-table/metrics.css */
+.row-price,
+.row-status,
+.row-build-list {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.row-price strong {
+  color: var(--accent-strong);
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.row-movement {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.price-movement {
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
+  overflow: hidden;
+  align-items: center;
+  color: var(--muted);
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 760;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.price-movement.is-down {
+  color: var(--success);
+}
+
+.price-movement.is-up {
+  color: var(--warning);
+}
+
+.price-movement.is-flat {
+  color: #8ea3b2;
+}
+
+.row-movement.is-empty {
+  text-align: center;
+}
+
+.row-movement.is-empty .price-movement {
+  justify-content: center;
+  width: fit-content;
+}

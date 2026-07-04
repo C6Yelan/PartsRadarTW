@@ -1,0 +1,92 @@
+/* apps/web/app/styles/ops-status/base.css */
+.ops-status-shell {
+  display: grid;
+  width: min(1440px, calc(100% - 48px));
+  min-height: 100svh;
+  gap: 18px;
+  margin: 0 auto;
+  padding: 28px 0 38px;
+}
+
+.ops-status-header,
+.ops-panel,
+.ops-runtime-panel,
+.ops-table-panel,
+.ops-check-card,
+.ops-metric-tile {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-muted);
+}
+
+.ops-status-header {
+  display: flex;
+  gap: 18px;
+  align-items: start;
+  justify-content: space-between;
+  padding: clamp(20px, 3vw, 30px);
+}
+
+.ops-status-eyebrow {
+  margin: 0 0 6px;
+  color: var(--accent-strong);
+  font-size: 13px;
+  font-weight: 850;
+  letter-spacing: 0;
+}
+
+.ops-status-header h1,
+.ops-check-card h2,
+.ops-panel h2,
+.ops-section-heading h2 {
+  margin: 0;
+  color: var(--text-strong);
+  letter-spacing: 0;
+}
+
+.ops-status-header h1 {
+  font-size: clamp(26px, 4vw, 40px);
+  line-height: 1.15;
+}
+
+.ops-status-header p:last-child,
+.ops-check-card p,
+.ops-section-heading p {
+  max-width: 760px;
+  margin: 8px 0 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.ops-status-pill {
+  display: inline-flex;
+  flex: 0 0 auto;
+  min-width: 66px;
+  min-height: 30px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.ops-status-pill.is-ok {
+  border-color: rgba(120, 216, 149, 0.42);
+  background: rgba(120, 216, 149, 0.11);
+  color: var(--success);
+}
+
+.ops-status-pill.is-warn {
+  border-color: rgba(216, 180, 95, 0.48);
+  background: rgba(216, 180, 95, 0.12);
+  color: var(--warning);
+}
+
+.ops-status-pill.is-fail {
+  border-color: rgba(224, 122, 134, 0.52);
+  background: rgba(224, 122, 134, 0.12);
+  color: var(--danger);
+}

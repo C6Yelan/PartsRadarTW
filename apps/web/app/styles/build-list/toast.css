@@ -1,0 +1,79 @@
+/* apps/web/app/styles/build-list/toast.css */
+.build-list-undo-toast {
+  position: fixed;
+  bottom: max(18px, env(safe-area-inset-bottom));
+  left: 50%;
+  z-index: 45;
+  display: flex;
+  width: min(430px, calc(100% - 28px));
+  min-height: 54px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 12px 10px 16px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: #0e202c;
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.34);
+  color: var(--text);
+  transform: translateX(-50%);
+  animation: build-list-toast-in 160ms ease-out;
+}
+
+.build-list-undo-toast-text {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+  font-size: 13px;
+  font-weight: 760;
+  line-height: 1.35;
+}
+
+.build-list-undo-toast-text span {
+  color: var(--muted);
+}
+
+.build-list-undo-toast-text strong {
+  overflow: hidden;
+  color: var(--text-strong);
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.build-list-undo-toast button {
+  flex: 0 0 auto;
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid rgba(143, 180, 204, 0.44);
+  border-radius: 7px;
+  background: rgba(143, 180, 204, 0.12);
+  color: var(--accent-strong);
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.build-list-undo-toast button:hover,
+.build-list-undo-toast button:focus-visible {
+  border-color: var(--border-strong);
+  background: rgba(143, 180, 204, 0.18);
+  color: var(--text-strong);
+}
+
+@keyframes build-list-toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .build-list-undo-toast {
+    animation: none;
+  }
+}

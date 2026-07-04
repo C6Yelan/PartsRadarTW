@@ -1,0 +1,57 @@
+/* apps/web/app/styles/app-shell/not-found.css */
+.not-found-shell {
+  display: grid;
+  align-content: start;
+  min-height: 100svh;
+  gap: clamp(56px, 12vw, 110px);
+  width: min(960px, calc(100% - 48px));
+  margin: 0 auto;
+  padding: clamp(24px, 5vw, 48px) 0;
+}
+
+.not-found-brand {
+  align-self: start;
+}
+
+.not-found-panel {
+  display: grid;
+  gap: 16px;
+  justify-items: start;
+  max-width: 620px;
+}
+
+.not-found-panel h1 {
+  margin: 0;
+  color: var(--text-strong);
+  font-size: clamp(34px, 7vw, 64px);
+  line-height: 1.05;
+}
+
+.not-found-panel p {
+  max-width: 520px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1.75;
+}
+
+.eyebrow {
+  display: block;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.quiet-alert {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid rgba(216, 180, 95, 0.36);
+  border-radius: 8px;
+  background: rgba(216, 180, 95, 0.08);
+  color: #e6cf95;
+  font-size: 14px;
+}
+
+.quiet-alert.warning {
+  margin: 0;
+}

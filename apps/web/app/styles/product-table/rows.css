@@ -1,0 +1,60 @@
+/* apps/web/app/styles/product-table/rows.css */
+.product-row {
+  min-height: 78px;
+  padding: 12px 22px;
+  border-bottom: 1px solid rgba(33, 51, 64, 0.72);
+  transition: background 140ms ease;
+}
+
+.product-row:hover {
+  background: rgba(22, 42, 56, 0.68);
+}
+
+.product-row.is-in-build-list {
+  background: linear-gradient(90deg, rgba(120, 216, 149, 0.09), rgba(120, 216, 149, 0.02) 70%);
+  box-shadow: inset 3px 0 0 rgba(120, 216, 149, 0.44);
+}
+
+.product-row.is-in-build-list:hover {
+  background: linear-gradient(90deg, rgba(120, 216, 149, 0.12), rgba(22, 42, 56, 0.68) 72%);
+}
+
+.product-row:last-child {
+  border-bottom: 0;
+}
+
+.product-main {
+  min-width: 0;
+}
+
+.product-main a {
+  display: -webkit-box;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  color: var(--text-strong);
+  font-weight: 760;
+  line-height: 1.35;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.product-main a:hover {
+  color: var(--accent-strong);
+}
+
+.table-cell {
+  min-width: 0;
+  color: var(--text);
+}
+
+.table-cell span:not(.cell-label) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cell-label {
+  display: none;
+}

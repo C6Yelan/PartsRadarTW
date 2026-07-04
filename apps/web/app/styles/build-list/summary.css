@@ -1,0 +1,60 @@
+/* apps/web/app/styles/build-list/summary.css */
+.build-list-summary {
+  position: sticky;
+  top: 18px;
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+}
+
+.build-list-summary dl {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.build-list-summary dl div {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 760;
+}
+
+.build-list-summary dd {
+  margin: 0;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.build-list-summary .build-list-total-row {
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  color: var(--text-strong);
+  font-size: 18px;
+}
+
+.build-list-total-row dd {
+  color: var(--accent-strong);
+}
+
+.build-list-summary p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.build-list-summary-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.build-list-summary-actions .control-button {
+  width: 100%;
+  min-height: 40px;
+  min-width: 0;
+  padding-inline: 10px;
+}

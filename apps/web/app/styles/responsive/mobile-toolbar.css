@@ -1,0 +1,50 @@
+/* apps/web/app/styles/responsive/mobile-toolbar.css */
+@media (max-width: 760px) {
+  .filter-panel summary {
+    min-height: 54px;
+    padding: 0 16px;
+    cursor: pointer;
+  }
+
+  .filter-summary-meta {
+    display: flex;
+  }
+
+  .results-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .toolbar-controls,
+  .toolbar-controls label,
+  .toolbar-price-filter,
+  .toolbar-status-filter {
+    display: grid;
+    grid-template-columns: 1fr;
+    justify-content: stretch;
+  }
+
+  .toolbar-price-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .toolbar-segmented-control {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .vendor-filter {
+    grid-template-columns: 1fr;
+  }
+
+  .vendor-menu-popover {
+    position: static;
+    width: 100%;
+    margin-top: 8px;
+  }
+
+  .vendor-option-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-height: min(480px, 62vh);
+  }
+}

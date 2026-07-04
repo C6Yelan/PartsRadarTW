@@ -1,0 +1,12 @@
+/* apps/web/app/styles/app-shell/base.css */
+.page-loading {
+  display: grid;
+  min-height: 100svh;
+  place-items: center;
+  color: var(--muted);
+}
+
+.app-shell {
+  min-height: 100svh;
+  background: var(--bg);
+}

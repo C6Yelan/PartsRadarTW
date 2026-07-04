@@ -1,0 +1,37 @@
+/* apps/web/app/styles/product-table/base.css */
+.product-table {
+  min-width: 0;
+}
+
+.table-header,
+.product-row,
+.skeleton-row {
+  display: grid;
+  grid-template-columns:
+    58px minmax(240px, 1fr) minmax(132px, 0.2fr) minmax(172px, 0.24fr)
+    minmax(112px, 0.18fr) minmax(148px, 0.18fr);
+  gap: 14px;
+  align-items: center;
+}
+
+.table-header {
+  min-height: 48px;
+  padding: 0 22px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-strong);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.table-header span:nth-child(2),
+.product-main {
+  text-align: left;
+}
+
+.table-header span:nth-child(3),
+.table-header span:nth-child(4),
+.table-header span:nth-child(5),
+.table-header span:nth-child(6) {
+  text-align: center;
+}

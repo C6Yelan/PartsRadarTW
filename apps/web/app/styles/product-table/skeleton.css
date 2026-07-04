@@ -1,0 +1,32 @@
+/* apps/web/app/styles/product-table/skeleton.css */
+.skeleton-row {
+  min-height: 78px;
+  padding: 12px 22px;
+  border-bottom: 1px solid rgba(33, 51, 64, 0.72);
+}
+
+.skeleton-box {
+  display: block;
+  min-height: 16px;
+  border-radius: 7px;
+  background: linear-gradient(90deg, #132431, #1b3040, #132431);
+  background-size: 220% 100%;
+  animation: skeleton-shimmer 2.6s ease-in-out infinite;
+}
+
+.skeleton-box.image {
+  width: 58px;
+  aspect-ratio: 1;
+}
+
+.skeleton-box.wide {
+  width: min(100%, 360px);
+}
+
+.skeleton-box.medium {
+  width: min(100%, 150px);
+}
+
+.skeleton-box.short {
+  width: min(100%, 96px);
+}

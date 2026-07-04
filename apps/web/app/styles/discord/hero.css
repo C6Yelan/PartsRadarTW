@@ -1,0 +1,79 @@
+/* apps/web/app/styles/discord/hero.css */
+.discord-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 460px);
+  gap: 28px;
+  align-items: center;
+  padding: clamp(22px, 4vw, 40px);
+}
+
+.discord-hero-copy {
+  display: grid;
+  gap: 14px;
+}
+
+.discord-hero-copy h2 {
+  max-width: 720px;
+  margin: 0;
+  color: var(--text-strong);
+  font-size: clamp(28px, 5vw, 46px);
+  line-height: 1.08;
+}
+
+.discord-hero-copy p {
+  max-width: 680px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1.75;
+}
+
+.discord-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.discord-actions .control-button {
+  min-height: 44px;
+  padding: 0 18px;
+}
+
+.control-button.is-disabled {
+  border-color: var(--border);
+  background: #0b1720;
+  color: var(--faint);
+  cursor: not-allowed;
+  opacity: 0.82;
+}
+
+.discord-visual-panel {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.discord-visual-frame {
+  box-sizing: border-box;
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  place-items: center;
+}
+
+.discord-visual-panel p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.discord-visual-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+  object-fit: contain;
+}

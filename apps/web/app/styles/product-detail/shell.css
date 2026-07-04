@@ -1,0 +1,60 @@
+/* apps/web/app/styles/product-detail/shell.css */
+.detail-shell {
+  display: grid;
+  gap: 18px;
+}
+
+.detail-topbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.back-link {
+  display: inline-flex;
+  gap: 7px;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: rgba(18, 34, 47, 0.72);
+  color: var(--accent-strong);
+  font-weight: 800;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease,
+    transform 140ms ease;
+}
+
+.back-link::before {
+  content: "←";
+  font-size: 15px;
+  line-height: 1;
+}
+
+.back-link:hover,
+.back-link:focus-visible {
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+  color: var(--text-strong);
+  transform: translateY(-1px);
+}
+
+.detail-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 440px) minmax(0, 1fr);
+  gap: 22px;
+  align-items: stretch;
+}
+
+.detail-media,
+.detail-content,
+.detail-loading,
+.detail-empty {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-muted);
+}

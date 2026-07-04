@@ -1,0 +1,46 @@
+/* apps/web/app/styles/app-shell/layout.css */
+.dashboard-shell {
+  width: min(1680px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 18px 0 30px;
+}
+
+.detail-shell {
+  width: min(1600px, calc(100% - 48px));
+  margin: 0 auto;
+  padding: 18px 0 30px;
+}
+
+.site-disclaimer {
+  width: min(1600px, calc(100% - 48px));
+  margin: 0 auto;
+  padding: 16px 0 28px;
+  border-top: 1px solid rgba(33, 51, 64, 0.78);
+  color: var(--faint);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.site-disclaimer p {
+  max-width: 960px;
+  margin: 0;
+}
+
+.site-disclaimer p + p {
+  margin-top: 6px;
+}
+
+.site-disclaimer a {
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+
+.site-disclaimer a:hover {
+  color: var(--text);
+}
+
+.detail-shell > .site-disclaimer,
+.not-found-shell > .site-disclaimer {
+  width: 100%;
+  padding-bottom: 0;
+}

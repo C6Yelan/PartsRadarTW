@@ -1,0 +1,97 @@
+/* apps/web/app/styles/product-detail/content.css */
+.detail-content {
+  display: grid;
+  min-width: 0;
+  gap: 18px;
+  align-content: space-evenly;
+  padding: clamp(20px, 3vw, 34px);
+}
+
+.detail-category-chip {
+  justify-self: start;
+  max-width: min(60vw, 220px);
+  overflow: hidden;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detail-content h1 {
+  max-width: 920px;
+  margin: 0;
+  color: var(--text-strong);
+  font-size: clamp(26px, 4vw, 44px);
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.price-block {
+  display: inline-flex;
+  justify-self: start;
+  align-self: start;
+  max-width: 100%;
+  gap: 10px;
+  align-items: baseline;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.price-block span {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 750;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.price-block strong {
+  min-width: 0;
+  color: var(--accent-strong);
+  font-size: clamp(28px, 3vw, 38px);
+  line-height: 1.05;
+  white-space: nowrap;
+}
+
+.detail-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 24px;
+  align-items: center;
+  margin: 0;
+  padding: 16px 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.detail-facts div {
+  display: inline-flex;
+  min-width: 0;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.detail-facts dt {
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 750;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.detail-facts dd {
+  margin: 0;
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 750;
+  line-height: 1.18;
+  white-space: nowrap;
+}

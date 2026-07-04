@@ -1,0 +1,84 @@
+/* apps/web/app/styles/discord/base.css */
+.topbar-brand-area {
+  display: flex;
+  min-width: 0;
+  gap: 12px;
+  align-items: center;
+}
+
+.discord-topbar-link {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 38px;
+  aspect-ratio: 1;
+  border: 1px solid rgba(143, 180, 204, 0.28);
+  border-radius: 8px;
+  background: #5865f2;
+  color: #fff;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    transform 140ms ease;
+}
+
+.discord-topbar-link:hover {
+  border-color: rgba(255, 255, 255, 0.34);
+  background: #6875ff;
+  transform: translateY(-1px);
+}
+
+.discord-logo-icon {
+  display: block;
+  width: 22px;
+  aspect-ratio: 1;
+}
+
+.discord-shell {
+  min-height: 100svh;
+}
+
+.discord-topbar {
+  grid-template-columns: minmax(220px, 1fr) minmax(220px, auto) minmax(220px, 1fr);
+}
+
+.discord-topbar-title {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  text-align: center;
+}
+
+.discord-topbar-title h1 {
+  margin: 0;
+  color: var(--text-strong);
+  font-size: 22px;
+  line-height: 1.1;
+}
+
+.discord-topbar-title span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.discord-page {
+  display: grid;
+  gap: 18px;
+  width: min(1120px, calc(100% - 48px));
+  margin: 0 auto;
+  padding: 18px 0 30px;
+}
+
+.discord-page-nav {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.discord-hero,
+.discord-section {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-muted);
+}
