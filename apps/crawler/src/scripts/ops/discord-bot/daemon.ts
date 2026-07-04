@@ -23,6 +23,9 @@ import type {
   MinimalWebSocketConstructor,
   ShutdownController,
 } from "./types";
+import { createOpsLogger } from "../shared/logger";
+
+const logger = createOpsLogger();
 
 export async function runDiscordBotDaemon({
   client,
@@ -195,5 +198,5 @@ async function runNotificationLoop({
 }
 
 function log(message: string): void {
-  console.log(`[${new Date().toISOString()}] ${message}`);
+  logger.info(message);
 }
