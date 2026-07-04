@@ -242,7 +242,7 @@ docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler ru
   pnpm ops:product-links:check -- --dry-run --limit 25
 ```
 
-確認後再跑 live check。live 模式必須明確加 `--confirm-live-fetch`，並保留 request delay。正式跑預設會檢查所有超過 48 小時未確認或 URL 已變更的候選連結，`--limit` 只作為小批次測試或緊急限量使用：
+確認後再跑 live check。live 模式必須明確加 `--confirm-live-fetch`，並保留 request delay。正式跑預設會檢查所有超過 168 小時未確認或 URL 已變更的候選連結，`--limit` 只作為小批次測試或緊急限量使用：
 
 ```bash
 docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler run --rm crawler \
@@ -253,7 +253,7 @@ docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler ru
 
 - `--kinds source`：檢查原價屋查看 / 購買連結；目前只支援 `source`。
 - `--igrp <number>`：限制單一分類。
-- `--stale-after-hours <hours>`：只重查超過指定時間的既有紀錄，預設 48。
+- `--stale-after-hours <hours>`：只重查超過指定時間的既有紀錄，預設 168。
 - `--failure-threshold <count>`：連續 404 / 410 達門檻才標記 broken，預設 3。
 - `--min-delay-ms` / `--max-delay-ms`：控制 live request 間隔，預設 10000 到 20000 ms，避免對來源站造成壓力。
 
@@ -266,30 +266,30 @@ docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler ru
 
 ## Scheduled Maintenance Daemon
 
-`maintenance-daemon` 負責低頻 product link health check：每天跑排程，但只選超過 48 小時未確認或 URL 已變更的 due links；每輪預設最多 200 條。商品圖片補圖不在 scheduled maintenance 內執行，需使用手動 backfill 工具。
+`maintenance-daemon` 負責低頻 product link health check：預設每週跑排程，只選超過 168 小時未確認或 URL 已變更的 due links；每輪預設最多 200 條。商品圖片補圖不在 scheduled maintenance 內執行，需使用手動 backfill 工具。
 
-此 service 只在 `scheduled-crawler` profile 啟動。它和 `crawler-daemon` 共用 `EXTERNAL_FETCH_LOCK_DIR`，避免定期價格抓取與 link health check 同時抓外部來源。daemon 啟動後預設先等 900 秒，再開始第一輪，降低部署或重啟時多個 daemon 同時起跑的機率。若價格 crawler 到點但 lock 被 link health 持有，crawler 會寫入短效 priority signal；maintenance 會在下一筆 link request 前或 request 間 delay 後暫停、釋放 lock，並在 `MAINTENANCE_PRICE_PRIORITY_PAUSE_SECONDS` 後繼續下一輪。
+此 service 只在明確 opt-in 的 `maintenance` profile 啟動；price freshness 只需要 `scheduled-crawler` profile。它和 `crawler-daemon` 共用 `EXTERNAL_FETCH_LOCK_DIR`，避免定期價格抓取與 link health check 同時抓外部來源。daemon 啟動後預設先等 900 秒，再開始第一輪，降低部署或重啟時多個 daemon 同時起跑的機率。若價格 crawler 到點但 lock 被 link health 持有，crawler 會寫入短效 priority signal；maintenance 會在下一筆 link request 前或 request 間 delay 後暫停、釋放 lock，並在 `MAINTENANCE_PRICE_PRIORITY_PAUSE_SECONDS` 後繼續下一輪。
 
 啟動：
 
 ```bash
-docker compose -f compose.yml -f compose.crawler.yml --profile scheduled-crawler up -d maintenance-daemon
-docker compose -f compose.yml -f compose.crawler.yml --profile scheduled-crawler ps maintenance-daemon
+docker compose -f compose.yml -f compose.crawler.yml --profile maintenance up -d maintenance-daemon
+docker compose -f compose.yml -f compose.crawler.yml --profile maintenance ps maintenance-daemon
 ```
 
 查看 log：
 
 ```bash
-docker compose -f compose.yml -f compose.crawler.yml --profile scheduled-crawler logs --tail=100 maintenance-daemon
+docker compose -f compose.yml -f compose.crawler.yml --profile maintenance logs --tail=100 maintenance-daemon
 ```
 
 常用設定：
 
-- `MAINTENANCE_INTERVAL_SECONDS`：maintenance cycle 間隔，預設 86400，允許 3600 到 604800。
+- `MAINTENANCE_INTERVAL_SECONDS`：maintenance cycle 間隔，預設 604800，允許 3600 到 604800。
 - `MAINTENANCE_INITIAL_DELAY_SECONDS`：daemon 啟動後第一次執行前的延遲，預設 900。
 - `MAINTENANCE_PRICE_PRIORITY_PAUSE_SECONDS`：因價格 crawler priority 暫停後多久再繼續，預設 300。
 - `MAINTENANCE_LINK_LIMIT`：每輪最多 link candidates，預設 200。
-- `MAINTENANCE_LINK_STALE_AFTER_HOURS`：link health due window，預設 48。
+- `MAINTENANCE_LINK_STALE_AFTER_HOURS`：link health due window，預設 168。
 - `MAINTENANCE_LINK_MIN_DELAY_MS` / `MAINTENANCE_LINK_MAX_DELAY_MS`：link live request delay，預設 10000 到 20000 ms。
 - `EXTERNAL_FETCH_LOCK_DIR`：crawler 與 maintenance 共用的外部抓取鎖路徑。
 - `EXTERNAL_FETCH_LOCK_STALE_SECONDS`：鎖超過此秒數視為 stale，預設 43200。
@@ -389,7 +389,7 @@ SMOKE_PUBLIC_BASE_URL=https://partsradar.net
 
 常用設定：
 
-- `SMOKE_INTERVAL_SECONDS`：daemon 檢查間隔，預設 300。
+- `SMOKE_INTERVAL_SECONDS`：daemon 檢查間隔，預設 900。Public uptime 建議交由 Uptime Kuma / Cloudflare / `monitor:public-smoke` 追蹤；此 daemon 保留 DB-backed 與 deployment-internal 訊號。
 - `SMOKE_INITIAL_DELAY_SECONDS`：daemon 啟動後第一次檢查前的延遲，預設 60。
 - `SMOKE_TIMEOUT_MS`：HTTP request timeout，預設 5000。
 - `SMOKE_PRODUCT_IMAGE_SAMPLE_SIZE`：從 product list 抽查幾筆 public product image API，預設 5，最大 50。

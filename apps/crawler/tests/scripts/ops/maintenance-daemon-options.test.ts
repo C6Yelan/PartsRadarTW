@@ -25,7 +25,7 @@ describe("maintenance daemon options", () => {
       workspaceRoot,
       dryRun: false,
       runOnce: false,
-      intervalSeconds: 86400,
+      intervalSeconds: 604800,
       initialDelaySeconds: 900,
       pricePriorityPauseSeconds: 300,
       prioritySignalTtlSeconds: 600,
@@ -33,7 +33,7 @@ describe("maintenance daemon options", () => {
       lockStaleSeconds: 43200,
       link: {
         limit: 200,
-        staleAfterHours: 48,
+        staleAfterHours: 168,
         minDelayMs: 10000,
         maxDelayMs: 20000,
         kinds: [PRODUCT_LINK_KINDS.SOURCE],

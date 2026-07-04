@@ -23,6 +23,15 @@ afterEach(() => {
 });
 
 describe("production smoke daemon options", () => {
+  it("uses a lower-noise daemon interval by default", async () => {
+    const { crawlerCwd } = await createWorkspace();
+    const options = parseProductionSmokeDaemonOptions([], {}, crawlerCwd);
+
+    expect(options.intervalSeconds).toBe(900);
+    expect(options.initialDelaySeconds).toBe(60);
+    expect(options.runOnce).toBe(false);
+  });
+
   it("adds daemon interval and run-once options", async () => {
     const { crawlerCwd } = await createWorkspace();
     const options = parseProductionSmokeDaemonOptions(

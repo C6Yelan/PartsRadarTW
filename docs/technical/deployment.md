@@ -65,6 +65,7 @@
 
 - `manual-crawler`
 - `scheduled-crawler`
+- `maintenance`
 - `ops`
 - `discord-bot`
 - `public-tunnel`
@@ -77,8 +78,8 @@
 - `crawler`、`crawler-daemon`、`maintenance-daemon` 與 `raw-snapshot-cleanup-daemon` 放在 `compose.crawler.yml`；啟動時需搭配 `-f compose.yml -f compose.crawler.yml`。
 - `ops-web`、`smoke-daemon` 與 `discord-bot` 放在 `compose.ops.yml`；啟動時需搭配 `-f compose.yml -f compose.ops.yml`。
 - `crawler` 預設 command 是 help，避免 `docker compose up` 意外 live fetch。
-- `crawler-daemon` 與 `maintenance-daemon` 只在 `scheduled-crawler` profile 啟動，且 command 保留 `--confirm-live-fetch`。
-- `crawler-daemon` 與 `maintenance-daemon` 共用 `EXTERNAL_FETCH_LOCK_DIR`，避免定期價格抓取與連結檢查同時打外部來源；價格 crawler 到點時會發出短效 priority signal，讓 maintenance link health 在安全邊界暫停並延後幾分鐘繼續。新品圖片快取只在每輪價格 crawl 完成並釋放 lock 後針對本輪新增商品執行，既有缺圖修復仍使用手動 backfill 工具。
+- `crawler-daemon` 與 `raw-snapshot-cleanup-daemon` 在 `scheduled-crawler` profile 啟動；`maintenance-daemon` 是明確 opt-in 的 `maintenance` profile，且 command 保留 `--confirm-live-fetch`。
+- `crawler-daemon` 與 `maintenance-daemon` 共用 `EXTERNAL_FETCH_LOCK_DIR`，避免定期價格抓取與連結檢查同時打外部來源；價格 crawler 到點時會發出短效 priority signal，讓 maintenance link health 在安全邊界暫停並延後幾分鐘繼續。price freshness 不需要啟動 scheduled link health。新品圖片快取只在每輪價格 crawl 完成並釋放 lock 後針對本輪新增商品執行，既有缺圖修復仍使用手動 backfill 工具。
 - `cloudflared` 放在 `compose.tunnel.yml`，只在 `public-tunnel` profile 啟動。
 - `COOLPC_BASE_URL` 在 production Compose 固定為 `https://www.coolpc.com.tw`。
 - `web` 預設綁 `127.0.0.1:${WEB_PORT:-3000}`；公開流量走 Cloudflare Tunnel。
@@ -203,12 +204,13 @@ Discord bot 權限：
 9. 啟動 `web`。
 10. private validation `/api/source-status`。
 11. 視需要先手動跑 product image backfill。
-12. 以 `compose.crawler.yml` 啟動 `scheduled-crawler` profile 中的 `crawler-daemon`、`maintenance-daemon` 與 `raw-snapshot-cleanup-daemon`。
-13. 以 `compose.ops.yml` 啟動 `ops` profile 中的 `smoke-daemon` 與視需要啟動 `ops-web`。
-14. 若啟用 Discord 個人化通知，設定 bot secret 後以 `compose.ops.yml` 啟動 `discord-bot` profile。
-15. 建立 Cloudflare remotely-managed tunnel。
-16. 以 `compose.tunnel.yml` 啟動 `public-tunnel` profile。
-17. 驗證正式網域、API、圖片 API、crawler、maintenance、smoke、ops status、Discord bot 與資料狀態。
+12. 以 `compose.crawler.yml` 啟動 `scheduled-crawler` profile 中的 `crawler-daemon` 與 `raw-snapshot-cleanup-daemon`。
+13. 視需要以 `compose.crawler.yml` 啟動 `maintenance` profile 中的 `maintenance-daemon`。
+14. 以 `compose.ops.yml` 啟動 `ops` profile 中的 `smoke-daemon` 與視需要啟動 `ops-web`。
+15. 若啟用 Discord 個人化通知，設定 bot secret 後以 `compose.ops.yml` 啟動 `discord-bot` profile。
+16. 建立 Cloudflare remotely-managed tunnel。
+17. 以 `compose.tunnel.yml` 啟動 `public-tunnel` profile。
+18. 驗證正式網域、API、圖片 API、crawler、maintenance、smoke、ops status、Discord bot 與資料狀態。
 
 ## Migration / Backup / Monitoring
 

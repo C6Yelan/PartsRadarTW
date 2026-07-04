@@ -65,7 +65,7 @@ Do not route `ops-web` through the public tunnel. If an external tool must read 
 ## Alert Routing
 
 - Public HTTP monitors alert only on public availability failures.
-- `smoke-daemon` admin webhook alerts on DB-backed or deployment-internal warnings and failures.
+- `smoke-daemon` runs at a lower-frequency internal cadence and its admin webhook alerts on DB-backed or deployment-internal warnings and failures.
 - Discord bot delivery `FAILED` / `RATE_LIMITED` aggregation stays internal via `smoke-daemon` and `ops-web`.
 - Avoid sending both Uptime Kuma and admin webhook to the same noisy channel without cooldown.
 

@@ -18,7 +18,7 @@ const CONFIRM_LIVE_FETCH_FLAG = "--confirm-live-fetch";
 const DRY_RUN_FLAG = "--dry-run";
 export const HELP_FLAG = "--help";
 const RUN_ONCE_FLAG = "--run-once";
-const DEFAULT_MAINTENANCE_INTERVAL_SECONDS = 24 * 60 * 60;
+const DEFAULT_MAINTENANCE_INTERVAL_SECONDS = 7 * 24 * 60 * 60;
 const DEFAULT_MAINTENANCE_INITIAL_DELAY_SECONDS = 15 * 60;
 const DEFAULT_PRICE_PRIORITY_PAUSE_SECONDS = 5 * 60;
 const MIN_MAINTENANCE_INTERVAL_SECONDS = 60 * 60;
@@ -138,7 +138,7 @@ function buildProductLinkArgs(
     "--stale-after-hours",
     getStringArg(args, "--link-stale-after-hours") ??
       env.MAINTENANCE_LINK_STALE_AFTER_HOURS ??
-      "48",
+      "168",
   );
   appendOption(
     linkArgs,
