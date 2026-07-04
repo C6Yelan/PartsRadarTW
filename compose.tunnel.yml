@@ -1,0 +1,17 @@
+services:
+  cloudflared:
+    profiles:
+      - public-tunnel
+    image: ${CLOUDFLARED_IMAGE:-cloudflare/cloudflared:replace_with_pinned_version}
+    restart: unless-stopped
+    depends_on:
+      web:
+        condition: service_healthy
+    command:
+      [
+        "tunnel",
+        "--no-autoupdate",
+        "run",
+        "--token",
+        "${CLOUDFLARE_TUNNEL_TOKEN:-replace_with_cloudflare_tunnel_token}",
+      ]

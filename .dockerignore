@@ -38,7 +38,7 @@ data/
 
 # Deployment and repo-only files not needed in runtime images
 Dockerfile
-compose.yml
+compose*.yml
 docker-compose*.yml
 docs/
 README.md
@@ -46,8 +46,16 @@ LICENSE
 
 # Test-only files
 vitest.config.ts
+playwright.config.ts
+apps/**/tests/
+packages/**/tests/
+apps/web/e2e/
+test-results/
+playwright-report/
+.playwright-mcp/
 **/*.test.ts
 **/*.test.tsx
 **/*.spec.ts
 **/*.spec.tsx
+**/fixtures/
 **/__fixtures__/
