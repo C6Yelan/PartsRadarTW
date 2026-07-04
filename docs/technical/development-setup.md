@@ -90,7 +90,7 @@ repo 應提供 `.env.example` 作為範本。實際本機設定使用 `.env.loca
 | `CRAWLER_NEW_PRODUCT_IMAGE_MAX_DELAY_MS` | crawler 每輪新增商品圖片請求最大間隔，預設 `12000` |
 | `CRAWLER_NEW_PRODUCT_IMAGE_TIMEOUT_MS` | crawler 新增商品單張來源圖片 timeout，預設 `15000` |
 | `CRAWLER_NEW_PRODUCT_IMAGE_MAX_SOURCE_BYTES` | crawler 新增商品單張來源圖片大小上限，預設 `5242880` |
-| `MAINTENANCE_INTERVAL_SECONDS` | link health maintenance 週期秒數，預設 `86400` |
+| `MAINTENANCE_INTERVAL_SECONDS` | link health maintenance 週期秒數，預設 `604800` |
 | `MAINTENANCE_INITIAL_DELAY_SECONDS` | maintenance daemon 啟動後第一次執行前延遲，預設 `900` |
 | `MAINTENANCE_PRICE_PRIORITY_PAUSE_SECONDS` | maintenance 因價格 crawler priority 暫停後的恢復延遲，預設 `300` |
 | `EXTERNAL_FETCH_LOCK_DIR` | crawler / maintenance 共用外部抓取鎖路徑 |
