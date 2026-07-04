@@ -1,4 +1,4 @@
-// apps/crawler/src/scripts/ops/price-change-discord-notification/options.ts
+// apps/crawler/src/scripts/ops/shared/public-base-url.ts
 
 export function normalizePublicBaseUrl(value: string): string {
   let url: URL;

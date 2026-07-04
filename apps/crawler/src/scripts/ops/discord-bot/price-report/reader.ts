@@ -1,4 +1,4 @@
-// apps/crawler/src/scripts/ops/price-change-discord-notification/reader.ts
+// apps/crawler/src/scripts/ops/discord-bot/price-report/reader.ts
 
 import {
   CURRENT_PRICE_SNAPSHOT_ORDER_BY,
@@ -18,22 +18,22 @@ import type {
   CrawlRunPriceChangeReadResult,
   CrawlRunPriceSnapshot,
   PreviousPriceSnapshot,
-  PriceChangeDiscordClient,
-  PriceChangeDiscordNotificationItem,
+  PriceReportReaderClient,
+  PriceReportPriceChangeItem,
   PriceReportNewProductItem,
   RecentPriceChangeOptions,
   RecentPriceReport,
-} from "./types";
+} from "./reader-types";
 
 export async function readCrawlRunPriceChanges(
-  client: PriceChangeDiscordClient,
+  client: PriceReportReaderClient,
   crawlRunId: string,
-): Promise<PriceChangeDiscordNotificationItem[]> {
+): Promise<PriceReportPriceChangeItem[]> {
   return (await readCrawlRunPriceChangeSummary(client, crawlRunId)).changes;
 }
 
 export async function readCrawlRunPriceChangeSummary(
-  client: PriceChangeDiscordClient,
+  client: PriceReportReaderClient,
   crawlRunId: string,
 ): Promise<CrawlRunPriceChangeReadResult> {
   const currentSnapshots = (await client.priceSnapshot.findMany({
@@ -67,7 +67,7 @@ export async function readCrawlRunPriceChangeSummary(
     orderBy: PREVIOUS_PRICE_SNAPSHOT_ORDER_BY,
   })) as PreviousPriceSnapshot[];
   const previousByProduct = groupPreviousSnapshots(previousSnapshots);
-  const changes: PriceChangeDiscordNotificationItem[] = [];
+  const changes: PriceReportPriceChangeItem[] = [];
   const newProductByProduct = new Map<string, PriceReportNewProductItem>();
   let unmatchedSnapshotCount = 0;
   let unchangedSnapshotCount = 0;
@@ -139,14 +139,14 @@ export async function readCrawlRunPriceChangeSummary(
 }
 
 export async function readRecentPriceChanges(
-  client: PriceChangeDiscordClient,
+  client: PriceReportReaderClient,
   { since, until = new Date() }: RecentPriceChangeOptions,
-): Promise<PriceChangeDiscordNotificationItem[]> {
+): Promise<PriceReportPriceChangeItem[]> {
   return (await readRecentPriceReport(client, { since, until })).priceChanges;
 }
 
 export async function readRecentPriceReport(
-  client: PriceChangeDiscordClient,
+  client: PriceReportReaderClient,
   { since, until = new Date(), filters = {} }: RecentPriceChangeOptions,
 ): Promise<RecentPriceReport> {
   if (since.getTime() >= until.getTime()) {
@@ -208,7 +208,7 @@ export async function readRecentPriceReport(
       .filter((snapshot) => snapshot.capturedAt.getTime() < since.getTime())
       .map((snapshot) => snapshot.productId),
   );
-  const latestChangeByProduct = new Map<string, PriceChangeDiscordNotificationItem>();
+  const latestChangeByProduct = new Map<string, PriceReportPriceChangeItem>();
   const newProductByProduct = new Map<string, PriceReportNewProductItem>();
 
   for (const current of currentSnapshots) {

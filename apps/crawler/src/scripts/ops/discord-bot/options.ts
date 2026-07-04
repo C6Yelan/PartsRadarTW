@@ -1,6 +1,6 @@
 // apps/crawler/src/scripts/ops/discord-bot/options.ts
 
-import { normalizePublicBaseUrl } from "../price-change-discord-notification";
+import { normalizePublicBaseUrl } from "../shared/public-base-url";
 import { getStringArg } from "../../shared/script-utils";
 import {
   DEFAULT_COMMAND_COOLDOWN_SECONDS,

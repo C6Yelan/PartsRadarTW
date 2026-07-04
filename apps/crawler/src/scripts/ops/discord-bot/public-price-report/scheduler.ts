@@ -1,7 +1,7 @@
 // apps/crawler/src/scripts/ops/discord-bot/public-price-report/scheduler.ts
 
 import { CRAWL_RUN_STATUSES } from "../../../../coolpc/crawl-run";
-import { readCrawlRunPriceChangeSummary } from "../../price-change-discord-notification";
+import { readCrawlRunPriceChangeSummary } from "../price-report/reader";
 import {
   MAX_DUE_PUBLIC_PRICE_REPORTS_PER_CYCLE,
   MAX_DUE_PUBLIC_PRICE_REPORT_SETTINGS_PER_CYCLE,

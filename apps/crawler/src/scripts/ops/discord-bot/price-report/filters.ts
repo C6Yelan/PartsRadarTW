@@ -1,8 +1,8 @@
 // apps/crawler/src/scripts/ops/discord-bot/price-report/filters.ts
 import type {
-  PriceChangeDiscordNotificationItem,
+  PriceReportPriceChangeItem,
   PriceReportNewProductItem,
-} from "../../price-change-discord-notification";
+} from "./reader-types";
 import {
   MAX_PRICE_REPORT_KEYWORD_GROUPS,
   MAX_PRICE_REPORT_KEYWORD_LENGTH,
@@ -38,9 +38,9 @@ export const DEFAULT_PRICE_REPORT_FILTERS: PriceReportFilters = {
 };
 
 export function filterPriceChangesForReport(
-  priceChanges: PriceChangeDiscordNotificationItem[],
+  priceChanges: PriceReportPriceChangeItem[],
   filters: PriceReportFilters,
-): PriceChangeDiscordNotificationItem[] {
+): PriceReportPriceChangeItem[] {
   const normalizedFilters = normalizePriceReportFilters(filters);
   const categoryIgrps = new Set(normalizedFilters.categoryIgrps);
   const keywordGroups = parseProductKeywordGroups(normalizedFilters.productKeyword);

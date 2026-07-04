@@ -1,8 +1,8 @@
-// apps/crawler/src/scripts/ops/price-change-discord-notification/types.ts
+// apps/crawler/src/scripts/ops/discord-bot/price-report/reader-types.ts
 
 import type { PrismaClient } from "@partsradar/db";
 
-export interface PriceChangeDiscordNotificationItem {
+export interface PriceReportPriceChangeItem {
   productId: string;
   productName: string;
   category: PriceReportProductCategory;
@@ -35,7 +35,7 @@ export interface PriceReportProductSubcategory {
 }
 
 export interface RecentPriceReport {
-  priceChanges: PriceChangeDiscordNotificationItem[];
+  priceChanges: PriceReportPriceChangeItem[];
   newProducts: PriceReportNewProductItem[];
 }
 
@@ -47,7 +47,7 @@ export interface RecentPriceReportFilters {
   includeNewProducts?: boolean;
 }
 
-export type PriceChangeDiscordClient = Pick<PrismaClient, "priceSnapshot">;
+export type PriceReportReaderClient = Pick<PrismaClient, "priceSnapshot">;
 
 export interface CrawlRunPriceSnapshot {
   id: string;
@@ -76,7 +76,7 @@ export interface PreviousPriceSnapshot {
 }
 
 export interface CrawlRunPriceChangeReadResult {
-  changes: PriceChangeDiscordNotificationItem[];
+  changes: PriceReportPriceChangeItem[];
   newProducts: PriceReportNewProductItem[];
   snapshotCount: number;
   unmatchedSnapshotCount: number;

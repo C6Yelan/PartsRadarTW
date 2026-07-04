@@ -1,6 +1,6 @@
 // apps/crawler/src/scripts/ops/discord-bot/public-price-report/preview.ts
 
-import { readRecentPriceReport } from "../../price-change-discord-notification";
+import { readRecentPriceReport } from "../price-report/reader";
 import { HOUR_MS } from "../constants";
 import { createPublicPriceReportMessages } from "../price-report/messages";
 import type {

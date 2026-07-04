@@ -1,7 +1,7 @@
 // apps/crawler/src/scripts/ops/discord-bot/types/bot-options.ts
 
 import type { PrismaClient } from "@partsradar/db";
-import type { PriceChangeDiscordClient } from "../../price-change-discord-notification";
+import type { PriceReportReaderClient } from "../price-report/reader-types";
 
 export interface DiscordBotOptions {
   token: string;
@@ -16,7 +16,7 @@ export interface DiscordBotOptions {
   priceReportScheduleIntervalSeconds: number;
 }
 
-export type DiscordBotClient = PriceChangeDiscordClient &
+export type DiscordBotClient = PriceReportReaderClient &
   Pick<
     PrismaClient,
     | "discordNotificationDelivery"

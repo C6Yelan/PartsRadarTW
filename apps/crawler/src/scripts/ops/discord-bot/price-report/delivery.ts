@@ -1,7 +1,7 @@
 // apps/crawler/src/scripts/ops/discord-bot/price-report/delivery.ts
 
 import type { Prisma } from "@partsradar/db";
-import { readRecentPriceReport } from "../../price-change-discord-notification";
+import { readRecentPriceReport } from "./reader";
 import { HOUR_MS } from "../constants";
 import type {
   DiscordBotClient,

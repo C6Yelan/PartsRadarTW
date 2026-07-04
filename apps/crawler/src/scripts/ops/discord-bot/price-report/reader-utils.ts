@@ -1,13 +1,13 @@
-// apps/crawler/src/scripts/ops/price-change-discord-notification/reader-utils.ts
+// apps/crawler/src/scripts/ops/discord-bot/price-report/reader-utils.ts
 
 import type { Prisma } from "@partsradar/db";
 import type {
   CrawlRunPriceSnapshot,
   PreviousPriceSnapshot,
-  PriceChangeDiscordNotificationItem,
+  PriceReportPriceChangeItem,
   PriceReportNewProductItem,
   RecentPriceReportFilters,
-} from "./types";
+} from "./reader-types";
 
 export function normalizeRecentPriceReportFilters(
   filters: RecentPriceReportFilters,
@@ -68,8 +68,8 @@ export function groupPreviousSnapshots(
 }
 
 export function comparePriceChanges(
-  left: PriceChangeDiscordNotificationItem,
-  right: PriceChangeDiscordNotificationItem,
+  left: PriceReportPriceChangeItem,
+  right: PriceReportPriceChangeItem,
 ): number {
   const deltaDiff = Math.abs(right.delta) - Math.abs(left.delta);
 

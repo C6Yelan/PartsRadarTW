@@ -1,9 +1,9 @@
 // apps/crawler/src/scripts/ops/discord-bot/price-report/messages.ts
 import type {
-  PriceChangeDiscordNotificationItem,
+  PriceReportPriceChangeItem,
   PriceReportNewProductItem,
   RecentPriceReport,
-} from "../../price-change-discord-notification";
+} from "./reader-types";
 import { DISCORD_EMBED_COLOR } from "../constants";
 import type { DiscordBotEmbed, DiscordBotMessage } from "../types";
 import { clampPriceReportMaxItems } from "./limits";
@@ -21,7 +21,7 @@ import {
 import { createReportMessages, createReportSectionEmbeds } from "./message-layout";
 
 export function createPublicPriceChangeReportMessages(
-  priceChanges: PriceChangeDiscordNotificationItem[],
+  priceChanges: PriceReportPriceChangeItem[],
   options: {
     publicBaseUrl: string;
     maxItems: number;
@@ -165,7 +165,7 @@ function createReportEmbeds({
   priceChangeCount: number;
   newProductCount: number;
   windowHours: number;
-  listedPriceChanges: PriceChangeDiscordNotificationItem[];
+  listedPriceChanges: PriceReportPriceChangeItem[];
   listedNewProducts: PriceReportNewProductItem[];
   publicBaseUrl: string;
   generatedAt: Date;

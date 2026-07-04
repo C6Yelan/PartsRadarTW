@@ -1,4 +1,4 @@
-// apps/crawler/src/scripts/ops/price-change-discord-notification/reader-query.ts
+// apps/crawler/src/scripts/ops/discord-bot/price-report/reader-query.ts
 
 import type { Prisma } from "@partsradar/db";
 

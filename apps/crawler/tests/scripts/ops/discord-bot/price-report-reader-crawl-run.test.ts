@@ -1,10 +1,10 @@
-// apps/crawler/tests/scripts/ops/price-change-discord-notification-crawl-run.test.ts
+// apps/crawler/tests/scripts/ops/discord-bot/price-report-reader-crawl-run.test.ts
 import { describe, expect, it } from "vitest";
 import {
   readCrawlRunPriceChangeSummary,
   readCrawlRunPriceChanges,
-} from "../../../src/scripts/ops/price-change-discord-notification";
-import { createPriceChangeClient, snapshot } from "./price-change-discord-notification-support";
+} from "../../../../src/scripts/ops/discord-bot/price-report/reader";
+import { createPriceChangeClient, snapshot } from "./price-report-reader-support";
 
 describe("readCrawlRunPriceChanges", () => {
   it("returns changed existing products and skips first-seen or unchanged snapshots", async () => {

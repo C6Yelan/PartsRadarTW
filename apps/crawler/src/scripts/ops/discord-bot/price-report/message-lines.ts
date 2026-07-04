@@ -1,11 +1,11 @@
 // apps/crawler/src/scripts/ops/discord-bot/price-report/message-lines.ts
 import type {
-  PriceChangeDiscordNotificationItem,
+  PriceReportPriceChangeItem,
   PriceReportNewProductItem,
   PriceReportProductCategory,
   PriceReportProductSubcategory,
   RecentPriceReport,
-} from "../../price-change-discord-notification";
+} from "./reader-types";
 import { PRODUCT_NAME_MAX_LENGTH } from "../constants";
 import { formatDiscordBotText } from "../rest";
 import {
@@ -37,7 +37,7 @@ export interface PriceChangeMovementCounts {
 }
 
 export function countPriceChangeMovements(
-  priceChanges: PriceChangeDiscordNotificationItem[],
+  priceChanges: PriceReportPriceChangeItem[],
 ): PriceChangeMovementCounts {
   return {
     drop: priceChanges.filter((change) => change.delta < 0).length,
@@ -47,7 +47,7 @@ export function countPriceChangeMovements(
 }
 
 export function createPriceChangeMovementGroups(
-  priceChanges: PriceChangeDiscordNotificationItem[],
+  priceChanges: PriceReportPriceChangeItem[],
   publicBaseUrl: string,
 ): PriceChangeMovementGroup[] {
   return [
@@ -80,7 +80,7 @@ function createPriceChangeMovementGroup({
 }: {
   kind: PriceChangeMovementGroup["kind"];
   title: string;
-  priceChanges: PriceChangeDiscordNotificationItem[];
+  priceChanges: PriceReportPriceChangeItem[];
   publicBaseUrl: string;
 }): PriceChangeMovementGroup {
   return {
@@ -257,7 +257,7 @@ function stripLeadingSubcategoryName(
 }
 
 export function formatPersonalPriceChangeEmbedLine(
-  change: PriceChangeDiscordNotificationItem,
+  change: PriceReportPriceChangeItem,
   publicBaseUrl: string,
 ): string {
   const productName = formatReportProductLinkText(change.productName, change.subcategory);

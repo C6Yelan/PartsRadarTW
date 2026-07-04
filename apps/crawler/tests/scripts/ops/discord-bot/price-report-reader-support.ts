@@ -1,6 +1,6 @@
-// apps/crawler/tests/scripts/ops/price-change-discord-notification-support.ts
+// apps/crawler/tests/scripts/ops/discord-bot/price-report-reader-support.ts
 import { vi } from "vitest";
-import type { PriceChangeDiscordClient } from "../../../src/scripts/ops/price-change-discord-notification";
+import type { PriceReportReaderClient } from "../../../../src/scripts/ops/discord-bot/price-report/reader-types";
 
 interface TestSnapshot {
   id: string;
@@ -69,7 +69,7 @@ export function snapshot({
   };
 }
 
-export function createPriceChangeClient(snapshots: TestSnapshot[]): PriceChangeDiscordClient & {
+export function createPriceChangeClient(snapshots: TestSnapshot[]): PriceReportReaderClient & {
   priceSnapshot: {
     findMany: ReturnType<typeof vi.fn>;
   };
@@ -130,7 +130,7 @@ export function createPriceChangeClient(snapshots: TestSnapshot[]): PriceChangeD
     priceSnapshot: {
       findMany,
     },
-  } as unknown as PriceChangeDiscordClient & {
+  } as unknown as PriceReportReaderClient & {
     priceSnapshot: {
       findMany: ReturnType<typeof vi.fn>;
     };
