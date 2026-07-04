@@ -33,7 +33,14 @@ import {
   HELP_FLAG,
   PUBLIC_ONLY_FLAG,
 } from "./constants";
+import { printProductionSmokeHelp } from "./options/help";
+import {
+  normalizeBaseUrl,
+  parseIntegerOption,
+} from "./options/values";
 import type { ProductionSmokeOptions } from "./types";
+
+export { printProductionSmokeHelp } from "./options/help";
 
 export function parseProductionSmokeOptions(
   args: string[],
@@ -270,85 +277,4 @@ export function parseProductionSmokeOptions(
       max: 1000000,
     }),
   };
-}
-
-function normalizeBaseUrl(value: string): string {
-  try {
-    const url = new URL(value);
-
-    if (url.protocol !== "http:" && url.protocol !== "https:") {
-      throw new Error("invalid protocol");
-    }
-
-    return url.toString();
-  } catch {
-    throw new Error("--base-url/SMOKE_PUBLIC_BASE_URL must be a valid HTTP(S) URL.");
-  }
-}
-
-function parseIntegerOption({
-  args,
-  env,
-  argName,
-  envName,
-  fallbackArgName,
-  fallbackEnvName,
-  fallback,
-  min,
-  max,
-}: {
-  args: string[];
-  env: NodeJS.ProcessEnv;
-  argName: string;
-  envName: string;
-  fallbackArgName?: string;
-  fallbackEnvName?: string;
-  fallback: number;
-  min: number;
-  max: number;
-}): number {
-  const raw =
-    getStringArg(args, argName) ??
-    (fallbackArgName ? getStringArg(args, fallbackArgName) : undefined) ??
-    env[envName] ??
-    (fallbackEnvName ? env[fallbackEnvName] : undefined) ??
-    String(fallback);
-  const aliases = [argName, envName, fallbackArgName, fallbackEnvName].filter(Boolean).join("/");
-  const message = `${aliases} must be an integer between ${min} and ${max}.`;
-
-  if (!/^(0|[1-9][0-9]*)$/.test(raw)) {
-    throw new Error(message);
-  }
-
-  const value = Number(raw);
-
-  if (!Number.isSafeInteger(value) || value < min || value > max) {
-    throw new Error(message);
-  }
-
-  return value;
-}
-
-export function printProductionSmokeHelp(): void {
-  console.log(`Usage:
-  pnpm --filter @partsradar/crawler ops:production-smoke -- [options]
-
-Options:
-  --base-url <url>                         Website base URL to check.
-                                           Default: SMOKE_PUBLIC_BASE_URL, then ${DEFAULT_BASE_URL}
-  --public-only                            Check public HTTP routes/APIs only; does not require DB access.
-  --timeout-ms <ms>                        HTTP request timeout. Default: ${DEFAULT_TIMEOUT_MS}
-  --product-image-storage-dir <path>       Product image cache directory.
-                                           Default: PRODUCT_IMAGE_STORAGE_DIR, then ${DEFAULT_PRODUCT_IMAGE_STORAGE_DIR}
-  --source-warn-after-minutes <minutes>    Warn when source success is older than this.
-  --source-fail-after-minutes <minutes>    Fail when source success is older than this.
-  --crawler-warn-after-minutes <minutes>   Warn when latest successful crawler run is older than this.
-  --crawler-fail-after-minutes <minutes>   Fail when latest successful crawler run is older than this.
-  --recent-window-hours <hours>            Window for suspected block and parse error checks.
-  --invalid-image-url-warn-count <count>   Warn only when source image URL anomalies exceed this.
-                                           Default: ${DEFAULT_INVALID_IMAGE_URL_WARN_COUNT}
-  --source-temporary-link-warn-count <n>   Warn when source.url temporary link errors exceed this.
-                                           Default: ${DEFAULT_TEMPORARY_LINK_WARN_COUNT}
-  --help                                   Show this help message.
-`);
 }
