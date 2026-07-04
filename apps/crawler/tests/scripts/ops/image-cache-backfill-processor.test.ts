@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { ImageBackfillOptions } from "../../../src/scripts/ops/image-cache-backfill/options";
 import {
+  backfillImages,
   readMissingImageCandidates,
   type ProductImageCandidate,
 } from "../../../src/scripts/ops/image-cache-backfill/processor";
@@ -51,6 +52,56 @@ describe("image cache backfill candidate reader", () => {
         lastSeenAt: true,
       }),
     );
+  });
+});
+
+describe("image cache backfill log levels", () => {
+  it("keeps dry-run candidate details behind debug logging", async () => {
+    const infoLines: string[] = [];
+    const debugLines: string[] = [];
+
+    const summary = await backfillImages(
+      [createCandidate("dry-run-image", "2026-06-08T08:05:00.000Z")],
+      createOptions({ dryRun: true }),
+      {
+        log: (message) => infoLines.push(message),
+        debugLog: (message) => debugLines.push(message),
+      },
+    );
+
+    expect(summary).toMatchObject({ selected: 1, dryRun: 1 });
+    expect(infoLines).toEqual([
+      "Selected 1 product image candidate(s).",
+      "Output directory: storage/product-images",
+      "Mode: dry run; no source requests will be sent.",
+      "Duplicate source image URLs are downloaded once and reused locally.",
+    ]);
+    expect(debugLines).toEqual([
+      "[dry-run] dry-run-image | CPU IGrp=4 | https://www.coolpc.com.tw/eval/4/dry-run-image.jpg -> storage/product-images/dry-run-image.webp",
+    ]);
+  });
+
+  it("keeps invalid image candidates visible in normal logs", async () => {
+    const infoLines: string[] = [];
+    const debugLines: string[] = [];
+
+    const summary = await backfillImages(
+      [
+        {
+          ...createCandidate("missing-url", "2026-06-08T08:05:00.000Z"),
+          primaryImageUrl: null,
+        },
+      ],
+      createOptions({ dryRun: true }),
+      {
+        log: (message) => infoLines.push(message),
+        debugLog: (message) => debugLines.push(message),
+      },
+    );
+
+    expect(summary).toMatchObject({ selected: 1, invalid: 1 });
+    expect(infoLines).toContain("[invalid] missing-url | missing image URL | missing-url");
+    expect(debugLines).toEqual([]);
   });
 });
 

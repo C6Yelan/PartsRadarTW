@@ -1,22 +1,10 @@
-// apps/crawler/tests/scripts/ops/smoke-discord-notification.test.ts
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import type {
-  ProductionSmokeSummary,
-  SmokeCheckResult,
-  SmokeStatus,
-} from "../../../src/scripts/ops/production-smoke";
 import {
   createSmokeDiscordNotificationDecision,
   parseSmokeDiscordNotificationOptions,
-  readSmokeDiscordNotificationState,
-  type SmokeDiscordNotificationState,
-  writeSmokeDiscordNotificationState,
 } from "../../../src/scripts/ops/smoke-discord-notification";
-
-const WEBHOOK_URL = "https://discord.com/api/webhooks/1234567890/token_ABC.def-ghi";
+import { check, createWorkspace, state, summary, WEBHOOK_URL } from "./smoke-discord-notification-support";
 
 describe("smoke Discord notification options", () => {
   it("uses disabled webhook defaults and workspace-relative state path", async () => {
@@ -294,91 +282,3 @@ describe("createSmokeDiscordNotificationDecision", () => {
     });
   });
 });
-
-describe("smoke Discord notification state file", () => {
-  it("returns null when the state file does not exist", async () => {
-    const workspaceRoot = await createWorkspace();
-
-    await expect(
-      readSmokeDiscordNotificationState(join(workspaceRoot, "missing.json")),
-    ).resolves.toBeNull();
-  });
-
-  it("writes and reads state files", async () => {
-    const workspaceRoot = await createWorkspace();
-    const path = join(workspaceRoot, "storage", "ops", "state.json");
-    const expectedState = state({
-      status: "FAIL",
-      lastNotificationKind: "FAIL",
-      lastNotificationKey: "FAIL:FAIL:crawler freshness",
-      lastNotificationAt: "2026-06-06T12:00:00.000Z",
-    });
-
-    await writeSmokeDiscordNotificationState(path, expectedState);
-
-    await expect(readSmokeDiscordNotificationState(path)).resolves.toEqual(expectedState);
-  });
-
-  it("rejects invalid state files", async () => {
-    const workspaceRoot = await createWorkspace();
-    const path = join(workspaceRoot, "storage", "ops", "state.json");
-    await mkdir(dirname(path), { recursive: true });
-    await writeFile(path, JSON.stringify({ version: 999 }), "utf8");
-
-    await expect(readSmokeDiscordNotificationState(path)).rejects.toThrow(
-      "Invalid smoke Discord notification state file.",
-    );
-  });
-});
-
-async function createWorkspace() {
-  return mkdtemp(join(tmpdir(), "partsradar-smoke-discord-"));
-}
-
-function summary({
-  status,
-  checkedAt = new Date("2026-06-06T12:00:00.000Z"),
-  checks,
-}: {
-  status: SmokeStatus;
-  checkedAt?: Date;
-  checks?: SmokeCheckResult[];
-}): ProductionSmokeSummary {
-  return {
-    checkedAt,
-    status,
-    checks:
-      checks ?? (status === "OK" ? [check("homepage", "OK")] : [check("source freshness", status)]),
-  };
-}
-
-function check(name: string, status: SmokeStatus, message = `${name} ${status}`): SmokeCheckResult {
-  return {
-    name,
-    status,
-    message,
-  };
-}
-
-function state({
-  status,
-  lastObservedAt = "2026-06-06T11:00:00.000Z",
-  lastNotificationKind = null,
-  lastNotificationKey = null,
-  lastNotificationAt = null,
-}: {
-  status: SmokeStatus;
-  lastObservedAt?: string;
-  lastNotificationKind?: SmokeDiscordNotificationState["lastNotificationKind"];
-  lastNotificationKey?: string | null;
-  lastNotificationAt?: string | null;
-}): SmokeDiscordNotificationState {
-  return {
-    version: 1,
-    lastObservedStatus: status,
-    lastObservedAt,
-    lastNotificationKind,
-    lastNotificationKey,
-    lastNotificationAt,
-  };
-}

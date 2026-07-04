@@ -1,4 +1,3 @@
-// apps/crawler/tests/coolpc/support/data-flow-client.ts
 import type {
   CoolpcCategorySnapshotWriteClient,
   WriteCoolpcCategoryProducts,
@@ -7,78 +6,24 @@ import { processCoolpcCategorySnapshot } from "../../../src/coolpc/category-snap
 import {
   type CrawlRunCategoryResultStatusValue,
   type CrawlRunSourceCategory,
-  type CrawlRunStatusValue,
   type CrawlRunWriteClient,
   runCoolpcCrawlOnce,
 } from "../../../src/coolpc/crawl-run";
 import type { CoolpcProductWriteClient } from "../../../src/coolpc/product-write";
-import type {
-  RawSnapshotContentStatusValue,
-  RawSnapshotWriteClient,
-} from "../../../src/coolpc/raw-snapshot-writer";
+import type { RawSnapshotWriteClient } from "../../../src/coolpc/raw-snapshot-writer";
 import {
   type FakeCurrentPrice,
   FakeCoolpcProductWriteClient,
   type FakeProduct,
 } from "./product-write-client";
-
-interface FakeSourceCategory extends CrawlRunSourceCategory {
-  lastCheckedAt: Date | null;
-  lastSuccessAt: Date | null;
-}
-
-interface FakeCrawlRun {
-  id: string;
-  status: CrawlRunStatusValue;
-  startedAt: Date;
-  finishedAt: Date | null;
-  triggerType: string;
-}
-
-interface FakeCategoryResult {
-  id: string;
-  crawlRunId: string;
-  sourceCategoryId: string;
-  status: CrawlRunCategoryResultStatusValue;
-  rawSnapshotId: string | null;
-  errorMessage: string | null;
-}
-
-interface FakeSourceCategoryUpdate {
-  sourceCategoryId: string;
-  lastCheckedAt: Date;
-  lastSuccessAt?: Date;
-  updatedLastSuccessAt: boolean;
-}
-
-interface FakeRawSnapshot {
-  id: string;
-  crawlRunId: string;
-  sourceCategoryId: string;
-  url: string;
-  fetchedAt: Date;
-  httpStatus: number | null;
-  fetchError: string | null;
-  contentStatus: RawSnapshotContentStatusValue;
-  contentHash: string | null;
-  parsedResultHash: string | null;
-  compressedHtmlPath: string | null;
-  duplicateOfSnapshotId: string | null;
-  createdAt: Date;
-}
-
-interface FakeParseError {
-  id: string;
-  crawlRunId: string;
-  rawSnapshotId: string | null;
-  sourceCategoryId: string;
-  errorType: string;
-  message: string;
-  rawName: string | null;
-  rawPriceText: string | null;
-  rawToken: string | null;
-  rawImageUrl: string | null;
-}
+import type {
+  FakeCategoryResult,
+  FakeCrawlRun,
+  FakeParseError,
+  FakeRawSnapshot,
+  FakeSourceCategory,
+  FakeSourceCategoryUpdate,
+} from "./data-flow-records";
 
 export class FakeCoolpcDataFlowClient
   extends FakeCoolpcProductWriteClient

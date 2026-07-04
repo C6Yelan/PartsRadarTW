@@ -1,7 +1,3 @@
-// apps/crawler/tests/scripts/ops/check-product-links.test.ts
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   parseOptions,
@@ -18,13 +14,12 @@ import {
   type ProductLinkHealthRecord,
   type ProductLinkProductRecord,
 } from "../../../src/scripts/ops/product-link-checker/processor";
+import { createProductLinkCheckerTestEnvironment } from "./check-product-links-support";
 
 const NOW = new Date("2026-06-02T12:00:00.000Z");
-const tempRoots: string[] = [];
+const testEnv = createProductLinkCheckerTestEnvironment();
 
-afterEach(async () => {
-  await Promise.all(tempRoots.splice(0).map((path) => rm(path, { recursive: true, force: true })));
-});
+afterEach(testEnv.cleanup);
 
 describe("product link checker options", () => {
   it("requires explicit live fetch confirmation", () => {
@@ -32,7 +27,7 @@ describe("product link checker options", () => {
   });
 
   it("uses safe dry-run defaults", async () => {
-    const workspaceRoot = await createWorkspace();
+    const workspaceRoot = await testEnv.createWorkspace();
     const options = parseOptions(["--dry-run"], workspaceRoot);
 
     expect(options).toMatchObject({
@@ -49,7 +44,7 @@ describe("product link checker options", () => {
   });
 
   it("rejects invalid link kind filters", async () => {
-    const workspaceRoot = await createWorkspace();
+    const workspaceRoot = await testEnv.createWorkspace();
 
     expect(() => parseOptions(["--dry-run", "--kinds", "source,download"], workspaceRoot)).toThrow(
       "--kinds only supports source",
@@ -214,15 +209,6 @@ describe("product link checker health resolution", () => {
     });
   });
 });
-
-async function createWorkspace(): Promise<string> {
-  const workspaceRoot = await mkdtemp(join(tmpdir(), "partsradar-link-checker-"));
-  tempRoots.push(workspaceRoot);
-  await writeFile(join(workspaceRoot, "pnpm-workspace.yaml"), "packages: []\n");
-  await mkdir(join(workspaceRoot, "apps", "crawler"), { recursive: true });
-
-  return workspaceRoot;
-}
 
 function product(overrides: Partial<ProductLinkProductRecord> = {}): ProductLinkProductRecord {
   return {

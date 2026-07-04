@@ -1,4 +1,3 @@
-// apps/crawler/tests/coolpc/support/category-snapshot-client.ts
 import type {
   CoolpcCategorySnapshotWriteClient,
   WriteCoolpcCategoryProducts,
@@ -6,58 +5,15 @@ import type {
 import type {
   CrawlRunCategoryResultStatusValue,
   CrawlRunSourceCategory,
-  CrawlRunStatusValue,
   CrawlRunWriteClient,
 } from "../../../src/coolpc/crawl-run";
+import type { RawSnapshotWriteClient } from "../../../src/coolpc/raw-snapshot-writer";
 import type {
-  RawSnapshotContentStatusValue,
-  RawSnapshotWriteClient,
-} from "../../../src/coolpc/raw-snapshot-writer";
-
-export interface FakeCrawlRun {
-  id: string;
-  status: CrawlRunStatusValue;
-  startedAt: Date;
-  finishedAt: Date | null;
-}
-
-export interface FakeCategoryResult {
-  id: string;
-  crawlRunId: string;
-  sourceCategoryId: string;
-  status: CrawlRunCategoryResultStatusValue;
-  rawSnapshotId: string | null;
-  errorMessage: string | null;
-}
-
-export interface FakeRawSnapshot {
-  id: string;
-  crawlRunId: string;
-  sourceCategoryId: string;
-  url: string;
-  fetchedAt: Date;
-  httpStatus: number | null;
-  fetchError: string | null;
-  contentStatus: RawSnapshotContentStatusValue;
-  contentHash: string | null;
-  parsedResultHash: string | null;
-  compressedHtmlPath: string | null;
-  duplicateOfSnapshotId: string | null;
-  createdAt: Date;
-}
-
-export interface FakeParseError {
-  id: string;
-  crawlRunId: string;
-  rawSnapshotId: string | null;
-  sourceCategoryId: string;
-  errorType: string;
-  message: string;
-  rawName: string | null;
-  rawPriceText: string | null;
-  rawToken: string | null;
-  rawImageUrl: string | null;
-}
+  FakeCategoryResult,
+  FakeCrawlRun,
+  FakeParseError,
+  FakeRawSnapshot,
+} from "./category-snapshot-records";
 
 // The fake implements only the Prisma delegate methods touched by this slice.
 // That keeps the tests focused on the crawler write contract without requiring

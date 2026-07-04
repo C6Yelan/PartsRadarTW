@@ -1,0 +1,257 @@
+// apps/crawler/tests/scripts/ops/production-smoke-support.ts
+import { mkdtemp, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { vi } from "vitest";
+import type { runProductionSmoke } from "../../../src/scripts/ops/production-smoke";
+import type { runProductionSmokeDaemon } from "../../../src/scripts/ops/production-smoke-daemon";
+
+export const DISCORD_ADMIN_WEBHOOK_URL =
+  "https://discord.com/api/webhooks/1234567890/token_ABC.def-ghi";
+
+export type SendDiscordWebhook = NonNullable<
+  Parameters<typeof runProductionSmokeDaemon>[0]["sendDiscordWebhook"]
+>;
+
+export async function createWorkspace(): Promise<{
+  workspaceRoot: string;
+  crawlerCwd: string;
+}> {
+  const workspaceRoot = await mkdtemp(join(tmpdir(), "partsradar-smoke-options-"));
+  await writeFile(join(workspaceRoot, "pnpm-workspace.yaml"), "packages: []\n");
+
+  return {
+    workspaceRoot,
+    crawlerCwd: join(workspaceRoot, "apps", "crawler"),
+  };
+}
+
+export function stubHealthyPublicApi({
+  buildListStatus = 200,
+  categoryIgrps = [4, 5, 6, 7, 8, 10, 11, 12, 14, 15, 16],
+  imageStatus = 200,
+  imageStatusByProductId = new Map<string, number>(),
+  nullImageProductIds = new Set<string>(),
+  productCount = 1,
+  rateLimitClientSource = "cf",
+}: {
+  buildListStatus?: number;
+  categoryIgrps?: number[];
+  imageStatus?: number;
+  imageStatusByProductId?: Map<string, number>;
+  nullImageProductIds?: Set<string>;
+  productCount?: number;
+  rateLimitClientSource?: string;
+} = {}): void {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: Parameters<typeof fetch>[0]) => {
+      const url = new URL(String(input));
+
+      if (url.pathname === "/") {
+        return new Response("<!doctype html>", { status: 200 });
+      }
+
+      if (url.pathname === "/build-list") {
+        return new Response("<!doctype html>", { status: buildListStatus });
+      }
+
+      if (url.pathname === "/api/source-status") {
+        return Response.json({
+          status: "ok",
+          lastSuccessAt: "2026-06-02T11:50:00.000Z",
+        });
+      }
+
+      if (url.pathname === "/api/categories") {
+        return Response.json({
+          data: categoryIgrps.map((igrp) => ({ igrp })),
+        });
+      }
+
+      if (url.pathname === "/api/products") {
+        return Response.json(
+          {
+            data: Array.from({ length: productCount }, (_, index) => {
+              const id = `product-${index + 1}`;
+
+              return {
+                id,
+                image: nullImageProductIds.has(id)
+                  ? null
+                  : {
+                      url: `/api/product-images/${id}.webp`,
+                    },
+              };
+            }),
+            pagination: { totalItems: 1 },
+          },
+          {
+            headers: {
+              "X-RateLimit-Client-Source": rateLimitClientSource,
+              "X-RateLimit-Limit": "360",
+              "X-RateLimit-Remaining": "359",
+              "X-RateLimit-Reset": "1780411200",
+            },
+          },
+        );
+      }
+
+      if (url.pathname === "/api/products/product-1") {
+        return Response.json({ id: "product-1" });
+      }
+
+      const productImageMatch = url.pathname.match(/^\/api\/product-images\/(product-\d+)\.webp$/);
+
+      if (productImageMatch) {
+        const status = imageStatusByProductId.get(productImageMatch[1]) ?? imageStatus;
+
+        return new Response(status === 200 ? "webp" : "not found", {
+          status,
+          headers: status === 200 ? { "content-type": "image/webp" } : undefined,
+        });
+      }
+
+      if (url.pathname === "/api/products/product-1/price-history") {
+        return Response.json({ points: [] });
+      }
+
+      return new Response("not found", { status: 404 });
+    }),
+  );
+}
+
+export function createSmokeClient({
+  invalidImageErrorCount,
+  trueParseErrorCount,
+  discordDeliveryCounts = {},
+  discordDeliveryRecords,
+  linkHealthCounts = {},
+}: {
+  invalidImageErrorCount: number;
+  trueParseErrorCount: number;
+  discordDeliveryCounts?: {
+    failed?: number;
+    rateLimited?: number;
+  };
+  discordDeliveryRecords?: Array<{
+    id: string;
+    discordUserId: string;
+    kind: "PRICE_REPORT_NOW" | "SCHEDULED_PRICE_REPORT" | "TARGET_PRICE";
+    status: "SENT" | "SKIPPED" | "FAILED" | "RATE_LIMITED";
+    targetPriceWatchId: string | null;
+    createdAt: Date;
+  }>;
+  linkHealthCounts?: {
+    sourceBroken?: number;
+    sourceTemporary?: number;
+  };
+}) {
+  return {
+    crawlRun: {
+      findFirst: async ({ where }: { where: { status?: { in?: string[] } } }) =>
+        where.status?.in
+          ? {
+              id: "crawl-run-success",
+              status: "SUCCESS_UNCHANGED",
+              finishedAt: new Date("2026-06-02T11:45:00.000Z"),
+            }
+          : {
+              id: "crawl-run-latest",
+              status: "SUCCESS_UNCHANGED",
+              startedAt: new Date("2026-06-02T11:45:00.000Z"),
+              finishedAt: new Date("2026-06-02T11:45:00.000Z"),
+            },
+      count: async () => 0,
+    },
+    parseError: {
+      count: async ({
+        where,
+      }: {
+        where: { errorType?: "INVALID_IMAGE_URL" | { not: "INVALID_IMAGE_URL" } };
+      }) => {
+        if (where.errorType === "INVALID_IMAGE_URL") {
+          return invalidImageErrorCount;
+        }
+
+        return trueParseErrorCount;
+      },
+      findMany: async ({
+        where,
+      }: {
+        where: { errorType?: "INVALID_IMAGE_URL" | { not: "INVALID_IMAGE_URL" } };
+      }) => {
+        if (where.errorType !== "INVALID_IMAGE_URL") {
+          return [];
+        }
+
+        return Array.from({ length: invalidImageErrorCount }, (_, index) => ({
+          rawToken: `TOKEN-${(index % 16) + 1}`,
+          rawName: `Invalid image product ${(index % 16) + 1}`,
+          rawImageUrl: `/eval/${(index % 5) + 1}/`,
+        }));
+      },
+    },
+    product: {
+      count: async () => 1,
+      findMany: async () => [{ id: "product-1" }],
+    },
+    productLinkHealth: {
+      count: async ({
+        where,
+      }: {
+        where: { linkKind?: string; status?: "BROKEN" | "TEMPORARY_ERROR" };
+      }) => {
+        if (where.linkKind === "SOURCE" && where.status === "BROKEN") {
+          return linkHealthCounts.sourceBroken ?? 0;
+        }
+        if (where.linkKind === "SOURCE" && where.status === "TEMPORARY_ERROR") {
+          return linkHealthCounts.sourceTemporary ?? 0;
+        }
+        return 0;
+      },
+    },
+    rawSnapshot: {
+      count: async () => 0,
+    },
+    discordNotificationDelivery: {
+      count: async ({ where }: { where: { status?: "FAILED" | "RATE_LIMITED" } }) => {
+        if (where.status === "FAILED") {
+          return discordDeliveryCounts.failed ?? 0;
+        }
+
+        if (where.status === "RATE_LIMITED") {
+          return discordDeliveryCounts.rateLimited ?? 0;
+        }
+
+        return 0;
+      },
+      findMany: async () =>
+        discordDeliveryRecords ?? [
+          ...Array.from({ length: discordDeliveryCounts.failed ?? 0 }, (_, index) => ({
+            id: `discord-failed-${index + 1}`,
+            discordUserId: `discord-user-failed-${index + 1}`,
+            kind: "SCHEDULED_PRICE_REPORT" as const,
+            status: "FAILED" as const,
+            targetPriceWatchId: null,
+            createdAt: new Date(`2026-06-02T11:${String(50 - index).padStart(2, "0")}:00.000Z`),
+          })),
+          ...Array.from({ length: discordDeliveryCounts.rateLimited ?? 0 }, (_, index) => ({
+            id: `discord-rate-limited-${index + 1}`,
+            discordUserId: `discord-user-rate-limited-${index + 1}`,
+            kind: "SCHEDULED_PRICE_REPORT" as const,
+            status: "RATE_LIMITED" as const,
+            targetPriceWatchId: null,
+            createdAt: new Date(`2026-06-02T11:${String(40 - index).padStart(2, "0")}:00.000Z`),
+          })),
+        ],
+    },
+  } as unknown as Parameters<typeof runProductionSmoke>[0];
+}
+
+export function idleShutdown() {
+  return {
+    requested: false,
+    sleep: async () => {},
+  };
+}
