@@ -38,6 +38,7 @@ import {
   sendPublicReportTest,
 } from "./public-report-settings";
 import {
+  sendFeatureDisabledResponse,
   sendMissingUserResponse,
   sendUnsupportedInteractionResponse,
 } from "./responses";
@@ -77,6 +78,36 @@ export async function handleApplicationCommandInteraction({
       interaction,
       fetchImpl,
       message: createBotHelpMessage(),
+    });
+    return;
+  }
+
+  if (command && !options.personalReportsEnabled) {
+    await sendFeatureDisabledResponse({
+      interaction,
+      options,
+      fetchImpl,
+      content: "個人價格報告目前已由維運暫停。",
+    });
+    return;
+  }
+
+  if (publicReportCommand && !options.publicReportsEnabled) {
+    await sendFeatureDisabledResponse({
+      interaction,
+      options,
+      fetchImpl,
+      content: "公開價格報告目前已由維運暫停。",
+    });
+    return;
+  }
+
+  if (watchCommand && !options.targetWatchesEnabled) {
+    await sendFeatureDisabledResponse({
+      interaction,
+      options,
+      fetchImpl,
+      content: "目標價提醒目前已由維運暫停。",
     });
     return;
   }

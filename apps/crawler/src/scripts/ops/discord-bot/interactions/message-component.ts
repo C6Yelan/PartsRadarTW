@@ -15,6 +15,7 @@ import type {
 import { handlePriceReportComponentInteraction } from "./price-report-handler";
 import { handlePublicReportComponentInteraction } from "./public-report-handler";
 import {
+  sendFeatureDisabledResponse,
   sendMissingUserResponse,
   sendUnsupportedInteractionResponse,
 } from "./responses";
@@ -53,6 +54,16 @@ export async function handleMessageComponentInteraction({
   }
 
   if (publicReportComponent) {
+    if (!options.publicReportsEnabled) {
+      await sendFeatureDisabledResponse({
+        interaction,
+        options,
+        fetchImpl,
+        content: "公開價格報告目前已由維運暫停。",
+      });
+      return;
+    }
+
     await handlePublicReportComponentInteraction({
       client,
       interaction,
@@ -66,6 +77,16 @@ export async function handleMessageComponentInteraction({
   }
 
   if (component) {
+    if (!options.personalReportsEnabled) {
+      await sendFeatureDisabledResponse({
+        interaction,
+        options,
+        fetchImpl,
+        content: "個人價格報告目前已由維運暫停。",
+      });
+      return;
+    }
+
     await handlePriceReportComponentInteraction({
       client,
       interaction,
@@ -79,6 +100,16 @@ export async function handleMessageComponentInteraction({
   }
 
   if (watchComponent) {
+    if (!options.targetWatchesEnabled) {
+      await sendFeatureDisabledResponse({
+        interaction,
+        options,
+        fetchImpl,
+        content: "目標價提醒目前已由維運暫停。",
+      });
+      return;
+    }
+
     await handleWatchComponentInteraction({
       client,
       interaction,

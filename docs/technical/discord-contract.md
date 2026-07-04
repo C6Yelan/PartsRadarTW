@@ -28,6 +28,7 @@ The bot daemon also scans due scheduled personal reports, pending public reports
 - A successfully notified watch is not sent again until the user updates or recreates the watch.
 - Same-user reached watches in one scan are combined into a digest; oversized digests are split into multiple embeds.
 - Delivery results are written to Discord notification delivery logs for retry, dedupe, and ops visibility.
+- Operator feature flags can temporarily disable public reports, personal reports, or target-price watches without deleting commands, settings, watches, or delivery history. Disabled commands return a safe user-facing message.
 
 ## Security/Data Boundary
 

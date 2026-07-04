@@ -34,6 +34,9 @@ export function parseDiscordBotOptions(
     ),
     registerCommands: args.includes("--register-commands"),
     registerCommandsOnStart: readBooleanEnv(env, "DISCORD_BOT_REGISTER_COMMANDS_ON_START", true),
+    publicReportsEnabled: readBooleanEnv(env, "DISCORD_FEATURE_PUBLIC_REPORTS_ENABLED", true),
+    personalReportsEnabled: readBooleanEnv(env, "DISCORD_FEATURE_PERSONAL_REPORTS_ENABLED", true),
+    targetWatchesEnabled: readBooleanEnv(env, "DISCORD_FEATURE_TARGET_WATCHES_ENABLED", true),
     priceReportMaxItems: parseIntegerOption({
       args,
       env,
@@ -191,6 +194,8 @@ Options:
 
 Environment:
   DISCORD_BOT_TOKEN, DISCORD_APPLICATION_ID, DISCORD_BOT_REGISTER_COMMANDS_ON_START,
+  DISCORD_FEATURE_PUBLIC_REPORTS_ENABLED, DISCORD_FEATURE_PERSONAL_REPORTS_ENABLED,
+  DISCORD_FEATURE_TARGET_WATCHES_ENABLED,
   DISCORD_PRICE_REPORT_MAX_ITEMS,
   DISCORD_BOT_COMMAND_COOLDOWN_SECONDS, DISCORD_PRICE_REPORT_SCHEDULE_INTERVAL_SECONDS,
   PARTSRADAR_PUBLIC_BASE_URL

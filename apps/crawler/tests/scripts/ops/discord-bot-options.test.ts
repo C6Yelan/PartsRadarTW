@@ -26,9 +26,46 @@ describe("Discord bot options", () => {
       apiBaseUrl: "https://discord.com/api/v10",
       registerCommands: false,
       registerCommandsOnStart: true,
+      publicReportsEnabled: true,
+      personalReportsEnabled: true,
+      targetWatchesEnabled: true,
       priceReportMaxItems: 50,
       commandCooldownSeconds: 60,
       priceReportScheduleIntervalSeconds: 300,
+    });
+  });
+
+  it("parses Discord feature flags with safe enabled defaults", () => {
+    expect(
+      parseDiscordBotOptions([], {
+        DISCORD_BOT_TOKEN: TOKEN,
+        DISCORD_APPLICATION_ID: APPLICATION_ID,
+        DISCORD_FEATURE_PUBLIC_REPORTS_ENABLED: "false",
+        DISCORD_FEATURE_PERSONAL_REPORTS_ENABLED: "0",
+        DISCORD_FEATURE_TARGET_WATCHES_ENABLED: "no",
+        DISCORD_BOT_REGISTER_COMMANDS_ON_START: "yes",
+      }),
+    ).toMatchObject({
+      publicReportsEnabled: false,
+      personalReportsEnabled: false,
+      targetWatchesEnabled: false,
+      registerCommandsOnStart: true,
+    });
+
+    expect(
+      parseDiscordBotOptions([], {
+        DISCORD_BOT_TOKEN: TOKEN,
+        DISCORD_APPLICATION_ID: APPLICATION_ID,
+        DISCORD_FEATURE_PUBLIC_REPORTS_ENABLED: "1",
+        DISCORD_FEATURE_PERSONAL_REPORTS_ENABLED: "true",
+        DISCORD_FEATURE_TARGET_WATCHES_ENABLED: "yes",
+        DISCORD_BOT_REGISTER_COMMANDS_ON_START: "0",
+      }),
+    ).toMatchObject({
+      publicReportsEnabled: true,
+      personalReportsEnabled: true,
+      targetWatchesEnabled: true,
+      registerCommandsOnStart: false,
     });
   });
 

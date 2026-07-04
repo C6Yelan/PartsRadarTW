@@ -18,7 +18,7 @@ export const TEST_SOURCE_CATEGORIES = [
   { igrp: 12, displayName: "顯示卡" },
 ] as const;
 
-export function createDiscordBotOptions(): DiscordBotOptions {
+export function createDiscordBotOptions(overrides: Partial<DiscordBotOptions> = {}): DiscordBotOptions {
   return {
     token: TOKEN,
     applicationId: APPLICATION_ID,
@@ -27,8 +27,12 @@ export function createDiscordBotOptions(): DiscordBotOptions {
     gatewayUrl: "wss://discord.test/gateway",
     registerCommands: false,
     registerCommandsOnStart: true,
+    publicReportsEnabled: true,
+    personalReportsEnabled: true,
+    targetWatchesEnabled: true,
     priceReportMaxItems: 50,
     commandCooldownSeconds: 60,
     priceReportScheduleIntervalSeconds: 300,
+    ...overrides,
   };
 }

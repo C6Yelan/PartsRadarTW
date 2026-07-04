@@ -39,6 +39,7 @@ import {
   readPublicReportInteractionContext,
 } from "./public-report-settings";
 import {
+  sendFeatureDisabledResponse,
   sendMissingUserResponse,
   sendUnsupportedInteractionResponse,
 } from "./responses";
@@ -72,6 +73,16 @@ export async function handleModalSubmitInteraction({
   }
 
   if (watchModal) {
+    if (!options.targetWatchesEnabled) {
+      await sendFeatureDisabledResponse({
+        interaction,
+        options,
+        fetchImpl,
+        content: "目標價提醒目前已由維運暫停。",
+      });
+      return;
+    }
+
     await handleWatchModalSubmit({
       client,
       interaction,
@@ -84,6 +95,16 @@ export async function handleModalSubmitInteraction({
   }
 
   if (publicReportModal) {
+    if (!options.publicReportsEnabled) {
+      await sendFeatureDisabledResponse({
+        interaction,
+        options,
+        fetchImpl,
+        content: "公開價格報告目前已由維運暫停。",
+      });
+      return;
+    }
+
     const publicContext = readPublicReportInteractionContext(interaction);
 
     if (!publicContext) {
@@ -179,6 +200,16 @@ export async function handleModalSubmitInteraction({
 
   if (!modal) {
     await sendUnsupportedInteractionResponse({ interaction, options, fetchImpl });
+    return;
+  }
+
+  if (!options.personalReportsEnabled) {
+    await sendFeatureDisabledResponse({
+      interaction,
+      options,
+      fetchImpl,
+      content: "個人價格報告目前已由維運暫停。",
+    });
     return;
   }
 

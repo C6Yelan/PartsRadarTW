@@ -37,3 +37,23 @@ export async function sendMissingUserResponse({
     content: "無法辨識這次操作的 Discord 使用者。",
   });
 }
+
+export async function sendFeatureDisabledResponse({
+  interaction,
+  options,
+  fetchImpl,
+  content,
+}: {
+  interaction: DiscordInteraction;
+  options: DiscordBotOptions;
+  fetchImpl: FetchImpl;
+  content: string;
+}): Promise<void> {
+  await sendInteractionResponse({
+    token: options.token,
+    apiBaseUrl: options.apiBaseUrl,
+    interaction,
+    fetchImpl,
+    content,
+  });
+}

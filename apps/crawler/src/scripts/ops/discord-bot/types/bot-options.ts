@@ -11,6 +11,9 @@ export interface DiscordBotOptions {
   gatewayUrl: string;
   registerCommands: boolean;
   registerCommandsOnStart: boolean;
+  publicReportsEnabled: boolean;
+  personalReportsEnabled: boolean;
+  targetWatchesEnabled: boolean;
   priceReportMaxItems: number;
   commandCooldownSeconds: number;
   priceReportScheduleIntervalSeconds: number;

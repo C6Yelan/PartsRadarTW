@@ -541,6 +541,9 @@ Bot 目標：
 - `DISCORD_BOT_TOKEN`：Discord bot token，只能放在 untracked `.env` 或部署 secret。
 - `DISCORD_APPLICATION_ID`：Discord application id。
 - `DISCORD_BOT_REGISTER_COMMANDS_ON_START`：daemon 啟動時是否註冊 slash command，預設 `true`。
+- `DISCORD_FEATURE_PUBLIC_REPORTS_ENABLED`：是否執行公開價格報告排程與互動，預設 `true`；設為 `false` 時保留設定但暫停發送與設定操作。
+- `DISCORD_FEATURE_PERSONAL_REPORTS_ENABLED`：是否執行個人價格報告排程與互動，預設 `true`；設為 `false` 時保留使用者設定但暫停 DM 報告。
+- `DISCORD_FEATURE_TARGET_WATCHES_ENABLED`：是否執行目標價追蹤掃描與互動，預設 `true`；設為 `false` 時保留 watch rows 但暫停通知與管理操作。
 - `DISCORD_PRICE_REPORT_MAX_ITEMS`：公開價格報告與 `/price-report now` 最多列出的商品數，預設 50。
 - `DISCORD_BOT_COMMAND_COOLDOWN_SECONDS`：每位使用者手動指令 cooldown，預設 60。
 - `DISCORD_PRICE_REPORT_SCHEDULE_INTERVAL_SECONDS`：bot daemon 的目標價掃描間隔與每日報告 fallback 掃描上限，預設 300 秒，允許 60 到 3600。每日報告若有更早的 `nextSendAt`，daemon 會睡到該 due time 附近才醒來；目標價仍依設定間隔掃描，最短 sleep 為 1 秒，避免高頻輪詢。
