@@ -44,6 +44,66 @@ test.describe("public web smoke", () => {
     await expect(page.getByRole("heading", { name: "常見問題" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "一般成員能用哪些指令？" })).toBeVisible();
   });
+
+  test("renders and updates a persisted build list item", async ({ page }) => {
+    const productId = "11111111-1111-1111-1111-111111111111";
+
+    await page.addInitScript(
+      ({ id }) => {
+        window.localStorage.setItem(
+          "partsradartw:build-list:v1",
+          JSON.stringify([
+            {
+              id,
+              name: "測試顯示卡 RTX",
+              image: {
+                url: `/api/product-images/${id}.webp`,
+                alt: "測試顯示卡 RTX",
+              },
+              category: {
+                id: "category-12",
+                igrp: 12,
+                displayName: "顯示卡",
+                sourceName: "顯示卡 VGA",
+              },
+              price: {
+                amount: 6990,
+                currency: "TWD",
+                capturedAt: "2026-05-28T11:45:00.000Z",
+                lastSeenAt: "2026-05-28T11:55:00.000Z",
+              },
+              source: {
+                name: "coolpc",
+                url: "https://www.coolpc.com.tw/evaluate.php?iBuy=GPU-RTX-4070",
+              },
+              quantity: 2,
+              addedAt: "2026-05-28T12:00:00.000Z",
+              updatedAt: "2026-05-28T12:00:00.000Z",
+            },
+          ]),
+        );
+      },
+      { id: productId },
+    );
+
+    await page.goto("/build-list");
+    const item = page.getByRole("article").filter({ hasText: "測試顯示卡 RTX" });
+
+    await expect(page.getByText("2 件商品")).toBeVisible();
+    await expect(item.getByRole("heading", { name: "測試顯示卡 RTX" })).toBeVisible();
+    await expect(item.getByRole("spinbutton", { name: "數量" })).toHaveValue("2");
+    await expect(item.getByText("NT$ 13,980")).toBeVisible();
+
+    await item.getByRole("button", { name: "增加數量" }).click();
+    await expect(page.getByText("3 件商品")).toBeVisible();
+    await expect(item.getByRole("spinbutton", { name: "數量" })).toHaveValue("3");
+    await expect(item.getByText("NT$ 20,970")).toBeVisible();
+
+    await item.getByRole("button", { name: "移除" }).click();
+    await expect(page.getByText("已從配單移除")).toBeVisible();
+    await page.getByRole("button", { name: "復原" }).click();
+    await expect(page.getByRole("article").filter({ hasText: "測試顯示卡 RTX" })).toBeVisible();
+  });
 });
 
 test.describe("public API smoke", () => {

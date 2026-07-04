@@ -1,11 +1,14 @@
-// apps/web/tests/build-list/excel.test.ts
+// apps/web/tests/build-list/export.test.ts
 import { describe, expect, it } from "vitest";
 
+import { createBuildListExcelDownload } from "../../app/build-list/download";
 import {
+  BUILD_LIST_EXCEL_MIME_TYPE,
   buildBuildListWorkbook,
   createBuildListExcelFilename,
   createBuildListWorksheetRows,
 } from "../../app/build-list/excel";
+import { formatBuildListExportDateTime } from "../../app/build-list/formatting";
 import type { BuildListItem } from "../../app/build-list/model";
 
 describe("build list Excel export", () => {
@@ -62,6 +65,27 @@ describe("build list Excel export", () => {
     );
     expect(worksheetXml).toContain("總價");
     expect(worksheetXml).toContain("<c r=\"E3\"><v>13980</v></c>");
+  });
+
+  it("creates a downloadable Excel blob and filename", async () => {
+    const download = createBuildListExcelDownload([item()], new Date(2026, 5, 3, 10, 15));
+
+    expect(download.filename).toBe("PartsRadarTW-build-list-20260603-1015.xlsx");
+    expect(download.blob.type).toBe(BUILD_LIST_EXCEL_MIME_TYPE);
+    expect(download.blob.size).toBeGreaterThan(0);
+    await expect(download.blob.arrayBuffer()).resolves.toBeInstanceOf(ArrayBuffer);
+  });
+});
+
+describe("build list export formatting", () => {
+  it("formats export date times in fixed UTC+8", () => {
+    expect(formatBuildListExportDateTime("2026-05-28T16:05:00.000Z")).toBe(
+      "2026-05-29 00:05",
+    );
+  });
+
+  it("keeps invalid export date values readable", () => {
+    expect(formatBuildListExportDateTime("not-a-date")).toBe("not-a-date");
   });
 });
 

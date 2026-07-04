@@ -1,4 +1,4 @@
-// apps/web/tests/build-list/model.test.ts
+// apps/web/tests/build-list/model-storage.test.ts
 import { describe, expect, it } from "vitest";
 
 import {
@@ -14,6 +14,12 @@ import {
   type BuildListItem,
   type BuildListProduct,
 } from "../../app/build-list/model";
+import {
+  BUILD_LIST_STORAGE_KEY,
+  readBuildListItems,
+  type BuildListStorage,
+  writeBuildListItems,
+} from "../../app/build-list/storage";
 
 describe("build list model", () => {
   it("adds products, increments existing quantities, and refreshes product snapshots", () => {
@@ -69,7 +75,7 @@ describe("build list model", () => {
     expect(restoreBuildListItem([item({ quantity: 1 })], removedItem)).toEqual([removedItem]);
   });
 
-  it("normalizes persisted localStorage data and drops invalid entries", () => {
+  it("normalizes persisted data, clamps quantities, and drops invalid entries", () => {
     const normalizedItems = normalizeBuildListItems([
       item({ quantity: 120 }),
       { ...item({ id: "product-2" }), source: { name: "coolpc", url: "javascript:alert(1)" } },
@@ -124,6 +130,39 @@ describe("build list model", () => {
     });
   });
 });
+
+describe("build list storage", () => {
+  it("reads normalized items and ignores malformed JSON", () => {
+    const storage = fakeStorage();
+    storage.setItem(BUILD_LIST_STORAGE_KEY, JSON.stringify([item()]));
+
+    expect(readBuildListItems(storage)).toHaveLength(1);
+
+    storage.setItem(BUILD_LIST_STORAGE_KEY, "{");
+
+    expect(readBuildListItems(storage)).toEqual([]);
+  });
+
+  it("writes non-empty lists and removes empty lists", () => {
+    const storage = fakeStorage();
+
+    expect(writeBuildListItems([item()], storage)).toHaveLength(1);
+    expect(storage.getItem(BUILD_LIST_STORAGE_KEY)).toContain("GPU RTX 4070");
+
+    expect(writeBuildListItems([], storage)).toEqual([]);
+    expect(storage.getItem(BUILD_LIST_STORAGE_KEY)).toBeNull();
+  });
+});
+
+function fakeStorage(): BuildListStorage {
+  const values = new Map<string, string>();
+
+  return {
+    getItem: (key) => values.get(key) ?? null,
+    removeItem: (key) => values.delete(key),
+    setItem: (key, value) => values.set(key, value),
+  };
+}
 
 function product(overrides: Partial<BuildListProduct> = {}): BuildListProduct {
   return {
