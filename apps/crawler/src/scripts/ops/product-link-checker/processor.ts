@@ -1,174 +1,33 @@
 // apps/crawler/src/scripts/ops/product-link-checker/processor.ts
-import type { Prisma } from "@partsradar/db";
-import { createCoolpcPurchaseUrl } from "@partsradar/shared";
-import { toSafeCliErrorMessage } from "../../shared/script-utils";
 import type { ProductLinkCheckerOptions, ProductLinkCheckerSummary } from "./options";
 import { toSummaryKey } from "./options";
+import { fetchProductLink } from "./fetch";
+import {
+  PRODUCT_LINK_HEALTH_STATUSES,
+  type LinkCheckOutcome,
+  type ProductLinkCandidate,
+  type ProductLinkCheckerDependencies,
+  type ProductLinkHealthClient,
+  type ProductLinkHealthWriteData,
+} from "./types";
 
-export const PRODUCT_LINK_KINDS = {
-  // SOURCE matches the public API source.url purchase link, not products.source_url.
-  SOURCE: "SOURCE",
-} as const;
-
-export const PRODUCT_LINK_HEALTH_STATUSES = {
-  OK: "OK",
-  BROKEN: "BROKEN",
-  TEMPORARY_ERROR: "TEMPORARY_ERROR",
-} as const;
-
-export type ProductLinkKindValue =
-  (typeof PRODUCT_LINK_KINDS)[keyof typeof PRODUCT_LINK_KINDS];
-export type ProductLinkHealthStatusValue =
-  (typeof PRODUCT_LINK_HEALTH_STATUSES)[keyof typeof PRODUCT_LINK_HEALTH_STATUSES];
-
-export const PRODUCT_LINK_SELECT = {
-  id: true,
-  name: true,
-  ibuyToken: true,
-  sourceCategory: {
-    select: {
-      igrp: true,
-      displayName: true,
-    },
-  },
-  linkHealthChecks: {
-    select: {
-      linkKind: true,
-      url: true,
-      status: true,
-      httpStatus: true,
-      checkedAt: true,
-      lastOkAt: true,
-      lastFailureAt: true,
-      failureCount: true,
-    },
-  },
-} as const satisfies Prisma.ProductSelect;
-
-export type ProductLinkProductRecord = Prisma.ProductGetPayload<{
-  select: typeof PRODUCT_LINK_SELECT;
-}>;
-export type ProductLinkHealthRecord = ProductLinkProductRecord["linkHealthChecks"][number];
-
-type ProductLinkFindManyArgs = Omit<Prisma.ProductFindManyArgs, "select"> & {
-  select: typeof PRODUCT_LINK_SELECT;
-};
-
-interface ProductLinkHealthUpsertArgs {
-  where: {
-    productId_linkKind: {
-      productId: string;
-      linkKind: ProductLinkKindValue;
-    };
-  };
-  create: ProductLinkHealthWriteData & {
-    productId: string;
-    linkKind: ProductLinkKindValue;
-  };
-  update: ProductLinkHealthWriteData;
-  select: { id: true };
-}
-
-interface ProductLinkHealthWriteData {
-  url: string;
-  status: ProductLinkHealthStatusValue;
-  httpStatus: number | null;
-  checkedAt: Date;
-  lastOkAt: Date | null;
-  lastFailureAt: Date | null;
-  failureCount: number;
-  errorMessage: string | null;
-}
-
-export interface ProductLinkHealthClient {
-  product: {
-    findMany(args: ProductLinkFindManyArgs): Promise<ProductLinkProductRecord[]>;
-  };
-  productLinkHealth: {
-    upsert(args: ProductLinkHealthUpsertArgs): Promise<{ id: string }>;
-  };
-}
-
-export interface ProductLinkCandidate {
-  productId: string;
-  productName: string;
-  categoryLabel: string;
-  linkKind: ProductLinkKindValue;
-  url: string;
-  existingHealth: ProductLinkHealthRecord | null;
-}
-
-export interface LinkCheckOutcome {
-  status: "ok" | "broken" | "temporary_error";
-  httpStatus: number | null;
-  errorMessage: string | null;
-}
-
-export interface ProductLinkCheckerDependencies {
-  fetchLink?: (url: string, options: ProductLinkCheckerOptions) => Promise<LinkCheckOutcome>;
-  delay?: (ms: number) => Promise<void>;
-  log?: (message: string) => void;
-  now?: () => Date;
-  shouldPause?: () => Promise<boolean> | boolean;
-}
-
-export async function readProductLinkCandidates(
-  client: ProductLinkHealthClient,
-  options: ProductLinkCheckerOptions,
-  now = new Date(),
-): Promise<ProductLinkCandidate[]> {
-  const products = await client.product.findMany({
-    where: {
-      isActive: true,
-      primaryImageUrl: { not: null },
-      primaryImageCheckedAt: { not: null },
-      currentPrice: { isNot: null },
-      sourceCategory: {
-        enabled: true,
-        ...(options.igrp === null ? {} : { igrp: options.igrp }),
-      },
-    },
-    select: PRODUCT_LINK_SELECT,
-    orderBy: [{ sourceCategory: { igrp: "asc" } }, { id: "asc" }],
-    take: undefined,
-  });
-  const candidates = buildProductLinkCandidates(products, options, now);
-
-  return options.limit === null ? candidates : candidates.slice(0, options.limit);
-}
-
-export function buildProductLinkCandidates(
-  products: ProductLinkProductRecord[],
-  options: ProductLinkCheckerOptions,
-  now: Date,
-): ProductLinkCandidate[] {
-  const staleBefore = new Date(now.getTime() - options.staleAfterHours * 60 * 60 * 1000);
-  const candidates: ProductLinkCandidate[] = [];
-
-  for (const product of products) {
-    const links = buildProductLinks(product, options);
-
-    for (const link of links) {
-      const existingHealth =
-        product.linkHealthChecks.find((health) => health.linkKind === link.linkKind) ?? null;
-
-      if (!shouldCheckLink(link.url, existingHealth, staleBefore)) {
-        continue;
-      }
-
-      candidates.push({
-        productId: product.id,
-        productName: product.name,
-        categoryLabel: `${product.sourceCategory.displayName} IGrp=${product.sourceCategory.igrp}`,
-        linkKind: link.linkKind,
-        url: link.url,
-        existingHealth,
-      });
-    }
-  }
-
-  return candidates.sort(compareProductLinkCandidates);
-}
+export { buildProductLinkCandidates, readProductLinkCandidates } from "./candidates";
+export { fetchProductLink } from "./fetch";
+export {
+  PRODUCT_LINK_HEALTH_STATUSES,
+  PRODUCT_LINK_KINDS,
+  PRODUCT_LINK_SELECT,
+} from "./types";
+export type {
+  LinkCheckOutcome,
+  ProductLinkCandidate,
+  ProductLinkCheckerDependencies,
+  ProductLinkHealthClient,
+  ProductLinkHealthRecord,
+  ProductLinkHealthStatusValue,
+  ProductLinkKindValue,
+  ProductLinkProductRecord,
+} from "./types";
 
 export async function checkProductLinks(
   client: ProductLinkHealthClient,
@@ -187,6 +46,7 @@ export async function checkProductLinks(
     pausedForPriority: false,
   };
   const log = dependencies.log ?? console.log;
+  const debugLog = dependencies.debugLog ?? (() => {});
   const fetchLink = dependencies.fetchLink ?? fetchProductLink;
   const sleep = dependencies.delay ?? delay;
   const now = dependencies.now ?? (() => new Date());
@@ -209,13 +69,13 @@ export async function checkProductLinks(
 
     if (options.dryRun) {
       summary.dryRun += 1;
-      log(`[dry-run] ${formatCandidate(candidate)} | ${candidate.url}`);
+      debugLog(`[dry-run] ${formatCandidate(candidate)} | ${candidate.url}`);
       continue;
     }
 
     if (summary.liveRequests > 0) {
       const waitMs = randomDelayMs(options.minDelayMs, options.maxDelayMs);
-      log(`Waiting ${waitMs}ms before the next link request...`);
+      debugLog(`Waiting ${waitMs}ms before the next link request...`);
       await sleep(waitMs);
 
       if (await shouldPause()) {
@@ -251,7 +111,8 @@ export async function checkProductLinks(
 
     const statusSuffix =
       writeData.httpStatus === null ? writeData.status : `${writeData.status} HTTP ${writeData.httpStatus}`;
-    log(`[${statusSuffix}] ${formatCandidate(candidate)}`);
+    const statusLog = writeData.status === PRODUCT_LINK_HEALTH_STATUSES.OK ? debugLog : log;
+    statusLog(`[${statusSuffix}] ${formatCandidate(candidate)}`);
   }
 
   return summary;
@@ -295,116 +156,6 @@ export function resolveNextProductLinkHealth(
     failureCount: nextFailureCount,
     errorMessage: outcome.errorMessage,
   };
-}
-
-export async function fetchProductLink(
-  url: string,
-  options: ProductLinkCheckerOptions,
-): Promise<LinkCheckOutcome> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), options.timeoutMs);
-
-  try {
-    const response = await fetch(url, {
-      headers: {
-        accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "accept-language": "zh-TW,zh;q=0.9,en;q=0.8",
-        "user-agent":
-          "PartsRadarTW product link health check (+https://github.com/C6Yelan/PartsRadarTW)",
-      },
-      redirect: "follow",
-      signal: controller.signal,
-    });
-
-    if (response.ok) {
-      return {
-        status: "ok",
-        httpStatus: response.status,
-        errorMessage: null,
-      };
-    }
-
-    const status = response.status === 404 || response.status === 410 ? "broken" : "temporary_error";
-
-    return {
-      status,
-      httpStatus: response.status,
-      errorMessage: `HTTP ${response.status}`,
-    };
-  } catch (error) {
-    return {
-      status: "temporary_error",
-      httpStatus: null,
-      errorMessage: toSafeCliErrorMessage(error),
-    };
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-function buildProductLinks(
-  product: ProductLinkProductRecord,
-  options: ProductLinkCheckerOptions,
-): Array<{ linkKind: ProductLinkKindValue; url: string }> {
-  const links: Array<{ linkKind: ProductLinkKindValue; url: string }> = [];
-
-  if (options.kinds.includes(PRODUCT_LINK_KINDS.SOURCE)) {
-    links.push({
-      linkKind: PRODUCT_LINK_KINDS.SOURCE,
-      url: createCoolpcPurchaseUrl(product.ibuyToken),
-    });
-  }
-
-  return links;
-}
-
-function shouldCheckLink(
-  url: string,
-  existingHealth: ProductLinkHealthRecord | null,
-  staleBefore: Date,
-): boolean {
-  return (
-    !existingHealth ||
-    existingHealth.url !== url ||
-    existingHealth.checkedAt.getTime() <= staleBefore.getTime()
-  );
-}
-
-function compareProductLinkCandidates(
-  left: ProductLinkCandidate,
-  right: ProductLinkCandidate,
-): number {
-  const priorityOrder = getCandidatePriority(left) - getCandidatePriority(right);
-
-  if (priorityOrder !== 0) {
-    return priorityOrder;
-  }
-
-  const checkedAtOrder = getCandidateCheckedAtTime(left) - getCandidateCheckedAtTime(right);
-
-  if (checkedAtOrder !== 0) {
-    return checkedAtOrder;
-  }
-
-  const kindOrder = left.linkKind.localeCompare(right.linkKind);
-
-  if (kindOrder !== 0) {
-    return kindOrder;
-  }
-
-  return left.productId.localeCompare(right.productId);
-}
-
-function getCandidatePriority(candidate: ProductLinkCandidate): number {
-  if (!candidate.existingHealth || candidate.existingHealth.url !== candidate.url) {
-    return 0;
-  }
-
-  return candidate.existingHealth.status === PRODUCT_LINK_HEALTH_STATUSES.TEMPORARY_ERROR ? 1 : 2;
-}
-
-function getCandidateCheckedAtTime(candidate: ProductLinkCandidate): number {
-  return candidate.existingHealth?.checkedAt.getTime() ?? 0;
 }
 
 function formatCandidate(candidate: ProductLinkCandidate): string {

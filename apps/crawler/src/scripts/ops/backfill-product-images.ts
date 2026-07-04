@@ -6,6 +6,9 @@ import type { PrismaClient } from "@partsradar/db";
 import { loadWorkspaceEnv, toSafeCliErrorMessage } from "../shared/script-utils";
 import { parseOptions, printSummary } from "./image-cache-backfill/options";
 import { backfillImages, readCandidates } from "./image-cache-backfill/processor";
+import { createOpsLogger } from "./shared/logger";
+
+const logger = createOpsLogger();
 
 async function main() {
   const options = parseOptions(process.argv.slice(2));
@@ -17,7 +20,10 @@ async function main() {
     client = db.prisma;
 
     const candidates = await readCandidates(client, options);
-    const summary = await backfillImages(candidates, options);
+    const summary = await backfillImages(candidates, options, {
+      log: (message) => logger.info(message),
+      debugLog: (message) => logger.debug(message),
+    });
 
     printSummary(summary, options);
   } finally {

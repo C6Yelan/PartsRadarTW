@@ -2,13 +2,19 @@
 // Builds an aggregate report from persisted product_link_health rows.
 // This command is read-only and never contacts external product links.
 import type { Prisma } from "@partsradar/db";
-import { getStringArg, resolveWorkspaceRoot } from "../shared/script-utils";
 import {
   PRODUCT_LINK_HEALTH_STATUSES,
   PRODUCT_LINK_KINDS,
   type ProductLinkHealthStatusValue,
   type ProductLinkKindValue,
 } from "./product-link-checker/processor";
+import type { ProductLinkHealthReportOptions } from "./product-link-health-report/options";
+
+export {
+  parseProductLinkHealthReportOptions,
+  printProductLinkHealthReportHelp,
+  type ProductLinkHealthReportOptions,
+} from "./product-link-health-report/options";
 
 const STATUS_ORDER: ProductLinkHealthStatusValue[] = [
   PRODUCT_LINK_HEALTH_STATUSES.OK,
@@ -50,12 +56,6 @@ export interface ProductLinkHealthReportClient {
   };
 }
 
-export interface ProductLinkHealthReportOptions {
-  workspaceRoot: string;
-  includeInactive: boolean;
-  kinds: ProductLinkKindValue[];
-}
-
 export interface ProductLinkHealthReport {
   generatedAt: Date;
   scope: "active products" | "all products";
@@ -79,22 +79,6 @@ export interface ProductLinkHealthErrorBreakdown {
 export interface CountBucket {
   label: string;
   count: number;
-}
-
-export function parseProductLinkHealthReportOptions(
-  args: string[],
-  cwd = process.cwd(),
-): ProductLinkHealthReportOptions {
-  if (args.includes("--help")) {
-    printProductLinkHealthReportHelp();
-    process.exit(0);
-  }
-
-  return {
-    workspaceRoot: resolveWorkspaceRoot(cwd),
-    includeInactive: args.includes("--include-inactive"),
-    kinds: parseKinds(getStringArg(args, "--kinds")),
-  };
 }
 
 export async function readProductLinkHealthReport(
@@ -261,38 +245,6 @@ function appendErrorBreakdown(lines: string[], breakdown: ProductLinkHealthError
   }
 }
 
-function parseKinds(rawKinds: string | undefined): ProductLinkKindValue[] {
-  const rawValues = rawKinds?.split(",").map((value) => value.trim().toLowerCase()) ?? ["source"];
-  const kinds: ProductLinkKindValue[] = [];
-
-  for (const rawValue of rawValues) {
-    const kind = toProductLinkKind(rawValue);
-
-    if (!kind) {
-      throw new Error("--kinds only supports source.");
-    }
-
-    if (!kinds.includes(kind)) {
-      kinds.push(kind);
-    }
-  }
-
-  if (kinds.length === 0) {
-    throw new Error("--kinds only supports source.");
-  }
-
-  return kinds;
-}
-
-function toProductLinkKind(rawValue: string): ProductLinkKindValue | null {
-  switch (rawValue) {
-    case "source":
-      return PRODUCT_LINK_KINDS.SOURCE;
-    default:
-      return null;
-  }
-}
-
 function toPublicKindLabel(kind: ProductLinkKindValue): string {
   return kind === PRODUCT_LINK_KINDS.SOURCE ? "source" : kind;
 }
@@ -333,16 +285,4 @@ function compareFailureBuckets(left: CountBucket, right: CountBucket): number {
     (FAILURE_BUCKET_ORDER.get(left.label) ?? Number.MAX_SAFE_INTEGER) -
     (FAILURE_BUCKET_ORDER.get(right.label) ?? Number.MAX_SAFE_INTEGER)
   );
-}
-
-export function printProductLinkHealthReportHelp(): void {
-  console.log(`Usage:
-  pnpm ops:product-links:report [options]
-
-Options:
-  --kinds <list>       Comma-separated link kinds. Only source is supported.
-                       Default: source
-  --include-inactive   Include inactive products. Default: active products only.
-  --help               Show this help message.
-`);
 }

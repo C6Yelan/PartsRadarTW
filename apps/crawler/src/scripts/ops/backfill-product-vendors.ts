@@ -3,7 +3,7 @@
 // It derives vendor fields from existing product names and category IDs.
 // Do not use this as the production scheduled crawler entrypoint.
 import type { PrismaClient } from "@partsradar/db";
-import { classifyProductVendor } from "@partsradar/shared";
+import { classifyProductVendor } from "../../coolpc/vendor-classification";
 import {
   getPositiveNumberArg,
   loadWorkspaceEnv,

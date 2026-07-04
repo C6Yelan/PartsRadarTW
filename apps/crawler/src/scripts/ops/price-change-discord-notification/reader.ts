@@ -1,6 +1,19 @@
 // apps/crawler/src/scripts/ops/price-change-discord-notification/reader.ts
 
-import type { Prisma } from "@partsradar/db";
+import {
+  CURRENT_PRICE_SNAPSHOT_ORDER_BY,
+  PREVIOUS_PRICE_SNAPSHOT_ORDER_BY,
+  PREVIOUS_PRICE_SNAPSHOT_SELECT,
+  PRICE_SNAPSHOT_WITH_PRODUCT_SELECT,
+} from "./reader-query";
+import {
+  compareNewProducts,
+  comparePriceChanges,
+  createRecentPriceReportProductFilter,
+  groupPreviousSnapshots,
+  normalizeRecentPriceReportFilters,
+  toProductSubcategory,
+} from "./reader-utils";
 import type {
   CrawlRunPriceChangeReadResult,
   CrawlRunPriceSnapshot,
@@ -10,7 +23,6 @@ import type {
   PriceReportNewProductItem,
   RecentPriceChangeOptions,
   RecentPriceReport,
-  RecentPriceReportFilters,
 } from "./types";
 
 export async function readCrawlRunPriceChanges(
@@ -26,29 +38,9 @@ export async function readCrawlRunPriceChangeSummary(
 ): Promise<CrawlRunPriceChangeReadResult> {
   const currentSnapshots = (await client.priceSnapshot.findMany({
     where: { crawlRunId },
-    select: {
-      id: true,
-      productId: true,
-      price: true,
-      currency: true,
-      capturedAt: true,
-      product: {
-        select: {
-          id: true,
-          name: true,
-          vendorSlug: true,
-          vendorName: true,
-          sourceCategory: {
-            select: {
-              igrp: true,
-              displayName: true,
-            },
-          },
-        },
-      },
-    },
-    orderBy: [{ capturedAt: "asc" }, { id: "asc" }],
-  })) as CrawlRunPriceSnapshot[];
+    select: PRICE_SNAPSHOT_WITH_PRODUCT_SELECT,
+    orderBy: CURRENT_PRICE_SNAPSHOT_ORDER_BY,
+  })) as unknown as CrawlRunPriceSnapshot[];
 
   if (currentSnapshots.length === 0) {
     return {
@@ -71,14 +63,8 @@ export async function readCrawlRunPriceChangeSummary(
       crawlRunId: { not: crawlRunId },
       capturedAt: { lt: latestCapturedAt },
     },
-    select: {
-      id: true,
-      productId: true,
-      price: true,
-      currency: true,
-      capturedAt: true,
-    },
-    orderBy: [{ productId: "asc" }, { capturedAt: "desc" }, { id: "desc" }],
+    select: PREVIOUS_PRICE_SNAPSHOT_SELECT,
+    orderBy: PREVIOUS_PRICE_SNAPSHOT_ORDER_BY,
   })) as PreviousPriceSnapshot[];
   const previousByProduct = groupPreviousSnapshots(previousSnapshots);
   const changes: PriceChangeDiscordNotificationItem[] = [];
@@ -196,29 +182,9 @@ export async function readRecentPriceReport(
           }
         : {}),
     },
-    select: {
-      id: true,
-      productId: true,
-      price: true,
-      currency: true,
-      capturedAt: true,
-      product: {
-        select: {
-          id: true,
-          name: true,
-          vendorSlug: true,
-          vendorName: true,
-          sourceCategory: {
-            select: {
-              igrp: true,
-              displayName: true,
-            },
-          },
-        },
-      },
-    },
-    orderBy: [{ capturedAt: "asc" }, { id: "asc" }],
-  })) as CrawlRunPriceSnapshot[];
+    select: PRICE_SNAPSHOT_WITH_PRODUCT_SELECT,
+    orderBy: CURRENT_PRICE_SNAPSHOT_ORDER_BY,
+  })) as unknown as CrawlRunPriceSnapshot[];
 
   if (currentSnapshots.length === 0) {
     return {
@@ -233,14 +199,8 @@ export async function readRecentPriceReport(
       productId: { in: productIds },
       capturedAt: { lt: until },
     },
-    select: {
-      id: true,
-      productId: true,
-      price: true,
-      currency: true,
-      capturedAt: true,
-    },
-    orderBy: [{ productId: "asc" }, { capturedAt: "desc" }, { id: "desc" }],
+    select: PREVIOUS_PRICE_SNAPSHOT_SELECT,
+    orderBy: PREVIOUS_PRICE_SNAPSHOT_ORDER_BY,
   })) as PreviousPriceSnapshot[];
   const previousByProduct = groupPreviousSnapshots(previousSnapshots);
   const existingProductIds = new Set(
@@ -320,156 +280,4 @@ export async function readRecentPriceReport(
     priceChanges: [...latestChangeByProduct.values()].sort(comparePriceChanges),
     newProducts: [...newProductByProduct.values()].sort(compareNewProducts),
   };
-}
-
-function normalizeRecentPriceReportFilters(
-  filters: RecentPriceReportFilters,
-): Required<RecentPriceReportFilters> {
-  return {
-    categoryIgrps: [...new Set(filters.categoryIgrps ?? [])]
-      .filter((igrp) => Number.isSafeInteger(igrp) && igrp > 0)
-      .sort((left, right) => left - right),
-    productKeyword: normalizeProductKeyword(filters.productKeyword),
-    includePriceDrops: filters.includePriceDrops ?? true,
-    includePriceRises: filters.includePriceRises ?? true,
-    includeNewProducts: filters.includeNewProducts ?? true,
-  };
-}
-
-function createRecentPriceReportProductFilter(
-  filters: Required<RecentPriceReportFilters>,
-): Prisma.ProductWhereInput {
-  const keywordFilter = filters.productKeyword
-    ? createProductKeywordFilter(filters.productKeyword)
-    : {};
-
-  return {
-    ...(filters.categoryIgrps.length > 0
-      ? {
-          sourceCategory: {
-            igrp: {
-              in: filters.categoryIgrps,
-            },
-          },
-        }
-      : {}),
-    ...keywordFilter,
-  };
-}
-
-function normalizeProductKeyword(value: string | null | undefined): string | null {
-  if (typeof value !== "string") {
-    return null;
-  }
-
-  const keyword = normalizeProductKeywordText(value);
-
-  return keyword.length > 0 ? keyword : null;
-}
-
-function createProductKeywordFilter(keyword: string): Prisma.ProductWhereInput {
-  const groups = parseProductKeywordGroups(keyword);
-
-  if (groups.length === 0) {
-    return {};
-  }
-
-  if (groups.length === 1) {
-    return createProductKeywordGroupFilter(groups[0] ?? []);
-  }
-
-  return {
-    OR: groups.map((tokens) => createProductKeywordGroupFilter(tokens)),
-  };
-}
-
-function createProductKeywordGroupFilter(tokens: string[]): Prisma.ProductWhereInput {
-  if (tokens.length <= 1) {
-    return {
-      name: {
-        contains: tokens[0] ?? "",
-        mode: "insensitive",
-      },
-    };
-  }
-
-  return {
-    AND: tokens.map((token) => ({
-      name: {
-        contains: token,
-        mode: "insensitive",
-      },
-    })),
-  };
-}
-
-function parseProductKeywordGroups(keyword: string): string[][] {
-  return keyword
-    .split(",")
-    .map((group) => group.trim().split(/\s+/).filter(Boolean))
-    .filter((tokens) => tokens.length > 0);
-}
-
-function normalizeProductKeywordText(value: string): string {
-  return value
-    .replace(/，/g, ",")
-    .split(",")
-    .map((group) => group.trim().replace(/\s+/g, " "))
-    .filter(Boolean)
-    .join(", ");
-}
-
-function toProductSubcategory(product: CrawlRunPriceSnapshot["product"]) {
-  return product.vendorName
-    ? {
-        slug: product.vendorSlug,
-        displayName: product.vendorName,
-      }
-    : null;
-}
-
-function groupPreviousSnapshots(
-  snapshots: PreviousPriceSnapshot[],
-): Map<string, PreviousPriceSnapshot[]> {
-  const groups = new Map<string, PreviousPriceSnapshot[]>();
-
-  for (const snapshot of snapshots) {
-    const group = groups.get(snapshot.productId) ?? [];
-    group.push(snapshot);
-    groups.set(snapshot.productId, group);
-  }
-
-  return groups;
-}
-
-function comparePriceChanges(
-  left: PriceChangeDiscordNotificationItem,
-  right: PriceChangeDiscordNotificationItem,
-): number {
-  const deltaDiff = Math.abs(right.delta) - Math.abs(left.delta);
-
-  if (deltaDiff !== 0) {
-    return deltaDiff;
-  }
-
-  const timeDiff = right.changedAt.getTime() - left.changedAt.getTime();
-
-  if (timeDiff !== 0) {
-    return timeDiff;
-  }
-
-  return left.productName.localeCompare(right.productName, "zh-Hant");
-}
-
-function compareNewProducts(
-  left: PriceReportNewProductItem,
-  right: PriceReportNewProductItem,
-): number {
-  const timeDiff = right.firstSeenAt.getTime() - left.firstSeenAt.getTime();
-
-  if (timeDiff !== 0) {
-    return timeDiff;
-  }
-
-  return left.productName.localeCompare(right.productName, "zh-Hant");
 }

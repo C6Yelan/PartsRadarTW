@@ -9,6 +9,9 @@ import {
   readProductLinkCandidates,
   type ProductLinkHealthClient,
 } from "./product-link-checker/processor";
+import { createOpsLogger } from "./shared/logger";
+
+const logger = createOpsLogger();
 
 async function main() {
   const options = parseOptions(process.argv.slice(2));
@@ -21,7 +24,10 @@ async function main() {
     const linkHealthClient = toProductLinkHealthClient(client);
 
     const candidates = await readProductLinkCandidates(linkHealthClient, options);
-    const summary = await checkProductLinks(linkHealthClient, candidates, options);
+    const summary = await checkProductLinks(linkHealthClient, candidates, options, {
+      log: (message) => logger.info(message),
+      debugLog: (message) => logger.debug(message),
+    });
 
     printSummary(summary, options);
   } finally {
