@@ -12,7 +12,7 @@ import {
   PRICE_REPORT_SETTINGS_CATEGORIES_CUSTOM_ID,
   PRICE_REPORT_SETTINGS_DISABLE_CUSTOM_ID,
   PRICE_REPORT_SETTINGS_ENABLE_CUSTOM_ID,
-  PRICE_REPORT_SETTINGS_EVENTS_CUSTOM_ID,
+  PRICE_REPORT_SETTINGS_CONTENT_FILTER_CUSTOM_ID,
   PRICE_REPORT_SETTINGS_KEYWORD_CUSTOM_ID,
   PRICE_REPORT_SETTINGS_KEYWORD_INPUT_CUSTOM_ID,
   PRICE_REPORT_SETTINGS_KEYWORD_MODAL_CUSTOM_ID,
@@ -28,7 +28,7 @@ import {
   PUBLIC_REPORT_CLEAR_CUSTOM_ID,
   PUBLIC_REPORT_DISABLE_CUSTOM_ID,
   PUBLIC_REPORT_ENABLE_CUSTOM_ID,
-  PUBLIC_REPORT_EVENTS_CUSTOM_ID,
+  PUBLIC_REPORT_CONTENT_FILTER_CUSTOM_ID,
   PUBLIC_REPORT_KEYWORD_CUSTOM_ID,
   PUBLIC_REPORT_KEYWORD_INPUT_CUSTOM_ID,
   PUBLIC_REPORT_KEYWORD_MODAL_CUSTOM_ID,
@@ -41,7 +41,7 @@ import {
 import {
   parseMaxItemsInput,
   parseProductKeywordInput,
-  parseReportEvents,
+  parseReportContentFilters,
   parseTimeOfDay,
   parseWindowHoursStrict,
 } from "./settings-input";
@@ -60,7 +60,7 @@ export function parsePriceReportComponentInteraction(
 
   if (customId === PRICE_REPORT_SETTINGS_ENABLE_CUSTOM_ID) {
     return {
-      name: "enable_daily_report",
+      name: "enable_daily_scheduled_report",
     };
   }
 
@@ -84,7 +84,7 @@ export function parsePriceReportComponentInteraction(
 
   if (customId === PRICE_REPORT_SETTINGS_DISABLE_CUSTOM_ID) {
     return {
-      name: "disable_daily_report",
+      name: "disable_daily_scheduled_report",
     };
   }
 
@@ -107,10 +107,10 @@ export function parsePriceReportComponentInteraction(
     };
   }
 
-  if (customId === PRICE_REPORT_SETTINGS_EVENTS_CUSTOM_ID) {
-    const events = parseReportEvents(interaction.data?.values ?? []);
+  if (customId === PRICE_REPORT_SETTINGS_CONTENT_FILTER_CUSTOM_ID) {
+    const contentFilters = parseReportContentFilters(interaction.data?.values ?? []);
 
-    return events ? { name: "update_events", ...events } : null;
+    return contentFilters ? { name: "update_content_filters", ...contentFilters } : null;
   }
 
   return null;
@@ -152,10 +152,10 @@ export function parsePublicReportComponentInteraction(
     return { name: "update_all_categories" };
   }
 
-  if (customId === PUBLIC_REPORT_EVENTS_CUSTOM_ID) {
-    const events = parseReportEvents(interaction.data?.values ?? []);
+  if (customId === PUBLIC_REPORT_CONTENT_FILTER_CUSTOM_ID) {
+    const contentFilters = parseReportContentFilters(interaction.data?.values ?? []);
 
-    return events ? { name: "update_events", ...events } : null;
+    return contentFilters ? { name: "update_content_filters", ...contentFilters } : null;
   }
 
   if (customId === PUBLIC_REPORT_KEYWORD_CUSTOM_ID) {

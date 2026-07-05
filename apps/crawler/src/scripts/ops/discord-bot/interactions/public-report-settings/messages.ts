@@ -8,7 +8,7 @@ import {
 } from "../../constants";
 import {
   formatPriceReportCategoryFilterLabel,
-  formatPriceReportEventFilterLabel,
+  formatPriceReportContentFilterLabel,
   formatPriceReportKeywordFilterLabel,
   formatTaipeiMinute,
   type PriceReportCategoryOption,
@@ -19,10 +19,7 @@ import {
   type PublicPriceReportSetting,
   toPublicPriceReportFilters,
 } from "../../public-price-report";
-import {
-  formatDiscordDeliveryFailureForUser,
-  formatDiscordRateLimitForUser,
-} from "../../rest";
+import { formatDiscordDeliveryFailureForUser, formatDiscordRateLimitForUser } from "../../rest";
 import type {
   DiscordBotEmbed,
   DiscordBotMessage,
@@ -186,7 +183,7 @@ function createPublicPriceReportSettingsEmbed({
       },
       {
         name: "內容",
-        value: formatPriceReportEventFilterLabel(filters),
+        value: formatPriceReportContentFilterLabel(filters),
         inline: true,
       },
       {
@@ -249,7 +246,7 @@ function formatPublicReportSettingSummary(
   return `套用設定：分類 ${formatPriceReportCategoryFilterLabel(
     filters,
     categories,
-  )}；內容 ${formatPriceReportEventFilterLabel(filters)}；關鍵字 ${formatPriceReportKeywordFilterLabel(
+  )}；內容 ${formatPriceReportContentFilterLabel(filters)}；關鍵字 ${formatPriceReportKeywordFilterLabel(
     filters,
   )}；最多 ${setting.maxItems} 筆。`;
 }

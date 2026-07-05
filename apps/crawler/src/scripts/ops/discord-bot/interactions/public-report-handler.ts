@@ -20,12 +20,7 @@ import {
   sendInteractionResponse,
   sendModalInteractionResponse,
 } from "../rest";
-import type {
-  DiscordBotClient,
-  DiscordBotOptions,
-  DiscordInteraction,
-  FetchImpl,
-} from "../types";
+import type { DiscordBotClient, DiscordBotOptions, DiscordInteraction, FetchImpl } from "../types";
 import { parsePriceReportCategorySelection } from "./price-report-settings";
 import {
   createPublicPriceReportSettingsPanelMessage,
@@ -226,15 +221,15 @@ export async function handlePublicReportComponentInteraction({
       discordUserId,
       categoryIgrps,
       includePriceDrops:
-        component.name === "update_events"
+        component.name === "update_content_filters"
           ? component.includePriceDrops
           : currentFilters.includePriceDrops,
       includePriceRises:
-        component.name === "update_events"
+        component.name === "update_content_filters"
           ? component.includePriceRises
           : currentFilters.includePriceRises,
       includeNewProducts:
-        component.name === "update_events"
+        component.name === "update_content_filters"
           ? component.includeNewProducts
           : currentFilters.includeNewProducts,
     });

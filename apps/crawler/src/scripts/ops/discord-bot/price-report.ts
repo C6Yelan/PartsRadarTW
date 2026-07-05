@@ -5,7 +5,7 @@ export {
   filterNewProductsForReport,
   filterPriceChangesForReport,
   formatPriceReportCategoryFilterLabel,
-  formatPriceReportEventFilterLabel,
+  formatPriceReportContentFilterLabel,
   formatPriceReportKeywordFilterLabel,
   normalizePriceReportFilters,
   toPriceReportFilters,
@@ -27,7 +27,7 @@ export {
 } from "./price-report/scheduler";
 export {
   disablePriceReport,
-  enableDailyPriceReport,
+  enableDailyScheduledPriceReport,
   formatPriceReportSettingMessage,
   readPriceReportSetting,
 } from "./price-report/settings";

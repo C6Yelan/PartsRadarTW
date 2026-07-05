@@ -16,12 +16,12 @@ export const PRICE_REPORT_SETTINGS_WINDOW_CUSTOM_ID = "price-report:settings:win
 export const PRICE_REPORT_SETTINGS_CATEGORIES_CUSTOM_ID = "price-report:settings:categories";
 export const PRICE_REPORT_SETTINGS_ALL_CATEGORIES_CUSTOM_ID =
   "price-report:settings:all-categories";
-export const PRICE_REPORT_SETTINGS_EVENTS_CUSTOM_ID = "price-report:settings:events";
+export const PRICE_REPORT_SETTINGS_CONTENT_FILTER_CUSTOM_ID = "price-report:settings:events";
 export const PRICE_REPORT_SETTINGS_MAX_ITEMS_CUSTOM_ID = "price-report:settings:max-items";
 export const PRICE_REPORT_SETTINGS_TIME_CUSTOM_ID = "price-report:settings:time";
-export const PRICE_REPORT_EVENT_PRICE_DROPS_VALUE = "price_drops";
-export const PRICE_REPORT_EVENT_PRICE_RISES_VALUE = "price_rises";
-export const PRICE_REPORT_EVENT_NEW_PRODUCTS_VALUE = "new_products";
+export const PRICE_REPORT_CONTENT_PRICE_DROPS_VALUE = "price_drops";
+export const PRICE_REPORT_CONTENT_PRICE_RISES_VALUE = "price_rises";
+export const PRICE_REPORT_CONTENT_NEW_PRODUCTS_VALUE = "new_products";
 export const PRICE_REPORT_CATEGORY_OPTION_LIMIT = 25;
 
 export const PUBLIC_REPORT_SET_CHANNEL_CUSTOM_ID = "public-report:set-channel";
@@ -31,7 +31,7 @@ export const PUBLIC_REPORT_PREVIEW_CUSTOM_ID = "public-report:preview";
 export const PUBLIC_REPORT_CLEAR_CUSTOM_ID = "public-report:clear";
 export const PUBLIC_REPORT_CATEGORIES_CUSTOM_ID = "public-report:categories";
 export const PUBLIC_REPORT_ALL_CATEGORIES_CUSTOM_ID = "public-report:all-categories";
-export const PUBLIC_REPORT_EVENTS_CUSTOM_ID = "public-report:events";
+export const PUBLIC_REPORT_CONTENT_FILTER_CUSTOM_ID = "public-report:events";
 export const PUBLIC_REPORT_KEYWORD_CUSTOM_ID = "public-report:keyword";
 export const PUBLIC_REPORT_KEYWORD_MODAL_CUSTOM_ID = "public-report:keyword-modal";
 export const PUBLIC_REPORT_KEYWORD_INPUT_CUSTOM_ID = "public-report:keyword-input";

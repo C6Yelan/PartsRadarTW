@@ -60,7 +60,7 @@ describe("public price report settings inputs", () => {
     expect(JSON.stringify(updateBody.components)).toContain("改為全部分類");
   });
 
-  it("updates public report event filters from the settings panel", async () => {
+  it("updates public report content filters from the settings panel", async () => {
     const client = createDiscordBotClient(
       [],
       [],

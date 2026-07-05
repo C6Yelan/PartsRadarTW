@@ -46,10 +46,10 @@ export type ParsedPriceReportCommand =
 
 export type ParsedPriceReportComponent =
   | {
-      name: "enable_daily_report";
+      name: "enable_daily_scheduled_report";
     }
   | {
-      name: "disable_daily_report";
+      name: "disable_daily_scheduled_report";
     }
   | {
       name: "open_time_limit_modal";
@@ -72,7 +72,7 @@ export type ParsedPriceReportComponent =
       name: "update_all_categories";
     }
   | {
-      name: "update_events";
+      name: "update_content_filters";
       includePriceDrops: boolean;
       includePriceRises: boolean;
       includeNewProducts: boolean;

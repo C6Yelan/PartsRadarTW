@@ -8,7 +8,7 @@ import {
 import type { CommandCooldowns } from "../cooldowns";
 import {
   disablePriceReport,
-  enableDailyPriceReport,
+  enableDailyScheduledPriceReport,
   readPriceReportSetting,
   sendPriceReportNow,
   toPriceReportFilters,
@@ -21,12 +21,7 @@ import {
   sendInteractionResponse,
   sendModalInteractionResponse,
 } from "../rest";
-import type {
-  DiscordBotClient,
-  DiscordBotOptions,
-  DiscordInteraction,
-  FetchImpl,
-} from "../types";
+import type { DiscordBotClient, DiscordBotOptions, DiscordInteraction, FetchImpl } from "../types";
 import {
   createPriceReportSettingsPanelMessage,
   formatPriceReportPreviewDmNotice,
@@ -156,7 +151,7 @@ export async function handlePriceReportComponentInteraction({
 
   let notice: string;
 
-  if (component.name === "disable_daily_report") {
+  if (component.name === "disable_daily_scheduled_report") {
     const disabledCount = await disablePriceReport({ client, discordUserId });
     notice = disabledCount > 0 ? "已關閉每日價格提醒。" : "目前沒有開啟每日價格提醒。";
   } else {
@@ -188,7 +183,7 @@ export async function handlePriceReportComponentInteraction({
       return;
     }
 
-    await enableDailyPriceReport({
+    await enableDailyScheduledPriceReport({
       client,
       discordUserId,
       windowHours:
@@ -198,22 +193,22 @@ export async function handlePriceReportComponentInteraction({
       maxItems: currentPanel.setting?.maxItems ?? options.priceReportMaxItems,
       categoryIgrps,
       includePriceDrops:
-        component.name === "update_events"
+        component.name === "update_content_filters"
           ? component.includePriceDrops
           : currentFilters.includePriceDrops,
       includePriceRises:
-        component.name === "update_events"
+        component.name === "update_content_filters"
           ? component.includePriceRises
           : currentFilters.includePriceRises,
       includeNewProducts:
-        component.name === "update_events"
+        component.name === "update_content_filters"
           ? component.includeNewProducts
           : currentFilters.includeNewProducts,
       productKeyword: currentFilters.productKeyword,
       timeOfDay: resolveTimeOfDay(currentPanel.setting?.nextSendAt),
     });
     notice =
-      component.name === "enable_daily_report"
+      component.name === "enable_daily_scheduled_report"
         ? "已開啟每日價格提醒。"
         : "已更新每日價格提醒設定。";
   }

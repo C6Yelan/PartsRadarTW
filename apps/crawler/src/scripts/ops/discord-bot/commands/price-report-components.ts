@@ -16,15 +16,15 @@ import {
 import type { DiscordMessageComponent, DiscordModal } from "../types";
 import {
   PRICE_REPORT_CATEGORY_OPTION_LIMIT,
-  PRICE_REPORT_EVENT_NEW_PRODUCTS_VALUE,
-  PRICE_REPORT_EVENT_PRICE_DROPS_VALUE,
-  PRICE_REPORT_EVENT_PRICE_RISES_VALUE,
+  PRICE_REPORT_CONTENT_NEW_PRODUCTS_VALUE,
+  PRICE_REPORT_CONTENT_PRICE_DROPS_VALUE,
+  PRICE_REPORT_CONTENT_PRICE_RISES_VALUE,
   PRICE_REPORT_KEYWORD_FORMAT_DESCRIPTION,
   PRICE_REPORT_SETTINGS_ALL_CATEGORIES_CUSTOM_ID,
   PRICE_REPORT_SETTINGS_CATEGORIES_CUSTOM_ID,
   PRICE_REPORT_SETTINGS_DISABLE_CUSTOM_ID,
   PRICE_REPORT_SETTINGS_ENABLE_CUSTOM_ID,
-  PRICE_REPORT_SETTINGS_EVENTS_CUSTOM_ID,
+  PRICE_REPORT_SETTINGS_CONTENT_FILTER_CUSTOM_ID,
   PRICE_REPORT_SETTINGS_KEYWORD_CUSTOM_ID,
   PRICE_REPORT_SETTINGS_KEYWORD_INPUT_CUSTOM_ID,
   PRICE_REPORT_SETTINGS_KEYWORD_MODAL_CUSTOM_ID,
@@ -125,24 +125,24 @@ export function createPriceReportSettingsComponents({
       components: [
         {
           type: DISCORD_COMPONENT_TYPE_STRING_SELECT,
-          custom_id: PRICE_REPORT_SETTINGS_EVENTS_CUSTOM_ID,
+          custom_id: PRICE_REPORT_SETTINGS_CONTENT_FILTER_CUSTOM_ID,
           placeholder: "報告內容",
           min_values: 1,
           max_values: 3,
           options: [
             {
               label: "降價",
-              value: PRICE_REPORT_EVENT_PRICE_DROPS_VALUE,
+              value: PRICE_REPORT_CONTENT_PRICE_DROPS_VALUE,
               default: includePriceDrops,
             },
             {
               label: "漲價",
-              value: PRICE_REPORT_EVENT_PRICE_RISES_VALUE,
+              value: PRICE_REPORT_CONTENT_PRICE_RISES_VALUE,
               default: includePriceRises,
             },
             {
               label: "新增商品",
-              value: PRICE_REPORT_EVENT_NEW_PRODUCTS_VALUE,
+              value: PRICE_REPORT_CONTENT_NEW_PRODUCTS_VALUE,
               default: includeNewProducts,
             },
           ],

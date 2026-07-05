@@ -1,12 +1,6 @@
 // apps/crawler/src/scripts/ops/discord-bot/price-report/filters.ts
-import type {
-  PriceReportPriceChangeItem,
-  PriceReportNewProductItem,
-} from "./reader-types";
-import {
-  MAX_PRICE_REPORT_KEYWORD_GROUPS,
-  MAX_PRICE_REPORT_KEYWORD_LENGTH,
-} from "../constants";
+import type { PriceReportPriceChangeItem, PriceReportNewProductItem } from "./reader-types";
+import { MAX_PRICE_REPORT_KEYWORD_GROUPS, MAX_PRICE_REPORT_KEYWORD_LENGTH } from "../constants";
 
 export interface PriceReportCategoryOption {
   igrp: number;
@@ -145,7 +139,7 @@ export function formatPriceReportKeywordFilterLabel(filters: PriceReportFilters)
   return filters.productKeyword ?? "不限";
 }
 
-export function formatPriceReportEventFilterLabel(filters: PriceReportFilters): string {
+export function formatPriceReportContentFilterLabel(filters: PriceReportFilters): string {
   const labels = [
     filters.includePriceDrops ? "降價" : null,
     filters.includePriceRises ? "漲價" : null,

@@ -6,9 +6,9 @@ import {
   MAX_PRICE_REPORT_KEYWORD_LENGTH,
 } from "../constants";
 import {
-  PRICE_REPORT_EVENT_NEW_PRODUCTS_VALUE,
-  PRICE_REPORT_EVENT_PRICE_DROPS_VALUE,
-  PRICE_REPORT_EVENT_PRICE_RISES_VALUE,
+  PRICE_REPORT_CONTENT_NEW_PRODUCTS_VALUE,
+  PRICE_REPORT_CONTENT_PRICE_DROPS_VALUE,
+  PRICE_REPORT_CONTENT_PRICE_RISES_VALUE,
 } from "./ids";
 
 export function parseWindowHoursStrict(value: unknown): number | null {
@@ -60,15 +60,15 @@ export function parseProductKeywordInput(value: unknown): string | null | undefi
     : undefined;
 }
 
-export function parseReportEvents(values: unknown[]): {
+export function parseReportContentFilters(values: unknown[]): {
   includePriceDrops: boolean;
   includePriceRises: boolean;
   includeNewProducts: boolean;
 } | null {
   const validValues = new Set([
-    PRICE_REPORT_EVENT_PRICE_DROPS_VALUE,
-    PRICE_REPORT_EVENT_PRICE_RISES_VALUE,
-    PRICE_REPORT_EVENT_NEW_PRODUCTS_VALUE,
+    PRICE_REPORT_CONTENT_PRICE_DROPS_VALUE,
+    PRICE_REPORT_CONTENT_PRICE_RISES_VALUE,
+    PRICE_REPORT_CONTENT_NEW_PRODUCTS_VALUE,
   ]);
 
   if (
@@ -79,9 +79,9 @@ export function parseReportEvents(values: unknown[]): {
   }
 
   return {
-    includePriceDrops: values.includes(PRICE_REPORT_EVENT_PRICE_DROPS_VALUE),
-    includePriceRises: values.includes(PRICE_REPORT_EVENT_PRICE_RISES_VALUE),
-    includeNewProducts: values.includes(PRICE_REPORT_EVENT_NEW_PRODUCTS_VALUE),
+    includePriceDrops: values.includes(PRICE_REPORT_CONTENT_PRICE_DROPS_VALUE),
+    includePriceRises: values.includes(PRICE_REPORT_CONTENT_PRICE_RISES_VALUE),
+    includeNewProducts: values.includes(PRICE_REPORT_CONTENT_NEW_PRODUCTS_VALUE),
   };
 }
 

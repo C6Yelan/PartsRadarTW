@@ -5,7 +5,7 @@ import { TIME_ZONE } from "../constants";
 import type { DiscordBotClient, PriceReportTimeOfDay } from "../types";
 import {
   formatPriceReportCategoryFilterLabel,
-  formatPriceReportEventFilterLabel,
+  formatPriceReportContentFilterLabel,
   formatPriceReportKeywordFilterLabel,
   normalizePriceReportFilters,
   toPriceReportFilters,
@@ -20,7 +20,7 @@ import {
   toPriceReportWindow,
 } from "./schedule";
 
-export async function enableDailyPriceReport({
+export async function enableDailyScheduledPriceReport({
   client,
   discordUserId,
   windowHours,
@@ -141,7 +141,7 @@ export function formatPriceReportSettingMessage(
     `統計區間：${formatWindowLabel(setting.window)}`,
     `分類：${formatPriceReportCategoryFilterLabel(filters, categories)}`,
     `商品關鍵字：${formatPriceReportKeywordFilterLabel(filters)}`,
-    `內容：${formatPriceReportEventFilterLabel(filters)}`,
+    `內容：${formatPriceReportContentFilterLabel(filters)}`,
     `每次最多：${setting.maxItems} 筆`,
     `每日時間：${formatTaipeiTime(setting.nextSendAt)}`,
     `下一次：${formatTaipeiMinute(setting.nextSendAt)}`,

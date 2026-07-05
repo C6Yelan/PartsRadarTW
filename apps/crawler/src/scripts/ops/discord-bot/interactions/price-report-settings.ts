@@ -1,8 +1,5 @@
 // apps/crawler/src/scripts/ops/discord-bot/interactions/price-report-settings.ts
-import {
-  createPriceReportSettingsComponents,
-  type parsePriceReportModalSubmit,
-} from "../commands";
+import { createPriceReportSettingsComponents, type parsePriceReportModalSubmit } from "../commands";
 import {
   DISCORD_EMBED_COLOR,
   MAX_PRICE_REPORT_ITEMS,
@@ -11,7 +8,7 @@ import {
 } from "../constants";
 import {
   formatPriceReportCategoryFilterLabel,
-  formatPriceReportEventFilterLabel,
+  formatPriceReportContentFilterLabel,
   formatPriceReportKeywordFilterLabel,
   formatTaipeiMinute,
   formatWindowLabel,
@@ -227,7 +224,7 @@ function createPriceReportSettingsEmbed({
       },
       {
         name: "內容",
-        value: formatPriceReportEventFilterLabel(filters),
+        value: formatPriceReportContentFilterLabel(filters),
         inline: true,
       },
       {

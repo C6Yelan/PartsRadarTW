@@ -35,7 +35,7 @@ export type ParsedPublicReportComponent =
       name: "update_all_categories";
     }
   | {
-      name: "update_events";
+      name: "update_content_filters";
       includePriceDrops: boolean;
       includePriceRises: boolean;
       includeNewProducts: boolean;

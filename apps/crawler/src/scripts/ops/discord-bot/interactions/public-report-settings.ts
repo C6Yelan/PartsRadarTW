@@ -1,8 +1,6 @@
 // apps/crawler/src/scripts/ops/discord-bot/interactions/public-report-settings.ts
 import type { CommandCooldowns } from "../cooldowns";
-import {
-  readPriceReportCategories,
-} from "../price-report";
+import { readPriceReportCategories } from "../price-report";
 import {
   readLatestPublicPriceReportDelivery,
   readPublicPriceReportSetting,
@@ -15,12 +13,7 @@ import {
   sendDiscordChannelMessages,
   sendInteractionResponse,
 } from "../rest";
-import type {
-  DiscordBotClient,
-  DiscordBotOptions,
-  DiscordInteraction,
-  FetchImpl,
-} from "../types";
+import type { DiscordBotClient, DiscordBotOptions, DiscordInteraction, FetchImpl } from "../types";
 import {
   formatPublicReportBotPermissionNotice,
   formatPublicReportPreviewNotice,

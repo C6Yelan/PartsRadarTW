@@ -1,13 +1,13 @@
 // apps/crawler/tests/scripts/ops/discord-bot/scheduled-price-report-settings.test.ts
 import { describe, expect, it } from "vitest";
-import { enableDailyPriceReport } from "../../../../src/scripts/ops/discord-bot/price-report";
+import { enableDailyScheduledPriceReport } from "../../../../src/scripts/ops/discord-bot/price-report";
 
 import { createDiscordBotClient } from "./support";
 
 describe("scheduled price report settings", () => {
   it("enables daily report settings for a Discord user", async () => {
     const client = createDiscordBotClient([]);
-    const setting = await enableDailyPriceReport({
+    const setting = await enableDailyScheduledPriceReport({
       client,
       discordUserId: "111122223333444455",
       windowHours: 12,
@@ -34,7 +34,7 @@ describe("scheduled price report settings", () => {
 
   it("enables daily report settings at a specific Taipei time", async () => {
     const client = createDiscordBotClient([]);
-    const setting = await enableDailyPriceReport({
+    const setting = await enableDailyScheduledPriceReport({
       client,
       discordUserId: "111122223333444455",
       windowHours: 24,

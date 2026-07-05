@@ -7,24 +7,14 @@ import {
 } from "../commands";
 import { MAX_PRICE_REPORT_ITEMS } from "../constants";
 import {
-  enableDailyPriceReport,
+  enableDailyScheduledPriceReport,
   formatTaipeiMinute,
   readPriceReportSetting,
   toPriceReportFilters,
 } from "../price-report";
-import {
-  toPublicPriceReportFilters,
-  updatePublicPriceReportFilters,
-} from "../public-price-report";
-import {
-  sendInteractionResponse,
-} from "../rest";
-import type {
-  DiscordBotClient,
-  DiscordBotOptions,
-  DiscordInteraction,
-  FetchImpl,
-} from "../types";
+import { toPublicPriceReportFilters, updatePublicPriceReportFilters } from "../public-price-report";
+import { sendInteractionResponse } from "../rest";
+import type { DiscordBotClient, DiscordBotOptions, DiscordInteraction, FetchImpl } from "../types";
 import {
   createPriceReportSettingsPanelMessage,
   formatPriceReportKeywordValidationMessage,
@@ -227,7 +217,7 @@ export async function handleModalSubmitInteraction({
 
     const currentSetting = await readPriceReportSetting({ client, discordUserId });
     const currentFilters = toPriceReportFilters(currentSetting);
-    await enableDailyPriceReport({
+    await enableDailyScheduledPriceReport({
       client,
       discordUserId,
       windowHours: resolveWindowHours(currentSetting?.window),
@@ -271,7 +261,7 @@ export async function handleModalSubmitInteraction({
 
   const currentSetting = await readPriceReportSetting({ client, discordUserId });
   const currentFilters = toPriceReportFilters(currentSetting);
-  const setting = await enableDailyPriceReport({
+  const setting = await enableDailyScheduledPriceReport({
     client,
     discordUserId,
     windowHours: resolveWindowHours(currentSetting?.window),
