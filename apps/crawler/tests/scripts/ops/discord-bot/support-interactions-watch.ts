@@ -17,7 +17,7 @@ export function createWatchOpenInteraction(): DiscordInteraction {
   };
 }
 
-export function createWatchModalSubmitInteraction({
+export function createTargetPriceWatchModalSubmitInteraction({
   productInput,
   targetPrice,
 }: {
@@ -75,7 +75,7 @@ export function createWatchButtonInteraction(customId: string): DiscordInteracti
 }
 
 export function createWatchSelectInteraction(
-  watchInput: string,
+  targetPriceWatchInput: string,
   page: number,
   statusFilter = "all",
   sortKey = "recent",
@@ -87,7 +87,7 @@ export function createWatchSelectInteraction(
     data: {
       custom_id: `watch:select:${page}:${statusFilter}:${sortKey}`,
       component_type: 3,
-      values: [watchInput],
+      values: [targetPriceWatchInput],
     },
     member: {
       user: {
@@ -98,7 +98,7 @@ export function createWatchSelectInteraction(
 }
 
 export function createWatchBulkRemoveSelectInteraction(
-  watchInputs: string[],
+  targetPriceWatchInputs: string[],
   page: number,
   statusFilter = "all",
   sortKey = "recent",
@@ -110,7 +110,7 @@ export function createWatchBulkRemoveSelectInteraction(
     data: {
       custom_id: `watch:bulk-remove-select:${page}:${statusFilter}:${sortKey}`,
       component_type: 3,
-      values: watchInputs,
+      values: targetPriceWatchInputs,
     },
     member: {
       user: {

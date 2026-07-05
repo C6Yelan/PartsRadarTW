@@ -7,7 +7,7 @@ import {
   createDiscordBotClient,
   createDiscordBotOptions,
   createWatchButtonInteraction,
-  createWatchModalSubmitInteraction,
+  createTargetPriceWatchModalSubmitInteraction,
   createWatchOpenInteraction,
   WATCH_DEFAULT_STATE,
 } from "./support";
@@ -159,7 +159,7 @@ describe("handleDiscordInteraction watch create form", () => {
       options: createDiscordBotOptions(),
       cooldowns: new CommandCooldowns(60),
       fetchImpl: fetchMock as typeof fetch,
-      interaction: createWatchModalSubmitInteraction({
+      interaction: createTargetPriceWatchModalSubmitInteraction({
         productInput: "",
         targetPrice: "NT$17,500",
       }),

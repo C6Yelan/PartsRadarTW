@@ -3,15 +3,10 @@
 import {
   parsePriceReportComponentInteraction,
   parsePublicReportComponentInteraction,
-  parseWatchComponentInteraction,
+  parseTargetPriceWatchComponentInteraction,
 } from "../commands";
 import type { CommandCooldowns } from "../cooldowns";
-import type {
-  DiscordBotClient,
-  DiscordBotOptions,
-  DiscordInteraction,
-  FetchImpl,
-} from "../types";
+import type { DiscordBotClient, DiscordBotOptions, DiscordInteraction, FetchImpl } from "../types";
 import { handlePriceReportComponentInteraction } from "./price-report-handler";
 import { handlePublicReportComponentInteraction } from "./public-report-handler";
 import {
@@ -19,7 +14,7 @@ import {
   sendMissingUserResponse,
   sendUnsupportedInteractionResponse,
 } from "./responses";
-import { handleWatchComponentInteraction } from "./watch-handler";
+import { handleTargetPriceWatchComponentInteraction } from "./watch-handler";
 
 export async function handleMessageComponentInteraction({
   client,
@@ -39,7 +34,9 @@ export async function handleMessageComponentInteraction({
     ? null
     : parsePublicReportComponentInteraction(interaction);
   const watchComponent =
-    component || publicReportComponent ? null : parseWatchComponentInteraction(interaction);
+    component || publicReportComponent
+      ? null
+      : parseTargetPriceWatchComponentInteraction(interaction);
 
   if (!component && !publicReportComponent && !watchComponent) {
     await sendUnsupportedInteractionResponse({ interaction, options, fetchImpl });
@@ -110,7 +107,7 @@ export async function handleMessageComponentInteraction({
       return;
     }
 
-    await handleWatchComponentInteraction({
+    await handleTargetPriceWatchComponentInteraction({
       client,
       interaction,
       options,

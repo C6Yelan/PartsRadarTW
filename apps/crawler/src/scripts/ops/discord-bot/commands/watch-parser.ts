@@ -3,8 +3,8 @@
 import { MAX_TARGET_PRICE } from "../constants";
 import type {
   DiscordInteraction,
-  ParsedWatchComponent,
-  ParsedWatchModal,
+  ParsedTargetPriceWatchComponent,
+  ParsedTargetPriceWatchModal,
   TargetPriceWatchSortKey,
   TargetPriceWatchStatusFilter,
 } from "../types";
@@ -30,9 +30,9 @@ import {
 } from "./ids";
 import { readSubmittedComponentValue } from "./submitted-components";
 
-export function parseWatchComponentInteraction(
+export function parseTargetPriceWatchComponentInteraction(
   interaction: DiscordInteraction,
-): ParsedWatchComponent | null {
+): ParsedTargetPriceWatchComponent | null {
   const customId = interaction.data?.custom_id;
 
   if (customId === WATCH_ADD_CUSTOM_ID) {
@@ -45,7 +45,7 @@ export function parseWatchComponentInteraction(
 
     return {
       action: "select",
-      watchInput:
+      targetPriceWatchInput:
         typeof selectedValue === "string" && selectedValue.trim() ? selectedValue.trim() : null,
       ...state,
     };
@@ -56,7 +56,7 @@ export function parseWatchComponentInteraction(
   if (edit) {
     return {
       action: "edit",
-      watchInput: edit.watchInput,
+      targetPriceWatchInput: edit.targetPriceWatchInput,
       targetPrice: edit.targetPrice,
       page: edit.page,
       statusFilter: edit.statusFilter,
@@ -69,7 +69,7 @@ export function parseWatchComponentInteraction(
   if (remove) {
     return {
       action: "remove",
-      watchInput: remove.watchInput,
+      targetPriceWatchInput: remove.targetPriceWatchInput,
       page: remove.page,
       statusFilter: remove.statusFilter,
       sortKey: remove.sortKey,
@@ -86,7 +86,7 @@ export function parseWatchComponentInteraction(
   if (customId?.startsWith(WATCH_BULK_REMOVE_SELECT_CUSTOM_ID_PREFIX)) {
     return {
       action: "bulk_remove_select",
-      watchInputs: (interaction.data?.values ?? [])
+      targetPriceWatchInputs: (interaction.data?.values ?? [])
         .filter((value): value is string => typeof value === "string")
         .map((value) => value.trim())
         .filter(Boolean),
@@ -137,7 +137,7 @@ export function parseWatchComponentInteraction(
   if (confirmRemove) {
     return {
       action: "confirm_remove",
-      watchInput: confirmRemove.watchInput,
+      targetPriceWatchInput: confirmRemove.targetPriceWatchInput,
       page: confirmRemove.page,
       statusFilter: confirmRemove.statusFilter,
       sortKey: confirmRemove.sortKey,
@@ -149,7 +149,7 @@ export function parseWatchComponentInteraction(
   if (cancelRemove) {
     return {
       action: "cancel_remove",
-      watchInput: cancelRemove.watchInput,
+      targetPriceWatchInput: cancelRemove.targetPriceWatchInput,
       page: cancelRemove.page,
       statusFilter: cancelRemove.statusFilter,
       sortKey: cancelRemove.sortKey,
@@ -173,7 +173,9 @@ export function parseWatchComponentInteraction(
   return null;
 }
 
-export function parseWatchModalSubmit(interaction: DiscordInteraction): ParsedWatchModal | null {
+export function parseTargetPriceWatchModalSubmit(
+  interaction: DiscordInteraction,
+): ParsedTargetPriceWatchModal | null {
   const customId = interaction.data?.custom_id;
   const targetPriceValue = readSubmittedComponentValue(
     interaction.data?.components,
@@ -204,7 +206,7 @@ export function parseWatchModalSubmit(interaction: DiscordInteraction): ParsedWa
 
     return {
       action: "edit",
-      watchInput: watchId ? `watch:${watchId}` : null,
+      targetPriceWatchInput: watchId ? `watch:${watchId}` : null,
       page: parsePage(pageValue),
       statusFilter: parseWatchStatusFilter(filterValue) ?? "all",
       sortKey: parseWatchSortKey(sortValue) ?? "recent",
@@ -221,7 +223,7 @@ function parseWatchActionCustomId(
   prefix: string,
   includesTargetPrice = false,
 ): {
-  watchInput: string | null;
+  targetPriceWatchInput: string | null;
   targetPrice: number | null;
   page: number;
   statusFilter: TargetPriceWatchStatusFilter;
@@ -237,7 +239,7 @@ function parseWatchActionCustomId(
   const state = parseWatchListState(segments.slice(includesTargetPrice ? 2 : 1).join(":"));
 
   return {
-    watchInput: watchId ? `watch:${watchId}` : null,
+    targetPriceWatchInput: watchId ? `watch:${watchId}` : null,
     targetPrice,
     ...state,
   };

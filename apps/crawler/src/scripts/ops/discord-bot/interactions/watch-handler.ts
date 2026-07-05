@@ -3,19 +3,14 @@
 import {
   createWatchEditModal,
   createWatchModal,
-  type parseWatchComponentInteraction,
+  type parseTargetPriceWatchComponentInteraction,
 } from "../commands";
 import {
   deferInteractionMessageUpdate,
   editDeferredInteractionResponse,
   sendModalInteractionResponse,
 } from "../rest";
-import type {
-  DiscordBotClient,
-  DiscordBotOptions,
-  DiscordInteraction,
-  FetchImpl,
-} from "../types";
+import type { DiscordBotClient, DiscordBotOptions, DiscordInteraction, FetchImpl } from "../types";
 import {
   consumeTargetPriceWatchBulkRemovalConfirmation,
   createTargetPriceWatchBulkRemovalConfirmation,
@@ -29,13 +24,15 @@ import {
 import { sendUnsupportedInteractionResponse } from "./responses";
 import {
   createTargetPriceWatchManagerMessageWithDelivery,
-  extractWatchId,
-  readWatchManagerPage,
+  extractTargetPriceWatchId,
+  readTargetPriceWatchManagerPage,
 } from "./watch-manager";
 
-type WatchComponent = NonNullable<ReturnType<typeof parseWatchComponentInteraction>>;
+type TargetPriceWatchComponent = NonNullable<
+  ReturnType<typeof parseTargetPriceWatchComponentInteraction>
+>;
 
-export async function handleWatchComponentInteraction({
+export async function handleTargetPriceWatchComponentInteraction({
   client,
   interaction,
   options,
@@ -48,7 +45,7 @@ export async function handleWatchComponentInteraction({
   options: DiscordBotOptions;
   fetchImpl: FetchImpl;
   discordUserId: string;
-  component: WatchComponent;
+  component: TargetPriceWatchComponent;
 }): Promise<void> {
   if (component.action === "add") {
     await sendModalInteractionResponse({
@@ -62,7 +59,7 @@ export async function handleWatchComponentInteraction({
   }
 
   if (component.action === "edit") {
-    const watchId = extractWatchId(component.watchInput);
+    const watchId = extractTargetPriceWatchId(component.targetPriceWatchInput);
 
     if (!watchId || !component.targetPrice) {
       await sendUnsupportedInteractionResponse({ interaction, options, fetchImpl });
@@ -96,7 +93,7 @@ export async function handleWatchComponentInteraction({
     const lookup = await readTargetPriceWatch({
       client,
       discordUserId,
-      watchInput: component.watchInput,
+      targetPriceWatchInput: component.targetPriceWatchInput,
     });
 
     await editDeferredInteractionResponse({
@@ -120,9 +117,9 @@ export async function handleWatchComponentInteraction({
     const disabled = await disableTargetPriceWatch({
       client,
       discordUserId,
-      watchInput: component.watchInput,
+      targetPriceWatchInput: component.targetPriceWatchInput,
     });
-    const result = await readWatchManagerPage({
+    const result = await readTargetPriceWatchManagerPage({
       client,
       discordUserId,
       page: component.page,
@@ -142,16 +139,14 @@ export async function handleWatchComponentInteraction({
         result,
         publicBaseUrl: options.publicBaseUrl,
         notice:
-          disabled.status === "disabled"
-            ? "已移除目標價追蹤。"
-            : "追蹤已不存在，清單已重新整理。",
+          disabled.status === "disabled" ? "已移除目標價追蹤。" : "追蹤已不存在，清單已重新整理。",
       }),
     });
     return;
   }
 
   if (component.action === "bulk_remove") {
-    const result = await readWatchManagerPage({
+    const result = await readTargetPriceWatchManagerPage({
       client,
       discordUserId,
       page: component.page,
@@ -174,7 +169,7 @@ export async function handleWatchComponentInteraction({
   }
 
   if (component.action === "bulk_remove_select") {
-    const result = await readWatchManagerPage({
+    const result = await readTargetPriceWatchManagerPage({
       client,
       discordUserId,
       page: component.page,
@@ -183,7 +178,7 @@ export async function handleWatchComponentInteraction({
     });
     const token = createTargetPriceWatchBulkRemovalConfirmation({
       discordUserId,
-      watchInputs: component.watchInputs,
+      targetPriceWatchInputs: component.targetPriceWatchInputs,
       page: result.page,
       statusFilter: result.statusFilter,
       sortKey: result.sortKey,
@@ -198,7 +193,7 @@ export async function handleWatchComponentInteraction({
       message: createTargetPriceWatchBulkRemovalConfirmationMessage({
         result,
         publicBaseUrl: options.publicBaseUrl,
-        selectedWatchInputs: component.watchInputs,
+        selectedWatchInputs: component.targetPriceWatchInputs,
         token,
       }),
     });
@@ -216,10 +211,10 @@ export async function handleWatchComponentInteraction({
       ? await disableTargetPriceWatches({
           client,
           discordUserId,
-          watchInputs: confirmation.watchInputs,
+          targetPriceWatchInputs: confirmation.targetPriceWatchInputs,
         })
       : null;
-    const result = await readWatchManagerPage({
+    const result = await readTargetPriceWatchManagerPage({
       client,
       discordUserId,
       page: confirmation.status === "found" ? confirmation.page : 0,
@@ -264,7 +259,7 @@ export async function handleWatchComponentInteraction({
     return;
   }
 
-  const result = await readWatchManagerPage({
+  const result = await readTargetPriceWatchManagerPage({
     client,
     discordUserId,
     page: component.page,
@@ -273,7 +268,7 @@ export async function handleWatchComponentInteraction({
   });
   const selectedWatchInput =
     component.action === "select" || component.action === "cancel_remove"
-      ? component.watchInput
+      ? component.targetPriceWatchInput
       : null;
 
   await editDeferredInteractionResponse({

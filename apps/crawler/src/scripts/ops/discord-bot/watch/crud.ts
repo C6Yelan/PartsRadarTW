@@ -17,16 +17,16 @@ export { createTargetPriceWatch } from "./crud/create";
 export async function disableTargetPriceWatch({
   client,
   discordUserId,
-  watchInput,
+  targetPriceWatchInput,
 }: {
   client: DiscordBotClient;
   discordUserId: string;
-  watchInput: string | null;
+  targetPriceWatchInput: string | null;
 }): Promise<DisableTargetPriceWatchResult> {
   const result = await readTargetPriceWatch({
     client,
     discordUserId,
-    watchInput,
+    targetPriceWatchInput,
   });
 
   if (result.status !== "found") {
@@ -43,21 +43,21 @@ export async function disableTargetPriceWatch({
 export async function disableTargetPriceWatches({
   client,
   discordUserId,
-  watchInputs,
+  targetPriceWatchInputs,
 }: {
   client: DiscordBotClient;
   discordUserId: string;
-  watchInputs: string[];
+  targetPriceWatchInputs: string[];
 }): Promise<DisableTargetPriceWatchesResult> {
-  const uniqueWatchInputs = [...new Set(watchInputs)];
+  const uniqueWatchInputs = [...new Set(targetPriceWatchInputs)];
   let disabledCount = 0;
   let unavailableCount = 0;
 
-  for (const watchInput of uniqueWatchInputs) {
+  for (const targetPriceWatchInput of uniqueWatchInputs) {
     const result = await disableTargetPriceWatch({
       client,
       discordUserId,
-      watchInput,
+      targetPriceWatchInput,
     });
 
     if (result.status === "disabled") {
@@ -76,13 +76,13 @@ export async function disableTargetPriceWatches({
 export async function updateTargetPriceWatch({
   client,
   discordUserId,
-  watchInput,
+  targetPriceWatchInput,
   targetPrice,
   now = new Date(),
 }: {
   client: DiscordBotClient;
   discordUserId: string;
-  watchInput: string | null;
+  targetPriceWatchInput: string | null;
   targetPrice: number | null;
   now?: Date;
 }): Promise<UpdateTargetPriceWatchResult> {
@@ -100,7 +100,7 @@ export async function updateTargetPriceWatch({
   const result = await readTargetPriceWatch({
     client,
     discordUserId,
-    watchInput,
+    targetPriceWatchInput,
   });
 
   if (result.status !== "found") {
@@ -137,13 +137,13 @@ export async function updateTargetPriceWatch({
 export async function readTargetPriceWatch({
   client,
   discordUserId,
-  watchInput,
+  targetPriceWatchInput,
 }: {
   client: DiscordBotClient;
   discordUserId: string;
-  watchInput: string | null;
+  targetPriceWatchInput: string | null;
 }): Promise<TargetPriceWatchLookupResult> {
-  const watchId = normalizeWatchId(watchInput);
+  const watchId = normalizeWatchId(targetPriceWatchInput);
 
   if (!watchId) {
     return {

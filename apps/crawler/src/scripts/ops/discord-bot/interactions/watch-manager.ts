@@ -1,5 +1,5 @@
 // apps/crawler/src/scripts/ops/discord-bot/interactions/watch-manager.ts
-import type { parseWatchModalSubmit } from "../commands";
+import type { parseTargetPriceWatchModalSubmit } from "../commands";
 import { MAX_TARGET_PRICE } from "../constants";
 import type { DiscordBotClient, DiscordBotMessage } from "../types";
 import {
@@ -8,8 +8,8 @@ import {
   readTargetPriceWatchlist,
 } from "../watch";
 
-export function formatWatchModalValidationMessage(
-  modal: NonNullable<ReturnType<typeof parseWatchModalSubmit>>,
+export function formatTargetPriceWatchModalValidationMessage(
+  modal: NonNullable<ReturnType<typeof parseTargetPriceWatchModalSubmit>>,
 ): string {
   const messages = [
     modal.action !== "create" || modal.productInputValid
@@ -23,7 +23,7 @@ export function formatWatchModalValidationMessage(
   return messages.join("\n");
 }
 
-export async function readWatchManagerPage({
+export async function readTargetPriceWatchManagerPage({
   client,
   discordUserId,
   page,
@@ -45,7 +45,7 @@ export async function readWatchManagerPage({
   });
 
   if (result.watches.length === 0 && result.hasPreviousPage) {
-    return readWatchManagerPage({
+    return readTargetPriceWatchManagerPage({
       client,
       discordUserId,
       page: page - 1,
@@ -67,12 +67,12 @@ export async function createTargetPriceWatchManagerMessageWithDelivery({
 }: {
   client: DiscordBotClient;
   discordUserId: string;
-  result: Awaited<ReturnType<typeof readWatchManagerPage>>;
+  result: Awaited<ReturnType<typeof readTargetPriceWatchManagerPage>>;
   publicBaseUrl: string;
   selectedWatchInput?: string | null;
   notice?: string;
 }): Promise<DiscordBotMessage> {
-  const selectedWatchId = extractWatchId(selectedWatchInput);
+  const selectedWatchId = extractTargetPriceWatchId(selectedWatchInput);
   const selectedWatchDelivery =
     selectedWatchId && result.watches.some((watch) => watch.id === selectedWatchId)
       ? await readLatestTargetPriceWatchDelivery({
@@ -91,8 +91,8 @@ export async function createTargetPriceWatchManagerMessageWithDelivery({
   });
 }
 
-export function extractWatchId(watchInput: string | null): string | null {
-  const match = /^watch:([0-9a-f-]{36})$/i.exec(watchInput ?? "");
+export function extractTargetPriceWatchId(targetPriceWatchInput: string | null): string | null {
+  const match = /^watch:([0-9a-f-]{36})$/i.exec(targetPriceWatchInput ?? "");
 
   return match?.[1] ?? null;
 }

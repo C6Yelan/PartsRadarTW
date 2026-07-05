@@ -1,6 +1,6 @@
 // apps/crawler/src/scripts/ops/discord-bot/interactions/modal-submit/watch.ts
 
-import type { parseWatchModalSubmit } from "../../commands";
+import type { parseTargetPriceWatchModalSubmit } from "../../commands";
 import {
   deferInteractionResponse,
   editDeferredInteractionResponse,
@@ -19,37 +19,37 @@ import {
 } from "../../watch";
 import {
   createTargetPriceWatchManagerMessageWithDelivery,
-  formatWatchModalValidationMessage,
-  readWatchManagerPage,
+  formatTargetPriceWatchModalValidationMessage,
+  readTargetPriceWatchManagerPage,
 } from "../watch-manager";
 
-type WatchModalSubmit = NonNullable<ReturnType<typeof parseWatchModalSubmit>>;
+type TargetPriceWatchModalSubmit = NonNullable<ReturnType<typeof parseTargetPriceWatchModalSubmit>>;
 
-export async function handleWatchModalSubmit({
+export async function handleTargetPriceWatchModalSubmit({
   client,
   interaction,
   options,
   fetchImpl,
   discordUserId,
-  watchModal,
+  targetPriceWatchModal,
 }: {
   client: DiscordBotClient;
   interaction: DiscordInteraction;
   options: DiscordBotOptions;
   fetchImpl: FetchImpl;
   discordUserId: string;
-  watchModal: WatchModalSubmit;
+  targetPriceWatchModal: TargetPriceWatchModalSubmit;
 }): Promise<void> {
   if (
-    !watchModal.targetPriceInputValid ||
-    (watchModal.action === "create" && !watchModal.productInputValid)
+    !targetPriceWatchModal.targetPriceInputValid ||
+    (targetPriceWatchModal.action === "create" && !targetPriceWatchModal.productInputValid)
   ) {
     await sendInteractionResponse({
       token: options.token,
       apiBaseUrl: options.apiBaseUrl,
       interaction,
       fetchImpl,
-      content: formatWatchModalValidationMessage(watchModal),
+      content: formatTargetPriceWatchModalValidationMessage(targetPriceWatchModal),
     });
     return;
   }
@@ -62,19 +62,19 @@ export async function handleWatchModalSubmit({
     ephemeral: true,
   });
 
-  if (watchModal.action === "edit") {
+  if (targetPriceWatchModal.action === "edit") {
     const updateResult = await updateTargetPriceWatch({
       client,
       discordUserId,
-      watchInput: watchModal.watchInput,
-      targetPrice: watchModal.targetPrice,
+      targetPriceWatchInput: targetPriceWatchModal.targetPriceWatchInput,
+      targetPrice: targetPriceWatchModal.targetPrice,
     });
-    const result = await readWatchManagerPage({
+    const result = await readTargetPriceWatchManagerPage({
       client,
       discordUserId,
-      page: watchModal.page,
-      statusFilter: watchModal.statusFilter,
-      sortKey: watchModal.sortKey,
+      page: targetPriceWatchModal.page,
+      statusFilter: targetPriceWatchModal.statusFilter,
+      sortKey: targetPriceWatchModal.sortKey,
     });
 
     await editDeferredInteractionResponse({
@@ -88,11 +88,10 @@ export async function handleWatchModalSubmit({
         discordUserId,
         result,
         publicBaseUrl: options.publicBaseUrl,
-        selectedWatchInput: updateResult.status === "updated" ? `watch:${updateResult.watch.id}` : null,
+        selectedWatchInput:
+          updateResult.status === "updated" ? `watch:${updateResult.watch.id}` : null,
         notice:
-          updateResult.status === "updated"
-            ? "已更新目標價格。"
-            : "無法更新追蹤，清單已重新整理。",
+          updateResult.status === "updated" ? "已更新目標價格。" : "無法更新追蹤，清單已重新整理。",
       }),
     });
     return;
@@ -101,12 +100,12 @@ export async function handleWatchModalSubmit({
   const createResult = await createTargetPriceWatch({
     client,
     discordUserId,
-    productInput: watchModal.productInput,
-    targetPrice: watchModal.targetPrice,
+    productInput: targetPriceWatchModal.productInput,
+    targetPrice: targetPriceWatchModal.targetPrice,
   });
 
   if (createResult.status === "saved") {
-    const result = await readWatchManagerPage({ client, discordUserId, page: 0 });
+    const result = await readTargetPriceWatchManagerPage({ client, discordUserId, page: 0 });
 
     await editDeferredInteractionResponse({
       token: options.token,

@@ -3,7 +3,7 @@
 export type TargetPriceWatchStatusFilter = "all" | "reached" | "unreached";
 export type TargetPriceWatchSortKey = "recent" | "target" | "current";
 
-export type ParsedWatchModal =
+export type ParsedTargetPriceWatchModal =
   | {
       action: "create";
       productInput: string | null;
@@ -13,7 +13,7 @@ export type ParsedWatchModal =
     }
   | {
       action: "edit";
-      watchInput: string | null;
+      targetPriceWatchInput: string | null;
       page: number;
       statusFilter: TargetPriceWatchStatusFilter;
       sortKey: TargetPriceWatchSortKey;
@@ -21,18 +21,18 @@ export type ParsedWatchModal =
       targetPriceInputValid: boolean;
     };
 
-export type ParsedWatchComponent =
+export type ParsedTargetPriceWatchComponent =
   | { action: "add" }
   | {
       action: "select";
-      watchInput: string | null;
+      targetPriceWatchInput: string | null;
       page: number;
       statusFilter: TargetPriceWatchStatusFilter;
       sortKey: TargetPriceWatchSortKey;
     }
   | {
       action: "edit";
-      watchInput: string | null;
+      targetPriceWatchInput: string | null;
       targetPrice: number | null;
       page: number;
       statusFilter: TargetPriceWatchStatusFilter;
@@ -46,7 +46,7 @@ export type ParsedWatchComponent =
     }
   | {
       action: "bulk_remove_select";
-      watchInputs: string[];
+      targetPriceWatchInputs: string[];
       page: number;
       statusFilter: TargetPriceWatchStatusFilter;
       sortKey: TargetPriceWatchSortKey;
@@ -63,7 +63,7 @@ export type ParsedWatchComponent =
     }
   | {
       action: "remove" | "confirm_remove" | "cancel_remove";
-      watchInput: string | null;
+      targetPriceWatchInput: string | null;
       page: number;
       statusFilter: TargetPriceWatchStatusFilter;
       sortKey: TargetPriceWatchSortKey;

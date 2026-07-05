@@ -6,7 +6,7 @@ import { MAX_TARGET_PRICE_WATCHES_PER_USER } from "../../../../src/scripts/ops/d
 import {
   createDiscordBotClient,
   createDiscordBotOptions,
-  createWatchModalSubmitInteraction,
+  createTargetPriceWatchModalSubmitInteraction,
   snapshot,
   targetPriceWatch,
   WATCH_PRODUCT_ID,
@@ -34,7 +34,7 @@ describe("handleDiscordInteraction watch create submit", () => {
       options: createDiscordBotOptions(),
       cooldowns: new CommandCooldowns(60),
       fetchImpl: fetchMock as typeof fetch,
-      interaction: createWatchModalSubmitInteraction({
+      interaction: createTargetPriceWatchModalSubmitInteraction({
         productInput: `https://partsradar.test/products/${WATCH_PRODUCT_ID}`,
         targetPrice: "17500",
       }),
@@ -133,7 +133,7 @@ describe("handleDiscordInteraction watch create submit", () => {
       options: createDiscordBotOptions(),
       cooldowns: new CommandCooldowns(60),
       fetchImpl: fetchMock as typeof fetch,
-      interaction: createWatchModalSubmitInteraction({
+      interaction: createTargetPriceWatchModalSubmitInteraction({
         productInput: `https://partsradar.test/products/${WATCH_PRODUCT_ID}`,
         targetPrice: "17500",
       }),
@@ -191,7 +191,7 @@ describe("handleDiscordInteraction watch create submit", () => {
       options: createDiscordBotOptions(),
       cooldowns: new CommandCooldowns(60),
       fetchImpl: fetchMock as typeof fetch,
-      interaction: createWatchModalSubmitInteraction({
+      interaction: createTargetPriceWatchModalSubmitInteraction({
         productInput: `https://partsradar.test/products/${WATCH_PRODUCT_ID}`,
         targetPrice: "16500",
       }),

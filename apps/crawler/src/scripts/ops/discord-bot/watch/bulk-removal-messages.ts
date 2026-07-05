@@ -118,7 +118,7 @@ export function createTargetPriceWatchBulkRemovalConfirmationMessage({
 }): DiscordBotMessage {
   const selectedWatchIds = new Set(
     selectedWatchInputs
-      .map((watchInput) => normalizeWatchId(watchInput))
+      .map((targetPriceWatchInput) => normalizeWatchId(targetPriceWatchInput))
       .filter((watchId): watchId is string => watchId !== null),
   );
   const selectedWatches = result.watches.filter((watch) => selectedWatchIds.has(watch.id));

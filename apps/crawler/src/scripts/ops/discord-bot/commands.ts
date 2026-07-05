@@ -14,8 +14,8 @@ export {
   parseWatchInteraction,
 } from "./commands/application-parser";
 export {
-  parseWatchComponentInteraction,
-  parseWatchModalSubmit,
+  parseTargetPriceWatchComponentInteraction,
+  parseTargetPriceWatchModalSubmit,
 } from "./commands/watch-parser";
 export {
   parsePriceReportComponentInteraction,

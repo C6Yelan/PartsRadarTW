@@ -6,7 +6,7 @@ const WATCH_BULK_REMOVAL_CONFIRMATION_TTL_MS = 5 * 60 * 1000;
 
 interface TargetPriceWatchBulkRemovalConfirmation {
   discordUserId: string;
-  watchInputs: string[];
+  targetPriceWatchInputs: string[];
   page: number;
   statusFilter: TargetPriceWatchStatusFilter;
   sortKey: TargetPriceWatchSortKey;
@@ -16,7 +16,7 @@ interface TargetPriceWatchBulkRemovalConfirmation {
 export type TargetPriceWatchBulkRemovalConfirmationResult =
   | {
       status: "found";
-      watchInputs: string[];
+      targetPriceWatchInputs: string[];
       page: number;
       statusFilter: TargetPriceWatchStatusFilter;
       sortKey: TargetPriceWatchSortKey;
@@ -29,14 +29,14 @@ const WATCH_BULK_REMOVAL_CONFIRMATIONS = new Map<string, TargetPriceWatchBulkRem
 
 export function createTargetPriceWatchBulkRemovalConfirmation({
   discordUserId,
-  watchInputs,
+  targetPriceWatchInputs,
   page,
   statusFilter,
   sortKey,
   now = new Date(),
 }: {
   discordUserId: string;
-  watchInputs: string[];
+  targetPriceWatchInputs: string[];
   page: number;
   statusFilter: TargetPriceWatchStatusFilter;
   sortKey: TargetPriceWatchSortKey;
@@ -47,7 +47,7 @@ export function createTargetPriceWatchBulkRemovalConfirmation({
   const token = randomUUID();
   WATCH_BULK_REMOVAL_CONFIRMATIONS.set(token, {
     discordUserId,
-    watchInputs: [...new Set(watchInputs)],
+    targetPriceWatchInputs: [...new Set(targetPriceWatchInputs)],
     page,
     statusFilter,
     sortKey,
@@ -91,7 +91,7 @@ export function consumeTargetPriceWatchBulkRemovalConfirmation({
 
   return {
     status: "found",
-    watchInputs: confirmation.watchInputs,
+    targetPriceWatchInputs: confirmation.targetPriceWatchInputs,
     page: confirmation.page,
     statusFilter: confirmation.statusFilter,
     sortKey: confirmation.sortKey,

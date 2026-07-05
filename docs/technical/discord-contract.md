@@ -25,6 +25,7 @@ The bot daemon also scans due scheduled personal reports, pending public reports
 - `/price-report now` may reply in the command context, but personal watch lists and target-price settings must stay ephemeral or DM-only.
 - Price reports include price drops, price rises, and new products, subject to configured filters and item limits.
 - Target-price watch notifications are sent when current price is less than or equal to the target price and currency matches.
+- `/watch` and `watch:*` component IDs are compatibility wire names for target-price watch flows; internal TypeScript names should keep the target-price domain explicit.
 - A successfully notified watch is not sent again until the user updates or recreates the watch.
 - Same-user reached watches in one scan are combined into a digest; oversized digests are split into multiple embeds.
 - Delivery results are written to Discord notification delivery logs for retry, dedupe, and ops visibility.

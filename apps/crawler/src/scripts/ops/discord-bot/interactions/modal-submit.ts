@@ -3,7 +3,7 @@
 import {
   parsePriceReportModalSubmit,
   parsePublicReportModalSubmit,
-  parseWatchModalSubmit,
+  parseTargetPriceWatchModalSubmit,
 } from "../commands";
 import { MAX_PRICE_REPORT_ITEMS } from "../constants";
 import {
@@ -33,7 +33,7 @@ import {
   sendMissingUserResponse,
   sendUnsupportedInteractionResponse,
 } from "./responses";
-import { handleWatchModalSubmit } from "./modal-submit/watch";
+import { handleTargetPriceWatchModalSubmit } from "./modal-submit/watch";
 
 export async function handleModalSubmitInteraction({
   client,
@@ -47,10 +47,11 @@ export async function handleModalSubmitInteraction({
   fetchImpl: FetchImpl;
 }): Promise<void> {
   const modal = parsePriceReportModalSubmit(interaction);
-  const watchModal = modal ? null : parseWatchModalSubmit(interaction);
-  const publicReportModal = modal || watchModal ? null : parsePublicReportModalSubmit(interaction);
+  const targetPriceWatchModal = modal ? null : parseTargetPriceWatchModalSubmit(interaction);
+  const publicReportModal =
+    modal || targetPriceWatchModal ? null : parsePublicReportModalSubmit(interaction);
 
-  if (!modal && !watchModal && !publicReportModal) {
+  if (!modal && !targetPriceWatchModal && !publicReportModal) {
     await sendUnsupportedInteractionResponse({ interaction, options, fetchImpl });
     return;
   }
@@ -62,7 +63,7 @@ export async function handleModalSubmitInteraction({
     return;
   }
 
-  if (watchModal) {
+  if (targetPriceWatchModal) {
     if (!options.targetWatchesEnabled) {
       await sendFeatureDisabledResponse({
         interaction,
@@ -73,13 +74,13 @@ export async function handleModalSubmitInteraction({
       return;
     }
 
-    await handleWatchModalSubmit({
+    await handleTargetPriceWatchModalSubmit({
       client,
       interaction,
       options,
       fetchImpl,
       discordUserId,
-      watchModal,
+      targetPriceWatchModal,
     });
     return;
   }

@@ -7,23 +7,14 @@ import {
   parseWatchInteraction,
 } from "../commands";
 import type { CommandCooldowns } from "../cooldowns";
-import {
-  readPriceReportSetting,
-  sendPriceReportNow,
-  toPriceReportFilters,
-} from "../price-report";
+import { readPriceReportSetting, sendPriceReportNow, toPriceReportFilters } from "../price-report";
 import {
   deferInteractionResponse,
   editDeferredInteractionResponse,
   sendDiscordInteractionMessages,
   sendInteractionResponse,
 } from "../rest";
-import type {
-  DiscordBotClient,
-  DiscordBotOptions,
-  DiscordInteraction,
-  FetchImpl,
-} from "../types";
+import type { DiscordBotClient, DiscordBotOptions, DiscordInteraction, FetchImpl } from "../types";
 import { createBotHelpMessage } from "./bot-help";
 import {
   createPriceReportSettingsPanelMessage,
@@ -44,7 +35,7 @@ import {
 } from "./responses";
 import {
   createTargetPriceWatchManagerMessageWithDelivery,
-  readWatchManagerPage,
+  readTargetPriceWatchManagerPage,
 } from "./watch-manager";
 
 export async function handleApplicationCommandInteraction({
@@ -241,7 +232,7 @@ export async function handleApplicationCommandInteraction({
       ephemeral: true,
     });
 
-    const result = await readWatchManagerPage({ client, discordUserId, page: 0 });
+    const result = await readTargetPriceWatchManagerPage({ client, discordUserId, page: 0 });
 
     await editDeferredInteractionResponse({
       token: options.token,
