@@ -1,4 +1,5 @@
 // apps/crawler/src/coolpc/crawl-run/status.ts
+// 定義 crawler run 與分類結果的狀態常數、型別與彙總規則。
 
 export const CRAWL_TRIGGER_TYPES = {
   MANUAL: "MANUAL",
@@ -32,11 +33,13 @@ export type CrawlRunStatusValue = (typeof CRAWL_RUN_STATUSES)[keyof typeof CRAWL
 export type CrawlRunCategoryResultStatusValue =
   (typeof CRAWL_RUN_CATEGORY_RESULT_STATUSES)[keyof typeof CRAWL_RUN_CATEGORY_RESULT_STATUSES];
 
+/**
+ * 依 category result 聚合判斷整體 crawl run 狀態。
+ * suspected_block 擁有最高優先權，成功與失敗會依結果比例推導。
+ */
 export function resolveCrawlRunStatus(
   results: Array<{ status: CrawlRunCategoryResultStatusValue }>,
 ): CrawlRunStatusValue {
-  // The run table stores only the overall state. Category counts and per-category
-  // details remain derivable from crawl_run_category_results.
   if (
     results.some((result) => result.status === CRAWL_RUN_CATEGORY_RESULT_STATUSES.SUSPECTED_BLOCK)
   ) {
@@ -68,6 +71,9 @@ export function resolveCrawlRunStatus(
   return CRAWL_RUN_STATUSES.SUCCESS_UNCHANGED;
 }
 
+/**
+ * 判斷單一分類結果是否屬於成功類別。
+ */
 export function isSuccessStatus(status: CrawlRunCategoryResultStatusValue): boolean {
   return (
     status === CRAWL_RUN_CATEGORY_RESULT_STATUSES.SUCCESS_CHANGED ||

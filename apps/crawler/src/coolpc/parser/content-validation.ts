@@ -1,4 +1,6 @@
 // apps/crawler/src/coolpc/parser/content-validation.ts
+// 驗證 CoolPC 分類頁 HTML 是否可進 parser，並回傳可進入後續流程的 validity 狀態與基本統計。
+
 import { load } from "cheerio";
 import { extractCoolpcProductCandidates } from "./candidates";
 import {
@@ -8,6 +10,7 @@ import {
 } from "./normalization";
 import type { ContentValidationResult, SourceCategoryContext } from "./types";
 
+// 驗證分類頁是否符合 expected title / token / 名稱 / 價格的最小條件，並區分正常、無效與疑似封鎖頁。
 export function validateCoolpcCategoryPage(
   html: string,
   context: SourceCategoryContext,
@@ -42,8 +45,7 @@ export function validateCoolpcCategoryPage(
     };
   }
 
-  // HTTP 200 alone is not trusted. A page with neither the expected title nor
-  // product structures is treated as a possible block page, not as an empty category.
+  // HTTP 200 不代表成功。若同時缺少預期標題與商品欄位，優先判為可疑封鎖頁，避免誤將風險頁誤判為空分類。
   if (!hasExpectedTitle && tokenCount === 0 && nameCount === 0 && priceTextCount === 0) {
     return {
       status: "suspected_block",
@@ -107,6 +109,7 @@ export function validateCoolpcCategoryPage(
   };
 }
 
+// 取出驗證用關鍵字（有自訂就用自訂，否則退回 sourceName + displayName）。
 function expectedTitleKeywords(context: SourceCategoryContext): string[] {
   return context.expectedTitleKeywords ?? [context.sourceName, context.displayName];
 }

@@ -1,4 +1,7 @@
 // apps/crawler/src/coolpc/category-snapshot.ts
+// 處理 CoolPC 分類頁抓取結果與 crawl run 的銜接：
+// 先落 raw snapshot，成功解析後再交給分類商品觀測寫入流程。
+
 import type { ParseErrorType as PrismaParseErrorType, PrismaClient } from "@partsradar/db";
 import {
   CRAWL_RUN_CATEGORY_RESULT_STATUSES,
@@ -29,9 +32,6 @@ import {
   toRawSnapshotContentStatus,
 } from "./category-snapshot/parse-result";
 
-// This module is the handoff point between raw CoolPC fetches and crawl-run
-// category results. It records evidence first, then lets changed valid parses
-// flow into the product/price writer.
 export interface CoolpcCategorySnapshotInput {
   url?: string;
   fetchedAt: Date;
@@ -110,16 +110,21 @@ export type PrismaCoolpcCategorySnapshotClient = Pick<
   "rawSnapshot" | "parseError" | "product" | "priceSnapshot" | "currentPrice" | "$transaction"
 >;
 
+/**
+ * 以 Prisma client 進入點呼叫共用流程，讓測試時可注入較窄 client。
+ */
 export function processCoolpcCategorySnapshotWithPrisma(
   options: ProcessCoolpcCategorySnapshotBaseOptions & {
     client: PrismaCoolpcCategorySnapshotClient;
   },
 ): Promise<ProcessCrawlCategoryResult> {
-  // Keep the processor testable with a narrow write client while exposing a
-  // Prisma-typed entry point for the real crawler wiring.
   return processCoolpcCategorySnapshot(options);
 }
 
+/**
+ * 落 raw snapshot 並依 parser 結果決定 crawl run 分類結果狀態。
+ * 僅當內容可匯入時，才進入分類商品觀測寫入流程，避免污染資料。
+ */
 export async function processCoolpcCategorySnapshot(
   options: ProcessCoolpcCategorySnapshotOptions,
 ): Promise<ProcessCrawlCategoryResult> {
@@ -130,8 +135,6 @@ export async function processCoolpcCategorySnapshot(
   const url = snapshot.url ?? createCoolpcCategoryUrl(category.igrp);
   const fetchError = snapshot.fetchError ?? null;
 
-  // Network failures still produce a raw_snapshot row so the crawl run has a
-  // traceable category result even when there is no HTML file to store.
   if (fetchError || !snapshot.rawHtml) {
     const rawSnapshot = await recordRawSnapshot({
       client,
@@ -162,8 +165,6 @@ export async function processCoolpcCategorySnapshot(
   const latestParsedResultHash = parsedResultHash
     ? await findLatestSuccessfulParsedResultHash(client, category.id)
     : null;
-  // Parser validation decides the stored content status. Only valid parsed
-  // products get a result hash; block/invalid pages remain inspectable as raw HTML.
   const rawSnapshot = await recordRawSnapshot({
     client,
     storageDir,
@@ -184,8 +185,6 @@ export async function processCoolpcCategorySnapshot(
     issues: parseResult.issues,
   });
 
-  // Suspected block is kept distinct from parse failure because the crawl runner
-  // treats it as a source-level stop signal for the rest of the current cycle.
   if (parseResult.validation.status === "suspected_block") {
     return {
       status: CRAWL_RUN_CATEGORY_RESULT_STATUSES.SUSPECTED_BLOCK,
@@ -194,8 +193,6 @@ export async function processCoolpcCategorySnapshot(
     };
   }
 
-  // Invalid or non-importable content is saved for diagnosis, but it must not
-  // flow into product/price writes.
   if (parseResult.validation.status === "invalid" || !parseResult.canImport) {
     return {
       status: CRAWL_RUN_CATEGORY_RESULT_STATUSES.PARSE_FAILED,
@@ -204,9 +201,6 @@ export async function processCoolpcCategorySnapshot(
     };
   }
 
-  // Every successful parse reaches the product writer. It avoids duplicate
-  // price snapshots itself, while unchanged crawls still refresh last_seen_at
-  // and advance missing counters for products absent from the parsed list.
   const productWriteSummary = await productWriter({
     crawlRunId,
     rawSnapshotId: rawSnapshot.id,
