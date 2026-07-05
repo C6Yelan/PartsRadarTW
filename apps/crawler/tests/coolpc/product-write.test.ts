@@ -1,20 +1,20 @@
 // apps/crawler/tests/coolpc/product-write.test.ts
 import { describe, expect, it } from "vitest";
-import { writeCoolpcProductPrices } from "../../src/coolpc/product-write";
+import { writeCoolpcCategoryProductObservation } from "../../src/coolpc/product-write";
 import { FakeCoolpcProductWriteClient, productItem } from "./support/product-write-client";
 
-describe("CoolPC product price writer", () => {
+describe("CoolPC category product observation writer", () => {
   it("creates product, price snapshot, and current price for a new item", async () => {
     const client = new FakeCoolpcProductWriteClient();
     const item = productItem({ price: 4880 });
 
-    const result = await writeCoolpcProductPrices({
+    const result = await writeCoolpcCategoryProductObservation({
       client,
       crawlRunId: "crawl-run-1",
       rawSnapshotId: "raw-snapshot-1",
       sourceCategoryId: item.sourceCategoryId,
       fetchedAt: item.fetchedAt,
-      items: [item],
+      parsedProducts: [item],
     });
 
     expect(result).toEqual({
@@ -79,13 +79,13 @@ describe("CoolPC product price writer", () => {
       fetchedAt: new Date("2026-05-27T11:00:00.000Z"),
     });
 
-    const result = await writeCoolpcProductPrices({
+    const result = await writeCoolpcCategoryProductObservation({
       client,
       crawlRunId: "crawl-run-2",
       rawSnapshotId: "raw-snapshot-2",
       sourceCategoryId: nextItem.sourceCategoryId,
       fetchedAt: nextItem.fetchedAt,
-      items: [nextItem],
+      parsedProducts: [nextItem],
     });
 
     expect(result).toMatchObject({
@@ -129,13 +129,13 @@ describe("CoolPC product price writer", () => {
     client.seedProductWithCurrentPrice(previousItem);
     const nextSeenAt = new Date("2026-05-27T11:00:00.000Z");
 
-    const result = await writeCoolpcProductPrices({
+    const result = await writeCoolpcCategoryProductObservation({
       client,
       crawlRunId: "crawl-run-2",
       rawSnapshotId: "raw-snapshot-2",
       sourceCategoryId: previousItem.sourceCategoryId,
       fetchedAt: nextSeenAt,
-      items: [productItem({ price: 4880, fetchedAt: nextSeenAt })],
+      parsedProducts: [productItem({ price: 4880, fetchedAt: nextSeenAt })],
     });
 
     expect(result).toMatchObject({
@@ -167,13 +167,13 @@ describe("CoolPC product price writer", () => {
     client.seedProductWithCurrentPrice(previousItem);
     const nextSeenAt = new Date("2026-05-27T11:00:00.000Z");
 
-    const result = await writeCoolpcProductPrices({
+    const result = await writeCoolpcCategoryProductObservation({
       client,
       crawlRunId: "crawl-run-2",
       rawSnapshotId: "raw-snapshot-2",
       sourceCategoryId: previousItem.sourceCategoryId,
       fetchedAt: nextSeenAt,
-      items: [
+      parsedProducts: [
         productItem({
           price: 4880,
           primaryImageUrl: null,
@@ -199,13 +199,13 @@ describe("CoolPC product price writer", () => {
     client.seedProductWithoutCurrentPrice(productItem({ price: 4880 }));
     const fetchedAt = new Date("2026-05-27T11:00:00.000Z");
 
-    const result = await writeCoolpcProductPrices({
+    const result = await writeCoolpcCategoryProductObservation({
       client,
       crawlRunId: "crawl-run-2",
       rawSnapshotId: "raw-snapshot-2",
       sourceCategoryId: "category-4",
       fetchedAt,
-      items: [productItem({ price: 4880, fetchedAt })],
+      parsedProducts: [productItem({ price: 4880, fetchedAt })],
     });
 
     expect(result).toMatchObject({
@@ -220,5 +220,4 @@ describe("CoolPC product price writer", () => {
     expect(client.currentPrices).toHaveLength(1);
     expect(client.currentPrices[0]?.priceSnapshotId).toBe("price-snapshot-1");
   });
-
 });

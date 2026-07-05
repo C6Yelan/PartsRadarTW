@@ -1,6 +1,6 @@
 import type {
   CoolpcCategorySnapshotWriteClient,
-  WriteCoolpcCategoryProducts,
+  WriteCoolpcCategoryProductObservation,
 } from "../../../src/coolpc/category-snapshot";
 import { processCoolpcCategorySnapshot } from "../../../src/coolpc/category-snapshot";
 import {
@@ -213,7 +213,7 @@ export async function runSnapshot({
   storageDir: string;
   rawHtml: string;
   fetchedAt: Date;
-  writeProducts?: WriteCoolpcCategoryProducts;
+  writeProducts?: WriteCoolpcCategoryProductObservation;
 }) {
   return runCoolpcCrawlOnce({
     client,

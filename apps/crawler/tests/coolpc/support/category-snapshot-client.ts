@@ -1,6 +1,6 @@
 import type {
   CoolpcCategorySnapshotWriteClient,
-  WriteCoolpcCategoryProducts,
+  WriteCoolpcCategoryProductObservation,
 } from "../../../src/coolpc/category-snapshot";
 import type {
   CrawlRunCategoryResultStatusValue,
@@ -233,7 +233,7 @@ export function createProductWriterSpy(): {
     fetchedAt: Date;
     sourceItemKeys: string[];
   }>;
-  writeProducts: WriteCoolpcCategoryProducts;
+  writeProducts: WriteCoolpcCategoryProductObservation;
 } {
   const calls: Array<{
     crawlRunId: string;
@@ -245,21 +245,27 @@ export function createProductWriterSpy(): {
 
   return {
     calls,
-    writeProducts: async ({ crawlRunId, rawSnapshotId, sourceCategoryId, fetchedAt, items }) => {
+    writeProducts: async ({
+      crawlRunId,
+      rawSnapshotId,
+      sourceCategoryId,
+      fetchedAt,
+      parsedProducts,
+    }) => {
       calls.push({
         crawlRunId,
         rawSnapshotId,
         sourceCategoryId,
         fetchedAt,
-        sourceItemKeys: items.map((item) => item.sourceItemKey),
+        sourceItemKeys: parsedProducts.map((item) => item.sourceItemKey),
       });
 
       return {
-        processedItemCount: items.length,
-        createdProductCount: items.length,
-        createdProductIds: items.map((_, index) => `product-${index + 1}`),
+        processedItemCount: parsedProducts.length,
+        createdProductCount: parsedProducts.length,
+        createdProductIds: parsedProducts.map((_, index) => `product-${index + 1}`),
         updatedProductCount: 0,
-        priceSnapshotCreatedCount: items.length,
+        priceSnapshotCreatedCount: parsedProducts.length,
         priceUnchangedCount: 0,
         missingProductUpdatedCount: 0,
         markedInactiveProductCount: 0,

@@ -14,9 +14,9 @@ import {
   type ParsedCoolpcProduct,
 } from "./parser";
 import {
-  writeCoolpcProductPrices,
+  writeCoolpcCategoryProductObservation,
   type CoolpcProductWriteClient,
-  type WriteCoolpcProductPricesResult,
+  type WriteCoolpcCategoryProductObservationResult,
 } from "./product-write";
 import {
   RAW_SNAPSHOT_CONTENT_STATUSES,
@@ -54,7 +54,7 @@ export type ProcessCoolpcCategorySnapshotOptions =
     })
   | (ProcessCoolpcCategorySnapshotBaseOptions & {
       client: CoolpcCategorySnapshotWriteClient;
-      writeProducts: WriteCoolpcCategoryProducts;
+      writeProducts: WriteCoolpcCategoryProductObservation;
     });
 
 export interface CoolpcCategorySnapshotWriteClient extends RawSnapshotWriteClient {
@@ -97,13 +97,13 @@ interface ParseErrorCreateManyData {
   rawImageUrl: string | null;
 }
 
-export type WriteCoolpcCategoryProducts = (options: {
+export type WriteCoolpcCategoryProductObservation = (options: {
   crawlRunId: string;
   rawSnapshotId: string;
   sourceCategoryId: string;
   fetchedAt: Date;
-  items: ParsedCoolpcProduct[];
-}) => Promise<WriteCoolpcProductPricesResult>;
+  parsedProducts: ParsedCoolpcProduct[];
+}) => Promise<WriteCoolpcCategoryProductObservationResult>;
 
 export type PrismaCoolpcCategorySnapshotClient = Pick<
   PrismaClient,
@@ -206,7 +206,7 @@ export async function processCoolpcCategorySnapshot(
     rawSnapshotId: rawSnapshot.id,
     sourceCategoryId: category.id,
     fetchedAt: snapshot.fetchedAt,
-    items: parseResult.items,
+    parsedProducts: parseResult.items,
   });
 
   return {
@@ -221,9 +221,9 @@ export async function processCoolpcCategorySnapshot(
 
 function createDefaultProductWriter(
   client: CoolpcCategorySnapshotWriteClient & CoolpcProductWriteClient,
-): WriteCoolpcCategoryProducts {
+): WriteCoolpcCategoryProductObservation {
   return (options) =>
-    writeCoolpcProductPrices({
+    writeCoolpcCategoryProductObservation({
       client,
       ...options,
     });

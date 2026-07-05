@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { writeCoolpcProductPrices } from "../../src/coolpc/product-write";
+import { writeCoolpcCategoryProductObservation } from "../../src/coolpc/product-write";
 import { FakeCoolpcProductWriteClient, productItem } from "./support/product-write-client";
 
-describe("CoolPC product price writer missing lifecycle", () => {
+describe("CoolPC category product observation writer missing lifecycle", () => {
   it("marks existing products missing when they are absent from a successful category parse", async () => {
     const client = new FakeCoolpcProductWriteClient();
     const previousSeenAt = new Date("2026-05-27T10:00:00.000Z");
@@ -22,13 +22,15 @@ describe("CoolPC product price writer missing lifecycle", () => {
     client.seedProductWithCurrentPrice(presentItem);
     client.seedProductWithCurrentPrice(missingItem);
 
-    const result = await writeCoolpcProductPrices({
+    const result = await writeCoolpcCategoryProductObservation({
       client,
       crawlRunId: "crawl-run-2",
       rawSnapshotId: "raw-snapshot-2",
       sourceCategoryId: "category-4",
       fetchedAt: nextSeenAt,
-      items: [productItem({ ibuyToken: "CPU-TOKEN-001", price: 4880, fetchedAt: nextSeenAt })],
+      parsedProducts: [
+        productItem({ ibuyToken: "CPU-TOKEN-001", price: 4880, fetchedAt: nextSeenAt }),
+      ],
     });
 
     expect(result).toMatchObject({
@@ -57,13 +59,13 @@ describe("CoolPC product price writer missing lifecycle", () => {
       missingSeenCount: 5,
     });
 
-    const result = await writeCoolpcProductPrices({
+    const result = await writeCoolpcCategoryProductObservation({
       client,
       crawlRunId: "crawl-run-2",
       rawSnapshotId: "raw-snapshot-2",
       sourceCategoryId: "category-4",
       fetchedAt,
-      items: [],
+      parsedProducts: [],
     });
 
     expect(result).toMatchObject({
@@ -91,13 +93,13 @@ describe("CoolPC product price writer missing lifecycle", () => {
       missingSeenCount: 6,
     });
 
-    const result = await writeCoolpcProductPrices({
+    const result = await writeCoolpcCategoryProductObservation({
       client,
       crawlRunId: "crawl-run-2",
       rawSnapshotId: "raw-snapshot-2",
       sourceCategoryId: "category-4",
       fetchedAt: nextSeenAt,
-      items: [productItem({ price: 4880, fetchedAt: nextSeenAt })],
+      parsedProducts: [productItem({ price: 4880, fetchedAt: nextSeenAt })],
     });
 
     expect(result).toMatchObject({

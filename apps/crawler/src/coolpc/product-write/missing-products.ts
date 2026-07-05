@@ -1,5 +1,8 @@
 // apps/crawler/src/coolpc/product-write/missing-products.ts
-import type { CoolpcProductWriteDelegates, WriteCoolpcProductPricesResult } from "./types";
+import type {
+  CoolpcProductWriteDelegates,
+  WriteCoolpcCategoryProductObservationResult,
+} from "./types";
 
 const MISSING_SUCCESSFUL_CRAWLS_BEFORE_INACTIVE = 6;
 
@@ -14,7 +17,10 @@ export async function markMissingProducts({
   fetchedAt: Date;
   presentIbuyTokens: ReadonlySet<string>;
 }): Promise<
-  Pick<WriteCoolpcProductPricesResult, "missingProductUpdatedCount" | "markedInactiveProductCount">
+  Pick<
+    WriteCoolpcCategoryProductObservationResult,
+    "missingProductUpdatedCount" | "markedInactiveProductCount"
+  >
 > {
   const products = await client.product.findMany({
     where: { sourceCategoryId },

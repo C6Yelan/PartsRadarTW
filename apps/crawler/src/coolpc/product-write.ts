@@ -1,55 +1,55 @@
 // apps/crawler/src/coolpc/product-write.ts
 import type { ParsedCoolpcProduct } from "./parser";
-import { writeProductItem } from "./product-write/item-writer";
+import { writeObservedProduct } from "./product-write/item-writer";
 import { markMissingProducts } from "./product-write/missing-products";
 import type {
   CoolpcProductWriteDelegates,
-  WriteCoolpcProductPricesOptions,
-  WriteCoolpcProductPricesResult,
+  WriteCoolpcCategoryProductObservationOptions,
+  WriteCoolpcCategoryProductObservationResult,
 } from "./product-write/types";
 
 export type {
   CoolpcProductWriteClient,
-  WriteCoolpcProductPricesOptions,
-  WriteCoolpcProductPricesResult,
+  WriteCoolpcCategoryProductObservationOptions,
+  WriteCoolpcCategoryProductObservationResult,
 } from "./product-write/types";
 
-export async function writeCoolpcProductPrices({
+export async function writeCoolpcCategoryProductObservation({
   client,
   crawlRunId,
   rawSnapshotId = null,
   sourceCategoryId,
   fetchedAt,
-  items,
-}: WriteCoolpcProductPricesOptions): Promise<WriteCoolpcProductPricesResult> {
+  parsedProducts,
+}: WriteCoolpcCategoryProductObservationOptions): Promise<WriteCoolpcCategoryProductObservationResult> {
   // Product, price snapshot, and current price must move together. The service
   // keeps the transaction boundary here instead of requiring every caller to
   // remember the same multi-table write rule.
   return client.$transaction((transactionClient) =>
-    writeCoolpcProductPricesInTransaction({
+    writeCoolpcCategoryProductObservationInTransaction({
       client: transactionClient,
       crawlRunId,
       rawSnapshotId,
       sourceCategoryId,
       fetchedAt,
-      items,
+      parsedProducts,
     }),
   );
 }
 
-async function writeCoolpcProductPricesInTransaction({
+async function writeCoolpcCategoryProductObservationInTransaction({
   client,
   crawlRunId,
   rawSnapshotId,
   sourceCategoryId,
   fetchedAt,
-  items,
-}: Omit<WriteCoolpcProductPricesOptions, "client" | "rawSnapshotId"> & {
+  parsedProducts,
+}: Omit<WriteCoolpcCategoryProductObservationOptions, "client" | "rawSnapshotId"> & {
   client: CoolpcProductWriteDelegates;
   rawSnapshotId: string | null;
-}): Promise<WriteCoolpcProductPricesResult> {
-  const result: WriteCoolpcProductPricesResult = {
-    processedItemCount: items.length,
+}): Promise<WriteCoolpcCategoryProductObservationResult> {
+  const result: WriteCoolpcCategoryProductObservationResult = {
+    processedItemCount: parsedProducts.length,
     createdProductCount: 0,
     createdProductIds: [],
     updatedProductCount: 0,
@@ -60,22 +60,22 @@ async function writeCoolpcProductPricesInTransaction({
   };
   const presentIbuyTokens = new Set<string>();
 
-  for (const item of items) {
-    assertItemBelongsToCategory(item, sourceCategoryId);
-    presentIbuyTokens.add(item.ibuyToken);
+  for (const parsedProduct of parsedProducts) {
+    assertParsedProductBelongsToCategory(parsedProduct, sourceCategoryId);
+    presentIbuyTokens.add(parsedProduct.ibuyToken);
 
-    const itemResult = await writeProductItem({
+    const observedProductResult = await writeObservedProduct({
       client,
       crawlRunId,
       rawSnapshotId,
-      item,
+      parsedProduct,
     });
 
-    result.createdProductCount += itemResult.createdProductCount;
-    result.createdProductIds.push(...itemResult.createdProductIds);
-    result.updatedProductCount += itemResult.updatedProductCount;
-    result.priceSnapshotCreatedCount += itemResult.priceSnapshotCreatedCount;
-    result.priceUnchangedCount += itemResult.priceUnchangedCount;
+    result.createdProductCount += observedProductResult.createdProductCount;
+    result.createdProductIds.push(...observedProductResult.createdProductIds);
+    result.updatedProductCount += observedProductResult.updatedProductCount;
+    result.priceSnapshotCreatedCount += observedProductResult.priceSnapshotCreatedCount;
+    result.priceUnchangedCount += observedProductResult.priceUnchangedCount;
   }
 
   const missingResult = await markMissingProducts({
@@ -90,13 +90,13 @@ async function writeCoolpcProductPricesInTransaction({
   return result;
 }
 
-function assertItemBelongsToCategory(
-  item: ParsedCoolpcProduct,
+function assertParsedProductBelongsToCategory(
+  parsedProduct: ParsedCoolpcProduct,
   sourceCategoryId: string,
 ): void {
-  if (item.sourceCategoryId !== sourceCategoryId) {
+  if (parsedProduct.sourceCategoryId !== sourceCategoryId) {
     throw new Error(
-      `Product item category mismatch: expected ${sourceCategoryId}, got ${item.sourceCategoryId}.`,
+      `Parsed product category mismatch: expected ${sourceCategoryId}, got ${parsedProduct.sourceCategoryId}.`,
     );
   }
 }

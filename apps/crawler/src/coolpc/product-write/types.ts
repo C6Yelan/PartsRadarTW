@@ -1,16 +1,16 @@
 // apps/crawler/src/coolpc/product-write/types.ts
 import type { ParsedCoolpcProduct } from "../parser";
 
-export interface WriteCoolpcProductPricesOptions {
+export interface WriteCoolpcCategoryProductObservationOptions {
   client: CoolpcProductWriteClient;
   crawlRunId: string;
   rawSnapshotId?: string | null;
   sourceCategoryId: string;
   fetchedAt: Date;
-  items: ParsedCoolpcProduct[];
+  parsedProducts: ParsedCoolpcProduct[];
 }
 
-export interface WriteCoolpcProductPricesResult {
+export interface WriteCoolpcCategoryProductObservationResult {
   processedItemCount: number;
   createdProductCount: number;
   createdProductIds: string[];

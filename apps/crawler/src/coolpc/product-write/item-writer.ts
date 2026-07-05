@@ -6,11 +6,11 @@ import type {
   ExistingProductForPriceWrite,
   ProductCreateData,
   ProductSeenUpdateData,
-  WriteCoolpcProductPricesResult,
+  WriteCoolpcCategoryProductObservationResult,
 } from "./types";
 
-type ProductItemWriteResult = Pick<
-  WriteCoolpcProductPricesResult,
+type ObservedProductWriteResult = Pick<
+  WriteCoolpcCategoryProductObservationResult,
   | "createdProductCount"
   | "createdProductIds"
   | "updatedProductCount"
@@ -18,18 +18,18 @@ type ProductItemWriteResult = Pick<
   | "priceUnchangedCount"
 >;
 
-export async function writeProductItem({
+export async function writeObservedProduct({
   client,
   crawlRunId,
   rawSnapshotId,
-  item,
+  parsedProduct,
 }: {
   client: CoolpcProductWriteDelegates;
   crawlRunId: string;
   rawSnapshotId: string | null;
-  item: ParsedCoolpcProduct;
-}): Promise<ProductItemWriteResult> {
-  const existingProduct = await findProduct(client, item);
+  parsedProduct: ParsedCoolpcProduct;
+}): Promise<ObservedProductWriteResult> {
+  const existingProduct = await findProduct(client, parsedProduct);
 
   if (!existingProduct) {
     // First sighting must create the complete read path in one pass:
@@ -38,7 +38,7 @@ export async function writeProductItem({
       client,
       crawlRunId,
       rawSnapshotId,
-      item,
+      parsedProduct,
     });
     return {
       createdProductCount: 1,
@@ -49,15 +49,15 @@ export async function writeProductItem({
     };
   }
 
-  await updateProductSeenData(client, existingProduct.id, item);
+  await updateProductSeenData(client, existingProduct.id, parsedProduct);
 
-  if (hasPriceChanged(existingProduct.currentPrice?.priceSnapshot ?? null, item)) {
+  if (hasPriceChanged(existingProduct.currentPrice?.priceSnapshot ?? null, parsedProduct)) {
     const priceSnapshot = await createPriceSnapshot({
       client,
       crawlRunId,
       rawSnapshotId,
       productId: existingProduct.id,
-      item,
+      parsedProduct,
     });
 
     if (existingProduct.currentPrice) {
@@ -65,13 +65,18 @@ export async function writeProductItem({
         where: { productId: existingProduct.id },
         data: {
           priceSnapshotId: priceSnapshot.id,
-          lastSeenAt: item.fetchedAt,
-          priceChangedAt: item.fetchedAt,
+          lastSeenAt: parsedProduct.fetchedAt,
+          priceChangedAt: parsedProduct.fetchedAt,
         },
         select: { productId: true },
       });
     } else {
-      await createCurrentPrice(client, existingProduct.id, priceSnapshot.id, item.fetchedAt);
+      await createCurrentPrice(
+        client,
+        existingProduct.id,
+        priceSnapshot.id,
+        parsedProduct.fetchedAt,
+      );
     }
 
     return {
@@ -87,7 +92,7 @@ export async function writeProductItem({
   // grow with duplicate snapshots on every crawl.
   await client.currentPrice.update({
     where: { productId: existingProduct.id },
-    data: { lastSeenAt: item.fetchedAt },
+    data: { lastSeenAt: parsedProduct.fetchedAt },
     select: { productId: true },
   });
 
@@ -102,15 +107,15 @@ export async function writeProductItem({
 
 function findProduct(
   client: CoolpcProductWriteDelegates,
-  item: ParsedCoolpcProduct,
+  parsedProduct: ParsedCoolpcProduct,
 ): Promise<ExistingProductForPriceWrite | null> {
   // The current price row points to the latest price snapshot. Loading that
   // snapshot lets us decide whether this crawl needs a new history row.
   return client.product.findUnique({
     where: {
       sourceCategoryId_ibuyToken: {
-        sourceCategoryId: item.sourceCategoryId,
-        ibuyToken: item.ibuyToken,
+        sourceCategoryId: parsedProduct.sourceCategoryId,
+        ibuyToken: parsedProduct.ibuyToken,
       },
     },
     include: {
@@ -127,15 +132,15 @@ async function createProductWithCurrentPrice({
   client,
   crawlRunId,
   rawSnapshotId,
-  item,
+  parsedProduct,
 }: {
   client: CoolpcProductWriteDelegates;
   crawlRunId: string;
   rawSnapshotId: string | null;
-  item: ParsedCoolpcProduct;
+  parsedProduct: ParsedCoolpcProduct;
 }): Promise<string> {
   const product = await client.product.create({
-    data: createProductData(item),
+    data: createProductData(parsedProduct),
     select: { id: true },
   });
   const priceSnapshot = await createPriceSnapshot({
@@ -143,10 +148,10 @@ async function createProductWithCurrentPrice({
     crawlRunId,
     rawSnapshotId,
     productId: product.id,
-    item,
+    parsedProduct,
   });
 
-  await createCurrentPrice(client, product.id, priceSnapshot.id, item.fetchedAt);
+  await createCurrentPrice(client, product.id, priceSnapshot.id, parsedProduct.fetchedAt);
 
   return product.id;
 }
@@ -154,35 +159,35 @@ async function createProductWithCurrentPrice({
 function updateProductSeenData(
   client: CoolpcProductWriteDelegates,
   productId: string,
-  item: ParsedCoolpcProduct,
+  parsedProduct: ParsedCoolpcProduct,
 ): Promise<{ id: string }> {
   // A successfully parsed item means the product is present again. If it had
   // been counted as missing or marked inactive, the same source identity resumes
   // its existing price history instead of creating a replacement product.
   return client.product.update({
     where: { id: productId },
-    data: buildProductSeenUpdateData(item),
+    data: buildProductSeenUpdateData(parsedProduct),
     select: { id: true },
   });
 }
 
-function buildProductSeenUpdateData(item: ParsedCoolpcProduct): ProductSeenUpdateData {
+function buildProductSeenUpdateData(parsedProduct: ParsedCoolpcProduct): ProductSeenUpdateData {
   return {
-    name: item.name,
-    normalizedName: item.normalizedName,
-    vendorSlug: item.vendorSlug,
-    vendorName: item.vendorName,
-    ...(item.primaryImageUrl
+    name: parsedProduct.name,
+    normalizedName: parsedProduct.normalizedName,
+    vendorSlug: parsedProduct.vendorSlug,
+    vendorName: parsedProduct.vendorName,
+    ...(parsedProduct.primaryImageUrl
       ? {
-          primaryImageUrl: item.primaryImageUrl,
-          primaryImageCheckedAt: item.fetchedAt,
+          primaryImageUrl: parsedProduct.primaryImageUrl,
+          primaryImageCheckedAt: parsedProduct.fetchedAt,
         }
       : {}),
-    sourceUrl: item.sourceUrl,
+    sourceUrl: parsedProduct.sourceUrl,
     isActive: true,
     missingSince: null,
     missingSeenCount: 0,
-    lastSeenAt: item.fetchedAt,
+    lastSeenAt: parsedProduct.fetchedAt,
   };
 }
 
@@ -191,20 +196,20 @@ function createPriceSnapshot({
   crawlRunId,
   rawSnapshotId,
   productId,
-  item,
+  parsedProduct,
 }: {
   client: CoolpcProductWriteDelegates;
   crawlRunId: string;
   rawSnapshotId: string | null;
   productId: string;
-  item: ParsedCoolpcProduct;
+  parsedProduct: ParsedCoolpcProduct;
 }): Promise<{ id: string }> {
   return client.priceSnapshot.create({
     data: {
       productId,
-      price: item.price,
-      currency: item.currency,
-      capturedAt: item.fetchedAt,
+      price: parsedProduct.price,
+      currency: parsedProduct.currency,
+      capturedAt: parsedProduct.fetchedAt,
       crawlRunId,
       rawSnapshotId,
     },
@@ -229,32 +234,32 @@ function createCurrentPrice(
   });
 }
 
-function createProductData(item: ParsedCoolpcProduct): ProductCreateData {
+function createProductData(parsedProduct: ParsedCoolpcProduct): ProductCreateData {
   return {
-    sourceCategoryId: item.sourceCategoryId,
-    ibuyToken: item.ibuyToken,
-    name: item.name,
-    normalizedName: item.normalizedName,
-    vendorSlug: item.vendorSlug,
-    vendorName: item.vendorName,
-    primaryImageUrl: item.primaryImageUrl,
-    primaryImageCheckedAt: item.primaryImageUrl ? item.fetchedAt : null,
-    sourceUrl: item.sourceUrl,
+    sourceCategoryId: parsedProduct.sourceCategoryId,
+    ibuyToken: parsedProduct.ibuyToken,
+    name: parsedProduct.name,
+    normalizedName: parsedProduct.normalizedName,
+    vendorSlug: parsedProduct.vendorSlug,
+    vendorName: parsedProduct.vendorName,
+    primaryImageUrl: parsedProduct.primaryImageUrl,
+    primaryImageCheckedAt: parsedProduct.primaryImageUrl ? parsedProduct.fetchedAt : null,
+    sourceUrl: parsedProduct.sourceUrl,
     isActive: true,
     missingSince: null,
     missingSeenCount: 0,
-    firstSeenAt: item.fetchedAt,
-    lastSeenAt: item.fetchedAt,
+    firstSeenAt: parsedProduct.fetchedAt,
+    lastSeenAt: parsedProduct.fetchedAt,
   };
 }
 
 function hasPriceChanged(
   currentSnapshot: ExistingCurrentPriceSnapshot | null,
-  item: ParsedCoolpcProduct,
+  parsedProduct: ParsedCoolpcProduct,
 ): boolean {
   return (
     !currentSnapshot ||
-    currentSnapshot.price !== item.price ||
-    currentSnapshot.currency !== item.currency
+    currentSnapshot.price !== parsedProduct.price ||
+    currentSnapshot.currency !== parsedProduct.currency
   );
 }
