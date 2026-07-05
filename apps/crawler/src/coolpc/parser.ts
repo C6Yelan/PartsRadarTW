@@ -1,4 +1,7 @@
 // apps/crawler/src/coolpc/parser.ts
+// CoolPC parser 入口，負責把分類頁 HTML 轉成 parsed products 與 issues 清單；
+// 同時重用 parser helpers 做頁面驗證、候選擷取、欄位正規化與 vendor 分類判斷。
+
 import { load } from "cheerio";
 import { decode } from "iconv-lite";
 import { extractCoolpcProductCandidates } from "./parser/candidates";
@@ -44,10 +47,12 @@ export {
   normalizeCoolpcProductImageUrl,
 } from "./parser/urls";
 
+// 將抓到的來源位元組資料以 Big5 解碼成字串，供 parser pipeline 後續使用。
 export function decodeCoolpcHtml(buffer: Buffer | Uint8Array, encoding = "big5"): string {
   return decode(buffer, encoding);
 }
 
+// 解析單一 CoolPC 分類頁 HTML，回傳驗證結果、可入庫商品、異常問題與去重統計。
 export function parseCoolpcCategoryPage(
   html: string,
   context: SourceCategoryContext,
@@ -135,8 +140,8 @@ export function parseCoolpcCategoryPage(
     const existingItem = seenItemsBySourceKey.get(sourceProductKey);
 
     if (existingItem) {
-      // CoolPC can repeat the exact same row in one category page. Exact repeats
-      // are harmless, but the same token with different data would corrupt identity.
+      // 同一分類頁可能重複出現同一列；同 token 同資料可去重忽略，
+      // 但同 token 對應不同內容時視為身份衝突，需標記為致命問題。
       if (existingItem.name === name && existingItem.price === price) {
         deduplicatedItemCount += 1;
         continue;

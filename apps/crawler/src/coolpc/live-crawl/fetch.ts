@@ -4,6 +4,24 @@
 import type { CoolpcCategorySnapshotInput } from "../category-snapshot";
 import { decodeCoolpcHtml } from "../parser";
 
+/**
+ * CoolPC live crawl 抓取契約
+ * 1) 回傳值為 CoolpcCategorySnapshotInput：
+ *    - url / fetchedAt：本次抓取識別資訊
+ *    - httpStatus：成功連線時為 HTTP 狀態碼；若請求失敗或中斷則為 null
+ *    - rawHtml：成功讀取 body 且未發生可中斷例外時為 decode 後 HTML；否則為 null
+ *    - fetchError：null 表示可繼續流程；非 null 包含失敗原因
+ * 2) fetchError 可能包含：
+ *    - "HTTP <status>"：HTTP 非 2xx
+ *    - 例外格式化內容（timeout、DNS、TLS、連線中斷、body 超過上限等）
+ * 3) 重試規則：
+ *    - 先以 retryDelaysMs 決定最大嘗試次數
+ *    - 預設只要非「body 超過上限」都會重試；命中上限即直接回傳錯誤
+ *    - 超過最大重試時才會進入不可達邏輯（理論上不應到達）
+ * 4) safety 邊界：
+ *    - 固定最大 response 大小，避免單筆抓取拖垮流程記憶體
+ */
+
 // 限制單次抓取可接受的最大 response bytes，避免異常大頁面拖累整輪抓取流程。
 export const MAX_COOLPC_RESPONSE_BODY_BYTES = 5 * 1024 * 1024;
 
@@ -15,7 +33,6 @@ interface CoolpcFetchRetryOptions {
   sleep?: (ms: number) => Promise<void>;
 }
 
-// 讀取 HTTP response body 時以 stream 逐塊累加，並限制最大位元組數以避免 memory 溢位。
 export async function readResponseBodyWithLimit(
   response: Response,
   maxBytes = MAX_COOLPC_RESPONSE_BODY_BYTES,
@@ -66,7 +83,6 @@ export async function readResponseBodyWithLimit(
   return bytes;
 }
 
-// 以固定 header 發送 live request，保留 retry 與 timeout 行為；成功回傳 raw html，失敗則回傳 fetchError。
 export async function fetchLiveCategorySnapshot(
   igrp: number,
   fetchedAt: Date,
@@ -126,7 +142,6 @@ export async function fetchLiveCategorySnapshot(
   throw new Error("Unreachable CoolPC fetch retry state.");
 }
 
-// 格式化 fetch 錯誤為可持久化訊息，保留 name / message / cause，便於後續排障與對帳。
 export function formatCoolpcFetchError(error: unknown): string {
   if (!(error instanceof Error)) {
     return String(error);
@@ -151,7 +166,6 @@ export function formatCoolpcFetchError(error: unknown): string {
   return parts.join(" ");
 }
 
-// 只解析合法且完整的 `content-length`，否則回傳 null 讓後續以實際 stream 大小保護。
 function parseContentLength(value: string | null): number | null {
   if (!value) {
     return null;
@@ -174,7 +188,6 @@ async function cancelReader(reader: ReadableStreamDefaultReader<Uint8Array>): Pr
   }
 }
 
-// 區分可重試與不可重試錯誤；大小限制錯誤屬於輸入端上限問題，不再重試。
 function isRetryableCoolpcFetchError(error: unknown): boolean {
   if (!(error instanceof Error)) {
     return true;
@@ -187,7 +200,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-// 預設 sleep 實作，保留可測試替換（例如 fake timer 或快速延遲）。
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }

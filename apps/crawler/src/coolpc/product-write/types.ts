@@ -1,6 +1,8 @@
 // apps/crawler/src/coolpc/product-write/types.ts
+// 定義 CoolPC 產品觀測寫入流程所需的輸入/輸出與資料寫入介面，讓流程邏輯與資料存取邊界解耦。
 import type { ParsedCoolpcProduct } from "../parser";
 
+// 寫入一次分類結果的輸入參數：含 crawl run 追蹤、原始快照、分類 ID 及已解析商品清單。
 export interface WriteCoolpcCategoryProductObservationOptions {
   client: CoolpcProductWriteClient;
   crawlRunId: string;
@@ -10,6 +12,7 @@ export interface WriteCoolpcCategoryProductObservationOptions {
   parsedProducts: ParsedCoolpcProduct[];
 }
 
+// 單次分類寫入的結果摘要，供上游彙總與排程監控顯示。
 export interface WriteCoolpcCategoryProductObservationResult {
   processedItemCount: number;
   createdProductCount: number;
@@ -21,12 +24,12 @@ export interface WriteCoolpcCategoryProductObservationResult {
   markedInactiveProductCount: number;
 }
 
-// Keep this client shape limited to the delegates this slice actually writes.
-// That avoids binding the product writer to a full PrismaClient in unit tests.
+// 僅保留寫入流程實際會使用的 Prisma delegates，避免商品寫入模組綁死整個 PrismaClient（測試可替代注入）。
 export interface CoolpcProductWriteClient extends CoolpcProductWriteDelegates {
   $transaction<T>(operation: (client: CoolpcProductWriteDelegates) => Promise<T>): Promise<T>;
 }
 
+// Prisma 寫入委派方法集合：product、priceSnapshot、currentPrice 在此模組共用的最小介面。
 export interface CoolpcProductWriteDelegates {
   product: {
     findUnique(args: {
@@ -90,6 +93,7 @@ export interface ExistingProductForPriceWrite {
   } | null;
 }
 
+// 缺漏判斷只需要的欄位集合（active 狀態與缺漏計數）。
 export interface ExistingProductForMissingWrite {
   id: string;
   ibuyToken: string;
@@ -105,6 +109,7 @@ export interface ExistingCurrentPriceSnapshot {
   currency: ParsedCoolpcProduct["currency"];
 }
 
+// 建立新產品時固定寫入的欄位：新品一律視為啟用，並重置缺漏相關欄位。
 export interface ProductCreateData {
   sourceCategoryId: string;
   ibuyToken: string;
@@ -122,6 +127,7 @@ export interface ProductCreateData {
   lastSeenAt: Date;
 }
 
+// 再次抓到既有產品時更新的欄位，維持既有商品 identity，但更新可觀測到的顯示/連結資訊。
 export interface ProductSeenUpdateData {
   name: string;
   normalizedName: string;
@@ -136,6 +142,7 @@ export interface ProductSeenUpdateData {
   lastSeenAt: Date;
 }
 
+// 連續缺漏時用來標記停用與遞增缺漏次數。
 export interface ProductMissingUpdateData {
   isActive: boolean;
   missingSince: Date;
@@ -144,6 +151,7 @@ export interface ProductMissingUpdateData {
 
 export type ProductUpdateData = ProductSeenUpdateData | ProductMissingUpdateData;
 
+// 價格快照是變價歷史的最小單位：每次判定變價都新增一筆快照。
 export interface PriceSnapshotCreateData {
   productId: string;
   price: number;
@@ -153,6 +161,7 @@ export interface PriceSnapshotCreateData {
   rawSnapshotId: string | null;
 }
 
+// current_price 維持「目前可見價格」與觀測時間，並指向對應快照。
 export interface CurrentPriceCreateData {
   productId: string;
   priceSnapshotId: string;

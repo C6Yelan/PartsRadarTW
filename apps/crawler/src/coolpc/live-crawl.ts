@@ -1,4 +1,5 @@
 // apps/crawler/src/coolpc/live-crawl.ts
+// Live crawl 進入點：驗證基礎設定、逐分類抓取頁面（可重播 raw），並將結果交由 crawl-run 與 snapshot 寫入流程。
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { PrismaClient } from "@partsradar/db";
@@ -60,6 +61,9 @@ export {
   readResponseBodyWithLimit,
 } from "./live-crawl/fetch";
 
+/**
+ * 執行單次 CoolPC 類別抓取流程：先驗證參數與環境，再逐分類抓取並交給 crawl-run 進行後續分類處理與狀態彙總。
+ */
 export async function runCoolpcCategoryCrawl({
   client,
   storageDir,
@@ -129,6 +133,9 @@ export async function assertSeededCategories(
   }
 }
 
+/**
+ * 驗證 CoolPC base URL：正式環境只允許官方 base，測試環境可選擇允許安全的非官方替代來源。
+ */
 export function validateCoolpcBaseUrl(
   baseUrl = DEFAULT_COOLPC_BASE_URL,
   options: ValidateCoolpcBaseUrlOptions = {},
@@ -175,6 +182,9 @@ export function validateRawReplayOptions({
   }
 }
 
+/**
+ * 驗證 delay / timeout 範圍：避免超出系統設計邊界造成過快封鎖或抓取超時失控。
+ */
 export function validateCrawlTimingOptions({
   delayMs,
   fetchTimeoutMs,
@@ -213,10 +223,16 @@ async function readRawCategorySnapshot(
   };
 }
 
+/**
+ * 以 Promise 包裝 setTimeout，作為分類間人工節流的阻塞點，避免短時間大量請求壓力。
+ */
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/**
+ * 檢查輸入是否為整數並在 min/max 內，提供 fail-fast 的設定驗證。
+ */
 function validateIntegerRange(label: string, value: number, min: number, max: number): number {
   if (!Number.isInteger(value)) {
     throw new Error(`${label} must be an integer.`);

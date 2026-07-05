@@ -1,11 +1,19 @@
 // apps/crawler/src/coolpc/categories.ts
+// 建立 CoolPC 目標分類共用資料：提供 parser 與手動驗證流程可用的 IGrp 對照、中文顯示名稱，並保留部分分類的頁面名稱預檢關鍵字。
+
 export interface CoolpcTargetCategory {
+  // IGrp：原價屋分類頁的 query 參數值，作為抓取目標定位鍵。
   igrp: number;
+  // 類別原始名稱，通常對齊原價屋分類標題，供報表與手動工具辨識。
   sourceName: string;
+  // 站內/後續 UI 顯示用名稱。
   displayName: string;
+  // 可選：該分類頁常見有效頁面標題片段，用於內容驗證與誤抓擋位偵測。
   expectedTitleKeywords?: readonly string[];
 }
 
+// 目前為 parser 與 manual 驗證共同維護的目標分類清單；
+// 缺失者會被視為「未抓取」而非「可預設支援」。
 export const COOLPC_TARGET_CATEGORIES = [
   {
     igrp: 4,

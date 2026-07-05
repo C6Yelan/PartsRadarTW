@@ -1,4 +1,5 @@
 // apps/crawler/src/coolpc/crawl-run.ts
+// 這是 crawler 的主流程總管：建立一次 crawlRun、逐分類呼叫處理器並彙整結果，最後回傳整體狀態。
 import type { PrismaClient } from "@partsradar/db";
 import {
   CRAWL_RUN_CATEGORY_RESULT_STATUSES,
@@ -11,8 +12,7 @@ import {
   type CrawlTriggerTypeValue,
 } from "./crawl-run/status";
 
-// This module owns crawl-run orchestration. Raw snapshot and product/price
-// writes stay in dedicated modules so their persistence rules are tested separately.
+// 類別處理流程與狀態常數集中重導出，raw snapshot / 商品價格寫入維持在專門模組，保留可測試邊界。
 export {
   CRAWL_RUN_CATEGORY_RESULT_STATUSES,
   CRAWL_RUN_STATUSES,
@@ -130,8 +130,7 @@ export function runCoolpcCrawlOnceWithPrisma(
     client: PrismaCrawlRunWriteClient;
   },
 ): Promise<RunCoolpcCrawlOnceResult> {
-  // Keep the core runner dependency-injected for unit tests while still exposing
-  // a Prisma-typed entry point for real crawler wiring.
+  // 核心 runner 採依賴注入，方便測試；同時保留 Prisma 進入點給實際排程流程使用。
   return runCoolpcCrawlOnce(options);
 }
 
@@ -188,8 +187,7 @@ export async function runCoolpcCrawlOnce({
       productWriteSummary: result.productWriteSummary ?? null,
     });
 
-    // Suspected block means the source may be serving non-product content. Stop
-    // the current cycle before later categories can overwrite valid data.
+    // 只要該分類判定疑似封鎖，先停止後續循環，避免繼續抓取時誤判正常分類而寫入混淆資料。
     if (result.status === CRAWL_RUN_CATEGORY_RESULT_STATUSES.SUSPECTED_BLOCK) {
       stoppedBySuspectedBlock = true;
       break;
@@ -226,8 +224,7 @@ async function updateSourceCategoryCheckTimestamps({
 }): Promise<void> {
   const data: { lastCheckedAt: Date; lastSuccessAt?: Date } = { lastCheckedAt: checkedAt };
 
-  // Failed, blocked, or parser-broken categories were attempted, but they did
-  // not produce a trustworthy product list. Keep last_success_at unchanged.
+  // 只在成功分類才更新 lastSuccessAt；失敗、封鎖、解析失敗只更新 lastCheckedAt，避免把不可信結果當成成功時間。
   if (isSuccessStatus(status)) {
     data.lastSuccessAt = checkedAt;
   }
@@ -248,8 +245,7 @@ async function processCategorySafely({
   try {
     return await processCategory({ crawlRunId, category });
   } catch (error) {
-    // Unexpected processing errors are recorded as parse failures for this
-    // category; the runner can still finish the cycle summary consistently.
+    // 未預期錯誤會被降級為此分類 PARSE_FAILED，確保整輪能持續回報完整結果彙總。
     return {
       status: CRAWL_RUN_CATEGORY_RESULT_STATUSES.PARSE_FAILED,
       errorMessage: error instanceof Error ? error.message : "Unknown crawler processing error.",

@@ -35,7 +35,13 @@ export type CrawlRunCategoryResultStatusValue =
 
 /**
  * 依 category result 聚合判斷整體 crawl run 狀態。
- * suspected_block 擁有最高優先權，成功與失敗會依結果比例推導。
+ * 優先權順序（由高到低）：
+ * 1) suspected_block：只要有一筆即代表整體應立即標記為阻斷。
+ * 2) 成功比例：全部都是 success => 回傳 SUCCESS_CHANGED 或 SUCCESS_UNCHANGED。
+ * 3) 成功+失敗混合：回傳 SUCCESS_WITH_ERRORS。
+ * 4) 全部非成功且有 parse 失敗 => PARSE_FAILED。
+ * 5) 全部非成功且有 fetch 失敗 => FETCH_FAILED。
+ * 6) 其餘情境 => SUCCESS_UNCHANGED（包含空結果陣列，若要調整需同步監控與告警語意）。
  */
 export function resolveCrawlRunStatus(
   results: Array<{ status: CrawlRunCategoryResultStatusValue }>,

@@ -1,4 +1,5 @@
 // apps/crawler/src/coolpc/product-write/item-writer.ts
+// 角色：將單筆已解析的 Coolpc 商品觀測資料，寫入商品主檔並同步價格歷史與 current_price 狀態。
 import type { ParsedCoolpcProduct } from "../parser";
 import type {
   CoolpcProductWriteDelegates,
@@ -29,11 +30,11 @@ export async function writeObservedProduct({
   rawSnapshotId: string | null;
   parsedProduct: ParsedCoolpcProduct;
 }): Promise<ObservedProductWriteResult> {
+  // 每次抓到一筆商品時，先以 sourceCategoryId + ibuyToken 判斷是否已存在商品記錄。
   const existingProduct = await findProduct(client, parsedProduct);
 
   if (!existingProduct) {
-    // First sighting must create the complete read path in one pass:
-    // product -> price_snapshot -> current_price.
+    // 首次看到此商品時，用一個流程建立：商品主檔 -> 價格快照 -> current_price。
     const productId = await createProductWithCurrentPrice({
       client,
       crawlRunId,
@@ -88,8 +89,7 @@ export async function writeObservedProduct({
     };
   }
 
-  // Same price means the product is still present, but price history should not
-  // grow with duplicate snapshots on every crawl.
+  // 價格未變，代表商品仍存在；不新增快照避免歷史資料在每次爬取時重複膨脹。
   await client.currentPrice.update({
     where: { productId: existingProduct.id },
     data: { lastSeenAt: parsedProduct.fetchedAt },
@@ -109,8 +109,8 @@ function findProduct(
   client: CoolpcProductWriteDelegates,
   parsedProduct: ParsedCoolpcProduct,
 ): Promise<ExistingProductForPriceWrite | null> {
-  // The current price row points to the latest price snapshot. Loading that
-  // snapshot lets us decide whether this crawl needs a new history row.
+  // 先抓出既有商品，並一併帶回目前最新的 current_price 與對應快照，
+  // 供價格是否異動的判斷使用。
   return client.product.findUnique({
     where: {
       sourceCategoryId_ibuyToken: {
@@ -139,6 +139,7 @@ async function createProductWithCurrentPrice({
   rawSnapshotId: string | null;
   parsedProduct: ParsedCoolpcProduct;
 }): Promise<string> {
+  // 新增商品時，需同時建立第一筆價格快照，並立即建立 current_price 指向它。
   const product = await client.product.create({
     data: createProductData(parsedProduct),
     select: { id: true },
@@ -161,9 +162,8 @@ function updateProductSeenData(
   productId: string,
   parsedProduct: ParsedCoolpcProduct,
 ): Promise<{ id: string }> {
-  // A successfully parsed item means the product is present again. If it had
-  // been counted as missing or marked inactive, the same source identity resumes
-  // its existing price history instead of creating a replacement product.
+  // 商品重新被解析到，更新最後看到時間、名稱、網址等欄位並恢復啟用，
+  // 不重建商品資料，保留既有價格歷史。
   return client.product.update({
     where: { id: productId },
     data: buildProductSeenUpdateData(parsedProduct),
@@ -172,6 +172,7 @@ function updateProductSeenData(
 }
 
 function buildProductSeenUpdateData(parsedProduct: ParsedCoolpcProduct): ProductSeenUpdateData {
+  // 組裝「再次看到」時的更新欄位；若缺少圖片時不清空既有 primaryImageUrl。
   return {
     name: parsedProduct.name,
     normalizedName: parsedProduct.normalizedName,
@@ -204,6 +205,7 @@ function createPriceSnapshot({
   productId: string;
   parsedProduct: ParsedCoolpcProduct;
 }): Promise<{ id: string }> {
+  // 價格異動時建立新的價格快照，保留變價軌跡與爬取來源關聯。
   return client.priceSnapshot.create({
     data: {
       productId,
@@ -223,6 +225,7 @@ function createCurrentPrice(
   priceSnapshotId: string,
   seenAt: Date,
 ): Promise<{ productId: string }> {
+  // 建立 current_price 的初始狀態，lastSeenAt 與 priceChangedAt 使用同一抓取時間。
   return client.currentPrice.create({
     data: {
       productId,
@@ -235,6 +238,7 @@ function createCurrentPrice(
 }
 
 function createProductData(parsedProduct: ParsedCoolpcProduct): ProductCreateData {
+  // 組裝商品建檔資料，將狀態設為啟用並重置缺漏相關欄位。
   return {
     sourceCategoryId: parsedProduct.sourceCategoryId,
     ibuyToken: parsedProduct.ibuyToken,
@@ -257,6 +261,7 @@ function hasPriceChanged(
   currentSnapshot: ExistingCurrentPriceSnapshot | null,
   parsedProduct: ParsedCoolpcProduct,
 ): boolean {
+  // 價格比對：若尚無 current snapshot，或價格、幣別任一不同都視為變動。
   return (
     !currentSnapshot ||
     currentSnapshot.price !== parsedProduct.price ||

@@ -1,4 +1,6 @@
 // apps/crawler/src/coolpc/raw-snapshot-writer.ts
+// 提供 Coolpc raw snapshot 的壓縮內容存檔與去重流程，包含快取查詢、雜湊產生與寫入結果回報。
+
 import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -86,8 +88,7 @@ export function recordRawSnapshotWithPrisma(
     client: PrismaRawSnapshotWriteClient;
   },
 ): Promise<RecordRawSnapshotResult> {
-  // Keep the storage writer dependency-injected for tests while exposing a
-  // Prisma-typed entry point for the real crawler flow.
+  // 以可注入的 writer client 便於測試，並提供 Prisma 型別入口供實際 crawler 流程使用。
   return recordRawSnapshot(options);
 }
 
@@ -106,8 +107,7 @@ export async function recordRawSnapshot({
 }: RecordRawSnapshotOptions): Promise<RecordRawSnapshotResult> {
   const contentBuffer = rawContent === null ? null : toBuffer(rawContent);
   const contentHash = contentBuffer ? createSha256Hash(contentBuffer) : null;
-  // Raw content hash controls file deduplication. Metadata is still inserted
-  // for every fetch so each crawl run remains traceable.
+  // 以 content hash 進行快照去重；不論是否重複，都記錄一筆 metadata 以保留每次抓取可追溯性。
   const existingSnapshot = contentHash ? await findExistingSnapshot(client, contentHash) : null;
   const compressedHtmlPath =
     existingSnapshot?.compressedHtmlPath ??
@@ -115,8 +115,7 @@ export async function recordRawSnapshot({
   const duplicateOfSnapshotId = existingSnapshot?.id ?? null;
   let wroteCompressedFile = false;
 
-  // Fetch failures may have no body; in that case we only record metadata and
-  // skip file creation instead of manufacturing an empty snapshot file.
+  // 失敗回應常無抓取本文，這裡僅寫入 metadata，不建立空白快照檔，避免污染資料。
   if (contentBuffer && !existingSnapshot && compressedHtmlPath) {
     await writeCompressedHtml({
       storageDir,
@@ -152,8 +151,7 @@ export async function recordRawSnapshot({
 }
 
 export function createParsedResultHash(value: unknown): string {
-  // Phase 3 uses this to distinguish changed vs unchanged parsed products
-  // without comparing raw HTML, which can vary for layout-only reasons.
+  // 以 JSON 序列化後的內容雜湊判斷解析結果是否變更，避免因頁面版面變化造成的重複比對誤判。
   return createSha256Hash(Buffer.from(JSON.stringify(value), "utf8"));
 }
 
@@ -162,8 +160,7 @@ function createSha256Hash(content: Buffer): string {
 }
 
 function createCompressedHtmlPath(contentHash: string): string {
-  // Content-addressed paths make duplicate detection independent of crawl time
-  // and keep the stored filename free of source query details.
+  // 以 content hash 決定儲存路徑，避免同一內容因抓取時間或 query 參數不同而重複落地。
   return `${SNAPSHOT_SUBDIR}/${contentHash}.html.gz`;
 }
 

@@ -1,15 +1,20 @@
 // apps/crawler/src/coolpc/vendor-classification.ts
+// 管理 Coolpc 商品品牌分類規則，依 IGRP 取得候選品牌並從商品名稱推斷來源廠商。
+
 export interface ProductVendorRule {
+  // 單一品牌規則，包含品牌代號、顯示名稱與匹配關鍵字。
   slug: string;
   name: string;
   keywords: readonly string[];
 }
 
 export interface ProductVendorMatch {
+  // 品牌匹配結果的最小資料。
   slug: string;
   name: string;
 }
 
+// 依 IGRP（商品分類）預置的品牌匹配規則表，供解析器進行前置判斷。
 export const PRODUCT_VENDOR_RULES_BY_IGRP: Record<number, readonly ProductVendorRule[]> = {
   4: [
     { slug: "amd", name: "AMD", keywords: ["AMD"] },
@@ -238,6 +243,7 @@ export const PRODUCT_VENDOR_RULES_BY_IGRP: Record<number, readonly ProductVendor
 export function getProductVendorRules(
   igrp: number | string | null | undefined,
 ): readonly ProductVendorRule[] {
+  // 先將 IGRP 正規化；無效輸入直接回空清單，避免無效規則查詢。
   const normalizedIgrp = normalizeIgrp(igrp);
 
   if (normalizedIgrp === null) {
@@ -251,6 +257,7 @@ export function classifyProductVendor(
   igrp: number | string | null | undefined,
   productName: string,
 ): ProductVendorMatch | null {
+  // 先清除來源標籤再做品牌匹配；未匹配到則回傳 null。
   const normalizedName = normalizeProductVendorText(stripLeadingSourceLabels(productName));
 
   if (!normalizedName) {
@@ -271,6 +278,7 @@ export function classifyProductVendor(
 }
 
 function normalizeIgrp(igrp: number | string | null | undefined): number | null {
+  // 將 IGRP 轉成純數字；非法或空值直接回傳 null，避免無效 lookup。
   if (typeof igrp === "number") {
     return Number.isInteger(igrp) ? igrp : null;
   }
@@ -283,9 +291,11 @@ function normalizeIgrp(igrp: number | string | null | undefined): number | null 
 }
 
 function stripLeadingSourceLabels(value: string): string {
+  // 移除商品名稱前綴的來源標籤（如 [活動]、【門市限定】），避免前綴干擾品牌判斷。
   return value.replace(/^(\s*(?:\[[^\]]+\]|【[^】]+】)\s*)+/u, "").trim();
 }
 
 function normalizeProductVendorText(value: string): string {
+  // 將空白壓縮、去首尾空白，並轉小寫，提供穩定的品牌關鍵字比對字串。
   return value.replace(/\s+/g, " ").trim().toLocaleLowerCase("zh-TW");
 }
