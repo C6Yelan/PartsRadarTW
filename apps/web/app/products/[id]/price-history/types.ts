@@ -5,6 +5,7 @@ export type PriceHistoryRange = PriceHistoryRangeDays | "all";
 export type PriceHistoryRangeKey = "7d" | "30d" | "90d" | "all";
 export type PriceSignalTone = "low" | "high" | "middle" | "flat";
 export type PriceRecordTone = "down" | "up";
+export type PriceHistoryObservationType = "price_snapshot" | "current_price_confirmation";
 
 export interface ProductPriceHistoryBody {
   productId: string;
@@ -28,7 +29,8 @@ export interface PriceHistoryPoint {
   amount: number;
   currency: "TWD";
   observedAt: string;
-  source: "price_snapshot" | "current_price_confirmation";
+  observationType: PriceHistoryObservationType;
+  source: PriceHistoryObservationType;
 }
 
 export interface PriceHistorySummaryPoint {

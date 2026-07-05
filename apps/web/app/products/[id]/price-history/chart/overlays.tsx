@@ -38,7 +38,9 @@ export function HistoryTooltip({
     <div className="history-tooltip" style={{ left, top }}>
       <span>{formatTooltipDate(point.observedAt)}</span>
       <strong>{formatPrice(point.amount)}</strong>
-      <small>{`${formatPointSource(point.source)} · ${formatSignedPercent(point.percentChange)}`}</small>
+      <small>{`${formatPointSource(point.observationType)} · ${formatSignedPercent(
+        point.percentChange,
+      )}`}</small>
     </div>
   );
 }

@@ -1,11 +1,7 @@
 "use client";
 // apps/web/app/products/[id]/price-history/chart.tsx
 
-import {
-  formatCompactDate,
-  getInsufficientDataMessage,
-  getPointAriaLabel,
-} from "./format";
+import { formatCompactDate, getInsufficientDataMessage, getPointAriaLabel } from "./format";
 import type {
   ChartModel,
   HistoryViewSummary,
@@ -80,7 +76,7 @@ export function PriceHistoryChart({
               {chart.points.map((point) => (
                 <circle
                   className={`history-chart-point ${
-                    point.source === "current_price_confirmation" ? "is-confirmation" : ""
+                    point.observationType === "current_price_confirmation" ? "is-confirmation" : ""
                   } ${activePointKey === point.key ? "is-active" : ""}`}
                   key={point.key}
                   cx={point.x}

@@ -10,9 +10,9 @@ export function getInsufficientDataMessage() {
 }
 
 export function getPointAriaLabel(point: ChartPoint) {
-  return `${formatPointSource(point.source)}，${formatTooltipDate(point.observedAt)}，${formatPrice(
-    point.amount,
-  )}`;
+  return `${formatPointSource(point.observationType)}，${formatTooltipDate(
+    point.observedAt,
+  )}，${formatPrice(point.amount)}`;
 }
 
 export function formatPrice(amount: number) {
@@ -79,6 +79,6 @@ export function formatTooltipDate(value: string) {
   }).format(new Date(value));
 }
 
-export function formatPointSource(source: PriceHistoryPoint["source"]) {
-  return source === "price_snapshot" ? "價格變動" : "價格確認";
+export function formatPointSource(observationType: PriceHistoryPoint["observationType"]) {
+  return observationType === "price_snapshot" ? "價格變動" : "價格確認";
 }

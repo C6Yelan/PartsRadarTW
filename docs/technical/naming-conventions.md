@@ -44,7 +44,7 @@
 
 - `source.url`：public 商品 response 的查看 / 購買連結。內部新變數應叫 `purchaseUrl`。
 - `ProductPurchaseLinkTarget`：link checker 目前產生的檢查目標，代表 public `source.url` 的原價屋查看 / 購買連結，不是任意產品連結集合。
-- price-history point 的 `source`：表示價格觀測點來源，例如 `price_snapshot` 或 `current_price_confirmation`。若未來調整 public API，可考慮改成 `observationType`，但不得在未版本化的情況下直接破壞既有 response。
+- price-history point 的 `observationType`：表示價格觀測點來源，例如 `price_snapshot` 或 `current_price_confirmation`。`source` 仍是相同值的 public API 相容 alias；內部新程式碼應使用 `observationType`。
 - DB enum `ProductLinkKind.SOURCE`：目前 map 到 `source`，但語意是 public `source.url` link health，不是 `products.source_url`。
 
 ## File Path Comments

@@ -2,11 +2,14 @@
 import type { PriceHistoryProductRecord, PriceHistorySnapshotRecord } from "./data";
 import type { PriceHistoryRange } from "./query";
 
+type PriceHistoryObservationType = "price_snapshot" | "current_price_confirmation";
+
 interface PriceHistoryPointResponse {
   amount: number;
   currency: "TWD";
   observedAt: string;
-  source: "price_snapshot" | "current_price_confirmation";
+  observationType: PriceHistoryObservationType;
+  source: PriceHistoryObservationType;
 }
 
 interface PriceHistorySummaryPoint {
@@ -78,7 +81,8 @@ function toPriceHistoryPoints(
     amount: snapshot.price,
     currency: snapshot.currency,
     observedAt: snapshot.capturedAt.toISOString(),
-    source: "price_snapshot" as const,
+    observationType: "price_snapshot",
+    source: "price_snapshot",
   }));
 
   if (!currentPrice || (since && currentPrice.lastSeenAt.getTime() < since.getTime())) {
@@ -98,6 +102,7 @@ function toPriceHistoryPoints(
     amount: currentPrice.priceSnapshot.price,
     currency: currentPrice.priceSnapshot.currency,
     observedAt: currentPrice.lastSeenAt.toISOString(),
+    observationType: "current_price_confirmation",
     source: "current_price_confirmation",
   });
 

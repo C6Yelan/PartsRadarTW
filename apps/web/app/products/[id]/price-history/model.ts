@@ -143,7 +143,8 @@ function createChartMarkers(points: ChartPoint[], summary: HistoryViewSummary): 
   const markers: ChartMarker[] = [];
   const lowest = summary.lowest ? findChartPoint(points, summary.lowest) : null;
   const highest = summary.highest ? findChartPoint(points, summary.highest) : null;
-  const hasRange = summary.lowest && summary.highest && summary.lowest.amount !== summary.highest.amount;
+  const hasRange =
+    summary.lowest && summary.highest && summary.lowest.amount !== summary.highest.amount;
 
   if (hasRange && lowest) {
     markers.push({ key: `lowest-${lowest.key}`, label: "最低", point: lowest, tone: "low" });
@@ -167,7 +168,7 @@ function createChangeRecords(points: PriceHistoryPoint[]): PriceChangeRecord[] {
   let previousPriceSnapshot: PriceHistoryPoint | null = null;
 
   for (const point of points) {
-    if (point.source === "current_price_confirmation") {
+    if (point.observationType === "current_price_confirmation") {
       continue;
     }
 
@@ -208,7 +209,9 @@ function getRangePositionPercent(
 
   return Math.min(
     Math.max(
-      Number((((latest.amount - lowest.amount) / (highest.amount - lowest.amount)) * 100).toFixed(2)),
+      Number(
+        (((latest.amount - lowest.amount) / (highest.amount - lowest.amount)) * 100).toFixed(2),
+      ),
       0,
     ),
     100,
@@ -260,7 +263,7 @@ function getRecordLabel(deltaAmount: number) {
 }
 
 function getPointKey(point: PriceHistoryPoint) {
-  return `${point.observedAt}-${point.amount}-${point.source}`;
+  return `${point.observedAt}-${point.amount}-${point.observationType}`;
 }
 
 function getPercentChange(amount: number, baseAmount: number) {

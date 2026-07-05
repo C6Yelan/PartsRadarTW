@@ -179,8 +179,9 @@ Response shape：
 - `days` 以目前時間回推，且只接受固定 allowlist，避免任意大型歷史查詢。
 - 價格歷史只讀 `price_snapshots` 與 `current_prices`，不觸發 crawler，也不依賴 raw snapshot 檔案。
 - `points` 依 `observedAt` 由舊到新排序。
-- `source = "price_snapshot"` 代表新商品或價格變動建立的 snapshot。
-- 若目前價格在 snapshot 後又被 crawler 看到且未變價，加入 `source = "current_price_confirmation"` 確認點，讓 UI 能畫出水平線。
+- `observationType = "price_snapshot"` 代表新商品或價格變動建立的 snapshot。
+- 若目前價格在 snapshot 後又被 crawler 看到且未變價，加入 `observationType = "current_price_confirmation"` 確認點，讓 UI 能畫出水平線。
+- `source` 保留為與 `observationType` 相同值的相容欄位，既有 client 可繼續讀取。
 - 價格摘要只描述資料庫已記錄或確認的價格觀測點，不代表來源站更新頻率保證。
 
 ## `GET /api/product-images/{id}.webp`
