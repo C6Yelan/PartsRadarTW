@@ -4,10 +4,7 @@
 
 import type { ParseErrorType as PrismaParseErrorType } from "@partsradar/db";
 import { COOLPC_TARGET_CATEGORIES, type CoolpcTargetCategory } from "../categories";
-import {
-  CRAWL_RUN_CATEGORY_RESULT_STATUSES,
-  type CrawlRunSourceCategory,
-} from "../crawl-run";
+import { CRAWL_RUN_CATEGORY_RESULT_STATUSES, type CrawlRunSourceCategory } from "../crawl-run";
 import type {
   ContentValidationStatus,
   CoolpcParseIssue,
@@ -39,7 +36,7 @@ const PRISMA_PARSE_ERROR_TYPES = {
 export function createCategoryContext(
   category: CrawlRunSourceCategory,
   fetchedAt: Date,
-  sourceUrl: string,
+  sourceCategoryUrl: string,
 ): SourceCategoryContext {
   const targetCategory: CoolpcTargetCategory | undefined = COOLPC_TARGET_CATEGORIES.find(
     (candidate) => candidate.igrp === category.igrp,
@@ -51,7 +48,7 @@ export function createCategoryContext(
     sourceName: category.sourceName,
     displayName: category.displayName,
     fetchedAt,
-    sourceUrl,
+    sourceCategoryUrl,
     expectedTitleKeywords: targetCategory?.expectedTitleKeywords
       ? [...targetCategory.expectedTitleKeywords]
       : undefined,

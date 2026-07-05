@@ -288,7 +288,7 @@ docker compose -f compose.yml -f compose.crawler.yml --profile maintenance logs 
 - `MAINTENANCE_INTERVAL_SECONDS`：maintenance cycle 間隔，預設 604800，允許 3600 到 604800。
 - `MAINTENANCE_INITIAL_DELAY_SECONDS`：daemon 啟動後第一次執行前的延遲，預設 900。
 - `MAINTENANCE_PRICE_PRIORITY_PAUSE_SECONDS`：因價格 crawler priority 暫停後多久再繼續，預設 300。
-- `MAINTENANCE_LINK_LIMIT`：每輪最多 link candidates，預設 200。
+- `MAINTENANCE_LINK_LIMIT`：每輪最多 purchase link targets，預設 200。
 - `MAINTENANCE_LINK_STALE_AFTER_HOURS`：link health due window，預設 168。
 - `MAINTENANCE_LINK_MIN_DELAY_MS` / `MAINTENANCE_LINK_MAX_DELAY_MS`：link live request delay，預設 10000 到 20000 ms。
 - `EXTERNAL_FETCH_LOCK_DIR`：crawler 與 maintenance 共用的外部抓取鎖路徑。

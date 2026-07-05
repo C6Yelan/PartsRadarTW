@@ -3,7 +3,7 @@ import type { ProductLinkCheckerOptions } from "../../../src/scripts/ops/product
 import {
   checkProductLinks,
   PRODUCT_LINK_KINDS,
-  type ProductLinkCandidate,
+  type ProductPurchaseLinkTarget,
   type ProductLinkHealthClient,
 } from "../../../src/scripts/ops/product-link-checker/processor";
 
@@ -14,13 +14,18 @@ describe("product link checker log levels", () => {
     const infoLines: string[] = [];
     const debugLines: string[] = [];
 
-    await checkProductLinks(fakeProductLinkHealthClient(), [linkCandidate()], productLinkOptions(), {
-      log: (message) => infoLines.push(message),
-      debugLog: (message) => debugLines.push(message),
-    });
+    await checkProductLinks(
+      fakeProductLinkHealthClient(),
+      [purchaseLinkTarget()],
+      productLinkOptions(),
+      {
+        log: (message) => infoLines.push(message),
+        debugLog: (message) => debugLines.push(message),
+      },
+    );
 
     expect(infoLines).toEqual([
-      "Selected 1 product link candidate(s).",
+      "Selected 1 product purchase link target(s).",
       "Mode: dry run; no external requests will be sent.",
       "",
     ]);
@@ -34,13 +39,13 @@ describe("product link checker log levels", () => {
     const debugLines: string[] = [];
     const options = { ...productLinkOptions(), dryRun: false };
 
-    await checkProductLinks(fakeProductLinkHealthClient(), [linkCandidate()], options, {
+    await checkProductLinks(fakeProductLinkHealthClient(), [purchaseLinkTarget()], options, {
       fetchLink: async () => ({ status: "ok", httpStatus: 200, errorMessage: null }),
       log: (message) => infoLines.push(message),
       debugLog: (message) => debugLines.push(message),
       now: () => NOW,
     });
-    await checkProductLinks(fakeProductLinkHealthClient(), [linkCandidate()], options, {
+    await checkProductLinks(fakeProductLinkHealthClient(), [purchaseLinkTarget()], options, {
       fetchLink: async () => ({
         status: "temporary_error",
         httpStatus: null,
@@ -60,7 +65,9 @@ describe("product link checker log levels", () => {
   });
 });
 
-function linkCandidate(overrides: Partial<ProductLinkCandidate> = {}): ProductLinkCandidate {
+function purchaseLinkTarget(
+  overrides: Partial<ProductPurchaseLinkTarget> = {},
+): ProductPurchaseLinkTarget {
   return {
     productId: "11111111-1111-1111-1111-111111111111",
     productName: "GPU RTX 4070",

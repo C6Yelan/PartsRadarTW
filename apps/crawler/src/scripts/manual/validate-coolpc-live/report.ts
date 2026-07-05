@@ -34,7 +34,7 @@ export interface ValidationSummary {
 export function createContext(
   category: CoolpcTargetCategory,
   fetchedAt: Date,
-  sourceUrl: string,
+  sourceCategoryUrl: string,
 ): SourceCategoryContext {
   return {
     sourceCategoryId: `manual-coolpc-igrp-${category.igrp}`,
@@ -42,7 +42,7 @@ export function createContext(
     sourceName: category.sourceName,
     displayName: category.displayName,
     fetchedAt,
-    sourceUrl,
+    sourceCategoryUrl,
     expectedTitleKeywords: category.expectedTitleKeywords
       ? [...category.expectedTitleKeywords]
       : undefined,

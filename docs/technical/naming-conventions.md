@@ -6,7 +6,8 @@
 
 - `source`：來源站或來源資料語境，第一版與第二版固定為 CoolPC / 原價屋。API 中 `source: "coolpc"` 是公開 attribution，不是 DB 多來源抽象。
 - `sourceCategory`：來源站分類，例如 CoolPC 的 `IGrp` 分類。DB / Prisma / crawler 使用 `sourceCategory`，不要改稱 `group`、`section` 或 `categorySource`。
-- `sourceUrl`：crawler / DB 內部保存的來源分類頁 URL。它代表資料被抓取的頁面，不代表使用者查看 / 購買連結。
+- `sourceCategoryUrl`：crawler / parser 內部傳遞的來源分類頁 URL。它代表資料被抓取的 `eachview.php?IGrp=...` 頁面，不代表使用者查看 / 購買連結。
+- `sourceUrl`：DB / Prisma 相容欄位，對應 `products.source_url`，內容仍是來源分類頁 URL。新增內部變數時優先使用 `sourceCategoryUrl`，只有在組 Prisma data shape 或 mapper 時保留 `sourceUrl`。
 - `purchaseUrl` 或 `coolpcPurchaseUrl`：由 `ibuyToken` 產生的 `evaluate.php?iBuy=...` 使用者查看 / 購買連結。新增內部變數時應使用這個語彙。
 - `source.url`：目前 public API / web model 的相容欄位，內容是查看 / 購買連結。不要在新內部變數中把它叫成 `sourceUrl`；若未來要改 public shape，需另做 API migration。
 - `linkKind`：外部連結健康檢查的 DB enum。現有 `SOURCE` 值代表 public API 的 `source.url` 查看 / 購買連結；新增程式註解時需說明它不是 `products.source_url`。
@@ -42,6 +43,7 @@
 下列名稱已是 public API 或 DB contract，短期內保留，但新增程式碼應避免擴大歧義：
 
 - `source.url`：public 商品 response 的查看 / 購買連結。內部新變數應叫 `purchaseUrl`。
+- `ProductPurchaseLinkTarget`：link checker 目前產生的檢查目標，代表 public `source.url` 的原價屋查看 / 購買連結，不是任意產品連結集合。
 - price-history point 的 `source`：表示價格觀測點來源，例如 `price_snapshot` 或 `current_price_confirmation`。若未來調整 public API，可考慮改成 `observationType`，但不得在未版本化的情況下直接破壞既有 response。
 - DB enum `ProductLinkKind.SOURCE`：目前 map 到 `source`，但語意是 public `source.url` link health，不是 `products.source_url`。
 

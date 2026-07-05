@@ -23,7 +23,7 @@ export interface SourceCategoryContext {
   sourceName: string;
   displayName: string;
   fetchedAt: Date;
-  sourceUrl?: string;
+  sourceCategoryUrl?: string;
   expectedTitleKeywords?: string[];
 }
 

@@ -6,18 +6,18 @@ import {
   PRODUCT_LINK_KINDS,
   PRODUCT_LINK_HEALTH_STATUSES,
   PRODUCT_LINK_SELECT,
-  type ProductLinkCandidate,
+  type ProductPurchaseLinkTarget,
   type ProductLinkHealthClient,
   type ProductLinkHealthRecord,
   type ProductLinkKindValue,
   type ProductLinkProductRecord,
 } from "./types";
 
-export async function readProductLinkCandidates(
+export async function readProductPurchaseLinkTargets(
   client: ProductLinkHealthClient,
   options: ProductLinkCheckerOptions,
   now = new Date(),
-): Promise<ProductLinkCandidate[]> {
+): Promise<ProductPurchaseLinkTarget[]> {
   const products = await client.product.findMany({
     where: {
       isActive: true,
@@ -33,58 +33,59 @@ export async function readProductLinkCandidates(
     orderBy: [{ sourceCategory: { igrp: "asc" } }, { id: "asc" }],
     take: undefined,
   });
-  const candidates = buildProductLinkCandidates(products, options, now);
+  const purchaseLinkTargets = buildProductPurchaseLinkTargets(products, options, now);
 
-  return options.limit === null ? candidates : candidates.slice(0, options.limit);
+  return options.limit === null ? purchaseLinkTargets : purchaseLinkTargets.slice(0, options.limit);
 }
 
-export function buildProductLinkCandidates(
+export function buildProductPurchaseLinkTargets(
   products: ProductLinkProductRecord[],
   options: ProductLinkCheckerOptions,
   now: Date,
-): ProductLinkCandidate[] {
+): ProductPurchaseLinkTarget[] {
   const staleBefore = new Date(now.getTime() - options.staleAfterHours * 60 * 60 * 1000);
-  const candidates: ProductLinkCandidate[] = [];
+  const purchaseLinkTargets: ProductPurchaseLinkTarget[] = [];
 
   for (const product of products) {
-    const links = buildProductLinks(product, options);
+    const purchaseLinks = buildProductPurchaseLinks(product, options);
 
-    for (const link of links) {
+    for (const purchaseLink of purchaseLinks) {
       const existingHealth =
-        product.linkHealthChecks.find((health) => health.linkKind === link.linkKind) ?? null;
+        product.linkHealthChecks.find((health) => health.linkKind === purchaseLink.linkKind) ??
+        null;
 
-      if (!shouldCheckLink(link.url, existingHealth, staleBefore)) {
+      if (!shouldCheckLink(purchaseLink.url, existingHealth, staleBefore)) {
         continue;
       }
 
-      candidates.push({
+      purchaseLinkTargets.push({
         productId: product.id,
         productName: product.name,
         categoryLabel: `${product.sourceCategory.displayName} IGrp=${product.sourceCategory.igrp}`,
-        linkKind: link.linkKind,
-        url: link.url,
+        linkKind: purchaseLink.linkKind,
+        url: purchaseLink.url,
         existingHealth,
       });
     }
   }
 
-  return candidates.sort(compareProductLinkCandidates);
+  return purchaseLinkTargets.sort(compareProductPurchaseLinkTargets);
 }
 
-function buildProductLinks(
+function buildProductPurchaseLinks(
   product: ProductLinkProductRecord,
   options: ProductLinkCheckerOptions,
 ): Array<{ linkKind: ProductLinkKindValue; url: string }> {
-  const links: Array<{ linkKind: ProductLinkKindValue; url: string }> = [];
+  const purchaseLinks: Array<{ linkKind: ProductLinkKindValue; url: string }> = [];
 
   if (options.kinds.includes(PRODUCT_LINK_KINDS.SOURCE)) {
-    links.push({
+    purchaseLinks.push({
       linkKind: PRODUCT_LINK_KINDS.SOURCE,
       url: createCoolpcPurchaseUrl(product.ibuyToken),
     });
   }
 
-  return links;
+  return purchaseLinks;
 }
 
 function shouldCheckLink(
@@ -99,17 +100,18 @@ function shouldCheckLink(
   );
 }
 
-function compareProductLinkCandidates(
-  left: ProductLinkCandidate,
-  right: ProductLinkCandidate,
+function compareProductPurchaseLinkTargets(
+  left: ProductPurchaseLinkTarget,
+  right: ProductPurchaseLinkTarget,
 ): number {
-  const priorityOrder = getCandidatePriority(left) - getCandidatePriority(right);
+  const priorityOrder = getPurchaseLinkTargetPriority(left) - getPurchaseLinkTargetPriority(right);
 
   if (priorityOrder !== 0) {
     return priorityOrder;
   }
 
-  const checkedAtOrder = getCandidateCheckedAtTime(left) - getCandidateCheckedAtTime(right);
+  const checkedAtOrder =
+    getPurchaseLinkTargetCheckedAtTime(left) - getPurchaseLinkTargetCheckedAtTime(right);
 
   if (checkedAtOrder !== 0) {
     return checkedAtOrder;
@@ -124,14 +126,14 @@ function compareProductLinkCandidates(
   return left.productId.localeCompare(right.productId);
 }
 
-function getCandidatePriority(candidate: ProductLinkCandidate): number {
-  if (!candidate.existingHealth || candidate.existingHealth.url !== candidate.url) {
+function getPurchaseLinkTargetPriority(target: ProductPurchaseLinkTarget): number {
+  if (!target.existingHealth || target.existingHealth.url !== target.url) {
     return 0;
   }
 
-  return candidate.existingHealth.status === PRODUCT_LINK_HEALTH_STATUSES.TEMPORARY_ERROR ? 1 : 2;
+  return target.existingHealth.status === PRODUCT_LINK_HEALTH_STATUSES.TEMPORARY_ERROR ? 1 : 2;
 }
 
-function getCandidateCheckedAtTime(candidate: ProductLinkCandidate): number {
-  return candidate.existingHealth?.checkedAt.getTime() ?? 0;
+function getPurchaseLinkTargetCheckedAtTime(target: ProductPurchaseLinkTarget): number {
+  return target.existingHealth?.checkedAt.getTime() ?? 0;
 }

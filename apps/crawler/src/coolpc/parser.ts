@@ -16,9 +16,9 @@ import type {
 } from "./parser/types";
 import {
   createCoolpcCategoryUrl,
-  createSourceItemKey,
+  createCoolpcSourceProductKey,
   normalizeCoolpcProductImageUrl,
-  sanitizeCoolpcSourceUrl,
+  sanitizeCoolpcSourceCategoryUrl,
 } from "./parser/urls";
 import { classifyProductVendor } from "./vendor-classification";
 
@@ -40,7 +40,7 @@ export {
 } from "./parser/normalization";
 export {
   createCoolpcCategoryUrl,
-  createSourceItemKey,
+  createCoolpcSourceProductKey,
   normalizeCoolpcProductImageUrl,
 } from "./parser/urls";
 
@@ -131,8 +131,8 @@ export function parseCoolpcCategoryPage(
       });
     }
 
-    const sourceItemKey = createSourceItemKey(context.igrp, ibuyToken);
-    const existingItem = seenItemsBySourceKey.get(sourceItemKey);
+    const sourceProductKey = createCoolpcSourceProductKey(context.igrp, ibuyToken);
+    const existingItem = seenItemsBySourceKey.get(sourceProductKey);
 
     if (existingItem) {
       // CoolPC can repeat the exact same row in one category page. Exact repeats
@@ -149,7 +149,7 @@ export function parseCoolpcCategoryPage(
         rawName: name,
         rawPriceText: candidate.rawPriceText,
         rawToken: ibuyToken,
-        sourceItemKey,
+        sourceItemKey: sourceProductKey,
       });
       continue;
     }
@@ -161,7 +161,7 @@ export function parseCoolpcCategoryPage(
       sourceName: context.sourceName,
       displayName: context.displayName,
       ibuyToken,
-      sourceItemKey,
+      sourceItemKey: sourceProductKey,
       name,
       normalizedName: normalizeProductName(name).toLocaleLowerCase("zh-TW"),
       vendorSlug: vendor?.slug ?? null,
@@ -169,13 +169,13 @@ export function parseCoolpcCategoryPage(
       primaryImageUrl,
       price,
       currency: "TWD",
-      sourceUrl: sanitizeCoolpcSourceUrl(
-        context.sourceUrl ?? createCoolpcCategoryUrl(context.igrp),
+      sourceUrl: sanitizeCoolpcSourceCategoryUrl(
+        context.sourceCategoryUrl ?? createCoolpcCategoryUrl(context.igrp),
       ),
       fetchedAt: context.fetchedAt,
     };
 
-    seenItemsBySourceKey.set(sourceItemKey, item);
+    seenItemsBySourceKey.set(sourceProductKey, item);
     items.push(item);
   }
 

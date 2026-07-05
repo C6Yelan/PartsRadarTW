@@ -5,13 +5,13 @@ import { fetchProductLink } from "./fetch";
 import {
   PRODUCT_LINK_HEALTH_STATUSES,
   type LinkCheckOutcome,
-  type ProductLinkCandidate,
+  type ProductPurchaseLinkTarget,
   type ProductLinkCheckerDependencies,
   type ProductLinkHealthClient,
   type ProductLinkHealthWriteData,
 } from "./types";
 
-export { buildProductLinkCandidates, readProductLinkCandidates } from "./candidates";
+export { buildProductPurchaseLinkTargets, readProductPurchaseLinkTargets } from "./candidates";
 export { fetchProductLink } from "./fetch";
 export {
   PRODUCT_LINK_HEALTH_STATUSES,
@@ -20,7 +20,7 @@ export {
 } from "./types";
 export type {
   LinkCheckOutcome,
-  ProductLinkCandidate,
+  ProductPurchaseLinkTarget,
   ProductLinkCheckerDependencies,
   ProductLinkHealthClient,
   ProductLinkHealthRecord,
@@ -31,12 +31,12 @@ export type {
 
 export async function checkProductLinks(
   client: ProductLinkHealthClient,
-  candidates: ProductLinkCandidate[],
+  purchaseLinkTargets: ProductPurchaseLinkTarget[],
   options: ProductLinkCheckerOptions,
   dependencies: ProductLinkCheckerDependencies = {},
 ): Promise<ProductLinkCheckerSummary> {
   const summary: ProductLinkCheckerSummary = {
-    selected: candidates.length,
+    selected: purchaseLinkTargets.length,
     checked: 0,
     dryRun: 0,
     ok: 0,
@@ -52,7 +52,7 @@ export async function checkProductLinks(
   const now = dependencies.now ?? (() => new Date());
   const shouldPause = dependencies.shouldPause ?? (() => false);
 
-  log(`Selected ${candidates.length} product link candidate(s).`);
+  log(`Selected ${purchaseLinkTargets.length} product purchase link target(s).`);
   log(
     options.dryRun
       ? "Mode: dry run; no external requests will be sent."
@@ -60,7 +60,7 @@ export async function checkProductLinks(
   );
   log("");
 
-  for (const candidate of candidates) {
+  for (const purchaseLinkTarget of purchaseLinkTargets) {
     if (await shouldPause()) {
       summary.pausedForPriority = true;
       log("Pausing product link health checks for a higher-priority external fetch task.");
@@ -69,7 +69,9 @@ export async function checkProductLinks(
 
     if (options.dryRun) {
       summary.dryRun += 1;
-      debugLog(`[dry-run] ${formatCandidate(candidate)} | ${candidate.url}`);
+      debugLog(
+        `[dry-run] ${formatPurchaseLinkTarget(purchaseLinkTarget)} | ${purchaseLinkTarget.url}`,
+      );
       continue;
     }
 
@@ -86,19 +88,19 @@ export async function checkProductLinks(
     }
 
     const checkedAt = now();
-    const outcome = await fetchLink(candidate.url, options);
-    const writeData = resolveNextProductLinkHealth(candidate, outcome, checkedAt, options);
+    const outcome = await fetchLink(purchaseLinkTarget.url, options);
+    const writeData = resolveNextProductLinkHealth(purchaseLinkTarget, outcome, checkedAt, options);
 
     await client.productLinkHealth.upsert({
       where: {
         productId_linkKind: {
-          productId: candidate.productId,
-          linkKind: candidate.linkKind,
+          productId: purchaseLinkTarget.productId,
+          linkKind: purchaseLinkTarget.linkKind,
         },
       },
       create: {
-        productId: candidate.productId,
-        linkKind: candidate.linkKind,
+        productId: purchaseLinkTarget.productId,
+        linkKind: purchaseLinkTarget.linkKind,
         ...writeData,
       },
       update: writeData,
@@ -110,26 +112,30 @@ export async function checkProductLinks(
     summary[toSummaryKey(writeData.status)] += 1;
 
     const statusSuffix =
-      writeData.httpStatus === null ? writeData.status : `${writeData.status} HTTP ${writeData.httpStatus}`;
+      writeData.httpStatus === null
+        ? writeData.status
+        : `${writeData.status} HTTP ${writeData.httpStatus}`;
     const statusLog = writeData.status === PRODUCT_LINK_HEALTH_STATUSES.OK ? debugLog : log;
-    statusLog(`[${statusSuffix}] ${formatCandidate(candidate)}`);
+    statusLog(`[${statusSuffix}] ${formatPurchaseLinkTarget(purchaseLinkTarget)}`);
   }
 
   return summary;
 }
 
 export function resolveNextProductLinkHealth(
-  candidate: ProductLinkCandidate,
+  purchaseLinkTarget: ProductPurchaseLinkTarget,
   outcome: LinkCheckOutcome,
   checkedAt: Date,
   options: Pick<ProductLinkCheckerOptions, "failureThreshold">,
 ): ProductLinkHealthWriteData {
   const existingHealth =
-    candidate.existingHealth?.url === candidate.url ? candidate.existingHealth : null;
+    purchaseLinkTarget.existingHealth?.url === purchaseLinkTarget.url
+      ? purchaseLinkTarget.existingHealth
+      : null;
 
   if (outcome.status === "ok") {
     return {
-      url: candidate.url,
+      url: purchaseLinkTarget.url,
       status: PRODUCT_LINK_HEALTH_STATUSES.OK,
       httpStatus: outcome.httpStatus,
       checkedAt,
@@ -147,7 +153,7 @@ export function resolveNextProductLinkHealth(
       : PRODUCT_LINK_HEALTH_STATUSES.TEMPORARY_ERROR;
 
   return {
-    url: candidate.url,
+    url: purchaseLinkTarget.url,
     status,
     httpStatus: outcome.httpStatus,
     checkedAt,
@@ -158,8 +164,8 @@ export function resolveNextProductLinkHealth(
   };
 }
 
-function formatCandidate(candidate: ProductLinkCandidate): string {
-  return `${candidate.linkKind.toLowerCase()} | ${candidate.productId} | ${candidate.categoryLabel} | ${candidate.productName}`;
+function formatPurchaseLinkTarget(target: ProductPurchaseLinkTarget): string {
+  return `${target.linkKind.toLowerCase()} | ${target.productId} | ${target.categoryLabel} | ${target.productName}`;
 }
 
 function randomDelayMs(minDelayMs: number, maxDelayMs: number): number {

@@ -14,8 +14,7 @@ export const PRODUCT_LINK_HEALTH_STATUSES = {
   TEMPORARY_ERROR: "TEMPORARY_ERROR",
 } as const;
 
-export type ProductLinkKindValue =
-  (typeof PRODUCT_LINK_KINDS)[keyof typeof PRODUCT_LINK_KINDS];
+export type ProductLinkKindValue = (typeof PRODUCT_LINK_KINDS)[keyof typeof PRODUCT_LINK_KINDS];
 export type ProductLinkHealthStatusValue =
   (typeof PRODUCT_LINK_HEALTH_STATUSES)[keyof typeof PRODUCT_LINK_HEALTH_STATUSES];
 
@@ -87,7 +86,7 @@ export interface ProductLinkHealthClient {
   };
 }
 
-export interface ProductLinkCandidate {
+export interface ProductPurchaseLinkTarget {
   productId: string;
   productName: string;
   categoryLabel: string;

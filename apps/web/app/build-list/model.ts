@@ -221,7 +221,7 @@ function normalizeBuildListProduct(value: Record<string, unknown>): BuildListPro
   const priceCapturedAt = normalizeIsoDate(value.price.capturedAt);
   const priceLastSeenAt = normalizeIsoDate(value.price.lastSeenAt);
   const sourceName = value.source.name;
-  const sourceUrl = toHttpUrl(value.source.url);
+  const purchaseUrl = toHttpUrl(value.source.url);
   const storedImage = normalizeBuildListImage(
     value.image,
     name ?? categoryDisplayName ?? "商品圖片",
@@ -240,7 +240,7 @@ function normalizeBuildListProduct(value: Record<string, unknown>): BuildListPro
     !priceCapturedAt ||
     !priceLastSeenAt ||
     sourceName !== "coolpc" ||
-    !sourceUrl
+    !purchaseUrl
   ) {
     return null;
   }
@@ -263,7 +263,7 @@ function normalizeBuildListProduct(value: Record<string, unknown>): BuildListPro
     },
     source: {
       name: "coolpc",
-      url: sourceUrl,
+      url: purchaseUrl,
     },
   };
 }

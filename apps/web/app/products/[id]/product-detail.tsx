@@ -73,9 +73,9 @@ export default function ProductDetail({
               canIncreaseBuildListQuantity={viewModel.buildList.canIncreaseBuildListQuantity}
               currentBuildListQuantity={viewModel.buildList.currentBuildListQuantity}
               productName={product.name}
+              purchaseUrl={product.source.url}
               shareStatusMessage={viewModel.share.statusMessage}
               sourceHealth={product.source.health}
-              sourceUrl={product.source.url}
               onAddToBuildList={viewModel.buildList.addCurrentProductToBuildList}
               onDecreaseBuildListQuantity={
                 viewModel.buildList.decreaseCurrentProductBuildListQuantity

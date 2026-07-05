@@ -38,10 +38,7 @@ export interface ProductLinkCheckerSummary {
   pausedForPriority: boolean;
 }
 
-export function parseOptions(
-  args: string[],
-  cwd = process.cwd(),
-): ProductLinkCheckerOptions {
+export function parseOptions(args: string[], cwd = process.cwd()): ProductLinkCheckerOptions {
   if (args.includes("--help")) {
     printHelp();
     process.exit(0);
@@ -137,7 +134,9 @@ function toPublicKindLabel(kind: ProductLinkKindValue): string {
   return kind === "SOURCE" ? "source" : kind;
 }
 
-export function toSummaryKey(status: ProductLinkHealthStatusValue): "ok" | "broken" | "temporaryError" {
+export function toSummaryKey(
+  status: ProductLinkHealthStatusValue,
+): "ok" | "broken" | "temporaryError" {
   switch (status) {
     case "OK":
       return "ok";
@@ -155,8 +154,8 @@ function printHelp(): void {
 
 Options:
   --confirm-live-fetch       Required for live external link requests.
-  --dry-run                  Select candidates without source requests or DB writes.
-  --limit <count>            Maximum due links to check. Default: all due links.
+  --dry-run                  Select purchase link targets without source requests or DB writes.
+  --limit <count>            Maximum due purchase links to check. Default: all due links.
   --igrp <number>            Limit to one enabled CoolPC category.
   --kinds <list>             Comma-separated link kinds. Only source is supported.
                              Default: source

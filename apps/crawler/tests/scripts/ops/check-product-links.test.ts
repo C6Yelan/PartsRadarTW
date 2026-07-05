@@ -4,12 +4,12 @@ import {
   type ProductLinkCheckerOptions,
 } from "../../../src/scripts/ops/product-link-checker/options";
 import {
-  buildProductLinkCandidates,
+  buildProductPurchaseLinkTargets,
   PRODUCT_LINK_HEALTH_STATUSES,
   PRODUCT_LINK_KINDS,
-  readProductLinkCandidates,
+  readProductPurchaseLinkTargets,
   resolveNextProductLinkHealth,
-  type ProductLinkCandidate,
+  type ProductPurchaseLinkTarget,
   type ProductLinkHealthClient,
   type ProductLinkHealthRecord,
   type ProductLinkProductRecord,
@@ -52,10 +52,10 @@ describe("product link checker options", () => {
   });
 });
 
-describe("product link checker candidates", () => {
+describe("product link checker purchase targets", () => {
   it("selects unchecked, stale, or changed URLs without selecting fresh matching URLs", () => {
     const options = productLinkOptions();
-    const candidates = buildProductLinkCandidates(
+    const purchaseLinkTargets = buildProductPurchaseLinkTargets(
       [
         product({
           ibuyToken: "GPU-NEW",
@@ -83,7 +83,7 @@ describe("product link checker candidates", () => {
       NOW,
     );
 
-    expect(candidates).toEqual([
+    expect(purchaseLinkTargets).toEqual([
       expect.objectContaining({
         linkKind: PRODUCT_LINK_KINDS.SOURCE,
         url: "https://www.coolpc.com.tw/evaluate.php?iBuy=GPU-NEW",
@@ -91,7 +91,7 @@ describe("product link checker candidates", () => {
     ]);
   });
 
-  it("applies link limits after building due link candidates", async () => {
+  it("applies link limits after building due purchase link targets", async () => {
     const products = [
       product({
         id: "fresh-product",
@@ -115,14 +115,14 @@ describe("product link checker candidates", () => {
       }),
     ];
     const client = fakeProductLinkHealthClient(products);
-    const candidates = await readProductLinkCandidates(
+    const purchaseLinkTargets = await readProductPurchaseLinkTargets(
       client,
       { ...productLinkOptions(), limit: 1 },
       NOW,
     );
 
     expect(client.lastFindManyArgs?.take).toBeUndefined();
-    expect(candidates).toEqual([
+    expect(purchaseLinkTargets).toEqual([
       expect.objectContaining({
         productId: "due-product",
         url: "https://www.coolpc.com.tw/evaluate.php?iBuy=GPU-DUE",
@@ -134,7 +134,7 @@ describe("product link checker candidates", () => {
 describe("product link checker health resolution", () => {
   it("keeps early 404 failures temporary until the failure threshold is reached", () => {
     const checkedAt = new Date("2026-06-02T12:30:00.000Z");
-    const candidate = linkCandidate({
+    const target = purchaseLinkTarget({
       existingHealth: health({
         failureCount: 0,
         status: PRODUCT_LINK_HEALTH_STATUSES.TEMPORARY_ERROR,
@@ -143,7 +143,7 @@ describe("product link checker health resolution", () => {
 
     expect(
       resolveNextProductLinkHealth(
-        candidate,
+        target,
         { status: "broken", httpStatus: 404, errorMessage: "HTTP 404" },
         checkedAt,
         { failureThreshold: 3 },
@@ -159,7 +159,7 @@ describe("product link checker health resolution", () => {
 
   it("marks repeated 404 failures as broken at the threshold", () => {
     const checkedAt = new Date("2026-06-02T12:30:00.000Z");
-    const candidate = linkCandidate({
+    const target = purchaseLinkTarget({
       existingHealth: health({
         failureCount: 2,
         status: PRODUCT_LINK_HEALTH_STATUSES.TEMPORARY_ERROR,
@@ -168,7 +168,7 @@ describe("product link checker health resolution", () => {
 
     expect(
       resolveNextProductLinkHealth(
-        candidate,
+        target,
         { status: "broken", httpStatus: 404, errorMessage: "HTTP 404" },
         checkedAt,
         { failureThreshold: 3 },
@@ -184,7 +184,7 @@ describe("product link checker health resolution", () => {
 
   it("resets consecutive failures after a successful check", () => {
     const checkedAt = new Date("2026-06-02T12:30:00.000Z");
-    const candidate = linkCandidate({
+    const target = purchaseLinkTarget({
       existingHealth: health({
         failureCount: 2,
         lastFailureAt: new Date("2026-06-02T11:30:00.000Z"),
@@ -194,7 +194,7 @@ describe("product link checker health resolution", () => {
 
     expect(
       resolveNextProductLinkHealth(
-        candidate,
+        target,
         { status: "ok", httpStatus: 200, errorMessage: null },
         checkedAt,
         { failureThreshold: 3 },
@@ -238,7 +238,9 @@ function health(overrides: Partial<ProductLinkHealthRecord> = {}): ProductLinkHe
   };
 }
 
-function linkCandidate(overrides: Partial<ProductLinkCandidate> = {}): ProductLinkCandidate {
+function purchaseLinkTarget(
+  overrides: Partial<ProductPurchaseLinkTarget> = {},
+): ProductPurchaseLinkTarget {
   return {
     productId: "11111111-1111-1111-1111-111111111111",
     productName: "GPU RTX 4070",

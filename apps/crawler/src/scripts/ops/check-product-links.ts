@@ -6,7 +6,7 @@ import { loadWorkspaceEnv, toSafeCliErrorMessage } from "../shared/script-utils"
 import { parseOptions, printSummary } from "./product-link-checker/options";
 import {
   checkProductLinks,
-  readProductLinkCandidates,
+  readProductPurchaseLinkTargets,
   type ProductLinkHealthClient,
 } from "./product-link-checker/processor";
 import { createOpsLogger } from "./shared/logger";
@@ -23,8 +23,8 @@ async function main() {
     client = db.prisma;
     const linkHealthClient = toProductLinkHealthClient(client);
 
-    const candidates = await readProductLinkCandidates(linkHealthClient, options);
-    const summary = await checkProductLinks(linkHealthClient, candidates, options, {
+    const purchaseLinkTargets = await readProductPurchaseLinkTargets(linkHealthClient, options);
+    const summary = await checkProductLinks(linkHealthClient, purchaseLinkTargets, options, {
       log: (message) => logger.info(message),
       debugLog: (message) => logger.debug(message),
     });

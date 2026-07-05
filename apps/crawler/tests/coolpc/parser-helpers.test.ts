@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { COOLPC_TARGET_CATEGORIES } from "../../src/coolpc/categories";
 import {
   createCoolpcCategoryUrl,
-  createSourceItemKey,
+  createCoolpcSourceProductKey,
   normalizeCoolpcProductImageUrl,
   parsePriceText,
 } from "../../src/coolpc/parser";
@@ -23,8 +23,8 @@ describe("CoolPC parser helpers", () => {
     expect(parsePriceText("請來電詢價")).toBeNull();
   });
 
-  it("creates source item keys without persisting them", () => {
-    expect(createSourceItemKey(4, "CPU123")).toBe("coolpc:igrp:4:ibuy:CPU123");
+  it("creates source product keys without persisting them", () => {
+    expect(createCoolpcSourceProductKey(4, "CPU123")).toBe("coolpc:igrp:4:ibuy:CPU123");
   });
 
   it("creates category URLs without PHP session state", () => {

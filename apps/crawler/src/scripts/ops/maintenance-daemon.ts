@@ -1,17 +1,17 @@
 // apps/crawler/src/scripts/ops/maintenance-daemon.ts
 import type { PrismaClient } from "@partsradar/db";
-import type { ProductLinkCheckerOptions, ProductLinkCheckerSummary } from "./product-link-checker/options";
+import type {
+  ProductLinkCheckerOptions,
+  ProductLinkCheckerSummary,
+} from "./product-link-checker/options";
 import {
   checkProductLinks,
-  readProductLinkCandidates,
-  type ProductLinkCandidate,
+  readProductPurchaseLinkTargets,
+  type ProductPurchaseLinkTarget,
   type ProductLinkCheckerDependencies,
   type ProductLinkHealthClient,
 } from "./product-link-checker/processor";
-import {
-  hasActiveExternalFetchPriority,
-  tryAcquireExternalFetchLock,
-} from "./external-fetch-lock";
+import { hasActiveExternalFetchPriority, tryAcquireExternalFetchLock } from "./external-fetch-lock";
 import {
   loadWorkspaceEnv,
   resolveWorkspaceRoot,
@@ -48,10 +48,10 @@ interface MaintenanceDaemonDependencies {
     client: ProductLinkHealthClient,
     options: ProductLinkCheckerOptions,
     now?: Date,
-  ) => Promise<ProductLinkCandidate[]>;
+  ) => Promise<ProductPurchaseLinkTarget[]>;
   checkLinks?: (
     client: ProductLinkHealthClient,
-    candidates: ProductLinkCandidate[],
+    purchaseLinkTargets: ProductPurchaseLinkTarget[],
     options: ProductLinkCheckerOptions,
     dependencies?: ProductLinkCheckerDependencies,
   ) => Promise<ProductLinkCheckerSummary>;
@@ -149,12 +149,12 @@ export async function runMaintenanceCycle({
   if (!lock) {
     logMessage("Skipping maintenance cycle because another external fetch task holds the lock.");
 
-      return {
-        skippedForLock: true,
-        pausedForPriority: false,
-        link: null,
-      };
-    }
+    return {
+      skippedForLock: true,
+      pausedForPriority: false,
+      link: null,
+    };
+  }
 
   try {
     logMessage("Starting maintenance cycle.");
@@ -179,15 +179,17 @@ async function runLinkTask(
   options: MaintenanceDaemonOptions,
   dependencies: MaintenanceDaemonDependencies,
 ): Promise<ProductLinkCheckerSummary> {
-  const readLinks = dependencies.readLinks ?? readProductLinkCandidates;
+  const readLinks = dependencies.readLinks ?? readProductPurchaseLinkTargets;
   const checkLinks = dependencies.checkLinks ?? checkProductLinks;
   const hasPriority = dependencies.hasPriority ?? hasActiveExternalFetchPriority;
   const logMessage = dependencies.logMessage ?? log;
-  const candidates = await readLinks(client, options.link);
+  const purchaseLinkTargets = await readLinks(client, options.link);
 
-  logMessage(`Maintenance link task selected ${candidates.length} candidate(s).`);
+  logMessage(
+    `Maintenance link task selected ${purchaseLinkTargets.length} purchase link target(s).`,
+  );
 
-  return checkLinks(client, candidates, options.link, {
+  return checkLinks(client, purchaseLinkTargets, options.link, {
     log: logMessage,
     shouldPause: () =>
       hasPriority({

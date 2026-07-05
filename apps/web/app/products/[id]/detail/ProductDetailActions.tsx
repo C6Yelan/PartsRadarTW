@@ -13,7 +13,7 @@ export default function ProductDetailActions({
   productName,
   shareStatusMessage,
   sourceHealth,
-  sourceUrl,
+  purchaseUrl,
 }: {
   canIncreaseBuildListQuantity: boolean;
   currentBuildListQuantity: number;
@@ -23,7 +23,7 @@ export default function ProductDetailActions({
   productName: string;
   shareStatusMessage: string | null;
   sourceHealth: ProductLinkHealth | null;
-  sourceUrl: string;
+  purchaseUrl: string;
 }) {
   return (
     <div className="detail-actions">
@@ -49,7 +49,9 @@ export default function ProductDetailActions({
               aria-label={`增加 ${productName} 的配單數量`}
               className="build-list-step-button"
               disabled={!canIncreaseBuildListQuantity}
-              title={canIncreaseBuildListQuantity ? "增加數量" : `最多 ${BUILD_LIST_MAX_QUANTITY} 件`}
+              title={
+                canIncreaseBuildListQuantity ? "增加數量" : `最多 ${BUILD_LIST_MAX_QUANTITY} 件`
+              }
               type="button"
               onClick={onAddToBuildList}
             >
@@ -66,7 +68,7 @@ export default function ProductDetailActions({
         <a
           aria-label="前往原價屋查看／購買，開新分頁"
           className={toExternalActionClassName(sourceHealth)}
-          href={sourceUrl}
+          href={purchaseUrl}
           rel="noreferrer"
           target="_blank"
         >

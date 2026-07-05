@@ -12,20 +12,14 @@ export const context: SourceCategoryContext = {
   sourceName: "處理器 CPU",
   displayName: "CPU",
   fetchedAt: new Date("2026-05-27T06:00:00.000Z"),
-  sourceUrl: "https://www.coolpc.com.tw/eachview.php?IGrp=4&PHPSESSID=local-session",
+  sourceCategoryUrl: "https://www.coolpc.com.tw/eachview.php?IGrp=4&PHPSESSID=local-session",
 };
 
 export function fixture(name: string): string {
   return readFileSync(join(fixtureDir, name), "utf8");
 }
 
-export function categoryHtml({
-  igrp,
-  rawImageUrl,
-}: {
-  igrp: number;
-  rawImageUrl: string;
-}): string {
+export function categoryHtml({ igrp, rawImageUrl }: { igrp: number; rawImageUrl: string }): string {
   return `<!doctype html>
 <html lang="zh-Hant-TW">
   <head>
@@ -61,7 +55,7 @@ export function contextForCategory(igrp: number): SourceCategoryContext {
     sourceName: category.sourceName,
     displayName: category.displayName,
     fetchedAt: context.fetchedAt,
-    sourceUrl: createCoolpcCategoryUrl(category.igrp),
+    sourceCategoryUrl: createCoolpcCategoryUrl(category.igrp),
     expectedTitleKeywords: category.expectedTitleKeywords
       ? [...category.expectedTitleKeywords]
       : undefined,
