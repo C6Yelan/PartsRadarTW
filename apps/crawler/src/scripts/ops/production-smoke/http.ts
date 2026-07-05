@@ -2,13 +2,13 @@
 
 import { toSafeCliErrorMessage } from "../../shared/script-utils";
 import type {
-  CategoriesResponse,
-  PriceHistoryResponse,
-  ProductDetailResponse,
+  SmokeCategoriesResponse,
+  SmokePriceHistoryResponse,
+  SmokeProductDetailResponse,
   ProductionSmokeOptions,
-  ProductsResponse,
+  SmokeProductsResponse,
   RateLimitHeaderSnapshot,
-  SourceStatusResponse,
+  SmokeSourceStatusResponse,
 } from "./types";
 
 export async function fetchText(
@@ -163,7 +163,7 @@ export async function fetchWithTimeout(
   }
 }
 
-export function isSourceStatusResponse(value: unknown): value is SourceStatusResponse {
+export function isSmokeSourceStatusResponse(value: unknown): value is SmokeSourceStatusResponse {
   return (
     isRecord(value) &&
     typeof value.status === "string" &&
@@ -171,7 +171,7 @@ export function isSourceStatusResponse(value: unknown): value is SourceStatusRes
   );
 }
 
-export function isProductsResponse(value: unknown): value is ProductsResponse {
+export function isSmokeProductsResponse(value: unknown): value is SmokeProductsResponse {
   return (
     isRecord(value) &&
     Array.isArray(value.data) &&
@@ -180,7 +180,7 @@ export function isProductsResponse(value: unknown): value is ProductsResponse {
   );
 }
 
-export function isCategoriesResponse(value: unknown): value is CategoriesResponse {
+export function isSmokeCategoriesResponse(value: unknown): value is SmokeCategoriesResponse {
   return (
     isRecord(value) &&
     Array.isArray(value.data) &&
@@ -188,11 +188,11 @@ export function isCategoriesResponse(value: unknown): value is CategoriesRespons
   );
 }
 
-export function isProductDetailResponse(value: unknown): value is ProductDetailResponse {
+export function isSmokeProductDetailResponse(value: unknown): value is SmokeProductDetailResponse {
   return isRecord(value) && typeof value.id === "string";
 }
 
-export function isPriceHistoryResponse(value: unknown): value is PriceHistoryResponse {
+export function isSmokePriceHistoryResponse(value: unknown): value is SmokePriceHistoryResponse {
   return isRecord(value) && Array.isArray(value.points);
 }
 

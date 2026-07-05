@@ -6,7 +6,7 @@ import {
 } from "../product-link-checker/options";
 import {
   getStringArg,
-  resolveRelativeToWorkspace,
+  resolveWorkspacePathArgument,
   resolveWorkspaceRoot,
 } from "../../shared/script-utils";
 import {
@@ -61,11 +61,9 @@ export function parseMaintenanceDaemonOptions(
   }
 
   const workspaceRoot = resolveWorkspaceRoot(cwd);
-  const lockDir = resolveRelativeToWorkspace(
+  const lockDir = resolveWorkspacePathArgument(
     workspaceRoot,
-    getStringArg(args, "--lock-dir") ??
-      env.EXTERNAL_FETCH_LOCK_DIR ??
-      "temp/external-fetch.lock",
+    getStringArg(args, "--lock-dir") ?? env.EXTERNAL_FETCH_LOCK_DIR ?? "temp/external-fetch.lock",
   );
 
   return {
@@ -122,11 +120,7 @@ export function parseMaintenanceDaemonOptions(
   };
 }
 
-function buildProductLinkArgs(
-  args: string[],
-  env: NodeJS.ProcessEnv,
-  dryRun: boolean,
-): string[] {
+function buildProductLinkArgs(args: string[], env: NodeJS.ProcessEnv, dryRun: boolean): string[] {
   const linkArgs = dryRun ? [DRY_RUN_FLAG] : [CONFIRM_LIVE_FETCH_FLAG];
   appendOption(
     linkArgs,

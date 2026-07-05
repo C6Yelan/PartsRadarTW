@@ -7,7 +7,7 @@ import {
   getNumberArg,
   getPositiveNumberArg,
   loadWorkspaceEnv,
-  resolveRelativeToWorkspace,
+  resolveWorkspacePathArgument,
   resolveWorkspaceRoot,
   toSafeCliErrorMessage,
 } from "../../../src/scripts/shared/script-utils";
@@ -141,10 +141,10 @@ describe("script utils", () => {
   it("resolves relative paths from the workspace and preserves absolute paths", async () => {
     const workspaceRoot = await createWorkspace();
 
-    expect(resolveRelativeToWorkspace(workspaceRoot, "storage/snapshots")).toBe(
+    expect(resolveWorkspacePathArgument(workspaceRoot, "storage/snapshots")).toBe(
       join(workspaceRoot, "storage", "snapshots"),
     );
-    expect(resolveRelativeToWorkspace(workspaceRoot, "/var/lib/partsradar/snapshots")).toBe(
+    expect(resolveWorkspacePathArgument(workspaceRoot, "/var/lib/partsradar/snapshots")).toBe(
       "/var/lib/partsradar/snapshots",
     );
   });

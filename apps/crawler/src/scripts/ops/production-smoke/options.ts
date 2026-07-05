@@ -2,7 +2,7 @@
 
 import {
   getStringArg,
-  resolveRelativeToWorkspace,
+  resolveWorkspacePathArgument,
   resolveWorkspaceRoot,
 } from "../../shared/script-utils";
 import {
@@ -34,10 +34,7 @@ import {
   PUBLIC_ONLY_FLAG,
 } from "./constants";
 import { printProductionSmokeHelp } from "./options/help";
-import {
-  normalizeBaseUrl,
-  parseIntegerOption,
-} from "./options/values";
+import { normalizeBaseUrl, parseIntegerOption } from "./options/values";
 import type { ProductionSmokeOptions } from "./types";
 
 export { printProductionSmokeHelp } from "./options/help";
@@ -70,7 +67,7 @@ export function parseProductionSmokeOptions(
       min: 1000,
       max: 60000,
     }),
-    productImageStorageDir: resolveRelativeToWorkspace(
+    productImageStorageDir: resolveWorkspacePathArgument(
       workspaceRoot,
       getStringArg(args, "--product-image-storage-dir") ??
         env.PRODUCT_IMAGE_STORAGE_DIR ??

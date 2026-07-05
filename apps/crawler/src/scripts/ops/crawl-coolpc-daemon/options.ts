@@ -6,7 +6,7 @@ import {
 } from "../../../coolpc/live-crawl";
 import {
   getStringArg,
-  resolveRelativeToWorkspace,
+  resolveWorkspacePathArgument,
   resolveWorkspaceRoot,
 } from "../../shared/script-utils";
 import {
@@ -87,7 +87,7 @@ export function parseDaemonOptions(
   }
 
   const workspaceRoot = resolveWorkspaceRoot(cwd);
-  const storageDir = resolveRelativeToWorkspace(
+  const storageDir = resolveWorkspacePathArgument(
     workspaceRoot,
     getStringArg(args, "--storage-dir") ?? env.SNAPSHOT_STORAGE_DIR ?? DEFAULT_STORAGE_DIR,
   );
@@ -121,7 +121,7 @@ export function parseDaemonOptions(
       min: MIN_CATEGORY_DELAY_MS,
       max: MAX_CATEGORY_DELAY_MS,
     }),
-    lockDir: resolveRelativeToWorkspace(
+    lockDir: resolveWorkspacePathArgument(
       workspaceRoot,
       getStringArg(args, "--lock-dir") ??
         env.EXTERNAL_FETCH_LOCK_DIR ??
@@ -192,7 +192,7 @@ function parseNewProductImageBackfillOptions(
 
   return {
     workspaceRoot,
-    storageDir: resolveRelativeToWorkspace(
+    storageDir: resolveWorkspacePathArgument(
       workspaceRoot,
       getStringArg(args, "--product-image-storage-dir") ??
         env.PRODUCT_IMAGE_STORAGE_DIR ??

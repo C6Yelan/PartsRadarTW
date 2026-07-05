@@ -45,7 +45,7 @@ export interface ProductionSmokeSummary {
   checks: SmokeCheckResult[];
 }
 
-export interface ProductsResponse {
+export interface SmokeProductsResponse {
   data: Array<{
     id: string;
     image?: {
@@ -62,22 +62,22 @@ export interface ProductsResponse {
   };
 }
 
-export interface CategoriesResponse {
+export interface SmokeCategoriesResponse {
   data: Array<{
     igrp: number;
   }>;
 }
 
-export interface SourceStatusResponse {
+export interface SmokeSourceStatusResponse {
   status: string;
   lastSuccessAt: string | null;
 }
 
-export interface PriceHistoryResponse {
+export interface SmokePriceHistoryResponse {
   points: unknown[];
 }
 
-export interface ProductDetailResponse {
+export interface SmokeProductDetailResponse {
   id: string;
 }
 

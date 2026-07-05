@@ -3,25 +3,25 @@ import {
   fetchJson,
   fetchText,
   fetchWithTimeout,
-  isCategoriesResponse,
-  isPriceHistoryResponse,
-  isProductDetailResponse,
-  isProductsResponse,
+  isSmokeCategoriesResponse,
+  isSmokePriceHistoryResponse,
+  isSmokeProductDetailResponse,
+  isSmokeProductsResponse,
   isPublicHttpsUrl,
-  isSourceStatusResponse,
+  isSmokeSourceStatusResponse,
   readRateLimitHeaders,
 } from "../http";
 import { fail, ok, warn } from "../results";
 import type {
   ProductionSmokeOptions,
-  ProductsResponse,
+  SmokeProductsResponse,
   SmokeCheckResult,
-  SourceStatusResponse,
+  SmokeSourceStatusResponse,
 } from "../types";
 
 export async function checkPublicEndpoints(options: ProductionSmokeOptions): Promise<{
   checks: SmokeCheckResult[];
-  sourceStatus: SourceStatusResponse | null;
+  sourceStatus: SmokeSourceStatusResponse | null;
 }> {
   const checks: SmokeCheckResult[] = [];
   const homepage = await fetchText("/", options);
@@ -38,7 +38,7 @@ export async function checkPublicEndpoints(options: ProductionSmokeOptions): Pro
 
   const sourceStatus = await fetchJson("/api/source-status", options);
   const sourceStatusBody =
-    sourceStatus.ok && isSourceStatusResponse(sourceStatus.body) ? sourceStatus.body : null;
+    sourceStatus.ok && isSmokeSourceStatusResponse(sourceStatus.body) ? sourceStatus.body : null;
   checks.push(
     sourceStatus.ok && sourceStatusBody
       ? ok("source-status api", `status=${sourceStatusBody.status}`)
@@ -55,7 +55,7 @@ export async function checkPublicEndpoints(options: ProductionSmokeOptions): Pro
     `/api/products?pageSize=${options.productImageSampleSize}`,
     options,
   );
-  const productsBody = products.ok && isProductsResponse(products.body) ? products.body : null;
+  const productsBody = products.ok && isSmokeProductsResponse(products.body) ? products.body : null;
   const firstProduct = productsBody?.data[0] ?? null;
   const productId = firstProduct?.id ?? null;
   checks.push(
@@ -79,7 +79,7 @@ export async function checkPublicEndpoints(options: ProductionSmokeOptions): Pro
   const productDetail = await fetchJson(`/api/products/${productId}`, options);
   checks.push(
     productDetail.ok &&
-      isProductDetailResponse(productDetail.body) &&
+      isSmokeProductDetailResponse(productDetail.body) &&
       productDetail.body.id === productId
       ? ok("product detail api", productId)
       : fail(
@@ -95,7 +95,7 @@ export async function checkPublicEndpoints(options: ProductionSmokeOptions): Pro
     options,
   );
   checks.push(
-    priceHistory.ok && isPriceHistoryResponse(priceHistory.body)
+    priceHistory.ok && isSmokePriceHistoryResponse(priceHistory.body)
       ? ok("price-history api", `points=${priceHistory.body.points.length}`)
       : fail(
           "price-history api",
@@ -116,7 +116,7 @@ function checkCategoriesApi(
     return fail("categories api", categoriesResult.message);
   }
 
-  if (!isCategoriesResponse(categoriesResult.body)) {
+  if (!isSmokeCategoriesResponse(categoriesResult.body)) {
     return fail("categories api", "response shape is invalid");
   }
 
@@ -130,7 +130,7 @@ function checkCategoriesApi(
 }
 
 async function checkProductImageEndpoints(
-  products: ProductsResponse["data"],
+  products: SmokeProductsResponse["data"],
   options: ProductionSmokeOptions,
 ): Promise<SmokeCheckResult> {
   const failures: string[] = [];

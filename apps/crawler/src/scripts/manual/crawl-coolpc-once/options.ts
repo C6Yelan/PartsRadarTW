@@ -4,7 +4,7 @@ import { DEFAULT_COOLPC_CATEGORY_DELAY_MS } from "../../../coolpc/live-crawl";
 import {
   getNumberArg,
   getStringArg,
-  resolveRelativeToWorkspace,
+  resolveWorkspacePathArgument,
   resolveWorkspaceRoot,
 } from "../../shared/script-utils";
 
@@ -27,7 +27,7 @@ export function parseOptions(args: string[]): CrawlOptions {
   const workspaceRoot = resolveWorkspaceRoot();
   const fromRawDirArg = getStringArg(args, "--from-raw-dir");
   const fromRawDir = fromRawDirArg
-    ? resolveRelativeToWorkspace(workspaceRoot, fromRawDirArg)
+    ? resolveWorkspacePathArgument(workspaceRoot, fromRawDirArg)
     : null;
 
   if (!fromRawDir && !args.includes(CONFIRM_LIVE_FETCH_FLAG)) {
@@ -39,7 +39,7 @@ export function parseOptions(args: string[]): CrawlOptions {
   return {
     workspaceRoot,
     fromRawDir,
-    storageDir: resolveRelativeToWorkspace(
+    storageDir: resolveWorkspacePathArgument(
       workspaceRoot,
       getStringArg(args, "--storage-dir") ??
         process.env.SNAPSHOT_STORAGE_DIR ??

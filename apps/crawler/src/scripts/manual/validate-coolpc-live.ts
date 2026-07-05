@@ -10,7 +10,7 @@ import {
 import {
   getNumberArg,
   getStringArg,
-  resolveRelativeToWorkspace,
+  resolveWorkspacePathArgument,
   resolveWorkspaceRoot,
   toSafeCliErrorMessage,
 } from "../shared/script-utils";
@@ -42,10 +42,10 @@ async function main() {
   const outputDirArg =
     getStringArg(args, "--output-dir") ??
     join("temp", "coolpc-live-validation", timestampForPath(new Date()));
-  const outputDir = resolveRelativeToWorkspace(workspaceRoot, outputDirArg);
+  const outputDir = resolveWorkspacePathArgument(workspaceRoot, outputDirArg);
   // Replay paths are resolved from the workspace root to match the report
   // commands copied into planning docs.
-  const inputRawDir = fromRawDir ? resolveRelativeToWorkspace(workspaceRoot, fromRawDir) : null;
+  const inputRawDir = fromRawDir ? resolveWorkspacePathArgument(workspaceRoot, fromRawDir) : null;
   const rawDir = join(outputDir, "raw");
   const fixtureDir = join(outputDir, "fixtures");
   await mkdir(rawDir, { recursive: true });

@@ -1,7 +1,7 @@
 // apps/crawler/src/scripts/ops/smoke-discord-notification.ts
 import type { ProductionSmokeSummary } from "./production-smoke";
 import { type DiscordWebhookMessage, readDiscordWebhookUrl } from "./discord-webhook";
-import { getStringArg, resolveRelativeToWorkspace } from "../shared/script-utils";
+import { getStringArg, resolveWorkspacePathArgument } from "../shared/script-utils";
 import {
   createAbnormalMessage,
   createRecoveredMessage,
@@ -57,7 +57,7 @@ export function parseSmokeDiscordNotificationOptions(
 ): SmokeDiscordNotificationOptions {
   return {
     adminWebhookUrl: readDiscordWebhookUrl(env, "DISCORD_ADMIN_WEBHOOK_URL"),
-    stateFilePath: resolveRelativeToWorkspace(
+    stateFilePath: resolveWorkspacePathArgument(
       workspaceRoot,
       getStringArg(args, "--smoke-discord-state-file") ??
         env.SMOKE_DISCORD_STATE_FILE ??

@@ -24,7 +24,7 @@ import type {
   ProductionSmokeOptions,
   ProductionSmokeSummary,
   SmokeCheckResult,
-  SourceStatusResponse,
+  SmokeSourceStatusResponse,
 } from "./types";
 
 export async function runProductionSmoke(
@@ -70,7 +70,7 @@ export async function runProductionPublicSmoke(
 }
 
 async function checkSourceFreshness(
-  sourceStatus: SourceStatusResponse | null,
+  sourceStatus: SmokeSourceStatusResponse | null,
   options: ProductionSmokeOptions,
   now: Date,
 ): Promise<SmokeCheckResult> {

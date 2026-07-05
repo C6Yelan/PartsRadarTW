@@ -97,10 +97,10 @@ export function getPositiveNumberArg(args: string[], name: string): number | nul
   return value;
 }
 
-// Resolves crawler script path arguments. Relative paths are rooted at the
-// workspace; absolute paths remain absolute for Docker volume mount paths such
-// as /var/lib/partsradar/snapshots. This is not a workspace containment check.
-export function resolveRelativeToWorkspace(workspaceRoot: string, path: string): string {
+// Resolves script path arguments. Relative paths are rooted at the workspace;
+// absolute paths remain absolute for Docker volume mount paths such as
+// /var/lib/partsradar/snapshots. This is not a workspace containment check.
+export function resolveWorkspacePathArgument(workspaceRoot: string, path: string): string {
   return resolve(workspaceRoot, path);
 }
 

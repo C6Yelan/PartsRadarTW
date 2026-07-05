@@ -9,7 +9,7 @@ import {
 import {
   getNumberArg,
   loadWorkspaceEnv,
-  resolveRelativeToWorkspace,
+  resolveWorkspacePathArgument,
   resolveWorkspaceRoot,
   toSafeCliErrorMessage,
 } from "../shared/script-utils";
@@ -166,7 +166,7 @@ function resolveAndValidateStorageDir(workspaceRoot: string, storageDir: string)
     throw new Error(`Unsafe snapshot storage dir "${storageDir}": value must not be empty.`);
   }
 
-  return validateStorageDir(resolveRelativeToWorkspace(workspaceRoot, storageDir), workspaceRoot);
+  return validateStorageDir(resolveWorkspacePathArgument(workspaceRoot, storageDir), workspaceRoot);
 }
 
 function getStringArgAllowingEmpty(args: string[], name: string): string | undefined {

@@ -328,7 +328,7 @@ docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler ru
 - raw snapshot metadata 沒有明顯超過 retention grace。
 - 近 24 小時 Discord bot delivery 最新狀態沒有未恢復的 failed / rate limited；若同一通知串後續已成功，舊失敗不再觸發 `WARN`。
 
-Link health smoke 只統計 `source`。`source` 代表 public `source.url` 的原價屋查看 / 購買連結；原價屋來源列中的產品介紹連結已移除，不再進 DB、API、UI、link checker 或 smoke 門檻。`SMOKE_BROKEN_LINK_*` 與 `SMOKE_TEMPORARY_LINK_*` 舊變數仍可作為 local CLI / script fallback；Compose 新部署使用 `SMOKE_SOURCE_*_LINK_*`。
+Link health smoke 只統計 `source`。`source` 代表 public `source.url` 的原價屋查看 / 購買連結；原價屋來源列中的產品介紹連結已移除，不再進 DB、API、UI、link checker 或 smoke 門檻。Compose 與新部署以 `SMOKE_SOURCE_*_LINK_*` 為 canonical env；`SMOKE_BROKEN_LINK_*` 與 `SMOKE_TEMPORARY_LINK_*` 舊變數只保留為 local CLI / script compatibility aliases。
 
 建議預設：
 

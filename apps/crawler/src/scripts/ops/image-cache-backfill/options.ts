@@ -4,7 +4,7 @@ import {
   getNumberArg,
   getPositiveNumberArg,
   getStringArg,
-  resolveRelativeToWorkspace,
+  resolveWorkspacePathArgument,
   resolveWorkspaceRoot,
 } from "../../shared/script-utils";
 
@@ -68,11 +68,9 @@ export function parseOptions(
 
   return {
     workspaceRoot,
-    storageDir: resolveRelativeToWorkspace(
+    storageDir: resolveWorkspacePathArgument(
       workspaceRoot,
-      getStringArg(args, "--storage-dir") ??
-        env.PRODUCT_IMAGE_STORAGE_DIR ??
-        DEFAULT_STORAGE_DIR,
+      getStringArg(args, "--storage-dir") ?? env.PRODUCT_IMAGE_STORAGE_DIR ?? DEFAULT_STORAGE_DIR,
     ),
     limit: getPositiveNumberArg(args, "--limit"),
     productId: getStringArg(args, "--product-id") ?? null,
