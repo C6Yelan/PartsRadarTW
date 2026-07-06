@@ -1,4 +1,5 @@
 // apps/crawler/src/scripts/ops/crawl-coolpc-daemon/new-product-images.ts
+// 在 scheduled crawler 成功寫入新商品後，針對本輪新增商品補齊本地商品圖片快取。
 
 import type { PrismaClient } from "@partsradar/db";
 import { toSafeCliErrorMessage } from "../../shared/script-utils";
@@ -12,12 +13,14 @@ import type { NewProductImageBackfillOptions } from "./options";
 
 const logger = createOpsLogger();
 
+// scheduled crawler 注入用的新商品圖片補圖 handler，讓主流程可測試替換而不綁定實際圖片下載。
 export type NewProductImageBackfillHandler = (args: {
   client: PrismaClient;
   productIds: string[];
   options: NewProductImageBackfillOptions;
 }) => Promise<void>;
 
+// 只針對本輪新建商品查找缺圖候選並執行補圖；補圖失敗只記錄，不中斷價格 crawl daemon。
 export async function handleNewProductImageBackfill({
   client,
   productIds,
@@ -60,6 +63,7 @@ export async function handleNewProductImageBackfill({
   }
 }
 
+// 將 scheduled crawler 的新商品補圖設定轉成共用 image backfill processor 需要的完整選項。
 function createImageBackfillOptions(options: NewProductImageBackfillOptions): ImageBackfillOptions {
   return {
     workspaceRoot: options.workspaceRoot,
@@ -76,6 +80,7 @@ function createImageBackfillOptions(options: NewProductImageBackfillOptions): Im
   };
 }
 
+// 記錄新商品圖片補圖摘要，只輸出統計值，避免 daemon log 夾帶逐筆來源 URL。
 function logNewProductImageBackfillSummary(
   summary: BackfillSummary,
   createdProductCount: number,

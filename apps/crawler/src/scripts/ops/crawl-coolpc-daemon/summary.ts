@@ -1,4 +1,5 @@
 // apps/crawler/src/scripts/ops/crawl-coolpc-daemon/summary.ts
+// 彙整 scheduled crawler 單輪結果，輸出維運摘要並決定下一輪是否進入 backoff。
 
 import {
   CRAWL_RUN_CATEGORY_RESULT_STATUSES,
@@ -11,8 +12,10 @@ import type { CoolpcDaemonOptions } from "./options";
 
 const DEFAULT_ALL_FETCH_FAILED_RETRY_SECONDS = 600;
 
+// scheduled crawler 需要的商品寫入彙總欄位，沿用 crawl-run category summary 的資料契約。
 export type ProductWriteSummaryTotals = CrawlRunCategoryProductWriteSummary;
 
+// 輸出單輪 scheduled crawl 的總結與各分類結果，避免 daemon 主流程混入 log 組字細節。
 export function printCycleSummary(
   result: RunCoolpcCrawlOnceResult,
   productWriteSummary: ProductWriteSummaryTotals,
@@ -35,6 +38,7 @@ export function printCycleSummary(
   }
 }
 
+// 將各分類的 product write summary 加總成單輪總表，供 log 與後續新商品圖片補圖使用。
 export function summarizeProductWrites(
   result: RunCoolpcCrawlOnceResult,
 ): ProductWriteSummaryTotals {
@@ -70,6 +74,7 @@ export function summarizeProductWrites(
   return totals;
 }
 
+// 判斷下一輪是否要使用 backoff；疑似封鎖與非成功結果都視為需要降速。
 export function shouldBackoffAfter(result: RunCoolpcCrawlOnceResult): boolean {
   if (result.stoppedBySuspectedBlock) {
     return true;
@@ -81,6 +86,7 @@ export function shouldBackoffAfter(result: RunCoolpcCrawlOnceResult): boolean {
   );
 }
 
+// 當所有分類都是 fetch 失敗時先用較短重試，避免暫時性 DNS/網路問題拖到完整 backoff。
 export function resolveAllFetchFailedRetrySeconds(
   result: RunCoolpcCrawlOnceResult,
   options: CoolpcDaemonOptions,

@@ -1,4 +1,5 @@
 // apps/crawler/src/scripts/ops/cleanup-raw-snapshots-daemon/options.ts
+// 解析 raw snapshot cleanup daemon 的 CLI/env 選項，將 daemon 週期設定與一次性 cleanup 共用參數分流。
 
 import {
   type CleanupOptions,
@@ -31,11 +32,13 @@ const ALLOWED_FLAGS = new Set([
 ]);
 const VALUE_FLAGS = new Set([...CLEANUP_VALUE_FLAGS, ...DAEMON_VALUE_FLAGS]);
 
+// raw snapshot cleanup daemon 的執行設定：包含共用清理參數，以及 daemon 自己的週期與單次執行模式。
 export interface RawSnapshotCleanupDaemonOptions extends CleanupOptions {
   intervalSeconds: number;
   runOnce: boolean;
 }
 
+// 解析 daemon CLI 參數並套用 env/default；排程刪除必須明確帶 --confirm-delete，避免誤把 dry-run 規則帶進常駐清理。
 export function parseRawSnapshotCleanupDaemonOptions(
   args: string[],
   env: NodeJS.ProcessEnv = process.env,
@@ -62,6 +65,7 @@ export function parseRawSnapshotCleanupDaemonOptions(
   };
 }
 
+// 先驗證 daemon 與 cleanup 兩組允許的旗標，避免未知參數被下游 cleanup parser 誤解。
 function validateDaemonArgs(args: string[]): void {
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
@@ -88,6 +92,7 @@ function validateDaemonArgs(args: string[]): void {
   }
 }
 
+// 將 daemon-only 旗標移除後交給一次性 cleanup parser，讓 retention/storage 規則維持單一來源。
 function stripDaemonOnlyArgs(args: string[]): string[] {
   const cleanupArgs: string[] = [];
 
@@ -109,6 +114,7 @@ function stripDaemonOnlyArgs(args: string[]): string[] {
   return cleanupArgs;
 }
 
+// 解析常駐清理間隔；限制在一小時到七天，避免過度頻繁刪除或排程長到失去維護意義。
 function parseIntervalSeconds(args: string[], env: NodeJS.ProcessEnv): number {
   const raw =
     getStringArg(args, INTERVAL_SECONDS_FLAG) ??
@@ -134,6 +140,7 @@ function parseIntervalSeconds(args: string[], env: NodeJS.ProcessEnv): number {
   return value;
 }
 
+// 輸出 daemon CLI 的維運入口說明，實際刪除仍需 --confirm-delete 才會啟用。
 export function printHelp(): void {
   console.log(`Usage:
   pnpm --filter @partsradar/crawler ops:raw-snapshots:cleanup-daemon -- --confirm-delete [options]

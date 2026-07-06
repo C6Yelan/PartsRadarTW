@@ -1,4 +1,5 @@
 // apps/crawler/src/scripts/ops/crawl-coolpc-daemon/options.ts
+// 解析 scheduled CoolPC crawler daemon 的 CLI/env 設定，集中管理排程、外部抓取鎖與新商品圖片補圖參數。
 
 import {
   DEFAULT_COOLPC_CATEGORY_DELAY_MS,
@@ -37,6 +38,7 @@ export const MAX_NEW_PRODUCT_IMAGE_TIMEOUT_MS = 120000;
 export const MIN_NEW_PRODUCT_IMAGE_SOURCE_BYTES = 64 * 1024;
 export const MAX_NEW_PRODUCT_IMAGE_SOURCE_BYTES = 20 * 1024 * 1024;
 
+// scheduled crawler 每輪成功後針對本輪新增商品執行圖片補圖所需的設定。
 export interface NewProductImageBackfillOptions {
   workspaceRoot: string;
   storageDir: string;
@@ -46,6 +48,7 @@ export interface NewProductImageBackfillOptions {
   maxSourceBytes: number;
 }
 
+// scheduled CoolPC crawler daemon 的完整執行設定，供 CLI entrypoint 與測試共用。
 export interface CoolpcDaemonOptions {
   workspaceRoot: string;
   storageDir: string;
@@ -61,6 +64,7 @@ export interface CoolpcDaemonOptions {
   newProductImageBackfill: NewProductImageBackfillOptions;
 }
 
+// 共用整數 option parser 的輸入契約，讓 CLI arg、env、default 與上下限驗證維持一致。
 interface ParseIntegerOption {
   args: string[];
   argName: string;
@@ -71,6 +75,7 @@ interface ParseIntegerOption {
   max?: number;
 }
 
+// 解析 scheduled crawler daemon 設定；live fetch 必須顯式確認，且 base URL 僅允許 env 內的官方 CoolPC 位址。
 export function parseDaemonOptions(
   args: string[],
   env: NodeJS.ProcessEnv = process.env,
@@ -160,6 +165,7 @@ export function parseDaemonOptions(
   };
 }
 
+// 解析新商品圖片補圖設定，並確保最小/最大 delay 範圍不會互相衝突。
 function parseNewProductImageBackfillOptions(
   args: string[],
   env: NodeJS.ProcessEnv,
@@ -221,6 +227,7 @@ function parseNewProductImageBackfillOptions(
   };
 }
 
+// 解析單一整數設定值，統一套用 CLI 優先於 env，未設定則使用 fallback 的規則。
 function parseIntegerOption({
   args,
   argName,

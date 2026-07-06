@@ -1,4 +1,6 @@
 // apps/crawler/src/scripts/ops/cleanup-raw-snapshots-daemon.ts
+// 啟動 raw snapshot cleanup 常駐程序，定期執行保留規則清理並處理 shutdown / logging 邊界。
+
 import type { PrismaClient } from "@partsradar/db";
 import {
   type CleanupRawSnapshotsResult,
@@ -23,11 +25,13 @@ const logger = createOpsLogger();
 export { parseRawSnapshotCleanupDaemonOptions } from "./cleanup-raw-snapshots-daemon/options";
 export type { RawSnapshotCleanupDaemonOptions } from "./cleanup-raw-snapshots-daemon/options";
 
+// 抽象化 daemon 的停止狀態與 sleep 行為，讓測試能驗證 loop 行為而不依賴真實 process signal。
 export interface ShutdownController {
   readonly requested: boolean;
   sleep(ms: number): Promise<void>;
 }
 
+// 單輪 raw snapshot cleanup 的執行器介面，讓 daemon loop 可注入測試替身並保留 production 實作。
 export type RawSnapshotCleanupExecutor = (options: {
   client: PrismaRawSnapshotCleanupClient;
   storageDir: string;
@@ -36,6 +40,7 @@ export type RawSnapshotCleanupExecutor = (options: {
   dryRun: boolean;
 }) => Promise<CleanupRawSnapshotsResult>;
 
+// 啟動 daemon loop 所需的依賴集合；production 使用 Prisma cleanup，測試可替換 cleanup 與 log。
 export interface RunRawSnapshotCleanupDaemonOptions {
   client: PrismaRawSnapshotCleanupClient;
   options: RawSnapshotCleanupDaemonOptions;
@@ -44,6 +49,7 @@ export interface RunRawSnapshotCleanupDaemonOptions {
   logMessage?: (message: string) => void;
 }
 
+// CLI 入口：載入環境、建立 DB client，並把實際循環交給可測試的 daemon runner。
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
 
@@ -72,6 +78,7 @@ async function main(): Promise<void> {
   }
 }
 
+// 執行 raw snapshot cleanup daemon 主迴圈；run-once 模式會在單輪失敗時直接拋出，常駐模式則記錄錯誤後等待下一輪。
 export async function runRawSnapshotCleanupDaemon({
   client,
   options,
@@ -102,6 +109,7 @@ export async function runRawSnapshotCleanupDaemon({
   } while (!shutdown.requested);
 }
 
+// 包住單輪 cleanup 的錯誤邊界，避免常駐 daemon 因一次清理失敗直接結束。
 async function runCleanupCycle({
   client,
   options,
@@ -134,6 +142,7 @@ async function runCleanupCycle({
   }
 }
 
+// 註冊 SIGINT/SIGTERM，讓 daemon 能在目前 cleanup step 結束後停止，且可中斷等待中的 sleep。
 function createShutdownController(): ShutdownController {
   let stopRequested = false;
   let wakeSleeper: (() => void) | null = null;
@@ -175,6 +184,7 @@ function createShutdownController(): ShutdownController {
   };
 }
 
+// 輸出單輪 cleanup 的高層摘要，避免 log 夾帶 raw path 或逐筆 metadata。
 function printCleanupSummary(
   result: CleanupRawSnapshotsResult,
   logMessage: (message: string) => void,

@@ -1,4 +1,5 @@
 // apps/crawler/src/scripts/ops/crawl-coolpc-daemon/help.ts
+// 輸出 scheduled CoolPC crawler daemon 的 CLI 使用說明，集中呈現可調整的排程、lock 與圖片補圖選項。
 
 import { DEFAULT_COOLPC_CATEGORY_DELAY_MS } from "../../../coolpc/live-crawl";
 import { DEFAULT_EXTERNAL_FETCH_PRIORITY_TTL_SECONDS } from "../external-fetch-lock";
@@ -20,6 +21,7 @@ import {
   MIN_LOCK_RETRY_SECONDS,
 } from "./options";
 
+// 印出 daemon 維運入口的 help 文字；實際參數驗證仍以 options parser 為準。
 export function printHelp(): void {
   console.log(`Usage:
   pnpm --filter @partsradar/crawler ops:crawl-coolpc-daemon -- --confirm-live-fetch [options]
