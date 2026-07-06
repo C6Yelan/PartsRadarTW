@@ -1,6 +1,6 @@
 // apps/crawler/src/scripts/manual/crawl-coolpc-once.ts
-// This script is a manual smoke tool for local validation.
-// Do not use this as the production scheduled crawler entrypoint.
+// 手動執行 CoolPC 單次爬蟲的 CLI 腳本。
+// 用於本機驗證流程，先抓取後輸出結果摘要，不可作為排程入口使用。
 import { relative } from "node:path";
 import type { Prisma, PrismaClient } from "@partsradar/db";
 import { createPublicProductImagePath } from "@partsradar/shared";
@@ -15,10 +15,11 @@ import {
 } from "../shared/script-utils";
 import { parseOptions, type CrawlOptions } from "./crawl-coolpc-once/options";
 
+// 取樣輸出的商品筆數上限（僅供 smoke summary 顯示）。
 const DEFAULT_PAGE_SIZE = 5;
 const MANUAL_CRAWL_USER_AGENT =
   "PartsRadarTW manual crawler smoke (+https://github.com/C6Yelan/PartsRadarTW)";
-// This smoke query mirrors the public product visibility rules without importing web handlers.
+// 公用商品查詢條件，盡量對齊前台曝光規則，不直接依賴 API handler。
 const PUBLIC_PRODUCT_SMOKE_FILTER = {
   sourceCategory: {
     enabled: true,
@@ -54,6 +55,7 @@ const PUBLIC_PRODUCT_SMOKE_FIELDS = {
   },
 } satisfies Prisma.ProductSelect;
 
+// DB 計數用欄位（爬蟲前後比對用）。
 interface DbCounts {
   products: number;
   activeProducts: number;
@@ -63,6 +65,7 @@ interface DbCounts {
   rawSnapshots: number;
 }
 
+// smoke 查詢結果的最小輸出摘要。
 interface PublicProductSmokeSummary {
   data: Array<{
     id: string;
@@ -84,6 +87,7 @@ interface PublicProductSmokeSummary {
   totalItems: number;
 }
 
+// 手動流程主入口：解析參數、載入環境、執行爬蟲並輸出報表。
 async function main() {
   const options = parseOptions(process.argv.slice(2));
   let client: PrismaClient | null = null;
@@ -114,6 +118,7 @@ async function main() {
   }
 }
 
+// 根據 options 呼叫一次性爬取流程，回傳 manual run 的執行結果。
 async function runManualCrawl(
   client: PrismaClient,
   options: CrawlOptions,
@@ -130,6 +135,7 @@ async function runManualCrawl(
   });
 }
 
+// 取得 DB 當前數據快照，用來計算單次爬取造成的變動。
 async function collectDbCounts(client: PrismaClient): Promise<DbCounts> {
   const [
     products,
@@ -157,6 +163,7 @@ async function collectDbCounts(client: PrismaClient): Promise<DbCounts> {
   };
 }
 
+// 讀取可見性對齊前台的商品快照，供手動驗證輸出。
 async function readPublicProductSmokeSummary(
   client: PrismaClient,
 ): Promise<PublicProductSmokeSummary> {
@@ -200,6 +207,7 @@ async function readPublicProductSmokeSummary(
   };
 }
 
+// 印出本次爬取模式、分類結果與 DB 變動，作為人工快速判讀的輸出。
 function printSummary({
   workspaceRoot,
   storageDir,
@@ -257,6 +265,7 @@ function printSummary({
   }
 }
 
+// 輸出單一指標的前後差異（含 +/- 標記）。
 function printCountDelta(label: string, before: number, after: number): void {
   const delta = after - before;
   const sign = delta >= 0 ? "+" : "";

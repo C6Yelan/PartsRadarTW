@@ -1,4 +1,6 @@
 // apps/crawler/src/scripts/manual/validate-coolpc-live/report.ts
+// 產生 CoolPC 手動驗證流程的回報資料。
+// 負責將 parser 驗證結果轉成可閱讀的樣板、HTML fixture 與 issue 統計。
 
 import type { CoolpcTargetCategory } from "../../../coolpc/categories";
 import type {
@@ -7,6 +9,7 @@ import type {
   SourceCategoryContext,
 } from "../../../coolpc/parser";
 
+// 驗證回報的一列摘要資料，供報表輸出與可讀性檢查使用。
 export interface ValidationSummary {
   igrp: number;
   displayName: string;
@@ -49,6 +52,7 @@ export function createContext(
   };
 }
 
+// 建立手動驗證共用的來源分類上下文，保留欄位複製以避免參數物件被外部意外修改。
 export function createSampleFixture(
   category: CoolpcTargetCategory,
   fetchedAt: Date,
@@ -87,6 +91,7 @@ ${rows}
 `;
 }
 
+// 將每個分類的驗證結果整理為 Markdown 報表，並註明是否為 raw 重放模式。
 export function createMarkdownReport(
   summaries: ValidationSummary[],
   outputDir: string,
@@ -146,6 +151,7 @@ ${issueSections}
 `;
 }
 
+// 將解析議題依類型彙總，供報表 issue 區塊輸出。
 export function countIssues(issues: CoolpcParseIssue[]): Record<string, number> {
   return issues.reduce<Record<string, number>>((counts, issue) => {
     counts[issue.type] = (counts[issue.type] ?? 0) + 1;
@@ -153,10 +159,12 @@ export function countIssues(issues: CoolpcParseIssue[]): Record<string, number> 
   }, {});
 }
 
+// 以英語區域格式輸出價格，對齊報表中現有可讀格式。
 function formatPrice(price: number): string {
   return new Intl.NumberFormat("en-US").format(price);
 }
 
+// 轉義 HTML 字元，防止 fixture 內容在輸出時破壞標籤結構。
 function escapeHtml(value: string): string {
   return value
     .replaceAll("&", "&amp;")
@@ -165,6 +173,7 @@ function escapeHtml(value: string): string {
     .replaceAll('"', "&quot;");
 }
 
+// 清理 Markdown 表格欄位值，避免 `|` 被當成欄位分隔符號。
 function sanitizeMarkdownCell(value: string): string {
   return value.replaceAll("|", "\\|").replace(/\s+/g, " ").trim();
 }

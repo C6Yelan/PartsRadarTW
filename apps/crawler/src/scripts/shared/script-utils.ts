@@ -1,4 +1,5 @@
 // apps/crawler/src/scripts/shared/script-utils.ts
+// 集中提供 crawler CLI 常用工具：參數解析、環境載入、路徑解析與錯誤輸出遮蔽。
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
@@ -13,6 +14,7 @@ const POSTGRES_URL_PATTERN = /postgres(?:ql)?:\/\/[^\s@]+@[^\s]+/gi;
 const PHP_SESSION_QUERY_PATTERN = /([?&]PHPSESSID=)[^&\s]+/gi;
 const WORKSPACE_ROOT_MARKER = "pnpm-workspace.yaml";
 
+// 由目前目錄往上尋找 pnpm workspace root；找不到就視為執行環境不正確。
 export function resolveWorkspaceRoot(cwd = process.cwd()): string {
   let currentDir = resolve(cwd);
 
@@ -33,6 +35,7 @@ export function resolveWorkspaceRoot(cwd = process.cwd()): string {
   }
 }
 
+// 僅在可控邊界內載入環境；正式環境只讀 .env，避免本機覆寫注入來源與既有值。
 export async function loadWorkspaceEnv(workspaceRoot: string): Promise<void> {
   await loadEnvFile(join(workspaceRoot, ".env"), false);
 
@@ -97,13 +100,11 @@ export function getPositiveNumberArg(args: string[], name: string): number | nul
   return value;
 }
 
-// Resolves script path arguments. Relative paths are rooted at the workspace;
-// absolute paths remain absolute for Docker volume mount paths such as
-// /var/lib/partsradar/snapshots. This is not a workspace containment check.
 export function resolveWorkspacePathArgument(workspaceRoot: string, path: string): string {
   return resolve(workspaceRoot, path);
 }
 
+// 輸出 CLI 錯誤前先套用遮蔽規則，避免密鑰字串外流。
 export function toSafeCliErrorMessage(error: unknown): string {
   return sanitizeCliLogMessage(error instanceof Error ? error.message : String(error));
 }
@@ -117,6 +118,7 @@ function sanitizeCliLogMessage(message: string): string {
     .replace(PHP_SESSION_QUERY_PATTERN, "$1***");
 }
 
+// 對 .env/ .env.local 進行逐行解析；缺行列格式會直接中斷，避免載入半套值到程式環境。
 async function loadEnvFile(path: string, override: boolean): Promise<void> {
   let content: string;
 
