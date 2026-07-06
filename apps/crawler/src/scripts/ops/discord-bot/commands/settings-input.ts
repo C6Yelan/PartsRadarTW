@@ -1,4 +1,5 @@
 // apps/crawler/src/scripts/ops/discord-bot/commands/settings-input.ts
+// 驗證並正規化 Discord 設定面板送回的 select value 與 modal 文字輸入。
 
 import {
   MAX_PRICE_REPORT_ITEMS,
@@ -11,6 +12,7 @@ import {
   PRICE_REPORT_CONTENT_PRICE_RISES_VALUE,
 } from "./ids";
 
+// 嚴格解析報告時間視窗 select value；未知值直接視為無效，避免錯誤 payload 套用預設。
 export function parseWindowHoursStrict(value: unknown): number | null {
   if (value === "6h") {
     return 6;
@@ -27,6 +29,7 @@ export function parseWindowHoursStrict(value: unknown): number | null {
   return null;
 }
 
+// 解析 modal 輸入的最多商品數，只接受正整數字串並限制在價格報告支援範圍內。
 export function parseMaxItemsInput(value: unknown): number | null {
   if (typeof value !== "string" || !/^(0|[1-9][0-9]*)$/.test(value.trim())) {
     return null;
@@ -39,6 +42,7 @@ export function parseMaxItemsInput(value: unknown): number | null {
     : null;
 }
 
+// 解析商品關鍵字輸入；null 代表清空，undefined 代表格式或長度不合法。
 export function parseProductKeywordInput(value: unknown): string | null | undefined {
   if (value === undefined || value === null) {
     return null;
@@ -60,6 +64,7 @@ export function parseProductKeywordInput(value: unknown): string | null | undefi
     : undefined;
 }
 
+// 解析報告內容篩選 select value，要求至少一種內容類型且不得包含未知值。
 export function parseReportContentFilters(values: unknown[]): {
   includePriceDrops: boolean;
   includePriceRises: boolean;
@@ -85,6 +90,7 @@ export function parseReportContentFilters(values: unknown[]): {
   };
 }
 
+// 解析台北時間 HH:mm 輸入，回傳 handler 可直接寫入排程設定的小時與分鐘。
 export function parseTimeOfDay(value: unknown): { hour: number; minute: number } | null {
   if (typeof value !== "string" || value.trim() === "") {
     return null;
@@ -102,6 +108,7 @@ export function parseTimeOfDay(value: unknown): { hour: number; minute: number }
   };
 }
 
+// 正規化使用者關鍵字輸入，支援中文逗號並壓平每組關鍵字內的多餘空白。
 function normalizeProductKeywordInput(value: string): string {
   return value
     .replace(/，/g, ",")
@@ -111,6 +118,7 @@ function normalizeProductKeywordInput(value: string): string {
     .join(", ");
 }
 
+// 計算關鍵字逗號分組數，對應 UI 說明與最大組數限制。
 function countProductKeywordGroups(keyword: string): number {
   return keyword.split(",").filter((group) => group.trim().length > 0).length;
 }

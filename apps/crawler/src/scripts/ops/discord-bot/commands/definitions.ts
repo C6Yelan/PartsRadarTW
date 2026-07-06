@@ -1,4 +1,5 @@
 // apps/crawler/src/scripts/ops/discord-bot/commands/definitions.ts
+// 定義要註冊到 Discord 的 slash command 結構，集中管理指令名稱、選項、context 與權限邊界。
 
 import {
   DISCORD_APPLICATION_CONTEXT_BOT_DM,
@@ -11,6 +12,7 @@ import {
   MAX_PRICE_REPORT_ITEMS,
 } from "../constants";
 
+// 建立 /price-report 指令定義，包含立即產生報告與管理個人每日報告設定的子命令。
 export function createPriceReportCommand(): Record<string, unknown> {
   return {
     name: "price-report",
@@ -54,6 +56,7 @@ export function createPriceReportCommand(): Record<string, unknown> {
   };
 }
 
+// 建立 /watch 指令定義，作為目標價提醒管理介面的入口。
 export function createWatchCommand(): Record<string, unknown> {
   return {
     name: "watch",
@@ -64,6 +67,7 @@ export function createWatchCommand(): Record<string, unknown> {
   };
 }
 
+// 建立 /public-report 指令定義；限制在 guild context 並要求管理伺服器權限。
 export function createPublicReportCommand(): Record<string, unknown> {
   return {
     name: "public-report",
@@ -92,6 +96,7 @@ export function createPublicReportCommand(): Record<string, unknown> {
   };
 }
 
+// 建立 /bot help 指令定義，提供 Discord bot 內建功能說明入口。
 export function createBotCommand(): Record<string, unknown> {
   return {
     name: "bot",

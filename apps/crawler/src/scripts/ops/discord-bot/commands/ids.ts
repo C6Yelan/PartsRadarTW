@@ -1,7 +1,9 @@
 // apps/crawler/src/scripts/ops/discord-bot/commands/ids.ts
+// 集中定義 Discord component custom_id 與 select value，讓元件產生與 interaction parser 共用同一組穩定識別字。
 
 import { MAX_PRICE_REPORT_KEYWORD_GROUPS } from "../constants";
 
+// 個人 price-report 設定面板、modal 與 select menu 使用的 component id。
 export const PRICE_REPORT_SETTINGS_OPEN_CUSTOM_ID = "price-report:settings:open";
 export const PRICE_REPORT_SETTINGS_ENABLE_CUSTOM_ID = "price-report:settings:enable";
 export const PRICE_REPORT_SETTINGS_DISABLE_CUSTOM_ID = "price-report:settings:disable";
@@ -24,6 +26,7 @@ export const PRICE_REPORT_CONTENT_PRICE_RISES_VALUE = "price_rises";
 export const PRICE_REPORT_CONTENT_NEW_PRODUCTS_VALUE = "new_products";
 export const PRICE_REPORT_CATEGORY_OPTION_LIMIT = 25;
 
+// 伺服器 public-report 設定面板、modal 與 select menu 使用的 component id。
 export const PUBLIC_REPORT_SET_CHANNEL_CUSTOM_ID = "public-report:set-channel";
 export const PUBLIC_REPORT_ENABLE_CUSTOM_ID = "public-report:enable";
 export const PUBLIC_REPORT_DISABLE_CUSTOM_ID = "public-report:disable";
@@ -39,6 +42,7 @@ export const PUBLIC_REPORT_LIMIT_CUSTOM_ID = "public-report:limit";
 export const PUBLIC_REPORT_LIMIT_MODAL_CUSTOM_ID = "public-report:limit-modal";
 export const PUBLIC_REPORT_MAX_ITEMS_CUSTOM_ID = "public-report:max-items";
 
+// 目標價 watch 管理介面使用的 component id；prefix 型 id 會在後方附加 watch id 或列表狀態。
 export const WATCH_CREATE_MODAL_CUSTOM_ID = "watch:create-modal";
 export const WATCH_EDIT_MODAL_CUSTOM_ID_PREFIX = "watch:edit-modal:";
 export const WATCH_PRODUCT_CUSTOM_ID = "watch:product";
@@ -58,6 +62,7 @@ export const WATCH_BULK_REMOVE_SELECT_CUSTOM_ID_PREFIX = "watch:bulk-remove-sele
 export const WATCH_BULK_REMOVE_CONFIRM_CUSTOM_ID_PREFIX = "watch:bulk-remove-confirm:";
 export const WATCH_BULK_REMOVE_CANCEL_CUSTOM_ID_PREFIX = "watch:bulk-remove-cancel:";
 
+// 共用於個人與公開報告設定的關鍵字輸入說明，需跟 keyword parser 的分組限制保持一致。
 export const PRICE_REPORT_KEYWORD_FORMAT_DESCRIPTION =
   "**格式說明**\n" +
   "留空：不限制商品名稱。\n" +

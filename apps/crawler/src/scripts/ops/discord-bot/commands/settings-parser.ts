@@ -1,4 +1,5 @@
 // apps/crawler/src/scripts/ops/discord-bot/commands/settings-parser.ts
+// 解析 price-report 與 public-report 設定面板的 component interaction 與 modal submit payload。
 
 import type {
   DiscordInteraction,
@@ -47,6 +48,7 @@ import {
 } from "./settings-input";
 import { readSubmittedComponentValue } from "./submitted-components";
 
+// 將個人 price-report 設定面板的 button/select custom_id 收斂成 handler 可分派的 component command。
 export function parsePriceReportComponentInteraction(
   interaction: DiscordInteraction,
 ): ParsedPriceReportComponent | null {
@@ -116,6 +118,7 @@ export function parsePriceReportComponentInteraction(
   return null;
 }
 
+// 將 public-report 管理面板的 button/select custom_id 收斂成 handler 可分派的 component command。
 export function parsePublicReportComponentInteraction(
   interaction: DiscordInteraction,
 ): ParsedPublicReportComponent | null {
@@ -169,6 +172,7 @@ export function parsePublicReportComponentInteraction(
   return null;
 }
 
+// 解析個人 price-report modal submit，保留輸入值與驗證結果，讓 handler 決定錯誤回覆或寫入設定。
 export function parsePriceReportModalSubmit(
   interaction: DiscordInteraction,
 ): ParsedPriceReportModal | null {
@@ -218,6 +222,7 @@ export function parsePriceReportModalSubmit(
   return null;
 }
 
+// 解析 public-report modal submit，和個人報告共用輸入驗證規則但輸出 public-report 專用 command。
 export function parsePublicReportModalSubmit(
   interaction: DiscordInteraction,
 ): ParsedPublicReportModal | null {

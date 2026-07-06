@@ -1,4 +1,5 @@
 // apps/crawler/src/scripts/ops/discord-bot/commands/watch-parser.ts
+// 解析目標價 watch 的 Discord component 與 modal submit，將 custom_id 與輸入值轉成內部 action。
 
 import { MAX_TARGET_PRICE } from "../constants";
 import type {
@@ -30,6 +31,7 @@ import {
 } from "./ids";
 import { readSubmittedComponentValue } from "./submitted-components";
 
+// 解析目標價 watch 訊息元件互動，保留列表頁碼、篩選與排序狀態供 handler 更新畫面。
 export function parseTargetPriceWatchComponentInteraction(
   interaction: DiscordInteraction,
 ): ParsedTargetPriceWatchComponent | null {
@@ -173,6 +175,7 @@ export function parseTargetPriceWatchComponentInteraction(
   return null;
 }
 
+// 解析新增與編輯 watch 的 modal submit，先做基本輸入驗證再交給後續 handler 執行寫入。
 export function parseTargetPriceWatchModalSubmit(
   interaction: DiscordInteraction,
 ): ParsedTargetPriceWatchModal | null {
@@ -218,6 +221,7 @@ export function parseTargetPriceWatchModalSubmit(
   return null;
 }
 
+// 解析帶有 watch id 與列表狀態的 action custom_id，供 edit/remove/confirm/cancel 共用。
 function parseWatchActionCustomId(
   customId: string | undefined,
   prefix: string,
@@ -245,6 +249,7 @@ function parseWatchActionCustomId(
   };
 }
 
+// 解析 watch 管理清單的頁碼、狀態篩選與排序；缺值或非法值一律回到安全預設。
 function parseWatchListState(value: string | undefined): {
   page: number;
   statusFilter: TargetPriceWatchStatusFilter;
@@ -259,20 +264,24 @@ function parseWatchListState(value: string | undefined): {
   };
 }
 
+// 將 Discord select 的狀態值收斂成 watch 清單支援的篩選 enum。
 function parseWatchStatusFilter(value: unknown): TargetPriceWatchStatusFilter | null {
   return value === "all" || value === "reached" || value === "unreached" ? value : null;
 }
 
+// 將 Discord select 的排序值收斂成 watch 清單支援的排序 enum。
 function parseWatchSortKey(value: unknown): TargetPriceWatchSortKey | null {
   return value === "recent" || value === "target" || value === "current" ? value : null;
 }
 
+// 驗證批次刪除確認 token 的基本格式，避免接受明顯錯誤的 custom_id payload。
 function parseWatchToken(value: string | undefined): string | null {
   const token = value?.trim() ?? "";
 
   return /^[0-9a-f-]{36}$/i.test(token) ? token : null;
 }
 
+// 解析列表頁碼；任何非法值都回到第一頁，避免互動狀態破壞清單導覽。
 function parsePage(value: unknown): number {
   if (typeof value !== "string" || !/^[0-9]+$/.test(value)) {
     return 0;
@@ -283,6 +292,7 @@ function parsePage(value: unknown): number {
   return Number.isSafeInteger(page) && page >= 0 ? page : 0;
 }
 
+// 驗證目標價輸入必須是允許範圍內的新台幣整數，避免不合法金額進入 watch 寫入流程。
 function parseTargetPriceInput(value: unknown): number | null {
   if (typeof value !== "string" || !/^(0|[1-9][0-9]*)$/.test(value.trim())) {
     return null;

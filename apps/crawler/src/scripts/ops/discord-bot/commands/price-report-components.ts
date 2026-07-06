@@ -1,4 +1,6 @@
 // apps/crawler/src/scripts/ops/discord-bot/commands/price-report-components.ts
+// 產生個人 price-report 設定面板與 modal component，讓 interaction handler 可重用同一組 Discord UI contract。
+
 import {
   DISCORD_BUTTON_STYLE_DANGER,
   DISCORD_BUTTON_STYLE_PRIMARY,
@@ -36,6 +38,7 @@ import {
   PRICE_REPORT_SETTINGS_WINDOW_CUSTOM_ID,
 } from "./ids";
 
+// 建立個人 price-report 設定面板的 select menu 與操作按鈕，對應 settings parser 的 custom_id contract。
 export function createPriceReportSettingsComponents({
   windowHours,
   categories,
@@ -183,6 +186,7 @@ export function createPriceReportSettingsComponents({
   ];
 }
 
+// 建立每日報告發送時間與最多商品數設定 modal，交由 modal submit parser 驗證輸入內容。
 export function createPriceReportTimeLimitModal({
   maxItems,
   timeValue,
@@ -228,6 +232,7 @@ export function createPriceReportTimeLimitModal({
   };
 }
 
+// 建立商品名稱關鍵字設定 modal，保留格式說明並讓 parser 統一處理空值、分組與長度限制。
 export function createPriceReportKeywordModal({
   keywordValue,
 }: {

@@ -1,4 +1,5 @@
 // apps/crawler/src/scripts/ops/discord-bot/commands/watch-components.ts
+// 產生目標價 watch 的新增與編輯 modal，維持 watch handler 與 parser 共用的 Discord UI contract。
 
 import {
   DISCORD_COMPONENT_TYPE_LABEL,
@@ -18,6 +19,7 @@ import {
   WATCH_TARGET_PRICE_CUSTOM_ID,
 } from "./ids";
 
+// 建立新增目標價 watch 的 modal，讓使用者輸入 PartsRadarTW 商品識別與目標價格。
 export function createWatchModal({
   productValue = "",
   targetPriceValue = "",
@@ -63,6 +65,7 @@ export function createWatchModal({
   };
 }
 
+// 建立修改既有 watch 目標價格的 modal，並把列表狀態編入 custom_id 供提交後回到原頁。
 export function createWatchEditModal({
   watchId,
   targetPrice,

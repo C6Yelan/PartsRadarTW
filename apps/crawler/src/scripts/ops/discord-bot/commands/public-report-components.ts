@@ -1,4 +1,6 @@
 // apps/crawler/src/scripts/ops/discord-bot/commands/public-report-components.ts
+// 產生 public-report 管理面板與 modal component，維持伺服器公開報告設定的 Discord UI contract。
+
 import {
   DISCORD_BUTTON_STYLE_DANGER,
   DISCORD_BUTTON_STYLE_PRIMARY,
@@ -36,6 +38,7 @@ import {
   PUBLIC_REPORT_SET_CHANNEL_CUSTOM_ID,
 } from "./ids";
 
+// 建立 public-report 設定面板，依目前頻道設定狀態控制分類、篩選、測試與啟停操作。
 export function createPublicReportSettingsComponents({
   hasChannel,
   enabled,
@@ -183,6 +186,7 @@ export function createPublicReportSettingsComponents({
   ];
 }
 
+// 建立公開報告顯示上限設定 modal，交由 modal submit parser 驗證輸入範圍。
 export function createPublicReportLimitModal({ maxItems }: { maxItems: number }): DiscordModal {
   return {
     custom_id: PUBLIC_REPORT_LIMIT_MODAL_CUSTOM_ID,
@@ -207,6 +211,7 @@ export function createPublicReportLimitModal({ maxItems }: { maxItems: number })
   };
 }
 
+// 建立公開報告商品關鍵字 modal，與個人報告共用關鍵字格式說明與 parser 規則。
 export function createPublicReportKeywordModal({
   keywordValue,
 }: {
