@@ -1,7 +1,10 @@
 // apps/crawler/src/scripts/ops/discord-bot/interactions/bot-help.ts
+// 組裝 /bot help 回覆訊息，提供 Discord 使用者可見的 bot 功能摘要。
+
 import { DISCORD_EMBED_COLOR } from "../constants";
 import type { DiscordBotMessage } from "../types";
 
+// 建立 Discord bot 說明 embed，列出目前公開註冊的主要 slash command。
 export function createBotHelpMessage(): DiscordBotMessage {
   return {
     embeds: [

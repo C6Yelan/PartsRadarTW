@@ -1,4 +1,5 @@
 // apps/crawler/src/scripts/ops/discord-bot/interactions/modal-submit/watch.ts
+// 處理目標價 watch modal submit，協調輸入驗證回覆、watch 寫入與管理面板重繪。
 
 import type { parseTargetPriceWatchModalSubmit } from "../../commands";
 import {
@@ -25,6 +26,7 @@ import {
 
 type TargetPriceWatchModalSubmit = NonNullable<ReturnType<typeof parseTargetPriceWatchModalSubmit>>;
 
+// 根據 watch modal parser 結果執行新增或編輯流程；驗證失敗時直接回覆使用者，不進入寫入。
 export async function handleTargetPriceWatchModalSubmit({
   client,
   interaction,

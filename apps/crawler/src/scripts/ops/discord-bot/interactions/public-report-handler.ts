@@ -1,4 +1,5 @@
 // apps/crawler/src/scripts/ops/discord-bot/interactions/public-report-handler.ts
+// 處理 public-report 設定面板的 component interaction，協調頻道設定、啟停、篩選更新與測試發送。
 
 import {
   createPublicReportKeywordModal,
@@ -32,6 +33,7 @@ import {
 
 type PublicReportComponent = NonNullable<ReturnType<typeof parsePublicReportComponentInteraction>>;
 
+// 根據 public-report component command 執行對應互動；只允許在伺服器頻道內更新公開報告設定。
 export async function handlePublicReportComponentInteraction({
   client,
   interaction,

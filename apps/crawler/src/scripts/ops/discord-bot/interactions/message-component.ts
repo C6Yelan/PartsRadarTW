@@ -1,4 +1,5 @@
 // apps/crawler/src/scripts/ops/discord-bot/interactions/message-component.ts
+// 分派 Discord message component interaction，協調設定面板、公開報告與 watch 管理元件的 handler。
 
 import {
   parsePriceReportComponentInteraction,
@@ -16,6 +17,7 @@ import {
 } from "./responses";
 import { handleTargetPriceWatchComponentInteraction } from "./watch-handler";
 
+// 處理 button/select 類互動入口，先解析 component 所屬功能，再套用功能開關與使用者識別檢查。
 export async function handleMessageComponentInteraction({
   client,
   interaction,

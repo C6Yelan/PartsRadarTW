@@ -1,4 +1,5 @@
 // apps/crawler/src/scripts/ops/discord-bot/interactions/watch-handler.ts
+// 處理 target-price watch 管理面板的 component interaction，協調新增、編輯、移除、批次移除與列表狀態切換。
 
 import {
   createWatchEditModal,
@@ -32,6 +33,7 @@ type TargetPriceWatchComponent = NonNullable<
   ReturnType<typeof parseTargetPriceWatchComponentInteraction>
 >;
 
+// 根據 watch component action 執行對應互動；所有查詢與寫入都以 discordUserId 綁定目前使用者。
 export async function handleTargetPriceWatchComponentInteraction({
   client,
   interaction,

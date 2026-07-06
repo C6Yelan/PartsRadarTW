@@ -1,4 +1,5 @@
 // apps/crawler/src/scripts/ops/discord-bot/interactions/price-report-handler.ts
+// 處理個人 price-report 設定面板的 component interaction，協調預覽、modal 開啟與設定更新。
 
 import {
   createPriceReportKeywordModal,
@@ -34,6 +35,7 @@ import {
 
 type PriceReportComponent = NonNullable<ReturnType<typeof parsePriceReportComponentInteraction>>;
 
+// 根據 price-report component command 執行對應互動；會保留既有設定並只更新使用者操作的欄位。
 export async function handlePriceReportComponentInteraction({
   client,
   interaction,

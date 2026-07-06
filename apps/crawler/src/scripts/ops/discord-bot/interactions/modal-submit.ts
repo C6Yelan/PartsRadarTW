@@ -1,4 +1,5 @@
 // apps/crawler/src/scripts/ops/discord-bot/interactions/modal-submit.ts
+// 分派 Discord modal submit interaction，處理 price-report、public-report 與 watch 表單提交流程。
 
 import {
   parsePriceReportModalSubmit,
@@ -35,6 +36,7 @@ import {
 } from "./responses";
 import { handleTargetPriceWatchModalSubmit } from "./modal-submit/watch";
 
+// 處理 modal submit 入口，先解析表單來源，再依功能開關、使用者與輸入驗證結果執行設定更新。
 export async function handleModalSubmitInteraction({
   client,
   interaction,

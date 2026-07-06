@@ -1,4 +1,5 @@
 // apps/crawler/src/scripts/ops/discord-bot/interactions/application-command.ts
+// 分派 Discord slash command interaction，協調功能開關、使用者識別、冷卻限制與各功能 handler。
 
 import {
   parseBotInteraction,
@@ -38,6 +39,7 @@ import {
   readTargetPriceWatchManagerPage,
 } from "./watch-manager";
 
+// 處理 slash command 入口，依 /bot、/price-report、/public-report、/watch 分派到對應互動流程。
 export async function handleApplicationCommandInteraction({
   client,
   interaction,

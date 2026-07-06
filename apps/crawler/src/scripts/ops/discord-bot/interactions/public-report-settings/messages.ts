@@ -1,4 +1,5 @@
 // apps/crawler/src/scripts/ops/discord-bot/interactions/public-report-settings/messages.ts
+// 組裝 public-report 設定面板、狀態訊息、權限提醒與測試發送結果文字。
 
 import { createPublicReportSettingsComponents } from "../../commands";
 import {
@@ -28,6 +29,7 @@ import type {
 } from "../../types";
 import { formatPriceReportDeliveryError } from "../price-report-settings";
 
+// public-report 設定面板訊息所需的資料契約，由設定讀取流程與 interaction handler 共用。
 export interface PublicPriceReportSettingsPanel {
   setting: PublicPriceReportSetting | null;
   latestDelivery: PublicPriceReportDeliveryStatus | null;
@@ -37,6 +39,7 @@ export interface PublicPriceReportSettingsPanel {
   notice?: string;
 }
 
+// 建立可互動的 public-report 設定面板，包含目前設定摘要與設定用 component。
 export function createPublicPriceReportSettingsPanelMessage({
   setting,
   latestDelivery,
@@ -70,6 +73,7 @@ export function createPublicPriceReportSettingsPanelMessage({
   };
 }
 
+// 建立只讀的 public-report 狀態訊息，用於 slash command 查詢目前設定與最近發送結果。
 export function createPublicPriceReportStatusMessage(
   panel: PublicPriceReportSettingsPanel,
 ): DiscordBotMessage {
@@ -84,6 +88,7 @@ export function createPublicPriceReportStatusMessage(
   };
 }
 
+// 依 Discord interaction 帶回的 app_permissions 判斷 bot 是否缺少公開報告發送所需權限。
 export function formatPublicReportBotPermissionNotice(
   interaction: DiscordInteraction,
   channelId: string,
@@ -106,6 +111,7 @@ export function formatPublicReportBotPermissionNotice(
   return `我目前無法在 <#${channelId}> 發送公開價格報告。請確認 PartsRadarTW bot 在該頻道具備「${missing.join("」與「")}」權限。`;
 }
 
+// 將測試公開報告的發送結果轉成使用者可讀訊息，並附上當次套用的篩選設定摘要。
 export function formatPublicReportPreviewNotice(
   result: PublicPriceReportPreviewResult,
   channelId: string,
@@ -133,6 +139,7 @@ export function formatPublicReportPreviewNotice(
   return formatDiscordDeliveryFailureForUser(result.message);
 }
 
+// 建立 public-report 設定 embed；互動面板與只讀狀態訊息共用相同欄位排列。
 function createPublicPriceReportSettingsEmbed({
   setting,
   latestDelivery,
@@ -209,6 +216,7 @@ function createPublicPriceReportSettingsEmbed({
   };
 }
 
+// 將最近一次公開報告 delivery 狀態轉成面板欄位文字，保留重試語意給維運判讀。
 function formatPublicReportDeliveryStatus(
   delivery: PublicPriceReportDeliveryStatus | null,
 ): string {
@@ -237,6 +245,7 @@ function formatPublicReportDeliveryStatus(
   return `${delivery.status}：${deliveredAt}，列出 ${delivery.itemCount} 筆。`;
 }
 
+// 摘要測試公開報告實際套用的分類、內容、關鍵字與列出上限。
 function formatPublicReportSettingSummary(
   setting: PublicPriceReportSetting,
   categories: PriceReportCategoryOption[],
@@ -251,12 +260,14 @@ function formatPublicReportSettingSummary(
   )}；最多 ${setting.maxItems} 筆。`;
 }
 
+// 檢查 Discord permission bitset 是否包含指定權限，避免用字串比對權限組合。
 function hasDiscordPermission(value: string | undefined, permission: bigint): boolean {
   const bitset = parseDiscordPermissionBitset(value);
 
   return bitset !== null && (bitset & permission) === permission;
 }
 
+// 將 Discord app_permissions 十進位字串轉為 bigint；非法值不丟錯，交由呼叫端視為無法確認。
 function parseDiscordPermissionBitset(value: string | undefined): bigint | null {
   if (!value || !/^(0|[1-9][0-9]*)$/.test(value)) {
     return null;
@@ -269,6 +280,7 @@ function parseDiscordPermissionBitset(value: string | undefined): bigint | null 
   }
 }
 
+// 判斷 Discord API 回覆是否是缺少權限，讓 preview 失敗時能顯示可操作的修正提示。
 function isDiscordMissingPermissionsError(message: string | null): boolean {
   const normalized = message?.toLowerCase() ?? "";
 

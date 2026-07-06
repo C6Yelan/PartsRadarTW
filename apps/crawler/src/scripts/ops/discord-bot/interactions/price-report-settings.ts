@@ -1,4 +1,6 @@
 // apps/crawler/src/scripts/ops/discord-bot/interactions/price-report-settings.ts
+// 組裝個人 price-report 設定面板，並提供表單驗證訊息、時間格式與分類選擇 helper。
+
 import { createPriceReportSettingsComponents, type parsePriceReportModalSubmit } from "../commands";
 import {
   DISCORD_EMBED_COLOR,
@@ -33,6 +35,7 @@ import type {
   PriceReportTimeOfDay,
 } from "../types";
 
+// 個人 price-report 設定面板所需資料，由 slash command、component handler 與 modal submit 共用。
 interface PriceReportSettingsPanel {
   setting: Awaited<ReturnType<typeof readPriceReportSetting>>;
   categories: PriceReportCategoryOption[];
@@ -41,6 +44,7 @@ interface PriceReportSettingsPanel {
   notice?: string;
 }
 
+// 讀取個人 price-report 設定面板資料，包含目前設定、可選分類與最近一次每日報告狀態。
 export async function readPriceReportSettingsPanel({
   client,
   discordUserId,
@@ -67,6 +71,7 @@ export async function readPriceReportSettingsPanel({
   };
 }
 
+// 建立個人 price-report 設定面板訊息，將設定摘要與互動元件保持同一份 filters 狀態。
 export function createPriceReportSettingsPanelMessage({
   setting,
   categories,
@@ -92,6 +97,7 @@ export function createPriceReportSettingsPanelMessage({
   };
 }
 
+// 將立即預覽 DM 的發送結果轉成設定面板 notice，避免暴露 Discord 原始錯誤細節。
 export function formatPriceReportPreviewDmNotice(result: PriceReportNowResult): string {
   if (result.status === "sent") {
     return `已傳送預覽 DM：列出 ${result.listedCount} 筆，送出 ${result.messageCount} 則訊息。`;
@@ -104,6 +110,7 @@ export function formatPriceReportPreviewDmNotice(result: PriceReportNowResult): 
   return formatDiscordDeliveryFailureForUser(result.message);
 }
 
+// 驗證分類 select 回傳值必須來自目前可見分類；空選或全選都代表不限制分類。
 export function parsePriceReportCategorySelection(
   values: string[],
   categories: PriceReportCategoryOption[],
@@ -133,6 +140,7 @@ export function parsePriceReportCategorySelection(
   return [...selectedIgrps].sort((left, right) => left - right);
 }
 
+// 建立個人 price-report modal 驗證錯誤訊息，讓 submit handler 共用同一組使用者回覆。
 export function formatPriceReportModalValidationMessage(
   modal: NonNullable<ReturnType<typeof parsePriceReportModalSubmit>>,
 ): string {
@@ -148,10 +156,12 @@ export function formatPriceReportModalValidationMessage(
   return messages.join("\n");
 }
 
+// 建立商品關鍵字輸入錯誤訊息，對齊 modal 說明中的長度與分組限制。
 export function formatPriceReportKeywordValidationMessage(): string {
   return `商品關鍵字最多 ${MAX_PRICE_REPORT_KEYWORD_LENGTH} 個字，且最多 ${MAX_PRICE_REPORT_KEYWORD_GROUPS} 組。`;
 }
 
+// 將 persisted window enum 轉回小時數；未知或未設定時回到 24 小時。
 export function resolveWindowHours(window: string | undefined): number {
   if (window === "HOURS_6") {
     return 6;
@@ -164,6 +174,7 @@ export function resolveWindowHours(window: string | undefined): number {
   return 24;
 }
 
+// 將既有 nextSendAt 轉為 modal 可用的台北時間；無法解析時回到 09:00。
 export function resolveTimeOfDay(value: Date | null | undefined): PriceReportTimeOfDay {
   const [hourValue, minuteValue] = formatTaipeiTimeInput(value).split(":");
   const hour = Number(hourValue);
@@ -174,6 +185,7 @@ export function resolveTimeOfDay(value: Date | null | undefined): PriceReportTim
     : { hour: 9, minute: 0 };
 }
 
+// 將 Date 格式化成台北時間 HH:mm，作為 modal 預填值與設定面板顯示。
 export function formatTaipeiTimeInput(value: Date | null | undefined): string {
   if (!value) {
     return "09:00";
@@ -191,6 +203,7 @@ export function formatTaipeiTimeInput(value: Date | null | undefined): string {
   return `${byType.get("hour")}:${byType.get("minute")}`;
 }
 
+// 建立個人 price-report 設定 embed，呈現目前篩選、排程時間與最近一次發送狀態。
 function createPriceReportSettingsEmbed({
   setting,
   categories,
@@ -255,6 +268,7 @@ function createPriceReportSettingsEmbed({
   };
 }
 
+// 將最近一次每日私訊報告 delivery 狀態轉成設定面板欄位文字。
 function formatPriceReportDeliveryStatus(delivery: PriceReportDeliveryStatus | null): string {
   if (!delivery) {
     return "尚無每日報告紀錄。";
@@ -277,6 +291,7 @@ function formatPriceReportDeliveryStatus(delivery: PriceReportDeliveryStatus | n
   return `${delivery.status}：${deliveredAt}，列出 ${delivery.itemCount} 筆。`;
 }
 
+// 將 Discord delivery 錯誤轉成短版使用者訊息，避免 embed 欄位過長。
 export function formatPriceReportDeliveryError(errorMessage: string | null): string {
   return formatDiscordBotText(formatDiscordDeliveryFailureForUser(errorMessage), 220);
 }

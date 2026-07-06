@@ -1,4 +1,6 @@
 // apps/crawler/src/scripts/ops/discord-bot/interactions/public-report-settings.ts
+// 提供 public-report interaction 共用流程，包含伺服器頻道 context、測試發送與設定面板資料讀取。
+
 import type { CommandCooldowns } from "../cooldowns";
 import { readPriceReportCategories } from "../price-report";
 import {
@@ -31,6 +33,7 @@ interface PublicReportInteractionContext {
   channelId: string;
 }
 
+// 從 Discord interaction 擷取 public-report 必要的伺服器與頻道資訊；DM 或缺少頻道時回傳 null。
 export function readPublicReportInteractionContext(
   interaction: DiscordInteraction,
 ): PublicReportInteractionContext | null {
@@ -40,6 +43,7 @@ export function readPublicReportInteractionContext(
   return discordGuildId && channelId ? { discordGuildId, channelId } : null;
 }
 
+// 執行 public-report 測試發送流程，套用使用者冷卻、頻道權限檢查與目前公開報告篩選設定。
 export async function sendPublicReportTest({
   client,
   interaction,
@@ -141,6 +145,7 @@ export async function sendPublicReportTest({
   });
 }
 
+// 讀取 public-report 設定面板所需資料，包含目前伺服器設定、可選分類與最近一次公開報告狀態。
 export async function readPublicPriceReportSettingsPanel({
   client,
   discordGuildId,
