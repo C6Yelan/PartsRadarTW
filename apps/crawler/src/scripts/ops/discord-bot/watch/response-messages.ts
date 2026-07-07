@@ -1,4 +1,6 @@
 // apps/crawler/src/scripts/ops/discord-bot/watch/response-messages.ts
+// 組裝目標價 watch 新增結果與單筆移除確認的 Discord 回覆訊息。
+
 import {
   WATCH_REMOVE_CANCEL_CUSTOM_ID_PREFIX,
   WATCH_REMOVE_CONFIRM_CUSTOM_ID_PREFIX,
@@ -24,6 +26,7 @@ import {
 } from "./message-formatting";
 import type { CreateTargetPriceWatchResult, TargetPriceWatchLookupResult } from "./records";
 
+// 將建立 watch 的 domain result 轉成使用者可讀回覆，成功時附上商品、目前價格與目標價。
 export function createTargetPriceWatchResponseMessage({
   result,
   publicBaseUrl,
@@ -95,6 +98,7 @@ export function createTargetPriceWatchResponseMessage({
   };
 }
 
+// 建立單筆移除確認訊息，保留目前列表狀態讓取消或確認後能回到原管理面板。
 export function createTargetPriceWatchRemovalConfirmationMessage({
   result,
   publicBaseUrl,

@@ -1,4 +1,5 @@
 // apps/crawler/src/scripts/ops/discord-bot/watch/list.ts
+// 讀取單一 Discord 使用者的目標價 watch 管理清單，套用狀態篩選、排序與分頁。
 
 import { MAX_TARGET_PRICE_WATCHES_PER_USER } from "../constants";
 import type {
@@ -18,6 +19,7 @@ import {
   type TargetPriceWatchlistResult,
 } from "./records";
 
+// 建立 watch 管理面板需要的清單結果，回傳當頁資料與分頁狀態。
 export async function readTargetPriceWatchlist({
   client,
   discordUserId,

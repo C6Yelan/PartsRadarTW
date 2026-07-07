@@ -1,4 +1,6 @@
 // apps/crawler/src/scripts/ops/discord-bot/watch/bulk-removal-messages.ts
+// 組裝目標價 watch 批次移除流程的選取頁與確認頁 Discord 訊息。
+// 僅供待移除的批次移除流程使用；新增功能不要再依賴此檔案。
 
 import {
   WATCH_BULK_REMOVE_CANCEL_CUSTOM_ID_PREFIX,
@@ -27,6 +29,7 @@ import {
 import type { TargetPriceWatchlistResult } from "./records";
 import { normalizeWatchId } from "./reference";
 
+// 建立批次移除的多選頁，讓使用者先選出要移除的 watch。
 export function createTargetPriceWatchBulkRemovalMessage({
   result,
   page,
@@ -105,6 +108,7 @@ export function createTargetPriceWatchBulkRemovalMessage({
   };
 }
 
+// 建立批次移除確認頁，只有在確認 token 仍有效時才會由 handler 執行實際停用。
 export function createTargetPriceWatchBulkRemovalConfirmationMessage({
   result,
   selectedWatchInputs,

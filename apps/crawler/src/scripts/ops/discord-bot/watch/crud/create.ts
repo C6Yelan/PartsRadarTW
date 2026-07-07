@@ -1,4 +1,5 @@
 // apps/crawler/src/scripts/ops/discord-bot/watch/crud/create.ts
+// 建立或重新啟用使用者的目標價 watch，處理商品驗證、上限檢查與通知游標初始化。
 
 import {
   MAX_TARGET_PRICE,
@@ -12,6 +13,7 @@ import {
   type CreateTargetPriceWatchResult,
 } from "../records";
 
+// 建立目標價 watch；若同一商品已有停用或既有 watch，會用 upsert 更新並重新啟用。
 export async function createTargetPriceWatch({
   client,
   discordUserId,
@@ -125,6 +127,7 @@ export async function createTargetPriceWatch({
   };
 }
 
+// 計算使用者目前啟用中的 watch 數量，用於新增不同商品前檢查每人上限。
 async function countActiveTargetPriceWatches({
   client,
   discordUserId,

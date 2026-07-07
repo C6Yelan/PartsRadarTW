@@ -1,4 +1,7 @@
 // apps/crawler/src/scripts/ops/discord-bot/watch/bulk-removal.ts
+// 管理目標價 watch 批次移除確認 token，限制確認流程只能由原使用者在短時間內完成。
+// 僅供待移除的批次移除流程使用；新增功能不要再依賴此檔案。
+
 import { randomUUID } from "node:crypto";
 import type { TargetPriceWatchSortKey, TargetPriceWatchStatusFilter } from "../types";
 

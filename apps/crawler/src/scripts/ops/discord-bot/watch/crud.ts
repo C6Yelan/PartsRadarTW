@@ -1,4 +1,5 @@
 // apps/crawler/src/scripts/ops/discord-bot/watch/crud.ts
+// 提供目標價 watch 的讀取、更新與停用操作，所有寫入都以 Discord 使用者隔離。
 
 import { MAX_TARGET_PRICE } from "../constants";
 import type { DiscordBotClient } from "../types";
@@ -14,6 +15,7 @@ import {
 
 export { createTargetPriceWatch } from "./crud/create";
 
+// 停用單一 watch；用 soft delete 保留歷史與 delivery 關聯。
 export async function disableTargetPriceWatch({
   client,
   discordUserId,
@@ -40,6 +42,7 @@ export async function disableTargetPriceWatch({
   });
 }
 
+// 僅供待移除的批次移除流程使用；新增功能不要再依賴此函式。
 export async function disableTargetPriceWatches({
   client,
   discordUserId,
@@ -73,6 +76,7 @@ export async function disableTargetPriceWatches({
   };
 }
 
+// 更新既有 watch 的目標價，並重設通知游標避免用舊價格立即觸發通知。
 export async function updateTargetPriceWatch({
   client,
   discordUserId,
@@ -134,6 +138,7 @@ export async function updateTargetPriceWatch({
       };
 }
 
+// 依使用者輸入的 watch reference 讀取單筆啟用中的 watch。
 export async function readTargetPriceWatch({
   client,
   discordUserId,
@@ -172,6 +177,7 @@ export async function readTargetPriceWatch({
   };
 }
 
+// 執行單筆 watch soft delete，並回傳停用前的 watch 資料供回覆訊息使用。
 async function disableTargetPriceWatchRecord({
   client,
   discordUserId,

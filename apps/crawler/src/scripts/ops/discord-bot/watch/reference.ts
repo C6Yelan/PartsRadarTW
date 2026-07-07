@@ -1,8 +1,11 @@
 // apps/crawler/src/scripts/ops/discord-bot/watch/reference.ts
+// 正規化目標價 watch 使用的商品 reference 與 watch id，隔離 Discord payload 與使用者輸入格式。
+
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export const WATCH_SELECT_VALUE_PREFIX = "watch:";
 
+// 將使用者貼上的商品 UUID、站內商品路徑或完整商品 URL 收斂成 product id。
 export function normalizeWatchProductReference(value: string): string | null {
   const input = value.trim();
   const normalizedDirectId = normalizeProductId(input);
@@ -24,6 +27,7 @@ export function normalizeWatchProductReference(value: string): string | null {
   }
 }
 
+// 將 watch select value 或內部 watch id 收斂成 UUID，避免 handler 直接信任 custom_id payload。
 export function normalizeWatchId(value: string | null): string | null {
   const normalized = value?.trim().toLowerCase() ?? "";
   const unprefixed = normalized.startsWith(WATCH_SELECT_VALUE_PREFIX)

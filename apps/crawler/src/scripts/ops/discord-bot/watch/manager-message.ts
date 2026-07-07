@@ -1,4 +1,5 @@
 // apps/crawler/src/scripts/ops/discord-bot/watch/manager-message.ts
+// 組裝目標價 watch 管理面板的 Discord embed、select menu、操作按鈕與分頁控制。
 
 import {
   WATCH_ADD_CUSTOM_ID,
@@ -47,6 +48,7 @@ const WATCH_MANAGER_GUIDE =
   "新增：貼商品頁網址與目標價。\n" +
   `管理：從選單選商品後編輯或移除，每人最多 ${MAX_TARGET_PRICE_WATCHES_PER_USER} 項。`;
 
+// 建立 /watch 管理面板訊息，依目前清單狀態呈現選取商品、管理操作與分頁控制。
 export function createTargetPriceWatchManagerMessage({
   result,
   publicBaseUrl,
@@ -201,6 +203,7 @@ export function createTargetPriceWatchManagerMessage({
   };
 }
 
+// 建立 watch 狀態篩選選單，讓目前管理面板可切換全部、已達標與未達標。
 function createStatusFilterRow(
   result: TargetPriceWatchlistResult,
   state: string,
@@ -239,6 +242,7 @@ function createStatusFilterRow(
   };
 }
 
+// 建立 watch 排序選單，讓目前管理面板可切換最近更新、目標價與目前價格排序。
 function createSortRow(
   result: TargetPriceWatchlistResult,
   state: string,
