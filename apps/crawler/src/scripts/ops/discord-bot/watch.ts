@@ -1,6 +1,6 @@
 // apps/crawler/src/scripts/ops/discord-bot/watch.ts
+// 集中轉出 Discord 目標價 watch 管理流程使用的 CRUD、清單、訊息與回覆 helper。
 
-// Public module boundary for Discord target-price watch management.
 export {
   consumeTargetPriceWatchBulkRemovalConfirmation,
   createTargetPriceWatchBulkRemovalConfirmation,

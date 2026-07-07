@@ -1,6 +1,6 @@
 // apps/crawler/src/scripts/ops/discord-bot/price-report.ts
+// 集中提供 Discord 個人價格報告流程對外使用的讀取、發送、排程、篩選與訊息組裝入口。
 
-// Public module boundary for Discord personal and public price report flows.
 export {
   filterNewProductsForReport,
   filterPriceChangesForReport,

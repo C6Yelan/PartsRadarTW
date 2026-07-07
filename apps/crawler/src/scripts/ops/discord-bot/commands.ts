@@ -1,6 +1,7 @@
 // apps/crawler/src/scripts/ops/discord-bot/commands.ts
+// 集中提供 Discord slash command 定義、互動 parser、component builder 與 custom_id 常數出口。
 
-// Public module boundary for Discord slash command definitions and parsers.
+// Discord bot 內部的 commands 模組邊界；互動 handler 透過此檔取得指令相關能力。
 export {
   createBotCommand,
   createPriceReportCommand,

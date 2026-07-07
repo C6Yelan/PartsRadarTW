@@ -1,4 +1,5 @@
 // apps/crawler/src/scripts/ops/discord-bot/interaction-responses.ts
+// 封裝 Discord interaction callback 與 deferred response API，統一建立 payload 與失敗處理。
 
 import {
   DISCORD_EPHEMERAL_MESSAGE_FLAG,
@@ -18,6 +19,7 @@ import type {
   FetchImpl,
 } from "./types";
 
+// 立即回覆 interaction 訊息；預設使用 ephemeral，避免指令錯誤或個人設定公開到頻道。
 export async function sendInteractionResponse({
   token,
   apiBaseUrl,
@@ -48,6 +50,7 @@ export async function sendInteractionResponse({
   assertDiscordInteractionResponseSucceeded("message", result);
 }
 
+// 回覆 modal callback，讓 Discord 開啟使用者輸入表單。
 export async function sendModalInteractionResponse({
   token,
   apiBaseUrl,
@@ -76,6 +79,7 @@ export async function sendModalInteractionResponse({
   assertDiscordInteractionResponseSucceeded("modal", result);
 }
 
+// 先延後回覆需要較久處理的 interaction，後續再 patch original response。
 export async function deferInteractionResponse({
   token,
   apiBaseUrl,
@@ -104,6 +108,7 @@ export async function deferInteractionResponse({
   assertDiscordInteractionResponseSucceeded("deferred", result);
 }
 
+// 延後更新既有 message component，避免按鈕或選單互動超過 Discord callback 時限。
 export async function deferInteractionMessageUpdate({
   token,
   apiBaseUrl,
@@ -129,6 +134,7 @@ export async function deferInteractionMessageUpdate({
   assertDiscordInteractionResponseSucceeded("deferred update", result);
 }
 
+// 編輯先前 deferred 的 original interaction response，送出最終訊息內容。
 export async function editDeferredInteractionResponse({
   token,
   applicationId,
@@ -158,6 +164,7 @@ export async function editDeferredInteractionResponse({
   assertDiscordInteractionResponseSucceeded("deferred message", result);
 }
 
+// 將 Discord REST 失敗統一轉成例外，交由上層安全格式化後記錄或回覆。
 function assertDiscordInteractionResponseSucceeded(
   responseKind: "message" | "modal" | "deferred" | "deferred update" | "deferred message",
   result: DiscordRestResult<unknown>,

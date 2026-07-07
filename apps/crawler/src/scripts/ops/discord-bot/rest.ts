@@ -1,4 +1,5 @@
 // apps/crawler/src/scripts/ops/discord-bot/rest.ts
+// 提供 Discord REST facade：訊息發送、interaction 回覆轉出口，以及使用者可見錯誤訊息泛化。
 
 import { createDiscordMessagePayload } from "./message-payload";
 import { sendDiscordRestRequest } from "./rest-request";
@@ -22,6 +23,7 @@ export {
 export { formatDiscordRestFailure } from "./rest-failure";
 export { sendDiscordRestRequest } from "./rest-request";
 
+// 將內部 Discord delivery 錯誤摘要轉成使用者可理解訊息，避免直接暴露 API 原始錯誤。
 export function formatDiscordDeliveryFailureForUser(errorMessage: string | null): string {
   const issue = classifyDiscordDeliveryFailure(errorMessage);
 
@@ -52,10 +54,12 @@ export function formatDiscordDeliveryFailureForUser(errorMessage: string | null)
   return "Discord 回傳通知失敗；系統已保留紀錄供維運檢查。若持續發生，請重新邀請 bot 或聯絡維運者。";
 }
 
+// 將 Discord rate limit 統一轉成使用者可見的稍後重試提示。
 export function formatDiscordRateLimitForUser(): string {
   return "Discord 暫時限制訊息發送，系統會稍後重試。";
 }
 
+// 建立使用者 DM channel 後逐則發送訊息，回傳給排程與互動流程判斷的 delivery result。
 export async function sendDiscordDirectMessages({
   token,
   apiBaseUrl,
@@ -121,6 +125,7 @@ export async function sendDiscordDirectMessages({
   });
 }
 
+// 向指定 Discord channel 逐則發送訊息，遇到限流或失敗時保留已送出數量。
 export async function sendDiscordChannelMessages({
   token,
   apiBaseUrl,
@@ -177,6 +182,7 @@ export async function sendDiscordChannelMessages({
   };
 }
 
+// 透過 interaction webhook 發送多則回覆；第一則覆寫 deferred original message，後續使用 follow-up。
 export async function sendDiscordInteractionMessages({
   token,
   applicationId,
@@ -242,6 +248,7 @@ export async function sendDiscordInteractionMessages({
   };
 }
 
+// 以 Discord error code / message 做最小分類，讓使用者端只看到泛化後的處理建議。
 function classifyDiscordDeliveryFailure(
   errorMessage: string | null,
 ):

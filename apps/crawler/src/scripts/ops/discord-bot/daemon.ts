@@ -1,4 +1,5 @@
 // apps/crawler/src/scripts/ops/discord-bot/daemon.ts
+// 啟動 Discord bot daemon，協調 slash command 註冊、gateway session 與背景通知掃描。
 
 import { toSafeCliErrorMessage } from "../../shared/script-utils";
 import { CommandCooldowns } from "./cooldowns";
@@ -27,6 +28,7 @@ import { createOpsLogger } from "../shared/logger";
 
 const logger = createOpsLogger();
 
+// 執行 Discord bot 主程序；gateway 負責互動事件，notification loop 負責排程與目標價通知。
 export async function runDiscordBotDaemon({
   client,
   options,
@@ -95,6 +97,7 @@ export async function runDiscordBotDaemon({
   logMessage("Discord bot daemon stopped.");
 }
 
+// 以可中止 sleep 跑背景通知迴圈，讓 shutdown 時能等待當前 cycle 結束。
 async function runNotificationLoop({
   client,
   options,
@@ -126,6 +129,7 @@ async function runNotificationLoop({
   }
 }
 
+// 執行單輪背景通知掃描，依 feature flag 分別處理目標價、公開報告與個人排程報告。
 export async function runDiscordBotNotificationCycle({
   client,
   options,

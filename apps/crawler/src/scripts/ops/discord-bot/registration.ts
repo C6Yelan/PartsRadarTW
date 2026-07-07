@@ -1,4 +1,5 @@
 // apps/crawler/src/scripts/ops/discord-bot/registration.ts
+// 負責把 PartsRadarTW Discord bot 的 slash commands 註冊到 Discord application。
 
 import {
   createBotCommand,
@@ -9,6 +10,7 @@ import {
 import { sendDiscordRestRequest } from "./rest";
 import type { DiscordBotOptions, DiscordRestResult, FetchImpl } from "./types";
 
+// 使用 Discord application commands bulk overwrite API，同步目前程式定義的指令集合。
 export async function registerDiscordBotCommands({
   token,
   applicationId,

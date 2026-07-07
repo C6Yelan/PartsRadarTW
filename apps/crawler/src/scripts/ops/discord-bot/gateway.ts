@@ -1,4 +1,5 @@
 // apps/crawler/src/scripts/ops/discord-bot/gateway.ts
+// 管理 Discord Gateway WebSocket session，處理 identify、heartbeat、互動事件與關閉流程。
 
 import { toSafeCliErrorMessage } from "../../shared/script-utils";
 import {
@@ -23,6 +24,7 @@ import type {
   ShutdownController,
 } from "./types";
 
+// 執行單次 Gateway session；連線關閉後交回 daemon，由外層決定是否重連。
 export async function runGatewaySession({
   client,
   options,
@@ -121,6 +123,7 @@ export async function runGatewaySession({
   });
 }
 
+// 向 Discord Gateway identify，目前不要求 gateway intents，只接收 interaction dispatch。
 function sendIdentifyPayload(socket: MinimalWebSocket, token: string): void {
   sendGatewayPayload(socket, {
     op: GATEWAY_OP_IDENTIFY,
@@ -136,12 +139,14 @@ function sendIdentifyPayload(socket: MinimalWebSocket, token: string): void {
   });
 }
 
+// 只在 WebSocket 開啟時送出 payload，避免 shutdown 或 reconnect 期間丟出 send 例外。
 function sendGatewayPayload(socket: MinimalWebSocket, payload: Record<string, unknown>): void {
   if (socket.readyState === GATEWAY_READY_STATE_OPEN) {
     socket.send(JSON.stringify(payload));
   }
 }
 
+// 讀取 Discord HELLO payload 的 heartbeat interval，缺值時回到保守預設。
 function readHeartbeatInterval(value: unknown): number {
   if (
     value &&
@@ -156,6 +161,7 @@ function readHeartbeatInterval(value: unknown): number {
   return 45_000;
 }
 
+// 將不同 WebSocket runtime 可能給出的 message data 格式收斂成 UTF-8 字串。
 function readWebSocketMessageData(event: { data?: unknown }): string {
   if (typeof event.data === "string") {
     return event.data;
@@ -172,6 +178,7 @@ function readWebSocketMessageData(event: { data?: unknown }): string {
   return String(event.data ?? "");
 }
 
+// 取得目前 Node.js runtime 提供的 WebSocket constructor，讓測試可注入替身。
 export function getWebSocketConstructor(): MinimalWebSocketConstructor {
   const WebSocketConstructor = (globalThis as { WebSocket?: MinimalWebSocketConstructor })
     .WebSocket;
@@ -183,6 +190,7 @@ export function getWebSocketConstructor(): MinimalWebSocketConstructor {
   return WebSocketConstructor;
 }
 
+// 建立 SIGINT/SIGTERM shutdown controller，提供 gateway 與背景 loop 共用的停止旗標與可中止 sleep。
 export function createShutdownController(logMessage: (message: string) => void): ShutdownController {
   let stopRequested = false;
   let wakeSleeper: (() => void) | null = null;

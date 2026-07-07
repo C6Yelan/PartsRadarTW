@@ -1,4 +1,5 @@
 // apps/crawler/src/scripts/ops/discord-bot/message-payload.ts
+// 將內部 Discord 訊息模型轉成 REST payload，套用欄位長度裁切與 mention 安全預設。
 
 import {
   DISCORD_EMBED_DESCRIPTION_MAX_LENGTH,
@@ -12,6 +13,7 @@ import {
 import { formatDiscordBotText } from "./message-text";
 import type { DiscordBotEmbed, DiscordBotMessage } from "./types";
 
+// 建立可送給 Discord REST API 的訊息 payload，預設禁止 allowed_mentions 自動 ping。
 export function createDiscordMessagePayload(
   message: DiscordBotMessage | string,
   ephemeral = false,
@@ -29,6 +31,7 @@ export function createDiscordMessagePayload(
   };
 }
 
+// 正規化訊息內容與 embed；若訊息被裁切到空內容，提供安全 fallback 文案。
 function normalizeDiscordBotMessage(message: DiscordBotMessage | string): DiscordBotMessage {
   if (typeof message === "string") {
     return {
@@ -61,6 +64,7 @@ function normalizeDiscordBotMessage(message: DiscordBotMessage | string): Discor
   };
 }
 
+// 套用 Discord embed 單欄位限制；跨 embed 的總長度分段由上游版面 helper 負責。
 function normalizeDiscordBotEmbed(embed: DiscordBotEmbed): DiscordBotEmbed {
   return {
     title:

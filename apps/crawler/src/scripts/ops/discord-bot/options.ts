@@ -1,4 +1,5 @@
 // apps/crawler/src/scripts/ops/discord-bot/options.ts
+// 解析 Discord bot CLI/env 設定，包含 token、API 端點、功能旗標與排程參數。
 
 import { normalizePublicBaseUrl } from "../shared/public-base-url";
 import { getStringArg } from "../../shared/script-utils";
@@ -14,6 +15,7 @@ import {
 } from "./constants";
 import type { DiscordBotOptions } from "./types";
 
+// 建立 Discord bot runtime options；CLI 只覆寫少數維運參數，其餘以 env/default 為主。
 export function parseDiscordBotOptions(
   args: string[],
   env: NodeJS.ProcessEnv = process.env,
@@ -67,6 +69,7 @@ export function parseDiscordBotOptions(
   };
 }
 
+// 讀取必要 secret/env；placeholder 視為未設定，避免用範例值啟動 bot。
 function readRequiredSecret(env: NodeJS.ProcessEnv, key: string): string {
   const value = env[key]?.trim();
 
@@ -77,6 +80,7 @@ function readRequiredSecret(env: NodeJS.ProcessEnv, key: string): string {
   return value;
 }
 
+// Discord application id 必須是 snowflake 數字字串，先在啟動期阻擋明顯錯誤設定。
 function readRequiredSnowflake(env: NodeJS.ProcessEnv, key: string): string {
   const value = readRequiredSecret(env, key);
 
@@ -87,6 +91,7 @@ function readRequiredSnowflake(env: NodeJS.ProcessEnv, key: string): string {
   return value;
 }
 
+// 解析 feature flag env，只接受明確 true/false 語意，避免拼字錯誤被默默套用預設值。
 function readBooleanEnv(env: NodeJS.ProcessEnv, key: string, fallback: boolean): boolean {
   const value = env[key]?.trim().toLowerCase();
 
@@ -105,6 +110,7 @@ function readBooleanEnv(env: NodeJS.ProcessEnv, key: string, fallback: boolean):
   throw new Error(`${key} must be true or false.`);
 }
 
+// 共用整數 option parser，統一 CLI arg、env、default 與上下限檢查。
 function parseIntegerOption({
   args,
   env,
@@ -138,6 +144,7 @@ function parseIntegerOption({
   return value;
 }
 
+// 正規化 Discord REST API base URL，移除 path 尾端斜線與 query/hash。
 function normalizeHttpBaseUrl(value: string, label: string): string {
   let url: URL;
 
@@ -158,6 +165,7 @@ function normalizeHttpBaseUrl(value: string, label: string): string {
   return url.toString();
 }
 
+// 正規化 Discord Gateway WebSocket URL，保留 query 參數但移除 hash。
 function normalizeWebSocketUrl(value: string, label: string): string {
   let url: URL;
 
@@ -176,6 +184,7 @@ function normalizeWebSocketUrl(value: string, label: string): string {
   return url.toString();
 }
 
+// 輸出 Discord bot CLI 說明，供手動啟動或維運檢查參數時使用。
 export function printDiscordBotHelp(): void {
   console.log(`Usage:
   pnpm --filter @partsradar/crawler ops:discord-bot -- [options]

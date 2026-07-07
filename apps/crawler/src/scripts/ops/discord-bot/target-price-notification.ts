@@ -1,3 +1,6 @@
+// apps/crawler/src/scripts/ops/discord-bot/target-price-notification.ts
+// 掃描達標的目標價 watch，負責 claim、分組發送 Discord DM，並記錄通知 delivery 結果。
+
 import { toSafeCliErrorMessage } from "../../shared/script-utils";
 import {
   MAX_TARGET_PRICE_NOTIFICATIONS_PER_CYCLE,
@@ -15,6 +18,7 @@ import {
 } from "./target-price-notification/records";
 import type { DiscordBotClient, DiscordBotMessage, DiscordBotMessageSendResult } from "./types";
 
+// 單輪目標價通知掃描結果，供 daemon log 與維運觀察本輪處理狀態。
 export interface TargetPriceNotificationSummary {
   scannedCount: number;
   dueCount: number;
@@ -24,6 +28,7 @@ export interface TargetPriceNotificationSummary {
   failedCount: number;
 }
 
+// 發送所有目前達標且尚未通知的 watch；以 claim lease 避免多個 daemon 重複寄送。
 export async function sendDueTargetPriceNotifications({
   client,
   publicBaseUrl,

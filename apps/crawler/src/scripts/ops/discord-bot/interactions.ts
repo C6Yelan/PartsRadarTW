@@ -1,4 +1,5 @@
 // apps/crawler/src/scripts/ops/discord-bot/interactions.ts
+// 依 Discord interaction type 分派到 slash command、message component 或 modal submit handler。
 
 import {
   DISCORD_INTERACTION_TYPE_APPLICATION_COMMAND,
@@ -16,6 +17,7 @@ import { handleApplicationCommandInteraction } from "./interactions/application-
 import { handleMessageComponentInteraction } from "./interactions/message-component";
 import { handleModalSubmitInteraction } from "./interactions/modal-submit";
 
+// Gateway 收到 INTERACTION_CREATE 後的統一入口，保留共用 options、cooldown 與 fetch 注入。
 export async function handleDiscordInteraction({
   client,
   interaction,
