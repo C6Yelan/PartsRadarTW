@@ -1,4 +1,5 @@
 // apps/crawler/src/scripts/ops/image-cache-backfill/image-files.ts
+// 提供圖片補圖流程的檔案存在檢查、來源圖片抓取、WebP 轉檔與安全寫入工具。
 
 import { copyFile, mkdir, rename, stat, unlink, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
@@ -9,6 +10,7 @@ import type { ImageBackfillOptions } from "./options";
 const THUMBNAIL_MAX_SIZE = 512;
 const WEBP_QUALITY = 74;
 
+// 檢查本地圖片檔是否存在；只有 ENOENT 視為不存在，其餘檔案系統錯誤向外拋出。
 export async function pathExists(path: string): Promise<boolean> {
   try {
     await stat(path);
@@ -22,6 +24,7 @@ export async function pathExists(path: string): Promise<boolean> {
   }
 }
 
+// 將相同來源圖片已產生的本地 WebP 複製給另一個商品，避免重複對來源站發 request。
 export async function writeFileFromReusableImage(
   sourcePath: string,
   outputPath: string,
@@ -30,6 +33,7 @@ export async function writeFileFromReusableImage(
   await copyFile(sourcePath, outputPath);
 }
 
+// 抓取來源商品圖片 bytes，限制 redirect、content type、timeout 與最大來源大小。
 export async function fetchSourceImageBytes(
   url: string,
   options: ImageBackfillOptions,
@@ -81,6 +85,7 @@ export async function fetchSourceImageBytes(
   }
 }
 
+// 將來源圖片正規化為最長邊 512px 的 WebP thumbnail，並保留圖片方向資訊。
 export async function createWebpThumbnail(sourceBytes: Buffer): Promise<Buffer> {
   return sharp(sourceBytes, { failOn: "error" })
     .rotate()
@@ -94,6 +99,7 @@ export async function createWebpThumbnail(sourceBytes: Buffer): Promise<Buffer> 
     .toBuffer();
 }
 
+// 先寫入暫存檔再 rename 成目標檔，避免中斷時留下半寫入的快取圖片。
 export async function writeFileAtomically(path: string, bytes: Buffer): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
 
@@ -108,14 +114,17 @@ export async function writeFileAtomically(path: string, bytes: Buffer): Promise<
   }
 }
 
+// 產生包含上下限的隨機延遲，分散手動補圖對來源站的請求節奏。
 export function randomDelayMs(minDelayMs: number, maxDelayMs: number): number {
   return minDelayMs + Math.floor(Math.random() * (maxDelayMs - minDelayMs + 1));
 }
 
+// 包裝 setTimeout，供補圖流程在來源站請求之間等待。
 export function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// 格式化補圖 log 使用的 byte 數，避免逐處重複單位轉換。
 export function formatBytes(bytes: number): string {
   if (bytes < 1024) {
     return `${bytes} B`;
@@ -124,6 +133,7 @@ export function formatBytes(bytes: number): string {
   return `${(bytes / 1024).toFixed(1)} KiB`;
 }
 
+// 輸出補圖錯誤前套用 shared sanitizer，避免敏感字串進入 log。
 export function toErrorMessage(error: unknown): string {
   return toSafeCliErrorMessage(error);
 }

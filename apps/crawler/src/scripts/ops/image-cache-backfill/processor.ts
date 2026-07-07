@@ -1,4 +1,6 @@
 // apps/crawler/src/scripts/ops/image-cache-backfill/processor.ts
+// 執行商品圖片補圖核心流程：讀取候選、避開既有快取、重用相同來源圖並寫入 WebP 縮圖。
+
 import { join, relative } from "node:path";
 import type { PrismaClient } from "@partsradar/db";
 import { normalizeCoolpcProductImageUrl } from "../../../coolpc/parser";
@@ -23,6 +25,7 @@ import {
 } from "./image-files";
 import type { BackfillSummary, ImageBackfillOptions } from "./options";
 
+// 圖片補圖流程需要的商品候選資料，對應 Prisma 查詢 select 的最小欄位集合。
 export interface ProductImageCandidate {
   id: string;
   name: string;
@@ -48,6 +51,7 @@ interface BackfillLoggers {
   debugLog?: (message: string) => void;
 }
 
+// 讀取手動補圖候選；保留 limit 直接套用於 DB 查詢，避免全量維運時一次取出過多資料。
 export async function readCandidates(
   client: PrismaClient,
   options: ImageBackfillOptions,
@@ -60,6 +64,7 @@ export async function readCandidates(
   });
 }
 
+// 讀取目前本地尚未有 WebP 快取的候選，並在檔案檢查後才套用 limit。
 export async function readMissingImageCandidates(
   client: PrismaClient,
   options: ImageBackfillOptions,
@@ -86,6 +91,7 @@ export async function readMissingImageCandidates(
   return missingCandidates;
 }
 
+// scheduled crawler 只針對本輪新增商品補圖，因此以 product id 清單收斂查詢範圍。
 export async function readMissingImageCandidatesByProductIds(
   client: PrismaClient,
   options: ImageBackfillOptions,
@@ -115,6 +121,7 @@ export async function readMissingImageCandidatesByProductIds(
   return missingCandidates;
 }
 
+// 逐筆處理圖片候選並彙整摘要；逐筆失敗會記入 failed，不中斷整批補圖。
 export async function backfillImages(
   candidates: ProductImageCandidate[],
   options: ImageBackfillOptions,
@@ -163,6 +170,7 @@ export async function backfillImages(
   return summary;
 }
 
+// 處理單一商品圖片：驗證來源 URL、略過既有快取、重用相同來源圖，必要時下載並轉 WebP。
 async function processCandidate(
   candidate: ProductImageCandidate,
   options: ImageBackfillOptions,
@@ -202,6 +210,7 @@ async function processCandidate(
       return { status: "skipped", didFetch: false };
     }
 
+    // 相同來源圖片只下載一次，後續商品直接複製已產生的本地縮圖。
     const reusableImagePath = reusableImagePathsBySourceUrl.get(normalizedImageUrl);
 
     if (options.dryRun) {
@@ -231,6 +240,7 @@ async function processCandidate(
       return { status: "reused", didFetch: false };
     }
 
+    // 第一筆 live request 不等待；從第二筆開始套用隨機延遲，降低手動補圖對來源站的壓力。
     if (liveFetches > 0) {
       const waitMs = randomDelayMs(options.minDelayMs, options.maxDelayMs);
       debugLog(`Waiting ${waitMs}ms before the next source image request...`);

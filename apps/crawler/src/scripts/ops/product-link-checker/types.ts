@@ -1,10 +1,12 @@
 // apps/crawler/src/scripts/ops/product-link-checker/types.ts
+// 定義 product link health checker 的狀態、Prisma select 與測試替換用 client contract。
+// 此檔屬於 link health maintenance 功能線；後續整線移除時一併刪除或收斂。
 
 import type { Prisma } from "@partsradar/db";
 import type { ProductLinkCheckerOptions } from "./options";
 
 export const PRODUCT_LINK_KINDS = {
-  // SOURCE matches the public API source.url purchase link, not products.source_url.
+  // SOURCE 對應 public API 的 source.url 購買連結，不是 products.source_url 欄位。
   SOURCE: "SOURCE",
 } as const;
 

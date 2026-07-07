@@ -1,4 +1,6 @@
 // apps/crawler/src/scripts/ops/image-cache-backfill/options.ts
+// 解析手動商品圖片補圖 CLI 的執行選項，並輸出補圖結果摘要。
+
 import { relative } from "node:path";
 import {
   getNumberArg,
@@ -15,6 +17,7 @@ const DEFAULT_MAX_DELAY_MS = 12000;
 const DEFAULT_TIMEOUT_MS = 15000;
 const DEFAULT_MAX_SOURCE_BYTES = 5 * 1024 * 1024;
 
+// 手動補圖流程傳給候選查詢、圖片下載與寫檔 processor 的設定契約。
 export interface ImageBackfillOptions {
   workspaceRoot: string;
   storageDir: string;
@@ -29,6 +32,7 @@ export interface ImageBackfillOptions {
   overwrite: boolean;
 }
 
+// 彙整補圖結果的各類計數，供 CLI 結束時輸出維運摘要。
 export interface BackfillSummary {
   selected: number;
   cached: number;
@@ -40,6 +44,7 @@ export interface BackfillSummary {
   liveFetches: number;
 }
 
+// 解析 image-cache backfill CLI 參數；live fetch 必須明確確認，避免誤打來源站。
 export function parseOptions(
   args: string[],
   cwd = process.cwd(),
@@ -53,6 +58,7 @@ export function parseOptions(
   const workspaceRoot = resolveWorkspaceRoot(cwd);
   const dryRun = args.includes("--dry-run");
 
+  // dry-run 不碰來源站；真正下載圖片時必須由操作者明確確認。
   if (!dryRun && !args.includes(CONFIRM_LIVE_FETCH_FLAG)) {
     throw new Error(
       `Refusing live CoolPC image fetch. Re-run with ${CONFIRM_LIVE_FETCH_FLAG} because this command contacts the source site and must stay manual-only.`,
@@ -84,6 +90,7 @@ export function parseOptions(
   };
 }
 
+// 將 processor 回傳的補圖統計輸出成 CLI 摘要，方便手動維運後確認結果。
 export function printSummary(summary: BackfillSummary, options: ImageBackfillOptions): void {
   console.log("");
   console.log("Product image cache backfill finished.");
@@ -98,6 +105,7 @@ export function printSummary(summary: BackfillSummary, options: ImageBackfillOpt
   console.log(`- Output directory: ${relative(options.workspaceRoot, options.storageDir)}`);
 }
 
+// 輸出手動圖片補圖 CLI 說明；此腳本偏維運用途，不作為使用者介面文案。
 function printHelp(): void {
   console.log(`Usage:
   pnpm ops:image-cache:backfill -- --dry-run --limit 10

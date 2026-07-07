@@ -1,4 +1,7 @@
 // apps/crawler/src/scripts/ops/product-link-checker/processor.ts
+// 協調 product link health 檢查、節流、結果寫入與摘要統計。
+// 此檔屬於 link health maintenance 功能線；後續整線移除時一併刪除或收斂。
+
 import type { ProductLinkCheckerOptions, ProductLinkCheckerSummary } from "./options";
 import { toSummaryKey } from "./options";
 import { fetchProductLink } from "./fetch";

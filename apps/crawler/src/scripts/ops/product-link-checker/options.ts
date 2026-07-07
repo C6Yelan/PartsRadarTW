@@ -1,4 +1,7 @@
 // apps/crawler/src/scripts/ops/product-link-checker/options.ts
+// 解析 product link health checker 的 CLI 參數與摘要輸出。
+// 此檔屬於 link health maintenance 功能線；後續整線移除時一併刪除或收斂。
+
 import {
   getNumberArg,
   getPositiveNumberArg,

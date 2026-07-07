@@ -1,4 +1,6 @@
 // apps/crawler/src/scripts/ops/product-link-checker/candidates.ts
+// 建立需要檢查的 product link health 候選，依既有健康狀態與過期時間排序。
+// 此檔屬於 link health maintenance 功能線；後續整線移除時一併刪除或收斂。
 
 import { createCoolpcPurchaseUrl } from "@partsradar/shared";
 import type { ProductLinkCheckerOptions } from "./options";

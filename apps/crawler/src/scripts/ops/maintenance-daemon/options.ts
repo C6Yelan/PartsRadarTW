@@ -1,4 +1,5 @@
 // apps/crawler/src/scripts/ops/maintenance-daemon/options.ts
+// 解析 maintenance daemon 的排程、外部請求鎖與商品連結健康檢查設定。
 
 import {
   type ProductLinkCheckerOptions,
@@ -29,6 +30,7 @@ const MIN_PRICE_PRIORITY_PAUSE_SECONDS = 60;
 const MAX_PRICE_PRIORITY_PAUSE_SECONDS = 60 * 60;
 const DEFAULT_LINK_LIMIT = 200;
 
+// maintenance daemon 的完整執行設定，包含自身排程與內部 product-link checker 子任務設定。
 export interface MaintenanceDaemonOptions {
   workspaceRoot: string;
   dryRun: boolean;
@@ -42,6 +44,7 @@ export interface MaintenanceDaemonOptions {
   link: ProductLinkCheckerOptions;
 }
 
+// 解析 maintenance daemon CLI/env 設定；live 模式目前必須明確確認，避免長駐任務誤打外部網站。
 export function parseMaintenanceDaemonOptions(
   args: string[],
   env: NodeJS.ProcessEnv = process.env,
@@ -120,6 +123,7 @@ export function parseMaintenanceDaemonOptions(
   };
 }
 
+// 將 maintenance daemon 的 link 子任務設定轉成 product-link checker 既有 parser 可接受的參數。
 function buildProductLinkArgs(args: string[], env: NodeJS.ProcessEnv, dryRun: boolean): string[] {
   const linkArgs = dryRun ? [DRY_RUN_FLAG] : [CONFIRM_LIVE_FETCH_FLAG];
   appendOption(
@@ -153,10 +157,12 @@ function buildProductLinkArgs(args: string[], env: NodeJS.ProcessEnv, dryRun: bo
   return linkArgs;
 }
 
+// 保留參數組裝集中在 buildProductLinkArgs()，避免每個 link option 重複 push 樣板。
 function appendOption(args: string[], name: string, value: string): void {
   args.push(name, value);
 }
 
+// 解析帶上下限的秒數設定，讓 CLI 與 env 使用同一套錯誤訊息與安全範圍。
 function parseIntegerOption({
   args,
   env,
@@ -190,6 +196,7 @@ function parseIntegerOption({
   return value;
 }
 
+// 輸出 maintenance daemon CLI 說明；正式部署設定仍以 env / Compose / runbook 為主。
 export function printHelp(): void {
   console.log(`Usage:
   pnpm --filter @partsradar/crawler ops:maintenance-daemon -- --confirm-live-fetch [options]

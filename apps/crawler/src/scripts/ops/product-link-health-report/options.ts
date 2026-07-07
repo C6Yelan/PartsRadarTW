@@ -1,4 +1,6 @@
 // apps/crawler/src/scripts/ops/product-link-health-report/options.ts
+// 解析 product link health 診斷報表的 CLI 參數。
+// 此檔屬於 link health maintenance 功能線；後續整線移除時一併刪除或收斂。
 
 import { getStringArg, resolveWorkspaceRoot } from "../../shared/script-utils";
 import {

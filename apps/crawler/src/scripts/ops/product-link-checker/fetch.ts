@@ -1,4 +1,6 @@
 // apps/crawler/src/scripts/ops/product-link-checker/fetch.ts
+// 執行 product link health checker 的單筆來源連結 HTTP 檢查。
+// 此檔屬於 link health maintenance 功能線；後續整線移除時一併刪除或收斂。
 
 import { toSafeCliErrorMessage } from "../../shared/script-utils";
 import type { ProductLinkCheckerOptions } from "./options";
