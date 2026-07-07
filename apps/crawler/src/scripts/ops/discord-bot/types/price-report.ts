@@ -1,5 +1,7 @@
 // apps/crawler/src/scripts/ops/discord-bot/types/price-report.ts
+// 定義個人 price-report 指令、設定面板、modal 與發送結果使用的共用型別。
 
+// 個人價格報告 DM 發送結果，供即時預覽、手動 now 指令與排程流程共用。
 export type PriceReportNowResult =
   | {
       status: "sent";
@@ -29,11 +31,13 @@ export type PriceReportNowResult =
       message: string;
     };
 
+// 使用者設定每日私訊價格報告的台北時間。
 export interface PriceReportTimeOfDay {
   hour: number;
   minute: number;
 }
 
+// `/price-report` slash command 解析後的內部 command。
 export type ParsedPriceReportCommand =
   | {
       name: "now";
@@ -44,6 +48,7 @@ export type ParsedPriceReportCommand =
       name: "settings";
     };
 
+// 個人 price-report 設定面板的 button/select interaction 解析結果。
 export type ParsedPriceReportComponent =
   | {
       name: "enable_daily_scheduled_report";
@@ -78,6 +83,7 @@ export type ParsedPriceReportComponent =
       includeNewProducts: boolean;
     };
 
+// 個人 price-report 設定 modal submit 的解析結果，保留輸入合法性供 handler 回覆錯誤。
 export type ParsedPriceReportModal =
   | {
       name: "time_limit";

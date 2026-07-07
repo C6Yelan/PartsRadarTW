@@ -1,13 +1,17 @@
 // apps/crawler/src/scripts/ops/discord-bot/types/discord-api.ts
+// 定義 Discord REST、Gateway、message component、modal 與 interaction payload 的本地最小型別。
 
+// 可替換的 fetch 介面，讓 REST 與 interaction handler 測試能注入 mock。
 export type FetchImpl = typeof fetch;
 
+// Discord embed 訊息欄位，供價格報告、目標價通知與設定面板共用。
 export interface DiscordBotEmbedField {
   name: string;
   value: string;
   inline?: boolean;
 }
 
+// Bot 送出的 embed payload，只保留目前 PartsRadarTW 訊息實際使用的欄位。
 export interface DiscordBotEmbed {
   title?: string;
   description?: string;
@@ -19,6 +23,7 @@ export interface DiscordBotEmbed {
   timestamp?: string;
 }
 
+// Bot 送出的 Discord message payload，可用於 webhook、DM 與 interaction follow-up。
 export interface DiscordBotMessage {
   content?: string;
   embeds?: DiscordBotEmbed[];
@@ -27,6 +32,7 @@ export interface DiscordBotMessage {
 
 export type DiscordMessageComponent = DiscordActionRowComponent;
 
+// Discord message component 的 action row 容器，目前承載 button 與 string select。
 export interface DiscordActionRowComponent {
   type: 1;
   components: Array<DiscordButtonComponent | DiscordStringSelectComponent>;
@@ -55,6 +61,7 @@ export interface DiscordStringSelectComponent {
   disabled?: boolean;
 }
 
+// Discord modal payload，使用新版 label component 包住 text input 或 string select。
 export interface DiscordModal {
   custom_id: string;
   title: string;
@@ -63,11 +70,13 @@ export interface DiscordModal {
 
 export type DiscordModalComponent = DiscordModalLabelComponent | DiscordModalTextDisplayComponent;
 
+// Modal 內的純文字說明 component，用於顯示輸入格式提示或限制說明。
 export interface DiscordModalTextDisplayComponent {
   type: 10;
   content: string;
 }
 
+// Modal label component 是目前輸入欄位的外層容器，內部才是實際 input component。
 export interface DiscordModalLabelComponent {
   type: 18;
   label: string;
@@ -79,6 +88,7 @@ export type DiscordModalInputComponent =
   | DiscordModalStringSelectComponent
   | DiscordModalTextInputComponent;
 
+// Modal 內使用的 string select，供設定表單用選單收集受限選項。
 export interface DiscordModalStringSelectComponent {
   type: 3;
   custom_id: string;
@@ -94,6 +104,7 @@ export interface DiscordModalStringSelectComponent {
   max_values?: number;
 }
 
+// Modal 內使用的文字輸入 component，供價格、時間與關鍵字等設定收集使用者輸入。
 export interface DiscordModalTextInputComponent {
   type: 4;
   custom_id: string;
@@ -105,6 +116,7 @@ export interface DiscordModalTextInputComponent {
   placeholder?: string;
 }
 
+// Discord 發送訊息的統一結果，區分成功、rate limit 與一般失敗。
 export type DiscordDirectMessageSendResult =
   | {
       status: "sent";
@@ -128,12 +140,14 @@ export type DiscordDirectMessageSendResult =
 
 export type DiscordBotMessageSendResult = DiscordDirectMessageSendResult;
 
+// Discord REST 呼叫所需的共用選項。
 export interface DiscordRestOptions {
   token: string;
   apiBaseUrl: string;
   fetchImpl?: FetchImpl;
 }
 
+// Discord REST helper 回傳的統一結果，讓上層不用直接解析 HTTP response。
 export type DiscordRestResult<T> =
   | {
       status: "ok";
@@ -153,6 +167,7 @@ export type DiscordRestResult<T> =
       retryAfterMs?: number;
     };
 
+// Gateway 收到的原始 payload 外型，只保留 dispatch、sequence 與 event type 判斷所需欄位。
 export interface DiscordGatewayPayload {
   op: number;
   d?: unknown;
@@ -160,6 +175,7 @@ export interface DiscordGatewayPayload {
   t?: string | null;
 }
 
+// Discord interaction payload 的本地最小型別，涵蓋 slash command、component 與 modal submit。
 export interface DiscordInteraction {
   id: string;
   token: string;
@@ -181,6 +197,7 @@ export interface DiscordInteraction {
   user?: DiscordUser;
 }
 
+// Slash command option 的巢狀結構，供 command parser 解析 subcommand 與使用者參數。
 export interface DiscordInteractionOption {
   type: number;
   name: string;
@@ -188,6 +205,7 @@ export interface DiscordInteractionOption {
   options?: DiscordInteractionOption[];
 }
 
+// Modal submit 與 component interaction 的 component tree 節點。
 export interface DiscordInteractionComponent {
   type: number;
   custom_id?: string;
@@ -197,18 +215,22 @@ export interface DiscordInteractionComponent {
   components?: DiscordInteractionComponent[];
 }
 
+// Discord 使用者最小識別資料，僅保留 bot 流程需要的 user id。
 export interface DiscordUser {
   id: string;
 }
 
+// 建立 DM channel 時 Discord 回傳的最小資料。
 export interface DiscordDirectMessageChannel {
   id?: unknown;
 }
 
+// Gateway WebSocket wrapper 的最小事件外型，讓 runtime 與測試可共用相同介面。
 export interface MinimalWebSocketEvent {
   data?: unknown;
 }
 
+// Gateway client 需要的最小 WebSocket 介面，避免程式直接綁死特定 WebSocket 實作。
 export interface MinimalWebSocket {
   readonly readyState: number;
   send(data: string): void;

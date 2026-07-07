@@ -1,4 +1,5 @@
 // apps/crawler/src/scripts/ops/discord-bot/target-price-notification/messages.ts
+// 組裝目標價達標通知的 Discord DM 訊息，處理單品通知、同使用者 digest 與 embed 長度限制。
 
 import {
   DISCORD_EMBED_DESCRIPTION_MAX_LENGTH,
@@ -10,6 +11,7 @@ import type { DiscordBotMessage } from "../types";
 
 const DISCORD_MESSAGE_MAX_EMBEDS = 10;
 
+// 目標價通知訊息所需的 watch 最小資料，讓訊息層不依賴完整 Prisma row。
 export interface TargetPriceNotificationMessageWatch {
   id: string;
   productId: string;
@@ -29,6 +31,7 @@ export interface TargetPriceNotificationMessageWatch {
   };
 }
 
+// 建立目標價達標 DM；單筆走完整商品 embed，多筆同使用者通知會合併成 digest。
 export function createTargetPriceReachedMessages({
   watches,
   publicBaseUrl,
@@ -52,6 +55,7 @@ export function createTargetPriceReachedMessages({
   return messages;
 }
 
+// 建立單一商品達標通知，顯示商品連結、目前價格、目標價格與價格資料時間。
 export function createTargetPriceReachedMessage({
   watch,
   publicBaseUrl,
@@ -95,6 +99,7 @@ export function createTargetPriceReachedMessage({
   };
 }
 
+// 將同使用者的多筆達標 watch 組成 digest embeds，並依 Discord description 上限切段。
 function createTargetPriceReachedDigestEmbeds({
   watches,
   publicBaseUrl,
@@ -137,6 +142,7 @@ function formatTargetPriceDigestLines(
   ];
 }
 
+// 依 Discord embed description 長度上限切分文字，避免 digest 因單則訊息過長而送出失敗。
 function createDescriptionChunks(lines: string[]): string[] {
   const chunks: string[] = [];
   let current = "";
