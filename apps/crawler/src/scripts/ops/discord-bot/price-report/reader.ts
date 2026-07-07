@@ -1,4 +1,5 @@
 // apps/crawler/src/scripts/ops/discord-bot/price-report/reader.ts
+// 讀取 price snapshot 並整理成 Discord 個人與公開價格報告需要的價格變動與新增商品資料。
 
 import {
   CURRENT_PRICE_SNAPSHOT_ORDER_BY,
@@ -25,6 +26,7 @@ import type {
   RecentPriceReport,
 } from "./reader-types";
 
+// 讀取指定 crawl run 的價格變動項目，供只需要變動清單的公開報告入口使用。
 export async function readCrawlRunPriceChanges(
   client: PriceReportReaderClient,
   crawlRunId: string,
@@ -32,6 +34,7 @@ export async function readCrawlRunPriceChanges(
   return (await readCrawlRunPriceChangeSummary(client, crawlRunId)).changes;
 }
 
+// 讀取指定 crawl run 的價格變動、新增商品與比對統計，供公開報告排程判斷與記錄。
 export async function readCrawlRunPriceChangeSummary(
   client: PriceReportReaderClient,
   crawlRunId: string,
@@ -138,6 +141,7 @@ export async function readCrawlRunPriceChangeSummary(
   };
 }
 
+// 讀取指定時間窗的近期價格變動，保留給只需要變動清單的呼叫端。
 export async function readRecentPriceChanges(
   client: PriceReportReaderClient,
   { since, until = new Date() }: RecentPriceChangeOptions,
@@ -145,6 +149,7 @@ export async function readRecentPriceChanges(
   return (await readRecentPriceReport(client, { since, until })).priceChanges;
 }
 
+// 讀取指定時間窗的完整價格報告，包含符合篩選的價格變動與新增商品。
 export async function readRecentPriceReport(
   client: PriceReportReaderClient,
   { since, until = new Date(), filters = {} }: RecentPriceChangeOptions,

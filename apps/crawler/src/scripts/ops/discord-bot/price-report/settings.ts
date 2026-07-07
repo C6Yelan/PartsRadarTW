@@ -1,4 +1,5 @@
 // apps/crawler/src/scripts/ops/discord-bot/price-report/settings.ts
+// 管理 Discord 使用者的個人每日價格報告設定，包含啟用、停用、讀取與摘要文字。
 
 import type { DiscordPriceReportSetting } from "@partsradar/db";
 import { TIME_ZONE } from "../constants";
@@ -20,6 +21,7 @@ import {
   toPriceReportWindow,
 } from "./schedule";
 
+// 建立或更新使用者每日私訊價格報告設定，並重設下一次發送時間與通知 cursor。
 export async function enableDailyScheduledPriceReport({
   client,
   discordUserId,
@@ -92,6 +94,7 @@ export async function enableDailyScheduledPriceReport({
   });
 }
 
+// 停用使用者的每日私訊價格報告，保留既有設定內容供日後重新啟用。
 export async function disablePriceReport({
   client,
   discordUserId,
@@ -113,6 +116,7 @@ export async function disablePriceReport({
   return result.count;
 }
 
+// 讀取使用者目前的個人價格報告設定。
 export async function readPriceReportSetting({
   client,
   discordUserId,
@@ -127,6 +131,7 @@ export async function readPriceReportSetting({
   });
 }
 
+// 格式化設定摘要文字，供舊版文字入口或測試檢查設定狀態。
 export function formatPriceReportSettingMessage(
   setting: DiscordPriceReportSetting | null,
   categories: PriceReportCategoryOption[] = [],

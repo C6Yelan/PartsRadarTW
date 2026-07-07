@@ -1,4 +1,6 @@
 // apps/crawler/src/scripts/ops/discord-bot/price-report/message-lines.ts
+// 組裝價格報告 embed 內的分類標題、價格變動摘要與商品連結行文字。
+
 import type {
   PriceReportPriceChangeItem,
   PriceReportNewProductItem,
@@ -17,12 +19,14 @@ import {
   toSingleLine,
 } from "./message-text";
 
+// 報告行分組所需的商品分類資訊與已格式化行文字。
 export interface GroupedReportLineItem {
   category: PriceReportProductCategory;
   subcategory: PriceReportProductSubcategory | null;
   line: string;
 }
 
+// 價格變動依降價、漲價與其他變動分組後的 embed 區塊資料。
 export interface PriceChangeMovementGroup {
   kind: "drop" | "rise" | "other";
   title: string;
@@ -30,12 +34,14 @@ export interface PriceChangeMovementGroup {
   lines: string[];
 }
 
+// 價格變動摘要使用的分類計數。
 export interface PriceChangeMovementCounts {
   drop: number;
   rise: number;
   other: number;
 }
 
+// 統計價格變動方向，供個人與公開報告摘要共用。
 export function countPriceChangeMovements(
   priceChanges: PriceReportPriceChangeItem[],
 ): PriceChangeMovementCounts {
@@ -46,6 +52,7 @@ export function countPriceChangeMovements(
   };
 }
 
+// 將價格變動商品整理成降價、漲價與其他變動三個報告區塊。
 export function createPriceChangeMovementGroups(
   priceChanges: PriceReportPriceChangeItem[],
   publicBaseUrl: string,
@@ -97,6 +104,7 @@ function createPriceChangeMovementGroup({
   };
 }
 
+// 格式化價格變動摘要文字，維持降價與漲價為主要掃描重點。
 export function formatPriceChangeSummary(counts: PriceChangeMovementCounts): string {
   const parts = [`**降價 ${counts.drop}**`, `**漲價 ${counts.rise}**`];
 
@@ -107,6 +115,7 @@ export function formatPriceChangeSummary(counts: PriceChangeMovementCounts): str
   return parts.join("，");
 }
 
+// 格式化公開報告的整體摘要，包含價格變動方向與新增商品數。
 export function formatPublicPriceReportSummary(
   report: Pick<RecentPriceReport, "priceChanges" | "newProducts">,
 ): string {
@@ -119,6 +128,7 @@ export function formatPublicPriceReportSummary(
   return parts.join("，");
 }
 
+// 將價格變動分組轉成 embed description 行，空分組不顯示標題。
 export function formatPriceChangeSectionLines(groups: PriceChangeMovementGroup[]): string[] {
   const lines: string[] = [];
 
@@ -141,6 +151,7 @@ export function formatPriceChangeSectionLines(groups: PriceChangeMovementGroup[]
   return lines;
 }
 
+// 根據本次列出數量決定新增商品區塊要顯示實際商品或上限提示。
 export function formatNewProductSectionLines(
   newProductLines: string[],
   listedNewProductCount: number,
@@ -157,6 +168,7 @@ export function formatNewProductSectionLines(
   return newProductLines;
 }
 
+// 依來源分類與子分類分段，讓報告內容接近使用者瀏覽商品時的分類脈絡。
 export function formatGroupedReportLines(items: GroupedReportLineItem[]): string[] {
   const lines: string[] = [];
   const categoryGroups = groupReportItems(items, (item) => formatCategoryKey(item.category));
@@ -256,6 +268,7 @@ function stripLeadingSubcategoryName(
   return strippedName || productName;
 }
 
+// 格式化單筆價格變動商品行，包含價差、前後價格與站內商品連結。
 export function formatPersonalPriceChangeEmbedLine(
   change: PriceReportPriceChangeItem,
   publicBaseUrl: string,
@@ -273,6 +286,7 @@ export function formatPersonalPriceChangeEmbedLine(
   );
 }
 
+// 格式化單筆新增商品行，包含目前價格與站內商品連結。
 export function formatNewProductEmbedLine(
   product: PriceReportNewProductItem,
   publicBaseUrl: string,

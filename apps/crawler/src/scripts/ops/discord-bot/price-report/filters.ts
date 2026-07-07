@@ -1,12 +1,16 @@
 // apps/crawler/src/scripts/ops/discord-bot/price-report/filters.ts
+// 定義 price-report 篩選條件，並提供分類、內容類型與商品關鍵字的正規化、套用與顯示文字。
+
 import type { PriceReportPriceChangeItem, PriceReportNewProductItem } from "./reader-types";
 import { MAX_PRICE_REPORT_KEYWORD_GROUPS, MAX_PRICE_REPORT_KEYWORD_LENGTH } from "../constants";
 
+// Discord 設定面板使用的來源分類選項，對應 CoolPC sourceCategory 的 IGrp 與顯示名稱。
 export interface PriceReportCategoryOption {
   igrp: number;
   displayName: string;
 }
 
+// 個人與公開價格報告共用的篩選條件，涵蓋分類、商品關鍵字與內容類型。
 export interface PriceReportFilters {
   categoryIgrps: number[];
   productKeyword: string | null;
@@ -15,6 +19,7 @@ export interface PriceReportFilters {
   includeNewProducts: boolean;
 }
 
+// 可轉換成 PriceReportFilters 的 persisted setting contract。
 export interface PriceReportFilterSetting {
   categoryIgrps: number[];
   productKeyword: string | null;
@@ -31,6 +36,7 @@ export const DEFAULT_PRICE_REPORT_FILTERS: PriceReportFilters = {
   includeNewProducts: true,
 };
 
+// 依篩選條件過濾價格變動項目，保留符合分類、價格方向與商品關鍵字的項目。
 export function filterPriceChangesForReport(
   priceChanges: PriceReportPriceChangeItem[],
   filters: PriceReportFilters,
@@ -56,6 +62,7 @@ export function filterPriceChangesForReport(
   });
 }
 
+// 依篩選條件過濾新增商品項目；若使用者停用新增商品，直接回傳空清單。
 export function filterNewProductsForReport(
   newProducts: PriceReportNewProductItem[],
   filters: PriceReportFilters,
@@ -77,6 +84,7 @@ export function filterNewProductsForReport(
   });
 }
 
+// 將 persisted setting 轉成 report 讀取與訊息組裝可直接使用的正規化 filters。
 export function toPriceReportFilters(setting: PriceReportFilterSetting | null): PriceReportFilters {
   if (!setting) {
     return DEFAULT_PRICE_REPORT_FILTERS;
@@ -91,6 +99,7 @@ export function toPriceReportFilters(setting: PriceReportFilterSetting | null): 
   });
 }
 
+// 收斂 filters 的分類、關鍵字與內容類型；若所有內容類型都關閉，回到預設避免產生空報告設定。
 export function normalizePriceReportFilters(filters: PriceReportFilters): PriceReportFilters {
   const categoryIgrps = [...new Set(filters.categoryIgrps)]
     .filter((igrp) => Number.isSafeInteger(igrp) && igrp > 0)
@@ -113,6 +122,7 @@ export function normalizePriceReportFilters(filters: PriceReportFilters): PriceR
   };
 }
 
+// 將分類篩選轉成設定面板摘要文字，未知 IGrp 保留原始編號方便維護判讀。
 export function formatPriceReportCategoryFilterLabel(
   filters: PriceReportFilters,
   categories: PriceReportCategoryOption[] = [],
@@ -135,10 +145,12 @@ export function formatPriceReportCategoryFilterLabel(
     : visibleLabels.join("、");
 }
 
+// 將商品關鍵字篩選轉成設定面板摘要文字。
 export function formatPriceReportKeywordFilterLabel(filters: PriceReportFilters): string {
   return filters.productKeyword ?? "不限";
 }
 
+// 將報告內容類型篩選轉成設定面板摘要文字。
 export function formatPriceReportContentFilterLabel(filters: PriceReportFilters): string {
   const labels = [
     filters.includePriceDrops ? "降價" : null,
@@ -149,6 +161,7 @@ export function formatPriceReportContentFilterLabel(filters: PriceReportFilters)
   return labels.join("、");
 }
 
+// 判斷目前 filters 是否和預設篩選不同，供訊息文案標示已套用自訂篩選。
 export function hasActivePriceReportFilters(filters: PriceReportFilters): boolean {
   return (
     filters.categoryIgrps.length > 0 ||

@@ -1,4 +1,6 @@
 // apps/crawler/src/scripts/ops/discord-bot/price-report/messages.ts
+// 將個人與公開價格報告資料組裝成可送往 Discord 的多則 embed 訊息。
+
 import type {
   PriceReportPriceChangeItem,
   PriceReportNewProductItem,
@@ -20,6 +22,7 @@ import {
 } from "./message-lines";
 import { createReportMessages, createReportSectionEmbeds } from "./message-layout";
 
+// 建立只包含價格變動的公開報告訊息，供舊有公開價格變動入口與測試共用。
 export function createPublicPriceChangeReportMessages(
   priceChanges: PriceReportPriceChangeItem[],
   options: {
@@ -37,6 +40,7 @@ export function createPublicPriceChangeReportMessages(
   );
 }
 
+// 建立公開頻道價格報告訊息，依項目上限列出價格變動與新增商品。
 export function createPublicPriceReportMessages(
   report: Pick<RecentPriceReport, "priceChanges" | "newProducts">,
   options: {
@@ -109,6 +113,7 @@ export function createPublicPriceReportMessages(
   return createReportMessages(embeds);
 }
 
+// 建立個人私訊價格報告訊息，包含空結果、篩選結果與項目上限提示。
 export function createPersonalPriceReportEmbedMessages(
   report: RecentPriceReport,
   options: {

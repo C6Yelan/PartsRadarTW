@@ -1,4 +1,6 @@
 // apps/crawler/src/scripts/ops/discord-bot/price-report/message-layout.ts
+// 將價格報告內容切成符合 Discord embed 與 message 長度限制的訊息版面。
+
 import {
   DISCORD_EMBED_COLOR,
   DISCORD_EMBED_DESCRIPTION_MAX_LENGTH,
@@ -9,6 +11,7 @@ import type { DiscordBotEmbed, DiscordBotMessage } from "../types";
 
 const DISCORD_MESSAGE_MAX_EMBEDS = 10;
 
+// 建立單一報告區塊的 embed；內容過長時會切成多個 embed 並保留頁次標示。
 export function createReportSectionEmbeds({
   title,
   lines,
@@ -56,6 +59,7 @@ function createReportDescriptionChunks(lines: string[]): string[] {
   return chunks;
 }
 
+// 將多個 embed 分批包成 Discord message，避免超過單則訊息的 embed 數量與總文字限制。
 export function createReportMessages(embeds: DiscordBotEmbed[]): DiscordBotMessage[] {
   const messages: DiscordBotMessage[] = [];
   let currentEmbeds: DiscordBotEmbed[] = [];

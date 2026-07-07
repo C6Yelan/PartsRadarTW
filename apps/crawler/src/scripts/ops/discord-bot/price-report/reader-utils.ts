@@ -1,4 +1,5 @@
 // apps/crawler/src/scripts/ops/discord-bot/price-report/reader-utils.ts
+// 提供價格報告 reader 共用的篩選正規化、Prisma 查詢條件、分組與排序規則。
 
 import type { Prisma } from "@partsradar/db";
 import type {
@@ -9,6 +10,7 @@ import type {
   RecentPriceReportFilters,
 } from "./reader-types";
 
+// 正規化報告篩選條件，讓 reader 後續查詢與內容類型判斷使用完整預設值。
 export function normalizeRecentPriceReportFilters(
   filters: RecentPriceReportFilters,
 ): Required<RecentPriceReportFilters> {
@@ -23,6 +25,7 @@ export function normalizeRecentPriceReportFilters(
   };
 }
 
+// 將報告篩選條件轉成 Prisma product where，供 price snapshot 查詢套用分類與關鍵字限制。
 export function createRecentPriceReportProductFilter(
   filters: Required<RecentPriceReportFilters>,
 ): Prisma.ProductWhereInput {
@@ -44,6 +47,7 @@ export function createRecentPriceReportProductFilter(
   };
 }
 
+// 將商品品牌資訊轉成報告子分類；未分類商品保留為 null，避免製造假分類。
 export function toProductSubcategory(product: CrawlRunPriceSnapshot["product"]) {
   return product.vendorName
     ? {
@@ -53,6 +57,7 @@ export function toProductSubcategory(product: CrawlRunPriceSnapshot["product"]) 
     : null;
 }
 
+// 依商品分組前次 snapshot，讓 reader 可快速尋找每筆 current snapshot 之前的最近價格。
 export function groupPreviousSnapshots(
   snapshots: PreviousPriceSnapshot[],
 ): Map<string, PreviousPriceSnapshot[]> {
@@ -67,6 +72,7 @@ export function groupPreviousSnapshots(
   return groups;
 }
 
+// 價格變動優先顯示變動幅度大且較新的商品，最後以商品名稱維持穩定排序。
 export function comparePriceChanges(
   left: PriceReportPriceChangeItem,
   right: PriceReportPriceChangeItem,
@@ -86,6 +92,7 @@ export function comparePriceChanges(
   return left.productName.localeCompare(right.productName, "zh-Hant");
 }
 
+// 新增商品優先顯示較新的項目，最後以商品名稱維持穩定排序。
 export function compareNewProducts(
   left: PriceReportNewProductItem,
   right: PriceReportNewProductItem,

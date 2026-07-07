@@ -1,4 +1,5 @@
 // apps/crawler/src/scripts/ops/discord-bot/price-report/delivery.ts
+// 產生個人價格報告訊息並記錄 Discord DM 發送結果。
 
 import type { Prisma } from "@partsradar/db";
 import { readRecentPriceReport } from "./reader";
@@ -32,6 +33,7 @@ export type PriceReportDeliveryStatus = Prisma.DiscordNotificationDeliveryGetPay
   select: typeof PRICE_REPORT_DELIVERY_STATUS_SELECT;
 }>;
 
+// 發送使用者手動觸發的即時價格報告，並以 command delivery 類型保存結果。
 export async function sendPriceReportNow({
   client,
   discordUserId,
@@ -64,6 +66,7 @@ export async function sendPriceReportNow({
   });
 }
 
+// 建立個人價格報告、交由呼叫端送出 Discord 訊息，並保存本次 delivery 狀態。
 export async function sendPriceReport({
   client,
   discordUserId,
@@ -154,6 +157,7 @@ export async function sendPriceReport({
   };
 }
 
+// 讀取使用者最近一次排程每日價格報告 delivery，供設定面板顯示狀態。
 export async function readLatestScheduledPriceReportDelivery({
   client,
   discordUserId,
@@ -171,6 +175,7 @@ export async function readLatestScheduledPriceReportDelivery({
   });
 }
 
+// 寫入個人價格報告 delivery 紀錄，保留成功、限流與失敗狀態供後續 UI 與重試判讀。
 export async function recordPriceReportDelivery({
   client,
   discordUserId,

@@ -1,4 +1,5 @@
 // apps/crawler/src/scripts/ops/discord-bot/price-report/scheduler.ts
+// 執行到期的個人每日價格報告發送，並計算 Discord bot daemon 的下一次喚醒時間。
 
 import {
   HOUR_MS,
@@ -18,6 +19,7 @@ import {
   toWindowHours,
 } from "./schedule";
 
+// 單輪個人價格報告排程處理摘要，供 daemon log 與維運觀察使用。
 export interface ScheduledPriceReportSummary {
   processedCount: number;
   sentCount: number;
@@ -25,6 +27,7 @@ export interface ScheduledPriceReportSummary {
   failedCount: number;
 }
 
+// 發送所有已到期且啟用的個人價格報告，並更新成功、失敗或限流後的下一次排程時間。
 export async function sendDueScheduledPriceReports({
   client,
   options,
@@ -103,6 +106,7 @@ export async function sendDueScheduledPriceReports({
   return summary;
 }
 
+// 讀取目前最早到期的個人價格報告時間，供 daemon 決定 sleep 間隔。
 export async function readNextScheduledPriceReportDueAt({
   client,
 }: {
@@ -124,6 +128,7 @@ export async function readNextScheduledPriceReportDueAt({
   return setting?.nextSendAt ?? null;
 }
 
+// 根據下一筆到期時間計算 daemon sleep；沒有到期項目時回到最大 sleep。
 export function calculateScheduledPriceReportSleepMs({
   now,
   nextDueAt,
