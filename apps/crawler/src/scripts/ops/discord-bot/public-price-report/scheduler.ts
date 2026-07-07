@@ -1,4 +1,5 @@
 // apps/crawler/src/scripts/ops/discord-bot/public-price-report/scheduler.ts
+// 掃描已完成的 scheduled crawl run，對啟用的公開報告頻道發送尚未送出的價格報告。
 
 import { CRAWL_RUN_STATUSES } from "../../../../coolpc/crawl-run";
 import { readCrawlRunPriceChangeSummary } from "../price-report/reader";
@@ -27,6 +28,7 @@ import {
   type PublicPriceReportSetting,
 } from "./settings";
 
+// 單輪公開價格報告排程處理摘要，供 Discord bot daemon log 與維運觀察使用。
 export interface PublicPriceReportSummary {
   settingCount: number;
   processedCount: number;
@@ -36,6 +38,7 @@ export interface PublicPriceReportSummary {
   failedCount: number;
 }
 
+// 對所有啟用的公開報告設定處理待發 crawl run，並彙總本輪發送結果。
 export async function sendPendingPublicPriceReports({
   client,
   options,
@@ -89,6 +92,7 @@ export async function sendPendingPublicPriceReports({
   return summary;
 }
 
+// 處理單一公開報告設定尚未送出的 scheduled crawl run，支援失敗與限流項目重試。
 async function sendPendingPublicPriceReportsForSetting({
   client,
   setting,
@@ -177,6 +181,7 @@ async function sendPendingPublicPriceReportsForSetting({
   return summary;
 }
 
+// 產生單一 crawl run 的公開價格報告、送出 Discord 訊息，並持久化 delivery 結果。
 async function sendPublicPriceReportForCrawlRun({
   client,
   setting,

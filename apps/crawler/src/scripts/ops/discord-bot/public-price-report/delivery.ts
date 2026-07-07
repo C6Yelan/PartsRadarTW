@@ -1,8 +1,10 @@
 // apps/crawler/src/scripts/ops/discord-bot/public-price-report/delivery.ts
+// 讀寫公開價格報告的 Discord 頻道發送紀錄，供排程去重與設定面板顯示狀態。
 
 import type { Prisma } from "@partsradar/db";
 import type { DiscordBotClient } from "../types";
 
+// 公開價格報告 delivery 的持久化狀態，對應成功、略過、失敗與 Discord rate limit。
 export type PublicPriceReportStatus = "SENT" | "SKIPPED" | "FAILED" | "RATE_LIMITED";
 
 const PUBLIC_PRICE_REPORT_DELIVERY_STATUS_SELECT = {
@@ -18,6 +20,7 @@ export type PublicPriceReportDeliveryStatus = Prisma.DiscordPublicPriceReportDel
   select: typeof PUBLIC_PRICE_REPORT_DELIVERY_STATUS_SELECT;
 }>;
 
+// 讀取指定頻道最近一次公開價格報告 delivery，供設定面板顯示發送狀態。
 export async function readLatestPublicPriceReportDelivery({
   client,
   channelId,
@@ -34,6 +37,7 @@ export async function readLatestPublicPriceReportDelivery({
   });
 }
 
+// 以 crawl run 與頻道為唯一鍵寫入公開報告 delivery，避免同輪重複建立發送紀錄。
 export async function recordPublicPriceReportDelivery({
   client,
   crawlRunId,

@@ -1,4 +1,5 @@
 // apps/crawler/src/scripts/ops/discord-bot/public-price-report/settings.ts
+// 管理 Discord 伺服器公開價格報告設定，包含頻道、啟停、篩選與清除。
 
 import type { Prisma } from "@partsradar/db";
 import type { DiscordBotClient } from "../types";
@@ -8,6 +9,7 @@ import {
   toPublicPriceReportFilters,
 } from "./filters";
 
+// 公開報告設定讀取時固定使用的欄位集合，供設定面板與排程共用。
 export const PUBLIC_PRICE_REPORT_SETTING_SELECT = {
   id: true,
   discordGuildId: true,
@@ -30,6 +32,7 @@ export type PublicPriceReportSetting = Prisma.DiscordPublicPriceReportSettingGet
   select: typeof PUBLIC_PRICE_REPORT_SETTING_SELECT;
 }>;
 
+// 讀取單一 Discord 伺服器目前的公開價格報告設定。
 export async function readPublicPriceReportSetting({
   client,
   discordGuildId,
@@ -45,6 +48,7 @@ export async function readPublicPriceReportSetting({
   });
 }
 
+// 設定公開報告發送頻道並啟用報告，同時重設 notification cursor 避免補發舊輪次。
 export async function setPublicPriceReportChannel({
   client,
   discordGuildId,
@@ -80,6 +84,7 @@ export async function setPublicPriceReportChannel({
   });
 }
 
+// 啟用或停用公開價格報告；重新啟用時從當下開始追蹤後續 crawl run。
 export async function setPublicPriceReportEnabled({
   client,
   discordGuildId,
@@ -132,6 +137,7 @@ export async function setPublicPriceReportEnabled({
   });
 }
 
+// 更新公開價格報告的篩選條件與顯示上限，並重設 notification cursor。
 export async function updatePublicPriceReportFilters({
   client,
   discordGuildId,
@@ -189,6 +195,7 @@ export async function updatePublicPriceReportFilters({
   });
 }
 
+// 清除 Discord 伺服器的公開價格報告設定。
 export async function clearPublicPriceReportSetting({
   client,
   discordGuildId,

@@ -1,4 +1,5 @@
 // apps/crawler/src/scripts/ops/discord-bot/public-price-report/preview.ts
+// 產生並發送公開價格報告測試訊息，供伺服器管理員驗證頻道與篩選設定。
 
 import { readRecentPriceReport } from "../price-report/reader";
 import { HOUR_MS } from "../constants";
@@ -13,6 +14,7 @@ import {
   type PriceReportFilters,
 } from "./filters";
 
+// 公開報告測試發送結果，供設定面板轉成使用者可讀狀態訊息。
 export type PublicPriceReportPreviewResult =
   | {
       status: "sent";
@@ -49,6 +51,7 @@ export type PublicPriceReportPreviewResult =
       message: string;
     };
 
+// 讀取最近 24 小時公開報告內容並送到指定頻道；無內容時回傳 skipped，不建立 delivery 紀錄。
 export async function sendPublicPriceReportPreview({
   client,
   channelId,
