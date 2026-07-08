@@ -1,4 +1,6 @@
 // apps/crawler/tests/scripts/ops/discord-bot/price-report-filters.test.ts
+// 驗證個人價格報告會依分類、內容類型與商品關鍵字篩選查詢與輸出結果。
+
 import { describe, expect, it, vi } from "vitest";
 import { sendPriceReportNow } from "../../../../src/scripts/ops/discord-bot/price-report";
 import type { DiscordBotMessage } from "../../../../src/scripts/ops/discord-bot/types";

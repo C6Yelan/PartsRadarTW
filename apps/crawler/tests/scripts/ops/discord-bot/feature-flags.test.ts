@@ -1,4 +1,6 @@
 // apps/crawler/tests/scripts/ops/discord-bot/feature-flags.test.ts
+// 驗證 Discord bot feature flag 停用時，背景掃描與指令入口會安全略過對應功能。
+
 import { describe, expect, it, vi } from "vitest";
 import { runDiscordBotNotificationCycle } from "../../../../src/scripts/ops/discord-bot/daemon";
 import { handleDiscordInteraction } from "../../../../src/scripts/ops/discord-bot/interactions";

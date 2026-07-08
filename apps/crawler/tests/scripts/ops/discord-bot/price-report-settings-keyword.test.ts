@@ -1,4 +1,6 @@
 // apps/crawler/tests/scripts/ops/discord-bot/price-report-settings-keyword.test.ts
+// 驗證個人價格報告關鍵字 modal 的輸入正規化、上限拒絕與清空流程。
+
 import { describe, expect, it, vi } from "vitest";
 import { CommandCooldowns } from "../../../../src/scripts/ops/discord-bot/cooldowns";
 import { handleDiscordInteraction } from "../../../../src/scripts/ops/discord-bot/interactions";

@@ -1,4 +1,6 @@
 // apps/crawler/tests/scripts/ops/discord-bot/interaction-help.test.ts
+// 驗證 /bot help 會回覆私密說明 embed，並涵蓋主要 Discord bot 功能入口。
+
 import { describe, expect, it, vi } from "vitest";
 import { CommandCooldowns } from "../../../../src/scripts/ops/discord-bot/cooldowns";
 import { handleDiscordInteraction } from "../../../../src/scripts/ops/discord-bot/interactions";

@@ -1,4 +1,6 @@
 // apps/crawler/tests/scripts/ops/discord-bot/price-report-settings-categories.test.ts
+// 驗證個人價格報告設定面板的分類選擇、全部分類重置與停用入口互動。
+
 import { describe, expect, it, vi } from "vitest";
 import { CommandCooldowns } from "../../../../src/scripts/ops/discord-bot/cooldowns";
 import { handleDiscordInteraction } from "../../../../src/scripts/ops/discord-bot/interactions";

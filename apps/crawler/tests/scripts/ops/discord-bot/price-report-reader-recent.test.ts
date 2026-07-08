@@ -1,4 +1,6 @@
 // apps/crawler/tests/scripts/ops/discord-bot/price-report-reader-recent.test.ts
+// 驗證近期時間窗價格報告 reader 會彙整最新變價、新商品與商品關鍵字篩選結果。
+
 import { describe, expect, it } from "vitest";
 import {
   readRecentPriceChanges,

@@ -1,4 +1,6 @@
 // apps/crawler/tests/scripts/ops/discord-bot/price-report-settings-modals.test.ts
+// 驗證個人價格報告設定面板開啟 modal、預填值，以及時間與上限 modal 提交驗證。
+
 import { describe, expect, it, vi } from "vitest";
 import { CommandCooldowns } from "../../../../src/scripts/ops/discord-bot/cooldowns";
 import { handleDiscordInteraction } from "../../../../src/scripts/ops/discord-bot/interactions";

@@ -1,4 +1,6 @@
 // apps/crawler/tests/scripts/ops/discord-bot/price-report-reader-support.ts
+// 提供價格報告 reader 測試用的 price snapshot fixture builder 與假 Prisma client。
+
 import { vi } from "vitest";
 import type { PriceReportReaderClient } from "../../../../src/scripts/ops/discord-bot/price-report/reader-types";
 
@@ -29,6 +31,7 @@ interface TestProductWhere {
   OR?: TestProductWhere[];
 }
 
+// 建立 reader 測試用的 price snapshot 記錄，預設套用常見顯示卡 / 華碩分類資料。
 export function snapshot({
   id,
   productId,
@@ -69,6 +72,7 @@ export function snapshot({
   };
 }
 
+// 建立支援 crawl-run 與近期時間窗查詢形狀的 fake reader client。
 export function createPriceChangeClient(snapshots: TestSnapshot[]): PriceReportReaderClient & {
   priceSnapshot: {
     findMany: ReturnType<typeof vi.fn>;
