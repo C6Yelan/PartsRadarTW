@@ -1,6 +1,7 @@
 // apps/crawler/src/scripts/ops/check-product-links.ts
-// This script is a low-frequency product link health checker.
-// It records link status for UI hints only; it does not remove or deactivate products.
+// 手動執行商品來源查看連結健康檢查，將結果寫入 product_link_health 供低干擾提示使用。
+// 此工具只記錄連結狀態，不會移除商品或改變商品 active / missing 判斷。
+
 import type { PrismaClient } from "@partsradar/db";
 import { loadWorkspaceEnv, toSafeCliErrorMessage } from "../shared/script-utils";
 import { parseOptions, printSummary } from "./product-link-checker/options";
@@ -13,6 +14,7 @@ import { createOpsLogger } from "./shared/logger";
 
 const logger = createOpsLogger();
 
+// 載入工作區 env 與 Prisma client，執行一次手動 link health 檢查並確保 DB 連線收尾。
 async function main() {
   const options = parseOptions(process.argv.slice(2));
   let client: PrismaClient | null = null;
@@ -40,6 +42,7 @@ main().catch((error: unknown) => {
   process.exitCode = 1;
 });
 
+// 將完整 Prisma client 收斂成 link health processor 需要的最小資料介面。
 function toProductLinkHealthClient(client: PrismaClient): ProductLinkHealthClient {
   return {
     product: {

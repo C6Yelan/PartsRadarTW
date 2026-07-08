@@ -1,4 +1,6 @@
 // apps/crawler/src/scripts/ops/production-smoke.ts
+// 提供單次 production smoke CLI 入口，並集中轉出 production-smoke 子模組的公開 API。
+
 import type { PrismaClient } from "@partsradar/db";
 import { loadWorkspaceEnv, resolveWorkspaceRoot, toSafeCliErrorMessage } from "../shared/script-utils";
 import { HELP_FLAG } from "./production-smoke/constants";
@@ -17,6 +19,7 @@ export type {
   SmokeStatus,
 } from "./production-smoke/types";
 
+// 依 CLI 參數執行 public-only 或完整 production smoke，並以 FAIL 決定程序退出碼。
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
 

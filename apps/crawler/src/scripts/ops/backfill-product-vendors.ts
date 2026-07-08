@@ -1,7 +1,7 @@
 // apps/crawler/src/scripts/ops/backfill-product-vendors.ts
-// This script is a manual local backfill tool for product vendor metadata.
-// It derives vendor fields from existing product names and category IDs.
-// Do not use this as the production scheduled crawler entrypoint.
+// 手動回填既有商品的 vendor metadata，使用目前分類與商品名稱重新套用品牌分類規則。
+// 此檔是一次性 ops CLI，不是 scheduled crawler 的常態寫入流程。
+
 import type { PrismaClient } from "@partsradar/db";
 import { classifyProductVendor } from "../../coolpc/vendor-classification";
 import {
@@ -37,6 +37,7 @@ interface BackfillSummary {
   unmatched: number;
 }
 
+// 載入工作區 env 與 Prisma client，執行一次 vendor backfill 並確保 DB 連線收尾。
 async function main() {
   const options = parseOptions(process.argv.slice(2));
   let client: PrismaClient | null = null;
@@ -55,6 +56,7 @@ async function main() {
   }
 }
 
+// 讀取啟用中 CoolPC 分類的商品候選，保留既有 vendor 欄位供差異判斷。
 async function readCandidates(
   client: PrismaClient,
   options: BackfillProductVendorsOptions,
@@ -83,6 +85,7 @@ async function readCandidates(
   });
 }
 
+// 逐筆重新分類 vendor，dry-run 僅列出變更，write 模式才更新商品欄位。
 async function backfillProductVendors(
   client: PrismaClient,
   candidates: ProductCandidate[],
@@ -136,6 +139,7 @@ async function backfillProductVendors(
   return summary;
 }
 
+// 解析手動 vendor backfill CLI 參數；此工具預設寫入，需由操作者用 --dry-run 切換預覽。
 function parseOptions(args: string[]): BackfillProductVendorsOptions {
   if (args.includes("--help")) {
     printHelp();
@@ -150,6 +154,7 @@ function parseOptions(args: string[]): BackfillProductVendorsOptions {
   };
 }
 
+// 輸出本次 vendor backfill 的分類命中與實際變更摘要。
 function printSummary(summary: BackfillSummary, options: BackfillProductVendorsOptions): void {
   console.log("");
   console.log("Product vendor backfill summary:");
@@ -161,6 +166,7 @@ function printSummary(summary: BackfillSummary, options: BackfillProductVendorsO
   console.log(`- unchanged: ${summary.unchanged}`);
 }
 
+// 輸出手動 vendor backfill CLI 說明；此腳本偏維運用途，不作為使用者介面文案。
 function printHelp(): void {
   console.log(`
 Usage: pnpm ops:product-vendors:backfill [options]

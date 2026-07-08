@@ -1,7 +1,7 @@
 // apps/crawler/src/scripts/ops/backfill-product-images.ts
-// This script is a manual image-cache backfill tool for local validation.
-// It downloads source product images at a low, jittered rate and writes small WebP thumbnails.
-// Do not use this as the production scheduled crawler entrypoint.
+// 手動執行商品圖片快取補圖，串接候選查詢、低頻來源請求與 WebP 縮圖寫入。
+// 此檔是 ops CLI entrypoint，不是 scheduled crawler 的常態補圖流程。
+
 import type { PrismaClient } from "@partsradar/db";
 import { loadWorkspaceEnv, toSafeCliErrorMessage } from "../shared/script-utils";
 import { parseOptions, printSummary } from "./image-cache-backfill/options";
@@ -10,6 +10,7 @@ import { createOpsLogger } from "./shared/logger";
 
 const logger = createOpsLogger();
 
+// 載入工作區 env 與 Prisma client，執行一次手動圖片補圖並確保 DB 連線收尾。
 async function main() {
   const options = parseOptions(process.argv.slice(2));
   let client: PrismaClient | null = null;

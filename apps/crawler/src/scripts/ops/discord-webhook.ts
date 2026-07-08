@@ -1,4 +1,5 @@
 // apps/crawler/src/scripts/ops/discord-webhook.ts
+// 提供 Discord admin webhook 的安全傳送工具，集中 URL 驗證、payload 限制、rate limit 與錯誤遮蔽。
 
 import {
   formatDiscordWebhookText,
@@ -15,12 +16,14 @@ const DISCORD_WEBHOOK_PATH_PATTERN = /^\/api\/webhooks\/[0-9]+\/[A-Za-z0-9._-]+\
 
 export { formatDiscordWebhookText } from "./discord-webhook/text";
 
+// Discord webhook embed 欄位 contract，只保留目前 admin 通知實際使用的欄位。
 export interface DiscordWebhookEmbedField {
   name: string;
   value: string;
   inline?: boolean;
 }
 
+// Discord webhook embed contract，供 smoke admin notification 組裝告警內容。
 export interface DiscordWebhookEmbed {
   title?: string;
   description?: string;
@@ -29,6 +32,7 @@ export interface DiscordWebhookEmbed {
   timestamp?: string;
 }
 
+// Discord webhook message contract；transport 層會再轉成 Discord API payload。
 export interface DiscordWebhookMessage {
   content?: string;
   username?: string;
@@ -36,6 +40,7 @@ export interface DiscordWebhookMessage {
   embeds?: DiscordWebhookEmbed[];
 }
 
+// webhook 傳送設定；webhookUrl 可為空，讓 admin notification 可用 opt-in 方式啟用。
 export interface DiscordWebhookSendOptions {
   webhookUrl: string | null | undefined;
   message: DiscordWebhookMessage;
@@ -43,6 +48,7 @@ export interface DiscordWebhookSendOptions {
   fetchImpl?: typeof fetch;
 }
 
+// webhook 傳送結果會保留 rate limit 與失敗分類，但不回傳原始 webhook URL 或未遮蔽 transport error。
 export type DiscordWebhookSendResult =
   | {
       status: "skipped";
@@ -88,6 +94,7 @@ interface DiscordWebhookPayload {
 
 type DiscordWebhookPayloadEmbed = NonNullable<DiscordWebhookPayload["embeds"]>[number];
 
+// 從 env 讀取 Discord webhook URL；placeholder 或空值視為未設定，避免開發環境誤送。
 export function readDiscordWebhookUrl(
   env: NodeJS.ProcessEnv,
   key: "DISCORD_ADMIN_WEBHOOK_URL",
@@ -101,6 +108,7 @@ export function readDiscordWebhookUrl(
   return normalizeDiscordWebhookUrl(value, key);
 }
 
+// 僅接受 Discord 官方 webhook URL，並移除 hash，避免把錯誤或多餘片段帶進傳送流程。
 export function normalizeDiscordWebhookUrl(value: string, label = "Discord webhook URL"): string {
   let url: URL;
 
@@ -124,6 +132,7 @@ export function normalizeDiscordWebhookUrl(value: string, label = "Discord webho
   return url.toString();
 }
 
+// 傳送 Discord webhook 訊息；空 webhook 會安全略過，HTTP 429 會回傳 retry-after 資訊。
 export async function sendDiscordWebhookMessage({
   webhookUrl,
   message,
@@ -191,6 +200,7 @@ export async function sendDiscordWebhookMessage({
   }
 }
 
+// 將內部 message contract 轉成 Discord webhook payload，並禁止 allowed_mentions 自動 ping。
 function toDiscordWebhookPayload(message: DiscordWebhookMessage): DiscordWebhookPayload {
   const content = message.content
     ? formatDiscordWebhookText(message.content, DISCORD_CONTENT_MAX_LENGTH).trim()
@@ -212,6 +222,7 @@ function toDiscordWebhookPayload(message: DiscordWebhookMessage): DiscordWebhook
   };
 }
 
+// 將 embed 文字裁切到 Discord 上限，避免單則 admin webhook 因欄位過長送失敗。
 function toDiscordEmbed(embed: DiscordWebhookEmbed): DiscordWebhookPayloadEmbed {
   return {
     title: embed.title ? formatDiscordWebhookText(embed.title, 256).trim() : undefined,
@@ -228,10 +239,12 @@ function toDiscordEmbed(embed: DiscordWebhookEmbed): DiscordWebhookPayloadEmbed 
   };
 }
 
+// 空 embed 不送出，避免 Discord 因無內容 embed 拒絕整個 payload。
 function hasDiscordEmbedContent(embed: DiscordWebhookPayloadEmbed): boolean {
   return Boolean(embed.title || embed.description || (embed.fields && embed.fields.length > 0));
 }
 
+// 優先使用 retry-after header；沒有 header 時再讀 Discord rate-limit body。
 async function resolveRetryAfterMs(response: Response): Promise<number> {
   const headerRetryAfterMs = parseRetryAfterHeader(response.headers);
 
@@ -245,6 +258,7 @@ async function resolveRetryAfterMs(response: Response): Promise<number> {
   return retryAfter !== null && Number.isFinite(retryAfter) ? Math.ceil(retryAfter * 1000) : 0;
 }
 
+// 將 Discord retry-after 秒數 header 轉成毫秒；無效值視為未提供。
 function parseRetryAfterHeader(headers: Headers): number | undefined {
   const retryAfter = headers.get("retry-after");
 
@@ -261,6 +275,7 @@ function parseRetryAfterHeader(headers: Headers): number | undefined {
   return Math.ceil(retryAfterSeconds * 1000);
 }
 
+// 讀取 Discord rate-limit body；解析失敗時回 null，避免錯誤處理再拋出新錯。
 async function readRateLimitBody(response: Response): Promise<DiscordRateLimitBody | null> {
   try {
     const body = (await response.clone().json()) as DiscordRateLimitBody;

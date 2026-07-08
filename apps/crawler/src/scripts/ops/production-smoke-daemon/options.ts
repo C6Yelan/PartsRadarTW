@@ -1,4 +1,5 @@
 // apps/crawler/src/scripts/ops/production-smoke-daemon/options.ts
+// 解析 production smoke daemon 的排程參數，並合併單輪 smoke 與 Discord 告警設定。
 
 import { getStringArg } from "../../shared/script-utils";
 import {
@@ -19,6 +20,7 @@ const MAX_SMOKE_INTERVAL_SECONDS = 24 * 60 * 60;
 const MIN_INITIAL_DELAY_SECONDS = 0;
 const MAX_INITIAL_DELAY_SECONDS = 24 * 60 * 60;
 
+// daemon 執行設定；包含單輪 production smoke options、循環排程與 Discord admin webhook 告警設定。
 export interface ProductionSmokeDaemonOptions extends ProductionSmokeOptions {
   intervalSeconds: number;
   initialDelaySeconds: number;
@@ -26,6 +28,7 @@ export interface ProductionSmokeDaemonOptions extends ProductionSmokeOptions {
   smokeDiscordNotification: SmokeDiscordNotificationOptions;
 }
 
+// 將 CLI args / env 解析成 daemon 設定，讓長駐 daemon 與 run-once 模式共用同一套參數。
 export function parseProductionSmokeDaemonOptions(
   args: string[],
   env: NodeJS.ProcessEnv = process.env,
@@ -67,6 +70,7 @@ export function parseProductionSmokeDaemonOptions(
   };
 }
 
+// 解析 daemon 專屬整數 option，限制 interval 與 initial delay 不被誤設成無效或極端值。
 function parseIntegerOption({
   args,
   env,
@@ -100,6 +104,7 @@ function parseIntegerOption({
   return value;
 }
 
+// 輸出 production smoke daemon 的手動啟動說明；完整 smoke 門檻仍由 production smoke help / runbook 說明。
 export function printHelp(): void {
   console.log(`Usage:
   pnpm --filter @partsradar/crawler ops:production-smoke-daemon -- [options]

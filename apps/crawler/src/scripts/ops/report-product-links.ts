@@ -1,5 +1,6 @@
 // apps/crawler/src/scripts/ops/report-product-links.ts
-// Read-only diagnostic report for persisted product link health rows.
+// 輸出 product link health 的唯讀診斷報表；此功能線後續會隨連結健康檢查一起移除。
+
 import type { PrismaClient } from "@partsradar/db";
 import { loadWorkspaceEnv, toSafeCliErrorMessage } from "../shared/script-utils";
 import {
@@ -9,6 +10,7 @@ import {
   type ProductLinkHealthReportClient,
 } from "./product-link-health-report";
 
+// 讀取 product link health rows 並輸出文字報表，不修改資料庫內容。
 async function main() {
   const options = parseProductLinkHealthReportOptions(process.argv.slice(2));
   let client: PrismaClient | null = null;
@@ -30,6 +32,7 @@ main().catch((error: unknown) => {
   process.exitCode = 1;
 });
 
+// 將 Prisma client 收斂成報表讀取需要的最小介面，方便測試替換。
 function toReportClient(client: PrismaClient): ProductLinkHealthReportClient {
   return {
     productLinkHealth: {

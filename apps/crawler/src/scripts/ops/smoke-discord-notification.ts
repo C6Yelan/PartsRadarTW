@@ -1,4 +1,6 @@
 // apps/crawler/src/scripts/ops/smoke-discord-notification.ts
+// 決定 production smoke admin Discord 告警是否發送，並管理 webhook 設定與通知去重狀態。
+
 import type { ProductionSmokeSummary } from "./production-smoke";
 import { type DiscordWebhookMessage, readDiscordWebhookUrl } from "./discord-webhook";
 import { getStringArg, resolveWorkspacePathArgument } from "../shared/script-utils";
@@ -25,17 +27,20 @@ export type {
   SmokeDiscordNotificationState,
 } from "./smoke-discord-notification/state";
 
+// smoke Discord 告警設定；state file 用來避免相同異常在 cooldown 內重複通知。
 export interface SmokeDiscordNotificationOptions {
   adminWebhookUrl: string | null;
   stateFilePath: string;
   cooldownSeconds: number;
 }
 
+// 不發送 Discord 告警時的明確原因，供 daemon log 與測試判斷。
 export type SmokeDiscordNotificationSkipReason =
   | "missing_webhook_url"
   | "status_ok_without_previous_alert"
   | "unchanged_within_cooldown";
 
+// Discord 告警決策結果；send 會附帶 message 與下一份 state，skip 只更新必要觀測狀態。
 export type SmokeDiscordNotificationDecision =
   | {
       action: "send";
@@ -50,6 +55,7 @@ export type SmokeDiscordNotificationDecision =
       nextState: SmokeDiscordNotificationState | null;
     };
 
+// 解析 smoke Discord 告警相關 CLI/env 設定，包含 webhook、state file 與重複通知 cooldown。
 export function parseSmokeDiscordNotificationOptions(
   args: string[],
   env: NodeJS.ProcessEnv,
@@ -75,6 +81,7 @@ export function parseSmokeDiscordNotificationOptions(
   };
 }
 
+// 根據本輪 smoke summary、前次 state 與 cooldown 規則決定是否送出 WARN/FAIL/RECOVERED。
 export function createSmokeDiscordNotificationDecision({
   summary,
   previousState,
@@ -150,6 +157,7 @@ export function createSmokeDiscordNotificationDecision({
   });
 }
 
+// 建立 send decision，並同步產生對應的下一份去重 state。
 function createSendDecision({
   kind,
   notificationKey,
@@ -180,6 +188,7 @@ function createSendDecision({
   };
 }
 
+// 建立下一份通知狀態；即使不發送通知，也會記錄最後觀測到的 smoke 狀態。
 function createNextState({
   previousState,
   summary,
@@ -206,6 +215,7 @@ function createNextState({
   };
 }
 
+// 判斷同一組異常是否已在 cooldown 內通知過，避免 Discord admin webhook 被重複洗版。
 function shouldSendAbnormalNotification({
   notificationKey,
   previousState,
@@ -240,6 +250,7 @@ function shouldSendAbnormalNotification({
   );
 }
 
+// 將目前所有非 OK check 組成穩定 key，用來判斷異常組合是否真的改變。
 function createAbnormalNotificationKey(summary: ProductionSmokeSummary): string {
   const abnormalChecks = summary.checks
     .filter((check) => check.status !== "OK")
@@ -249,6 +260,7 @@ function createAbnormalNotificationKey(summary: ProductionSmokeSummary): string 
   return `${summary.status}:${abnormalChecks.join("|")}`;
 }
 
+// 解析整數型 notification option，避免錯字或超出範圍的 env 靜默套用預設值。
 function parseIntegerOption({
   args,
   env,

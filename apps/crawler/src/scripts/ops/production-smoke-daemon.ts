@@ -1,4 +1,6 @@
 // apps/crawler/src/scripts/ops/production-smoke-daemon.ts
+// 以 daemon 形式定期執行 production smoke，並把異常與恢復狀態送往維運 Discord webhook。
+
 import type { PrismaClient } from "@partsradar/db";
 import { runProductionSmoke } from "./production-smoke";
 import type { ProductionSmokeSummary, SmokeStatus } from "./production-smoke";
@@ -31,11 +33,13 @@ const logger = createOpsLogger();
 export { parseProductionSmokeDaemonOptions } from "./production-smoke-daemon/options";
 export type { ProductionSmokeDaemonOptions } from "./production-smoke-daemon/options";
 
+// daemon shutdown 抽象，讓測試能控制停止狀態與 sleep 行為。
 export interface ShutdownController {
   readonly requested: boolean;
   sleep(ms: number): Promise<void>;
 }
 
+// production smoke daemon 的可注入依賴，供 CLI entrypoint 與單元測試共用。
 interface RunProductionSmokeDaemonOptions {
   client: PrismaClient;
   options: ProductionSmokeDaemonOptions;
@@ -44,6 +48,7 @@ interface RunProductionSmokeDaemonOptions {
   sendDiscordWebhook?: (options: DiscordWebhookSendOptions) => Promise<DiscordWebhookSendResult>;
 }
 
+// 解析環境與 CLI 設定後啟動 daemon，並在結束時釋放 Prisma 連線。
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
 
@@ -112,6 +117,7 @@ export async function runProductionSmokeDaemon({
   } while (!shutdown.requested);
 }
 
+// 輸出每輪 smoke 結果摘要；OK 只統計數量，WARN/FAIL 另外列出問題方便維運追查。
 export function logProductionSmokeDaemonSummary(
   summary: ProductionSmokeSummary,
   logMessage: (message: string) => void,
@@ -133,6 +139,7 @@ export function logProductionSmokeDaemonSummary(
   }
 }
 
+// 計算單輪 smoke check 的狀態分布，供 daemon log 保持固定格式。
 function countChecksByStatus(summary: ProductionSmokeSummary): Record<SmokeStatus, number> {
   const counts: Record<SmokeStatus, number> = { OK: 0, WARN: 0, FAIL: 0 };
 
@@ -143,6 +150,7 @@ function countChecksByStatus(summary: ProductionSmokeSummary): Record<SmokeStatu
   return counts;
 }
 
+// 依 smoke 結果與上次通知狀態決定是否發送 Discord 告警，並更新去重 state。
 async function handleSmokeDiscordNotification({
   summary,
   options,
@@ -220,6 +228,7 @@ async function handleSmokeDiscordNotification({
   logMessage(`Smoke Discord notification skipped by sender. reason=${result.reason}`);
 }
 
+// 寫入 Discord 通知去重 state；寫入失敗只記錄 log，不阻斷下一輪 smoke。
 async function writeSmokeDiscordNotificationStateSafely({
   path,
   state,
@@ -242,6 +251,7 @@ async function writeSmokeDiscordNotificationStateSafely({
   }
 }
 
+// 建立 SIGINT/SIGTERM shutdown controller，讓 daemon 可喚醒 sleep 並在目前檢查後停止。
 function createShutdownController(): ShutdownController {
   let stopRequested = false;
   let wakeSleeper: (() => void) | null = null;
@@ -284,6 +294,7 @@ function createShutdownController(): ShutdownController {
   };
 }
 
+// 透過 ops logger 輸出 daemon log，避免直接在流程中散落 console 呼叫。
 function log(message: string): void {
   logger.info(message);
 }

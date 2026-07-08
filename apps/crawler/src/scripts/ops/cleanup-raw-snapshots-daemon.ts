@@ -194,6 +194,7 @@ function printCleanupSummary(
   );
 }
 
+// 統一套用 CLI 錯誤遮蔽，避免 daemon log 直接輸出敏感 env 或連線字串。
 function toLogErrorMessage(error: unknown): string {
   return toSafeCliErrorMessage(error);
 }

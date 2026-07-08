@@ -1,4 +1,6 @@
 // apps/crawler/src/scripts/ops/maintenance-daemon.ts
+// 啟動低頻 maintenance daemon，負責排程 product link health 檢查並配合 crawler priority 讓路。
+
 import type { PrismaClient } from "@partsradar/db";
 import type {
   ProductLinkCheckerOptions,
@@ -35,6 +37,7 @@ export interface ShutdownController {
   sleep(ms: number): Promise<void>;
 }
 
+// 單輪 maintenance 結果摘要，讓 daemon 判斷是否因 crawler priority 改用較短恢復延遲。
 export interface MaintenanceCycleSummary {
   skippedForLock: boolean;
   pausedForPriority: boolean;
@@ -65,6 +68,7 @@ interface RunMaintenanceDaemonOptions {
   dependencies?: MaintenanceDaemonDependencies;
 }
 
+// CLI 入口：載入 env、建立 Prisma client，並用 graceful shutdown 控制 maintenance loop。
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
 
@@ -93,6 +97,7 @@ async function main(): Promise<void> {
   }
 }
 
+// 執行 maintenance daemon 主迴圈；priority pause 會縮短下一輪等待，以便讓 crawler 先跑。
 export async function runMaintenanceDaemon({
   client,
   options,
@@ -133,6 +138,7 @@ export async function runMaintenanceDaemon({
   }
 }
 
+// 執行單輪 maintenance；先取得 external fetch lock，再跑 link health task。
 export async function runMaintenanceCycle({
   client,
   options,
@@ -174,6 +180,7 @@ export async function runMaintenanceCycle({
   }
 }
 
+// 選出 due purchase links 並執行 link checker；若 crawler priority 存在，checker 會在安全邊界暫停。
 async function runLinkTask(
   client: PrismaClient,
   options: MaintenanceDaemonOptions,
@@ -200,6 +207,7 @@ async function runLinkTask(
   });
 }
 
+// 註冊 SIGINT/SIGTERM，讓 daemon 在目前 maintenance step 結束後停止，並可喚醒等待中的 sleep。
 function createShutdownController(): ShutdownController {
   let stopRequested = false;
   let wakeSleeper: (() => void) | null = null;
@@ -242,6 +250,7 @@ function createShutdownController(): ShutdownController {
   };
 }
 
+// 透過 ops logger 輸出 maintenance daemon 訊息，讓格式與其他 daemon 一致。
 function log(message: string): void {
   logger.info(message);
 }

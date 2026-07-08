@@ -1,6 +1,6 @@
 // apps/crawler/src/scripts/ops/product-link-health-report.ts
-// Builds an aggregate report from persisted product_link_health rows.
-// This command is read-only and never contacts external product links.
+// 從既有 product_link_health rows 彙整唯讀報表；不會連外檢查商品連結。
+
 import type { Prisma } from "@partsradar/db";
 import {
   PRODUCT_LINK_HEALTH_STATUSES,
@@ -42,6 +42,7 @@ export const PRODUCT_LINK_HEALTH_REPORT_SELECT = {
   },
 } as const satisfies Prisma.ProductLinkHealthSelect;
 
+// product_link_health 報表讀取所需的最小 row shape，對應上方 Prisma select。
 export type ProductLinkHealthReportRecord = Prisma.ProductLinkHealthGetPayload<{
   select: typeof PRODUCT_LINK_HEALTH_REPORT_SELECT;
 }>;
@@ -50,12 +51,14 @@ type ProductLinkHealthReportFindManyArgs = Omit<Prisma.ProductLinkHealthFindMany
   select: typeof PRODUCT_LINK_HEALTH_REPORT_SELECT;
 };
 
+// 報表 helper 需要的最小資料讀取介面，讓 entrypoint 與測試不用依賴完整 PrismaClient。
 export interface ProductLinkHealthReportClient {
   productLinkHealth: {
     findMany(args: ProductLinkHealthReportFindManyArgs): Promise<ProductLinkHealthReportRecord[]>;
   };
 }
 
+// product link health 報表的頂層結果，依 link kind 彙整狀態與錯誤分布。
 export interface ProductLinkHealthReport {
   generatedAt: Date;
   scope: "active products" | "all products";
@@ -63,6 +66,7 @@ export interface ProductLinkHealthReport {
   kinds: ProductLinkHealthKindReport[];
 }
 
+// 單一 link kind 的健康狀態彙總，包含各狀態計數與錯誤細分。
 export interface ProductLinkHealthKindReport {
   linkKind: ProductLinkKindValue;
   total: number;
@@ -70,17 +74,20 @@ export interface ProductLinkHealthKindReport {
   errors: Record<"TEMPORARY_ERROR" | "BROKEN", ProductLinkHealthErrorBreakdown>;
 }
 
+// 錯誤狀態的 HTTP status 與連續失敗次數分布。
 export interface ProductLinkHealthErrorBreakdown {
   total: number;
   httpStatusCounts: CountBucket[];
   failureCountCounts: CountBucket[];
 }
 
+// 報表中的計數桶，label 可能是 HTTP status、no_status 或 failure_count 區間。
 export interface CountBucket {
   label: string;
   count: number;
 }
 
+// 讀取 product_link_health rows 並產生報表；預設只看 active products。
 export async function readProductLinkHealthReport(
   client: ProductLinkHealthReportClient,
   options: ProductLinkHealthReportOptions,
@@ -104,6 +111,7 @@ export async function readProductLinkHealthReport(
   return buildProductLinkHealthReport(records, options, generatedAt);
 }
 
+// 將查詢結果彙整成報表資料結構，讓 CLI formatting 與測試可重用。
 export function buildProductLinkHealthReport(
   records: ProductLinkHealthReportRecord[],
   options: Pick<ProductLinkHealthReportOptions, "includeInactive" | "kinds">,
@@ -142,6 +150,7 @@ export function buildProductLinkHealthReport(
   };
 }
 
+// 將報表轉成 CLI 文字輸出，供手動維運快速查看 link health 分布。
 export function formatProductLinkHealthReport(report: ProductLinkHealthReport): string {
   const lines = [
     "Product link health report",

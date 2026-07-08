@@ -1,4 +1,6 @@
 // apps/crawler/src/scripts/ops/crawl-coolpc-daemon.ts
+// 啟動 scheduled CoolPC crawler daemon，負責週期性抓取分類、寫入商品資料並補齊新增商品圖片。
+
 import type { PrismaClient } from "@partsradar/db";
 import { CRAWL_TRIGGER_TYPES, type RunCoolpcCrawlOnceResult } from "../../coolpc/crawl-run";
 import {
@@ -44,11 +46,13 @@ interface ShutdownController {
   sleep(ms: number): Promise<void>;
 }
 
+// 單輪 scheduled crawl 結果，回傳下一輪是否進入 backoff 或使用較短 retry。
 interface ScheduledCycleResult {
   shouldBackoff: boolean;
   retryAfterSeconds?: number;
 }
 
+// CLI 入口：載入 env、建立 Prisma client，並用 graceful shutdown 控制 daemon loop。
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
 
@@ -94,6 +98,7 @@ async function main(): Promise<void> {
   }
 }
 
+// 執行單輪 scheduled crawl；先取得外部抓取 lock，再跑分類 crawl 與新增商品圖片補圖。
 export async function runScheduledCycle(
   client: PrismaClient,
   options: CoolpcDaemonOptions,
@@ -200,6 +205,7 @@ export async function runScheduledCycle(
       };
 }
 
+// 註冊 SIGINT/SIGTERM，讓 crawler 在目前步驟結束後停止，並可喚醒等待中的下一輪 sleep。
 function createShutdownController(): ShutdownController {
   let stopRequested = false;
   let wakeSleeper: (() => void) | null = null;
@@ -241,10 +247,12 @@ function createShutdownController(): ShutdownController {
   };
 }
 
+// 統一套用 CLI 錯誤遮蔽，避免 daemon log 直接輸出敏感 env 或連線字串。
 function toSafeErrorMessage(error: unknown): string {
   return toSafeCliErrorMessage(error);
 }
 
+// 透過 ops logger 輸出 scheduled crawler 訊息，讓格式與其他 daemon 一致。
 function log(message: string): void {
   logger.info(message);
 }

@@ -1,5 +1,6 @@
 // apps/crawler/src/scripts/shared/script-utils.ts
 // 集中提供 crawler CLI 常用工具：參數解析、環境載入、路徑解析與錯誤輸出遮蔽。
+
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
@@ -44,6 +45,7 @@ export async function loadWorkspaceEnv(workspaceRoot: string): Promise<void> {
   }
 }
 
+// 讀取指定 CLI flag 後方的字串值；缺值或下一個 token 是 flag 時直接報錯。
 export function getStringArg(args: string[], name: string): string | undefined {
   const index = args.indexOf(name);
 
@@ -60,6 +62,7 @@ export function getStringArg(args: string[], name: string): string | undefined {
   return value;
 }
 
+// 讀取非負整數 CLI 參數；未提供時回傳 fallback。
 export function getNumberArg(args: string[], name: string, fallback: number): number {
   const raw = getStringArg(args, name);
 
@@ -80,6 +83,7 @@ export function getNumberArg(args: string[], name: string, fallback: number): nu
   return value;
 }
 
+// 讀取正整數 CLI 參數；未提供時回傳 null，供 optional limit 類參數使用。
 export function getPositiveNumberArg(args: string[], name: string): number | null {
   const raw = getStringArg(args, name);
 
@@ -100,6 +104,7 @@ export function getPositiveNumberArg(args: string[], name: string): number | nul
   return value;
 }
 
+// 將 CLI/env 取得的相對路徑解析到 workspace root 底下。
 export function resolveWorkspacePathArgument(workspaceRoot: string, path: string): string {
   return resolve(workspaceRoot, path);
 }
@@ -109,6 +114,7 @@ export function toSafeCliErrorMessage(error: unknown): string {
   return sanitizeCliLogMessage(error instanceof Error ? error.message : String(error));
 }
 
+// 遮蔽 CLI/log 常見敏感片段；完整規則後續需和 ops logger 收斂成同一來源。
 function sanitizeCliLogMessage(message: string): string {
   return message
     .replace(POSTGRES_URL_PATTERN, "postgresql://***")
@@ -159,14 +165,17 @@ async function loadEnvFile(path: string, override: boolean): Promise<void> {
   }
 }
 
+// 判斷是否載入 .env.local；production 不載入本機覆寫檔，避免部署環境被 local 設定影響。
 function shouldLoadLocalEnv(): boolean {
   return process.env.NODE_ENV !== "production";
 }
 
+// 判斷 .env.local 是否覆寫既有 env；目前與載入條件一致，後續可合併為單一 helper。
 function shouldOverrideLocalEnvFile(): boolean {
   return process.env.NODE_ENV !== "production";
 }
 
+// 移除 env value 外層成對引號；不處理 shell escape，維持簡單 .env parser 邊界。
 function unquoteEnvValue(value: string): string {
   if (
     (value.startsWith('"') && value.endsWith('"')) ||
@@ -178,6 +187,7 @@ function unquoteEnvValue(value: string): string {
   return value;
 }
 
+// 收斂 Node.js syscall error 判斷，供 ENOENT 等檔案錯誤分支使用。
 function isNodeError(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && "code" in error;
 }
