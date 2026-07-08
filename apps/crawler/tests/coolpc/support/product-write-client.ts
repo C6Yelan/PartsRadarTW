@@ -1,4 +1,6 @@
 // apps/crawler/tests/coolpc/support/product-write-client.ts
+// 提供 product-write 與 data-flow 測試用的記憶體 fake client、商品 factory 與價格資料列型別。
+
 import type { ParsedCoolpcProduct } from "../../../src/coolpc/parser";
 import type { CoolpcProductWriteClient } from "../../../src/coolpc/product-write";
 
@@ -37,9 +39,7 @@ export interface FakeCurrentPrice {
   priceChangedAt: Date;
 }
 
-// This fake mirrors only the product writer's read/write contract. It is not a
-// general in-memory Prisma replacement, which keeps this slice from growing a
-// shared test database abstraction too early.
+// 只模擬 product writer 需要的讀寫 contract，不擴張成通用 in-memory Prisma 替代品。
 export class FakeCoolpcProductWriteClient implements CoolpcProductWriteClient {
   readonly products: FakeProduct[] = [];
   readonly priceSnapshots: FakePriceSnapshot[] = [];
@@ -47,8 +47,7 @@ export class FakeCoolpcProductWriteClient implements CoolpcProductWriteClient {
   transactionCallCount = 0;
 
   async $transaction<T>(operation: (client: CoolpcProductWriteClient) => Promise<T>): Promise<T> {
-    // Rollback behavior belongs to Prisma integration tests. These unit tests
-    // only need to prove that the writer uses a transaction boundary.
+    // rollback 屬於 Prisma integration 測試範圍；這裡只確認 writer 有進入 transaction boundary。
     this.transactionCallCount += 1;
     return operation(this);
   }
@@ -71,8 +70,7 @@ export class FakeCoolpcProductWriteClient implements CoolpcProductWriteClient {
 
       const currentPrice =
         this.currentPrices.find((candidate) => candidate.productId === product.id) ?? null;
-      // The production query includes currentPrice.priceSnapshot because price
-      // comparisons must use the latest persisted history row, not a cached field.
+      // production query 會帶 currentPrice.priceSnapshot，價格比較必須看最新歷史列而不是快取欄位。
       const priceSnapshot = currentPrice
         ? (this.priceSnapshots.find((candidate) => candidate.id === currentPrice.priceSnapshotId) ??
           null)
@@ -184,6 +182,7 @@ export class FakeCoolpcProductWriteClient implements CoolpcProductWriteClient {
     },
   };
 
+  // 建立已有 current price 的既有商品，供更新、價格變動與 missing lifecycle 測試使用。
   seedProductWithCurrentPrice(
     item: ParsedCoolpcProduct,
     overrides: Partial<Pick<FakeProduct, "isActive" | "missingSince" | "missingSeenCount">> = {},
@@ -212,6 +211,7 @@ export class FakeCoolpcProductWriteClient implements CoolpcProductWriteClient {
     });
   }
 
+  // 建立沒有 current price 的既有商品，用來驗證修復 current price 缺口的分支。
   seedProductWithoutCurrentPrice(
     item: ParsedCoolpcProduct,
     overrides: Partial<Pick<FakeProduct, "isActive" | "missingSince" | "missingSeenCount">> = {},
@@ -236,6 +236,7 @@ export class FakeCoolpcProductWriteClient implements CoolpcProductWriteClient {
   }
 }
 
+// 建立測試用 parsed CoolPC product，預設使用 CPU 分類與台幣價格。
 export function productItem({
   sourceCategoryId = "category-4",
   ibuyToken = "CPU-TOKEN-001",

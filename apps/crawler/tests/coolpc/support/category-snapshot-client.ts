@@ -1,3 +1,6 @@
+// apps/crawler/tests/coolpc/support/category-snapshot-client.ts
+// 提供 category snapshot 與 crawl run 測試用的記憶體 fake client 與共用 fixture factory。
+
 import type {
   CoolpcCategorySnapshotWriteClient,
   WriteCoolpcCategoryProductObservation,
@@ -15,9 +18,7 @@ import type {
   FakeRawSnapshot,
 } from "./category-snapshot-records";
 
-// The fake implements only the Prisma delegate methods touched by this slice.
-// That keeps the tests focused on the crawler write contract without requiring
-// a test database.
+// 只實作這組測試會碰到的 Prisma delegate 方法，讓測試聚焦 crawler write contract 而不需要測試資料庫。
 export class FakeCrawlerWriteClient
   implements CrawlRunWriteClient, CoolpcCategorySnapshotWriteClient
 {
@@ -29,7 +30,7 @@ export class FakeCrawlerWriteClient
   constructor(private readonly categories: CrawlRunSourceCategory[]) {}
 
   sourceCategory = {
-    // Mirror the production query shape: enabled categories in source order.
+    // 模擬 production 查詢語意：只回傳 enabled category，並依來源分類順序排列。
     findMany: async () =>
       [...this.categories]
         .filter((sourceCategory) => sourceCategory.enabled)
@@ -84,8 +85,7 @@ export class FakeCrawlerWriteClient
   };
 
   rawSnapshot = {
-    // Raw snapshot storage deduplicates by content hash while still inserting
-    // one metadata row per crawl result.
+    // raw snapshot storage 會用 content hash 去重，但每個 crawl result 仍會新增一筆 metadata。
     findFirst: async ({
       where,
     }: Parameters<RawSnapshotWriteClient["rawSnapshot"]["findFirst"]>[0]) =>
@@ -185,6 +185,7 @@ export class FakeCrawlerWriteClient
   }
 }
 
+// 建立測試用 source category，預設為 CPU 分類。
 export function category({
   id,
   igrp,
@@ -205,6 +206,7 @@ export function category({
   };
 }
 
+// 建立測試用 category snapshot input，預設模擬成功抓到 CPU 分類頁。
 export function snapshot({
   rawHtml,
   fetchError = null,
@@ -225,6 +227,7 @@ export function snapshot({
   };
 }
 
+// 建立 product writer spy，讓測試能檢查寫入流程收到哪些 parsed product。
 export function createProductWriterSpy(): {
   calls: Array<{
     crawlRunId: string;
@@ -274,6 +277,7 @@ export function createProductWriterSpy(): {
   };
 }
 
+// 固定測試時間，避免 snapshot / crawl run 狀態斷言受目前時間影響。
 export function fixedClock(): () => Date {
   return () => new Date("2026-05-27T11:00:00.000Z");
 }

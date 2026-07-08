@@ -1,3 +1,6 @@
+// apps/crawler/tests/coolpc/support/category-snapshot-records.ts
+// 定義 category snapshot fake client 使用的記憶體資料列型別。
+
 import type {
   CrawlRunCategoryResultStatusValue,
   CrawlRunStatusValue,

@@ -1,3 +1,6 @@
+// apps/crawler/tests/coolpc/support/data-flow-records.ts
+// 定義 data-flow fake client 使用的記憶體資料列型別。
+
 import type {
   CrawlRunCategoryResultStatusValue,
   CrawlRunSourceCategory,

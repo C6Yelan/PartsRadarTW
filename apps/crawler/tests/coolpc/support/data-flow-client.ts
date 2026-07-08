@@ -1,3 +1,6 @@
+// apps/crawler/tests/coolpc/support/data-flow-client.ts
+// 提供 CoolPC crawler data-flow 測試用的整合 fake client 與資料查找 helper。
+
 import type {
   CoolpcCategorySnapshotWriteClient,
   WriteCoolpcCategoryProductObservation,
@@ -25,6 +28,7 @@ import type {
   FakeSourceCategoryUpdate,
 } from "./data-flow-records";
 
+// 串接 crawl run、category snapshot 與 product write 的記憶體 fake client，供 data-flow 測試驗證跨模組資料變化。
 export class FakeCoolpcDataFlowClient
   extends FakeCoolpcProductWriteClient
   implements CrawlRunWriteClient, CoolpcCategorySnapshotWriteClient, CoolpcProductWriteClient
@@ -122,8 +126,7 @@ export class FakeCoolpcDataFlowClient
   };
 
   rawSnapshot = {
-    // The data-flow tests need hash dedupe and latest-success lookup, but no
-    // broader Prisma behavior.
+    // data-flow 測試只需要 content hash 去重與最近成功 snapshot 查詢，不模擬完整 Prisma 行為。
     findFirst: async ({
       where,
     }: Parameters<RawSnapshotWriteClient["rawSnapshot"]["findFirst"]>[0]) =>
@@ -202,6 +205,7 @@ export class FakeCoolpcDataFlowClient
   };
 }
 
+// 以單一 raw HTML 執行一輪 category snapshot + crawl run，模擬 scheduled crawler 的核心寫入路徑。
 export async function runSnapshot({
   client,
   storageDir,
@@ -234,6 +238,7 @@ export async function runSnapshot({
   });
 }
 
+// 建立 data-flow 測試使用的 CPU source category。
 export function category(): CrawlRunSourceCategory {
   return {
     id: "category-4",
@@ -244,6 +249,7 @@ export function category(): CrawlRunSourceCategory {
   };
 }
 
+// 從 CPU fixture 移除第二個商品，用來模擬商品連續缺漏。
 export function keepOnlyFirstProduct(rawHtml: string): string {
   const secondProduct = `      <div class="item">
         <div class="w">CPU-TOKEN-002</div>
@@ -262,6 +268,7 @@ export function keepOnlyFirstProduct(rawHtml: string): string {
   return rawHtml.replace(secondProduct, "");
 }
 
+// 依 ibuy token 從 fake client 找商品，找不到時讓測試直接失敗。
 export function productByToken(client: FakeCoolpcDataFlowClient, ibuyToken: string): FakeProduct {
   const product = client.products.find((candidate) => candidate.ibuyToken === ibuyToken);
 
@@ -272,6 +279,7 @@ export function productByToken(client: FakeCoolpcDataFlowClient, ibuyToken: stri
   return product;
 }
 
+// 依 ibuy token 找目前價格，讓測試能檢查 current price 是否指向正確 price snapshot。
 export function currentPriceByToken(
   client: FakeCoolpcDataFlowClient,
   ibuyToken: string,
@@ -286,6 +294,7 @@ export function currentPriceByToken(
   return currentPrice;
 }
 
+// 取陣列最後一筆資料；空陣列代表測試前置流程沒有產生預期紀錄。
 export function last<T>(items: T[]): T {
   const item = items[items.length - 1];
 
