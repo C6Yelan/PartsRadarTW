@@ -1,4 +1,6 @@
 // apps/crawler/tests/scripts/shared/script-utils.test.ts
+// 驗證 crawler script 共用工具的 env 載入、CLI 整數解析、workspace 路徑解析與錯誤遮蔽。
+
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";

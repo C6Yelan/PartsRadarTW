@@ -1,4 +1,6 @@
 // apps/crawler/tests/scripts/ops/shared-logger.test.ts
+// 驗證 ops shared logger 的 key-value 格式、level filter 與基本敏感字串遮蔽。
+
 import { describe, expect, it } from "vitest";
 
 import { createOpsLogger, formatOpsLogLine } from "../../../src/scripts/ops/shared/logger";

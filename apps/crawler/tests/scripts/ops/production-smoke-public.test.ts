@@ -1,4 +1,6 @@
 // apps/crawler/tests/scripts/ops/production-smoke-public.test.ts
+// 驗證 production smoke 的公開 HTTP 頁面、API、圖片抽樣與 rate limit header 檢查。
+
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";

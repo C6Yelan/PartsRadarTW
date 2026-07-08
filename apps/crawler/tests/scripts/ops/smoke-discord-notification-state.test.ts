@@ -1,3 +1,6 @@
+// apps/crawler/tests/scripts/ops/smoke-discord-notification-state.test.ts
+// 驗證 production smoke Discord 告警 state file 的缺檔、原子寫讀與 schema 驗證。
+
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";

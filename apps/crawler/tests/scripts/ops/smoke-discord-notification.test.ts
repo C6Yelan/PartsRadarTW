@@ -1,3 +1,6 @@
+// apps/crawler/tests/scripts/ops/smoke-discord-notification.test.ts
+// 驗證 production smoke Discord 告警 options、通知決策、cooldown、fingerprint 與恢復通知。
+
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {

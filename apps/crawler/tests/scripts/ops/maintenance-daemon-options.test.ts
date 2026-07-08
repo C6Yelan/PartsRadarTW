@@ -1,4 +1,6 @@
 // apps/crawler/tests/scripts/ops/maintenance-daemon-options.test.ts
+// 驗證 maintenance daemon 的 live fetch 確認、排程預設、env 覆寫與 interval 防呆。
+
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { parseMaintenanceDaemonOptions } from "../../../src/scripts/ops/maintenance-daemon";

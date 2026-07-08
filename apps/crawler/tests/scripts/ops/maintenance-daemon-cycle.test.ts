@@ -1,4 +1,6 @@
 // apps/crawler/tests/scripts/ops/maintenance-daemon-cycle.test.ts
+// 驗證 maintenance daemon 單輪 link health 檢查、external fetch lock、crawler priority 暫停與失敗續跑。
+
 import { describe, expect, it } from "vitest";
 import { runMaintenanceCycle, runMaintenanceDaemon } from "../../../src/scripts/ops/maintenance-daemon";
 import { PRODUCT_LINK_KINDS } from "../../../src/scripts/ops/product-link-checker/processor";

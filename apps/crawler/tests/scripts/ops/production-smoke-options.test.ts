@@ -1,4 +1,6 @@
 // apps/crawler/tests/scripts/ops/production-smoke-options.test.ts
+// 驗證 production smoke CLI/env options、門檻 override、URL/整數防呆與摘要輸出格式。
+
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {

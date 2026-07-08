@@ -1,4 +1,6 @@
 // apps/crawler/tests/scripts/ops/production-smoke-support.ts
+// 提供 production smoke 測試共用的 workspace fixture、public API stub、fake Prisma client 與 shutdown helper。
+
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -13,6 +15,7 @@ export type SendDiscordWebhook = NonNullable<
   Parameters<typeof runProductionSmokeDaemon>[0]["sendDiscordWebhook"]
 >;
 
+// 建立最小 workspace 結構，讓 smoke option parser 可解析 repo root 與 crawler cwd。
 export async function createWorkspace(): Promise<{
   workspaceRoot: string;
   crawlerCwd: string;
@@ -26,6 +29,7 @@ export async function createWorkspace(): Promise<{
   };
 }
 
+// Stub public HTTP endpoints，讓 production smoke 測試可控制頁面、API、圖片與 rate-limit header 狀態。
 export function stubHealthyPublicApi({
   buildListStatus = 200,
   categoryIgrps = [4, 5, 6, 7, 8, 10, 11, 12, 14, 15, 16],
@@ -121,6 +125,7 @@ export function stubHealthyPublicApi({
   );
 }
 
+// 建立 production smoke fake client，集中控制 DB-backed checks 需要的統計資料。
 export function createSmokeClient({
   invalidImageErrorCount,
   trueParseErrorCount,
@@ -249,6 +254,7 @@ export function createSmokeClient({
   } as unknown as Parameters<typeof runProductionSmoke>[0];
 }
 
+// 提供 daemon 測試用的不等待 shutdown controller，讓 run-once 路徑直接完成。
 export function idleShutdown() {
   return {
     requested: false,

@@ -1,4 +1,6 @@
 // apps/crawler/tests/scripts/ops/product-link-health-report.test.ts
+// 驗證 product link health report 的 CLI 範圍解析、資料查詢條件、彙整統計與維運輸出格式。
+
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";

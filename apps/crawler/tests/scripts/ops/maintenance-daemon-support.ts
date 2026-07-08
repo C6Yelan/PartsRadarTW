@@ -1,4 +1,6 @@
 // apps/crawler/tests/scripts/ops/maintenance-daemon-support.ts
+// 提供 maintenance daemon 測試共用的 options fixture、fake shutdown 與暫存 workspace helper。
+
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";

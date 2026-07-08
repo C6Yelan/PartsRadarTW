@@ -1,4 +1,6 @@
 // apps/crawler/tests/scripts/ops/production-smoke-db.test.ts
+// 驗證 production smoke 的 DB-backed 檢查：parse error、圖片異常、link health 與 Discord delivery。
+
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";

@@ -1,4 +1,6 @@
 // apps/crawler/tests/scripts/ops/production-smoke-daemon.test.ts
+// 驗證 production smoke daemon 的排程參數、摘要 log 與 Discord admin webhook 告警 state 行為。
+
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
