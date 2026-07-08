@@ -1,4 +1,6 @@
 // apps/crawler/tests/scripts/ops/discord-bot/target-price-notification-delivery.test.ts
+// 驗證目標價通知達標發送、同使用者 digest、長訊息拆分與 delivery 紀錄。
+
 import { describe, expect, it, vi } from "vitest";
 import { sendDueTargetPriceNotifications } from "../../../../src/scripts/ops/discord-bot/target-price-notification";
 import type { DiscordBotMessage } from "../../../../src/scripts/ops/discord-bot/types";

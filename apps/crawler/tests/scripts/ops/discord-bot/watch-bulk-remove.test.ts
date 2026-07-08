@@ -1,4 +1,6 @@
 // apps/crawler/tests/scripts/ops/discord-bot/watch-bulk-remove.test.ts
+// 驗證 /watch 管理面板的批次移除選單、確認流程與移除後刷新。
+
 import { describe, expect, it, vi } from "vitest";
 import { CommandCooldowns } from "../../../../src/scripts/ops/discord-bot/cooldowns";
 import { handleDiscordInteraction } from "../../../../src/scripts/ops/discord-bot/interactions";

@@ -1,4 +1,6 @@
 // apps/crawler/tests/scripts/ops/discord-bot/watch-create-form.test.ts
+// 驗證 /watch 新增追蹤表單、空清單狀態、Discord 錯誤透出與欄位驗證提示。
+
 import { describe, expect, it, vi } from "vitest";
 import { CommandCooldowns } from "../../../../src/scripts/ops/discord-bot/cooldowns";
 import { handleDiscordInteraction } from "../../../../src/scripts/ops/discord-bot/interactions";

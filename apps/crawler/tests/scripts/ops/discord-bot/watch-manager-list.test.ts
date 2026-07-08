@@ -1,4 +1,6 @@
 // apps/crawler/tests/scripts/ops/discord-bot/watch-manager-list.test.ts
+// 驗證 /watch 管理清單、選取狀態、active watch 顯示與通知失敗訊息轉譯。
+
 import { describe, expect, it, vi } from "vitest";
 import { CommandCooldowns } from "../../../../src/scripts/ops/discord-bot/cooldowns";
 import { handleDiscordInteraction } from "../../../../src/scripts/ops/discord-bot/interactions";

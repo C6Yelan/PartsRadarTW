@@ -1,4 +1,6 @@
 // apps/crawler/tests/scripts/ops/discord-bot/watch-edit-remove.test.ts
+// 驗證 /watch 單筆追蹤的編輯、移除確認/取消、移除後刷新與錯誤輸入提示。
+
 import { describe, expect, it, vi } from "vitest";
 import { CommandCooldowns } from "../../../../src/scripts/ops/discord-bot/cooldowns";
 import { handleDiscordInteraction } from "../../../../src/scripts/ops/discord-bot/interactions";

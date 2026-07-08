@@ -1,4 +1,6 @@
 // apps/crawler/tests/scripts/ops/discord-bot/target-price-notification-skip.test.ts
+// 驗證目標價通知在未達標或早於 watch cursor 時不會誤送與寫入 delivery。
+
 import { describe, expect, it, vi } from "vitest";
 import { sendDueTargetPriceNotifications } from "../../../../src/scripts/ops/discord-bot/target-price-notification";
 

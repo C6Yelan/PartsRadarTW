@@ -1,4 +1,6 @@
 // apps/crawler/tests/scripts/ops/discord-bot/target-price-notification-claim.test.ts
+// 驗證目標價通知 claim lease 會避免重複發送，且失敗後可釋放給下一輪重試。
+
 import { describe, expect, it, vi } from "vitest";
 import { sendDueTargetPriceNotifications } from "../../../../src/scripts/ops/discord-bot/target-price-notification";
 import type { DiscordBotMessage } from "../../../../src/scripts/ops/discord-bot/types";

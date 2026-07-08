@@ -1,4 +1,6 @@
 // apps/crawler/tests/scripts/ops/discord-bot/watch-manager-navigation.test.ts
+// 驗證 /watch 管理清單的分頁導覽、狀態篩選與排序互動。
+
 import { describe, expect, it, vi } from "vitest";
 import { CommandCooldowns } from "../../../../src/scripts/ops/discord-bot/cooldowns";
 import { handleDiscordInteraction } from "../../../../src/scripts/ops/discord-bot/interactions";
