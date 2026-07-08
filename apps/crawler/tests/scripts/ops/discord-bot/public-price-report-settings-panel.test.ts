@@ -1,4 +1,6 @@
 // apps/crawler/tests/scripts/ops/discord-bot/public-price-report-settings-panel.test.ts
+// 驗證公開報告狀態、管理面板、頻道設定與 bot 權限不足時的回應。
+
 import { describe, expect, it, vi } from "vitest";
 import { CommandCooldowns } from "../../../../src/scripts/ops/discord-bot/cooldowns";
 import { handleDiscordInteraction } from "../../../../src/scripts/ops/discord-bot/interactions";

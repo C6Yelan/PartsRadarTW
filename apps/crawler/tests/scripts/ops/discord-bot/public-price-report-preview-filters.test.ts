@@ -1,4 +1,6 @@
 // apps/crawler/tests/scripts/ops/discord-bot/public-price-report-preview-filters.test.ts
+// 驗證公開報告測試發送會套用伺服器設定中的分類、關鍵字與漲跌篩選。
+
 import { describe, expect, it, vi } from "vitest";
 import { CommandCooldowns } from "../../../../src/scripts/ops/discord-bot/cooldowns";
 import { handleDiscordInteraction } from "../../../../src/scripts/ops/discord-bot/interactions";

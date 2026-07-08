@@ -1,4 +1,6 @@
 // apps/crawler/tests/scripts/ops/discord-bot/scheduled-price-report-settings.test.ts
+// 驗證個人每日價格報告設定會建立排程，並正確換算指定的台北發送時間。
+
 import { describe, expect, it } from "vitest";
 import { enableDailyScheduledPriceReport } from "../../../../src/scripts/ops/discord-bot/price-report";
 

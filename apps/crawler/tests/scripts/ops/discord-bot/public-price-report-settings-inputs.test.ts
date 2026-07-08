@@ -1,4 +1,6 @@
 // apps/crawler/tests/scripts/ops/discord-bot/public-price-report-settings-inputs.test.ts
+// 驗證公開報告設定面板與 modal 輸入會正確更新分類、內容類型、上限與關鍵字。
+
 import { describe, expect, it, vi } from "vitest";
 import { CommandCooldowns } from "../../../../src/scripts/ops/discord-bot/cooldowns";
 import { handleDiscordInteraction } from "../../../../src/scripts/ops/discord-bot/interactions";

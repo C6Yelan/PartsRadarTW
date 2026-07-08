@@ -1,4 +1,6 @@
 // apps/crawler/tests/scripts/ops/discord-bot/scheduled-price-report-retry.test.ts
+// 驗證個人排程價格報告在發送失敗或 Discord 限流後會保留 cursor 並安排短時間重試。
+
 import { describe, expect, it, vi } from "vitest";
 import { sendDueScheduledPriceReports } from "../../../../src/scripts/ops/discord-bot/price-report";
 import type { DiscordBotMessage } from "../../../../src/scripts/ops/discord-bot/types";

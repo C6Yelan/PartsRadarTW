@@ -1,4 +1,6 @@
 // apps/crawler/tests/scripts/ops/discord-bot/scheduled-price-report-delivery.test.ts
+// 驗證個人排程價格報告會到期送出、記錄 delivery、推進 cursor 與下一次發送時間。
+
 import { describe, expect, it, vi } from "vitest";
 import { sendDueScheduledPriceReports } from "../../../../src/scripts/ops/discord-bot/price-report";
 import type { DiscordBotMessage } from "../../../../src/scripts/ops/discord-bot/types";

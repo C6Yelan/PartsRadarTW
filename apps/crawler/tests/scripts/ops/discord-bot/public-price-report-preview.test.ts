@@ -1,4 +1,6 @@
 // apps/crawler/tests/scripts/ops/discord-bot/public-price-report-preview.test.ts
+// 驗證公開報告測試發送入口、面板按鈕與頻道權限失敗時的使用者回應。
+
 import { describe, expect, it, vi } from "vitest";
 import { CommandCooldowns } from "../../../../src/scripts/ops/discord-bot/cooldowns";
 import { handleDiscordInteraction } from "../../../../src/scripts/ops/discord-bot/interactions";

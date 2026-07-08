@@ -1,4 +1,6 @@
 // apps/crawler/tests/scripts/ops/discord-bot/public-price-report-messages.test.ts
+// 驗證公開價格報告訊息會正確呈現價格變動、新增商品與 Discord embed 結構。
+
 import { describe, expect, it } from "vitest";
 import {
   createPublicPriceChangeReportMessages,

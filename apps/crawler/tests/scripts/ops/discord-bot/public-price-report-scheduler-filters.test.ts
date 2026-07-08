@@ -1,4 +1,6 @@
 // apps/crawler/tests/scripts/ops/discord-bot/public-price-report-scheduler-filters.test.ts
+// 驗證公開價格報告排程會套用篩選設定，並略過未設定或已送出的 crawl run。
+
 import { describe, expect, it, vi } from "vitest";
 import { sendPendingPublicPriceReports } from "../../../../src/scripts/ops/discord-bot/public-price-report";
 import type { DiscordBotMessage } from "../../../../src/scripts/ops/discord-bot/types";

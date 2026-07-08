@@ -1,4 +1,6 @@
 // apps/crawler/tests/scripts/ops/discord-bot/scheduled-price-report-timing.test.ts
+// 驗證個人排程價格報告的 daemon sleep 計算與最早到期設定讀取。
+
 import { describe, expect, it } from "vitest";
 import {
   calculateScheduledPriceReportSleepMs,

@@ -1,4 +1,6 @@
 // apps/crawler/tests/scripts/ops/discord-bot/public-price-report-scheduler-delivery.test.ts
+// 驗證公開價格報告排程會發送待處理 crawl run、記錄 delivery，並遵守設定 cursor。
+
 import { describe, expect, it, vi } from "vitest";
 import { sendPendingPublicPriceReports } from "../../../../src/scripts/ops/discord-bot/public-price-report";
 import type { DiscordBotMessage } from "../../../../src/scripts/ops/discord-bot/types";
