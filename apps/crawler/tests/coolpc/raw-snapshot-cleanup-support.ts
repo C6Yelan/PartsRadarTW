@@ -1,4 +1,6 @@
 // apps/crawler/tests/coolpc/raw-snapshot-cleanup-support.ts
+// 提供 raw snapshot cleanup 測試用的假 client、暫存檔案建立與路徑存在性檢查 helper。
+
 import { access, mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";

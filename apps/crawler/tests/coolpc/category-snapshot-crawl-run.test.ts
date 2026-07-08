@@ -1,3 +1,6 @@
+// apps/crawler/tests/coolpc/category-snapshot-crawl-run.test.ts
+// 驗證 category snapshot 與 crawl run 串接時，suspected block 會保留 raw snapshot id 並停止後續分類。
+
 import { afterEach, describe, expect, it } from "vitest";
 import {
   CRAWL_RUN_CATEGORY_RESULT_STATUSES,

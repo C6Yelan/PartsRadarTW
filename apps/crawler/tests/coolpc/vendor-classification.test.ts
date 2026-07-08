@@ -1,4 +1,6 @@
 // apps/crawler/tests/coolpc/vendor-classification.test.ts
+// 驗證 CoolPC 商品名稱的廠商品牌分類規則，涵蓋曾缺漏的品牌與來源標籤前綴。
+
 import { describe, expect, it } from "vitest";
 import { classifyProductVendor } from "../../src/coolpc/vendor-classification";
 

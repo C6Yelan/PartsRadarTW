@@ -1,4 +1,6 @@
 // apps/crawler/tests/coolpc/parser-support.ts
+// 提供 CoolPC parser 測試共用的 fixture 讀取、分類 context 與小型 edge case HTML builder。
+
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { COOLPC_TARGET_CATEGORIES, type CoolpcTargetCategory } from "../../src/coolpc/categories";
@@ -19,6 +21,7 @@ export function fixture(name: string): string {
   return readFileSync(join(fixtureDir, name), "utf8");
 }
 
+// 建立只含單筆商品列的 live-like HTML，用來測試特定 raw image URL 邊界。
 export function categoryHtml({ igrp, rawImageUrl }: { igrp: number; rawImageUrl: string }): string {
   return `<!doctype html>
 <html lang="zh-Hant-TW">

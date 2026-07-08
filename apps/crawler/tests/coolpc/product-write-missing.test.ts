@@ -1,3 +1,6 @@
+// apps/crawler/tests/coolpc/product-write-missing.test.ts
+// 驗證 product-write 會在成功分類觀測後更新商品缺漏、停用與恢復狀態。
+
 import { describe, expect, it } from "vitest";
 import { writeCoolpcCategoryProductObservation } from "../../src/coolpc/product-write";
 import { FakeCoolpcProductWriteClient, productItem } from "./support/product-write-client";

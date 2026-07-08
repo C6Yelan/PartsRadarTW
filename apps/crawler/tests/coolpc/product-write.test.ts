@@ -1,4 +1,6 @@
 // apps/crawler/tests/coolpc/product-write.test.ts
+// 驗證 product-write 會正確建立與更新商品主檔、價格快照、current price 與圖片欄位。
+
 import { describe, expect, it } from "vitest";
 import { writeCoolpcCategoryProductObservation } from "../../src/coolpc/product-write";
 import { FakeCoolpcProductWriteClient, productItem } from "./support/product-write-client";

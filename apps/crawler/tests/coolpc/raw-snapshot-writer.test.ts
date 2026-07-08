@@ -1,4 +1,6 @@
 // apps/crawler/tests/coolpc/raw-snapshot-writer.test.ts
+// 驗證 raw snapshot writer 的 gzip 落檔、content hash 去重、metadata 記錄與 parsed result hash。
+
 import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -192,8 +194,7 @@ class FakeRawSnapshotWriteClient implements RawSnapshotWriteClient {
   readonly rawSnapshots: FakeRawSnapshot[] = [];
 
   rawSnapshot = {
-    // The fake mirrors the production dedupe query closely enough to prove that
-    // a second fetch creates metadata but reuses the first compressed file.
+    // 假 client 保留 production 去重查詢的關鍵條件，用來證明重複抓取會新增 metadata 但重用既有壓縮檔。
     findFirst: async ({
       where,
     }: Parameters<RawSnapshotWriteClient["rawSnapshot"]["findFirst"]>[0]) =>

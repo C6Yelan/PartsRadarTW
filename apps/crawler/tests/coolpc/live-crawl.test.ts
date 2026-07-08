@@ -1,4 +1,6 @@
 // apps/crawler/tests/coolpc/live-crawl.test.ts
+// 驗證 CoolPC live crawl 的來源安全限制、請求大小限制、錯誤格式與暫時性失敗重試。
+
 import { describe, expect, it, vi } from "vitest";
 import { CRAWL_TRIGGER_TYPES } from "../../src/coolpc/crawl-run";
 import {

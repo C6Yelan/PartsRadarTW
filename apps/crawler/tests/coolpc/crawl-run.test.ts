@@ -1,4 +1,6 @@
 // apps/crawler/tests/coolpc/crawl-run.test.ts
+// 驗證 CoolPC crawl run 會依分類順序寫入結果、彙總狀態，並處理阻斷與錯誤分支。
+
 import { describe, expect, it } from "vitest";
 import {
   CRAWL_RUN_CATEGORY_RESULT_STATUSES,

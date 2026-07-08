@@ -1,4 +1,6 @@
 // apps/crawler/tests/coolpc/data-flow.test.ts
+// 驗證 CoolPC crawler 從 raw snapshot 到商品、價格、缺漏與恢復狀態的跨模組資料流。
+
 import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";

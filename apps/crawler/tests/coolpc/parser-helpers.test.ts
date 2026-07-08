@@ -1,4 +1,6 @@
 // apps/crawler/tests/coolpc/parser-helpers.test.ts
+// 驗證 CoolPC parser 共用 helper 的分類範圍、價格解析、來源 key、分類 URL 與圖片 URL 正規化規則。
+
 import { describe, expect, it } from "vitest";
 import { COOLPC_TARGET_CATEGORIES } from "../../src/coolpc/categories";
 import {

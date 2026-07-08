@@ -1,4 +1,6 @@
 // apps/crawler/tests/coolpc/parser-category.test.ts
+// 驗證 CoolPC 分類頁 parser 會組裝商品欄位、parse issue、去重結果與可匯入狀態。
+
 import { describe, expect, it } from "vitest";
 import { parseCoolpcCategoryPage } from "../../src/coolpc/parser";
 import { categoryHtml, context, contextForCategory, fixture } from "./parser-support";

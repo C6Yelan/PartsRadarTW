@@ -1,3 +1,6 @@
+// apps/crawler/tests/coolpc/category-snapshot.test.ts
+// 驗證 category snapshot 成功分支會落 raw snapshot、判斷解析結果變更，並呼叫商品寫入流程。
+
 import { afterEach, describe, expect, it } from "vitest";
 import { CRAWL_RUN_CATEGORY_RESULT_STATUSES } from "../../src/coolpc/crawl-run";
 import { processCoolpcCategorySnapshot } from "../../src/coolpc/category-snapshot";

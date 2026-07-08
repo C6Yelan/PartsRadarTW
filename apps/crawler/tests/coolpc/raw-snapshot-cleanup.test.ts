@@ -1,4 +1,6 @@
 // apps/crawler/tests/coolpc/raw-snapshot-cleanup.test.ts
+// 驗證 raw snapshot cleanup 的 dry-run、實際刪除、引用保留與危險路徑防護。
+
 import { mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";

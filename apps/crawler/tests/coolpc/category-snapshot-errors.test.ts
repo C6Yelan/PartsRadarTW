@@ -1,3 +1,6 @@
+// apps/crawler/tests/coolpc/category-snapshot-errors.test.ts
+// 驗證 category snapshot 錯誤分支會正確落 raw snapshot、parse error，並避免寫入商品資料。
+
 import { afterEach, describe, expect, it } from "vitest";
 import { CRAWL_RUN_CATEGORY_RESULT_STATUSES } from "../../src/coolpc/crawl-run";
 import { processCoolpcCategorySnapshot } from "../../src/coolpc/category-snapshot";
