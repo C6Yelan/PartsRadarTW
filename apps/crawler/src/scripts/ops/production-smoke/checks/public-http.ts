@@ -1,4 +1,6 @@
 // apps/crawler/src/scripts/ops/production-smoke/checks/public-http.ts
+// 檢查 production 公開頁面與 API 是否可用，並回傳 source-status 給後續 freshness 檢查。
+
 import {
   fetchJson,
   fetchText,
@@ -19,6 +21,7 @@ import type {
   SmokeSourceStatusResponse,
 } from "../types";
 
+// 執行不需要 DB client 的 public HTTP smoke，涵蓋頁面、商品 API、圖片 API、價格歷史與 rate limit headers。
 export async function checkPublicEndpoints(options: ProductionSmokeOptions): Promise<{
   checks: SmokeCheckResult[];
   sourceStatus: SmokeSourceStatusResponse | null;
@@ -109,6 +112,7 @@ export async function checkPublicEndpoints(options: ProductionSmokeOptions): Pro
   };
 }
 
+// 驗證分類 API 回傳 shape 且至少有一個啟用分類，避免前端分類選單空白。
 function checkCategoriesApi(
   categoriesResult: Awaited<ReturnType<typeof fetchJson>>,
 ): SmokeCheckResult {
@@ -129,6 +133,7 @@ function checkCategoriesApi(
   return ok("categories api", `categories=${categoryCount}`);
 }
 
+// 抽樣商品列表中的公開圖片 URL，確認 image route 可回應 image content type。
 async function checkProductImageEndpoints(
   products: SmokeProductsResponse["data"],
   options: ProductionSmokeOptions,
@@ -178,6 +183,7 @@ async function checkProductImageEndpoints(
   );
 }
 
+// 驗證商品列表 API 回應帶有 rate limit headers；公開 HTTPS smoke 也應能辨識 client source。
 function checkRateLimitHeaders(
   productsResult: Awaited<ReturnType<typeof fetchJson>>,
   options: ProductionSmokeOptions,

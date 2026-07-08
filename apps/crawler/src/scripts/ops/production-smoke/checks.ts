@@ -1,4 +1,5 @@
 // apps/crawler/src/scripts/ops/production-smoke/checks.ts
+// 編排 production smoke 的公開端點、資料庫健康度、爬蟲狀態與通知狀態檢查。
 
 import {
   fail,
@@ -27,6 +28,7 @@ import type {
   SmokeSourceStatusResponse,
 } from "./types";
 
+// 執行完整 production smoke，包含 public HTTP、DB 狀態、爬蟲資料與 Discord delivery 檢查。
 export async function runProductionSmoke(
   client: ProductionSmokeClient,
   options: ProductionSmokeOptions,
@@ -42,6 +44,7 @@ export async function runProductionSmoke(
   checks.push(await checkSourceImageAnomalies(client, options, now));
   checks.push(await checkActiveProductCount(client, options));
   checks.push(await checkMissingProductImages(client, options));
+  // 此檢查屬於 link health maintenance 功能線；後續整線移除時一併從 smoke 編排移除。
   checks.push(await checkLinkHealth(client, options));
   checks.push(await checkRawSnapshotRetention(client, options, now));
   checks.push(await checkDiscordBotDeliveries(client, options, now));
@@ -53,6 +56,7 @@ export async function runProductionSmoke(
   };
 }
 
+// 執行不需要 DB 連線的公開網站 smoke，供外部端點或輕量部署檢查使用。
 export async function runProductionPublicSmoke(
   options: ProductionSmokeOptions,
   now = new Date(),
@@ -69,6 +73,7 @@ export async function runProductionPublicSmoke(
   };
 }
 
+// 根據 public source-status 回應判斷來源資料的新鮮度與可用狀態。
 async function checkSourceFreshness(
   sourceStatus: SmokeSourceStatusResponse | null,
   options: ProductionSmokeOptions,

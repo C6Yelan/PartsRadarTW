@@ -1,4 +1,5 @@
 // apps/crawler/src/scripts/ops/production-smoke/constants.ts
+// 定義 production smoke CLI flag、預設門檻與跨檢查共用的時間換算常數。
 
 export const HELP_FLAG = "--help";
 export const PUBLIC_ONLY_FLAG = "--public-only";

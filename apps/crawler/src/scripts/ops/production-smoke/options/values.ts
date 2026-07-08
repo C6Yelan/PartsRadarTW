@@ -1,7 +1,9 @@
 // apps/crawler/src/scripts/ops/production-smoke/options/values.ts
+// 集中處理 production smoke CLI / env 的基本值解析與邊界驗證。
 
 import { getStringArg } from "../../../shared/script-utils";
 
+// 正規化公開網站 smoke test 的 base URL，只允許 HTTP(S) 端點。
 export function normalizeBaseUrl(value: string): string {
   try {
     const url = new URL(value);
@@ -16,6 +18,7 @@ export function normalizeBaseUrl(value: string): string {
   }
 }
 
+// 解析整數型 smoke option，並支援少數舊名稱 alias 以維持過渡相容。
 export function parseIntegerOption({
   args,
   env,

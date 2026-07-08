@@ -1,4 +1,5 @@
 // apps/crawler/src/scripts/ops/production-smoke/options/help.ts
+// 輸出 production smoke CLI 的精簡說明，保留常用 public / DB-backed smoke 調整入口。
 
 import {
   DEFAULT_BASE_URL,
@@ -8,6 +9,7 @@ import {
   DEFAULT_TIMEOUT_MS,
 } from "../constants";
 
+// 顯示手動執行 production smoke 時最常用的 options；完整 env 說明仍以 runbook / .env.example 為主。
 export function printProductionSmokeHelp(): void {
   console.log(`Usage:
   pnpm --filter @partsradar/crawler ops:production-smoke -- [options]

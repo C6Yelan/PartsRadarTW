@@ -1,9 +1,12 @@
 // apps/crawler/src/scripts/ops/production-smoke/checks/crawler-runs.ts
+// 檢查 production DB 中 scheduled crawler 的成功時間與近期 suspected block 狀態。
+
 import { CRAWL_RUN_STATUSES } from "../../../../coolpc/crawl-run";
 import { MILLISECONDS_PER_HOUR } from "../constants";
 import { fail, formatAgeMinutes, minutesBetween, ok, warn } from "../results";
 import type { ProductionSmokeClient, ProductionSmokeOptions, SmokeCheckResult } from "../types";
 
+// 檢查最近一次成功 scheduled crawl 是否仍在 freshness 門檻內，並把 suspected block 視為立即失敗。
 export async function checkCrawlerFreshness(
   client: ProductionSmokeClient,
   options: ProductionSmokeOptions,
@@ -17,10 +20,7 @@ export async function checkCrawlerFreshness(
       startedAt: "desc",
     },
     select: {
-      id: true,
       status: true,
-      startedAt: true,
-      finishedAt: true,
     },
   });
   const latestSuccess = await client.crawlRun.findFirst({
@@ -37,8 +37,6 @@ export async function checkCrawlerFreshness(
       finishedAt: "desc",
     },
     select: {
-      id: true,
-      status: true,
       finishedAt: true,
     },
   });
@@ -66,6 +64,7 @@ export async function checkCrawlerFreshness(
   return ok("crawler freshness", message);
 }
 
+// 統計近期 scheduled crawl 是否出現 suspected block；此檢查用 WARN 提醒來源站風險升高。
 export async function checkRecentSuspectedBlocks(
   client: ProductionSmokeClient,
   options: ProductionSmokeOptions,

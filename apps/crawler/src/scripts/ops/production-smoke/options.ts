@@ -1,4 +1,5 @@
 // apps/crawler/src/scripts/ops/production-smoke/options.ts
+// 解析 production smoke 的 CLI 參數、env override 與工作區路徑設定。
 
 import {
   getStringArg,
@@ -39,6 +40,7 @@ import type { ProductionSmokeOptions } from "./types";
 
 export { printProductionSmokeHelp } from "./options/help";
 
+// 將 CLI args 與 env 組合成 production smoke 執行設定，並套用各檢查項目的安全上下限。
 export function parseProductionSmokeOptions(
   args: string[],
   env: NodeJS.ProcessEnv = process.env,
