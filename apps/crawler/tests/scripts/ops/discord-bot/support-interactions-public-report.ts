@@ -1,6 +1,8 @@
 // apps/crawler/tests/scripts/ops/discord-bot/support-interactions-public-report.ts
+// 建立公開價格報告設定與預覽測試用的 Discord interaction payload。
 import type { DiscordInteraction } from "../../../../src/scripts/ops/discord-bot/types";
 
+// 建立 /public-report slash command interaction，含 guild/channel 與 app permission context。
 export function createPublicReportInteraction({
   guildId = "guild-1",
   channelId = "999988887777666655",
@@ -36,6 +38,7 @@ export function createPublicReportInteraction({
   };
 }
 
+// 建立公開報告設定面板上的 button interaction。
 export function createPublicReportButtonInteraction(
   customId: string,
   {
@@ -67,6 +70,7 @@ export function createPublicReportButtonInteraction(
   };
 }
 
+// 建立公開報告設定面板上的 string select interaction。
 export function createPublicReportSelectInteraction(
   customId: string,
   values: string[],
@@ -100,6 +104,7 @@ export function createPublicReportSelectInteraction(
   };
 }
 
+// 建立公開報告最多商品數 modal submit interaction。
 export function createPublicReportLimitModalSubmitInteraction({
   maxItems,
   guildId = "guild-1",
@@ -136,6 +141,7 @@ export function createPublicReportLimitModalSubmitInteraction({
   };
 }
 
+// 建立公開報告商品關鍵字 modal submit interaction。
 export function createPublicReportKeywordModalSubmitInteraction({
   keyword,
   guildId = "guild-1",

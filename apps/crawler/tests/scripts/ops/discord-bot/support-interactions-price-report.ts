@@ -1,6 +1,8 @@
 // apps/crawler/tests/scripts/ops/discord-bot/support-interactions-price-report.ts
+// 建立個人價格報告設定 modal 測試用 interaction payload。
 import type { DiscordInteraction } from "../../../../src/scripts/ops/discord-bot/types";
 
+// 建立時間與最多商品數設定 modal submit interaction。
 export function createSettingsModalSubmitInteraction({
   maxItems = "50",
   time = "09:00",
@@ -41,6 +43,7 @@ export function createSettingsModalSubmitInteraction({
   };
 }
 
+// 建立商品關鍵字設定 modal submit interaction。
 export function createKeywordModalSubmitInteraction({
   keyword,
 }: {

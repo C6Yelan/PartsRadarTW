@@ -1,4 +1,5 @@
 // apps/crawler/tests/scripts/ops/discord-bot/support-client.ts
+// 組合 Discord bot 測試用 fake Prisma client，讓互動、報告與 watch 測試共用資料入口。
 import type { vi } from "vitest";
 import type { DiscordBotClient } from "../../../../src/scripts/ops/discord-bot/types";
 import type {
@@ -18,6 +19,7 @@ import { createPublicReportClient } from "./support-public-report-client";
 import { createTargetPriceWatchClient } from "./support-target-watch-client";
 import { TEST_SOURCE_CATEGORIES } from "./support-options";
 
+// 依測試資料組出 DiscordBotClient 的局部 fake implementation，並保留 vi.fn 讓測試可檢查 DB 呼叫。
 export function createDiscordBotClient(
   snapshots: TestSnapshot[],
   settings: TestPriceReportSetting[] = [],

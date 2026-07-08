@@ -1,4 +1,5 @@
 // apps/crawler/tests/scripts/ops/discord-bot/support-data-types.ts
+// 定義 Discord bot 測試資料列型別，供 fixture factory 與 fake client 共用。
 
 export interface TestSnapshot {
   id: string;

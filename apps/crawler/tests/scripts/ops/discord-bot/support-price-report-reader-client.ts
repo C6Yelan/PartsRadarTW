@@ -1,4 +1,5 @@
 // apps/crawler/tests/scripts/ops/discord-bot/support-price-report-reader-client.ts
+// 模擬個人價格報告 reader 需要的 product、priceSnapshot 與 sourceCategory delegate。
 import { vi } from "vitest";
 import type { TestProductWhere, TestSnapshot, TestSourceCategory } from "./support-data";
 import {
@@ -9,6 +10,7 @@ import {
   toPrismaWatchProduct,
 } from "./support-client-mappers";
 
+// 依測試 snapshots 建立可查 crawl run、時間窗與前一筆價格的 in-memory reader client。
 export function createPriceReportReaderClient({
   snapshots,
   categories,

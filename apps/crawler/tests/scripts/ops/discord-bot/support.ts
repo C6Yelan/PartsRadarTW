@@ -1,8 +1,10 @@
 // apps/crawler/tests/scripts/ops/discord-bot/support.ts
+// 彙整 Discord bot 測試共用 helper、fixture 與 fake client 入口。
 import type { DiscordBotEmbed, DiscordBotMessage } from "../../../../src/scripts/ops/discord-bot/types";
 
 export * from "./support-options";
 
+// 從 interaction response 或一般 message body 取出第一個 embed。
 export function readResponseEmbed(body: {
   data?: { embeds?: DiscordBotEmbed[] };
   embeds?: DiscordBotEmbed[];
@@ -16,10 +18,12 @@ export function readResponseEmbed(body: {
   return embed;
 }
 
+// 讀取 embed 指定欄位的顯示值。
 export function readEmbedFieldValue(embed: DiscordBotEmbed, fieldName: string): string | undefined {
   return embed.fields?.find((field) => field.name === fieldName)?.value;
 }
 
+// 在 message component tree 中依 custom id 找出元件。
 export function findMessageComponent(
   body: DiscordBotMessage,
   customId: string,
@@ -29,6 +33,7 @@ export function findMessageComponent(
     .find((component) => component.custom_id === customId);
 }
 
+// 在 message component tree 中依 custom id prefix 找出元件。
 export function findMessageComponentByPrefix(
   body: DiscordBotMessage,
   customIdPrefix: string,
@@ -38,6 +43,7 @@ export function findMessageComponentByPrefix(
     .find((component) => component.custom_id.startsWith(customIdPrefix));
 }
 
+// 計算 message 內所有 embed 文字長度，對齊 Discord embed size 測試。
 export function calculateMessageEmbedTextLength(message: DiscordBotMessage): number {
   return (message.embeds ?? []).reduce(
     (total, embed) =>

@@ -1,4 +1,5 @@
 // apps/crawler/tests/scripts/ops/discord-bot/support-watch-clients.ts
+// 建立 watch 測試常用的 Discord bot fake client 情境。
 import { createDiscordBotClient } from "./support-client";
 import { snapshot, targetPriceWatch } from "./support-data";
 import {
@@ -8,6 +9,7 @@ import {
   WATCH_SECOND_ROW_ID,
 } from "./support-options";
 
+// 建立單一 watch 商品的管理面板測試 client。
 export function createWatchManagerClient() {
   return createDiscordBotClient(
     [
@@ -32,6 +34,7 @@ export function createWatchManagerClient() {
   );
 }
 
+// 建立兩筆 watch 商品的批次操作測試 client。
 export function createBatchWatchManagerClient() {
   return createDiscordBotClient(
     [
@@ -70,6 +73,7 @@ export function createBatchWatchManagerClient() {
   );
 }
 
+// 建立兩筆不同更新時間 watch 商品的排序測試 client。
 export function createSortableWatchManagerClient() {
   return createDiscordBotClient(
     [

@@ -1,4 +1,5 @@
 // apps/crawler/tests/scripts/ops/discord-bot/support-data-factories.ts
+// 建立 Discord bot 測試資料列，讓測試只覆寫案例關心的欄位。
 import type {
   TestCrawlRun,
   TestDiscordNotificationDelivery,

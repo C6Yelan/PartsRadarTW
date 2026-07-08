@@ -1,6 +1,8 @@
 // apps/crawler/tests/scripts/ops/discord-bot/support-interactions-core.ts
+// 建立 Discord bot 測試共用的基本 interaction payload。
 import type { DiscordInteraction } from "../../../../src/scripts/ops/discord-bot/types";
 
+// 建立個人價格報告 slash command interaction，預設使用測試使用者。
 export function createInteraction(
   subcommandName: string,
   subcommandOptions: NonNullable<NonNullable<DiscordInteraction["data"]>["options"]> = [],
@@ -27,6 +29,7 @@ export function createInteraction(
   };
 }
 
+// 建立 /bot help slash command interaction。
 export function createBotHelpInteraction(): DiscordInteraction {
   return {
     id: "interaction-1",
@@ -49,6 +52,7 @@ export function createBotHelpInteraction(): DiscordInteraction {
   };
 }
 
+// 建立 button component interaction。
 export function createComponentInteraction(customId: string): DiscordInteraction {
   return {
     id: "interaction-1",
@@ -66,6 +70,7 @@ export function createComponentInteraction(customId: string): DiscordInteraction
   };
 }
 
+// 建立 string select component interaction。
 export function createSelectComponentInteraction(
   customId: string,
   values: string[],

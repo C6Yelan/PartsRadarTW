@@ -1,4 +1,5 @@
 // apps/crawler/tests/scripts/ops/discord-bot/support-options.ts
+// 提供 Discord bot 測試共用的固定 id、分類 fixture 與預設 bot options。
 import type { DiscordBotOptions } from "../../../../src/scripts/ops/discord-bot/types";
 
 export const TOKEN = "test_bot_token";
@@ -18,6 +19,7 @@ export const TEST_SOURCE_CATEGORIES = [
   { igrp: 12, displayName: "顯示卡" },
 ] as const;
 
+// 建立 Discord bot 測試用 options，允許個別案例覆寫 feature flags 或限制值。
 export function createDiscordBotOptions(overrides: Partial<DiscordBotOptions> = {}): DiscordBotOptions {
   return {
     token: TOKEN,

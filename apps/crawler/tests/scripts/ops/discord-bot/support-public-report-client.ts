@@ -1,4 +1,5 @@
 // apps/crawler/tests/scripts/ops/discord-bot/support-public-report-client.ts
+// 模擬公開價格報告設定、發送紀錄與 crawl run 查詢 delegate。
 import { vi } from "vitest";
 import type {
   TestCrawlRun,
@@ -6,6 +7,7 @@ import type {
   TestDiscordPublicPriceReportSetting,
 } from "./support-data";
 
+// 建立公開報告測試用 in-memory client，支援設定面板與排程發送流程。
 export function createPublicReportClient({
   crawlRuns,
   publicPriceReportDeliveries,

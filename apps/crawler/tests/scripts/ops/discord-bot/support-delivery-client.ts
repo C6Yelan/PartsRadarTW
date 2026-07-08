@@ -1,7 +1,9 @@
 // apps/crawler/tests/scripts/ops/discord-bot/support-delivery-client.ts
+// 模擬個人 Discord notification delivery delegate，支援寫入紀錄與查詢最近通知。
 import { vi } from "vitest";
 import type { TestDiscordNotificationDelivery } from "./support-data";
 
+// 建立可檢查 create / findFirst 呼叫的 in-memory delivery client。
 export function createNotificationDeliveryClient(deliveries: TestDiscordNotificationDelivery[]) {
   const deliveryRows = [...deliveries];
   const deliveryCreate = vi.fn(

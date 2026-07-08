@@ -1,4 +1,5 @@
 // apps/crawler/tests/scripts/ops/discord-bot/support-target-watch-client.ts
+// 模擬目標價 watch delegate，支援 watch 管理面板與達標通知流程。
 import { vi } from "vitest";
 import type { TestSnapshot, TestTargetPriceWatch } from "./support-data";
 import { toPrismaWatchListRecord } from "./support-client-mappers";
@@ -16,6 +17,7 @@ type WatchWhere = {
   product?: unknown;
 };
 
+// 建立可檢查 find / updateMany / upsert 呼叫的 in-memory watch client。
 export function createTargetPriceWatchClient(
   watches: TestTargetPriceWatch[],
   snapshots: TestSnapshot[],
