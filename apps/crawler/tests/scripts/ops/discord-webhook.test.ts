@@ -1,4 +1,6 @@
 // apps/crawler/tests/scripts/ops/discord-webhook.test.ts
+// 驗證 Discord admin webhook 的 URL 驗證、payload 安全預設、rate limit 與錯誤遮蔽。
+
 import { describe, expect, it, vi } from "vitest";
 import {
   formatDiscordWebhookText,

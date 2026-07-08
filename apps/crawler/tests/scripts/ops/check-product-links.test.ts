@@ -1,3 +1,6 @@
+// apps/crawler/tests/scripts/ops/check-product-links.test.ts
+// 驗證 product-link-checker 的 CLI option、防呆預設、待檢查連結選取與 health 狀態轉換。
+
 import { afterEach, describe, expect, it } from "vitest";
 import {
   parseOptions,

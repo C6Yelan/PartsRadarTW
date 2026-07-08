@@ -1,3 +1,6 @@
+// apps/crawler/tests/scripts/ops/crawl-coolpc-daemon.test.ts
+// 驗證 scheduled CoolPC crawler daemon 的 live fetch 確認、env/default 解析、base URL 與排程防呆。
+
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { parseDaemonOptions } from "../../../src/scripts/ops/crawl-coolpc-daemon";

@@ -1,4 +1,6 @@
 // apps/crawler/tests/scripts/ops/discord-bot-transport.test.ts
+// 驗證 Discord bot REST transport 的訊息發送、mention 防護、rate limit 與 interaction 回覆行為。
+
 import { describe, expect, it, vi } from "vitest";
 import {
   sendDiscordChannelMessages,

@@ -1,4 +1,6 @@
 // apps/crawler/tests/scripts/ops/external-fetch-lock.test.ts
+// 驗證外部來源抓取鎖的互斥取得、釋放流程與短效 priority signal TTL 行為。
+
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {

@@ -1,4 +1,6 @@
 // apps/crawler/tests/scripts/ops/cleanup-raw-snapshots-daemon.test.ts
+// 驗證 raw snapshot cleanup daemon 的刪除確認、排程參數、run-once 與失敗後續跑行為。
+
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";

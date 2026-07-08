@@ -1,3 +1,6 @@
+// apps/crawler/tests/scripts/ops/check-product-links-logging.test.ts
+// 驗證 product-link-checker 將 dry-run 與 live check 細節分流到合適的 info/debug log。
+
 import { describe, expect, it } from "vitest";
 import type { ProductLinkCheckerOptions } from "../../../src/scripts/ops/product-link-checker/options";
 import {

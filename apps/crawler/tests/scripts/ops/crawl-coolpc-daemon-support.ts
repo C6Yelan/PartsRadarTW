@@ -1,8 +1,12 @@
+// apps/crawler/tests/scripts/ops/crawl-coolpc-daemon-support.ts
+// 提供 scheduled CoolPC crawler daemon 測試共用的暫存 workspace 與 options fixture。
+
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { CoolpcDaemonOptions } from "../../../src/scripts/ops/crawl-coolpc-daemon";
 
+// 建立隔離 workspace，讓 daemon option 測試可模擬 crawler package 工作目錄。
 export function createCrawlerDaemonTestEnvironment() {
   const tempRoots: string[] = [];
 
@@ -22,6 +26,7 @@ export function createCrawlerDaemonTestEnvironment() {
   };
 }
 
+// 建立單輪 cycle 測試可覆寫的 daemon options，避免每個測試重複填完整設定。
 export function createDaemonOptions(
   overrides: Partial<CoolpcDaemonOptions> = {},
 ): CoolpcDaemonOptions {

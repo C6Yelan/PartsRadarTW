@@ -1,4 +1,6 @@
 // apps/crawler/tests/scripts/ops/discord-bot-commands-gateway.test.ts
+// 驗證 Discord bot slash command 註冊 payload 與 Gateway identify 的低權限 intents 設定。
+
 import { describe, expect, it, vi } from "vitest";
 import { CommandCooldowns } from "../../../src/scripts/ops/discord-bot/cooldowns";
 import { runGatewaySession } from "../../../src/scripts/ops/discord-bot/gateway";

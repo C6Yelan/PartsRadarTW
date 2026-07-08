@@ -1,3 +1,6 @@
+// apps/crawler/tests/scripts/ops/crawl-coolpc-daemon-cycle.test.ts
+// 驗證 scheduled CoolPC crawler 單輪執行的 external fetch lock、priority retry、backoff 與新商品圖片補圖協調。
+
 import { describe, expect, it } from "vitest";
 import {
   CRAWL_RUN_CATEGORY_RESULT_STATUSES,

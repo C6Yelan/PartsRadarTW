@@ -1,4 +1,6 @@
 // apps/crawler/tests/scripts/ops/image-cache-backfill-processor.test.ts
+// 驗證圖片快取補圖候選讀取、既有檔案略過、dry-run log 與無效候選摘要行為。
+
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";

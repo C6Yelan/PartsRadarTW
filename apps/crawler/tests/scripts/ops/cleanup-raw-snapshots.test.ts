@@ -1,4 +1,6 @@
 // apps/crawler/tests/scripts/ops/cleanup-raw-snapshots.test.ts
+// 驗證 raw snapshot cleanup CLI 的 dry-run 預設、參數驗證、storage dir 防呆與摘要路徑格式。
+
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";

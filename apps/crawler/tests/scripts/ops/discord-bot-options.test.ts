@@ -1,4 +1,6 @@
 // apps/crawler/tests/scripts/ops/discord-bot-options.test.ts
+// 驗證 Discord bot 啟動設定解析、CLI 錯誤遮蔽與 watch 商品 reference 正規化邊界。
+
 import { describe, expect, it } from "vitest";
 import { formatDiscordBotCliError } from "../../../src/scripts/ops/discord-bot/cli-error";
 import { parseDiscordBotOptions } from "../../../src/scripts/ops/discord-bot/options";
