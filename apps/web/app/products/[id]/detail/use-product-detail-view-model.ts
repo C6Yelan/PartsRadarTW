@@ -1,5 +1,6 @@
 "use client";
 // apps/web/app/products/[id]/detail/use-product-detail-view-model.ts
+// 組裝商品詳細頁所需的商品資料、價格歷史、配單、圖片、返回連結與分享狀態。
 
 import { useEffect, useState } from "react";
 import { BUILD_LIST_MAX_QUANTITY, toBuildListProduct } from "../../../build-list/model";
@@ -15,6 +16,7 @@ import { formatProductPrice } from "./format";
 import { usePriceHistoryLoader } from "./use-price-history-loader";
 import { useProductDetail } from "./use-product-detail";
 
+// 建立商品詳細頁 view model，將多個 hook 狀態整理成 page 與子元件可直接消費的區塊。
 export function useProductDetailViewModel({
   productId,
   returnHref,

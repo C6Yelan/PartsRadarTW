@@ -1,8 +1,10 @@
 "use client";
 // apps/web/app/products/[id]/detail/ProductDetailMedia.tsx
+// 顯示商品詳細頁主圖，並在圖片缺失或載入失敗時提供分類 fallback。
 
 import type { ProductDetailBody } from "./types";
 
+// 呈現商品詳細頁圖片區塊；圖片錯誤後固定顯示 fallback，避免重複觸發載入錯誤。
 export default function ProductDetailMedia({
   imageError,
   onImageError,

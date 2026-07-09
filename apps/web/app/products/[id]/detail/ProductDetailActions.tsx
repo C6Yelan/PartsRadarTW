@@ -1,9 +1,11 @@
 "use client";
 // apps/web/app/products/[id]/detail/ProductDetailActions.tsx
+// 顯示商品詳細頁的配單操作、來源購買連結與分享操作區塊。
 
 import { BUILD_LIST_MAX_QUANTITY } from "../../../build-list/model";
 import type { ProductLinkHealth } from "./types";
 
+// 組裝商品詳細頁主要操作，依配單狀態切換加入按鈕或數量控制。
 export default function ProductDetailActions({
   canIncreaseBuildListQuantity,
   currentBuildListQuantity,
@@ -92,6 +94,7 @@ export default function ProductDetailActions({
   );
 }
 
+// 依來源連結健康狀態附加提示樣式，讓購買連結在需要確認時降低確定性。
 function toExternalActionClassName(health: ProductLinkHealth | null) {
   return ["external-action", health && health.status !== "ok" ? "needs-link-check" : null]
     .filter(Boolean)

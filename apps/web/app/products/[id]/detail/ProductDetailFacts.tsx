@@ -1,7 +1,10 @@
 // apps/web/app/products/[id]/detail/ProductDetailFacts.tsx
+// 顯示商品詳細頁的目前價格、資料更新時間與上架狀態摘要。
+
 import { formatProductDateTime, formatProductPrice } from "./format";
 import type { ProductDetailBody } from "./types";
 
+// 組裝商品詳細頁的核心資料區塊，並在商品未出現在來源列表時顯示低干擾提醒。
 export default function ProductDetailFacts({ product }: { product: ProductDetailBody }) {
   return (
     <>

@@ -1,7 +1,10 @@
 // apps/web/app/products/[id]/detail/use-product-detail.ts
+// 管理商品詳細頁主資料 API 載入，並把 HTTP 結果轉成頁面載入狀態。
+
 import { useEffect, useState } from "react";
 import type { ProductDetailBody, ProductDetailLoadState } from "./types";
 
+// 依 product id 載入商品詳細資料；404 顯示 not-found，其餘失敗交給頁面錯誤狀態。
 export function useProductDetail(productId: string) {
   const [state, setState] = useState<ProductDetailLoadState>("idle");
   const [product, setProduct] = useState<ProductDetailBody | null>(null);
