@@ -1,4 +1,6 @@
 // apps/web/app/api/products/query.ts
+// 定義商品列表 API 的 public query contract，集中驗證篩選、排序、品牌與分頁語意。
+
 import type { Prisma } from "@partsradar/db";
 
 import {
@@ -30,6 +32,7 @@ export interface ProductVendorOption {
   name: string;
 }
 
+// 商品列表 API 已驗證後的查詢條件，避免 handler 直接操作未清洗 URLSearchParams。
 export interface ProductListQuery {
   q?: string;
   igrp?: number;
@@ -42,6 +45,7 @@ export interface ProductListQuery {
   pageSize: number;
 }
 
+// 將 URL query 解析成商品列表查詢條件，並在 DB 查詢前擋下語意不明或超出範圍的輸入。
 export function parseProductListQuery(params: URLSearchParams): ProductListQuery {
   const pagination = parsePaginationQuery(params);
   const igrp = parseOptionalIntegerQuery(params, "igrp", { min: 1 });
@@ -65,6 +69,7 @@ export function parseProductListQuery(params: URLSearchParams): ProductListQuery
   };
 }
 
+// 將已驗證 query 轉成 Prisma where；品牌條件可關閉，讓品牌選項查詢不被當前品牌篩選自我限制。
 export function buildProductWhere(
   query: ProductListQuery,
   options: { includeVendors: boolean },
@@ -104,6 +109,7 @@ export function buildProductWhere(
   return where;
 }
 
+// 建立指定分類可用品牌清單的查詢條件；品牌篩選只在分類語境下提供。
 export function buildProductVendorOptionsWhere(igrp: number): Prisma.ProductWhereInput {
   return {
     sourceCategory: {
@@ -118,6 +124,7 @@ export function buildProductVendorOptionsWhere(igrp: number): Prisma.ProductWher
   };
 }
 
+// 將 DB 品牌資料轉成去重後的公開選項，缺 slug/name 的資料不出現在篩選器。
 export function toProductVendorOptions(records: ProductVendorRecord[]): ProductVendorOption[] {
   const options = new Map<string, ProductVendorOption>();
 
@@ -135,6 +142,7 @@ export function toProductVendorOptions(records: ProductVendorRecord[]): ProductV
   return [...options.values()].sort((left, right) => left.name.localeCompare(right.name, "zh-TW"));
 }
 
+// 確認使用者提交的品牌值都來自目前分類的可用選項，避免查詢不存在或跨分類品牌。
 export function validateVendorValues(vendors: string[], options: ProductVendorOption[]): void {
   if (vendors.length === 0) {
     return;
@@ -149,6 +157,7 @@ export function validateVendorValues(vendors: string[], options: ProductVendorOp
   }
 }
 
+// 建立 DB 可直接排序的欄位；價格變動排序仍會在 price-movement.ts 依計算結果重新排序。
 export function buildProductOrderBy(sort: ProductSort): Prisma.ProductOrderByWithRelationInput[] {
   switch (sort) {
     case "price_desc":
@@ -164,6 +173,7 @@ export function buildProductOrderBy(sort: ProductSort): Prisma.ProductOrderByWit
   }
 }
 
+// 判斷排序是否需要先計算近 30 天價格變動，再由應用層排序與分頁。
 export function isPriceMovementSort(sort: ProductSort) {
   return sort === "price_drop_desc" || sort === "price_rise_desc";
 }

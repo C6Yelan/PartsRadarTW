@@ -1,4 +1,6 @@
 // apps/web/app/api/products/response.ts
+// 將商品列表查詢結果轉成 public API response，組裝商品卡片、價格變動、分頁與 meta。
+
 import {
   COOLPC_SOURCE_NAME,
   createCoolpcPurchaseUrl,
@@ -16,6 +18,7 @@ import {
 } from "./data";
 import type { ProductVendorOption } from "./query";
 
+// 商品列表前端與配單入口使用的單筆商品 response contract。
 interface ProductListResponseItem {
   id: string;
   name: string;
@@ -53,6 +56,7 @@ interface ProductListResponseItem {
 
 export type ProductPriceMovement = ProductListResponseItem["priceMovement"];
 
+// 商品列表 API 的完整 response contract，包含商品資料、分頁與來源/品牌 meta。
 export interface ProductsResponseBody {
   data: ProductListResponseItem[];
   pagination: {
@@ -68,6 +72,7 @@ export interface ProductsResponseBody {
   };
 }
 
+// 依目前分類篩選來源狀態；未指定分類時使用所有啟用來源分類彙整。
 export function buildProductSourceStatus(
   categories: SourceStatusCategoryRecord[],
   igrp: number | undefined,
@@ -79,6 +84,7 @@ export function buildProductSourceStatus(
   return buildSourceStatusResponse(sourceCategories, now);
 }
 
+// 將 DB product projection 轉成單筆 public response，並重新產生公開購買連結。
 export function toProductResponseItem(product: ProductRecord): ProductListResponseItem {
   if (!product.currentPrice) {
     throw new Error("Product list query returned a product without current price.");
@@ -103,7 +109,7 @@ export function toProductResponseItem(product: ProductRecord): ProductListRespon
     priceMovement: toProductPriceMovement(product, []),
     source: {
       name: COOLPC_SOURCE_NAME,
-      // Build the public purchase URL directly so stored crawler source URLs cannot leak.
+      // 使用 ibuyToken 重新組公開購買連結，避免 crawler 儲存的來源 URL 被直接外露。
       url: createCoolpcPurchaseUrl(product.ibuyToken),
     },
     status: {
@@ -113,19 +119,21 @@ export function toProductResponseItem(product: ProductRecord): ProductListRespon
   };
 }
 
+// 將商品圖片欄位轉成列表用的公開圖片資訊；缺少快取檢查時間時視為沒有可用圖片。
 function toProductListImage(product: ProductRecord): ProductListResponseItem["image"] {
   if (!product.primaryImageUrl || !product.primaryImageCheckedAt) {
     return null;
   }
 
   return {
-    // Product image paths come from shared code so list/detail/manual smoke output cannot drift.
+    // 圖片路徑由 shared helper 產生，避免列表、詳細頁與 smoke test 的公開圖片 URL 漂移。
     url: createPublicProductImagePath(product.id),
     alt: product.name,
     capturedAt: product.primaryImageCheckedAt.toISOString(),
   };
 }
 
+// 依 productId 分組歷史快照，替商品列表建立近 30 天價格變動查表。
 export function buildProductPriceMovementMap(
   products: ProductRecord[],
   snapshots: ProductPriceMovementSnapshotRecord[],
@@ -147,6 +155,7 @@ export function buildProductPriceMovementMap(
   );
 }
 
+// 使用已計算好的 movement 覆蓋預設值，避免 response mapper 重複計算價格變動。
 export function toProductResponseItemWithMovement(
   product: ProductRecord,
   movement: ProductListResponseItem["priceMovement"],
@@ -157,6 +166,7 @@ export function toProductResponseItemWithMovement(
   };
 }
 
+// 計算目前價格相對於近 30 天基準價的變動；資料不足時回傳 null movement。
 function toProductPriceMovement(
   product: ProductRecord,
   snapshots: ProductPriceMovementSnapshotRecord[],

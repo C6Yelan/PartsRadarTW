@@ -1,11 +1,12 @@
 // apps/web/app/api/products/data.ts
+// 定義商品列表 API 使用的 Prisma select、價格變動查詢欄位與窄 read client contract。
+
 import type { Prisma } from "@partsradar/db";
 
 import type { SourceStatusReadClient } from "../source-status/handler";
 
+// 限定商品列表可讀取的 public-safe 欄位；ibuyToken 僅用來組 outbound CoolPC purchase URL。
 export const PRODUCT_SELECT = {
-  // Keep the list endpoint on public-safe fields only. ibuyToken is selected
-  // only to build the outbound CoolPC purchase URL; it is not returned directly.
   id: true,
   ibuyToken: true,
   name: true,
@@ -42,6 +43,7 @@ export const PRODUCT_VENDOR_SELECT = {
 
 export const PRODUCT_PRICE_MOVEMENT_RANGE_DAYS = 30;
 
+// 價格變動摘要只需要歷史快照的價格、幣別與時間，不讀取商品完整資料。
 export const PRODUCT_PRICE_MOVEMENT_SNAPSHOT_SELECT = {
   productId: true,
   price: true,
@@ -71,6 +73,7 @@ export type ProductPriceMovementSnapshotFindManyArgs = Omit<
   select: typeof PRODUCT_PRICE_MOVEMENT_SNAPSHOT_SELECT;
 };
 
+// 商品列表 API handler 使用的最小讀取介面，包含列表、品牌選項、數量、價格快照與來源狀態查詢。
 export interface ProductsReadClient extends SourceStatusReadClient {
   product: {
     findProducts(args: ProductListFindManyArgs): Promise<ProductRecord[]>;

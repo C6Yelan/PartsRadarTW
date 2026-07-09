@@ -1,4 +1,6 @@
 // apps/web/app/api/products/handler.ts
+// 處理商品列表 API 的 query 解析、品牌選項、價格變動排序、來源狀態與分頁回應。
+
 import { InvalidQueryError } from "../_shared/query";
 import { internalErrorResponse, invalidQueryResponse, jsonOk } from "../_shared/responses";
 import { SOURCE_STATUS_CATEGORY_QUERY } from "../source-status/handler";
@@ -27,6 +29,7 @@ interface GetProductsHandlerOptions {
   now?: () => Date;
 }
 
+// 建立商品列表 API handler，將公開 query 轉成 DB 查詢並組裝列表、pagination 與 meta。
 export function createGetProductsHandler(
   client: ProductsReadClient,
   options: GetProductsHandlerOptions = {},

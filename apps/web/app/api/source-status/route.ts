@@ -1,4 +1,6 @@
 // apps/web/app/api/source-status/route.ts
+// 接上來源狀態 public API 的 rate limit、Prisma read client 與 handler。
+
 import { withRateLimit } from "../_shared/rate-limit";
 import {
   createGetSourceStatusHandler,
@@ -6,6 +8,7 @@ import {
   type SourceStatusReadClient,
 } from "./handler";
 
+// 接收來源狀態 GET request，將 Prisma delegate 轉接給可測試的 handler。
 export async function GET(request: Request): Promise<Response> {
   return withRateLimit(request, "api:read", async () => {
     const { prisma } = await import("@partsradar/db");

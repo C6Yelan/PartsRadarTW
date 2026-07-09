@@ -1,4 +1,6 @@
 // apps/web/app/api/products/price-movement.ts
+// 協調商品列表的價格變動查詢與排序，處理需要先計算 movement 才能分頁的排序模式。
+
 import {
   PRODUCT_PRICE_MOVEMENT_SNAPSHOT_SELECT,
   PRODUCT_SELECT,
@@ -13,6 +15,7 @@ import {
 
 type ProductWhere = Parameters<ProductsReadClient["product"]["findProducts"]>[0]["where"];
 
+// 讀取商品列表並補上價格變動資料；價格變動排序需先取全量候選再依計算結果分頁。
 export async function findProductsWithMovement(
   client: ProductsReadClient,
   where: ProductWhere,
