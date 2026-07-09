@@ -1,4 +1,6 @@
 // apps/web/app/product-explorer/hooks.ts
+// 集中商品探索頁的 client-side UI hooks，管理 query、響應式篩選面板與分頁後捲動。
+
 import {
   type MouseEvent,
   useCallback,
@@ -19,8 +21,10 @@ import type { LoadState, ProductsResponse, QueryState } from "./types";
 export { useCategories } from "./data/use-categories";
 export { useProducts } from "./data/use-products";
 
+// 對齊 CSS mobile breakpoint max-width: 760px，桌面端強制維持分類面板展開。
 const DESKTOP_FILTER_MEDIA_QUERY_VALUE = "(min-width: 761px)";
 
+// 管理商品探索頁 URL query、表單 draft、價格驗證與瀏覽器上一頁 / 下一頁同步。
 export function useProductExplorerQuery() {
   const [isReady, setIsReady] = useState(false);
   const [query, setQuery] = useState<QueryState>(DEFAULT_QUERY);
@@ -112,6 +116,7 @@ export function useProductExplorerQuery() {
   };
 }
 
+// 控制分類篩選面板的響應式開合，桌面維持展開、手機允許使用者收合。
 export function useResponsiveFiltersOpen() {
   const [filtersOpen, setFiltersOpen] = useState(true);
 
@@ -147,6 +152,7 @@ export function useResponsiveFiltersOpen() {
   };
 }
 
+// 在分頁載入完成或失敗後捲回商品結果區，避免使用者停留在舊頁面位置。
 export function usePendingPageScroll(productState: LoadState, products: ProductsResponse | null) {
   const resultsPanelRef = useRef<HTMLElement | null>(null);
   const pendingPageScrollRef = useRef<number | null>(null);
