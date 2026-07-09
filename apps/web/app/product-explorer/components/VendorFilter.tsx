@@ -1,4 +1,6 @@
 // apps/web/app/product-explorer/components/VendorFilter.tsx
+// 呈現商品探索頁的廠商多選下拉篩選器，並處理選單開合與關閉互動。
+
 import { useEffect, useRef, useState } from "react";
 import type { ProductVendorOption } from "../types";
 
@@ -12,6 +14,7 @@ interface VendorFilterProps {
   onToggle: (vendor: string) => void;
 }
 
+// 顯示目前分類可用的廠商選項，將勾選 / 清除事件交回上層 query 狀態。
 export function VendorFilter({
   options,
   disabledLabel,

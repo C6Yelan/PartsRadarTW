@@ -1,4 +1,6 @@
 // apps/web/app/product-explorer/components/ProductImage.tsx
+// 呈現商品探索列表的商品圖片，並在缺圖或載入失敗時顯示分類 fallback。
+
 import { useState } from "react";
 
 interface ProductImageProps {
@@ -9,6 +11,7 @@ interface ProductImageProps {
   } | null;
 }
 
+// 顯示單一商品縮圖，圖片失敗時切換為無圖狀態以避免破圖留在列表中。
 export function ProductImage({ fallbackLabel, image }: ProductImageProps) {
   const [hasError, setHasError] = useState(false);
 

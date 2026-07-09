@@ -1,4 +1,6 @@
 // apps/web/app/product-explorer/components/ProductToolbar.tsx
+// 呈現商品探索結果上方的篩選、排序、每頁數量與重設控制列。
+
 import type { ProductStatus, ProductSort, ProductVendorOption, QueryState } from "../types";
 import { formatInteger } from "../formatting";
 import {
@@ -28,6 +30,7 @@ interface ProductToolbarProps {
   onToggleVendor: (vendor: string) => void;
 }
 
+// 組裝結果工具列的可互動控制，將 query / draft 變更交由上層 actions 套用。
 export function ProductToolbar({
   draft,
   formError,

@@ -1,4 +1,6 @@
 // apps/web/app/product-explorer/components/CategoryOption.tsx
+// 呈現商品探索頁分類篩選使用的單一 radio 選項。
+
 interface CategoryOptionProps {
   checked: boolean;
   label: string;
@@ -7,6 +9,7 @@ interface CategoryOptionProps {
   onChange: () => void;
 }
 
+// 顯示分類名稱與來源站分類名稱，並把選取狀態交給原生 radio input。
 export function CategoryOption({
   checked,
   label,

@@ -1,4 +1,6 @@
 // apps/web/app/product-explorer/components/ProductTable.tsx
+// 呈現商品探索結果表格，依載入狀態切換 skeleton、錯誤、空結果與商品列。
+
 import { createProductDetailHref } from "../query-state";
 import type { LoadState, ProductListItem, ProductsResponse } from "../types";
 import { ProductRow } from "./ProductRow";
@@ -13,6 +15,7 @@ interface ProductTableProps {
   onDecreaseBuildListQuantity(product: ProductListItem): void;
 }
 
+// 組裝商品列表狀態與每列商品資料，將配單操作事件傳遞給 ProductRow。
 export function ProductTable({
   buildListQuantities,
   productListReturnTo,

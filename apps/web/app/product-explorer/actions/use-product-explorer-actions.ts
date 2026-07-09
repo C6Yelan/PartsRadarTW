@@ -1,4 +1,6 @@
 // apps/web/app/product-explorer/actions/use-product-explorer-actions.ts
+// 集中商品探索頁的查詢、篩選、分頁與返回首頁互動處理。
+
 import { type FormEvent, type MouseEvent, useState } from "react";
 import {
   DEFAULT_QUERY,
@@ -10,6 +12,7 @@ import type { CategoryItem, ProductVendorOption, QueryState } from "../types";
 
 const TOUCH_INPUT_MEDIA_QUERY = "(pointer: coarse)";
 
+// 建立商品探索頁 UI 事件 handler，負責把使用者操作轉成 query / draft 更新。
 export function useProductExplorerActions({
   categories,
   commitQuery,
@@ -185,6 +188,7 @@ export function useProductExplorerActions({
   };
 }
 
+// 觸控裝置提交搜尋或清除搜尋後收起鍵盤，避免結果區被虛擬鍵盤遮住。
 function blurActiveElementOnTouchInput() {
   if (!window.matchMedia(TOUCH_INPUT_MEDIA_QUERY).matches) {
     return;

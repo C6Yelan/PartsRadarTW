@@ -1,4 +1,6 @@
 // apps/web/app/product-explorer/components/ProductRow.tsx
+// 呈現商品探索列表中的單筆商品列，包含圖片、價格、價格變動、上架狀態與配單控制。
+
 import Link from "next/link";
 import { BUILD_LIST_MAX_QUANTITY } from "../../build-list/model";
 import { formatPrice, formatSignedPercent, formatSignedPrice } from "../formatting";
@@ -13,6 +15,7 @@ interface ProductRowProps {
   onDecreaseBuildListQuantity(product: ProductListItem): void;
 }
 
+// 組裝單筆商品列的可互動內容，並把配單增減事件交回頁面狀態管理。
 export function ProductRow({
   buildListQuantity,
   detailHref,

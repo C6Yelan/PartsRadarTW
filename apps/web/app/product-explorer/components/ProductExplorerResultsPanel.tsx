@@ -1,5 +1,6 @@
 "use client";
 // apps/web/app/product-explorer/components/ProductExplorerResultsPanel.tsx
+// 組裝商品探索結果區塊，將 toolbar、商品表格與分頁控制接到 view model。
 
 import type { FormEvent, RefObject } from "react";
 import type {
@@ -15,6 +16,7 @@ import { Pagination } from "./Pagination";
 import { ProductTable } from "./ProductTable";
 import { ProductToolbar } from "./ProductToolbar";
 
+// 呈現商品列表主區域，負責把分組後的資料與事件傳給子元件。
 export function ProductExplorerResultsPanel({
   actions,
   pagination,

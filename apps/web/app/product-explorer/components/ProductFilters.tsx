@@ -1,4 +1,6 @@
 // apps/web/app/product-explorer/components/ProductFilters.tsx
+// 呈現商品探索頁左側分類篩選面板，桌面固定展開、手機可收合。
+
 import type { MouseEvent } from "react";
 import type { CategoryItem, LoadState } from "../types";
 import { CategoryOption } from "./CategoryOption";
@@ -13,6 +15,7 @@ interface ProductFiltersProps {
   onToggleOpen: (isOpen: boolean) => void;
 }
 
+// 顯示來源分類 radio group，並透過 details / summary 承接響應式收合行為。
 export function ProductFilters({
   categories,
   categoryState,

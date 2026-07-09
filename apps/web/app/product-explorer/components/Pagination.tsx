@@ -1,4 +1,6 @@
 // apps/web/app/product-explorer/components/Pagination.tsx
+// 呈現商品列表分頁控制、頁碼按鈕與大量頁數時的跳頁輸入。
+
 import type { FormEvent } from "react";
 import type { LoadState } from "../types";
 import { toDigitsOnly } from "../query-state";
@@ -15,6 +17,7 @@ interface PaginationProps {
   onPageJumpValueChange: (value: string) => void;
 }
 
+// 顯示商品探索結果的分頁列，將頁碼切換與跳頁提交交給上層 actions 處理。
 export function Pagination({
   page,
   pageJumpValue,
