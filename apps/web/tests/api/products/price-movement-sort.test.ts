@@ -1,4 +1,6 @@
 // apps/web/tests/api/products/price-movement-sort.test.ts
+// 驗證商品列表依 30 天價格跌幅 / 漲幅排序時，會先計算全量候選再分頁。
+
 import { describe, expect, it } from "vitest";
 
 import { createGetProductsHandler } from "../../../app/api/products/handler";

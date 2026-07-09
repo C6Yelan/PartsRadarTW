@@ -1,4 +1,6 @@
 // apps/web/tests/api/products/query-validation.test.ts
+// 驗證商品列表 API 的搜尋、品牌篩選、價格區間與 invalid query 安全中止行為。
+
 import { describe, expect, it } from "vitest";
 
 import { API_ERROR_MESSAGES } from "../../../app/api/_shared/responses";

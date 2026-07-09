@@ -1,4 +1,6 @@
 // apps/web/tests/api/products/support/handler-client.ts
+// 提供商品列表 API 測試共用的 fake read client、固定資料與查詢條件 builder。
+
 import type {
   SOURCE_STATUS_CATEGORY_QUERY,
   SourceStatusCategoryRecord,

@@ -1,4 +1,6 @@
 // apps/web/tests/api/products/response.test.ts
+// 驗證商品列表 API 的 public response shape、價格變動、來源狀態 meta 與安全欄位邊界。
+
 import { describe, expect, it } from "vitest";
 
 import { createGetProductsHandler } from "../../../app/api/products/handler";

@@ -1,4 +1,6 @@
 // apps/web/tests/api/_shared/rate-limit.test.ts
+// 驗證 public API rate limiter 的 client 來源判斷、scope 分桶、env 設定與公開 headers。
+
 import { describe, expect, it } from "vitest";
 
 import {

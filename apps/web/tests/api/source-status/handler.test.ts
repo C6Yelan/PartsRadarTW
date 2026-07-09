@@ -1,4 +1,6 @@
 // apps/web/tests/api/source-status/handler.test.ts
+// 驗證來源狀態 API 的 ok / stale / unavailable 判斷、查詢投影與安全錯誤回應。
+
 import { describe, expect, it } from "vitest";
 
 import { API_ERROR_MESSAGES } from "../../../app/api/_shared/responses";

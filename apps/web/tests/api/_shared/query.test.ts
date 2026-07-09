@@ -1,4 +1,6 @@
 // apps/web/tests/api/_shared/query.test.ts
+// 驗證 web API 共用 query parser 的單值參數、型別邊界與分頁限制。
+
 import { describe, expect, it } from "vitest";
 
 import {

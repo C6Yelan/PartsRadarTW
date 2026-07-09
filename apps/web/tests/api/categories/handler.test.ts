@@ -1,4 +1,6 @@
 // apps/web/tests/api/categories/handler.test.ts
+// 驗證公開分類 API handler 的 enabled 篩選、來源排序、response shape 與安全錯誤回應。
+
 import { describe, expect, it } from "vitest";
 
 import { API_ERROR_MESSAGES } from "../../../app/api/_shared/responses";

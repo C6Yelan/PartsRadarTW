@@ -1,4 +1,6 @@
 // apps/web/tests/api/products/[id]/price-history/response.test.ts
+// 驗證商品價格歷史 API 的觀測點、目前價格確認點、range 查詢條件與摘要 response。
+
 import { describe, expect, it } from "vitest";
 
 import { createGetProductPriceHistoryHandler } from "../../../../../app/api/products/[id]/price-history/handler";

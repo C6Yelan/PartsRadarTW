@@ -1,4 +1,6 @@
 // apps/web/tests/api/_shared/responses.test.ts
+// 驗證 web public API response helper 的成功格式、泛用錯誤訊息與限流 headers。
+
 import { describe, expect, it } from "vitest";
 
 import * as responseExports from "../../../app/api/_shared/responses";

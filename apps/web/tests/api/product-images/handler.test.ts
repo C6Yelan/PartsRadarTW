@@ -1,4 +1,6 @@
 // apps/web/tests/api/product-images/handler.test.ts
+// 驗證商品圖片 API handler 的 public path、快取檔讀取、image id 正規化與安全錯誤回應。
+
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -22,7 +24,7 @@ afterEach(async () => {
 
 describe("product image API helpers", () => {
   it("builds a public API path for product images", () => {
-    // The API exposes cached images through an app route, not through raw storage paths.
+    // 圖片對外只暴露 app route，不暴露實際 storage path。
     expect(createPublicProductImagePath(PRODUCT_ID.toUpperCase())).toBe(
       `/api/product-images/${PRODUCT_ID}.webp`,
     );

@@ -1,4 +1,6 @@
 // apps/web/tests/api/products/[id]/handler.test.ts
+// 驗證商品詳細 API handler 的公開 response shape、購買連結重建、link health 與安全錯誤回應。
+
 import { describe, expect, it } from "vitest";
 
 import { API_ERROR_MESSAGES } from "../../../../app/api/_shared/responses";

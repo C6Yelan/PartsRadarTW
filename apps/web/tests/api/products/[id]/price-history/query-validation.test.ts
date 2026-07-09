@@ -1,4 +1,6 @@
 // apps/web/tests/api/products/[id]/price-history/query-validation.test.ts
+// 驗證商品價格歷史 API 的 query / product id 驗證失敗時，會安全回應且避免不必要 DB 讀取。
+
 import { describe, expect, it } from "vitest";
 
 import { API_ERROR_MESSAGES } from "../../../../../app/api/_shared/responses";
