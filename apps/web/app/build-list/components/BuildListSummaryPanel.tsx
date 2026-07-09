@@ -1,9 +1,11 @@
 "use client";
 // apps/web/app/build-list/components/BuildListSummaryPanel.tsx
+// 顯示配單總計、來源資料提醒與匯出 / 清空操作入口。
 
 import { formatBuildListPrice } from "../formatting";
 import type { BuildListSummary } from "../model";
 
+// 呈現配單摘要側欄，將清空與下載事件交回頁面層處理。
 export default function BuildListSummaryPanel({
   onClear,
   onDownloadExcel,

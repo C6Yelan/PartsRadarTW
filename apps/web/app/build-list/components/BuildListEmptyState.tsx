@@ -1,6 +1,9 @@
 // apps/web/app/build-list/components/BuildListEmptyState.tsx
+// 顯示配單沒有品項時的空狀態，提供回到商品查詢的入口。
+
 import Link from "next/link";
 
+// 呈現配單空狀態，避免未加入商品時顯示空白頁面。
 export default function BuildListEmptyState() {
   return (
     <section className="build-list-empty">

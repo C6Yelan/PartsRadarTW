@@ -1,11 +1,13 @@
 "use client";
 // apps/web/app/build-list/components/BuildListItemRow.tsx
+// 呈現配單單一品項列，串接商品詳細連結、來源連結、數量控制與移除操作。
 
 import Link from "next/link";
 import { formatBuildListDateTime, formatBuildListPrice } from "../formatting";
 import { BUILD_LIST_MAX_QUANTITY, getBuildListLineSubtotal, type BuildListItem } from "../model";
 import BuildListItemImage from "./BuildListItemImage";
 
+// 組裝配單品項列，將互動事件交回頁面層維護配單狀態。
 export default function BuildListItemRow({
   item,
   onQuantityChange,
@@ -95,6 +97,7 @@ export default function BuildListItemRow({
   );
 }
 
+// 建立從配單進入商品詳細頁的連結，讓詳細頁返回時能回到配單。
 function createBuildListProductDetailHref(productId: string) {
   const params = new URLSearchParams({
     returnTo: "/build-list",

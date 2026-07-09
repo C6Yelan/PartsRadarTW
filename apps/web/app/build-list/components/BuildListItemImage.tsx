@@ -1,9 +1,11 @@
 "use client";
 // apps/web/app/build-list/components/BuildListItemImage.tsx
+// 顯示配單品項縮圖，並在圖片缺失或載入失敗時提供可讀的 fallback。
 
 import { useState } from "react";
 import type { BuildListItem } from "../model";
 
+// 呈現單一配單品項圖片；圖片失敗後固定改顯示分類 fallback，避免重複觸發錯誤載入。
 export default function BuildListItemImage({ item }: { item: BuildListItem }) {
   const [hasError, setHasError] = useState(false);
 
