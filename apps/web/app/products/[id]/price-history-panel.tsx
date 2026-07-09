@@ -1,5 +1,6 @@
 "use client";
 // apps/web/app/products/[id]/price-history-panel.tsx
+// 組裝商品詳細頁的價格歷史區塊，串接期間選擇、摘要卡、走勢圖與變價紀錄。
 
 import { useMemo, useState } from "react";
 import { PriceHistoryChart, useChartConfig } from "./price-history/chart";
@@ -26,6 +27,7 @@ const RANGE_OPTIONS = [
   { label: "全部", value: "all" },
 ] as const satisfies readonly { label: string; value: PriceHistoryRange }[];
 
+// 將價格歷史 API body 轉成畫面模型，並依載入狀態呈現圖表、摘要與空狀態。
 export default function PriceHistoryPanel({
   history,
   selectedRange,
@@ -104,6 +106,7 @@ export default function PriceHistoryPanel({
   );
 }
 
+// 顯示價格歷史查詢期間切換控制，變更期間時由外層 loader 重新載入資料。
 function HistoryRangeControls({
   range,
   onRangeChange,

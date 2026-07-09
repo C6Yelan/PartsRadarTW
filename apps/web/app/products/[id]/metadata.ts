@@ -1,4 +1,6 @@
 // apps/web/app/products/[id]/metadata.ts
+// 建立商品詳細頁的 Next.js metadata，限制只使用公開商品欄位組出 SEO 與分享預覽資訊。
+
 import type { Prisma } from "@partsradar/db";
 import { createPublicProductImagePath } from "@partsradar/shared";
 import type { Metadata } from "next";
@@ -38,6 +40,7 @@ export type ProductMetadataFindFirstArgs = Omit<Prisma.ProductFindFirstArgs, "se
   select: typeof PRODUCT_METADATA_SELECT;
 };
 
+// 商品 metadata 查詢所需的最小 Prisma client contract，供 page 與測試注入。
 export interface ProductMetadataReadClient {
   product: {
     findFirst(args: ProductMetadataFindFirstArgs): Promise<ProductMetadataRecord | null>;
@@ -48,6 +51,7 @@ interface ProductMetadataOptions {
   publicSiteUrl?: string | null;
 }
 
+// 讀取商品公開欄位並建立詳細頁 metadata；無效 id、查無商品或查詢失敗時回退預設 metadata。
 export async function createProductDetailMetadata(
   client: ProductMetadataReadClient,
   productId: string,
@@ -84,6 +88,7 @@ export async function createProductDetailMetadata(
   }
 }
 
+// 將商品 metadata record 轉成 Next.js Metadata，避免暴露 crawler 內部來源 URL 或非公開欄位。
 export function buildProductDetailMetadata(
   product: ProductMetadataRecord,
   publicSiteUrl = DEFAULT_PUBLIC_SITE_URL,
@@ -132,6 +137,7 @@ export function buildProductDetailMetadata(
   };
 }
 
+// 決定 metadata 使用的公開站台 origin，無效或非 HTTP(S) 設定會回退正式站網址。
 export function resolvePublicSiteUrl(publicSiteUrl?: string | null) {
   const candidate =
     publicSiteUrl?.trim() ||
@@ -151,6 +157,7 @@ export function resolvePublicSiteUrl(publicSiteUrl?: string | null) {
   }
 }
 
+// 建立找不到商品或 metadata 查詢失敗時的安全預設 metadata。
 function createFallbackProductMetadata(publicSiteUrl: string, productId?: string): Metadata {
   const canonicalPath = productId ? `/products/${productId}` : "/";
   const canonical = createAbsoluteUrl(publicSiteUrl, canonicalPath);
@@ -177,14 +184,17 @@ function createFallbackProductMetadata(publicSiteUrl: string, productId?: string
   };
 }
 
+// 將 metadata 使用的相對路徑轉成公開站台絕對 URL。
 function createAbsoluteUrl(publicSiteUrl: string, path: string) {
   return new URL(path, `${publicSiteUrl}/`).toString();
 }
 
+// 將 metadata 中的價格格式化為台幣顯示文字。
 function formatMetadataPrice(amount: number) {
   return `NT$ ${new Intl.NumberFormat("zh-TW").format(amount)}`;
 }
 
+// 將 metadata 更新時間固定轉成台灣時間，避免伺服器時區影響分享描述。
 function formatTaipeiDateTime(value: Date) {
   const parts = new Intl.DateTimeFormat("zh-TW", {
     year: "numeric",
@@ -202,10 +212,12 @@ function formatTaipeiDateTime(value: Date) {
   )} ${getDateTimePart(parts, "hour")}:${getDateTimePart(parts, "minute")}`;
 }
 
+// 從 Intl formatToParts 結果取出指定日期時間片段。
 function getDateTimePart(parts: Intl.DateTimeFormatPart[], type: Intl.DateTimeFormatPartTypes) {
   return parts.find((part) => part.type === type)?.value ?? "";
 }
 
+// 壓縮 metadata title 文字，避免商品名稱過長讓分享標題失焦。
 function truncateMetadataText(value: string, maxLength: number) {
   const normalizedValue = value.replace(/\s+/g, " ").trim();
 

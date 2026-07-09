@@ -1,5 +1,6 @@
 "use client";
 // apps/web/app/products/[id]/product-detail.tsx
+// 組裝商品詳細頁 client 介面，串接商品資料、配單操作、連結提示與價格歷史。
 
 import Link from "next/link";
 import FloatingBuildListLink from "../../build-list/FloatingBuildListLink";
@@ -11,6 +12,7 @@ import LinkHealthNotice from "./detail/link-health-notice";
 import { useProductDetailViewModel } from "./detail/use-product-detail-view-model";
 import PriceHistoryPanel from "./price-history-panel";
 
+// 呈現商品詳細頁主要內容，依 view model 的載入狀態切換 loading、錯誤、空狀態與完整商品資訊。
 export default function ProductDetail({
   productId,
   returnHref,
