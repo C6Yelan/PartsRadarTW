@@ -1,4 +1,6 @@
 // apps/web/tests/ops/status-thresholds.test.ts
+// 驗證待移除的 /ops/status 門檻讀取仍支援 smoke fallback env 名稱。
+
 import { describe, expect, it } from "vitest";
 import { readOpsStatusThresholds } from "../../app/ops/status/data";
 

@@ -1,4 +1,6 @@
 // apps/web/tests/build-list/model-storage.test.ts
+// 驗證配單 model 純函式、persisted data 正規化與 localStorage 讀寫邊界。
+
 import { describe, expect, it } from "vitest";
 
 import {

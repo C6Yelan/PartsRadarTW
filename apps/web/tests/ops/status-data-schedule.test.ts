@@ -1,4 +1,6 @@
 // apps/web/tests/ops/status-data-schedule.test.ts
+// 驗證待移除的 /ops/status runtime schedule 摘要會反映部署 env 覆寫。
+
 import { describe, expect, it } from "vitest";
 import { collectOpsStatus } from "../../app/ops/status/data";
 import { fakeOpsClient, NOW } from "./status-data-support";

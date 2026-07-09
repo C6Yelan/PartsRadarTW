@@ -1,4 +1,6 @@
 // apps/web/tests/build-list/export.test.ts
+// 驗證配單 Excel 匯出的檔名、worksheet 內容、XLSX package 與下載 Blob。
+
 import { describe, expect, it } from "vitest";
 
 import { createBuildListExcelDownload } from "../../app/build-list/download";

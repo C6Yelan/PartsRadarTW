@@ -1,4 +1,6 @@
 // apps/web/tests/ops/status-data-discord.test.ts
+// 驗證待移除的 /ops/status Discord delivery 健康摘要與失敗恢復判斷。
+
 import { describe, expect, it } from "vitest";
 import { collectOpsStatus } from "../../app/ops/status/data";
 import { fakeOpsClient, NOW } from "./status-data-support";

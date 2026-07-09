@@ -1,4 +1,6 @@
 // apps/web/tests/products/return-href.test.ts
+// 驗證商品詳細頁 returnTo 只允許安全站內返回路徑，外站與不支援路徑會回首頁。
+
 import { describe, expect, it } from "vitest";
 
 import { normalizeReturnHref } from "../../app/products/[id]/return-href";

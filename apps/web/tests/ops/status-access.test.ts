@@ -1,4 +1,6 @@
 // apps/web/tests/ops/status-access.test.ts
+// 驗證待移除的 /ops/status access gate、token 讀取與 Bearer token 解析行為。
+
 import { describe, expect, it } from "vitest";
 import {
   extractBearerToken,

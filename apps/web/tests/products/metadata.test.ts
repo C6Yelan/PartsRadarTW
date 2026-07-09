@@ -1,4 +1,6 @@
 // apps/web/tests/products/metadata.test.ts
+// 驗證商品詳細頁 metadata 的公開欄位、canonical URL、分享預覽與安全 fallback。
+
 import { describe, expect, it } from "vitest";
 import {
   buildProductDetailMetadata,

@@ -1,4 +1,6 @@
 // apps/web/tests/ops/status-data-summary.test.ts
+// 驗證待移除的 /ops/status 整體摘要、健康檢查清單與排程 policy 輸出。
+
 import { describe, expect, it } from "vitest";
 import { collectOpsStatus } from "../../app/ops/status/data";
 import { fakeOpsClient, NOW } from "./status-data-support";

@@ -1,4 +1,6 @@
 // apps/web/tests/ops/status-data-support.ts
+// 提供待移除的 /ops/status 測試共用 fake read client、固定時間與 delivery 資料。
+
 import type { OpsStatusReadClient } from "../../app/ops/status/data";
 
 export const NOW = new Date("2026-06-07T12:00:00.000Z");

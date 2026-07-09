@@ -1,4 +1,6 @@
 // apps/web/tests/products/product-share.test.ts
+// 驗證商品分享 URL、Web Share API、剪貼簿 fallback 與分享狀態顯示邊界。
+
 import { describe, expect, it, vi } from "vitest";
 import {
   createProductShareUrl,

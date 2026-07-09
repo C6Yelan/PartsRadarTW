@@ -1,4 +1,6 @@
 // apps/web/tests/products/price-history-format.test.ts
+// 驗證商品價格歷史紀錄的時間格式會固定以台灣時間輸出。
+
 import { describe, expect, it } from "vitest";
 
 import { formatRecordDateTime } from "../../app/products/[id]/price-history/format";
