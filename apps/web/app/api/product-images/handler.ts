@@ -1,4 +1,6 @@
 // apps/web/app/api/product-images/handler.ts
+// 讀取站內商品 WebP 縮圖快取，負責 image id 驗證、storage path 組裝與安全回應。
+
 import { readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 export { createPublicProductImagePath } from "@partsradar/shared";
@@ -17,6 +19,7 @@ export interface ProductImageHandlerOptions {
   readImageFile?: ProductImageReadFile;
 }
 
+// 建立商品縮圖 API handler；只讀本機快取，不在訪客請求期間抓取來源站圖片。
 export function createGetProductImageHandler(
   options: ProductImageHandlerOptions = {},
 ): (imageId: string) => Promise<Response> {
@@ -52,6 +55,7 @@ export function createGetProductImageHandler(
   };
 }
 
+// 正規化 URL path 中的圖片 id，只允許 product UUID 與可選 `.webp` 副檔名。
 function normalizeProductImageId(imageId: string): string | null {
   const value = imageId.trim().toLowerCase();
   const normalizedValue = value.endsWith(".webp") ? value.slice(0, -".webp".length) : value;
@@ -68,7 +72,7 @@ function resolveProductImageStorageDir(storageDir: string | undefined): string {
     throw new Error("Product image storage directory must not be empty.");
   }
 
-  // Resolve once at handler construction so request-time path building only joins a validated UUID.
+  // handler 建立時先 resolve storage root，request 階段只會接上已驗證的 UUID 檔名。
   return resolve(trimmedValue);
 }
 

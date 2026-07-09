@@ -1,4 +1,6 @@
 // apps/web/app/api/_shared/rate-limit.ts
+// 提供 public web API 共用的 in-memory rate limit，依 API scope 與 client identifier 控制請求量。
+
 import { createHash } from "node:crypto";
 import { LRUCache } from "lru-cache";
 
@@ -53,6 +55,7 @@ export interface RateLimitCheck {
 
 type RateLimitEnv = Partial<Record<string, string>>;
 
+// 包裝 API handler，負責在執行前檢查 rate limit，並為成功或錯誤回應補上公開限流 headers。
 export async function withRateLimit(
   request: Request,
   scope: RateLimitScope,
@@ -71,6 +74,7 @@ export async function withRateLimit(
   }
 }
 
+// 執行單次 rate limit 判斷；被擋時直接產生 429 response 並記錄 sanitized log。
 export function checkRateLimit(request: Request, scope: RateLimitScope): RateLimitCheck {
   const decision = getGlobalRateLimiter().check(request, scope);
 
@@ -89,6 +93,7 @@ export function checkRateLimit(request: Request, scope: RateLimitScope): RateLim
   };
 }
 
+// 建立可測試的 rate limiter 實例，使用固定時間窗口與 LRU bucket 控制記憶體用量。
 export function createRateLimiter(options: RateLimiterOptions = {}): RateLimiter {
   const config = options.config ?? resolveRateLimitConfig();
   const nowMs = options.nowMs ?? Date.now;
@@ -141,6 +146,7 @@ export function createRateLimiter(options: RateLimiterOptions = {}): RateLimiter
   };
 }
 
+// 解析 rate limit env；無效值回退到保守預設，避免錯誤設定讓 API 失去限流。
 export function resolveRateLimitConfig(env: RateLimitEnv = process.env): RateLimitConfig {
   const readMax = readPositiveInteger(env.API_READ_RATE_LIMIT_MAX, RATE_LIMIT_DEFAULTS.readMax);
   const listMax = readPositiveInteger(env.API_LIST_RATE_LIMIT_MAX, RATE_LIMIT_DEFAULTS.listMax);
@@ -165,10 +171,12 @@ export function resolveRateLimitConfig(env: RateLimitEnv = process.env): RateLim
   };
 }
 
+// 回傳目前 request 的 client identifier；主要供測試與 smoke 檢查確認來源判斷。
 export function getClientIdentifier(request: Request): string {
   return getClientIdentifierInfo(request).value;
 }
 
+// 判斷 client identifier 來源；部署預期優先使用 Cloudflare header，再退回 X-Forwarded-For。
 export function getClientIdentifierInfo(request: Request): {
   source: ClientIdentifierSource;
   value: string;
@@ -197,6 +205,7 @@ export function getClientIdentifierInfo(request: Request): {
   };
 }
 
+// 建立公開 rate limit headers，讓前端、smoke test 與維運檢查能觀察目前限流狀態。
 export function rateLimitHeaders(decision: RateLimitDecision): Record<string, string> {
   return {
     "X-RateLimit-Client-Source": decision.clientIdentifierSource,
@@ -206,6 +215,7 @@ export function rateLimitHeaders(decision: RateLimitDecision): Record<string, st
   };
 }
 
+// 將 rate limit headers 套到既有 response，避免 handler 自行重複處理 header 細節。
 export function withRateLimitHeaders(response: Response, decision: RateLimitDecision): Response {
   for (const [name, value] of Object.entries(rateLimitHeaders(decision))) {
     response.headers.set(name, value);

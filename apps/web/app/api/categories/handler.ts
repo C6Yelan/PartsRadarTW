@@ -1,4 +1,6 @@
 // apps/web/app/api/categories/handler.ts
+// 處理公開分類 API 的 enabled sourceCategory 讀取、排序與安全 JSON 回應。
+
 import { COOLPC_SOURCE_NAME } from "@partsradar/shared";
 import { internalErrorResponse, jsonOk } from "../_shared/responses";
 
@@ -51,6 +53,7 @@ interface CategoriesResponseBody {
   data: CategoryResponseItem[];
 }
 
+// 建立分類列表 API handler，只公開已啟用分類與前端篩選需要的來源健康時間欄位。
 export function createGetCategoriesHandler(client: CategoriesReadClient): () => Promise<Response> {
   return async () => {
     try {
@@ -77,6 +80,7 @@ export function createGetCategoriesHandler(client: CategoriesReadClient): () => 
   };
 }
 
+// 將 DB category row 轉成 public API item，固定 source attribution 並把時間轉成 UTC ISO。
 function toCategoryResponseItem(category: CategoryRecord): CategoryResponseItem {
   return {
     id: category.id,
