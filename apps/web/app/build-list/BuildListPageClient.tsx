@@ -1,5 +1,6 @@
 "use client";
 // apps/web/app/build-list/BuildListPageClient.tsx
+// 組裝配單頁的 client-side 狀態、品項列表、摘要側欄、Excel 匯出與移除復原流程。
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -21,6 +22,7 @@ interface RemovedItemNotice {
   item: BuildListItem;
 }
 
+// 呈現配單頁主要互動區塊，將 localStorage 配單狀態分派給列表、摘要與 undo toast。
 export default function BuildListPageClient() {
   const {
     clearBuildListItems,

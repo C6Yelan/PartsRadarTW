@@ -1,5 +1,6 @@
 "use client";
 // apps/web/app/build-list/use-build-list.ts
+// 提供配單的 client-side hook，負責 localStorage 同步、摘要計算與配單操作入口。
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -19,6 +20,7 @@ import {
   writeBuildListItems,
 } from "./storage";
 
+// 管理瀏覽器本機配單狀態，並同步同頁 hook 與其他分頁的 localStorage 更新。
 export function useBuildList() {
   const [items, setItems] = useState<BuildListItem[]>([]);
   const [isReady, setIsReady] = useState(false);
@@ -45,6 +47,7 @@ export function useBuildList() {
     };
   }, []);
 
+  // 每次提交前重新讀取 storage，避免多個 hook 實例用舊 state 覆蓋較新的配單資料。
   const commitItems = useCallback((updater: (currentItems: BuildListItem[]) => BuildListItem[]) => {
     const nextItems = writeBuildListItems(updater(readBuildListItems()));
     setItems(nextItems);

@@ -1,10 +1,12 @@
 // apps/web/app/build-list/xlsx-zip.ts
+// 建立配單 Excel 匯出所需的最小 ZIP 封裝，只支援未壓縮的文字檔 entry。
 
 interface StoredZipEntry {
   path: string;
   content: string;
 }
 
+// 將 XLSX 內部 XML 檔案包成 store-only ZIP；不作為通用壓縮工具使用。
 export function createStoredZipArchive(entries: StoredZipEntry[]) {
   const encoder = new TextEncoder();
   const fileRecords = entries.map((entry) => ({
@@ -34,6 +36,7 @@ export function createStoredZipArchive(entries: StoredZipEntry[]) {
   return concatUint8Arrays([...localParts, ...centralParts, endRecord]);
 }
 
+// 建立 ZIP local file header，供 Excel 讀取每個未壓縮 XML entry。
 function createLocalFileHeader(path: Uint8Array, content: Uint8Array, crc: number) {
   const header = new Uint8Array(30 + path.byteLength);
   const view = new DataView(header.buffer);
@@ -53,6 +56,7 @@ function createLocalFileHeader(path: Uint8Array, content: Uint8Array, crc: numbe
   return header;
 }
 
+// 建立 central directory header，讓 XLSX reader 能定位每個 entry 的 local header。
 function createCentralDirectoryHeader(
   path: Uint8Array,
   content: Uint8Array,
@@ -83,6 +87,7 @@ function createCentralDirectoryHeader(
   return header;
 }
 
+// 建立 ZIP 結尾紀錄，宣告 entry 數量與 central directory 位置。
 function createEndOfCentralDirectoryRecord(
   fileCount: number,
   centralDirectorySize: number,
@@ -102,6 +107,7 @@ function createEndOfCentralDirectoryRecord(
   return record;
 }
 
+// 合併各段 ZIP binary 結構，避免 Blob 之外的匯出流程再處理多個 buffer。
 function concatUint8Arrays(parts: Uint8Array[]) {
   const length = parts.reduce((total, part) => total + part.byteLength, 0);
   const output = new Uint8Array(length);
@@ -115,6 +121,7 @@ function concatUint8Arrays(parts: Uint8Array[]) {
   return output;
 }
 
+// 計算 ZIP entry 需要的 CRC32 checksum，確保 Excel 能驗證未壓縮內容。
 function crc32(bytes: Uint8Array) {
   let crc = 0xffffffff;
 

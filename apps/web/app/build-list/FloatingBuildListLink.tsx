@@ -1,8 +1,11 @@
 // apps/web/app/build-list/FloatingBuildListLink.tsx
+// 提供商品頁面共用的浮動配單入口，顯示目前配單數量與總價的無障礙摘要。
+
 import Link from "next/link";
 import { formatBuildListPrice } from "./formatting";
 import type { BuildListSummary } from "./model";
 
+// 呈現固定位置的配單連結，讓使用者能從查詢或商品詳細頁快速回到配單。
 export default function FloatingBuildListLink({ summary }: { summary: BuildListSummary }) {
   return (
     <Link
