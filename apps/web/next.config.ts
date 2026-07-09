@@ -1,4 +1,5 @@
 // apps/web/next.config.ts
+// 設定 Next.js build/runtime 行為，載入 workspace env 並集中套用 CSP 與安全 headers。
 
 import { existsSync } from "node:fs";
 import { join } from "node:path";

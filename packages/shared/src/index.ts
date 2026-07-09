@@ -1,4 +1,4 @@
 // packages/shared/src/index.ts
-// Keep cross-package helpers explicit so app packages do not import each other's internals.
+// 明確集中跨 package 共用 helper，避免 web / crawler 互相 import 對方內部檔案。
 export * from "./product-image-url";
 export * from "./coolpc-source";

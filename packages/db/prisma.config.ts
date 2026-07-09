@@ -1,4 +1,6 @@
 // packages/db/prisma.config.ts
+// 設定 Prisma CLI 使用的 schema、migration、seed 與 DATABASE_URL 載入來源。
+
 import { resolve } from "node:path";
 import { config as loadDotenv } from "dotenv";
 import { defineConfig, env } from "prisma/config";

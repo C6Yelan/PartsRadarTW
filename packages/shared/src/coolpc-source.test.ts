@@ -1,4 +1,6 @@
 // packages/shared/src/coolpc-source.test.ts
+// 驗證 CoolPC 來源名稱、官方 origin、分類 / 購買 URL 與官方 base URL 判斷。
+
 import { describe, expect, it } from "vitest";
 import {
   COOLPC_OFFICIAL_BASE_URL,

@@ -1,4 +1,6 @@
 // packages/db/prisma/seed.ts
+// 寫入 PartsRadarTW 第一版使用的 CoolPC sourceCategory 基礎分類資料。
+
 import { prisma } from "../src/client";
 
 const coolpcCategories = [
@@ -59,6 +61,7 @@ const coolpcCategories = [
   },
 ] as const;
 
+// 以 IGrp 作為穩定 key upsert 分類，確保部署或本機重跑 seed 時分類名稱同步更新。
 async function main() {
   for (const category of coolpcCategories) {
     await prisma.sourceCategory.upsert({
