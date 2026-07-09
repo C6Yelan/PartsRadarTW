@@ -1,12 +1,15 @@
 "use client";
 // apps/web/app/products/[id]/price-history/records.tsx
+// 顯示價格歷史中的實際漲跌紀錄，並在紀錄較多時提供本機分頁。
 
 import { useState } from "react";
 import { formatPrice, formatRecordDateTime, formatSignedPrice } from "./format";
 import type { PriceChangeRecord } from "./types";
 
+// 限制單頁變價紀錄數，避免商品詳細頁的價格歷史區塊過長。
 const HISTORY_RECORD_PAGE_SIZE = 5;
 
+// 呈現價格變動紀錄列表，將分頁狀態保留在價格歷史面板內部。
 export function HistoryRecordList({ records }: { records: PriceChangeRecord[] }) {
   const [pageIndex, setPageIndex] = useState(0);
   const pageCount = Math.ceil(records.length / HISTORY_RECORD_PAGE_SIZE);

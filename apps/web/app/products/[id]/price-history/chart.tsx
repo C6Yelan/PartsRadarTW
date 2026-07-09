@@ -1,5 +1,6 @@
 "use client";
 // apps/web/app/products/[id]/price-history/chart.tsx
+// 繪製商品價格歷史走勢圖，包含 SVG 折線、互動點位、固定標記與空資料狀態。
 
 import { formatCompactDate, getInsufficientDataMessage, getPointAriaLabel } from "./format";
 import type {
@@ -11,6 +12,7 @@ import type {
 import { FixedChartMarker, HistoryTooltip } from "./chart/overlays";
 export { useChartConfig } from "./chart/chart-config";
 
+// 呈現價格歷史 chart model，並把滑鼠、焦點與點擊事件轉成目前作用中的價格點。
 export function PriceHistoryChart({
   activePointKey,
   chart,
@@ -124,6 +126,7 @@ export function PriceHistoryChart({
   );
 }
 
+// 建立圖表 aria-label，讓螢幕閱讀器可辨識目前顯示的價格歷史範圍。
 function formatChartAriaLabel(
   range: PriceHistoryRangeKey,
   rangeDays: PriceHistoryRangeDays | null,

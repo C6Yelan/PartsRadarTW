@@ -1,5 +1,6 @@
 "use client";
 // apps/web/app/products/[id]/price-history/chart/chart-config.ts
+// 提供價格走勢圖的桌面 / 手機 SVG 尺寸設定，讓 chart model 可依 viewport 建立座標。
 
 import { useEffect, useState } from "react";
 import type { ChartConfig } from "../types";
@@ -26,6 +27,7 @@ const MOBILE_CHART_CONFIG = {
   },
 } as const satisfies ChartConfig;
 
+// 依照網站 760px mobile breakpoint 切換 chart config，讓 SVG viewBox 與互動座標同步。
 export function useChartConfig() {
   const [isMobile, setIsMobile] = useState(false);
 

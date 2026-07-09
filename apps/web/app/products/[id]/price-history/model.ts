@@ -1,4 +1,6 @@
 // apps/web/app/products/[id]/price-history/model.ts
+// 將價格歷史 API points 轉成摘要、圖表座標、標記與價格變動紀錄。
+
 import type {
   ChartConfig,
   ChartMarker,
@@ -11,6 +13,7 @@ import type {
   PriceRecordTone,
 } from "./types";
 
+// 彙整價格歷史 points，供摘要卡、圖表軸線與變動紀錄共用。
 export function summarizePoints(points: PriceHistoryPoint[]): HistoryViewSummary {
   const first = points[0] ?? null;
   const latest = points.at(-1) ?? null;
@@ -45,6 +48,7 @@ export function summarizePoints(points: PriceHistoryPoint[]): HistoryViewSummary
   };
 }
 
+// 建立價格歷史 SVG chart model，將時間與價格轉成圖表座標、線段、面積與標記。
 export function createChartModel(
   points: PriceHistoryPoint[],
   summary: HistoryViewSummary,
@@ -99,6 +103,7 @@ export function createChartModel(
   };
 }
 
+// 建立階梯式價格走勢線，讓價格變動呈現為固定價格區間後再跳動。
 function createStepPath(points: ChartPoint[]) {
   if (points.length === 0) {
     return "";
@@ -116,6 +121,7 @@ function createStepPath(points: ChartPoint[]) {
   return previousPoint ? path : "";
 }
 
+// 建立固定三段式 Y 軸刻度，讓圖表顯示最高、中間與最低價格區間。
 function createChartTicks({
   chartConfig,
   maxValue,
@@ -139,6 +145,7 @@ function createChartTicks({
   }));
 }
 
+// 只在價格有高低差時標示最高與最低點，避免持平資料出現多餘標記。
 function createChartMarkers(points: ChartPoint[], summary: HistoryViewSummary): ChartMarker[] {
   const markers: ChartMarker[] = [];
   const lowest = summary.lowest ? findChartPoint(points, summary.lowest) : null;
@@ -163,6 +170,7 @@ function findChartPoint(points: ChartPoint[], point: PriceHistoryPoint) {
   );
 }
 
+// 建立價格變動紀錄，只列出實際價格快照的漲跌，排除單純確認價格仍存在的觀測點。
 function createChangeRecords(points: PriceHistoryPoint[]): PriceChangeRecord[] {
   const records: PriceChangeRecord[] = [];
   let previousPriceSnapshot: PriceHistoryPoint | null = null;
@@ -198,6 +206,7 @@ function createChangeRecords(points: PriceHistoryPoint[]): PriceChangeRecord[] {
   return records.reverse();
 }
 
+// 計算最新價格在歷史高低區間中的位置，用於摘要訊號判斷。
 function getRangePositionPercent(
   lowest: PriceHistoryPoint | null,
   highest: PriceHistoryPoint | null,
@@ -218,6 +227,7 @@ function getRangePositionPercent(
   );
 }
 
+// 將歷史區間位置與首尾價格變化轉成摘要卡顯示的價格訊號。
 function getPriceSignal({
   deltaAmount,
   highest,

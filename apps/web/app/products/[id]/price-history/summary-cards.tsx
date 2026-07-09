@@ -1,4 +1,6 @@
 // apps/web/app/products/[id]/price-history/summary-cards.tsx
+// 呈現價格歷史摘要卡片，包含期間變動、歷史區間位置與高低均價資訊。
+
 import type { HistoryViewSummary, PriceHistoryRangeDays, PriceHistoryRangeKey } from "./types";
 import {
   formatCompactDate,
@@ -8,6 +10,7 @@ import {
   formatSignedPrice,
 } from "./format";
 
+// 顯示選定期間首尾價格差與價格訊號，提供價格趨勢的快速判讀。
 export function PeriodDeltaCard({ summary }: { summary: HistoryViewSummary }) {
   return (
     <div className={`history-period-card is-${summary.signal.tone}`}>
@@ -20,6 +23,7 @@ export function PeriodDeltaCard({ summary }: { summary: HistoryViewSummary }) {
   );
 }
 
+// 顯示價格歷史區間摘要，包含目前位置、最低價、最高價與平均價。
 export function HistoryRangeCard({
   range,
   rangeDays,
