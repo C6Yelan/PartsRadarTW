@@ -1,6 +1,9 @@
 // apps/web/app/DiscordTopbarLink.tsx
+// 提供全站 topbar 使用的 Discord 通知入口連結與品牌圖示。
+
 import Link from "next/link";
 
+// 顯示導向 Discord 介紹頁的 topbar 圖示連結，文字以 sr-only 保留給輔助工具。
 export default function DiscordTopbarLink() {
   return (
     <Link className="discord-topbar-link" href="/discord" title="Discord 通知">
@@ -10,6 +13,7 @@ export default function DiscordTopbarLink() {
   );
 }
 
+// 內嵌 Discord logo path，避免為單一品牌圖示額外載入圖片資源。
 function DiscordLogoIcon() {
   return (
     <svg className="discord-logo-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">

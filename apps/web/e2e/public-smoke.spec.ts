@@ -1,4 +1,6 @@
 // apps/web/e2e/public-smoke.spec.ts
+// 以 Playwright 驗證公開網站主要頁面、配單互動與 public API 的基本可用性。
+
 import { type APIRequestContext, expect, test } from "@playwright/test";
 
 interface ProductListResponse {
