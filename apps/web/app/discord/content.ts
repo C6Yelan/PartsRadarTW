@@ -1,4 +1,6 @@
 // apps/web/app/discord/content.ts
+// 集中 Discord 介紹頁使用的靜態文案與截圖 metadata，避免頁面 JSX 混入大量內容資料。
+
 export const heroScreenshot = {
   alt: "Discord 指令選單截圖",
   height: 377,
@@ -6,6 +8,7 @@ export const heroScreenshot = {
   width: 1218,
 } as const;
 
+// Discord bot 初次使用流程，供頁面快速開始區塊呈現。
 export const quickStartSteps = [
   {
     title: "邀請機器人",
@@ -29,6 +32,7 @@ export const quickStartSteps = [
   },
 ] as const;
 
+// /watch 指令教學內容，說明即時目標價提醒的設定流程。
 export const targetPriceCommandGuides = [
   {
     command: "/watch",
@@ -56,6 +60,7 @@ export const targetPriceCommandGuides = [
   },
 ] as const;
 
+// /price-report 指令教學內容，說明個人價格報告的設定與預覽流程。
 export const personalReportCommandGuides = [
   {
     command: "/price-report settings",
@@ -83,6 +88,7 @@ export const personalReportCommandGuides = [
   },
 ] as const;
 
+// /public-report 指令教學內容，說明伺服器公開報告的管理者操作流程。
 export const serverReportCommandGuides = [
   {
     command: "/public-report manage",
@@ -122,6 +128,7 @@ export const serverReportCommandGuides = [
   },
 ] as const;
 
+// Discord 頁面常見問題，只保留邀請、權限與私訊提醒相關的使用者阻塞點。
 export const discordFaqItems = [
   {
     question: "一般成員能用哪些指令？",

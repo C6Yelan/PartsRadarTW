@@ -1,4 +1,6 @@
 // apps/web/app/ops/status/runtime-schedule.ts
+// 將部署 env 與程式預設值整理成 /ops/status 顯示用的排程與互斥策略摘要。
+
 import {
   DEFAULT_RAW_SNAPSHOT_ABNORMAL_RETENTION_DAYS,
   DEFAULT_RAW_SNAPSHOT_NORMAL_RETENTION_DAYS,
@@ -31,6 +33,7 @@ const DEFAULT_DISCORD_PRICE_REPORT_SCHEDULE_INTERVAL_SECONDS = 300;
 const DEFAULT_EXTERNAL_FETCH_LOCK_STALE_SECONDS = 12 * 60 * 60;
 const DEFAULT_EXTERNAL_FETCH_PRIORITY_TTL_SECONDS = 10 * 60;
 
+// 讀取 runtime 排程設定並轉成維運頁面可讀的 job / policy 摘要。
 export function readOpsRuntimeSchedule(
   env: OpsStatusEnv,
   thresholds: OpsStatusThresholds = readOpsStatusThresholds(env),
@@ -202,6 +205,7 @@ export function readOpsRuntimeSchedule(
   };
 }
 
+// 解析狀態頁顯示用的 boolean env；格式錯誤時回退預設值避免頁面中斷。
 function readBoolean(value: string | undefined, fallback: boolean): boolean {
   const normalized = value?.trim().toLowerCase();
 
@@ -220,6 +224,7 @@ function readBoolean(value: string | undefined, fallback: boolean): boolean {
   return fallback;
 }
 
+// 將秒數轉成維運頁面短格式，例如 30s、5m、2h 或 1d2h。
 function formatDuration(seconds: number): string {
   if (seconds < 60) {
     return `${seconds}s`;
@@ -245,10 +250,12 @@ function formatDuration(seconds: number): string {
   return hours > 0 ? `${days}d${hours}h` : `${days}d`;
 }
 
+// 將毫秒轉成維運頁面短格式，能整除秒時沿用秒數格式。
 function formatDurationMs(milliseconds: number): string {
   return milliseconds % 1000 === 0 ? formatDuration(milliseconds / 1000) : `${milliseconds}ms`;
 }
 
+// 將 byte 數轉成維運頁面短格式，整除 KiB / MiB 時使用二進位單位。
 function formatBytes(bytes: number): string {
   if (bytes >= 1024 * 1024 && bytes % (1024 * 1024) === 0) {
     return `${bytes / (1024 * 1024)}MiB`;

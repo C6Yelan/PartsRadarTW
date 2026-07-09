@@ -1,4 +1,5 @@
 // apps/web/app/ops/status/data/discord-health.ts
+// 收集 /ops/status 需要的 Discord bot 設定、目標價追蹤與 delivery 健康摘要。
 
 import type { OpsStatusReadClient } from "../client";
 import {
@@ -10,6 +11,7 @@ import {
 } from "../queries";
 import type { OpsStatusThresholds } from "../types";
 
+// 單一 Discord delivery 類型在觀察窗口內的狀態統計。
 export interface OpsStatusDiscordDeliveryKindSummary {
   sent: number;
   skipped: number;
@@ -17,6 +19,7 @@ export interface OpsStatusDiscordDeliveryKindSummary {
   rateLimited: number;
 }
 
+// /ops/status 顯示 Discord bot 健康狀態所需的聚合摘要。
 export interface OpsStatusDiscordBotSummary {
   priceReportSettings: {
     total: number;
@@ -37,6 +40,7 @@ export interface OpsStatusDiscordBotSummary {
   latestDeliveries: OpsDiscordDeliveryRecord[];
 }
 
+// 收集 Discord bot 設定數、目標價追蹤數與最近 delivery 狀態摘要。
 export async function collectDiscordBotStatus(
   client: OpsStatusReadClient,
   thresholds: OpsStatusThresholds,

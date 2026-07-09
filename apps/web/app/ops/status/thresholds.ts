@@ -1,4 +1,6 @@
 // apps/web/app/ops/status/thresholds.ts
+// 解析 /ops/status 與 smoke 共用的健康檢查門檻 env，並提供整數 fallback helper。
+
 import type { OpsStatusEnv, OpsStatusThresholds } from "./types";
 
 const DEFAULT_SOURCE_WARN_AFTER_MINUTES = 60;
@@ -22,6 +24,7 @@ const DEFAULT_RAW_SNAPSHOT_RETENTION_GRACE_DAYS = 2;
 const DEFAULT_RAW_SNAPSHOT_WARN_COUNT = 1;
 const DEFAULT_RAW_SNAPSHOT_FAIL_COUNT = 100;
 
+// 從 env 讀取 ops status 門檻；無效或缺漏值回退到程式預設。
 export function readOpsStatusThresholds(env: OpsStatusEnv): OpsStatusThresholds {
   return {
     sourceWarnAfterMinutes: readPositiveInteger(
@@ -107,12 +110,14 @@ export function readOpsStatusThresholds(env: OpsStatusEnv): OpsStatusThresholds 
   };
 }
 
+// 讀取正整數 env；空值、非數字或非正數時回退 fallback。
 export function readPositiveInteger(value: string | undefined, fallback: number): number {
   const parsed = readInteger(value);
 
   return parsed && parsed > 0 ? parsed : fallback;
 }
 
+// 讀取非負整數 env；空值、非數字或負數時回退 fallback。
 export function readNonNegativeInteger(value: string | undefined, fallback: number): number {
   const parsed = readInteger(value);
 

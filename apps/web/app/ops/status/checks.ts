@@ -1,4 +1,6 @@
 // apps/web/app/ops/status/checks.ts
+// 將 ops status 收集到的資料轉成 ok / warn / fail 檢查項目與整體狀態。
+
 import type {
   OpsLatestScheduledRunRecord,
   OpsLatestSuccessfulScheduledRunRecord,
@@ -57,6 +59,7 @@ interface BuildOpsStatusChecksInput {
   now: Date;
 }
 
+// 建立 /ops/status 頁面顯示的健康檢查清單，集中套用各項門檻。
 export function buildOpsStatusChecks({
   displayReadyProductCount,
   displayReadyProductTotal,
@@ -101,6 +104,7 @@ export function buildOpsStatusChecks({
   ];
 }
 
+// 彙總多個檢查項目的嚴重度，任一 fail 優先於 warn / ok。
 export function getOverallOpsStatusLevel(checks: OpsStatusCheck[]): OpsStatusLevel {
   return checks.reduce((level, check) => worseLevel(level, check.level), "ok" as OpsStatusLevel);
 }

@@ -1,4 +1,5 @@
 // apps/web/app/ops/status/data/raw-snapshot-retention.ts
+// 收集 raw snapshot 是否超過保留期限的 /ops/status 摘要。
 
 import type { OpsStatusReadClient } from "../client";
 import type { OpsStatusThresholds } from "../types";
@@ -7,12 +8,14 @@ const MILLISECONDS_PER_MINUTE = 60 * 1000;
 const MILLISECONDS_PER_HOUR = 60 * MILLISECONDS_PER_MINUTE;
 const MILLISECONDS_PER_DAY = 24 * MILLISECONDS_PER_HOUR;
 
+// raw snapshot retention 檢查的過期筆數摘要。
 export interface OpsStatusRawSnapshotRetentionSummary {
   expired: number;
   expiredNormal: number;
   expiredAbnormal: number;
 }
 
+// 依正常與異常 snapshot 保留天數門檻，計算目前已過期的 metadata 筆數。
 export async function collectRawSnapshotRetention(
   client: OpsStatusReadClient,
   thresholds: OpsStatusThresholds,

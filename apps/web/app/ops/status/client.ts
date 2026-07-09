@@ -1,4 +1,6 @@
 // apps/web/app/ops/status/client.ts
+// 封裝 /ops/status 資料收集使用的 Prisma read client，方便測試注入 fake client。
+
 import type { Prisma, PrismaClient } from "@partsradar/db";
 import {
   type OPS_DISPLAY_READY_PRODUCT_ID_QUERY,
@@ -13,6 +15,7 @@ import {
   type OpsSourceCategoryRecord,
 } from "./queries";
 
+// /ops/status 所需的窄版讀取介面，只暴露狀態頁會查詢的 aggregate 與清單操作。
 export interface OpsStatusReadClient {
   sourceCategory: {
     findMany(args: typeof OPS_SOURCE_CATEGORY_QUERY): Promise<OpsSourceCategoryRecord[]>;
@@ -50,6 +53,7 @@ export interface OpsStatusReadClient {
   };
 }
 
+// 將 PrismaClient 轉成 ops status read client，讓資料收集層不直接依賴全量 Prisma API。
 export function createPrismaOpsStatusClient(prisma: PrismaClient): OpsStatusReadClient {
   return {
     sourceCategory: {

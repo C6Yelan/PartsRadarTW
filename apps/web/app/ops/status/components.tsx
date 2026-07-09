@@ -1,4 +1,5 @@
 // apps/web/app/ops/status/components.tsx
+// 提供內部 ops status 頁面使用的狀態標籤、指標磚與資料表元件。
 
 import type { OpsStatusLevel, OpsStatusSummary } from "./data";
 
@@ -29,10 +30,12 @@ const dateTimeFormatter = new Intl.DateTimeFormat("zh-TW", {
 });
 const numberFormatter = new Intl.NumberFormat("zh-TW");
 
+// 顯示單一 ok / warn / fail 狀態徽章。
 export function StatusPill({ level }: { level: OpsStatusLevel }) {
   return <span className={`ops-status-pill is-${level}`}>{LEVEL_LABELS[level]}</span>;
 }
 
+// 顯示內部狀態頁頂部使用的單一聚合指標。
 export function MetricTile({ label, value }: { label: string; value: string }) {
   return (
     <div className="ops-metric-tile">
@@ -42,6 +45,7 @@ export function MetricTile({ label, value }: { label: string; value: string }) {
   );
 }
 
+// 顯示單一 link health 類型的 OK / temporary / broken 統計。
 export function LinkHealthColumn({
   title,
   summary,
@@ -67,6 +71,7 @@ export function LinkHealthColumn({
   );
 }
 
+// 顯示最近 Discord delivery 摘要；刻意不輸出 user id 或原始錯誤內容。
 export function DiscordDeliveriesTable({
   deliveries,
 }: {
@@ -114,6 +119,7 @@ export function DiscordDeliveriesTable({
   );
 }
 
+// 顯示最近 crawler run 的高層結果與數量，不暴露 raw error message。
 export function CrawlRunsTable({ runs }: { runs: OpsStatusSummary["recentCrawlRuns"] }) {
   return (
     <section className="ops-table-panel" aria-labelledby="ops-runs-heading">
@@ -151,6 +157,7 @@ export function CrawlRunsTable({ runs }: { runs: OpsStatusSummary["recentCrawlRu
   );
 }
 
+// 顯示來源分類最近檢查與成功時間，協助判斷同步落後是否集中在特定分類。
 export function SourceCategoriesTable({
   categories,
 }: {
@@ -190,6 +197,7 @@ export function SourceCategoriesTable({
   );
 }
 
+// 計算近期 Discord 發送失敗與 rate limit 數量，供頁面摘要指標使用。
 export function countDiscordDeliveryProblems(discordBot: OpsStatusSummary["discordBot"]): number {
   const recent = discordBot.recentDeliveries;
 
@@ -211,10 +219,12 @@ function formatDiscordDeliveryStatus(status: string): string {
   return DISCORD_DELIVERY_STATUS_LABELS[status] ?? status.toLowerCase();
 }
 
+// 將時間固定顯示為台灣時間；無資料時回傳頁面可讀文字。
 export function formatDateTime(value: Date | null): string {
   return value ? dateTimeFormatter.format(value) : "尚無資料";
 }
 
+// 格式化 ops status 頁面顯示的整數數量。
 export function formatNumber(value: number): string {
   return numberFormatter.format(value);
 }

@@ -1,4 +1,6 @@
 // apps/web/app/ops/status/page.tsx
+// 提供受保護的內部 /ops/status 頁面，顯示資料健康、排程與 Discord delivery 摘要。
+
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
@@ -19,6 +21,7 @@ import {
   formatNumber,
 } from "./components";
 
+// ops status 需讀取 runtime env、DB 與本機檔案狀態，因此每次 request 動態產生。
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const runtime = "nodejs";
@@ -35,6 +38,7 @@ interface OpsStatusPageProps {
   searchParams: Promise<{ token?: string | string[] }>;
 }
 
+// 驗證 ops token 後收集內部狀態；未授權一律回 404，避免公開暴露頁面存在。
 export default async function OpsStatusPage({ searchParams }: OpsStatusPageProps) {
   const [resolvedSearchParams, requestHeaders] = await Promise.all([searchParams, headers()]);
   const providedToken =

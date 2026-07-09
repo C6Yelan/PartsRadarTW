@@ -1,4 +1,6 @@
 // apps/web/app/ops/status/data.ts
+// 彙整內部 /ops/status 頁面需要的 DB 狀態、檔案快取狀態、門檻與排程摘要。
+
 import { access } from "node:fs/promises";
 import { join } from "node:path";
 import {
@@ -43,7 +45,7 @@ const DEFAULT_PRODUCT_IMAGE_STORAGE_DIR = "storage/product-images";
 const MILLISECONDS_PER_MINUTE = 60 * 1000;
 const MILLISECONDS_PER_HOUR = 60 * MILLISECONDS_PER_MINUTE;
 
-// Public module boundary for ops status collection, query contracts, and tests.
+// /ops/status 的 public module boundary，供頁面與測試使用資料收集、查詢契約與型別。
 export { readOpsRuntimeSchedule } from "./runtime-schedule";
 export { readOpsStatusThresholds } from "./thresholds";
 export { createPrismaOpsStatusClient } from "./client";
@@ -77,6 +79,7 @@ export type {
 export type { OpsStatusReadClient } from "./client";
 export type { OpsStatusCheck } from "./checks";
 
+// /ops/status 頁面一次渲染所需的完整狀態摘要。
 export interface OpsStatusSummary {
   generatedAt: Date;
   overallLevel: OpsStatusLevel;
@@ -103,6 +106,7 @@ export interface OpsStatusSummary {
   runtimeSchedule: OpsStatusRuntimeSchedule;
 }
 
+// 收集 ops status 時可注入的時間、env、門檻與檔案存在性檢查，主要供測試使用。
 export interface CollectOpsStatusOptions {
   now?: () => Date;
   env?: OpsStatusEnv;
@@ -111,6 +115,7 @@ export interface CollectOpsStatusOptions {
   productImageExists?: (path: string) => Promise<boolean>;
 }
 
+// 從 DB 與本機圖片快取收集內部維運狀態，並組裝頁面摘要。
 export async function collectOpsStatus(
   client: OpsStatusReadClient,
   options: CollectOpsStatusOptions = {},
