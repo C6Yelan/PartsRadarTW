@@ -1,4 +1,6 @@
 // apps/web/app/api/products/[id]/response.ts
+// 將商品詳細查詢結果轉成 public API response，隔離 DB 欄位與來源站內部 URL。
+
 import {
   COOLPC_SOURCE_NAME,
   createCoolpcPurchaseUrl,
@@ -11,6 +13,7 @@ const PRODUCT_LINK_KINDS = {
   SOURCE: "SOURCE",
 } as const;
 
+// 商品詳細頁使用的 public response contract，只暴露前端顯示與配單保存需要的資料。
 export interface ProductDetailResponseBody {
   id: string;
   name: string;
@@ -51,6 +54,7 @@ interface ProductLinkHealthResponse {
   httpStatus: number | null;
 }
 
+// 組裝商品詳細 public response，並確保購買連結由 ibuyToken 重新產生而非直接回傳 crawler 儲存 URL。
 export function toProductDetailResponse(product: ProductDetailRecord): ProductDetailResponseBody {
   if (!product.currentPrice) {
     throw new Error("Product detail query returned a product without current price.");
@@ -77,7 +81,7 @@ export function toProductDetailResponse(product: ProductDetailRecord): ProductDe
     },
     source: {
       name: COOLPC_SOURCE_NAME,
-      // Build the public purchase URL directly so stored crawler source URLs cannot leak.
+      // 使用 ibuyToken 重新組公開購買連結，避免 crawler 儲存的來源 URL 被直接外露。
       url: purchaseUrl,
       health: toProductLinkHealthResponse(
         product.linkHealthChecks,
@@ -94,6 +98,7 @@ export function toProductDetailResponse(product: ProductDetailRecord): ProductDe
   };
 }
 
+// 只在圖片來源與檢查時間都存在時提供站內快取圖片路徑，避免回傳來源站 raw image URL。
 function toProductDetailImage(product: ProductDetailRecord): ProductDetailResponseBody["image"] {
   if (!product.primaryImageUrl || !product.primaryImageCheckedAt) {
     return null;
@@ -106,6 +111,7 @@ function toProductDetailImage(product: ProductDetailRecord): ProductDetailRespon
   };
 }
 
+// 只採用符合目前公開購買連結的 link health 紀錄，避免舊 URL 的檢查結果影響現行商品連結。
 function toProductLinkHealthResponse(
   linkHealthChecks: ProductLinkHealthRecord[],
   linkKind: ProductLinkHealthRecord["linkKind"],

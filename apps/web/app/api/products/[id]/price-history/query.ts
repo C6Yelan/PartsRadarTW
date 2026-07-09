@@ -1,4 +1,6 @@
 // apps/web/app/api/products/[id]/price-history/query.ts
+// 解析商品價格歷史 API 的 range/days query，限制公開可查詢的時間範圍。
+
 import { InvalidQueryError, parseOptionalIntegerQuery } from "../../../_shared/query";
 
 const ALLOWED_RANGE_DAYS = new Set([7, 30, 90]);
@@ -11,6 +13,7 @@ export interface PriceHistoryRange {
   days: 7 | 30 | 90 | null;
 }
 
+// 將 query 轉成價格歷史查詢範圍；`range=all` 不套日期下限，其餘只允許 7/30/90 天。
 export function parsePriceHistoryRange(params: URLSearchParams): PriceHistoryRange {
   const range = params.get("range");
 

@@ -1,4 +1,6 @@
 // apps/web/app/api/products/[id]/price-history/handler.ts
+// 處理商品價格歷史 API 的 product id 驗證、range query 解析、DB 讀取與安全回應。
+
 import { InvalidQueryError } from "../../../_shared/query";
 import {
   internalErrorResponse,
@@ -21,6 +23,7 @@ interface ProductPriceHistoryHandlerOptions {
   now?: Date;
 }
 
+// 建立商品價格歷史 handler；不合法 id/query 會在讀 DB 前中止，避免無效請求觸發資料查詢。
 export function createGetProductPriceHistoryHandler(
   client: ProductPriceHistoryReadClient,
   options: ProductPriceHistoryHandlerOptions = {},

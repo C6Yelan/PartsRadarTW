@@ -1,4 +1,6 @@
 // apps/web/app/api/products/[id]/price-history/response.ts
+// 組裝商品價格歷史 API 回應，包含觀測點、目前價格確認點與區間摘要。
+
 import type { PriceHistoryProductRecord, PriceHistorySnapshotRecord } from "./data";
 import type { PriceHistoryRange } from "./query";
 
@@ -35,6 +37,7 @@ export interface ProductPriceHistoryResponseBody {
   };
 }
 
+// 將 DB snapshot 與目前價格確認資料轉成 public response，維持 API 的 UTC ISO 時間格式。
 export function toPriceHistoryResponse(
   productId: string,
   range: PriceHistoryRange,
@@ -72,6 +75,7 @@ export function toPriceHistoryResponse(
   };
 }
 
+// 建立價格觀測點；若目前價格在最後一筆 snapshot 後仍被看到，補一筆 confirmation 點供圖表延伸。
 function toPriceHistoryPoints(
   snapshots: PriceHistorySnapshotRecord[],
   currentPrice: PriceHistoryProductRecord["currentPrice"],
