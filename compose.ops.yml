@@ -39,7 +39,7 @@ services:
       SMOKE_RAW_SNAPSHOT_FAIL_COUNT: "${SMOKE_RAW_SNAPSHOT_FAIL_COUNT:-100}"
       DISCORD_ADMIN_WEBHOOK_URL: "${DISCORD_ADMIN_WEBHOOK_URL:-replace_with_discord_admin_webhook_url}"
       SMOKE_DISCORD_STATE_FILE: "${SMOKE_DISCORD_STATE_FILE:-/var/lib/partsradar/snapshots/ops/smoke-discord-state.json}"
-      SMOKE_DISCORD_COOLDOWN_SECONDS: "${SMOKE_DISCORD_COOLDOWN_SECONDS:-3600}"
+      SMOKE_DISCORD_COOLDOWN_SECONDS: "${SMOKE_DISCORD_COOLDOWN_SECONDS:-21600}"
     volumes:
       - snapshots:/var/lib/partsradar/snapshots
       - product_images:/var/lib/partsradar/product-images:ro

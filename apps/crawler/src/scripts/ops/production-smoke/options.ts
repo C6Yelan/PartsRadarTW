@@ -148,9 +148,6 @@ export function parseProductionSmokeOptions(
       env,
       argName: "--invalid-image-url-warn-count",
       envName: "SMOKE_INVALID_IMAGE_URL_WARN_COUNT",
-      // Normal production baseline is roughly 624 invalid source image URLs
-      // per 24h. Warn at a little over 3x that baseline so fixed third-party
-      // source noise stays informational while spikes remain visible.
       fallback: DEFAULT_INVALID_IMAGE_URL_WARN_COUNT,
       min: 0,
       max: 1000000,

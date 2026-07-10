@@ -328,7 +328,7 @@ Discord webhook 僅保留給管理者告警。`smoke-daemon` 會在每輪 produc
 
 - `DISCORD_ADMIN_WEBHOOK_URL`：管理者頻道 webhook，可用於維運告警，但仍不得包含 secret、raw HTML、stack trace、raw IP、internal header dump 或完整 DB URL。
 - `SMOKE_DISCORD_STATE_FILE`：smoke Discord notification policy 狀態檔；local script 預設 `storage/ops/smoke-discord-state.json`，Compose `smoke-daemon` 預設 `/var/lib/partsradar/snapshots/ops/smoke-discord-state.json`，讓 dedupe state 留在 named volume。部署主機若曾設定 `SMOKE_DISCORD_STATE_FILE=storage/ops/smoke-discord-state.json`，建議移除該行或改成 container absolute path，避免 state 寫在 ephemeral container filesystem。
-- `SMOKE_DISCORD_COOLDOWN_SECONDS`：相同 smoke 異常通知的再次提醒間隔，預設 3600 秒。
+- `SMOKE_DISCORD_COOLDOWN_SECONDS`：相同 smoke 異常通知的再次提醒間隔，預設 21600 秒（6 小時）。首次異常、異常 check 組合／等級變化與恢復仍立即通知。
 
 安全邊界：
 
@@ -347,7 +347,7 @@ smoke Discord notification policy 行為：
 - `OK -> WARN`、`OK -> FAIL`、`WARN -> FAIL` 或異常 fingerprint 改變時送一次。
 - 相同 `WARN` / `FAIL` 在 cooldown 內不重複送；超過 cooldown 可再次提醒。
 - `WARN -> OK` 或 `FAIL -> OK` 送 `RECOVERED` 一次。
-- policy message 使用 Discord embed，直接列出 smoke status、異常 check 名稱與該 check 的安全摘要 message；不再放 runbook link。
+- `WARN` / `FAIL` embed 以 `Asia/Taipei` 顯示檢查時間，只列異常 check 名稱與安全摘要；`RECOVERED` 只列前一狀態、台北恢復時間與目前 OK/WARN/FAIL counts，不列所有 OK check，也不再放 runbook link。
 - Discord 發送失敗、rate limit 或 state file 寫入失敗只會寫入安全 log，不會讓 `smoke-daemon` 崩潰或停止後續檢查。
 - `--run-once` 也會走相同 policy，可用於主機端單次驗證。
 

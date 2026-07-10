@@ -23,7 +23,7 @@ describe("smoke Discord notification options", () => {
     expect(options).toEqual({
       adminWebhookUrl: null,
       stateFilePath: join(workspaceRoot, "storage", "ops", "smoke-discord-state.json"),
-      cooldownSeconds: 3600,
+      cooldownSeconds: 21600,
     });
   });
 
@@ -58,7 +58,7 @@ describe("createSmokeDiscordNotificationDecision", () => {
     const decision = createSmokeDiscordNotificationDecision({
       summary: summary({ status: "FAIL" }),
       previousState,
-      options: { adminWebhookUrl: null, cooldownSeconds: 3600 },
+      options: { adminWebhookUrl: null, cooldownSeconds: 21600 },
       now: new Date("2026-06-06T12:00:00.000Z"),
     });
 
@@ -74,7 +74,7 @@ describe("createSmokeDiscordNotificationDecision", () => {
     const decision = createSmokeDiscordNotificationDecision({
       summary: summary({ status: "OK", checkedAt }),
       previousState: null,
-      options: { adminWebhookUrl: WEBHOOK_URL, cooldownSeconds: 3600 },
+      options: { adminWebhookUrl: WEBHOOK_URL, cooldownSeconds: 21600 },
     });
 
     expect(decision).toEqual({
@@ -103,7 +103,7 @@ describe("createSmokeDiscordNotificationDecision", () => {
         ],
       }),
       previousState: state({ status: "OK" }),
-      options: { adminWebhookUrl: WEBHOOK_URL, cooldownSeconds: 3600 },
+      options: { adminWebhookUrl: WEBHOOK_URL, cooldownSeconds: 21600 },
     });
 
     expect(decision).toMatchObject({
@@ -127,25 +127,29 @@ describe("createSmokeDiscordNotificationDecision", () => {
     expect(decision.message.embeds?.[0]).toMatchObject({
       title: "PartsRadarTW smoke WARN",
       color: 0xf59e0b,
-      timestamp: checkedAt.toISOString(),
     });
+    expect(decision.message.embeds?.[0]?.timestamp).toBeUndefined();
+    expect(decision.message.embeds?.[0]?.description).toContain(
+      "Checked at (Asia/Taipei): 2026-06-06 20:00:00",
+    );
     expect(decision.message.embeds?.[0]?.description).toContain("Status: WARN");
     expect(decision.message.embeds?.[0]?.description).toContain("Issues:");
     expect(decision.message.embeds?.[0]?.description).toContain(
       "- WARN source freshness: lastSuccessAt=90m ago",
     );
+    expect(decision.message.embeds?.[0]?.description).not.toContain("homepage");
     expect(decision.message.embeds?.[0]?.description).not.toContain("Runbook:");
   });
 
-  it("skips repeated unchanged WARN within cooldown", () => {
+  it("skips repeated unchanged WARN within the six-hour cooldown", () => {
     const decision = createSmokeDiscordNotificationDecision({
       summary: summary({ status: "WARN" }),
       previousState: state({
         status: "WARN",
         lastNotificationKey: "WARN:WARN:source freshness",
-        lastNotificationAt: "2026-06-06T11:30:00.000Z",
+        lastNotificationAt: "2026-06-06T06:00:01.000Z",
       }),
-      options: { adminWebhookUrl: WEBHOOK_URL, cooldownSeconds: 3600 },
+      options: { adminWebhookUrl: WEBHOOK_URL, cooldownSeconds: 21600 },
       now: new Date("2026-06-06T12:00:00.000Z"),
     });
 
@@ -155,21 +159,21 @@ describe("createSmokeDiscordNotificationDecision", () => {
       nextState: {
         lastObservedStatus: "WARN",
         lastNotificationKey: "WARN:WARN:source freshness",
-        lastNotificationAt: "2026-06-06T11:30:00.000Z",
+        lastNotificationAt: "2026-06-06T06:00:01.000Z",
       },
     });
   });
 
-  it("sends repeated unchanged WARN after cooldown", () => {
+  it("sends repeated unchanged WARN at the six-hour cooldown boundary", () => {
     const checkedAt = new Date("2026-06-06T12:00:00.000Z");
     const decision = createSmokeDiscordNotificationDecision({
       summary: summary({ status: "WARN", checkedAt }),
       previousState: state({
         status: "WARN",
         lastNotificationKey: "WARN:WARN:source freshness",
-        lastNotificationAt: "2026-06-06T10:00:00.000Z",
+        lastNotificationAt: "2026-06-06T06:00:00.000Z",
       }),
-      options: { adminWebhookUrl: WEBHOOK_URL, cooldownSeconds: 3600 },
+      options: { adminWebhookUrl: WEBHOOK_URL, cooldownSeconds: 21600 },
       now: checkedAt,
     });
 
@@ -193,7 +197,7 @@ describe("createSmokeDiscordNotificationDecision", () => {
         lastNotificationKey: "WARN:WARN:source freshness",
         lastNotificationAt: "2026-06-06T11:55:00.000Z",
       }),
-      options: { adminWebhookUrl: WEBHOOK_URL, cooldownSeconds: 3600 },
+      options: { adminWebhookUrl: WEBHOOK_URL, cooldownSeconds: 21600 },
       now: new Date("2026-06-06T12:00:00.000Z"),
     });
 
@@ -208,14 +212,17 @@ describe("createSmokeDiscordNotificationDecision", () => {
     const decision = createSmokeDiscordNotificationDecision({
       summary: summary({
         status: "FAIL",
-        checks: [check("crawler freshness", "FAIL", "last run too old")],
+        checks: [
+          check("homepage", "OK", "HTTP 200"),
+          check("crawler freshness", "FAIL", "last run too old"),
+        ],
       }),
       previousState: state({
         status: "WARN",
         lastNotificationKey: "WARN:WARN:source freshness",
         lastNotificationAt: "2026-06-06T11:59:00.000Z",
       }),
-      options: { adminWebhookUrl: WEBHOOK_URL, cooldownSeconds: 3600 },
+      options: { adminWebhookUrl: WEBHOOK_URL, cooldownSeconds: 21600 },
       now: new Date("2026-06-06T12:00:00.000Z"),
     });
 
@@ -224,6 +231,10 @@ describe("createSmokeDiscordNotificationDecision", () => {
       kind: "FAIL",
       notificationKey: "FAIL:FAIL:crawler freshness",
     });
+    if (decision.action !== "send") {
+      throw new Error("Expected send decision.");
+    }
+    expect(decision.message.embeds?.[0]?.description).not.toContain("homepage");
   });
 
   it("sends RECOVERED when WARN or FAIL returns to OK", () => {
@@ -235,7 +246,7 @@ describe("createSmokeDiscordNotificationDecision", () => {
         lastNotificationKey: "FAIL:FAIL:crawler freshness",
         lastNotificationAt: "2026-06-06T11:00:00.000Z",
       }),
-      options: { adminWebhookUrl: WEBHOOK_URL, cooldownSeconds: 3600 },
+      options: { adminWebhookUrl: WEBHOOK_URL, cooldownSeconds: 21600 },
       now: checkedAt,
     });
 
@@ -259,12 +270,15 @@ describe("createSmokeDiscordNotificationDecision", () => {
     expect(decision.message.embeds?.[0]).toMatchObject({
       title: "PartsRadarTW smoke RECOVERED",
       color: 0x16a34a,
-      timestamp: checkedAt.toISOString(),
     });
-    expect(decision.message.embeds?.[0]?.description).toContain("Previous status: FAIL");
-    expect(decision.message.embeds?.[0]?.description).toContain("Current state:");
-    expect(decision.message.embeds?.[0]?.description).toContain("- OK homepage: homepage OK");
-    expect(decision.message.embeds?.[0]?.description).not.toContain("Runbook:");
+    expect(decision.message.embeds?.[0]?.timestamp).toBeUndefined();
+    expect(decision.message.embeds?.[0]?.description).toBe(
+      [
+        "Previous status: FAIL",
+        "Recovered at (Asia/Taipei): 2026-06-06 20:00:00",
+        "Checks: OK=1 WARN=0 FAIL=0",
+      ].join("\n"),
+    );
   });
 
   it("skips subsequent OK after recovered notification", () => {
@@ -276,7 +290,7 @@ describe("createSmokeDiscordNotificationDecision", () => {
         lastNotificationKey: "RECOVERED:FAIL->OK",
         lastNotificationAt: "2026-06-06T11:00:00.000Z",
       }),
-      options: { adminWebhookUrl: WEBHOOK_URL, cooldownSeconds: 3600 },
+      options: { adminWebhookUrl: WEBHOOK_URL, cooldownSeconds: 21600 },
       now: new Date("2026-06-06T12:00:00.000Z"),
     });
 
@@ -289,5 +303,31 @@ describe("createSmokeDiscordNotificationDecision", () => {
         lastNotificationKey: "RECOVERED:FAIL->OK",
       },
     });
+  });
+
+  it("caps abnormal detail lines without including OK checks", () => {
+    const decision = createSmokeDiscordNotificationDecision({
+      summary: summary({
+        status: "WARN",
+        checks: [
+          check("homepage", "OK", "HTTP 200"),
+          ...Array.from({ length: 10 }, (_, index) =>
+            check(`issue-${index + 1}`, "WARN", `detail-${index + 1}`),
+          ),
+        ],
+      }),
+      previousState: state({ status: "OK" }),
+      options: { adminWebhookUrl: WEBHOOK_URL, cooldownSeconds: 21600 },
+    });
+
+    if (decision.action !== "send") {
+      throw new Error("Expected send decision.");
+    }
+
+    const description = decision.message.embeds?.[0]?.description ?? "";
+    expect(description).not.toContain("homepage");
+    expect(description).toContain("- WARN issue-8: detail-8");
+    expect(description).not.toContain("issue-9");
+    expect(description).toContain("- ... 2 more checks");
   });
 });

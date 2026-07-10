@@ -32,6 +32,7 @@ describe("production smoke daemon options", () => {
     expect(options.intervalSeconds).toBe(900);
     expect(options.initialDelaySeconds).toBe(60);
     expect(options.runOnce).toBe(false);
+    expect(options.smokeDiscordNotification.cooldownSeconds).toBe(21600);
   });
 
   it("adds daemon interval and run-once options", async () => {
@@ -149,6 +150,10 @@ describe("production smoke daemon Discord notifications", () => {
     }
     expect(webhookCall.message.content).toBeUndefined();
     expect(webhookCall.message.embeds?.[0]?.description).toContain("Issues:");
+    expect(webhookCall.message.embeds?.[0]?.description).toContain(
+      "Checked at (Asia/Taipei): 2026-06-02 20:00:00",
+    );
+    expect(webhookCall.message.embeds?.[0]?.timestamp).toBeUndefined();
     expect(webhookCall.message.embeds?.[0]?.description).toContain(
       "- WARN rate limit headers: clientSource=unknown limit=360 remaining=359; public HTTPS smoke should expose client identity",
     );

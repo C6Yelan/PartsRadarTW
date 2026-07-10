@@ -36,7 +36,6 @@ export interface DiscordWebhookEmbed {
 export interface DiscordWebhookMessage {
   content?: string;
   username?: string;
-  avatarUrl?: string;
   embeds?: DiscordWebhookEmbed[];
 }
 
@@ -79,7 +78,6 @@ interface DiscordRateLimitBody {
 interface DiscordWebhookPayload {
   content?: string;
   username?: string;
-  avatar_url?: string;
   embeds?: Array<{
     title?: string;
     description?: string;
@@ -214,7 +212,6 @@ function toDiscordWebhookPayload(message: DiscordWebhookMessage): DiscordWebhook
   return {
     content,
     username: message.username ? formatDiscordWebhookText(message.username, 80).trim() : undefined,
-    avatar_url: message.avatarUrl,
     embeds,
     allowed_mentions: {
       parse: [],
@@ -226,9 +223,7 @@ function toDiscordWebhookPayload(message: DiscordWebhookMessage): DiscordWebhook
 function toDiscordEmbed(embed: DiscordWebhookEmbed): DiscordWebhookPayloadEmbed {
   return {
     title: embed.title ? formatDiscordWebhookText(embed.title, 256).trim() : undefined,
-    description: embed.description
-      ? formatDiscordWebhookText(embed.description).trim()
-      : undefined,
+    description: embed.description ? formatDiscordWebhookText(embed.description).trim() : undefined,
     color: embed.color,
     fields: embed.fields?.map((field) => ({
       name: formatDiscordWebhookText(field.name, DISCORD_FIELD_NAME_MAX_LENGTH).trim(),
