@@ -82,63 +82,15 @@ export function createWatchButtonInteraction(customId: string): DiscordInteracti
 export function createWatchSelectInteraction(
   targetPriceWatchInput: string,
   page: number,
-  statusFilter = "all",
-  sortKey = "recent",
 ): DiscordInteraction {
   return {
     id: "interaction-1",
     token: "interaction-token",
     type: 3,
     data: {
-      custom_id: `watch:select:${page}:${statusFilter}:${sortKey}`,
+      custom_id: `watch:select:${page}`,
       component_type: 3,
       values: [targetPriceWatchInput],
-    },
-    member: {
-      user: {
-        id: "111122223333444455",
-      },
-    },
-  };
-}
-
-// 建立批次移除 watch 的 string select interaction。
-export function createWatchBulkRemoveSelectInteraction(
-  targetPriceWatchInputs: string[],
-  page: number,
-  statusFilter = "all",
-  sortKey = "recent",
-): DiscordInteraction {
-  return {
-    id: "interaction-1",
-    token: "interaction-token",
-    type: 3,
-    data: {
-      custom_id: `watch:bulk-remove-select:${page}:${statusFilter}:${sortKey}`,
-      component_type: 3,
-      values: targetPriceWatchInputs,
-    },
-    member: {
-      user: {
-        id: "111122223333444455",
-      },
-    },
-  };
-}
-
-// 建立 watch 篩選或排序 select interaction。
-export function createWatchStateSelectInteraction(
-  customId: string,
-  value: string,
-): DiscordInteraction {
-  return {
-    id: "interaction-1",
-    token: "interaction-token",
-    type: 3,
-    data: {
-      custom_id: customId,
-      component_type: 3,
-      values: [value],
     },
     member: {
       user: {
@@ -153,21 +105,17 @@ export function createWatchEditModalSubmitInteraction({
   watchId,
   targetPrice,
   page,
-  statusFilter = "all",
-  sortKey = "recent",
 }: {
   watchId: string;
   targetPrice: string;
   page: number;
-  statusFilter?: string;
-  sortKey?: string;
 }): DiscordInteraction {
   return {
     id: "interaction-1",
     token: "interaction-token",
     type: 5,
     data: {
-      custom_id: `watch:edit-modal:${watchId}:${page}:${statusFilter}:${sortKey}`,
+      custom_id: `watch:edit-modal:${watchId}:${page}`,
       components: [
         {
           type: 18,

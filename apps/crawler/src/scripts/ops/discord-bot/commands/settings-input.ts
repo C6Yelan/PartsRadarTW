@@ -3,10 +3,41 @@
 
 import { MAX_PRICE_REPORT_KEYWORD_GROUPS, MAX_PRICE_REPORT_KEYWORD_LENGTH } from "../constants";
 import {
+  PRICE_REPORT_CATEGORY_OPTION_LIMIT,
   PRICE_REPORT_CONTENT_NEW_PRODUCTS_VALUE,
   PRICE_REPORT_CONTENT_PRICE_DROPS_VALUE,
   PRICE_REPORT_CONTENT_PRICE_RISES_VALUE,
 } from "./ids";
+
+// 驗證分類 select 回傳值必須來自目前可見分類；空選或全選都代表不限制分類。
+export function parsePriceReportCategorySelection(
+  values: string[],
+  categories: Array<{ igrp: number }>,
+): number[] | null {
+  const visibleCategories = categories.slice(0, PRICE_REPORT_CATEGORY_OPTION_LIMIT);
+  const visibleIgrps = new Set(visibleCategories.map((category) => category.igrp));
+  const selectedIgrps = new Set<number>();
+
+  for (const value of values) {
+    if (!/^[1-9][0-9]*$/.test(value)) {
+      return null;
+    }
+
+    const igrp = Number(value);
+
+    if (!visibleIgrps.has(igrp)) {
+      return null;
+    }
+
+    selectedIgrps.add(igrp);
+  }
+
+  if (selectedIgrps.size === 0 || selectedIgrps.size === visibleIgrps.size) {
+    return [];
+  }
+
+  return [...selectedIgrps].sort((left, right) => left - right);
+}
 
 // 嚴格解析報告時間視窗 select value；未知值直接視為無效，避免錯誤 payload 套用預設。
 export function parseWindowHoursStrict(value: unknown): number | null {

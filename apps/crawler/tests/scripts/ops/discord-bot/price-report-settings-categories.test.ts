@@ -149,7 +149,7 @@ describe("handleDiscordInteraction price report settings categories", () => {
       JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body)),
     ).toEqual({ type: 6 });
     expect(String((fetchMock.mock.calls[1]?.[1] as RequestInit | undefined)?.body)).toContain(
-      "已關閉每日價格提醒",
+      "已關閉每日私訊價格報告",
     );
   });
 });

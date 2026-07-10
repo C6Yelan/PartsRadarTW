@@ -16,19 +16,13 @@ export {
 } from "./commands/definitions";
 export {
   WATCH_ADD_CUSTOM_ID,
-  WATCH_BULK_REMOVE_CANCEL_CUSTOM_ID_PREFIX,
-  WATCH_BULK_REMOVE_CONFIRM_CUSTOM_ID_PREFIX,
-  WATCH_BULK_REMOVE_CUSTOM_ID_PREFIX,
-  WATCH_BULK_REMOVE_SELECT_CUSTOM_ID_PREFIX,
   WATCH_EDIT_CUSTOM_ID_PREFIX,
-  WATCH_FILTER_CUSTOM_ID_PREFIX,
   WATCH_PAGE_CUSTOM_ID_PREFIX,
   WATCH_REFRESH_CUSTOM_ID_PREFIX,
   WATCH_REMOVE_CANCEL_CUSTOM_ID_PREFIX,
   WATCH_REMOVE_CONFIRM_CUSTOM_ID_PREFIX,
   WATCH_REMOVE_CUSTOM_ID_PREFIX,
   WATCH_SELECT_CUSTOM_ID_PREFIX,
-  WATCH_SORT_CUSTOM_ID_PREFIX,
 } from "./commands/ids";
 export {
   createPriceReportKeywordModal,
@@ -39,6 +33,7 @@ export {
   createPublicReportKeywordModal,
   createPublicReportSettingsComponents,
 } from "./commands/public-report-components";
+export { parsePriceReportCategorySelection } from "./commands/settings-input";
 export {
   parsePriceReportComponentInteraction,
   parsePriceReportModalSubmit,

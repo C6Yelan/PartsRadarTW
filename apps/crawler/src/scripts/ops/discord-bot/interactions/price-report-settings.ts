@@ -21,7 +21,7 @@ import {
   toPriceReportFilters,
 } from "../price-report";
 import {
-  formatDiscordBotText,
+  formatDiscordDeliveryFailureFieldValue,
   formatDiscordDeliveryFailureForUser,
   formatDiscordRateLimitForUser,
 } from "../rest";
@@ -41,7 +41,7 @@ interface PriceReportSettingsPanel {
   notice?: string;
 }
 
-// 讀取個人 price-report 設定面板資料，包含目前設定、可選分類與最近一次每日報告狀態。
+// 讀取個人 price-report 設定面板資料，包含目前設定、可選分類與最近一次每日私訊價格報告狀態。
 export async function readPriceReportSettingsPanel({
   client,
   discordUserId,
@@ -99,36 +99,6 @@ export function formatPriceReportPreviewDmNotice(result: PriceReportNowResult): 
   }
 
   return formatDiscordDeliveryFailureForUser(result);
-}
-
-// 驗證分類 select 回傳值必須來自目前可見分類；空選或全選都代表不限制分類。
-export function parsePriceReportCategorySelection(
-  values: string[],
-  categories: PriceReportCategoryOption[],
-): number[] | null {
-  const visibleCategories = categories.slice(0, 25);
-  const visibleIgrps = new Set(visibleCategories.map((category) => category.igrp));
-  const selectedIgrps = new Set<number>();
-
-  for (const value of values) {
-    if (!/^[1-9][0-9]*$/.test(value)) {
-      return null;
-    }
-
-    const igrp = Number(value);
-
-    if (!visibleIgrps.has(igrp)) {
-      return null;
-    }
-
-    selectedIgrps.add(igrp);
-  }
-
-  if (selectedIgrps.size === 0 || selectedIgrps.size === visibleIgrps.size) {
-    return [];
-  }
-
-  return [...selectedIgrps].sort((left, right) => left - right);
 }
 
 // 建立個人 price-report modal 驗證錯誤訊息，讓 submit handler 共用同一組使用者回覆。
@@ -202,7 +172,7 @@ function createPriceReportSettingsEmbed({
   const filters = toPriceReportFilters(setting);
   const description = [
     notice ? `**${notice}**` : null,
-    enabled ? "每日價格提醒已開啟。" : "尚未開啟每日價格提醒。",
+    enabled ? "每日私訊價格報告已開啟。" : "尚未開啟每日私訊價格報告。",
   ]
     .filter((line): line is string => line !== null)
     .join("\n");
@@ -243,7 +213,7 @@ function createPriceReportSettingsEmbed({
         inline: true,
       },
       {
-        name: "最近一次每日報告",
+        name: "最近一次每日私訊價格報告",
         value: formatPriceReportDeliveryStatus(latestDelivery),
       },
     ],
@@ -253,7 +223,7 @@ function createPriceReportSettingsEmbed({
 // 將最近一次每日私訊報告 delivery 狀態轉成設定面板欄位文字。
 function formatPriceReportDeliveryStatus(delivery: PriceReportDeliveryStatus | null): string {
   if (!delivery) {
-    return "尚無每日報告紀錄。";
+    return "尚無每日私訊價格報告紀錄。";
   }
 
   const deliveredAt = formatTaipeiMinute(delivery.deliveredAt ?? delivery.createdAt);
@@ -267,17 +237,8 @@ function formatPriceReportDeliveryStatus(delivery: PriceReportDeliveryStatus | n
   }
 
   if (delivery.status === "FAILED") {
-    return `失敗：${deliveredAt}。${formatPriceReportDeliveryError(delivery)}`;
+    return `失敗：${deliveredAt}。${formatDiscordDeliveryFailureFieldValue(delivery)}`;
   }
 
   return `${delivery.status}：${deliveredAt}，列出 ${delivery.itemCount} 筆。`;
-}
-
-// 將 Discord delivery 錯誤轉成短版使用者訊息，避免 embed 欄位過長。
-export function formatPriceReportDeliveryError(failure: {
-  errorCategory: PriceReportDeliveryStatus["errorCategory"];
-  httpStatus: PriceReportDeliveryStatus["httpStatus"];
-  providerErrorCode: PriceReportDeliveryStatus["providerErrorCode"];
-}): string {
-  return formatDiscordBotText(formatDiscordDeliveryFailureForUser(failure), 220);
 }

@@ -159,12 +159,12 @@ export function formatPriceReportSettingMessage(
   categories: PriceReportCategoryOption[] = [],
 ): string {
   if (!setting?.enabled) {
-    return "尚未開啟每日價格提醒。使用下方按鈕可開啟每日私訊報告。";
+    return "尚未開啟每日私訊價格報告。使用下方按鈕可開啟。";
   }
 
   const filters = toPriceReportFilters(setting);
   return [
-    "每日價格提醒已開啟。",
+    "每日私訊價格報告已開啟。",
     `統計區間：${formatWindowLabel(setting.window)}`,
     `分類：${formatPriceReportCategoryFilterLabel(filters, categories)}`,
     `商品關鍵字：${formatPriceReportKeywordFilterLabel(filters)}`,

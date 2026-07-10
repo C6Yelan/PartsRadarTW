@@ -4,6 +4,7 @@
 import {
   createPriceReportKeywordModal,
   createPriceReportTimeModal,
+  parsePriceReportCategorySelection,
   type parsePriceReportComponentInteraction,
 } from "../commands";
 import type { CommandCooldowns } from "../cooldowns";
@@ -27,7 +28,6 @@ import {
   createPriceReportSettingsPanelMessage,
   formatPriceReportPreviewDmNotice,
   formatTaipeiTimeInput,
-  parsePriceReportCategorySelection,
   readPriceReportSettingsPanel,
   resolveTimeOfDay,
   resolveWindowHours,
@@ -150,7 +150,7 @@ export async function handlePriceReportComponentInteraction({
 
   if (component.name === "disable_daily_scheduled_report") {
     const disabledCount = await disablePriceReport({ client, discordUserId });
-    notice = disabledCount > 0 ? "已關閉每日價格提醒。" : "目前沒有開啟每日價格提醒。";
+    notice = disabledCount > 0 ? "已關閉每日私訊價格報告。" : "目前沒有開啟每日私訊價格報告。";
   } else {
     const currentPanel = await readPriceReportSettingsPanel({
       client,
@@ -204,8 +204,8 @@ export async function handlePriceReportComponentInteraction({
     });
     notice =
       component.name === "enable_daily_scheduled_report"
-        ? "已開啟每日價格提醒。"
-        : "已更新每日價格提醒設定。";
+        ? "已開啟每日私訊價格報告。"
+        : "已更新每日私訊價格報告設定。";
   }
 
   const panel = await readPriceReportSettingsPanel({

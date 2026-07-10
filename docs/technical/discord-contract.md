@@ -10,10 +10,10 @@ Admin Discord webhook remains separate and is only for maintainer smoke / ops al
 
 Supported slash commands:
 
-- `/bot help`: returns an ephemeral Traditional Chinese help embed.
+- `/bot help`: returns an ephemeral Traditional Chinese task guide covering target-price alerts, immediate reports, daily DM reports, public reports, and their DM / guild / permission boundaries.
 - `/price-report now`: creates a recent price report in the command context. If the user has enabled daily report settings, the report inherits its filters and can inherit its window.
-- `/price-report settings`: opens an ephemeral settings panel for daily DM reports. Users can configure window, categories, content type, up to five OR keyword groups, Taipei send time, preview DM, enable, and disable.
-- `/watch`: opens an ephemeral target-price watch manager. Users can add a watch from a PartsRadarTW product URL, `/products/<id>` URL, or product id; edit target price; remove one watch; batch remove watches; filter and sort their active watch list.
+- `/price-report settings`: opens an ephemeral settings panel for daily DM price reports. Users can configure window, categories, content type, up to five OR keyword groups, Taipei send time, preview DM, enable, and disable.
+- `/watch`: opens an ephemeral target-price watch manager. Users can add a watch from a PartsRadarTW product URL, `/products/<id>` URL, or product id; list watches in fixed recent-update order with pagination; edit target price; and confirm removal of one watch.
 - `/public-report status/manage/test`: lets a server manager view, configure, and test public price reports for the current guild.
 
 The bot daemon also scans due scheduled personal reports, pending public reports, and reached target-price watches.
@@ -24,6 +24,7 @@ The bot daemon also scans due scheduled personal reports, pending public reports
 - Personal scheduled reports and target-price watch notifications are sent by DM.
 - `/price-report now` may reply in the command context, but personal watch lists and target-price settings must stay ephemeral or DM-only.
 - Price reports include price drops, price rises, and optionally new products, subject to configured filters and a fixed system limit of 50 listed items.
+- Discord price display is TWD-only because the database `Currency` enum and current crawler source contract only permit TWD.
 - Target-price watch notifications are sent when current price is less than or equal to the target price and currency matches.
 - `/watch` and `watch:*` component IDs are compatibility wire names for target-price watch flows; internal TypeScript names should keep the target-price domain explicit.
 - A successfully notified watch is not sent again until the user updates or recreates the watch.
@@ -31,6 +32,7 @@ The bot daemon also scans due scheduled personal reports, pending public reports
 - Delivery results are written to Discord notification delivery logs for retry, dedupe, and ops visibility.
 - Failed and rate-limited deliveries are classified at the Discord transport boundary and persist only `error_category`, HTTP status, and numeric provider error code; provider `message` / `errors` payloads are not forwarded.
 - Operator feature flags can temporarily disable public reports, personal reports, or target-price watches without deleting commands, settings, watches, or delivery history. Disabled commands return a safe user-facing message.
+- Public-report tests are one-shot previews: they do not advance scheduled delivery state and are not retried automatically. Scheduled public-report retry applies only to persisted scheduled deliveries, and newly enabled settings do not backfill earlier crawl runs.
 
 ## Security/Data Boundary
 

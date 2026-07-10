@@ -2,9 +2,9 @@
 // 驗證 /watch 新增送出後的追蹤寫入、上限阻擋與既有追蹤更新規則。
 
 import { describe, expect, it, vi } from "vitest";
+import { MAX_TARGET_PRICE_WATCHES_PER_USER } from "../../../../src/scripts/ops/discord-bot/constants";
 import { CommandCooldowns } from "../../../../src/scripts/ops/discord-bot/cooldowns";
 import { handleDiscordInteraction } from "../../../../src/scripts/ops/discord-bot/interactions";
-import { MAX_TARGET_PRICE_WATCHES_PER_USER } from "../../../../src/scripts/ops/discord-bot/constants";
 import {
   createDiscordBotClient,
   createDiscordBotOptions,
@@ -38,7 +38,7 @@ describe("handleDiscordInteraction watch create submit", () => {
       fetchImpl: fetchMock as typeof fetch,
       interaction: createTargetPriceWatchModalSubmitInteraction({
         productInput: `https://partsradar.test/products/${WATCH_PRODUCT_ID}`,
-        targetPrice: "17500",
+        targetPrice: " ２００００ ",
       }),
     });
 
@@ -52,13 +52,13 @@ describe("handleDiscordInteraction watch create submit", () => {
       create: {
         discordUserId: "111122223333444455",
         productId: WATCH_PRODUCT_ID,
-        targetPrice: 17_500,
+        targetPrice: 20_000,
         currency: "TWD",
         enabled: true,
         notificationCursorAt: expect.any(Date),
       },
       update: {
-        targetPrice: 17_500,
+        targetPrice: 20_000,
         currency: "TWD",
         enabled: true,
         lastNotifiedAt: null,
@@ -93,7 +93,8 @@ describe("handleDiscordInteraction watch create submit", () => {
           description: expect.stringContaining("RTX 5070 測試卡"),
           fields: expect.arrayContaining([
             expect.objectContaining({ name: "目前價格", value: "NT$18,990" }),
-            expect.objectContaining({ name: "目標價格", value: "NT$17,500" }),
+            expect.objectContaining({ name: "目標價格", value: "NT$20,000" }),
+            expect.objectContaining({ name: "追蹤狀態", value: "目前價格已達標。" }),
           ]),
         }),
       ],
@@ -143,7 +144,7 @@ describe("handleDiscordInteraction watch create submit", () => {
 
     const responseBody = String((fetchMock.mock.calls[1]?.[1] as RequestInit | undefined)?.body);
 
-    expect(responseBody).toContain(`最多 ${MAX_TARGET_PRICE_WATCHES_PER_USER} 個商品追蹤`);
+    expect(responseBody).toContain(`已追蹤${MAX_TARGET_PRICE_WATCHES_PER_USER}個商品，已達上限`);
     expect(responseBody).toContain("請先在 /watch 移除不需要的追蹤");
     expect(client.discordTargetPriceWatch.upsert).not.toHaveBeenCalled();
   });

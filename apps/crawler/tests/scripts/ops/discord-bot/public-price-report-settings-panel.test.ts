@@ -100,6 +100,12 @@ describe("public price report settings panel", () => {
         ]),
       },
     });
+    const settingsEmbed = readResponseEmbed(requestBody.data);
+
+    expect(settingsEmbed.description).toContain("只處理後續輪次，不補發先前輪次");
+    expect(readEmbedFieldValue(settingsEmbed, "排程與測試")).toContain(
+      "手動測試是單次操作，不會自動重試",
+    );
     expect(JSON.stringify(requestBody.data)).not.toContain("最多列出");
     expect(JSON.stringify(requestBody.data)).not.toContain("public-report:limit");
   });
@@ -217,6 +223,7 @@ describe("public price report settings panel", () => {
     );
 
     expect(latestDelivery).toContain("失敗：06/07 10:00 GMT+8");
+    expect(latestDelivery).toContain("下一次排程檢查時會重試");
     expect(client.discordPublicPriceReportDelivery.findFirst).toHaveBeenCalledWith({
       where: {
         channelId: "999988887777666655",
@@ -227,6 +234,50 @@ describe("public price report settings panel", () => {
       }),
       orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
     });
+  });
+
+  it("labels rate-limited public delivery retries as scheduled work", async () => {
+    const client = createDiscordBotClient(
+      [],
+      [],
+      [],
+      [...TEST_SOURCE_CATEGORIES],
+      [],
+      [
+        publicPriceReportDelivery({
+          id: "delivery-rate-limited",
+          crawlRunId: "crawl-run-rate-limited",
+          channelId: "999988887777666655",
+          status: "RATE_LIMITED",
+          errorCategory: "RATE_LIMITED",
+          createdAt: new Date("2026-06-07T01:00:00.000Z"),
+          updatedAt: new Date("2026-06-07T02:00:00.000Z"),
+        }),
+      ],
+      [],
+      [publicPriceReportSetting({ id: "public-setting-1" })],
+    );
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createPublicReportInteraction({ subcommandName: "status" }),
+    });
+
+    const requestBody = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
+    const latestDelivery = readEmbedFieldValue(
+      readResponseEmbed(requestBody.data),
+      "最近一次公開報告",
+    );
+
+    expect(latestDelivery).toContain("Discord 限流：06/07 10:00 GMT+8");
+    expect(latestDelivery).toContain("下一次排程檢查時會重試");
+    expect(latestDelivery).not.toContain("手動測試");
   });
 
   it("sets the current channel as the public report channel", async () => {

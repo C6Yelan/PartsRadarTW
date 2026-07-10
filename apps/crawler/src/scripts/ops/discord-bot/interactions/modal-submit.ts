@@ -70,7 +70,7 @@ export async function handleModalSubmitInteraction({
         interaction,
         options,
         fetchImpl,
-        content: "目標價提醒目前已由維運暫停。",
+        featureName: "目標價提醒",
       });
       return;
     }
@@ -92,7 +92,7 @@ export async function handleModalSubmitInteraction({
         interaction,
         options,
         fetchImpl,
-        content: "公開價格報告目前已由維運暫停。",
+        featureName: "公開價格報告",
       });
       return;
     }
@@ -182,7 +182,7 @@ export async function handleModalSubmitInteraction({
       interaction,
       options,
       fetchImpl,
-      content: "個人價格報告目前已由維運暫停。",
+      featureName: "每日私訊價格報告",
     });
     return;
   }
@@ -257,7 +257,7 @@ export async function handleModalSubmitInteraction({
   const panel = await readPriceReportSettingsPanel({
     client,
     discordUserId,
-    notice: `已更新每日價格提醒。下一次：${formatTaipeiMinute(setting.nextSendAt)}。`,
+    notice: `已更新每日私訊價格報告。下一次：${formatTaipeiMinute(setting.nextSendAt)}。`,
   });
 
   await sendInteractionResponse({

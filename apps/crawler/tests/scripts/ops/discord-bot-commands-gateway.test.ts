@@ -46,7 +46,7 @@ describe("registerDiscordBotCommands", () => {
     expect(JSON.parse(String(globalRequestInit.body))).toEqual([
       expect.objectContaining({
         name: "price-report",
-        description: "查看即時價格報告並管理每日私訊設定。",
+        description: "查看即時價格報告並管理每日私訊價格報告。",
         contexts: [0, 1],
         dm_permission: true,
         options: [

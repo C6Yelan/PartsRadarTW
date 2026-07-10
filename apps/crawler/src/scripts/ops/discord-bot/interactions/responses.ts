@@ -47,18 +47,18 @@ export async function sendFeatureDisabledResponse({
   interaction,
   options,
   fetchImpl,
-  content,
+  featureName,
 }: {
   interaction: DiscordInteraction;
   options: DiscordBotOptions;
   fetchImpl: FetchImpl;
-  content: string;
+  featureName: "即時價格報告" | "每日私訊價格報告" | "公開價格報告" | "目標價提醒";
 }): Promise<void> {
   await sendInteractionResponse({
     token: options.token,
     apiBaseUrl: options.apiBaseUrl,
     interaction,
     fetchImpl,
-    content,
+    content: `${featureName}目前暫停使用，請稍後再試。`,
   });
 }

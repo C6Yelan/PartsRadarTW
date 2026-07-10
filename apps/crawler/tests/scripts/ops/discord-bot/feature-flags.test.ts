@@ -2,15 +2,11 @@
 // 驗證 Discord bot feature flag 停用時，背景掃描與指令入口會安全略過對應功能。
 
 import { describe, expect, it, vi } from "vitest";
+import { CommandCooldowns } from "../../../../src/scripts/ops/discord-bot/cooldowns";
 import { runDiscordBotNotificationCycle } from "../../../../src/scripts/ops/discord-bot/daemon";
 import { handleDiscordInteraction } from "../../../../src/scripts/ops/discord-bot/interactions";
 import type { DiscordInteraction } from "../../../../src/scripts/ops/discord-bot/types";
-import { CommandCooldowns } from "../../../../src/scripts/ops/discord-bot/cooldowns";
-import {
-  createDiscordBotClient,
-  createDiscordBotOptions,
-  createInteraction,
-} from "./support";
+import { createDiscordBotClient, createDiscordBotOptions, createInteraction } from "./support";
 
 describe("Discord bot feature flags", () => {
   it("skips disabled notification cycle work without reading or writing delivery state", async () => {
@@ -97,9 +93,9 @@ describe("Discord bot feature flags", () => {
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(3);
-    expect(responseContent(fetchMock, 0)).toBe("個人價格報告目前已由維運暫停。");
-    expect(responseContent(fetchMock, 1)).toBe("公開價格報告目前已由維運暫停。");
-    expect(responseContent(fetchMock, 2)).toBe("目標價提醒目前已由維運暫停。");
+    expect(responseContent(fetchMock, 0)).toBe("即時價格報告目前暫停使用，請稍後再試。");
+    expect(responseContent(fetchMock, 1)).toBe("公開價格報告目前暫停使用，請稍後再試。");
+    expect(responseContent(fetchMock, 2)).toBe("目標價提醒目前暫停使用，請稍後再試。");
     expect(client.discordPriceReportSetting.findUnique).not.toHaveBeenCalled();
     expect(client.discordPublicPriceReportSetting.findUnique).not.toHaveBeenCalled();
     expect(client.discordTargetPriceWatch.findMany).not.toHaveBeenCalled();
@@ -146,7 +142,10 @@ function createWatchInteraction(): DiscordInteraction {
   };
 }
 
-function responseContent(fetchMock: ReturnType<typeof vi.fn<typeof fetch>>, callIndex: number): string {
+function responseContent(
+  fetchMock: ReturnType<typeof vi.fn<typeof fetch>>,
+  callIndex: number,
+): string {
   const body = JSON.parse(String((fetchMock.mock.calls[callIndex]?.[1] as RequestInit).body));
 
   expect(body).toMatchObject({

@@ -11,7 +11,6 @@ import {
   createWatchEditModalSubmitInteraction,
   createWatchManagerClient,
   findMessageComponent,
-  WATCH_DEFAULT_STATE,
   WATCH_ROW_ID,
 } from "./support";
 
@@ -27,9 +26,7 @@ describe("handleDiscordInteraction watch edit and remove", () => {
       options: createDiscordBotOptions(),
       cooldowns: new CommandCooldowns(60),
       fetchImpl: fetchMock as typeof fetch,
-      interaction: createWatchButtonInteraction(
-        `watch:edit:${WATCH_ROW_ID}:17500:${WATCH_DEFAULT_STATE}`,
-      ),
+      interaction: createWatchButtonInteraction(`watch:edit:${WATCH_ROW_ID}:17500:0:all:recent`),
     });
 
     const requestBody = JSON.parse(
@@ -39,7 +36,7 @@ describe("handleDiscordInteraction watch edit and remove", () => {
     expect(requestBody).toMatchObject({
       type: 9,
       data: {
-        custom_id: `watch:edit-modal:${WATCH_ROW_ID}:${WATCH_DEFAULT_STATE}`,
+        custom_id: `watch:edit-modal:${WATCH_ROW_ID}:0`,
         title: "修改商品目標價",
         components: [
           expect.objectContaining({
@@ -104,9 +101,7 @@ describe("handleDiscordInteraction watch edit and remove", () => {
       options: createDiscordBotOptions(),
       cooldowns: new CommandCooldowns(60),
       fetchImpl: fetchMock as typeof fetch,
-      interaction: createWatchButtonInteraction(
-        `watch:remove:${WATCH_ROW_ID}:${WATCH_DEFAULT_STATE}`,
-      ),
+      interaction: createWatchButtonInteraction(`watch:remove:${WATCH_ROW_ID}:0`),
     });
 
     expect(client.discordTargetPriceWatch.updateMany).not.toHaveBeenCalled();
@@ -124,11 +119,11 @@ describe("handleDiscordInteraction watch edit and remove", () => {
           type: 1,
           components: [
             expect.objectContaining({
-              custom_id: `watch:remove-confirm:${WATCH_ROW_ID}:${WATCH_DEFAULT_STATE}`,
+              custom_id: `watch:remove-confirm:${WATCH_ROW_ID}:0`,
               label: "確認移除",
             }),
             expect.objectContaining({
-              custom_id: `watch:remove-cancel:${WATCH_ROW_ID}:${WATCH_DEFAULT_STATE}`,
+              custom_id: `watch:remove-cancel:${WATCH_ROW_ID}:0`,
               label: "返回設定",
             }),
           ],
@@ -151,9 +146,7 @@ describe("handleDiscordInteraction watch edit and remove", () => {
       options: createDiscordBotOptions(),
       cooldowns: new CommandCooldowns(60),
       fetchImpl: fetchMock as typeof fetch,
-      interaction: createWatchButtonInteraction(
-        `watch:remove-cancel:${WATCH_ROW_ID}:${WATCH_DEFAULT_STATE}`,
-      ),
+      interaction: createWatchButtonInteraction(`watch:remove-cancel:${WATCH_ROW_ID}:0`),
     });
 
     expect(client.discordTargetPriceWatch.updateMany).not.toHaveBeenCalled();
@@ -162,12 +155,8 @@ describe("handleDiscordInteraction watch edit and remove", () => {
       value: `watch:${WATCH_ROW_ID}`,
       default: true,
     });
-    expect(
-      findMessageComponent(requestBody, `watch:edit:${WATCH_ROW_ID}:17500:${WATCH_DEFAULT_STATE}`),
-    ).toBeDefined();
-    expect(
-      findMessageComponent(requestBody, `watch:remove:${WATCH_ROW_ID}:${WATCH_DEFAULT_STATE}`),
-    ).toBeDefined();
+    expect(findMessageComponent(requestBody, `watch:edit:${WATCH_ROW_ID}:17500:0`)).toBeDefined();
+    expect(findMessageComponent(requestBody, `watch:remove:${WATCH_ROW_ID}:0`)).toBeDefined();
   });
 
   it("removes a watch after confirmation and refreshes the manager", async () => {
@@ -181,9 +170,7 @@ describe("handleDiscordInteraction watch edit and remove", () => {
       options: createDiscordBotOptions(),
       cooldowns: new CommandCooldowns(60),
       fetchImpl: fetchMock as typeof fetch,
-      interaction: createWatchButtonInteraction(
-        `watch:remove-confirm:${WATCH_ROW_ID}:${WATCH_DEFAULT_STATE}`,
-      ),
+      interaction: createWatchButtonInteraction(`watch:remove-confirm:${WATCH_ROW_ID}:0`),
     });
 
     expect(client.discordTargetPriceWatch.updateMany).toHaveBeenCalledWith({
@@ -248,6 +235,6 @@ describe("handleDiscordInteraction watch edit and remove", () => {
     });
 
     expect(client.discordTargetPriceWatch.updateMany).not.toHaveBeenCalled();
-    expect(String(fetchMock.mock.calls[0]?.[1]?.body)).toContain("目標價格需為");
+    expect(String(fetchMock.mock.calls[0]?.[1]?.body)).toContain("目標價格請輸入");
   });
 });

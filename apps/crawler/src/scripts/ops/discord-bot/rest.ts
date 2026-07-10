@@ -2,6 +2,7 @@
 // 提供 Discord REST facade：訊息發送、interaction 回覆轉出口，以及使用者可見錯誤訊息泛化。
 
 import { createDiscordMessagePayload } from "./message-payload";
+import { formatDiscordBotText } from "./message-text";
 import { sendDiscordRestRequest } from "./rest-request";
 import type {
   DiscordBotMessage,
@@ -20,7 +21,6 @@ export {
   sendInteractionResponse,
   sendModalInteractionResponse,
 } from "./interaction-responses";
-export { formatDiscordBotText } from "./message-text";
 export { formatDiscordRestFailure } from "./rest-failure";
 export { sendDiscordRestRequest } from "./rest-request";
 
@@ -51,6 +51,15 @@ export function formatDiscordDeliveryFailureForUser(failure: {
   }
 
   return "Discord 暫時無法完成通知，請稍後重試；若持續發生，請伺服器管理員檢查 PartsRadarTW bot 設定。";
+}
+
+// 將安全的 delivery 失敗說明裁成設定面板欄位使用的短版文字。
+export function formatDiscordDeliveryFailureFieldValue(failure: {
+  errorCategory: DiscordDeliveryErrorCategory | null;
+  httpStatus: number | null;
+  providerErrorCode: number | null;
+}): string {
+  return formatDiscordBotText(formatDiscordDeliveryFailureForUser(failure), 220);
 }
 
 // 將 Discord rate limit 統一轉成使用者可見的稍後重試提示。

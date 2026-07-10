@@ -11,7 +11,6 @@ import {
   createTargetPriceWatchModalSubmitInteraction,
   createWatchButtonInteraction,
   createWatchOpenInteraction,
-  WATCH_DEFAULT_STATE,
 } from "./support";
 
 describe("handleDiscordInteraction watch create form", () => {
@@ -53,21 +52,21 @@ describe("handleDiscordInteraction watch create form", () => {
           components: [
             expect.objectContaining({ custom_id: "watch:add", label: "新增追蹤" }),
             expect.objectContaining({
-              custom_id: `watch:edit:none:0:${WATCH_DEFAULT_STATE}`,
+              custom_id: "watch:edit:none:0:0",
               disabled: true,
             }),
             expect.objectContaining({
-              custom_id: `watch:remove:none:${WATCH_DEFAULT_STATE}`,
+              custom_id: "watch:remove:none:0",
               disabled: true,
             }),
-            expect.objectContaining({ custom_id: `watch:refresh:${WATCH_DEFAULT_STATE}` }),
+            expect.objectContaining({ custom_id: "watch:refresh:0" }),
           ],
         },
       ],
     });
     expect(client.discordTargetPriceWatch.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        take: MAX_TARGET_PRICE_WATCHES_PER_USER + 1,
+        take: MAX_TARGET_PRICE_WATCHES_PER_USER,
       }),
     );
   });
@@ -98,12 +97,12 @@ describe("handleDiscordInteraction watch create form", () => {
         components: [
           expect.objectContaining({
             label: "PartsRadarTW 商品",
-            description: expect.stringContaining("商品頁完整網址"),
+            description: expect.stringContaining("商品頁網址或網址最後那串ID"),
             component: expect.objectContaining({ custom_id: "watch:product" }),
           }),
           expect.objectContaining({
             label: "理想入手價格（新台幣）",
-            description: expect.stringContaining("不要加 NT$"),
+            description: expect.stringContaining("不要加NT$"),
             component: expect.objectContaining({ custom_id: "watch:target-price" }),
           }),
         ],
@@ -171,9 +170,36 @@ describe("handleDiscordInteraction watch create form", () => {
 
     expect(client.discordTargetPriceWatch.upsert).not.toHaveBeenCalled();
     const responseBody = String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body);
-    expect(responseBody).toContain("PartsRadarTW 商品頁完整網址");
-    expect(responseBody).toContain("網址 `/products/` 後面的商品 ID");
-    expect(responseBody).toContain("目標價格需為");
-    expect(responseBody).toContain("不要輸入 NT$");
+    expect(responseBody).toContain("商品頁網址或網址最後那串ID");
+    expect(responseBody).toContain("目標價格請輸入");
+    expect(responseBody).toContain("範圍內純數字");
+    expect(responseBody).toContain("不要加NT$");
+  });
+
+  it.each([
+    "17 500",
+    "17,500",
+    "17500.0",
+    "-17500",
+    "一萬七千五",
+  ])("rejects mixed target-price input %s", async (targetPrice) => {
+    const client = createDiscordBotClient([]);
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createTargetPriceWatchModalSubmitInteraction({
+        productInput: "https://partsradar.test/products/11111111-1111-4111-8111-111111111111",
+        targetPrice,
+      }),
+    });
+
+    expect(client.discordTargetPriceWatch.upsert).not.toHaveBeenCalled();
+    expect(String(fetchMock.mock.calls[0]?.[1]?.body)).toContain("範圍內純數字");
   });
 });

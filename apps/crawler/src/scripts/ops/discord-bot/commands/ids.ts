@@ -46,7 +46,7 @@ export const PUBLIC_REPORT_KEYWORD_INPUT_CUSTOM_IDS = [
   "public-report:keyword-input:5",
 ] as const;
 
-// 目標價 watch 管理介面使用的 component id；prefix 型 id 會在後方附加 watch id 或列表狀態。
+// 目標價 watch 管理介面使用的 component id；prefix 型 id 會在後方附加 watch id 或頁碼。
 export const WATCH_CREATE_MODAL_CUSTOM_ID = "watch:create-modal";
 export const WATCH_EDIT_MODAL_CUSTOM_ID_PREFIX = "watch:edit-modal:";
 export const WATCH_PRODUCT_CUSTOM_ID = "watch:product";
@@ -59,9 +59,3 @@ export const WATCH_REMOVE_CONFIRM_CUSTOM_ID_PREFIX = "watch:remove-confirm:";
 export const WATCH_REMOVE_CANCEL_CUSTOM_ID_PREFIX = "watch:remove-cancel:";
 export const WATCH_REFRESH_CUSTOM_ID_PREFIX = "watch:refresh:";
 export const WATCH_PAGE_CUSTOM_ID_PREFIX = "watch:page:";
-export const WATCH_FILTER_CUSTOM_ID_PREFIX = "watch:filter:";
-export const WATCH_SORT_CUSTOM_ID_PREFIX = "watch:sort:";
-export const WATCH_BULK_REMOVE_CUSTOM_ID_PREFIX = "watch:bulk-remove:";
-export const WATCH_BULK_REMOVE_SELECT_CUSTOM_ID_PREFIX = "watch:bulk-remove-select:";
-export const WATCH_BULK_REMOVE_CONFIRM_CUSTOM_ID_PREFIX = "watch:bulk-remove-confirm:";
-export const WATCH_BULK_REMOVE_CANCEL_CUSTOM_ID_PREFIX = "watch:bulk-remove-cancel:";

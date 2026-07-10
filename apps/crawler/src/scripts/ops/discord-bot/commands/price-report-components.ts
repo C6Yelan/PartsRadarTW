@@ -182,18 +182,18 @@ export function createPriceReportSettingsComponents({
           custom_id: enabled
             ? PRICE_REPORT_SETTINGS_DISABLE_CUSTOM_ID
             : PRICE_REPORT_SETTINGS_ENABLE_CUSTOM_ID,
-          label: enabled ? "關閉每日報告" : "開啟每日報告",
+          label: enabled ? "關閉每日私訊價格報告" : "開啟每日私訊價格報告",
         },
       ],
     },
   ];
 }
 
-// 建立每日報告發送時間 modal；沿用既有 wire custom_id 以相容已發出的設定面板。
+// 建立每日私訊價格報告發送時間 modal；沿用既有 wire custom_id 以相容已發出的設定面板。
 export function createPriceReportTimeModal({ timeValue }: { timeValue: string }): DiscordModal {
   return {
     custom_id: PRICE_REPORT_SETTINGS_TIME_MODAL_CUSTOM_ID,
-    title: "每日報告時間",
+    title: "每日私訊價格報告時間",
     components: [
       {
         type: DISCORD_COMPONENT_TYPE_LABEL,

@@ -80,7 +80,7 @@ export async function handleApplicationCommandInteraction({
       interaction,
       options,
       fetchImpl,
-      content: "個人價格報告目前已由維運暫停。",
+      featureName: command.name === "now" ? "即時價格報告" : "每日私訊價格報告",
     });
     return;
   }
@@ -90,7 +90,7 @@ export async function handleApplicationCommandInteraction({
       interaction,
       options,
       fetchImpl,
-      content: "公開價格報告目前已由維運暫停。",
+      featureName: "公開價格報告",
     });
     return;
   }
@@ -100,7 +100,7 @@ export async function handleApplicationCommandInteraction({
       interaction,
       options,
       fetchImpl,
-      content: "目標價提醒目前已由維運暫停。",
+      featureName: "目標價提醒",
     });
     return;
   }

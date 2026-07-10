@@ -15,7 +15,6 @@ import {
   snapshot,
   TEST_SOURCE_CATEGORIES,
   targetPriceWatch,
-  WATCH_DEFAULT_STATE,
   WATCH_PRODUCT_ID,
   WATCH_ROW_ID,
 } from "./support";
@@ -61,7 +60,7 @@ describe("handleDiscordInteraction watch manager list", () => {
         expect.objectContaining({
           components: [
             expect.objectContaining({
-              custom_id: `watch:select:${WATCH_DEFAULT_STATE}`,
+              custom_id: "watch:select:0",
               options: [expect.objectContaining({ value: `watch:${WATCH_ROW_ID}`, default: true })],
             }),
           ],
@@ -69,11 +68,11 @@ describe("handleDiscordInteraction watch manager list", () => {
         expect.objectContaining({
           components: expect.arrayContaining([
             expect.objectContaining({
-              custom_id: `watch:edit:${WATCH_ROW_ID}:17500:${WATCH_DEFAULT_STATE}`,
+              custom_id: `watch:edit:${WATCH_ROW_ID}:17500:0`,
               disabled: false,
             }),
             expect.objectContaining({
-              custom_id: `watch:remove:${WATCH_ROW_ID}:${WATCH_DEFAULT_STATE}`,
+              custom_id: `watch:remove:${WATCH_ROW_ID}:0`,
               disabled: false,
             }),
           ]),
@@ -211,12 +210,12 @@ describe("handleDiscordInteraction watch manager list", () => {
         expect.objectContaining({
           components: [
             expect.objectContaining({
-              custom_id: `watch:select:${WATCH_DEFAULT_STATE}`,
+              custom_id: "watch:select:0",
               options: [
                 expect.objectContaining({
                   label: "RTX 5070 測試卡",
                   value: `watch:${WATCH_ROW_ID}`,
-                  description: expect.stringContaining("目標 NT$17,500"),
+                  description: "目前 NT$18,990，目標 NT$17,500",
                 }),
               ],
             }),
@@ -226,7 +225,11 @@ describe("handleDiscordInteraction watch manager list", () => {
     });
     expect(requestBody.embeds[0].description).not.toContain("此頁面只有你看得到");
     expect(requestBody.embeds[0].description).toContain("**使用方式**");
+    expect(requestBody.embeds[0].description).toContain("價格達標時會嘗試透過 DM 傳送目標價提醒");
     expect(requestBody.embeds[0].description).toContain("從選單選商品");
+    expect(JSON.stringify(requestBody.components)).not.toContain("watch:filter:");
+    expect(JSON.stringify(requestBody.components)).not.toContain("watch:sort:");
+    expect(JSON.stringify(requestBody.components)).not.toContain("watch:bulk-remove:");
     expect(JSON.stringify(requestBody.embeds)).not.toContain(WATCH_ROW_ID);
   });
 });

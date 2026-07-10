@@ -67,7 +67,11 @@ describe("public price report previews", () => {
       `${API_BASE_URL}/channels/999988887777666655/messages`,
     );
     const responseBody = JSON.parse(String(fetchMock.mock.calls[2]?.[1]?.body));
-    expect(responseBody.content).toContain("已發送測試公開報告到 <#999988887777666655>");
+    expect(responseBody.content).toContain("已發送單次測試公開報告到 <#999988887777666655>");
+    expect(responseBody.content).toContain("不會改變排程進度");
+    expect(client.discordPublicPriceReportDelivery.upsert).not.toHaveBeenCalled();
+    expect(client.discordPublicPriceReportSetting.update).not.toHaveBeenCalled();
+    expect(client.discordPublicPriceReportSetting.upsert).not.toHaveBeenCalled();
   });
 
   it("sends a public report preview to the configured channel", async () => {
@@ -132,7 +136,8 @@ describe("public price report previews", () => {
       },
     });
     const responseBody = JSON.parse(String(fetchMock.mock.calls[2]?.[1]?.body));
-    expect(responseBody.content).toContain("已發送測試公開報告到 <#999988887777666655>");
+    expect(responseBody.content).toContain("已發送單次測試公開報告到 <#999988887777666655>");
+    expect(responseBody.content).toContain("不會改變排程進度");
   });
 
   it("shows a channel permission hint when the public report preview send fails", async () => {
@@ -200,5 +205,59 @@ describe("public price report previews", () => {
     expect(responseBody.content).not.toContain("private-token");
     expect(responseBody.content).not.toContain("private-authorization");
     expect(responseBody.content).not.toContain("Administrator");
+  });
+
+  it("does not promise an automatic retry for a rate-limited manual test", async () => {
+    const now = new Date();
+    const client = createDiscordBotClient(
+      [
+        snapshot({
+          id: "public-rate-limit-old",
+          productId: "public-rate-limit-product",
+          productName: "華碩 GPU A",
+          crawlRunId: "old-run",
+          price: 12_000,
+          capturedAt: new Date(now.getTime() - 25 * 60 * 60 * 1000).toISOString(),
+        }),
+        snapshot({
+          id: "public-rate-limit-new",
+          productId: "public-rate-limit-product",
+          productName: "華碩 GPU A",
+          crawlRunId: "new-run",
+          price: 10_990,
+          capturedAt: new Date(now.getTime() - 60 * 60 * 1000).toISOString(),
+        }),
+      ],
+      [],
+      [],
+      [...TEST_SOURCE_CATEGORIES],
+      [],
+      [],
+      [],
+      [publicPriceReportSetting({ id: "public-setting-1" })],
+    );
+    const fetchMock = vi.fn<typeof fetch>(async (input) => {
+      if (String(input).endsWith("/channels/999988887777666655/messages")) {
+        return new Response(JSON.stringify({ retry_after: 2 }), { status: 429 });
+      }
+
+      return new Response(JSON.stringify({ id: "message" }), { status: 200 });
+    });
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createPublicReportInteraction({ subcommandName: "test" }),
+    });
+
+    const responseBody = JSON.parse(String(fetchMock.mock.calls[2]?.[1]?.body));
+
+    expect(responseBody.content).toContain("本次測試未送出且不會自動重試");
+    expect(responseBody.content).toContain("請稍後重新執行測試");
+    expect(responseBody.content).not.toContain("系統會稍後重試");
+    expect(client.discordPublicPriceReportDelivery.upsert).not.toHaveBeenCalled();
+    expect(client.discordPublicPriceReportSetting.update).not.toHaveBeenCalled();
   });
 });

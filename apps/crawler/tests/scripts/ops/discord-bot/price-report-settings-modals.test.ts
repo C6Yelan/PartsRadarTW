@@ -47,7 +47,7 @@ describe("handleDiscordInteraction price report settings modals", () => {
       type: 9,
       data: {
         custom_id: "price-report:settings:time-limit-modal",
-        title: "每日報告時間",
+        title: "每日私訊價格報告時間",
       },
     });
     expect(requestBody.data.components).toHaveLength(1);
@@ -172,7 +172,7 @@ describe("handleDiscordInteraction price report settings modals", () => {
     expect(upsert.create).not.toHaveProperty("maxItems");
     expect(upsert.update).not.toHaveProperty("maxItems");
     expect(String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body)).toContain(
-      "已更新每日價格提醒",
+      "已更新每日私訊價格報告",
     );
   });
 

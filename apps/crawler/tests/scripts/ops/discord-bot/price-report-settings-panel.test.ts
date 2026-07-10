@@ -39,7 +39,7 @@ describe("handleDiscordInteraction price report settings panel", () => {
         embeds: [
           expect.objectContaining({
             title: "價格報告設定",
-            description: "尚未開啟每日價格提醒。",
+            description: "尚未開啟每日私訊價格報告。",
             fields: expect.arrayContaining([
               expect.objectContaining({ name: "統計區間", value: "過去 24 小時" }),
               expect.objectContaining({ name: "分類", value: "全部分類" }),
@@ -48,8 +48,8 @@ describe("handleDiscordInteraction price report settings panel", () => {
               expect.objectContaining({ name: "每日時間", value: "09:00" }),
               expect.objectContaining({ name: "下一次", value: "啟用後排程" }),
               expect.objectContaining({
-                name: "最近一次每日報告",
-                value: "尚無每日報告紀錄。",
+                name: "最近一次每日私訊價格報告",
+                value: "尚無每日私訊價格報告紀錄。",
               }),
             ]),
           }),
@@ -113,7 +113,7 @@ describe("handleDiscordInteraction price report settings panel", () => {
               expect.objectContaining({
                 type: 2,
                 custom_id: "price-report:settings:enable",
-                label: "開啟每日報告",
+                label: "開啟每日私訊價格報告",
               }),
             ]),
           },

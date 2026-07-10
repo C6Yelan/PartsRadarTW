@@ -353,19 +353,19 @@ smoke Discord notification policy 行為：
 
 ## Discord Bot Notifications
 
-Discord bot 處理公開價格報告、使用者 slash command 與個人化通知。公開價格報告會發送到設定的伺服器頻道；手動報告會回覆在指令發出的 Discord context；每日價格提醒以 DM 發送。
+Discord bot 處理公開價格報告、使用者 slash command 與個人化通知。公開價格報告會發送到設定的伺服器頻道；即時價格報告會回覆在指令發出的 Discord context；每日私訊價格報告與目標價提醒以 DM 發送。
 
 Bot 目標：
 
 - 公開價格報告：本輪 scheduled crawl 有符合設定的既有商品價格變動或新增商品時，由 bot 發送到指定公開頻道。
-- 個人目標價提醒：使用者追蹤單一商品，價格小於等於目標價時收到 DM。
-- 個人價格變動報告：使用者設定固定 interval / window / scope、分類篩選與內容類型篩選，定期收到特定時間段內實際變價商品報告。
+- 目標價提醒：使用者追蹤單一商品，價格小於等於目標價時收到 DM。
+- 每日私訊價格報告：使用者設定固定 interval / window / scope、分類篩選與內容類型篩選，定期收到特定時間段內實際變價商品報告。
 
 目前已實作：
 
 - `discord-bot` Compose profile 與 `pnpm ops:discord-bot` daemon entrypoint。
 - Discord slash command registration。
-- `/public-report status/manage/test`：管理伺服器公開價格報告，分別用於查看狀態、開啟設定面板與發送測試報告；此指令以 Discord command 權限限制可見性，只有具備管理伺服器權限的成員通常會看到。頻道設定、分類、最多五組商品名稱關鍵字與降價 / 漲價 / 新增商品內容類型寫入 `discord_public_price_report_settings`。公開報告目標頻道需允許 bot 傳送訊息與嵌入連結。
+- `/public-report status/manage/test`：管理伺服器公開價格報告，分別用於查看狀態、開啟設定面板與發送單次測試報告；此指令以 Discord command 權限限制可見性，只有具備管理伺服器權限的成員通常會看到。頻道設定、分類、最多五組商品名稱關鍵字與降價 / 漲價 / 新增商品內容類型寫入 `discord_public_price_report_settings`。公開報告目標頻道需允許 bot 傳送訊息與嵌入連結。手動測試不更新排程 cursor 且不會自動重試；新啟用的設定只處理後續 crawl run，不補發先前輪次。
 - Public price report：bot daemon 讀取已啟用的 `discord_public_price_report_settings`，掃描 scheduled crawl 後尚未送出的 `crawlRunId`，讀取該輪新建立的 `price_snapshots`，和同商品上一筆 snapshot 比對，套用該伺服器的公開報告篩選後送到公開 Discord；沒有舊價的 first-seen 商品只在設定包含新增商品時送出，同價更新不會送出。
 - Public price report 訊息使用 bot embed，依 DB 的 `sourceCategory.displayName` 大分類與 `vendorName` 小分類分組，列出 signed 漲跌金額、舊價、新價、商品名稱與站內商品連結。送達、略過、失敗與 rate limit 會寫入 `discord_public_price_report_deliveries`，以 `crawlRunId + channelId` 去重；失敗只保存 structured category、HTTP status 與數字 Discord code。
 - `/price-report now`：使用者手動要求最近 `24h` / `12h` / `6h` 價格報告，bot 會在指令發出的頻道或私訊 context 以 embed 回覆中文報告；若使用者已有啟用中的每日設定，手動報告會沿用該設定的分類、商品名稱關鍵字與內容類型，方便確認報告內容。
@@ -373,13 +373,13 @@ Bot 目標：
 - `/price-report now` 報告只為有資料的「價格變動」或「新增商品」產生 embed；摘要時間、統計數字與價格變動方向標題使用 Markdown emphasis 強化區隔；價格變動 embed 先分「降價」與「漲價」，商品列以單行呈現 signed 漲跌金額、舊價、新價與站內商品連結；新增商品 embed 以單行呈現目前價格與站內商品連結；兩者都依 DB 的 `sourceCategory.displayName` 大分類與 `vendorName` 小分類分組，並在小分類已顯示品牌時移除商品名稱開頭重複品牌；兩邊都沒資料時才送一個空報告摘要。
 - 個人與公開價格報告固定最多列 50 筆，上限套用在價格變動與新增商品兩區合計；不提供 slash command、設定面板、CLI 或 env override。per-user cooldown 套用在實際產生報告的 `now` 指令與 settings 面板的「傳送預覽 DM」。
 - 每次 `/price-report now` 或 settings「傳送預覽 DM」會寫入 `discord_notification_deliveries`，供後續去重、排程與維運檢視使用。
-- 排程每日 DM 若發送失敗或遇到 Discord rate limit，會保留上次成功時間並在 10 分鐘後重試；後續成功後才推進到下一個正式每日時間。
-- `/price-report settings`：開啟私密設定面板，以 embed 顯示每日價格報告狀態、最近一次每日報告 delivery 狀態與目前設定，並用選單調整統計區間、分類篩選與報告內容類型；分類選單只列實際分類，部分分類狀態可按「改為全部分類」恢復不限制分類。
-- settings 面板的「傳送預覽 DM」會以目前設定產生一次 DM 報告，即使每日報告尚未啟用也可先確認篩選效果與私訊可用性；多則 report chunks 會直接送到使用者 DM，settings 面板只回報送達狀態或可理解的失敗原因。
+- 排程每日私訊價格報告若發送失敗或遇到 Discord rate limit，會保留上次成功時間並在 10 分鐘後重試；後續成功後才推進到下一個正式每日時間。
+- `/price-report settings`：開啟私密設定面板，以 embed 顯示每日私訊價格報告狀態、最近一次 delivery 狀態與目前設定，並用選單調整統計區間、分類篩選與報告內容類型；分類選單只列實際分類，部分分類狀態可按「改為全部分類」恢復不限制分類。
+- settings 面板的「傳送預覽 DM」會以目前設定產生一次 DM 報告，即使每日私訊價格報告尚未啟用也可先確認篩選效果與私訊可用性；多則 report chunks 會直接送到使用者 DM，settings 面板只回報送達狀態或可理解的失敗原因。
 - 「調整關鍵字」會開啟最多五格的 modal；不同格擇一符合，每格內以空白表示所有詞都要符合，全部留空代表不限。儲存仍使用逗號分隔 OR 組，例如 `RTX 5090, DDR5` 代表 `(RTX AND 5090) OR DDR5`。
 - 「調整時間」只設定每日私訊發送時間；`time` 使用台北時間 `HH:mm`，並接受手機常見的全形數字、全形冒號與冒號周邊空白。報告內容至少包含降價、漲價或新增商品其中一種。
-- 「開啟每日報告」會依目前面板設定啟用每日 DM；「關閉每日報告」會直接關閉每日價格報告 DM。
-- `/watch`：開啟 ephemeral 統合管理介面，分頁列出目前 Discord 使用者啟用中的目標價追蹤。使用者可按「新增追蹤」開啟表單，貼 PartsRadarTW 商品頁分享連結、網址列 `/products/<id>` URL 或站內商品 ID，並輸入純數字目標價格；也可從選單挑選既有追蹤後查看目前價格、價格資料時間、目標價格與追蹤狀態，再修改目標價或經確認後移除。每頁最多 25 筆，介面不顯示資料庫 watch ID。
+- 「開啟每日私訊價格報告」會依目前面板設定啟用每日 DM；「關閉每日私訊價格報告」會直接關閉該 DM 排程。
+- `/watch`：開啟 ephemeral 統合管理介面，依最近更新優先的固定順序，分頁列出目前 Discord 使用者啟用中的目標價追蹤。使用者可按「新增追蹤」開啟表單，貼 PartsRadarTW 商品頁分享連結、網址列 `/products/<id>` URL 或站內商品 ID，並輸入純數字目標價格；全形數字會先轉為半形，`NT$`、逗號、內部空格、小數、負數與文字仍會拒絕。使用者也可從選單挑選既有追蹤後查看目前價格、價格資料時間、目標價格與追蹤狀態，再修改目標價或經確認後移除單筆追蹤。每頁最多 25 筆，介面不提供篩選、排序選單或批次移除，也不顯示資料庫 watch ID。
 - Bot daemon 會掃描啟用且尚未通知的 watch；當目前價格與 watch 幣別一致且小於等於目標價時，以精簡 DM embed 發送商品名稱、目前價格、目標價格、站內商品連結與單一價格資料時間。
 - 同一 watch 成功發送後只通知一次；修改目標價或重新啟用 watch 會清除通知狀態。發送失敗或 Discord rate limit 不會標記成功，後續掃描仍可重試。
 - 每輪最多處理 25 筆達標 watch，並以 15 分鐘 notification claim lease 避免同時執行的 daemon 重複發送；程序在 claim 後中斷時，逾時 claim 可由後續掃描接手。
@@ -394,7 +394,7 @@ Bot 目標：
 - `DISCORD_FEATURE_PERSONAL_REPORTS_ENABLED`：是否執行個人價格報告排程與互動，預設 `true`；設為 `false` 時保留使用者設定但暫停 DM 報告。
 - `DISCORD_FEATURE_TARGET_WATCHES_ENABLED`：是否執行目標價追蹤掃描與互動，預設 `true`；設為 `false` 時保留 watch rows 但暫停通知與管理操作。
 - `DISCORD_BOT_COMMAND_COOLDOWN_SECONDS`：每位使用者手動指令 cooldown，預設 60。
-- `DISCORD_PRICE_REPORT_SCHEDULE_INTERVAL_SECONDS`：bot daemon 的目標價掃描間隔與每日報告 fallback 掃描上限，預設 300 秒，允許 60 到 3600。每日報告若有更早的 `nextSendAt`，daemon 會睡到該 due time 附近才醒來；目標價仍依設定間隔掃描，最短 sleep 為 1 秒，避免高頻輪詢。
+- `DISCORD_PRICE_REPORT_SCHEDULE_INTERVAL_SECONDS`：bot daemon 的目標價掃描間隔與每日私訊價格報告 fallback 掃描上限，預設 300 秒，允許 60 到 3600。每日私訊價格報告若有更早的 `nextSendAt`，daemon 會睡到該 due time 附近才醒來；目標價仍依設定間隔掃描，最短 sleep 為 1 秒，避免高頻輪詢。
 
 啟動：
 
@@ -413,7 +413,7 @@ docker compose -f compose.yml -f compose.ops.yml --profile discord-bot run --rm 
 
 已定案的第一輪限制：
 
-- 目前指令只開放每日報告；資料模型保留 `daily`、`every_12h`、`every_6h` 供後續擴充。
+- 目前指令只開放每日私訊價格報告；資料模型保留 `daily`、`every_12h`、`every_6h` 供後續擴充。
 - `window` 只支援 `24h`、`12h`、`6h`。
 - `scope` 仍只支援全站 `all`；個人化只做分類、商品名稱關鍵字與內容類型篩選，不接 `/watch` 清單，避免將 price-report 與單品目標價追蹤耦合。
 - 時區固定 `Asia/Taipei`。

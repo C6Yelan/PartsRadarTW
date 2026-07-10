@@ -66,7 +66,10 @@ describe("handleDiscordInteraction price report settings delivery", () => {
     const requestBody = JSON.parse(
       String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body),
     );
-    const deliveryStatus = readEmbedFieldValue(readResponseEmbed(requestBody), "最近一次每日報告");
+    const deliveryStatus = readEmbedFieldValue(
+      readResponseEmbed(requestBody),
+      "最近一次每日私訊價格報告",
+    );
 
     expect(deliveryStatus).toBe("成功：06/07 09:00 GMT+8，列出 7 筆，送出 2 則訊息。");
     expect(client.discordNotificationDelivery.findFirst).toHaveBeenCalledWith({
@@ -125,7 +128,10 @@ describe("handleDiscordInteraction price report settings delivery", () => {
     const requestBody = JSON.parse(
       String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body),
     );
-    const deliveryStatus = readEmbedFieldValue(readResponseEmbed(requestBody), "最近一次每日報告");
+    const deliveryStatus = readEmbedFieldValue(
+      readResponseEmbed(requestBody),
+      "最近一次每日私訊價格報告",
+    );
 
     expect(deliveryStatus).toContain("我目前無法傳送私訊給你");
     expect(deliveryStatus).not.toContain("private-token");
@@ -172,7 +178,10 @@ describe("handleDiscordInteraction price report settings delivery", () => {
     const requestBody = JSON.parse(
       String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body),
     );
-    const deliveryStatus = readEmbedFieldValue(readResponseEmbed(requestBody), "最近一次每日報告");
+    const deliveryStatus = readEmbedFieldValue(
+      readResponseEmbed(requestBody),
+      "最近一次每日私訊價格報告",
+    );
 
     expect(deliveryStatus).toContain("Discord 暫時無法完成通知");
     expect(deliveryStatus).not.toContain("50007");

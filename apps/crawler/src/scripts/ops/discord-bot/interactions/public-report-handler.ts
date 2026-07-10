@@ -3,6 +3,7 @@
 
 import {
   createPublicReportKeywordModal,
+  parsePriceReportCategorySelection,
   type parsePublicReportComponentInteraction,
 } from "../commands";
 import type { CommandCooldowns } from "../cooldowns";
@@ -21,7 +22,6 @@ import {
   sendModalInteractionResponse,
 } from "../rest";
 import type { DiscordBotClient, DiscordBotOptions, DiscordInteraction, FetchImpl } from "../types";
-import { parsePriceReportCategorySelection } from "./price-report-settings";
 import {
   createPublicPriceReportSettingsPanelMessage,
   formatPublicReportBotPermissionNotice,
