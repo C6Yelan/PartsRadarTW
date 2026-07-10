@@ -58,3 +58,14 @@
     width: 100%;
   }
 }
+
+@media (max-width: 520px) {
+  .discord-visual-panel {
+    padding-top: 12px;
+    border-top: 1px solid rgba(33, 51, 64, 0.78);
+  }
+
+  .discord-visual-frame {
+    display: none;
+  }
+}

@@ -69,7 +69,7 @@ export function PriceHistoryChart({
                 y2={chart.config.height - chart.config.padding.bottom}
               />
               <line
-                className="history-chart-axis-line history-chart-x-axis-line"
+                className="history-chart-axis-line"
                 x1={chart.config.padding.left}
                 x2={chart.config.width - chart.config.padding.right}
                 y1={chart.config.height - chart.config.padding.bottom}

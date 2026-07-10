@@ -3,6 +3,7 @@
 
 import type { MouseEvent } from "react";
 import { API_RATE_LIMITED_MESSAGE } from "../../_shared/api-client";
+import { ChevronDownIcon } from "../../_shared/icons";
 import type { CategoryItem, LoadState } from "../types";
 import { CategoryOption } from "./CategoryOption";
 
@@ -33,11 +34,11 @@ export function ProductFilters({
         <summary onClick={onKeepDesktopOpen}>
           <span>搜尋與篩選</span>
           <span className="filter-summary-meta">
-            <span className="filter-chevron" aria-hidden="true" />
+            <ChevronDownIcon className="filter-chevron" />
           </span>
         </summary>
         <div className="filter-stack">
-          <div className="filter-group">
+          <div>
             <span className="filter-title">分類</span>
             <div className="category-list" role="radiogroup" aria-label="分類">
               {categories.map((category) => (

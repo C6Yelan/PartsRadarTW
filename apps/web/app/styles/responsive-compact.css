@@ -4,19 +4,6 @@
     font-size: 18px;
   }
 
-  .segmented-control {
-    grid-template-columns: 1fr;
-  }
-
-  .segmented-control button {
-    border-right: 0;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .segmented-control button:last-child {
-    border-bottom: 0;
-  }
-
   .toolbar-segmented-control {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -51,10 +38,6 @@
   .detail-share-action {
     padding: 0 6px;
     font-size: 12px;
-  }
-
-  .detail-actions .external-action::after {
-    display: none;
   }
 
   .product-image {

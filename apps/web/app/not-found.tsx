@@ -2,6 +2,7 @@
 // 提供 App Router 找不到頁面時的全站 404 畫面，保留品牌入口與來源聲明。
 
 import Link from "next/link";
+import { BrandMarkIcon } from "./_shared/icons";
 import SiteDisclaimer from "./site-disclaimer";
 
 // 顯示未知路由的回首頁引導，讓使用者回到商品查詢流程。
@@ -9,7 +10,7 @@ export default function NotFound() {
   return (
     <main className="not-found-shell">
       <Link className="brand-lockup not-found-brand" href="/">
-        <span className="brand-mark" aria-hidden="true" />
+        <BrandMarkIcon />
         <span>
           <span className="brand-name">PartsRadarTW</span>
           <span className="brand-subtitle">原價屋零件查詢</span>

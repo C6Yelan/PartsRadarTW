@@ -136,11 +136,10 @@
 }
 
 .build-list-link-icon {
+  width: 14px;
+  height: 14px;
   color: currentColor;
-  font-size: 11px;
-  line-height: 1;
   opacity: 0.68;
-  transform: translateY(-1px);
   transition:
     opacity 140ms ease,
     transform 140ms ease;
@@ -149,7 +148,7 @@
 .build-list-links a:hover .build-list-link-icon,
 .build-list-links a:focus-visible .build-list-link-icon {
   opacity: 1;
-  transform: translate(1px, -2px);
+  transform: translate(1px, -1px);
 }
 
 .build-list-item-controls {

@@ -29,10 +29,10 @@
     transform 140ms ease;
 }
 
-.back-link::before {
-  content: "←";
-  font-size: 15px;
-  line-height: 1;
+.back-link .ui-icon {
+  width: 15px;
+  height: 15px;
+  transition: transform 140ms ease;
 }
 
 .back-link:hover,
@@ -41,6 +41,11 @@
   background: var(--surface-hover);
   color: var(--text-strong);
   transform: translateY(-1px);
+}
+
+.back-link:hover .ui-icon,
+.back-link:focus-visible .ui-icon {
+  transform: translateX(-1px);
 }
 
 .detail-layout {

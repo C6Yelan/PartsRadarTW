@@ -10,7 +10,7 @@
   display: grid;
   flex: 0 0 auto;
   place-items: center;
-  width: 38px;
+  width: 44px;
   aspect-ratio: 1;
   border: 1px solid rgba(143, 180, 204, 0.28);
   border-radius: 8px;
@@ -32,6 +32,21 @@
   display: block;
   width: 22px;
   aspect-ratio: 1;
+}
+
+.discord-invite-icon {
+  width: 15px;
+  height: 15px;
+  opacity: 0.78;
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease;
+}
+
+.discord-actions a:hover .discord-invite-icon,
+.discord-actions a:focus-visible .discord-invite-icon {
+  opacity: 1;
+  transform: translate(1px, -1px);
 }
 
 .discord-shell {

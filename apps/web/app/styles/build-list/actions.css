@@ -36,10 +36,6 @@
 .build-list-floating-icon {
   width: 27px;
   height: 27px;
-  stroke: currentColor;
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
 }
 
 .build-list-floating-badge {
@@ -99,15 +95,12 @@
 }
 
 .build-list-detail-action {
-  border-color: rgba(120, 216, 149, 0.36);
-  background: rgba(120, 216, 149, 0.1);
-  color: var(--success);
-}
-
-.build-list-detail-action {
   min-height: 40px;
   min-width: 120px;
   padding: 0 14px;
+  border-color: rgba(120, 216, 149, 0.36);
+  background: rgba(120, 216, 149, 0.1);
+  color: var(--success);
   font-size: 13px;
   white-space: nowrap;
 }

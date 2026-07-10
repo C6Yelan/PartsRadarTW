@@ -4,6 +4,7 @@
 
 import Link from "next/link";
 import { formatTwdPrice } from "../../_shared/formatting";
+import { ExternalLinkIcon } from "../../_shared/icons";
 import { formatTaipeiDateTime } from "../../_shared/time";
 import { BUILD_LIST_MAX_QUANTITY, type BuildListItem, getBuildListLineSubtotal } from "../model";
 import BuildListItemImage from "./BuildListItemImage";
@@ -61,11 +62,14 @@ export default function BuildListItemRow({
         </dl>
         {product ? (
           <div className="build-list-links">
-            <a href={product.source.url} rel="noreferrer" target="_blank">
+            <a
+              aria-label="原價屋查看／購買，開新分頁"
+              href={product.source.url}
+              rel="noreferrer"
+              target="_blank"
+            >
               原價屋查看／購買
-              <span className="build-list-link-icon" aria-hidden="true">
-                ↗
-              </span>
+              <ExternalLinkIcon className="build-list-link-icon" />
             </a>
           </div>
         ) : null}

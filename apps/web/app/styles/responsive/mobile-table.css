@@ -127,27 +127,39 @@
 
   .pagination-bar {
     display: grid;
-    grid-template-columns: auto auto auto;
+    grid-template-areas:
+      "previous next"
+      "pages pages"
+      "jump jump";
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 6px;
-    justify-content: center;
+    width: 100%;
   }
 
   .pagination-bar > .icon-button,
   .pagination-bar .page-buttons button {
-    min-height: 40px;
-    min-width: 34px;
+    min-height: 44px;
+    min-width: 40px;
     padding: 0 8px;
     font-size: 14px;
   }
 
   .pagination-bar > .icon-button {
-    min-width: 62px;
-    flex: 0 0 auto;
+    width: 100%;
+  }
+
+  .pagination-bar > .icon-button:first-child {
+    grid-area: previous;
+  }
+
+  .pagination-bar > .icon-button:last-of-type {
+    grid-area: next;
   }
 
   .page-buttons {
-    width: auto;
-    flex-wrap: nowrap;
+    grid-area: pages;
+    width: 100%;
+    flex-wrap: wrap;
     gap: 4px;
   }
 
@@ -157,8 +169,8 @@
   }
 
   .page-jump {
-    grid-column: 1 / -1;
-    width: auto;
+    grid-area: jump;
+    width: 100%;
     justify-content: center;
   }
 

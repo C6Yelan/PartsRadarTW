@@ -4,6 +4,7 @@
 
 import Link from "next/link";
 import type { MouseEvent, SyntheticEvent } from "react";
+import { BrandMarkIcon, ClearIcon, SearchIcon } from "../../_shared/icons";
 import { formatTaipeiDateTime } from "../../_shared/time";
 import DiscordTopbarLink from "../../DiscordTopbarLink";
 import type { ProductsResponse, QueryState } from "../types";
@@ -28,7 +29,7 @@ export function ProductExplorerHeader({
     <header className="topbar">
       <div className="topbar-brand-area">
         <Link className="brand-lockup" href="/" onClick={onReturnHome}>
-          <span className="brand-mark" aria-hidden="true" />
+          <BrandMarkIcon />
           <span>
             <span className="brand-name">PartsRadarTW</span>
             <span className="brand-subtitle">原價屋零件查詢</span>
@@ -41,7 +42,7 @@ export function ProductExplorerHeader({
         <label className="sr-only" htmlFor="global-search">
           搜尋商品名稱
         </label>
-        <span className="search-glyph" aria-hidden="true" />
+        <SearchIcon className="search-glyph" />
         <input
           id="global-search"
           maxLength={100}
@@ -56,7 +57,9 @@ export function ProductExplorerHeader({
             className="search-clear-button"
             type="button"
             onClick={onClearSearchDraft}
-          />
+          >
+            <ClearIcon />
+          </button>
         ) : null}
         <button className="control-button primary" type="submit">
           搜尋

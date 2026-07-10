@@ -1,6 +1,7 @@
 // apps/web/app/products/[id]/price-history/chart/overlays.tsx
 // 顯示價格走勢圖上的固定高低點標記與互動 tooltip。
 
+import type { CSSProperties } from "react";
 import { formatTwdPrice } from "../../../../_shared/formatting";
 import { formatTaipeiMonthDayTime } from "../../../../_shared/time";
 import { formatPointSource, formatSignedPercent } from "../format";
@@ -14,13 +15,17 @@ export function FixedChartMarker({
   chartConfig: ChartConfig;
   marker: ChartMarker;
 }) {
+  const isBelow = marker.point.y / chartConfig.height < 0.32;
+
   return (
     <div
-      className={`history-chart-marker is-${marker.tone}`}
-      style={{
-        left: `${(marker.point.x / chartConfig.width) * 100}%`,
-        top: `${(marker.point.y / chartConfig.height) * 100}%`,
-      }}
+      className={`history-chart-marker is-${marker.tone}${isBelow ? " is-below" : ""}`}
+      style={
+        {
+          "--history-overlay-left": `${(marker.point.x / chartConfig.width) * 100}%`,
+          top: `${(marker.point.y / chartConfig.height) * 100}%`,
+        } as CSSProperties
+      }
     >
       <span>{marker.label}</span>
       <strong>{formatTwdPrice(marker.point.amount)}</strong>
@@ -36,11 +41,15 @@ export function HistoryTooltip({
   chartConfig: ChartConfig;
   point: ChartPoint;
 }) {
-  const left = `${Math.min(Math.max((point.x / chartConfig.width) * 100, 12), 88)}%`;
+  const left = `${(point.x / chartConfig.width) * 100}%`;
   const top = `${(point.y / chartConfig.height) * 100}%`;
+  const isBelow = point.y / chartConfig.height < 0.32;
 
   return (
-    <div className="history-tooltip" style={{ left, top }}>
+    <div
+      className={`history-tooltip${isBelow ? " is-below" : ""}`}
+      style={{ "--history-overlay-left": left, top } as CSSProperties}
+    >
       <span>{formatTaipeiMonthDayTime(point.observedAt)}</span>
       <strong>{formatTwdPrice(point.amount)}</strong>
       <small>{`${formatPointSource(point.observationType)} · ${formatSignedPercent(

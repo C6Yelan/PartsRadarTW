@@ -35,6 +35,11 @@
   display: none;
 }
 
+.filter-panel summary:focus-visible {
+  outline: 2px solid rgba(166, 196, 215, 0.68);
+  outline-offset: -3px;
+}
+
 .filter-summary-meta {
   display: none;
   gap: 8px;
@@ -45,16 +50,13 @@
 }
 
 .filter-chevron {
-  width: 8px;
-  aspect-ratio: 1;
-  border-right: 2px solid currentColor;
-  border-bottom: 2px solid currentColor;
-  transform: rotate(45deg);
+  width: 18px;
+  height: 18px;
   transition: transform 140ms ease;
 }
 
 .filter-panel details[open] .filter-chevron {
-  transform: rotate(225deg);
+  transform: rotate(180deg);
 }
 
 .filter-stack {

@@ -2,6 +2,7 @@
 // 呈現商品探索頁的廠商多選下拉篩選器，並處理選單開合與關閉互動。
 
 import { useEffect, useRef, useState } from "react";
+import { ChevronDownIcon } from "../../_shared/icons";
 import type { ProductVendorOption } from "../types";
 
 interface VendorFilterProps {
@@ -81,7 +82,7 @@ export function VendorFilter({
             onClick={() => setIsOpen((current) => !current)}
           >
             <span>{summaryLabel}</span>
-            <span className="filter-chevron" aria-hidden="true" />
+            <ChevronDownIcon className="filter-chevron" />
           </button>
           {isOpen ? (
             <div className="vendor-menu-popover">

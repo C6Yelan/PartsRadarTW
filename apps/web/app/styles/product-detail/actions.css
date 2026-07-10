@@ -40,22 +40,26 @@
   white-space: nowrap;
 }
 
-.detail-actions .external-action::after {
-  content: "↗";
+.detail-action-icon {
+  width: 15px;
+  height: 15px;
   color: currentColor;
-  font-size: 12px;
-  line-height: 1;
   opacity: 0.68;
-  transform: translateY(-1px);
   transition:
     opacity 140ms ease,
     transform 140ms ease;
 }
 
-.detail-actions .external-action:hover::after,
-.detail-actions .external-action:focus-visible::after {
+.detail-actions .external-action:hover .detail-action-icon,
+.detail-actions .external-action:focus-visible .detail-action-icon,
+.detail-share-action:hover .detail-action-icon,
+.detail-share-action:focus-visible .detail-action-icon {
   opacity: 1;
-  transform: translate(1px, -2px);
+}
+
+.detail-actions .external-action:hover .detail-action-icon,
+.detail-actions .external-action:focus-visible .detail-action-icon {
+  transform: translate(1px, -1px);
 }
 
 .detail-share-action {

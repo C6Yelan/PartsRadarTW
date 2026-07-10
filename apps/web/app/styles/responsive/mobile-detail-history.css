@@ -1,4 +1,10 @@
 /* apps/web/app/styles/responsive/mobile-detail-history.css */
+@media (max-width: 900px) {
+  .history-insight-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 760px) {
   .detail-facts {
     display: grid;
@@ -72,7 +78,6 @@
 
   .history-insight-grid {
     order: 2;
-    grid-template-columns: 1fr;
   }
 
   .history-chart-wrap {

@@ -4,6 +4,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { ArrowLeftIcon, BrandMarkIcon } from "../_shared/icons";
 import DiscordTopbarLink from "../DiscordTopbarLink";
 import SiteDisclaimer from "../site-disclaimer";
 import BuildListEmptyState from "./components/BuildListEmptyState";
@@ -98,7 +99,7 @@ export default function BuildListPageClient() {
       <header className="topbar build-list-topbar">
         <div className="topbar-brand-area">
           <Link className="brand-lockup" href="/">
-            <span className="brand-mark" aria-hidden="true" />
+            <BrandMarkIcon />
             <span>
               <span className="brand-name">PartsRadarTW</span>
               <span className="brand-subtitle">原價屋零件查詢</span>
@@ -113,6 +114,7 @@ export default function BuildListPageClient() {
         </div>
 
         <Link className="back-link build-list-back-link" href="/">
+          <ArrowLeftIcon />
           返回查詢
         </Link>
       </header>

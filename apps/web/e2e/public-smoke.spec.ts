@@ -2,6 +2,7 @@
 // 以 Playwright 驗證公開網站主要頁面、配單互動與 public API 的基本可用性。
 
 import { type APIRequestContext, expect, test } from "@playwright/test";
+import { expectImagesLoaded } from "./support/images";
 
 interface ProductListResponse {
   data: Array<{
@@ -33,22 +34,32 @@ test.describe("public web smoke", () => {
 
     await page.goto("/discord");
     await expect(page.getByRole("heading", { exact: true, name: "Discord 通知" })).toBeVisible();
-    await expect(page.getByRole("img", { name: "Discord 指令選單截圖" })).toBeVisible();
+    const heroScreenshot = page.getByRole("img", { name: "Discord 指令選單截圖" });
+    await expect(heroScreenshot).toBeAttached();
+    if ((page.viewportSize()?.width ?? 0) > 520) {
+      await expect(heroScreenshot).toBeVisible();
+    } else {
+      await expect(heroScreenshot).toBeHidden();
+    }
     await expect(page.getByRole("heading", { name: "快速開始" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "指令說明" })).toBeVisible();
     const commandsSection = page.getByRole("region", { name: "指令說明" });
     await expect(
-      commandsSection.getByRole("heading", { exact: true, name: "即時目標價提醒" }),
+      commandsSection.getByRole("heading", { exact: true, name: "目標價提醒" }),
     ).toBeVisible();
     await expect(
-      commandsSection.getByRole("heading", { exact: true, name: "個人價格報告" }),
+      commandsSection.getByRole("heading", {
+        exact: true,
+        name: "即時價格報告與每日私訊價格報告",
+      }),
     ).toBeVisible();
     await expect(
-      commandsSection.getByRole("heading", { exact: true, name: "伺服器公開報告" }),
+      commandsSection.getByRole("heading", { exact: true, name: "公開價格報告" }),
     ).toBeVisible();
-    await expect(page.getByRole("img", { name: "/watch 即時目標價提醒面板截圖" })).toBeVisible();
-    await expect(page.getByRole("img", { name: "個人價格報告設定截圖" })).toBeVisible();
-    await expect(page.getByRole("img", { name: "伺服器公開報告管理面板截圖" })).toBeVisible();
+    await expectImagesLoaded(page.locator(".discord-guide-image"));
+    await expect(page.getByRole("img", { name: "/watch 目標價提醒面板截圖" })).toBeVisible();
+    await expect(page.getByRole("img", { name: "每日私訊價格報告設定截圖" })).toBeVisible();
+    await expect(page.getByRole("img", { name: "公開價格報告管理面板截圖" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "常見問題" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "一般成員能用哪些指令？" })).toBeVisible();
   });
