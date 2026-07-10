@@ -8,11 +8,6 @@ import { defineConfig, env } from "prisma/config";
 const workspaceRoot = resolve(__dirname, "../..");
 
 loadDotenv({ path: resolve(workspaceRoot, ".env"), quiet: true });
-loadDotenv({
-  path: resolve(workspaceRoot, ".env.local"),
-  override: true,
-  quiet: true,
-});
 
 export default defineConfig({
   schema: "prisma/schema.prisma",

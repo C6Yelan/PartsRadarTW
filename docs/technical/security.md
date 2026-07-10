@@ -31,7 +31,7 @@
 
 規則：
 
-- `.env`、`.env.local`、DB password、SSH key、Cloudflare Tunnel token、部署 token 不提交。
+- `.env`、DB password、SSH key、Cloudflare Tunnel token、部署 token 不提交。
 - `.env.example` 只放非敏感欄位與 placeholder。
 - `DATABASE_URL` 不出現在 log、API response、client bundle 或文件真實值。
 - Web runtime source 不使用 `console.*`，避免把後端錯誤或 internal state 帶到 browser console。

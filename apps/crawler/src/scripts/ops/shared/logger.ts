@@ -1,5 +1,7 @@
 // apps/crawler/src/scripts/ops/shared/logger.ts
 // 提供 ops daemon / CLI 共用的 key-value logger，統一 log level、時間戳與敏感字串遮蔽。
+import { sanitizeSensitiveText } from "../../shared/script-utils";
+
 export type OpsLogLevel = "debug" | "info" | "warn" | "error";
 
 // ops 腳本使用的最小 logger 介面，方便測試注入 sink 並避免直接散落 console 呼叫。
@@ -57,7 +59,7 @@ export function formatOpsLogLine(
   return [
     timestamp.toISOString(),
     `level=${level}`,
-    `message=${formatOpsLogValue(redactSensitiveText(message))}`,
+    `message=${formatOpsLogValue(message)}`,
     ...fieldEntries,
   ].join(" ");
 }
@@ -77,16 +79,7 @@ function formatOpsLogValue(value: unknown): string {
     return String(value);
   }
 
-  const text = redactSensitiveText(String(value));
+  const text = sanitizeSensitiveText(String(value));
 
   return /^[A-Za-z0-9._:/-]+$/.test(text) ? text : JSON.stringify(text);
-}
-
-// 遮蔽常見 key=value secret 片段，避免 token、password、secret 與 webhook URL 進入 ops log。
-function redactSensitiveText(value: string): string {
-  return value
-    .replace(/(token=)[^\s]+/gi, "$1[redacted]")
-    .replace(/(password=)[^\s]+/gi, "$1[redacted]")
-    .replace(/(secret=)[^\s]+/gi, "$1[redacted]")
-    .replace(/(webhookUrl=)[^\s]+/gi, "$1[redacted]");
 }

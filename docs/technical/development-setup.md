@@ -65,7 +65,7 @@ docs/
 
 ## 環境變數
 
-repo 應提供 `.env.example` 作為範本。實際本機設定使用 `.env.local` 或各 app 對應的 local env 檔，不提交到 Git。
+repo 應提供 `.env.example` 作為範本。實際本機設定由 `.env.example` 複製為 workspace `.env`，並可由既有 process env 覆寫；`.env` 不提交到 Git。
 
 第一版預期環境變數：
 
@@ -102,7 +102,7 @@ repo 應提供 `.env.example` 作為範本。實際本機設定使用 `.env.loca
 規則：
 
 - `.env.example` 可以提交。
-- `.env`、`.env.local`、實際密碼、Cloudflare Tunnel token 與私鑰不可提交。
+- `.env`、實際密碼、Cloudflare Tunnel token 與私鑰不可提交。
 - 正式環境的 env 應在 Ubuntu VM 或部署工具內管理。
 
 ## PostgreSQL
@@ -232,7 +232,6 @@ Parser 修正後，應能使用保存的 raw snapshot 或 fixture 重跑測試�
 - `.next/`
 - build output。
 - `.env`
-- `.env.local`
 - raw snapshot 檔案。
 - 本機資料庫 volume。
 - IDE 或作業系統產生的暫存檔。

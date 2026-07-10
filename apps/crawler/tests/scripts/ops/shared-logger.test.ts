@@ -15,7 +15,7 @@ describe("ops logger", () => {
     ).toBe('2026-07-03T01:02:03.004Z level=info message="cycle finished" status=OK count=3');
   });
 
-  it("filters by level and redacts common secret fields", () => {
+  it("filters by level and sanitizes messages and structured field values", () => {
     const lines: string[] = [];
     const logger = createOpsLogger({
       level: "warn",
@@ -23,11 +23,20 @@ describe("ops logger", () => {
       sink: (line) => lines.push(line),
     });
 
-    logger.info("token=abc skipped");
-    logger.error("webhookUrl=https://discord.example/token failed");
+    logger.info("token=fake-filtered-token skipped");
+    logger.error("Authorization: Bearer fake-message-token failed", {
+      database: "postgresql://fake-user:fake-password@db.example/app",
+      webhook: "https://discord.com/api/webhooks/123/fake-webhook-token",
+      product: "RTX 5090",
+    });
 
-    expect(lines).toEqual([
-      "2026-07-03T01:02:03.004Z level=error message=\"webhookUrl=[redacted] failed\"",
-    ]);
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain('message="Authorization: Bearer [redacted] failed"');
+    expect(lines[0]).toContain('database="postgresql://[redacted]"');
+    expect(lines[0]).toContain('webhook="https://discord.com/api/webhooks/[redacted]"');
+    expect(lines[0]).toContain('product="RTX 5090"');
+    expect(lines[0]).not.toContain("fake-message-token");
+    expect(lines[0]).not.toContain("fake-password");
+    expect(lines[0]).not.toContain("fake-webhook-token");
   });
 });
