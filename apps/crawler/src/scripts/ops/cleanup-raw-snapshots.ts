@@ -1,24 +1,29 @@
 // apps/crawler/src/scripts/ops/cleanup-raw-snapshots.ts
 // 手動執行 raw snapshot 保留規則清理，預設 dry-run，只有明確確認後才刪 metadata 與孤立 gzip 檔。
 
-import { isAbsolute, parse, relative, resolve } from "node:path";
+import { isAbsolute, relative, resolve } from "node:path";
 import type { PrismaClient } from "@partsradar/db";
 import {
   DEFAULT_RAW_SNAPSHOT_ABNORMAL_RETENTION_DAYS,
   DEFAULT_RAW_SNAPSHOT_NORMAL_RETENTION_DAYS,
+  type CleanupRawSnapshotsResult,
+  type PrismaRawSnapshotCleanupClient,
   cleanupRawSnapshotsWithPrisma,
 } from "../../coolpc/raw-snapshot-cleanup";
 import {
+  DEFAULT_RAW_SNAPSHOT_STORAGE_DIR,
+  resolveAllowlistedRawSnapshotStorage,
+  tryAcquireRawSnapshotMutationLock,
+} from "../../coolpc/raw-snapshot-storage";
+import {
   getNumberArg,
   loadWorkspaceEnv,
-  resolveWorkspacePathArgument,
   resolveWorkspaceRoot,
   toSafeCliErrorMessage,
 } from "../shared/script-utils";
 
 const CONFIRM_DELETE_FLAG = "--confirm-delete";
 const HELP_FLAG = "--help";
-const DEFAULT_STORAGE_DIR = "temp/coolpc-daemon/snapshots";
 const VALUE_FLAGS = new Set([
   "--storage-dir",
   "--normal-retention-days",
@@ -30,9 +35,23 @@ const ALLOWED_FLAGS = new Set([...VALUE_FLAGS, ...BOOLEAN_FLAGS]);
 export interface CleanupOptions {
   workspaceRoot: string;
   storageDir: string;
+  mutationRoot: string;
+  storagePathPrefix: string;
   normalRetentionDays: number;
   abnormalRetentionDays: number;
   dryRun: boolean;
+}
+
+export type RawSnapshotCleanupExecutor = (options: {
+  client: PrismaRawSnapshotCleanupClient;
+  storageDir: string;
+  normalRetentionDays: number;
+  abnormalRetentionDays: number;
+  dryRun: boolean;
+}) => Promise<CleanupRawSnapshotsResult>;
+
+interface CleanupStorageValidationOptions {
+  additionalAllowedRootsForTesting?: string[];
 }
 
 // CLI 入口：載入 env、建立 Prisma client，並執行一次 raw snapshot cleanup。
@@ -53,12 +72,10 @@ async function main(): Promise<void> {
     const db = await import("@partsradar/db");
     client = db.prisma;
 
-    const result = await cleanupRawSnapshotsWithPrisma({
+    const result = await runRawSnapshotCleanup({
       client,
-      storageDir: options.storageDir,
-      normalRetentionDays: options.normalRetentionDays,
-      abnormalRetentionDays: options.abnormalRetentionDays,
-      dryRun: options.dryRun,
+      options,
+      owner: "raw-snapshot-cleanup",
     });
 
     printSummary(options, result);
@@ -72,6 +89,7 @@ export function parseCleanupOptions(
   args: string[],
   workspaceRoot: string,
   env: NodeJS.ProcessEnv = process.env,
+  validationOptions: CleanupStorageValidationOptions = {},
 ): CleanupOptions {
   const normalizedArgs = normalizeCleanupArgs(args);
   validateCleanupArgs(normalizedArgs);
@@ -90,18 +108,67 @@ export function parseCleanupOptions(
   validateRetentionDays(normalRetentionDays, "--normal-retention-days");
   validateRetentionDays(abnormalRetentionDays, "--abnormal-retention-days");
 
+  const storageLocation = resolveAllowlistedRawSnapshotStorage({
+    workspaceRoot,
+    requestedDir:
+      getStringArgAllowingEmpty(normalizedArgs, "--storage-dir") ??
+      env.SNAPSHOT_STORAGE_DIR ??
+      DEFAULT_RAW_SNAPSHOT_STORAGE_DIR,
+    configuredDir: env.SNAPSHOT_STORAGE_DIR,
+    additionalAllowedRootsForTesting: validationOptions.additionalAllowedRootsForTesting,
+  });
+
   return {
     workspaceRoot,
-    storageDir: resolveAndValidateStorageDir(
-      workspaceRoot,
-      getStringArgAllowingEmpty(normalizedArgs, "--storage-dir") ??
-        env.SNAPSHOT_STORAGE_DIR ??
-        DEFAULT_STORAGE_DIR,
-    ),
+    ...storageLocation,
     normalRetentionDays,
     abnormalRetentionDays,
     dryRun: !normalizedArgs.includes(CONFIRM_DELETE_FLAG),
   };
+}
+
+// confirmed cleanup 與所有 raw writers 共用 matched root 的 mutation lock；dry-run 保持純讀取。
+export async function runRawSnapshotCleanup({
+  client,
+  options,
+  owner,
+  cleanup = cleanupRawSnapshotsWithPrisma,
+  acquireMutationLock = tryAcquireRawSnapshotMutationLock,
+}: {
+  client: PrismaRawSnapshotCleanupClient;
+  options: CleanupOptions;
+  owner: string;
+  cleanup?: RawSnapshotCleanupExecutor;
+  acquireMutationLock?: typeof tryAcquireRawSnapshotMutationLock;
+}): Promise<CleanupRawSnapshotsResult> {
+  const cleanupOptions = {
+    client,
+    storageDir: options.mutationRoot,
+    normalRetentionDays: options.normalRetentionDays,
+    abnormalRetentionDays: options.abnormalRetentionDays,
+    dryRun: options.dryRun,
+  };
+
+  if (options.dryRun) {
+    return cleanup(cleanupOptions);
+  }
+
+  const lock = await acquireMutationLock({
+    mutationRoot: options.mutationRoot,
+    owner,
+  });
+
+  if (!lock) {
+    throw new Error(
+      "Raw snapshot storage is busy; another crawler or cleanup process holds the mutation lock.",
+    );
+  }
+
+  try {
+    return await cleanup(cleanupOptions);
+  } finally {
+    await lock.release();
+  }
 }
 
 // 驗證 CLI 參數只包含明確允許的 flag，避免拼字錯誤被默默忽略。
@@ -136,26 +203,6 @@ export function normalizeCleanupArgs(args: string[]): string[] {
   return args.filter((arg) => arg !== "--");
 }
 
-// 擋下空值、filesystem root 與 workspace root，避免 cleanup 對過大的目錄範圍執行刪除。
-export function validateStorageDir(storageDir: string, workspaceRoot: string): string {
-  const resolvedStorageDir = resolve(storageDir);
-  const resolvedWorkspaceRoot = resolve(workspaceRoot);
-
-  if (storageDir.trim() === "") {
-    throw new Error(`Unsafe snapshot storage dir "${storageDir}": value must not be empty.`);
-  }
-
-  if (isFilesystemRoot(resolvedStorageDir)) {
-    throw new Error(`Unsafe snapshot storage dir "${storageDir}": filesystem root cannot be used.`);
-  }
-
-  if (resolvedStorageDir === resolvedWorkspaceRoot) {
-    throw new Error(`Unsafe snapshot storage dir "${storageDir}": workspace root cannot be used.`);
-  }
-
-  return resolvedStorageDir;
-}
-
 // 將 storage path 轉成摘要用文字；工作區內顯示相對路徑，工作區外保留絕對路徑。
 export function formatStorageDirForSummary(workspaceRoot: string, storageDir: string): string {
   const resolvedWorkspaceRoot = resolve(workspaceRoot);
@@ -169,16 +216,7 @@ export function formatStorageDirForSummary(workspaceRoot: string, storageDir: st
   return resolvedStorageDir;
 }
 
-// 先套用 workspace-relative path 解析，再走刪除目錄安全檢查。
-function resolveAndValidateStorageDir(workspaceRoot: string, storageDir: string): string {
-  if (storageDir.trim() === "") {
-    throw new Error(`Unsafe snapshot storage dir "${storageDir}": value must not be empty.`);
-  }
-
-  return validateStorageDir(resolveWorkspacePathArgument(workspaceRoot, storageDir), workspaceRoot);
-}
-
-// 允許測試覆蓋空字串 storage-dir，讓 validateStorageDir 的防呆能被直接驗證。
+// 允許測試覆蓋空字串 storage-dir，讓 allowlist validator 的防呆能被直接驗證。
 function getStringArgAllowingEmpty(args: string[], name: string): string | undefined {
   const index = args.indexOf(name);
 
@@ -194,13 +232,6 @@ function validateRetentionDays(value: number, name: string): void {
   if (!Number.isSafeInteger(value) || value <= 0) {
     throw new Error(`${name} must be a positive integer.`);
   }
-}
-
-// 判斷指定 path 是否為 filesystem root，供 storage-dir 安全檢查使用。
-function isFilesystemRoot(path: string): boolean {
-  const root = parse(path).root;
-
-  return root !== "" && path === root;
 }
 
 // 輸出 one-shot cleanup 摘要；dry-run 會提示需要 --confirm-delete 才會真正刪除。
@@ -251,10 +282,13 @@ Options:
                                   Retention for INVALID and SUSPECTED_BLOCK snapshots.
                                   Default: ${DEFAULT_RAW_SNAPSHOT_ABNORMAL_RETENTION_DAYS}
   --storage-dir <path>            Snapshot storage directory from the workspace root.
-                                  Default: SNAPSHOT_STORAGE_DIR or ${DEFAULT_STORAGE_DIR}
+                                  Must equal the active root or its controlled child.
+                                  SNAPSHOT_STORAGE_DIR replaces the built-in default when set.
+                                  Default: SNAPSHOT_STORAGE_DIR or ${DEFAULT_RAW_SNAPSHOT_STORAGE_DIR}
 
 Safety:
-  Do not run this cleanup while manual crawler, scheduled crawler, or raw replay writes are running.
+  Confirmed deletion stops if a crawler/replay holds the raw snapshot mutation lock.
+  Dry-run does not acquire or modify that lock.
 `);
 }
 

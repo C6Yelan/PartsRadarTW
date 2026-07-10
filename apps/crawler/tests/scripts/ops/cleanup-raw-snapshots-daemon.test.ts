@@ -72,7 +72,7 @@ describe("raw snapshot cleanup daemon options", () => {
           "--abnormal-retention-days",
           "14",
         ],
-        {},
+        { SNAPSHOT_STORAGE_DIR: "/var/lib/partsradar/snapshots" },
         crawlerCwd,
       ),
     ).toMatchObject({
@@ -166,6 +166,7 @@ describe("raw snapshot cleanup daemon options", () => {
         cleanup: async () => {
           throw error;
         },
+        acquireMutationLock: async () => createFakeMutationLock(),
         logMessage: () => {},
       }),
     ).rejects.toThrow(error);
@@ -183,6 +184,7 @@ describe("raw snapshot cleanup daemon options", () => {
         cleanup: async () => {
           throw new Error("temporary cleanup failure");
         },
+        acquireMutationLock: async () => createFakeMutationLock(),
         logMessage: (message) => logs.push(message),
       }),
     ).resolves.toBeUndefined();
@@ -201,10 +203,30 @@ describe("raw snapshot cleanup daemon options", () => {
         cleanupCalls += 1;
         return SUCCESSFUL_CLEANUP_RESULT;
       },
+      acquireMutationLock: async () => createFakeMutationLock(),
       logMessage: () => {},
     });
 
     expect(cleanupCalls).toBe(1);
+  });
+
+  it("does not invoke daemon cleanup when the mutation lock is busy", async () => {
+    let cleanupCalls = 0;
+
+    await expect(
+      runRawSnapshotCleanupDaemon({
+        client: {} as never,
+        options: createDaemonOptions({ runOnce: true }),
+        shutdown: createFakeShutdown(),
+        cleanup: async () => {
+          cleanupCalls += 1;
+          return SUCCESSFUL_CLEANUP_RESULT;
+        },
+        acquireMutationLock: async () => null,
+        logMessage: () => {},
+      }),
+    ).rejects.toThrow("another crawler or cleanup process holds the mutation lock");
+    expect(cleanupCalls).toBe(0);
   });
 });
 
@@ -214,12 +236,22 @@ function createDaemonOptions(
   return {
     workspaceRoot: "/workspace",
     storageDir: "/var/lib/partsradar/snapshots",
+    mutationRoot: "/var/lib/partsradar/snapshots",
+    storagePathPrefix: "",
     normalRetentionDays: 30,
     abnormalRetentionDays: 90,
     dryRun: false,
     intervalSeconds: 86400,
     runOnce: false,
     ...overrides,
+  };
+}
+
+function createFakeMutationLock() {
+  return {
+    lockDir: "/var/lib/partsradar/snapshots/.locks/raw-snapshot-mutation",
+    owner: "test-cleanup-daemon",
+    async release() {},
   };
 }
 

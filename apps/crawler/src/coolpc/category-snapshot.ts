@@ -42,6 +42,7 @@ export interface CoolpcCategorySnapshotInput {
 
 interface ProcessCoolpcCategorySnapshotBaseOptions {
   storageDir: string;
+  storagePathPrefix?: string;
   crawlRunId: string;
   category: CrawlRunSourceCategory;
   snapshot: CoolpcCategorySnapshotInput;
@@ -128,7 +129,7 @@ export function processCoolpcCategorySnapshotWithPrisma(
 export async function processCoolpcCategorySnapshot(
   options: ProcessCoolpcCategorySnapshotOptions,
 ): Promise<ProcessCrawlCategoryResult> {
-  const { client, storageDir, crawlRunId, category, snapshot } = options;
+  const { client, storageDir, storagePathPrefix, crawlRunId, category, snapshot } = options;
   const productWriter = options.writeProducts
     ? options.writeProducts
     : createDefaultProductWriter(options.client);
@@ -139,6 +140,7 @@ export async function processCoolpcCategorySnapshot(
     const rawSnapshot = await recordRawSnapshot({
       client,
       storageDir,
+      storagePathPrefix,
       crawlRunId,
       sourceCategoryId: category.id,
       url,
@@ -168,6 +170,7 @@ export async function processCoolpcCategorySnapshot(
   const rawSnapshot = await recordRawSnapshot({
     client,
     storageDir,
+    storagePathPrefix,
     crawlRunId,
     sourceCategoryId: category.id,
     url,

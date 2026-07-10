@@ -1,10 +1,10 @@
 // apps/crawler/tests/scripts/ops/image-cache-backfill-processor.test.ts
 // 驗證圖片快取補圖候選讀取、既有檔案略過、dry-run log 與無效候選摘要行為。
 
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ImageBackfillOptions } from "../../../src/scripts/ops/image-cache-backfill/options";
 import {
   backfillImages,
@@ -15,6 +15,7 @@ import {
 const tempRoots: string[] = [];
 
 afterEach(async () => {
+  vi.unstubAllGlobals();
   await Promise.all(tempRoots.splice(0).map((path) => rm(path, { recursive: true, force: true })));
 });
 
@@ -33,10 +34,7 @@ describe("image cache backfill candidate reader", () => {
       createOptions({ storageDir, limit: 2 }),
     );
 
-    expect(candidates.map((candidate) => candidate.id)).toEqual([
-      "recent-missing",
-      "old-missing",
-    ]);
+    expect(candidates.map((candidate) => candidate.id)).toEqual(["recent-missing", "old-missing"]);
     expect(client.lastFindManyArgs?.orderBy).toEqual([
       { firstSeenAt: "desc" },
       { lastSeenAt: "desc" },
@@ -107,6 +105,84 @@ describe("image cache backfill log levels", () => {
   });
 });
 
+describe("image cache backfill live request accounting", () => {
+  it("does not count a filesystem failure before the source request", async () => {
+    const tempRoot = await createTempRoot();
+    const blockedStoragePath = join(tempRoot, "not-a-directory");
+    const fetchMock = vi.fn();
+    await writeFile(blockedStoragePath, "file");
+    vi.stubGlobal("fetch", fetchMock);
+
+    const summary = await backfillImages(
+      [createCandidate("pre-request-failure", "2026-06-08T08:05:00.000Z")],
+      createOptions({ storageDir: blockedStoragePath }),
+      { log: () => {}, debugLog: () => {} },
+    );
+
+    expect(summary).toMatchObject({ failed: 1, liveFetches: 0 });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("does not count a failed local thumbnail reuse as a source request", async () => {
+    const storageDir = await createTempRoot();
+    const sourceCandidate = createCandidate("reusable-source", "2026-06-08T08:05:00.000Z");
+    const reuseCandidate = {
+      ...createCandidate("reuse-target", "2026-06-08T08:04:00.000Z"),
+      primaryImageUrl: sourceCandidate.primaryImageUrl,
+    };
+    const fetchMock = vi.fn();
+    await mkdir(join(storageDir, "reusable-source.webp"));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const summary = await backfillImages(
+      [sourceCandidate, reuseCandidate],
+      createOptions({ storageDir }),
+      { log: () => {}, debugLog: () => {} },
+    );
+
+    expect(summary).toMatchObject({ skipped: 1, failed: 1, liveFetches: 0 });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("counts a rejected fetch function call as one live source request", async () => {
+    const storageDir = await createTempRoot();
+    const fetchMock = vi.fn(async () => {
+      throw new Error("source unavailable");
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const summary = await backfillImages(
+      [createCandidate("fetch-failure", "2026-06-08T08:05:00.000Z")],
+      createOptions({ storageDir }),
+      { log: () => {}, debugLog: () => {} },
+    );
+
+    expect(summary).toMatchObject({ failed: 1, liveFetches: 1 });
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("keeps the live request counted when thumbnail creation fails afterward", async () => {
+    const storageDir = await createTempRoot();
+    const fetchMock = vi.fn(
+      async () =>
+        new Response("not an image", {
+          status: 200,
+          headers: { "content-type": "image/png" },
+        }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const summary = await backfillImages(
+      [createCandidate("thumbnail-failure", "2026-06-08T08:05:00.000Z")],
+      createOptions({ storageDir }),
+      { log: () => {}, debugLog: () => {} },
+    );
+
+    expect(summary).toMatchObject({ failed: 1, liveFetches: 1 });
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+});
+
 interface ProductFindManyArgs {
   orderBy?: unknown;
   select?: unknown;
@@ -146,9 +222,7 @@ function createCandidate(id: string, seenAt: string): ProductImageCandidate {
   };
 }
 
-function createOptions(
-  overrides: Partial<ImageBackfillOptions> = {},
-): ImageBackfillOptions {
+function createOptions(overrides: Partial<ImageBackfillOptions> = {}): ImageBackfillOptions {
   return {
     workspaceRoot: "/workspace",
     storageDir: "/workspace/storage/product-images",

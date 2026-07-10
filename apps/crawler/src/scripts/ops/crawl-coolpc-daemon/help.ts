@@ -54,7 +54,9 @@ Options:
   --lock-dir <path>          Shared external fetch lock directory.
   --lock-stale-seconds <sec> Break stale external fetch locks after this age.
   --storage-dir <path>       Snapshot storage directory from the workspace root.
-                             Default: ${DEFAULT_STORAGE_DIR}
+                             Must equal the active root or its controlled child.
+                             SNAPSHOT_STORAGE_DIR replaces the built-in default when set.
+                             Default: SNAPSHOT_STORAGE_DIR or ${DEFAULT_STORAGE_DIR}
 
 Environment:
   CRAWLER_INTERVAL_SECONDS, CRAWLER_BACKOFF_SECONDS, CRAWLER_LOCK_RETRY_SECONDS,

@@ -16,6 +16,10 @@ import {
 } from "./crawl-run";
 import { fetchLiveCategorySnapshot } from "./live-crawl/fetch";
 import { createCoolpcCategoryUrl } from "./parser";
+import {
+  resolveAllowlistedRawSnapshotStorage,
+  tryAcquireRawSnapshotMutationLock,
+} from "./raw-snapshot-storage";
 
 export const DEFAULT_COOLPC_BASE_URL = COOLPC_OFFICIAL_BASE_URL;
 export const DEFAULT_COOLPC_CATEGORY_DELAY_MS = 8000;
@@ -27,7 +31,10 @@ const MAX_COOLPC_FETCH_TIMEOUT_MS = 60000;
 
 export interface RunCoolpcCategoryCrawlOptions {
   client: PrismaClient;
+  workspaceRoot: string;
   storageDir: string;
+  configuredStorageDir?: string | null;
+  additionalAllowedStorageRootsForTesting?: string[];
   triggerType?: CrawlTriggerTypeValue;
   fromRawDir?: string | null;
   delayMs?: number;
@@ -54,6 +61,11 @@ interface CrawlTimingOptions {
   fetchTimeoutMs: number;
 }
 
+interface RunCoolpcCategoryCrawlDependencies {
+  acquireMutationLock?: typeof tryAcquireRawSnapshotMutationLock;
+  runCrawl?: typeof runCoolpcCrawlOnceWithPrisma;
+}
+
 export {
   fetchLiveCategorySnapshot,
   formatCoolpcFetchError,
@@ -64,22 +76,34 @@ export {
 /**
  * 執行單次 CoolPC 類別抓取流程：先驗證參數與環境，再逐分類抓取並交給 crawl-run 進行後續分類處理與狀態彙總。
  */
-export async function runCoolpcCategoryCrawl({
-  client,
-  storageDir,
-  triggerType = CRAWL_TRIGGER_TYPES.MANUAL,
-  fromRawDir = null,
-  delayMs = DEFAULT_COOLPC_CATEGORY_DELAY_MS,
-  fetchTimeoutMs = DEFAULT_COOLPC_FETCH_TIMEOUT_MS,
-  baseUrl,
-  allowUnsafeBaseUrlForTesting = false,
-  fetchUserAgent,
-  log,
-}: RunCoolpcCategoryCrawlOptions): Promise<RunCoolpcCrawlOnceResult> {
+export async function runCoolpcCategoryCrawl(
+  {
+    client,
+    workspaceRoot,
+    storageDir,
+    configuredStorageDir = process.env.SNAPSHOT_STORAGE_DIR,
+    additionalAllowedStorageRootsForTesting = [],
+    triggerType = CRAWL_TRIGGER_TYPES.MANUAL,
+    fromRawDir = null,
+    delayMs = DEFAULT_COOLPC_CATEGORY_DELAY_MS,
+    fetchTimeoutMs = DEFAULT_COOLPC_FETCH_TIMEOUT_MS,
+    baseUrl,
+    allowUnsafeBaseUrlForTesting = false,
+    fetchUserAgent,
+    log,
+  }: RunCoolpcCategoryCrawlOptions,
+  dependencies: RunCoolpcCategoryCrawlDependencies = {},
+): Promise<RunCoolpcCrawlOnceResult> {
   let processedCategoryCount = 0;
   const timingOptions = validateCrawlTimingOptions({ delayMs, fetchTimeoutMs });
   const resolvedBaseUrl = validateCoolpcBaseUrl(baseUrl, {
     allowUnsafeBaseUrlForTesting,
+  });
+  const storageLocation = resolveAllowlistedRawSnapshotStorage({
+    workspaceRoot,
+    requestedDir: storageDir,
+    configuredDir: configuredStorageDir,
+    additionalAllowedRootsForTesting: additionalAllowedStorageRootsForTesting,
   });
 
   validateRawReplayOptions({
@@ -87,38 +111,61 @@ export async function runCoolpcCategoryCrawl({
     triggerType,
   });
 
-  return runCoolpcCrawlOnceWithPrisma({
-    client,
-    triggerType,
-    processCategory: async ({ crawlRunId, category }) => {
-      if (!fromRawDir && processedCategoryCount > 0) {
-        await delay(timingOptions.delayMs);
-      }
-
-      processedCategoryCount += 1;
-
-      const fetchedAt = new Date();
-      const url = createCoolpcCategoryUrl(category.igrp, resolvedBaseUrl);
-      const snapshot = fromRawDir
-        ? await readRawCategorySnapshot(fromRawDir, category.igrp, fetchedAt, url, log)
-        : await fetchLiveCategorySnapshot(
-            category.igrp,
-            fetchedAt,
-            url,
-            fetchUserAgent,
-            timingOptions.fetchTimeoutMs,
-            log,
-          );
-
-      return processCoolpcCategorySnapshotWithPrisma({
-        client,
-        storageDir,
-        crawlRunId,
-        category,
-        snapshot,
-      });
-    },
+  const acquireMutationLock = dependencies.acquireMutationLock ?? tryAcquireRawSnapshotMutationLock;
+  const runCrawl = dependencies.runCrawl ?? runCoolpcCrawlOnceWithPrisma;
+  const mutationLock = await acquireMutationLock({
+    mutationRoot: storageLocation.mutationRoot,
+    owner:
+      triggerType === CRAWL_TRIGGER_TYPES.SCHEDULED
+        ? "scheduled-crawler"
+        : fromRawDir
+          ? "manual-raw-replay"
+          : "manual-crawler",
   });
+
+  if (!mutationLock) {
+    throw new Error(
+      "Raw snapshot storage is busy; another crawler or cleanup process holds the mutation lock.",
+    );
+  }
+
+  try {
+    return await runCrawl({
+      client,
+      triggerType,
+      processCategory: async ({ crawlRunId, category }) => {
+        if (!fromRawDir && processedCategoryCount > 0) {
+          await delay(timingOptions.delayMs);
+        }
+
+        processedCategoryCount += 1;
+
+        const fetchedAt = new Date();
+        const url = createCoolpcCategoryUrl(category.igrp, resolvedBaseUrl);
+        const snapshot = fromRawDir
+          ? await readRawCategorySnapshot(fromRawDir, category.igrp, fetchedAt, url, log)
+          : await fetchLiveCategorySnapshot(
+              category.igrp,
+              fetchedAt,
+              url,
+              fetchUserAgent,
+              timingOptions.fetchTimeoutMs,
+              log,
+            );
+
+        return processCoolpcCategorySnapshotWithPrisma({
+          client,
+          storageDir: storageLocation.mutationRoot,
+          storagePathPrefix: storageLocation.storagePathPrefix,
+          crawlRunId,
+          category,
+          snapshot,
+        });
+      },
+    });
+  } finally {
+    await mutationLock.release();
+  }
 }
 
 export async function assertSeededCategories(

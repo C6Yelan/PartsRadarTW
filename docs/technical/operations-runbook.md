@@ -497,7 +497,7 @@ docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler ru
   pnpm manual:crawl-coolpc-once -- --confirm-live-fetch --delay-ms 8000
 ```
 
-若 `product image api` 抽樣 404，先依本文件的 [Product Image Cache Backfill](#product-image-cache-backfill) 章節用 `--dry-run` 確認候選，再按分類或全量低速補圖。補圖完成後重跑 public smoke。
+若 `product image api` 抽樣 404，先依本文件的 [Product Image Cache Backfill](#product-image-cache-backfill) 章節用預設 dry-run 確認候選，再按分類或全量低速補圖。補圖完成後重跑 public smoke。
 
 最後同時跑 public-only 與部署主機內部 smoke；第二版正式完成前不應留下未解釋的 `FAIL`：
 
@@ -561,7 +561,7 @@ docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler ru
 pnpm ops:raw-snapshots:cleanup
 ```
 
-cleanup 會依 `SNAPSHOT_STORAGE_DIR` 找到 raw snapshot 壓縮檔，刪除超過保留期限的 metadata，並只移除不再被任何保留中 snapshot metadata 參照的 gzip 檔案。執行前應確認 manual crawler、scheduled crawler 與 raw replay 沒有同時寫入 raw snapshot storage。若要先驗證目前資料是否會產生 candidates，可暫時用較短 retention 做 dry run：
+cleanup 會依 active snapshot root 找到 raw snapshot 壓縮檔，刪除超過保留期限的 metadata，並只移除不再被任何保留中 snapshot metadata 參照的 gzip 檔案。設定 `SNAPSHOT_STORAGE_DIR` 時會取代內建 default；`--storage-dir` 只能使用該 active root 或其受控子目錄，child 內的 gzip path 仍以 active root 為相對基準記錄。正式刪除與 scheduled/manual/replay writer 共用同一把 storage mutation lock；writer 執行中會直接停止刪除且不改動資料。dry-run 不取得或修改該 lock，因此 writer 執行中仍可列出 candidates。若要先驗證目前資料是否會產生 candidates，可暫時用較短 retention 做 dry run：
 
 ```bash
 docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler run --rm --no-deps crawler \
@@ -581,18 +581,18 @@ docker compose -f compose.yml -f compose.crawler.yml --profile scheduled-crawler
 
 商品資料 crawl 主流程會把 `primary_image_url` 寫入 DB；`crawler-daemon` 在每輪價格 crawl 完成並釋放 external fetch lock 後，只針對本輪新增商品建立本地 WebP 縮圖。新主機、重建 volume 或大量缺圖修復仍使用手動 product image cache backfill，避免低優先度圖片維護反覆掃描既有商品並卡住價格資料更新。
 
-先跑小批次 dry-run：
+裸命令預設是 dry-run，不會對來源站送 request。先跑小批次預覽：
 
 ```bash
-docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler run --rm crawler pnpm ops:image-cache:backfill -- --dry-run --limit 20
+docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler run --rm crawler pnpm ops:image-cache:backfill -- --limit 20
 ```
 
 若 public smoke 的 `product image api` 失敗，且失敗商品集中在第二版新增分類，先用分類限縮補圖，避免一開始就全量抓取。第二版第一批新增分類是 `IGrp=8`、`IGrp=11`、`IGrp=16`：
 
 ```bash
-docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler run --rm crawler pnpm ops:image-cache:backfill -- --dry-run --igrp 16 --limit 20
-docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler run --rm crawler pnpm ops:image-cache:backfill -- --dry-run --igrp 11 --limit 20
-docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler run --rm crawler pnpm ops:image-cache:backfill -- --dry-run --igrp 8 --limit 20
+docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler run --rm crawler pnpm ops:image-cache:backfill -- --igrp 16 --limit 20
+docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler run --rm crawler pnpm ops:image-cache:backfill -- --igrp 11 --limit 20
+docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler run --rm crawler pnpm ops:image-cache:backfill -- --igrp 8 --limit 20
 ```
 
 確認候選與 storage path 正常後，再用低速 live fetch 分類補跑。每次只跑一個分類，確認 tmux session 結束與 log summary 後，再換下一個分類，避免同時對來源站送出多批 image requests：
@@ -638,3 +638,17 @@ Backfill 規則：
 - 不和 `manual:crawl-coolpc-once` 或 `crawler-daemon` 同時執行，避免和 scheduled 新品補圖或其他外部來源請求重疊。
 - 中斷後可重跑；已存在的 `.webp` 會被 skipped。
 - 圖片寫入 volume 後通常不需要重啟 `web`，重新整理頁面即可讀到新檔案。
+
+## Product Vendor Backfill
+
+Vendor metadata backfill 裸命令預設只預覽分類差異，不寫 DB：
+
+```bash
+pnpm ops:product-vendors:backfill -- --limit 20
+```
+
+確認預覽結果後，只有明確加入 `--confirm-write` 才會更新已變更商品；可搭配 `--igrp` 或 `--limit` 收斂範圍：
+
+```bash
+pnpm ops:product-vendors:backfill -- --confirm-write --igrp 4 --limit 20
+```

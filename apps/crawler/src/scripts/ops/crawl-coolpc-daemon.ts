@@ -132,6 +132,7 @@ export async function runScheduledCycle(
   try {
     result = await crawlCategories({
       client,
+      workspaceRoot: options.workspaceRoot,
       storageDir: options.storageDir,
       triggerType: CRAWL_TRIGGER_TYPES.SCHEDULED,
       delayMs: options.categoryDelayMs,

@@ -4,13 +4,11 @@
 import { relative } from "node:path";
 import type { Prisma, PrismaClient } from "@partsradar/db";
 import { createPublicProductImagePath } from "@partsradar/shared";
-import {
-  assertSeededCategories,
-  runCoolpcCategoryCrawl,
-} from "../../coolpc/live-crawl";
+import { assertSeededCategories, runCoolpcCategoryCrawl } from "../../coolpc/live-crawl";
 import { CRAWL_TRIGGER_TYPES, type RunCoolpcCrawlOnceResult } from "../../coolpc/crawl-run";
 import {
   loadWorkspaceEnv,
+  resolveWorkspaceRoot,
   toSafeCliErrorMessage,
 } from "../shared/script-utils";
 import { parseOptions, type CrawlOptions } from "./crawl-coolpc-once/options";
@@ -89,11 +87,16 @@ interface PublicProductSmokeSummary {
 
 // 手動流程主入口：解析參數、載入環境、執行爬蟲並輸出報表。
 async function main() {
-  const options = parseOptions(process.argv.slice(2));
+  const args = process.argv.slice(2);
+
+  if (!args.includes("--help")) {
+    await loadWorkspaceEnv(resolveWorkspaceRoot());
+  }
+
+  const options = parseOptions(args);
   let client: PrismaClient | null = null;
 
   try {
-    await loadWorkspaceEnv(options.workspaceRoot);
     const db = await import("@partsradar/db");
     client = db.prisma;
 
@@ -125,6 +128,7 @@ async function runManualCrawl(
 ): Promise<RunCoolpcCrawlOnceResult> {
   return runCoolpcCategoryCrawl({
     client,
+    workspaceRoot: options.workspaceRoot,
     storageDir: options.storageDir,
     fromRawDir: options.fromRawDir,
     delayMs: options.delayMs,
@@ -273,7 +277,9 @@ function printCountDelta(label: string, before: number, after: number): void {
   console.log(`- ${label}: ${after} (${sign}${delta})`);
 }
 
-main().catch((error) => {
-  console.error(toSafeCliErrorMessage(error));
-  process.exitCode = 1;
-});
+if (require.main === module) {
+  main().catch((error) => {
+    console.error(toSafeCliErrorMessage(error));
+    process.exitCode = 1;
+  });
+}

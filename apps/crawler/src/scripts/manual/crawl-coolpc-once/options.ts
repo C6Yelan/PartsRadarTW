@@ -4,6 +4,10 @@
 
 import { DEFAULT_COOLPC_CATEGORY_DELAY_MS } from "../../../coolpc/live-crawl";
 import {
+  DEFAULT_RAW_SNAPSHOT_STORAGE_DIR,
+  resolveAllowlistedRawSnapshotStorage,
+} from "../../../coolpc/raw-snapshot-storage";
+import {
   getNumberArg,
   getStringArg,
   resolveWorkspacePathArgument,
@@ -12,9 +16,6 @@ import {
 
 // 未指定 --from-raw-dir 時，要求使用者顯式加上此旗標，避免誤執行 live 網站抓取。
 const CONFIRM_LIVE_FETCH_FLAG = "--confirm-live-fetch";
-// 手動流程預設輸出的快照目錄（以 workspace 根目錄為準）。
-const DEFAULT_STORAGE_DIR = "temp/coolpc-manual-crawl/snapshots";
-
 // 供手動流程使用的解析結果；包含 workspace、快照來源、輸出位置與抓取間隔。
 export interface CrawlOptions {
   workspaceRoot: string;
@@ -25,13 +26,18 @@ export interface CrawlOptions {
 
 // 解析命令列引數，並回傳手動流程所需參數。
 // 如果未指定 --from-raw-dir，且未帶 --confirm-live-fetch，直接中止以避免未授權的 live 抓取。
-export function parseOptions(args: string[]): CrawlOptions {
+export function parseOptions(
+  args: string[],
+  cwd = process.cwd(),
+  env: NodeJS.ProcessEnv = process.env,
+  additionalAllowedStorageRootsForTesting: string[] = [],
+): CrawlOptions {
   if (args.includes("--help")) {
     printHelp();
     process.exit(0);
   }
 
-  const workspaceRoot = resolveWorkspaceRoot();
+  const workspaceRoot = resolveWorkspaceRoot(cwd);
   const fromRawDirArg = getStringArg(args, "--from-raw-dir");
   const fromRawDir = fromRawDirArg
     ? resolveWorkspacePathArgument(workspaceRoot, fromRawDirArg)
@@ -43,15 +49,20 @@ export function parseOptions(args: string[]): CrawlOptions {
     );
   }
 
+  const { storageDir } = resolveAllowlistedRawSnapshotStorage({
+    workspaceRoot,
+    requestedDir:
+      getStringArg(args, "--storage-dir") ??
+      env.SNAPSHOT_STORAGE_DIR ??
+      DEFAULT_RAW_SNAPSHOT_STORAGE_DIR,
+    configuredDir: env.SNAPSHOT_STORAGE_DIR,
+    additionalAllowedRootsForTesting: additionalAllowedStorageRootsForTesting,
+  });
+
   return {
     workspaceRoot,
     fromRawDir,
-    storageDir: resolveWorkspacePathArgument(
-      workspaceRoot,
-      getStringArg(args, "--storage-dir") ??
-        process.env.SNAPSHOT_STORAGE_DIR ??
-        DEFAULT_STORAGE_DIR,
-    ),
+    storageDir,
     delayMs: getNumberArg(args, "--delay-ms", DEFAULT_COOLPC_CATEGORY_DELAY_MS),
   };
 }
@@ -69,6 +80,8 @@ Options:
   --delay-ms <ms>            Delay between live category requests.
                              Default: ${DEFAULT_COOLPC_CATEGORY_DELAY_MS}
   --storage-dir <path>       Snapshot storage directory from the workspace root.
-                             Default: ${DEFAULT_STORAGE_DIR}
+                             Must equal the active root or its controlled child.
+                             SNAPSHOT_STORAGE_DIR replaces the built-in default when set.
+                             Default: SNAPSHOT_STORAGE_DIR or ${DEFAULT_RAW_SNAPSHOT_STORAGE_DIR}
 `);
 }

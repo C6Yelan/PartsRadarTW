@@ -11,14 +11,14 @@ import {
   toSafeCliErrorMessage,
 } from "../shared/script-utils";
 
-interface BackfillProductVendorsOptions {
+export interface BackfillProductVendorsOptions {
   workspaceRoot: string;
   dryRun: boolean;
   limit: number | null;
   igrp: number | null;
 }
 
-interface ProductCandidate {
+export interface ProductCandidate {
   id: string;
   name: string;
   vendorSlug: string | null;
@@ -29,7 +29,7 @@ interface ProductCandidate {
   };
 }
 
-interface BackfillSummary {
+export interface BackfillSummary {
   selected: number;
   changed: number;
   unchanged: number;
@@ -86,7 +86,7 @@ async function readCandidates(
 }
 
 // 逐筆重新分類 vendor，dry-run 僅列出變更，write 模式才更新商品欄位。
-async function backfillProductVendors(
+export async function backfillProductVendors(
   client: PrismaClient,
   candidates: ProductCandidate[],
   options: BackfillProductVendorsOptions,
@@ -139,16 +139,24 @@ async function backfillProductVendors(
   return summary;
 }
 
-// 解析手動 vendor backfill CLI 參數；此工具預設寫入，需由操作者用 --dry-run 切換預覽。
-function parseOptions(args: string[]): BackfillProductVendorsOptions {
+// 解析手動 vendor backfill CLI 參數；只有 --confirm-write 啟用 DB update，裸命令維持 dry-run。
+export function parseOptions(args: string[], cwd = process.cwd()): BackfillProductVendorsOptions {
   if (args.includes("--help")) {
     printHelp();
     process.exit(0);
   }
 
+  const confirmWrite = args.includes("--confirm-write");
+
+  if (confirmWrite && args.includes("--dry-run")) {
+    throw new Error(
+      "Do not combine --dry-run with --confirm-write; omit both flags for the default dry run.",
+    );
+  }
+
   return {
-    workspaceRoot: resolveWorkspaceRoot(),
-    dryRun: args.includes("--dry-run"),
+    workspaceRoot: resolveWorkspaceRoot(cwd),
+    dryRun: !confirmWrite,
     limit: getPositiveNumberArg(args, "--limit"),
     igrp: getPositiveNumberArg(args, "--igrp"),
   };
@@ -172,14 +180,18 @@ function printHelp(): void {
 Usage: pnpm ops:product-vendors:backfill [options]
 
 Options:
-  --dry-run       Print changes without writing to the database.
+  --confirm-write Write changed vendor metadata to the database.
+                  Without this flag the command only previews changes.
+  --dry-run       Compatibility alias for the default dry-run mode.
   --igrp <value>  Limit backfill to one CoolPC category.
   --limit <value> Limit number of products to scan.
   --help          Show this help message.
 `);
 }
 
-main().catch((error: unknown) => {
-  console.error(toSafeCliErrorMessage(error));
-  process.exitCode = 1;
-});
+if (require.main === module) {
+  main().catch((error: unknown) => {
+    console.error(toSafeCliErrorMessage(error));
+    process.exitCode = 1;
+  });
+}

@@ -7,6 +7,7 @@ import {
   type PrismaRawSnapshotCleanupClient,
   cleanupRawSnapshotsWithPrisma,
 } from "../../coolpc/raw-snapshot-cleanup";
+import { tryAcquireRawSnapshotMutationLock } from "../../coolpc/raw-snapshot-storage";
 import {
   loadWorkspaceEnv,
   resolveWorkspaceRoot,
@@ -18,6 +19,7 @@ import {
   printHelp,
   type RawSnapshotCleanupDaemonOptions,
 } from "./cleanup-raw-snapshots-daemon/options";
+import { type RawSnapshotCleanupExecutor, runRawSnapshotCleanup } from "./cleanup-raw-snapshots";
 import { createOpsLogger } from "./shared/logger";
 
 const logger = createOpsLogger();
@@ -31,21 +33,13 @@ export interface ShutdownController {
   sleep(ms: number): Promise<void>;
 }
 
-// 單輪 raw snapshot cleanup 的執行器介面，讓 daemon loop 可注入測試替身並保留 production 實作。
-export type RawSnapshotCleanupExecutor = (options: {
-  client: PrismaRawSnapshotCleanupClient;
-  storageDir: string;
-  normalRetentionDays: number;
-  abnormalRetentionDays: number;
-  dryRun: boolean;
-}) => Promise<CleanupRawSnapshotsResult>;
-
 // 啟動 daemon loop 所需的依賴集合；production 使用 Prisma cleanup，測試可替換 cleanup 與 log。
 export interface RunRawSnapshotCleanupDaemonOptions {
   client: PrismaRawSnapshotCleanupClient;
   options: RawSnapshotCleanupDaemonOptions;
   shutdown: ShutdownController;
   cleanup?: RawSnapshotCleanupExecutor;
+  acquireMutationLock?: typeof tryAcquireRawSnapshotMutationLock;
   logMessage?: (message: string) => void;
 }
 
@@ -84,6 +78,7 @@ export async function runRawSnapshotCleanupDaemon({
   options,
   shutdown,
   cleanup = cleanupRawSnapshotsWithPrisma,
+  acquireMutationLock = tryAcquireRawSnapshotMutationLock,
   logMessage = log,
 }: RunRawSnapshotCleanupDaemonOptions): Promise<void> {
   do {
@@ -91,6 +86,7 @@ export async function runRawSnapshotCleanupDaemon({
       client,
       options,
       cleanup,
+      acquireMutationLock,
       logMessage,
     });
 
@@ -114,22 +110,24 @@ async function runCleanupCycle({
   client,
   options,
   cleanup,
+  acquireMutationLock,
   logMessage,
 }: {
   client: PrismaRawSnapshotCleanupClient;
   options: RawSnapshotCleanupDaemonOptions;
   cleanup: RawSnapshotCleanupExecutor;
+  acquireMutationLock: typeof tryAcquireRawSnapshotMutationLock;
   logMessage: (message: string) => void;
 }): Promise<{ ok: true } | { ok: false; error: unknown }> {
   logMessage("Starting raw snapshot cleanup cycle.");
 
   try {
-    const result = await cleanup({
+    const result = await runRawSnapshotCleanup({
       client,
-      storageDir: options.storageDir,
-      normalRetentionDays: options.normalRetentionDays,
-      abnormalRetentionDays: options.abnormalRetentionDays,
-      dryRun: false,
+      options,
+      owner: "raw-snapshot-cleanup-daemon",
+      cleanup,
+      acquireMutationLock,
     });
 
     printCleanupSummary(result, logMessage);

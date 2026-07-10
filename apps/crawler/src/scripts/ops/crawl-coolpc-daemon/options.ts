@@ -6,6 +6,10 @@ import {
   validateCoolpcBaseUrl,
 } from "../../../coolpc/live-crawl";
 import {
+  DEFAULT_RAW_SNAPSHOT_STORAGE_DIR,
+  resolveAllowlistedRawSnapshotStorage,
+} from "../../../coolpc/raw-snapshot-storage";
+import {
   getStringArg,
   resolveWorkspacePathArgument,
   resolveWorkspaceRoot,
@@ -13,7 +17,7 @@ import {
 import { DEFAULT_EXTERNAL_FETCH_LOCK_STALE_SECONDS } from "../external-fetch-lock";
 
 export const CONFIRM_LIVE_FETCH_FLAG = "--confirm-live-fetch";
-export const DEFAULT_STORAGE_DIR = "temp/coolpc-daemon/snapshots";
+export const DEFAULT_STORAGE_DIR = DEFAULT_RAW_SNAPSHOT_STORAGE_DIR;
 export const DEFAULT_PRODUCT_IMAGE_STORAGE_DIR = "storage/product-images";
 export const DEFAULT_INTERVAL_SECONDS = 1800;
 export const DEFAULT_BACKOFF_SECONDS = 3600;
@@ -88,10 +92,12 @@ export function parseDaemonOptions(
   }
 
   const workspaceRoot = resolveWorkspaceRoot(cwd);
-  const storageDir = resolveWorkspacePathArgument(
+  const { storageDir } = resolveAllowlistedRawSnapshotStorage({
     workspaceRoot,
-    getStringArg(args, "--storage-dir") ?? env.SNAPSHOT_STORAGE_DIR ?? DEFAULT_STORAGE_DIR,
-  );
+    requestedDir:
+      getStringArg(args, "--storage-dir") ?? env.SNAPSHOT_STORAGE_DIR ?? DEFAULT_STORAGE_DIR,
+    configuredDir: env.SNAPSHOT_STORAGE_DIR,
+  });
   const newProductImageBackfill = parseNewProductImageBackfillOptions(args, env, workspaceRoot);
 
   return {

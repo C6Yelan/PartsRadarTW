@@ -62,6 +62,48 @@ describe("CoolPC raw snapshot writer", () => {
     expect((await gunzipAsync(compressed)).toString("utf8")).toBe(rawHtml);
   });
 
+  it("stores controlled-child paths relative to the shared mutation root", async () => {
+    const client = new FakeRawSnapshotWriteClient();
+    const mutationRoot = await createTempDir(tempDirs);
+    const rawHtml = "<html><body>child snapshot</body></html>";
+
+    const result = await recordRawSnapshot({
+      client,
+      storageDir: mutationRoot,
+      storagePathPrefix: "controlled-child",
+      crawlRunId: "crawl-run-child",
+      sourceCategoryId: "category-4",
+      url: "https://www.coolpc.com.tw/eachview.php?IGrp=4",
+      fetchedAt: new Date("2026-07-10T00:00:00.000Z"),
+      httpStatus: 200,
+      contentStatus: RAW_SNAPSHOT_CONTENT_STATUSES.VALID,
+      rawContent: rawHtml,
+    });
+
+    expect(result.compressedHtmlPath).toMatch(/^controlled-child\/coolpc\/[a-f0-9]{64}\.html\.gz$/);
+    const compressed = await readFile(join(mutationRoot, result.compressedHtmlPath ?? ""));
+    expect((await gunzipAsync(compressed)).toString("utf8")).toBe(rawHtml);
+  });
+
+  it("rejects a storage path prefix outside the mutation root", async () => {
+    const client = new FakeRawSnapshotWriteClient();
+    const mutationRoot = await createTempDir(tempDirs);
+
+    await expect(
+      recordRawSnapshot({
+        client,
+        storageDir: mutationRoot,
+        storagePathPrefix: "../outside",
+        crawlRunId: "crawl-run-unsafe",
+        sourceCategoryId: "category-4",
+        url: "https://www.coolpc.com.tw/eachview.php?IGrp=4",
+        fetchedAt: new Date("2026-07-10T00:00:00.000Z"),
+        contentStatus: RAW_SNAPSHOT_CONTENT_STATUSES.VALID,
+        rawContent: "unsafe",
+      }),
+    ).rejects.toThrow("path prefix must stay within its mutation root");
+  });
+
   it("deduplicates gzip files by raw content hash while keeping new metadata", async () => {
     const client = new FakeRawSnapshotWriteClient();
     const storageDir = await createTempDir(tempDirs);

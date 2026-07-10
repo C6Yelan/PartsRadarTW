@@ -56,14 +56,16 @@ export function parseOptions(
   }
 
   const workspaceRoot = resolveWorkspaceRoot(cwd);
-  const dryRun = args.includes("--dry-run");
+  const confirmLiveFetch = args.includes(CONFIRM_LIVE_FETCH_FLAG);
 
-  // dry-run 不碰來源站；真正下載圖片時必須由操作者明確確認。
-  if (!dryRun && !args.includes(CONFIRM_LIVE_FETCH_FLAG)) {
+  if (confirmLiveFetch && args.includes("--dry-run")) {
     throw new Error(
-      `Refusing live CoolPC image fetch. Re-run with ${CONFIRM_LIVE_FETCH_FLAG} because this command contacts the source site and must stay manual-only.`,
+      `Do not combine --dry-run with ${CONFIRM_LIVE_FETCH_FLAG}; omit both flags for the default dry run.`,
     );
   }
+
+  // 唯一 live truth 是明確 confirmation；裸命令與相容用 --dry-run 都不碰來源站。
+  const dryRun = !confirmLiveFetch;
 
   const minDelayMs = getNumberArg(args, "--min-delay-ms", DEFAULT_MIN_DELAY_MS);
   const maxDelayMs = getNumberArg(args, "--max-delay-ms", DEFAULT_MAX_DELAY_MS);
@@ -108,12 +110,12 @@ export function printSummary(summary: BackfillSummary, options: ImageBackfillOpt
 // 輸出手動圖片補圖 CLI 說明；此腳本偏維運用途，不作為使用者介面文案。
 function printHelp(): void {
   console.log(`Usage:
-  pnpm ops:image-cache:backfill -- --dry-run --limit 10
+  pnpm ops:image-cache:backfill -- --limit 10
   pnpm ops:image-cache:backfill -- --confirm-live-fetch --limit 10
 
 Options:
-  --confirm-live-fetch       Required for live CoolPC image requests.
-  --dry-run                  Validate candidates and output paths without source requests.
+  --confirm-live-fetch       Send live CoolPC image requests. Without this flag the command is dry-run.
+  --dry-run                  Compatibility alias for the default dry-run mode.
   --limit <count>            Limit selected products.
   --product-id <uuid>        Backfill a single product.
   --igrp <number>            Backfill one enabled CoolPC category.

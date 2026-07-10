@@ -43,7 +43,7 @@ type ProcessStatus = "cached" | "dry-run" | "failed" | "invalid" | "reused" | "s
 
 interface ProcessResult {
   status: ProcessStatus;
-  didFetch: boolean;
+  didRequestSource: boolean;
 }
 
 interface BackfillLoggers {
@@ -162,7 +162,7 @@ export async function backfillImages(
     );
     summary[result.status === "dry-run" ? "dryRun" : result.status] += 1;
 
-    if (result.didFetch) {
+    if (result.didRequestSource) {
       summary.liveFetches += 1;
     }
   }
@@ -180,13 +180,14 @@ async function processCandidate(
 ): Promise<ProcessResult> {
   const outputPath = join(options.storageDir, `${candidate.id}.webp`);
   const label = `${candidate.sourceCategory.displayName} IGrp=${candidate.sourceCategory.igrp}`;
+  let didRequestSource = false;
 
   try {
     const sourceImageUrl = candidate.primaryImageUrl;
 
     if (!sourceImageUrl) {
       log(`[invalid] ${candidate.id} | missing image URL | ${candidate.name}`);
-      return { status: "invalid", didFetch: false };
+      return { status: "invalid", didRequestSource };
     }
 
     const normalizedImageUrl = normalizeCoolpcProductImageUrl(
@@ -196,7 +197,7 @@ async function processCandidate(
 
     if (!normalizedImageUrl) {
       log(`[invalid] ${candidate.id} | invalid source image URL | ${sourceImageUrl}`);
-      return { status: "invalid", didFetch: false };
+      return { status: "invalid", didRequestSource };
     }
 
     if (!options.overwrite && (await pathExists(outputPath))) {
@@ -207,7 +208,7 @@ async function processCandidate(
       debugLog(
         `[skipped] ${candidate.id} | existing ${relative(options.workspaceRoot, outputPath)} | ${candidate.name}`,
       );
-      return { status: "skipped", didFetch: false };
+      return { status: "skipped", didRequestSource };
     }
 
     // 相同來源圖片只下載一次，後續商品直接複製已產生的本地縮圖。
@@ -223,7 +224,7 @@ async function processCandidate(
           reusableImagePath ? "reuse local thumbnail" : normalizedImageUrl
         } -> ${relative(options.workspaceRoot, outputPath)}`,
       );
-      return { status: "dry-run", didFetch: false };
+      return { status: "dry-run", didRequestSource };
     }
 
     if (reusableImagePath) {
@@ -237,7 +238,7 @@ async function processCandidate(
         )} | ${candidate.name}`,
       );
 
-      return { status: "reused", didFetch: false };
+      return { status: "reused", didRequestSource };
     }
 
     // 第一筆 live request 不等待；從第二筆開始套用隨機延遲，降低手動補圖對來源站的壓力。
@@ -247,7 +248,9 @@ async function processCandidate(
       await delay(waitMs);
     }
 
-    const sourceBytes = await fetchSourceImageBytes(normalizedImageUrl, options);
+    const sourceRequest = fetchSourceImageBytes(normalizedImageUrl, options);
+    didRequestSource = true;
+    const sourceBytes = await sourceRequest;
     const thumbnailBytes = await createWebpThumbnail(sourceBytes);
     await writeFileAtomically(outputPath, thumbnailBytes);
     reusableImagePathsBySourceUrl.set(normalizedImageUrl, outputPath);
@@ -258,9 +261,9 @@ async function processCandidate(
       )} | ${candidate.name}`,
     );
 
-    return { status: "cached", didFetch: true };
+    return { status: "cached", didRequestSource };
   } catch (error) {
     log(`[failed] ${candidate.id} | ${toErrorMessage(error)} | ${candidate.name}`);
-    return { status: "failed", didFetch: true };
+    return { status: "failed", didRequestSource };
   }
 }

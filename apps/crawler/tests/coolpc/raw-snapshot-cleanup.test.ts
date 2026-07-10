@@ -1,7 +1,7 @@
 // apps/crawler/tests/coolpc/raw-snapshot-cleanup.test.ts
 // 驗證 raw snapshot cleanup 的 dry-run、實際刪除、引用保留與危險路徑防護。
 
-import { mkdir, rm } from "node:fs/promises";
+import { mkdir, rm, symlink } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanupRawSnapshots } from "../../src/coolpc/raw-snapshot-cleanup";
@@ -87,6 +87,29 @@ describe("raw snapshot cleanup", () => {
     await expect(pathExists(join(storageDir, "coolpc/old-invalid.html.gz"))).resolves.toBe(false);
     await expect(pathExists(join(storageDir, "coolpc/new-valid.html.gz"))).resolves.toBe(true);
     await expect(pathExists(join(storageDir, "coolpc/new-invalid.html.gz"))).resolves.toBe(true);
+  });
+
+  it("deletes root-relative files written under a controlled storage child", async () => {
+    const mutationRoot = await createTempDir(tempDirs);
+    const childPath = "controlled-child/coolpc/old-valid.html.gz";
+    const client = new FakeRawSnapshotCleanupClient([
+      snapshot("old-valid", "VALID", "2026-04-01T00:00:00.000Z", childPath),
+    ]);
+    await writeSnapshotFile(mutationRoot, childPath);
+
+    const result = await cleanupRawSnapshots({
+      client,
+      storageDir: mutationRoot,
+      now: NOW,
+      dryRun: false,
+    });
+
+    expect(result).toMatchObject({
+      deletedMetadataCount: 1,
+      deletedCompressedFileCount: 1,
+      missingCompressedFileCount: 0,
+    });
+    await expect(pathExists(join(mutationRoot, childPath))).resolves.toBe(false);
   });
 
   it("keeps compressed files still referenced by retained metadata", async () => {
@@ -181,6 +204,28 @@ describe("raw snapshot cleanup", () => {
       }),
     ).rejects.toThrow("outside storage dir");
     expect(client.rawSnapshots.map((row) => row.id)).toEqual(["old-valid"]);
+  });
+
+  it("refuses a compressed file whose parent symlink escapes the storage root", async () => {
+    const storageDir = await createTempDir(tempDirs);
+    const outsideDir = await createTempDir(tempDirs);
+    const compressedPath = "coolpc/outside.html.gz";
+    const client = new FakeRawSnapshotCleanupClient([
+      snapshot("old-valid", "VALID", "2026-04-01T00:00:00.000Z", compressedPath),
+    ]);
+    await writeSnapshotFile(outsideDir, "outside.html.gz");
+    await symlink(outsideDir, join(storageDir, "coolpc"), "dir");
+
+    await expect(
+      cleanupRawSnapshots({
+        client,
+        storageDir,
+        now: NOW,
+        dryRun: false,
+      }),
+    ).rejects.toThrow("symlink resolves outside storage dir");
+    expect(client.rawSnapshots.map((row) => row.id)).toEqual(["old-valid"]);
+    await expect(pathExists(join(outsideDir, "outside.html.gz"))).resolves.toBe(true);
   });
 
   it("fails the whole cleanup before deleting safe files when any candidate path is dangerous", async () => {

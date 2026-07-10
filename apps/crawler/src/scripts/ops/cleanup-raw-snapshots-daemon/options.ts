@@ -153,6 +153,10 @@ Options:
   --normal-retention-days <days>  Retention for VALID snapshots.
   --abnormal-retention-days <days>
                                   Retention for INVALID and SUSPECTED_BLOCK snapshots.
-  --storage-dir <path>            Snapshot storage directory from the workspace root or Docker volume path.
+  --storage-dir <path>            Must equal the active root or its controlled child.
+                                  SNAPSHOT_STORAGE_DIR replaces the built-in default when set.
+
+Safety:
+  Each delete cycle stops if a crawler/replay holds the raw snapshot mutation lock.
 `);
 }

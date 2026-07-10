@@ -84,6 +84,18 @@ describe("CoolPC scheduled crawler daemon options", () => {
     ).toThrow("CoolPC base URL must be https://www.coolpc.com.tw.");
   });
 
+  it("rejects snapshot storage paths outside the configured or built-in roots", async () => {
+    const { crawlerCwd } = await testEnv.createWorkspace();
+
+    expect(() =>
+      parseDaemonOptions(
+        ["--confirm-live-fetch", "--storage-dir", "temp/unrelated-snapshots"],
+        {},
+        crawlerCwd,
+      ),
+    ).toThrow("not within an allowlisted snapshot storage root");
+  });
+
   it("rejects aggressive schedule values", async () => {
     const { crawlerCwd } = await testEnv.createWorkspace();
 
