@@ -34,7 +34,7 @@ test.describe("public web smoke", () => {
 
     await page.goto("/discord");
     await expect(page.getByRole("heading", { exact: true, name: "Discord 通知" })).toBeVisible();
-    const heroScreenshot = page.getByRole("img", { name: "Discord 指令選單截圖" });
+    const heroScreenshot = page.getByAltText("Discord 指令選單截圖");
     await expect(heroScreenshot).toBeAttached();
     if ((page.viewportSize()?.width ?? 0) > 520) {
       await expect(heroScreenshot).toBeVisible();

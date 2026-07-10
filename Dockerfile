@@ -3,6 +3,7 @@
 FROM node:24-bookworm-slim AS base
 
 ENV PNPM_HOME="/pnpm"
+ENV COREPACK_HOME="/corepack"
 ENV PATH="$PNPM_HOME:$PATH"
 ENV NEXT_TELEMETRY_DISABLED=1
 
@@ -12,7 +13,12 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends ca-certificates openssl \
   && rm -rf /var/lib/apt/lists/*
 
-RUN corepack enable && corepack prepare pnpm@11.3.0 --activate
+RUN mkdir -p "$COREPACK_HOME" \
+  && corepack enable \
+  && corepack prepare pnpm@11.3.0 --activate \
+  && chmod -R a+rX "$COREPACK_HOME"
+
+ENV COREPACK_ENABLE_NETWORK=0
 
 RUN mkdir -p /var/lib/partsradar/snapshots /var/lib/partsradar/product-images \
   && chown -R node:node /var/lib/partsradar
@@ -40,17 +46,31 @@ ENV NODE_ENV=production \
 
 RUN pnpm build:web
 
-FROM web-build AS web
+FROM node:24-bookworm-slim AS web
 
-ENV NODE_ENV=production
-ENV PORT=3000
-ENV HOSTNAME=0.0.0.0
+ENV NODE_ENV=production \
+  NEXT_TELEMETRY_DISABLED=1 \
+  PORT=3000 \
+  HOSTNAME=0.0.0.0
+
+WORKDIR /app
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ca-certificates openssl \
+  && rm -rf /var/lib/apt/lists/*
+
+COPY --from=web-build --chown=node:node /app/apps/web/.next/standalone ./
+COPY --from=web-build --chown=node:node /app/apps/web/.next/static ./apps/web/.next/static
+COPY --from=web-build --chown=node:node /app/apps/web/public ./apps/web/public
+
+RUN mkdir -p /app/apps/web/.next/cache \
+  && chown -R node:node /app/apps/web/.next/cache
 
 USER node
 
 EXPOSE 3000
 
-CMD ["pnpm", "--filter", "@partsradar/web", "start"]
+CMD ["node", "apps/web/server.js"]
 
 FROM base AS crawler
 

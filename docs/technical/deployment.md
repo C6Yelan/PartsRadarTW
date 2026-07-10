@@ -216,8 +216,9 @@ Discord bot 權限：
 Migration：
 
 - 正式部署使用 `prisma migrate deploy` 或 root `pnpm db:deploy`。
+- Compose 將 PostgreSQL `PGDATA` 固定在 `/var/lib/postgresql/data`。重建既有 `postgres` container 前，必須先從有日期的 production read-only artifact，或使用者另行同意的可追溯 live baseline，確認 `SHOW data_directory`、實際 volume layout、`PG_VERSION` 與備份；若現有 PostgreSQL 18 使用 `/var/lib/postgresql/18/docker` 等版本化 parent-volume layout，應走正式 upgrade 或 backup/restore，不得直接假設 child-volume layout 相容。
 - `20260702093000_add_discord_public_report_filters` 會替 `discord_public_price_report_settings` 新增公開報告篩選欄位；既有 `max_items` 欄位與值仍保留供 schema 相容，但新版 runtime 不再讀寫，公開與個人報告統一最多列 50 筆。
-- 從舊版升級時，套用 G03 migration 前先用舊版 Compose definition 停止並移除 `maintenance-daemon` container，避免舊 process 在 table drop 後繼續存取已移除 schema。
+- 從舊版升級時，套用 `20260710120000_remove_product_link_health` 前先用舊版 Compose definition 停止並移除 `maintenance-daemon` container，避免舊 process 在 table drop 後繼續存取已移除 schema。
 - `20260710120000_remove_product_link_health` 會刪除 link-health table 與 enums；部署前必須備份 DB，rollback 需使用備份或另寫反向 migration，不能假設 dropped data 可自動復原。
 - `20260710200000_add_discord_delivery_error_metadata` 只新增 nullable structured error 欄位並保留既有 delivery audit rows；部署時先停止所有舊版 `discord-bot` instance，再執行 `db:deploy`，成功後立即啟動新版 `discord-bot` / `smoke-daemon`。不得混跑新舊 bot，也不得讓舊 bot 在 migration 後繼續寫入 raw-ish `error_message`。
 - migration 失敗時不啟動新版服務。

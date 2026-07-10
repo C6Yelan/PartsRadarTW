@@ -111,7 +111,7 @@ repo 應提供 `.env.example` 作為範本。實際本機設定由 `.env.example
 - PostgreSQL port 預設只綁定 `127.0.0.1`，避免對區網公開。
 - 除非有額外防火牆與私網限制，否則不要把 PostgreSQL 綁定到 `0.0.0.0`。
 - PostgreSQL image、帳號、密碼、database、綁定位址與 port 都可用 `.env` 覆蓋。
-- PostgreSQL 18 官方 image 的資料 volume 位置是 `/var/lib/postgresql/data`；本機 compose 也掛載在此位置，並讓 image 使用自己的 `PGDATA` 預設值。
+- Compose 將 PostgreSQL `PGDATA` 明確固定在 `/var/lib/postgresql/data`，與既有 `postgres_data` volume 掛載位置一致；升級 PostgreSQL major version 前仍須依正式 upgrade 流程處理資料格式，不能只換 major-version image tag。
 - migration 由 Prisma 管理。
 - seed data 若有需要，應使用可重跑的 script。
 

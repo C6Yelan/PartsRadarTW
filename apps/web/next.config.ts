@@ -35,6 +35,7 @@ const contentSecurityPolicy = [
 
 const nextConfig: NextConfig = {
   allowedDevOrigins: ["127.0.0.1"],
+  output: "standalone",
   poweredByHeader: false,
   async headers() {
     return [
