@@ -2,36 +2,36 @@
 // 以 daemon 形式定期執行 production smoke，並把異常與恢復狀態送往維運 Discord webhook。
 
 import type { PrismaClient } from "@partsradar/db";
-import { runProductionSmoke } from "./production-smoke";
-import type { ProductionSmokeSummary, SmokeStatus } from "./production-smoke";
 import {
-  sendDiscordWebhookMessage,
+  loadWorkspaceEnv,
+  resolveWorkspaceRoot,
+  toSafeCliErrorMessage,
+} from "../shared/script-utils";
+import {
   type DiscordWebhookSendOptions,
   type DiscordWebhookSendResult,
+  sendDiscordWebhookMessage,
 } from "./discord-webhook";
+import type { ProductionSmokeSummary, SmokeStatus } from "./production-smoke";
+import { runProductionSmoke } from "./production-smoke";
+import {
+  HELP_FLAG,
+  type ProductionSmokeDaemonOptions,
+  parseProductionSmokeDaemonOptions,
+  printHelp,
+} from "./production-smoke-daemon/options";
+import { createOpsLogger } from "./shared/logger";
 import {
   createSmokeDiscordNotificationDecision,
   readSmokeDiscordNotificationState,
   type SmokeDiscordNotificationOptions,
   writeSmokeDiscordNotificationState,
 } from "./smoke-discord-notification";
-import {
-  loadWorkspaceEnv,
-  resolveWorkspaceRoot,
-  toSafeCliErrorMessage,
-} from "../shared/script-utils";
-import { createOpsLogger } from "./shared/logger";
-import {
-  HELP_FLAG,
-  parseProductionSmokeDaemonOptions,
-  printHelp,
-  type ProductionSmokeDaemonOptions,
-} from "./production-smoke-daemon/options";
 
 const logger = createOpsLogger();
 
-export { parseProductionSmokeDaemonOptions } from "./production-smoke-daemon/options";
 export type { ProductionSmokeDaemonOptions } from "./production-smoke-daemon/options";
+export { parseProductionSmokeDaemonOptions } from "./production-smoke-daemon/options";
 
 // daemon shutdown 抽象，讓測試能控制停止狀態與 sleep 行為。
 export interface ShutdownController {
@@ -279,13 +279,13 @@ function createShutdownController(): ShutdownController {
           return;
         }
 
-        const timeout = setTimeout(() => {
+        const timeoutId = setTimeout(() => {
           wakeSleeper = null;
           resolve();
         }, ms);
 
         wakeSleeper = () => {
-          clearTimeout(timeout);
+          clearTimeout(timeoutId);
           wakeSleeper = null;
           resolve();
         };

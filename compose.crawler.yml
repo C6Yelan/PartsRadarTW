@@ -1,10 +1,10 @@
-x-app-env: &app-env
+x-database-env: &database-env
   NODE_ENV: "production"
   DATABASE_URL: "postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}?schema=public"
+
+x-crawler-storage-env: &crawler-storage-env
   SNAPSHOT_STORAGE_DIR: "/var/lib/partsradar/snapshots"
   PRODUCT_IMAGE_STORAGE_DIR: "/var/lib/partsradar/product-images"
-  EXTERNAL_FETCH_LOCK_DIR: "/var/lib/partsradar/snapshots/.locks/external-fetch"
-  PARTSRADAR_PUBLIC_BASE_URL: "${PARTSRADAR_PUBLIC_BASE_URL:-https://partsradar.net}"
 
 services:
   crawler:
@@ -15,9 +15,11 @@ services:
       target: crawler
     restart: "no"
     environment:
-      <<: *app-env
+      <<: [*database-env, *crawler-storage-env]
+      LOG_LEVEL: "${LOG_LEVEL:-info}"
     volumes:
       - snapshots:/var/lib/partsradar/snapshots
+      - product_images:/var/lib/partsradar/product-images
     depends_on:
       storage-init:
         condition: service_completed_successfully
@@ -45,12 +47,13 @@ services:
       target: crawler
     restart: unless-stopped
     environment:
-      <<: *app-env
+      <<: [*database-env, *crawler-storage-env]
+      LOG_LEVEL: "${LOG_LEVEL:-info}"
       CRAWLER_INTERVAL_SECONDS: "${CRAWLER_INTERVAL_SECONDS:-1800}"
       CRAWLER_BACKOFF_SECONDS: "${CRAWLER_BACKOFF_SECONDS:-3600}"
       CRAWLER_LOCK_RETRY_SECONDS: "${CRAWLER_LOCK_RETRY_SECONDS:-120}"
       CRAWLER_CATEGORY_DELAY_MS: "${CRAWLER_CATEGORY_DELAY_MS:-8000}"
-      PRODUCT_IMAGE_STORAGE_DIR: /var/lib/partsradar/product-images
+      EXTERNAL_FETCH_LOCK_DIR: "/var/lib/partsradar/snapshots/.locks/external-fetch"
       CRAWLER_NEW_PRODUCT_IMAGE_MIN_DELAY_MS: "${CRAWLER_NEW_PRODUCT_IMAGE_MIN_DELAY_MS:-5000}"
       CRAWLER_NEW_PRODUCT_IMAGE_MAX_DELAY_MS: "${CRAWLER_NEW_PRODUCT_IMAGE_MAX_DELAY_MS:-12000}"
       CRAWLER_NEW_PRODUCT_IMAGE_TIMEOUT_MS: "${CRAWLER_NEW_PRODUCT_IMAGE_TIMEOUT_MS:-15000}"
@@ -86,7 +89,9 @@ services:
       target: crawler
     restart: unless-stopped
     environment:
-      <<: *app-env
+      <<: *database-env
+      SNAPSHOT_STORAGE_DIR: "/var/lib/partsradar/snapshots"
+      LOG_LEVEL: "${LOG_LEVEL:-info}"
       RAW_SNAPSHOT_CLEANUP_INTERVAL_SECONDS: "${RAW_SNAPSHOT_CLEANUP_INTERVAL_SECONDS:-86400}"
     volumes:
       - snapshots:/var/lib/partsradar/snapshots

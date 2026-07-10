@@ -47,7 +47,6 @@ The bot daemon also scans due scheduled personal reports, pending public reports
 
 - `apps/crawler/src/scripts/ops/discord-bot.ts`
 - `apps/crawler/src/scripts/ops/discord-bot/**`
-- `apps/crawler/tests/scripts/ops/discord-bot*.test.ts`
 - `apps/crawler/tests/scripts/ops/discord-bot/**`
 - `docs/technical/operations-runbook.md`
 - `docs/technical/data-model.md`

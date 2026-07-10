@@ -1,6 +1,8 @@
 // apps/crawler/src/scripts/ops/discord-bot/message-text.ts
 // 提供 Discord 訊息共用的純文字、TWD、站內連結與台北時間格式化。
 
+import { TIME_ZONE } from "./constants";
+
 // 將輸入文字整理成可放進 Discord payload 的安全長度字串。
 export function formatDiscordBotText(value: string, maxLength: number): string {
   const text = replaceControlCharacters(value);
@@ -35,7 +37,7 @@ export function escapeMarkdownLinkText(value: string): string {
 // 將時間格式化為 Discord 訊息共用的台北時間分鐘粒度。
 export function formatTaipeiMinute(value: Date): string {
   const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "Asia/Taipei",
+    timeZone: TIME_ZONE,
     month: "2-digit",
     day: "2-digit",
     hour: "2-digit",

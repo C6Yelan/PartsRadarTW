@@ -19,10 +19,10 @@ export const metadata: Metadata = {
   description: "邀請 PartsRadarTW Discord bot，設定即時目標價提醒、個人價格報告與伺服器公開報告。",
 };
 
-// 邀請連結由 runtime env 控制，讓部署端可在不重建 image 的情況下開關或更換 URL。
+// Server-only runtime env keeps invite changes independent from the web image build.
 export const dynamic = "force-dynamic";
 
-const discordInviteUrl = process.env.NEXT_PUBLIC_DISCORD_BOT_INVITE_URL?.trim();
+const discordInviteUrl = process.env.DISCORD_BOT_INVITE_URL?.trim();
 
 // 組裝 Discord 介紹頁，將靜態內容資料分派到 hero、快速開始、指令教學與 FAQ 區塊。
 export default function DiscordPage() {

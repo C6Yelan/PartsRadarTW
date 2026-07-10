@@ -4,11 +4,11 @@
 import { isAbsolute, relative, resolve } from "node:path";
 import type { PrismaClient } from "@partsradar/db";
 import {
+  type CleanupRawSnapshotsResult,
+  cleanupRawSnapshotsWithPrisma,
   DEFAULT_RAW_SNAPSHOT_ABNORMAL_RETENTION_DAYS,
   DEFAULT_RAW_SNAPSHOT_NORMAL_RETENTION_DAYS,
-  type CleanupRawSnapshotsResult,
   type PrismaRawSnapshotCleanupClient,
-  cleanupRawSnapshotsWithPrisma,
 } from "../../coolpc/raw-snapshot-cleanup";
 import {
   DEFAULT_RAW_SNAPSHOT_STORAGE_DIR,
@@ -21,6 +21,7 @@ import {
   resolveWorkspaceRoot,
   toSafeCliErrorMessage,
 } from "../shared/script-utils";
+import { formatTaipeiDateTime, TAIPEI_TIME_ZONE } from "./shared/time";
 
 const CONFIRM_DELETE_FLAG = "--confirm-delete";
 const HELP_FLAG = "--help";
@@ -246,10 +247,10 @@ function printSummary(
     `- Snapshot storage: ${formatStorageDirForSummary(options.workspaceRoot, options.storageDir)}`,
   );
   console.log(
-    `- Normal retention: ${options.normalRetentionDays} days, cutoff ${result.normalCutoff.toISOString()}`,
+    `- Normal retention: ${options.normalRetentionDays} days, cutoff (${TAIPEI_TIME_ZONE}) ${formatTaipeiDateTime(result.normalCutoff)}; cutoff (UTC) ${result.normalCutoff.toISOString()}`,
   );
   console.log(
-    `- Abnormal retention: ${options.abnormalRetentionDays} days, cutoff ${result.abnormalCutoff.toISOString()}`,
+    `- Abnormal retention: ${options.abnormalRetentionDays} days, cutoff (${TAIPEI_TIME_ZONE}) ${formatTaipeiDateTime(result.abnormalCutoff)}; cutoff (UTC) ${result.abnormalCutoff.toISOString()}`,
   );
   console.log(`- Metadata candidates: ${result.candidateMetadataCount}`);
   console.log(`- Metadata deleted: ${result.deletedMetadataCount}`);

@@ -14,13 +14,13 @@ import {
   handleNewProductImageBackfill,
   type NewProductImageBackfillHandler,
 } from "./crawl-coolpc-daemon/new-product-images";
-import { parseDaemonOptions, type CoolpcDaemonOptions } from "./crawl-coolpc-daemon/options";
+import { type CoolpcDaemonOptions, parseDaemonOptions } from "./crawl-coolpc-daemon/options";
 import {
+  type ProductWriteSummaryTotals,
   printCycleSummary,
   resolveAllFetchFailedRetrySeconds,
   shouldBackoffAfter,
   summarizeProductWrites,
-  type ProductWriteSummaryTotals,
 } from "./crawl-coolpc-daemon/summary";
 import { tryAcquireExternalFetchLock } from "./external-fetch-lock";
 import { createOpsLogger } from "./shared/logger";
@@ -29,11 +29,11 @@ const SCHEDULED_CRAWL_USER_AGENT =
   "PartsRadarTW scheduled crawler (+https://github.com/C6Yelan/PartsRadarTW)";
 const logger = createOpsLogger();
 
-export { parseDaemonOptions } from "./crawl-coolpc-daemon/options";
 export type {
   CoolpcDaemonOptions,
   NewProductImageBackfillOptions,
 } from "./crawl-coolpc-daemon/options";
+export { parseDaemonOptions } from "./crawl-coolpc-daemon/options";
 
 interface ShutdownController {
   readonly requested: boolean;
@@ -212,13 +212,13 @@ function createShutdownController(): ShutdownController {
       }
 
       return new Promise<void>((resolve) => {
-        const timeout = setTimeout(() => {
+        const timeoutId = setTimeout(() => {
           wakeSleeper = null;
           resolve();
         }, ms);
 
         wakeSleeper = () => {
-          clearTimeout(timeout);
+          clearTimeout(timeoutId);
           wakeSleeper = null;
           resolve();
         };

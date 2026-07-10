@@ -3,12 +3,12 @@
 
 import { toSafeCliErrorMessage } from "../../shared/script-utils";
 import type {
+  ProductionSmokeOptions,
+  RateLimitHeaderSnapshot,
   SmokeCategoriesResponse,
   SmokePriceHistoryResponse,
   SmokeProductDetailResponse,
-  ProductionSmokeOptions,
   SmokeProductsResponse,
-  RateLimitHeaderSnapshot,
   SmokeSourceStatusResponse,
 } from "./types";
 
@@ -137,7 +137,7 @@ export async function fetchWithTimeout(
     }
 > {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), options.timeoutMs);
+  const timeoutId = setTimeout(() => controller.abort(), options.timeoutMs);
   const url = new URL(path, options.baseUrl);
 
   try {
@@ -165,7 +165,7 @@ export async function fetchWithTimeout(
       message: toSafeCliErrorMessage(error),
     };
   } finally {
-    clearTimeout(timeout);
+    clearTimeout(timeoutId);
   }
 }
 

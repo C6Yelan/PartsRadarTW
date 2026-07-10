@@ -31,7 +31,12 @@ RUN DATABASE_URL="postgresql://partsradar:partsradar@localhost:5432/partsradar?s
 
 FROM base AS web-build
 
-ENV NODE_ENV=production
+ARG CSP_MODE=enforce
+ARG CSP_REPORT_URI=""
+
+ENV NODE_ENV=production \
+  CSP_MODE=$CSP_MODE \
+  CSP_REPORT_URI=$CSP_REPORT_URI
 
 RUN pnpm build:web
 

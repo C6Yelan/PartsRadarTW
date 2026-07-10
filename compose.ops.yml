@@ -1,10 +1,6 @@
-x-app-env: &app-env
+x-database-env: &database-env
   NODE_ENV: "production"
   DATABASE_URL: "postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}?schema=public"
-  SNAPSHOT_STORAGE_DIR: "/var/lib/partsradar/snapshots"
-  PRODUCT_IMAGE_STORAGE_DIR: "/var/lib/partsradar/product-images"
-  EXTERNAL_FETCH_LOCK_DIR: "/var/lib/partsradar/snapshots/.locks/external-fetch"
-  PARTSRADAR_PUBLIC_BASE_URL: "${PARTSRADAR_PUBLIC_BASE_URL:-https://partsradar.net}"
 
 services:
   smoke-daemon:
@@ -15,7 +11,9 @@ services:
       target: crawler
     restart: unless-stopped
     environment:
-      <<: *app-env
+      <<: *database-env
+      PRODUCT_IMAGE_STORAGE_DIR: "/var/lib/partsradar/product-images"
+      LOG_LEVEL: "${LOG_LEVEL:-info}"
       SMOKE_PUBLIC_BASE_URL: "${SMOKE_PUBLIC_BASE_URL:-http://web:3000}"
       SMOKE_INTERVAL_SECONDS: "${SMOKE_INTERVAL_SECONDS:-900}"
       SMOKE_INITIAL_DELAY_SECONDS: "${SMOKE_INITIAL_DELAY_SECONDS:-60}"
@@ -68,9 +66,13 @@ services:
       target: crawler
     restart: unless-stopped
     environment:
-      <<: *app-env
+      <<: *database-env
+      PARTSRADAR_PUBLIC_BASE_URL: "${PARTSRADAR_PUBLIC_BASE_URL:-https://partsradar.net}"
+      LOG_LEVEL: "${LOG_LEVEL:-info}"
       DISCORD_BOT_TOKEN: "${DISCORD_BOT_TOKEN:-replace_with_discord_bot_token}"
       DISCORD_APPLICATION_ID: "${DISCORD_APPLICATION_ID:-replace_with_discord_application_id}"
+      DISCORD_API_BASE_URL: "${DISCORD_API_BASE_URL:-https://discord.com/api/v10}"
+      DISCORD_GATEWAY_URL: "${DISCORD_GATEWAY_URL:-wss://gateway.discord.gg/?v=10&encoding=json}"
       DISCORD_BOT_REGISTER_COMMANDS_ON_START: "${DISCORD_BOT_REGISTER_COMMANDS_ON_START:-true}"
       DISCORD_FEATURE_PUBLIC_REPORTS_ENABLED: "${DISCORD_FEATURE_PUBLIC_REPORTS_ENABLED:-true}"
       DISCORD_FEATURE_PERSONAL_REPORTS_ENABLED: "${DISCORD_FEATURE_PERSONAL_REPORTS_ENABLED:-true}"

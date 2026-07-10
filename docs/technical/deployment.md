@@ -9,7 +9,7 @@
 - PostgreSQL、raw snapshots、product image cache 都能持久保存。
 - web、crawler、postgres、Cloudflare Tunnel 清楚分離。
 - secrets 不進 Git。
-- 後續價格歷史、配單、Excel 匯出與營運監控可在同一部署邊界內擴充，不以帳號或使用者通知服務為前提。
+- 價格歷史、配單、Excel 匯出、營運監控與 Discord bot 都維持在同一自架部署邊界內；網站本身仍不建立帳號。
 
 ## 目標環境
 
@@ -37,7 +37,7 @@
 | `crawler-daemon` | scheduled CoolPC crawl + new-product image cache follow-up |
 | `raw-snapshot-cleanup-daemon` | scheduled raw snapshot cleanup |
 | `smoke-daemon` | scheduled production smoke and admin webhook notification |
-| `discord-bot` | Discord slash command bot for personal DM notifications |
+| `discord-bot` | Discord slash commands, public reports, personal reports, and target-price notifications |
 | `postgres` | 商品、價格、crawler 狀態與 metadata |
 | `cloudflared` | Cloudflare Tunnel public entry |
 
@@ -81,6 +81,8 @@
 - scheduled 與 manual live crawl 固定使用官方 CoolPC URL；raw replay 只保留在 `manual:validate-coolpc-live`，且不再提供來源網址設定。
 - `web` 預設綁 `127.0.0.1:${WEB_PORT:-3000}`；公開流量走 Cloudflare Tunnel。
 - `POSTGRES_*` 在 Compose 中必填，不使用 development fallback。
+- `CSP_MODE` 與 `CSP_REPORT_URI` 由 Compose build args 傳入 `web` image；變更後必須 rebuild，不能只 restart container。
+- `DISCORD_BOT_INVITE_URL` 是 server-only runtime env；變更後 recreate `web` container 即可，不需 rebuild image。
 - `.env.example` 只放非敏感模板；正式 `.env` 不提交。
 
 ## Runtime Image Hygiene
@@ -142,7 +144,7 @@ PRODUCT_IMAGE_STORAGE_DIR=/var/lib/partsradar/product-images
 
 ## Environment And Secrets
 
-正式 `.env` 至少包含：
+正式 `.env` 由 `.env.example` 建立。`POSTGRES_DB`、`POSTGRES_USER`、`POSTGRES_PASSWORD` 與 host-side `DATABASE_URL` 必須替換；其餘欄位只在啟用對應 profile 或刻意覆寫預設時設定：
 
 | 名稱 | 用途 |
 | --- | --- |
@@ -153,19 +155,21 @@ PRODUCT_IMAGE_STORAGE_DIR=/var/lib/partsradar/product-images
 | `API_READ_RATE_LIMIT_MAX` / `API_LIST_RATE_LIMIT_MAX` / `API_IMAGE_RATE_LIMIT_MAX` | Web API 每 window 的 read / list / image 限流額度 |
 | `API_RATE_LIMIT_WINDOW_SECONDS` / `API_RATE_LIMIT_CACHE_SIZE` | Web API 限流 window 與 bounded cache 大小 |
 | `CSP_MODE` / `CSP_REPORT_URI` | Web build 時的 CSP enforce / report-only 模式與可選回報端點 |
-| `SNAPSHOT_STORAGE_DIR` | container 內 snapshot path |
-| `PRODUCT_IMAGE_STORAGE_DIR` | container 內縮圖 path |
+| `SNAPSHOT_STORAGE_DIR` | local crawler / CLI 的 workspace-relative snapshot path；Compose 使用固定 container path |
+| `PRODUCT_IMAGE_STORAGE_DIR` | local web / crawler 的縮圖 path；同一 `.env` 同時供兩者使用時，自訂值必須是絕對路徑；Compose 使用固定 container path |
 | `CRAWLER_INTERVAL_SECONDS` / `CRAWLER_BACKOFF_SECONDS` / `CRAWLER_LOCK_RETRY_SECONDS` / `CRAWLER_CATEGORY_DELAY_MS` | scheduled crawler 節奏 |
 | `CRAWLER_NEW_PRODUCT_IMAGE_MIN_DELAY_MS` / `CRAWLER_NEW_PRODUCT_IMAGE_MAX_DELAY_MS` / `CRAWLER_NEW_PRODUCT_IMAGE_TIMEOUT_MS` / `CRAWLER_NEW_PRODUCT_IMAGE_MAX_SOURCE_BYTES` | scheduled crawler 新增商品圖片快取節奏 |
-| `EXTERNAL_FETCH_LOCK_DIR` / `EXTERNAL_FETCH_LOCK_STALE_SECONDS` | scheduled crawler 外部抓取鎖 |
+| `EXTERNAL_FETCH_LOCK_DIR` / `EXTERNAL_FETCH_LOCK_STALE_SECONDS` | local crawler 的 lock path 與 stale 秒數；Compose 固定 container lock path，只傳入 stale override |
 | `RAW_SNAPSHOT_CLEANUP_INTERVAL_SECONDS` | cleanup daemon 節奏 |
 | `DISCORD_BOT_TOKEN` / `DISCORD_APPLICATION_ID` | Discord bot token 與 application id；公開價格報告頻道由 `/public-report` 指令設定 |
-| `NEXT_PUBLIC_DISCORD_BOT_INVITE_URL` | 網站 `/discord` 邀請按鈕使用的公開 Discord bot invite URL；由 web runtime 讀取，不得放 token。 |
+| `DISCORD_BOT_INVITE_URL` | 網站 `/discord` 邀請按鈕使用的公開 Discord bot invite URL；由 server runtime 讀取，變更後 recreate `web`，不得放 token。 |
 | `DISCORD_BOT_REGISTER_COMMANDS_ON_START` / `DISCORD_FEATURE_PUBLIC_REPORTS_ENABLED` / `DISCORD_FEATURE_PERSONAL_REPORTS_ENABLED` / `DISCORD_FEATURE_TARGET_WATCHES_ENABLED` | Discord bot 指令註冊與 public / personal / target watch 子功能 runtime flags；flags 預設 `true`，可作為 emergency kill switch |
 | `DISCORD_BOT_COMMAND_COOLDOWN_SECONDS` / `DISCORD_PRICE_REPORT_SCHEDULE_INTERVAL_SECONDS` | Discord bot cooldown 與每日報告 fallback 掃描上限；近期待發報告會睡到 due time |
+| `DISCORD_API_BASE_URL` / `DISCORD_GATEWAY_URL` | 進階測試環境 override；一般部署保留 Discord 官方 endpoint |
+| `LOG_LEVEL` | 使用 shared ops logger 的 daemon / CLI level；`debug`、`info`、`warn` 或 `error`，預設 `info` |
 | `CLOUDFLARED_IMAGE` | 固定版本 cloudflared image |
 | `CLOUDFLARE_TUNNEL_TOKEN` | Tunnel token |
-| `NODE_ENV` | production |
+| `NODE_ENV` | local template 預設 development；Compose service 固定 production |
 
 Discord bot 權限：
 
@@ -191,7 +195,7 @@ Discord bot 權限：
 
 1. VM 安裝 Docker / Compose。
 2. 取得 repo 或部署產物。
-3. 建立 `.env` 並替換所有 placeholder。
+3. 建立 `.env`，替換必要 DB placeholder，並只替換實際啟用之 Discord / Cloudflare feature placeholder。
 4. 建立 persistent volumes。
 5. 執行 `storage-init`，初始化 snapshot / product image volume 權限。
 6. 啟動 `postgres`。
@@ -202,7 +206,7 @@ Discord bot 權限：
 11. 視需要先手動跑 product image backfill。
 12. 以 `compose.crawler.yml` 啟動 `scheduled-crawler` profile 中的 `crawler-daemon` 與 `raw-snapshot-cleanup-daemon`。
 13. 以 `compose.ops.yml` 啟動 `ops` profile 中的 `smoke-daemon`。
-14. 若啟用 Discord 個人化通知，設定 bot secret 後以 `compose.ops.yml` 啟動 `discord-bot` profile。
+14. 若啟用 Discord 公開報告、個人報告或目標價通知，設定 bot secret 後以 `compose.ops.yml` 啟動 `discord-bot` profile。
 15. 建立 Cloudflare remotely-managed tunnel。
 16. 以 `compose.tunnel.yml` 啟動 `public-tunnel` profile。
 17. 驗證正式網域、API、圖片 API、crawler、smoke、Discord bot 與資料狀態。

@@ -4,8 +4,8 @@
 import type { PrismaClient } from "@partsradar/db";
 import {
   type CleanupRawSnapshotsResult,
-  type PrismaRawSnapshotCleanupClient,
   cleanupRawSnapshotsWithPrisma,
+  type PrismaRawSnapshotCleanupClient,
 } from "../../coolpc/raw-snapshot-cleanup";
 import { tryAcquireRawSnapshotMutationLock } from "../../coolpc/raw-snapshot-storage";
 import {
@@ -13,19 +13,19 @@ import {
   resolveWorkspaceRoot,
   toSafeCliErrorMessage,
 } from "../shared/script-utils";
+import { type RawSnapshotCleanupExecutor, runRawSnapshotCleanup } from "./cleanup-raw-snapshots";
 import {
   HELP_FLAG,
   parseRawSnapshotCleanupDaemonOptions,
   printHelp,
   type RawSnapshotCleanupDaemonOptions,
 } from "./cleanup-raw-snapshots-daemon/options";
-import { type RawSnapshotCleanupExecutor, runRawSnapshotCleanup } from "./cleanup-raw-snapshots";
 import { createOpsLogger } from "./shared/logger";
 
 const logger = createOpsLogger();
 
-export { parseRawSnapshotCleanupDaemonOptions } from "./cleanup-raw-snapshots-daemon/options";
 export type { RawSnapshotCleanupDaemonOptions } from "./cleanup-raw-snapshots-daemon/options";
+export { parseRawSnapshotCleanupDaemonOptions } from "./cleanup-raw-snapshots-daemon/options";
 
 // 抽象化 daemon 的停止狀態與 sleep 行為，讓測試能驗證 loop 行為而不依賴真實 process signal。
 export interface ShutdownController {
@@ -167,13 +167,13 @@ function createShutdownController(): ShutdownController {
       }
 
       return new Promise<void>((resolve) => {
-        const timeout = setTimeout(() => {
+        const timeoutId = setTimeout(() => {
           wakeSleeper = null;
           resolve();
         }, ms);
 
         wakeSleeper = () => {
-          clearTimeout(timeout);
+          clearTimeout(timeoutId);
           wakeSleeper = null;
           resolve();
         };

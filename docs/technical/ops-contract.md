@@ -9,6 +9,7 @@ Ops tooling helps maintainers detect public availability issues, crawler/data-fl
 - `production-smoke` checks public routes/APIs and, when DB access is available, deployment-internal data health.
 - `smoke-daemon` runs production smoke on a schedule and writes safe summaries to container logs.
 - Admin Discord webhook sends maintainer-only `WARN`, `FAIL`, and `RECOVERED` summaries from smoke results.
+- Machine logs and notification state use UTC ISO timestamps; maintainer smoke summaries and admin webhook copy show `Asia/Taipei` first and label any additional UTC value.
 - Container logs and direct maintainer DB queries remain available for deeper diagnosis.
 - External monitoring is public-only and should use homepage, public APIs, and `production-smoke --public-only`; DB-backed and Discord delivery signals stay internal.
 

@@ -25,6 +25,11 @@
 
 ## Time Fields
 
+- 週期、backoff、lock stale、TTL 與 retry delay 若以秒為部署契約，程式名稱使用 `Seconds`、env 使用 `_SECONDS`；HTTP timeout、來源 request delay 與 timer/sleep 邊界使用 `Ms`、`_MS`。
+- 分鐘、小時與天數門檻保留 `Minutes`、`Hours`、`Days`；時間數值不得只叫 `interval`、`timeout`、`delay` 或 `retryAfter`。Timer handle 使用 `timeoutId` / `timer`，不假裝是 duration。
+- 秒轉毫秒只在 `sleep`、`setTimeout`、排程 Date 計算等 timer 邊界；已是毫秒的 provider/API 值不可重複轉換。
+- DB、public API、machine state JSON 與 structured machine log 使用 UTC `Date` / ISO timestamp。Web 與 Discord 使用者可見時間使用 `Asia/Taipei`；maintainer CLI 與 admin webhook 以台北時間為主要顯示，附 UTC 時必須明確標示。
+- Formatter owner 維持 app-local：web 使用 `apps/web/app/_shared/time.ts`，Discord bot 使用 `apps/crawler/src/scripts/ops/discord-bot/message-text.ts`，crawler 維運摘要使用 `apps/crawler/src/scripts/ops/shared/time.ts`；不要建立跨 monorepo time framework。
 - `fetchedAt`：crawler 抓到來源頁或 raw snapshot 的時間。
 - `capturedAt`：price snapshot / image record 被收錄的時間。
 - `observedAt`：public price-history point 對使用者呈現的觀測時間。

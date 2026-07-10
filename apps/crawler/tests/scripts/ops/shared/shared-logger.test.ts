@@ -39,4 +39,31 @@ describe("ops logger", () => {
     expect(lines[0]).not.toContain("fake-password");
     expect(lines[0]).not.toContain("fake-webhook-token");
   });
+
+  it("resolves the implicit level on first write after workspace env loading", () => {
+    const originalLogLevel = process.env.LOG_LEVEL;
+    const lines: string[] = [];
+
+    try {
+      delete process.env.LOG_LEVEL;
+      const logger = createOpsLogger({
+        now: () => new Date("2026-07-03T01:02:03.004Z"),
+        sink: (line) => lines.push(line),
+      });
+      process.env.LOG_LEVEL = "error";
+
+      logger.warn("hidden warning");
+      logger.error("visible error");
+
+      expect(lines).toHaveLength(1);
+      expect(lines[0]).toContain("level=error");
+      expect(lines[0]).toContain('message="visible error"');
+    } finally {
+      if (originalLogLevel === undefined) {
+        delete process.env.LOG_LEVEL;
+      } else {
+        process.env.LOG_LEVEL = originalLogLevel;
+      }
+    }
+  });
 });

@@ -1,22 +1,12 @@
 // apps/crawler/src/scripts/ops/smoke-discord-notification/message.ts
 // 組裝 production smoke Discord admin webhook 訊息，區分異常告警與恢復通知的 embed 內容。
 
-import type { ProductionSmokeSummary, SmokeCheckResult, SmokeStatus } from "../production-smoke";
 import { type DiscordWebhookMessage, formatDiscordWebhookText } from "../discord-webhook";
+import type { ProductionSmokeSummary, SmokeCheckResult, SmokeStatus } from "../production-smoke";
+import { formatTaipeiDateTime, TAIPEI_TIME_ZONE } from "../shared/time";
 import type { SmokeDiscordNotificationKind } from "./state";
 
 const MAX_ABNORMAL_CHECK_LINES = 8;
-const TAIPEI_TIME_ZONE = "Asia/Taipei";
-const TAIPEI_DATE_TIME_FORMATTER = new Intl.DateTimeFormat("en-US", {
-  timeZone: TAIPEI_TIME_ZONE,
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-  hour: "2-digit",
-  minute: "2-digit",
-  second: "2-digit",
-  hourCycle: "h23",
-});
 const SMOKE_EMBED_COLORS: Record<SmokeDiscordNotificationKind, number> = {
   WARN: 0xf59e0b,
   FAIL: 0xdc2626,
@@ -112,12 +102,4 @@ function countChecksByStatus(summary: ProductionSmokeSummary): Record<SmokeStatu
   }
 
   return counts;
-}
-
-function formatTaipeiDateTime(value: Date): string {
-  const parts = new Map(
-    TAIPEI_DATE_TIME_FORMATTER.formatToParts(value).map((part) => [part.type, part.value]),
-  );
-
-  return `${parts.get("year")}-${parts.get("month")}-${parts.get("day")} ${parts.get("hour")}:${parts.get("minute")}:${parts.get("second")}`;
 }

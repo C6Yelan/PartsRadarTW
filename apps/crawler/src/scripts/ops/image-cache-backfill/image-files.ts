@@ -39,7 +39,7 @@ export async function fetchSourceImageBytes(
   options: ImageBackfillOptions,
 ): Promise<Buffer> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), options.timeoutMs);
+  const timeoutId = setTimeout(() => controller.abort(), options.timeoutMs);
 
   try {
     const response = await fetch(url, {
@@ -81,7 +81,7 @@ export async function fetchSourceImageBytes(
 
     return bytes;
   } finally {
-    clearTimeout(timeout);
+    clearTimeout(timeoutId);
   }
 }
 

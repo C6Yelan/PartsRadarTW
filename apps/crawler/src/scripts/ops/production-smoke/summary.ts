@@ -1,6 +1,7 @@
 // apps/crawler/src/scripts/ops/production-smoke/summary.ts
 // 將 production smoke summary 輸出成維運 CLI 可快速掃描的文字摘要。
 
+import { formatTaipeiDateTime, TAIPEI_TIME_ZONE } from "../shared/time";
 import type { ProductionSmokeSummary } from "./types";
 
 // 輸出整體狀態、各等級數量與 WARN / FAIL 細節，省略 OK 明細以降低噪音。
@@ -10,7 +11,8 @@ export function printProductionSmokeSummary(summary: ProductionSmokeSummary): vo
 
   console.log("");
   console.log("PartsRadarTW production smoke");
-  console.log(`Checked at: ${summary.checkedAt.toISOString()}`);
+  console.log(`Checked at (${TAIPEI_TIME_ZONE}): ${formatTaipeiDateTime(summary.checkedAt)}`);
+  console.log(`Checked at (UTC): ${summary.checkedAt.toISOString()}`);
   console.log("");
   console.log(`Checks: ok=${counts.OK} warn=${counts.WARN} fail=${counts.FAIL}`);
 

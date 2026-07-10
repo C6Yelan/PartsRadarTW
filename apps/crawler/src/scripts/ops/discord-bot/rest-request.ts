@@ -91,20 +91,22 @@ async function readDiscordJson<T>(response: Response): Promise<T | null> {
 
 // Discord body 的 retry_after 使用秒，內部統一轉成毫秒方便排程與 sleep 使用。
 function resolveRetryAfterMsFromBody(body: { retry_after?: unknown } | null): number {
-  const retryAfter = typeof body?.retry_after === "number" ? body.retry_after : null;
+  const retryAfterSeconds = typeof body?.retry_after === "number" ? body.retry_after : null;
 
-  return retryAfter !== null && Number.isFinite(retryAfter) ? Math.ceil(retryAfter * 1000) : 0;
+  return retryAfterSeconds !== null && Number.isFinite(retryAfterSeconds)
+    ? Math.ceil(retryAfterSeconds * 1000)
+    : 0;
 }
 
 // 優先讀取 Discord 回應 header 的 retry-after，單位同樣轉為毫秒。
 function parseRetryAfterHeader(headers: Headers): number | undefined {
-  const retryAfter = headers.get("retry-after");
+  const retryAfterSecondsText = headers.get("retry-after");
 
-  if (!retryAfter) {
+  if (!retryAfterSecondsText) {
     return undefined;
   }
 
-  const retryAfterSeconds = Number(retryAfter);
+  const retryAfterSeconds = Number(retryAfterSecondsText);
 
   return Number.isFinite(retryAfterSeconds) ? Math.ceil(retryAfterSeconds * 1000) : undefined;
 }

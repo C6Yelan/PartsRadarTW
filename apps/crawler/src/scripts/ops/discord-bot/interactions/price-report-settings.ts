@@ -6,6 +6,7 @@ import {
   DISCORD_EMBED_COLOR,
   MAX_PRICE_REPORT_KEYWORD_GROUPS,
   MAX_PRICE_REPORT_KEYWORD_LENGTH,
+  TIME_ZONE,
 } from "../constants";
 import {
   formatPriceReportCategoryFilterLabel,
@@ -152,7 +153,7 @@ export function formatTaipeiTimeInput(value: Date | null | undefined): string {
   }
 
   const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "Asia/Taipei",
+    timeZone: TIME_ZONE,
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,

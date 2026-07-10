@@ -164,7 +164,7 @@ Build-list tests are grouped by public boundary:
 - partial missing 與 refresh 失敗保留 intent，未知價格不計入總價，remove / undo 仍可運作。
 - 顯示 browser-only、最近同步、手動 refresh 與 50 個不同品項上限。
 
-Playwright 驗證需使用可設定 base URL 或相對導覽，避免硬寫單一 localhost port。
+Playwright 驗證以 `E2E_BASE_URL` 指向既有環境；未設定時會在 `127.0.0.1:3100` build 並啟動 local web server。只有已存在可重用的 local Next.js build 時才設定 `E2E_SKIP_BUILD=1`，避免把 stale build 當成驗證結果。
 
 ## Deployment Smoke
 

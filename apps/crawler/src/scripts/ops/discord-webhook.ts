@@ -147,7 +147,7 @@ export async function sendDiscordWebhookMessage({
   const normalizedWebhookUrl = normalizeDiscordWebhookUrl(webhookUrl);
   const payload = toDiscordWebhookPayload(message);
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const response = await fetchImpl(normalizedWebhookUrl, {
@@ -194,7 +194,7 @@ export async function sendDiscordWebhookMessage({
       ),
     };
   } finally {
-    clearTimeout(timeout);
+    clearTimeout(timeoutId);
   }
 }
 
@@ -248,20 +248,22 @@ async function resolveRetryAfterMs(response: Response): Promise<number> {
   }
 
   const body = await readRateLimitBody(response);
-  const retryAfter = typeof body?.retry_after === "number" ? body.retry_after : null;
+  const retryAfterSeconds = typeof body?.retry_after === "number" ? body.retry_after : null;
 
-  return retryAfter !== null && Number.isFinite(retryAfter) ? Math.ceil(retryAfter * 1000) : 0;
+  return retryAfterSeconds !== null && Number.isFinite(retryAfterSeconds)
+    ? Math.ceil(retryAfterSeconds * 1000)
+    : 0;
 }
 
 // 將 Discord retry-after 秒數 header 轉成毫秒；無效值視為未提供。
 function parseRetryAfterHeader(headers: Headers): number | undefined {
-  const retryAfter = headers.get("retry-after");
+  const retryAfterSecondsText = headers.get("retry-after");
 
-  if (!retryAfter) {
+  if (!retryAfterSecondsText) {
     return undefined;
   }
 
-  const retryAfterSeconds = Number(retryAfter);
+  const retryAfterSeconds = Number(retryAfterSecondsText);
 
   if (!Number.isFinite(retryAfterSeconds) || retryAfterSeconds < 0) {
     return undefined;

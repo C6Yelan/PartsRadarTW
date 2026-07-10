@@ -21,7 +21,7 @@ const LEVEL_ORDER: Record<OpsLogLevel, number> = {
 
 // 建立具 level filter 的 ops logger；預設輸出到 console.log。
 export function createOpsLogger({
-  level = parseOpsLogLevel(process.env.LOG_LEVEL),
+  level,
   now = () => new Date(),
   sink = console.log,
 }: {
@@ -29,8 +29,14 @@ export function createOpsLogger({
   now?: () => Date;
   sink?: (line: string) => void;
 } = {}): OpsLogger {
+  let resolvedLevel = level;
+
   function write(nextLevel: OpsLogLevel, message: string, fields: Record<string, unknown> = {}) {
-    if (LEVEL_ORDER[nextLevel] < LEVEL_ORDER[level]) {
+    // Entrypoints load the workspace .env after module imports, so resolve the
+    // implicit level on first use instead of capturing process.env at import time.
+    resolvedLevel ??= parseOpsLogLevel(process.env.LOG_LEVEL);
+
+    if (LEVEL_ORDER[nextLevel] < LEVEL_ORDER[resolvedLevel]) {
       return;
     }
 

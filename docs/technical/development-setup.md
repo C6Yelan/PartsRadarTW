@@ -1,6 +1,6 @@
 # 開發環境設定
 
-本文件定義 PartsRadarTW 第一版正式開發時的本機開發方式。內容先作為環境與指令規劃，實際指令會在專案初始化後依 package scripts 補齊。
+本文件定義 PartsRadarTW 目前的本機開發方式；實際入口以 root `package.json` scripts 與 `.env.example` 為準。
 
 ## 目標
 
@@ -80,7 +80,7 @@ repo 應提供 `.env.example` 作為範本。實際本機設定由 `.env.example
 | `POSTGRES_PORT` | 本機 PostgreSQL 對外 port，預設 `5432` |
 | `PARTSRADAR_PUBLIC_BASE_URL` | 公開網址，用於 Open Graph / Discord link preview 的 canonical URL 與圖片 URL；預設 `https://partsradar.net` |
 | `SNAPSHOT_STORAGE_DIR` | raw snapshot 壓縮檔保存位置 |
-| `PRODUCT_IMAGE_STORAGE_DIR` | 商品縮圖快取保存位置；本機 Next.js dev server 預設對應 repo root 的 `storage/product-images` |
+| `PRODUCT_IMAGE_STORAGE_DIR` | 商品縮圖快取保存位置；web 與 crawler 各自預設 repo root 的 `storage/product-images`，若要在共用 `.env` 覆寫則使用絕對路徑 |
 | `CRAWLER_INTERVAL_SECONDS` | crawler 週期秒數，預設 `1800` |
 | `CRAWLER_BACKOFF_SECONDS` | 連續失敗後延後秒數，第一版預設 `3600`；整輪全分類 fetch failed 時會先用較短 retry 間隔重新嘗試 |
 | `CRAWLER_LOCK_RETRY_SECONDS` | crawler 發現另一個 process 持有外部抓取鎖後的重試秒數，預設 `120` |
@@ -164,32 +164,24 @@ storage/snapshots/
 - 實際檔案透過 `SNAPSHOT_STORAGE_DIR` 控制。
 - 正式 Ubuntu VM 上需掛載 persistent volume，避免 container 重建後檔案消失。
 
-## 預期 Scripts
+## Scripts
 
-正式初始化 package scripts 時，建議保留下列入口：
+Root package 提供下列主要入口：
 
 | Script | 用途 |
 | --- | --- |
 | `pnpm dev` | 啟動網站開發環境，不預設啟動 crawler |
 | `pnpm dev:web` | 啟動 Next.js web app |
-| `pnpm dev:crawler` | 啟動 crawler 開發模式 |
 | `pnpm db:migrate` | 執行 Prisma migration |
 | `pnpm db:generate` | 產生 Prisma client |
-| `pnpm test` | 執行 Vitest |
+| `pnpm test` / `pnpm test:core` | 執行不含 ops / Discord 的 core Vitest suite |
+| `pnpm test:ops` / `pnpm test:discord` | 執行對應維運或 Discord feature suite |
+| `pnpm test:all` | 執行 repo-wide Vitest suite |
 | `pnpm lint` | 使用 Biome 執行 lint |
 | `pnpm format` | 使用 Biome 格式化檔案 |
 | `pnpm typecheck` | 執行 TypeScript type check |
 | `pnpm build` | 執行 Next.js production build |
 | `pnpm check` | 依序執行 typecheck、lint 與 build |
-
-第一版不要求一開始就建立所有 script，但正式開發前應至少有：
-
-- `pnpm dev`
-- `pnpm test`
-- `pnpm lint`
-- `pnpm typecheck`
-- `pnpm build`
-- `pnpm check`
 
 第一版程式品質工具以 Biome、TypeScript 與 Next.js build 分工處理：Biome 負責 lint / format，TypeScript typecheck 負責型別檢查，Next.js build 負責確認網站可正常編譯。第一版不使用 `eslint-config-next`，也不把 ESLint 列為必要工具。
 

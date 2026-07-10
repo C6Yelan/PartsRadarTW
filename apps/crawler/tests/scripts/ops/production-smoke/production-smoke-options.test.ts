@@ -107,7 +107,7 @@ describe("production smoke summary output", () => {
     const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
 
     printProductionSmokeSummary({
-      checkedAt: new Date("2026-06-02T12:00:00.000Z"),
+      checkedAt: new Date("2026-06-06T16:00:00.000Z"),
       status: "FAIL",
       checks: [
         { name: "homepage", status: "OK", message: "HTTP 200" },
@@ -120,6 +120,8 @@ describe("production smoke summary output", () => {
     log.mockRestore();
 
     expect(lines).toContain("Checks: ok=1 warn=1 fail=1");
+    expect(lines).toContain("Checked at (Asia/Taipei): 2026-06-07 00:00:00");
+    expect(lines).toContain("Checked at (UTC): 2026-06-06T16:00:00.000Z");
     expect(lines).toContain("[WARN] source freshness: last success is old");
     expect(lines).toContain("[FAIL] product image api: sample failed");
     expect(lines).not.toContain("[OK] homepage: HTTP 200");

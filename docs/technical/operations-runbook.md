@@ -2,7 +2,7 @@
 
 本文件保存 PartsRadarTW production 部署後的操作步驟。部署邊界、服務拆分、storage 與 security 原則仍以 [deployment.md](deployment.md) 為主；本文件只放可執行的維運流程與驗證 checklist。
 
-所有指令都假設在部署主機的 repo 根目錄執行。正式 `.env` 不提交 Git，且所有 `replace_with_*` placeholder 都必須先替換成主機專用值。
+所有指令都假設在部署主機的 repo 根目錄執行。正式 `.env` 不提交 Git；必要 DB placeholder 與實際啟用之 Discord / Cloudflare feature placeholder 必須先替換成主機專用值。
 
 ## Private Validation
 
@@ -14,7 +14,7 @@
 - Docker 與 Docker Compose 可由目前使用者執行。
 - `.env` 由 `.env.example` 複製而來，且未被 Git 追蹤。
 - `POSTGRES_DB`、`POSTGRES_USER` 與 `POSTGRES_PASSWORD` 已填入正式值，不使用 `replace_with_*` placeholder。
-- `POSTGRES_PASSWORD` 是強密碼。
+- `POSTGRES_DB`、`POSTGRES_USER` 與強密碼 `POSTGRES_PASSWORD` 使用 URI-safe 字元（例如 password 採長 base64url），因 Compose 會用原值組合 container `DATABASE_URL`。
 - `POSTGRES_BIND_HOST=127.0.0.1`，除非有額外防火牆與私網限制，否則不得公開 PostgreSQL。
 - `WEB_BIND_HOST=127.0.0.1`，避免尚未設定 Cloudflare Tunnel / CSP 前直接對外公開。
 
@@ -174,8 +174,8 @@ curl -i https://<domain>/api/source-status
 - 若另一個 crawler process 正在持有 external fetch lock，`crawler-daemon` 會在 `CRAWLER_LOCK_RETRY_SECONDS` 後重試，不會並行抓來源。
 - `.env` 中的 `CRAWLER_INTERVAL_SECONDS`、`CRAWLER_BACKOFF_SECONDS` 與 `CRAWLER_CATEGORY_DELAY_MS` 已確認；預設分別為 `1800`、`3600`、`8000`。
 - `.env` 中的 `CRAWLER_LOCK_RETRY_SECONDS` 已確認；預設 `120`。
-- `.env` 中的 `PRODUCT_IMAGE_STORAGE_DIR` 與 `CRAWLER_NEW_PRODUCT_IMAGE_*` 已確認；crawler-daemon 只會在每輪價格 crawl 後補本輪新增商品圖片。
-- `.env` 中的 `EXTERNAL_FETCH_LOCK_DIR` 與 `EXTERNAL_FETCH_LOCK_STALE_SECONDS` 已確認。
+- `.env` 中的 `CRAWLER_NEW_PRODUCT_IMAGE_*` 已確認；Compose 將 `PRODUCT_IMAGE_STORAGE_DIR` 固定到 mounted `product_images` volume，crawler-daemon 只會在每輪價格 crawl 後補本輪新增商品圖片。
+- `.env` 中的 `EXTERNAL_FETCH_LOCK_STALE_SECONDS` 已確認；Compose 將 `EXTERNAL_FETCH_LOCK_DIR` 固定到 mounted snapshot volume 內。
 - `WEB_BIND_HOST` 與 `POSTGRES_BIND_HOST` 仍維持 `127.0.0.1`。
 
 啟動：
@@ -312,7 +312,10 @@ SMOKE_PUBLIC_BASE_URL=https://partsradar.net
 - `SMOKE_RECENT_WINDOW_HOURS`：suspected block / parse error / Discord bot delivery 最新狀態檢查窗口，預設 24。
 - `SMOKE_PARSE_ERROR_WARN_COUNT` / `SMOKE_PARSE_ERROR_FAIL_COUNT`：parse error 門檻，預設 20 / 100。
 - `SMOKE_INVALID_IMAGE_URL_WARN_COUNT`：source image anomaly rows WARN 門檻，預設 2000；真正使用者可見影響仍由 active products / missing product images 判斷。
+- `SMOKE_MIN_ACTIVE_PRODUCTS`：active display-ready products 的最低數量，現行預設 1；fresh production baseline 尚未提供前不在本地任意校準。
 - `SMOKE_MISSING_IMAGE_WARN_COUNT` / `SMOKE_MISSING_IMAGE_FAIL_COUNT`：缺圖門檻，預設 200 / 500。
+- `SMOKE_RAW_SNAPSHOT_NORMAL_RETENTION_DAYS` / `SMOKE_RAW_SNAPSHOT_ABNORMAL_RETENTION_DAYS` / `SMOKE_RAW_SNAPSHOT_RETENTION_GRACE_DAYS`：raw snapshot retention 與 grace，現行預設 30 / 90 / 2 天。
+- `SMOKE_RAW_SNAPSHOT_WARN_COUNT` / `SMOKE_RAW_SNAPSHOT_FAIL_COUNT`：超過 retention + grace 的 raw snapshot 筆數門檻，現行預設 1 / 100。
 
 注意事項：
 
@@ -395,6 +398,8 @@ Bot 目標：
 - `DISCORD_FEATURE_TARGET_WATCHES_ENABLED`：是否執行目標價追蹤掃描與互動，預設 `true`；設為 `false` 時保留 watch rows 但暫停通知與管理操作。
 - `DISCORD_BOT_COMMAND_COOLDOWN_SECONDS`：每位使用者手動指令 cooldown，預設 60。
 - `DISCORD_PRICE_REPORT_SCHEDULE_INTERVAL_SECONDS`：bot daemon 的目標價掃描間隔與每日私訊價格報告 fallback 掃描上限，預設 300 秒，允許 60 到 3600。每日私訊價格報告若有更早的 `nextSendAt`，daemon 會睡到該 due time 附近才醒來；目標價仍依設定間隔掃描，最短 sleep 為 1 秒，避免高頻輪詢。
+- `DISCORD_API_BASE_URL` / `DISCORD_GATEWAY_URL`：只供可追溯測試環境覆寫；一般部署不設定，固定使用 Discord 官方 REST / Gateway endpoint。
+- `LOG_LEVEL`：ops daemon 共用 log level，接受 `debug`、`info`、`warn`、`error`，預設 `info`。Machine log timestamp 維持 UTC ISO。
 
 啟動：
 
@@ -525,6 +530,16 @@ pnpm backup:create
 ```bash
 BACKUP_INCLUDE_SNAPSHOTS=1 pnpm backup:create
 ```
+
+低頻 script override：
+
+- `BACKUP_DIR`：備份根目錄，預設 `backups`。
+- `BACKUP_TIMESTAMP`：備份目錄使用的 UTC timestamp；一般由 script 產生，只在可追溯演練需要固定值時覆寫。
+- `BACKUP_HELPER_IMAGE`：volume archive helper image，預設 `alpine:3.20`。
+- `BACKUP_INCLUDE_SNAPSHOTS=1`：額外封存 raw snapshot volume。
+- `COMPOSE_PROJECT_NAME`：named volume 所屬 Compose project，預設 `partsradar-tw`；自訂 deployment project name 時必須同步。
+- `RESTORE_DRILL_DB`：還原演練用 database 名稱，預設 `${POSTGRES_DB}_restore_drill`。
+- `KEEP_RESTORE_DRILL_DB=1`：演練後保留暫時 database 供人工檢查。
 
 還原演練不覆蓋正式 DB；它會建立 `${POSTGRES_DB}_restore_drill`，還原 dump、查詢基本表格，最後預設刪除臨時 DB：
 
