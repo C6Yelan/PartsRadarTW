@@ -1,7 +1,0 @@
-/* apps/web/app/styles/ops-status.css */
-@import "./ops-status/base.css";
-@import "./ops-status/summary.css";
-@import "./ops-status/runtime.css";
-@import "./ops-status/details.css";
-@import "./ops-status/tables.css";
-@import "./ops-status/responsive.css";

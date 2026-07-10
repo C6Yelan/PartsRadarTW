@@ -1,6 +1,6 @@
 # External Monitoring
 
-This document defines the first external monitoring slice. It covers public availability and keeps DB-backed or personal Discord bot signals inside `smoke-daemon`, admin webhook, and protected `ops-web`.
+This document defines the first external monitoring slice. It covers public availability and keeps DB-backed or personal Discord bot signals inside `smoke-daemon`, its admin webhook, and container logs.
 
 ## Scope
 
@@ -19,7 +19,6 @@ Product detail, price-history, and image API checks need a real product id. Pref
 
 Do not expose or monitor these publicly:
 
-- `/ops/status`
 - PostgreSQL
 - crawler, maintenance, cleanup, or Discord bot containers
 - raw snapshot storage
@@ -60,13 +59,13 @@ Cloudflare should remain the public edge. Use it for:
 - WAF / security events review
 - Basic bot / high-rate request observation before changing app limits
 
-Do not route `ops-web` through the public tunnel. If an external tool must read `/ops/status`, access it through VPN, SSH tunnel, or private network and include `OPS_STATUS_TOKEN`.
+Do not expose PostgreSQL, crawler services, raw storage, or Discord delivery data through the public tunnel.
 
 ## Alert Routing
 
 - Public HTTP monitors alert only on public availability failures.
 - `smoke-daemon` runs at a lower-frequency internal cadence and its admin webhook alerts on DB-backed or deployment-internal warnings and failures.
-- Discord bot delivery `FAILED` / `RATE_LIMITED` aggregation stays internal via `smoke-daemon` and `ops-web`.
+- Discord bot delivery `FAILED` / `RATE_LIMITED` aggregation stays internal via `smoke-daemon` and its admin webhook.
 - Avoid sending both Uptime Kuma and admin webhook to the same noisy channel without cooldown.
 
 ## First Response

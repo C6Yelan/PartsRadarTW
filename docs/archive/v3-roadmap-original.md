@@ -1,6 +1,6 @@
 # 第三版 Roadmap Original
 
-本文件保留第三版原始規劃、歷史範圍、切片與 closeout 背景，是歷史資料，不是 current runtime contract。現行第三版 scope 入口見 [第三版 Roadmap](../planning/v3-roadmap.md)；Discord bot 現行行為以 [Discord Contract](../technical/discord-contract.md) 為準；ops / smoke / admin webhook / protected status page 現行行為以 [Ops Contract](../technical/ops-contract.md) 為準。
+本文件保留第三版原始規劃、歷史範圍、切片與 closeout 背景，是歷史資料，不是 current runtime contract。現行第三版 scope 入口見 [第三版 Roadmap](../planning/v3-roadmap.md)；Discord bot 現行行為以 [Discord Contract](../technical/discord-contract.md) 為準；production smoke / admin webhook / external monitoring 現行行為以 [Ops Contract](../technical/ops-contract.md) 為準。
 
 ## 目標
 

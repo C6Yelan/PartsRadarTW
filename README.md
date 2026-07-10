@@ -23,7 +23,7 @@ PartsRadarTW 是一個以原價屋電腦零組件價格查詢為核心的網站�
 - 不需帳號的 client-side 配單、數量調整、總價、Excel 匯出與可列印版面。
 - 商品連結健康檢查、缺圖補齊、production smoke 與 log 型維運監控。
 - Discord bot 公開價格報告、個人價格報告與個人目標價提醒；網站本身仍不建立帳號。
-- 受保護的內部 `/ops/status` 頁面與管理者 Discord smoke alerting。
+- 管理者 Discord smoke 告警與 public-only 外部監控。
 
 ## 資料來源
 

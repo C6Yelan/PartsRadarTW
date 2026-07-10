@@ -81,7 +81,7 @@ http://127.0.0.1:3000
 - `mkdir -p /var/lib/partsradar/snapshots /var/lib/partsradar/product-images`
 - `chown -R node:node /var/lib/partsradar/snapshots /var/lib/partsradar/product-images`
 
-它不連 DB、不抓 CoolPC、不跑 crawler，也不長期維持 root runtime。`web`、`crawler`、`crawler-daemon`、`maintenance-daemon`、`raw-snapshot-cleanup-daemon`、`ops-web` 與 `smoke-daemon` 都會等 `storage-init` 成功完成後才啟動。
+它不連 DB、不抓 CoolPC、不跑 crawler，也不長期維持 root runtime。`web`、`crawler`、`crawler-daemon`、`maintenance-daemon`、`raw-snapshot-cleanup-daemon` 與 `smoke-daemon` 都會等 `storage-init` 成功完成後才啟動。
 
 初次部署、重建 volume、或懷疑 owner 錯誤時可手動重跑：
 
@@ -306,7 +306,7 @@ docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler ru
 
 `smoke-daemon` 是第二版第一輪內部營運監控。它不抓原價屋資料、不寫入商品資料，也不公開內部監控頁；只定期檢查網站、API、crawler 資料流與本機維運狀態，並把結果輸出到 container log。
 
-外部監控的公開檢查範圍與 Uptime Kuma / Cloudflare 建議見 [External Monitoring](external-monitoring.md)。公開監控只看 public route / API；DB-backed 與 Discord bot delivery 訊號留在 `smoke-daemon`、admin webhook 與受保護的 `ops-web`。
+外部監控的公開檢查範圍與 Uptime Kuma / Cloudflare 建議見 [External Monitoring](external-monitoring.md)。公開監控只看 public route / API；DB-backed 與 Discord bot delivery 訊號留在 `smoke-daemon`、admin webhook 與 container logs。
 
 檢查項目：
 
@@ -406,68 +406,7 @@ SMOKE_PUBLIC_BASE_URL=https://partsradar.net
 
 - `smoke-daemon` 的 log 可以作為第一輪內部監控呈現，不應直接公開給使用者。
 - 這不是使用者通知功能，也不建立帳號、watchlist 或價格提醒。
-- 第三版維運通知、內部狀態頁與外部監控方向以 [第三版 Roadmap](../planning/v3-roadmap.md) 為準。
-
-## Internal Ops Status Page
-
-`ops-web` 是內部維運狀態頁服務，使用同一個 `web` image，但獨立 Compose profile 與 port。公開 `web` service 會固定設定 `OPS_STATUS_ENABLED=false`，因此公開入口請求 `/ops/status` 應回 `HTTP 404`；只有 `ops-web` 會設定 `OPS_STATUS_ENABLED=true`。
-
-狀態頁目前顯示：
-
-- overall `OK` / `WARN` / `FAIL`。
-- source freshness、crawler freshness、recent suspected block、parse error、source image anomaly。
-- display-ready active product count、product image cache missing count。
-- 目前部署 env / 程式預設推導出的 daemon 排程：價格 crawler、新增商品圖片補圖、link health maintenance、raw snapshot cleanup、production smoke 與 Discord bot due report scan。
-- 外部抓取互斥策略：shared external-fetch lock、價格 crawler priority signal、maintenance 暫停延後，以及排程圖片補圖只處理本輪新增商品。
-- `source` link health 的 `ok`、`temporary_error`、`broken` 聚合。
-- raw snapshot retention drift。
-- Discord bot 個人化通知聚合：每日報告設定數、待發每日報告、啟用中目標價追蹤、已通知目標價、notification claim、近 24 小時 delivery 最新狀態訊號，以及最近 Discord delivery 的 kind / status / item count / message count / created / delivered 時間。
-- 最近 crawl runs 與 enabled source categories 的高層級時間資訊。
-
-狀態頁不顯示 raw HTML、parse error raw content、crawler stack trace、DB URL、token、raw IP、internal header dump、Discord user id、商品 ID 或 delivery error message。
-
-啟用前先在部署主機 `.env` 設定：
-
-```env
-OPS_STATUS_TOKEN=replace_with_random_ops_status_token
-# OPS_WEB_BIND_HOST=127.0.0.1
-# OPS_WEB_PORT=3001
-```
-
-啟動：
-
-```bash
-docker compose -f compose.yml -f compose.ops.yml --profile ops up -d ops-web
-docker compose -f compose.yml -f compose.ops.yml --profile ops ps ops-web
-```
-
-驗證 public `web` 沒有公開狀態頁：
-
-```bash
-curl -i http://127.0.0.1:3000/ops/status
-```
-
-預期結果是 `HTTP 404`。
-
-驗證內部 `ops-web`：
-
-```bash
-curl -i -H "x-ops-status-token: <OPS_STATUS_TOKEN>" \
-  http://127.0.0.1:3001/ops/status
-```
-
-預期結果是 `HTTP 200`。若用瀏覽器開啟，可使用：
-
-```text
-http://127.0.0.1:3001/ops/status?token=<OPS_STATUS_TOKEN>
-```
-
-外部可見性邊界：
-
-- `OPS_WEB_BIND_HOST` 預設必須維持 `127.0.0.1`。
-- `cloudflared` / public reverse proxy 只能導向 `web:3000`，不得導向 `ops-web:3000`。
-- 若需要遠端查看，優先用 SSH tunnel 或內網 VPN，不把 `ops-web` 暴露到 public tunnel。
-- `OPS_STATUS_TOKEN` 不得提交 Git，也不得放入公開文件、Discord 或 issue。
+- 第三版維運通知與外部監控方向以 [第三版 Roadmap](../planning/v3-roadmap.md) 為準。
 
 ## Discord Admin Webhook Notification Foundation
 

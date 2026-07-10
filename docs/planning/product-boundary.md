@@ -57,6 +57,6 @@ Discord 個人化只使用 Discord user id 與必要偏好設定，不建立網�
 
 第二版功能以價格歷史、價格變動探索、商品連結健康檢查、正常瀏覽限流調整、原價屋分類擴充、配單與 Excel 匯出為主；歷史範圍與驗收紀錄見 [第二版 Closeout](../archive/v2-closeout.md)。
 
-第三版功能以商品分享 / Open Graph、Discord bot 公開變價廣播、Discord 管理者告警、Discord bot 個人目標價提醒、Discord bot 個人價格變動報告、內網 ops status page、外部監控與公開流量成長硬化為主；詳細範圍與非目標以 [第三版 Roadmap](v3-roadmap.md) 為準。
+第三版功能以商品分享 / Open Graph、Discord bot 公開變價廣播、Discord 管理者告警、Discord bot 個人目標價提醒、Discord bot 個人價格變動報告、production smoke、外部監控與公開流量成長硬化為主；詳細範圍與非目標以 [第三版 Roadmap](v3-roadmap.md) 為準。
 
 後續功能的前提是資料流已足夠穩定，可以可靠辨識商品、更新價格並呈現價格變化。若未來要突破 Roadmap 非目標，必須另行建立產品與資安規劃。

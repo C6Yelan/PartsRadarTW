@@ -8,12 +8,12 @@
 
 - 商品詳細頁分享與 Open Graph preview。
 - Discord bot 公開價格變動報告、個人目標價提醒與個人價格變動報告。
-- 受保護的內網 ops status page、production smoke、admin webhook、外部 public-only monitoring 與公開流量硬化。
+- Production smoke、admin webhook、外部 public-only monitoring 與公開流量硬化。
 
 ## 現行契約
 
 - Discord bot 指令、通知、資料保存與隱私邊界以 [Discord Contract](../technical/discord-contract.md) 為準。
-- Ops status、production smoke、admin webhook 與外部監控邊界以 [Ops Contract](../technical/ops-contract.md) 為準。
+- Production smoke、admin webhook 與外部監控邊界以 [Ops Contract](../technical/ops-contract.md) 為準。
 - 產品非目標與 accountless 邊界以 [產品邊界](product-boundary.md) 為準。
 - 部署與維運命令以 [部署設計](../technical/deployment.md)、[Operations Runbook](../technical/operations-runbook.md) 與 [外部監控](../technical/external-monitoring.md) 為準。
 

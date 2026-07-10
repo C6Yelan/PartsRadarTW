@@ -13,6 +13,12 @@ interface ProductListResponse {
 }
 
 test.describe("public web smoke", () => {
+  test("does not expose the removed internal ops route", async ({ request }) => {
+    const response = await request.get("/ops/status");
+
+    expect(response.status()).toBe(404);
+  });
+
   test("loads the homepage and build list on desktop and mobile", async ({ page }) => {
     await page.goto("/");
     await expect(page.getByText("PartsRadarTW").first()).toBeVisible();
