@@ -11,7 +11,6 @@ export interface DiscordBotOptions {
   publicBaseUrl: string;
   apiBaseUrl: string;
   gatewayUrl: string;
-  registerCommands: boolean;
   registerCommandsOnStart: boolean;
   publicReportsEnabled: boolean;
   personalReportsEnabled: boolean;

@@ -32,7 +32,6 @@ export function parseDiscordBotOptions(
       env.DISCORD_GATEWAY_URL ?? DEFAULT_DISCORD_GATEWAY_URL,
       "DISCORD_GATEWAY_URL",
     ),
-    registerCommands: args.includes("--register-commands"),
     registerCommandsOnStart: readBooleanEnv(env, "DISCORD_BOT_REGISTER_COMMANDS_ON_START", true),
     publicReportsEnabled: readBooleanEnv(env, "DISCORD_FEATURE_PUBLIC_REPORTS_ENABLED", true),
     personalReportsEnabled: readBooleanEnv(env, "DISCORD_FEATURE_PERSONAL_REPORTS_ENABLED", true),

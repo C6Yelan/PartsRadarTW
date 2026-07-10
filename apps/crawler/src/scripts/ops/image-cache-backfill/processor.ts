@@ -3,7 +3,7 @@
 
 import { join, relative } from "node:path";
 import type { PrismaClient } from "@partsradar/db";
-import { normalizeCoolpcProductImageUrl } from "../../../coolpc/parser";
+import { normalizeCoolpcProductImageUrl } from "../../../coolpc/parser/urls";
 import {
   createProductImageCandidateByIdsWhere,
   createProductImageCandidateSelect,

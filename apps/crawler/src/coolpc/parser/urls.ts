@@ -1,17 +1,11 @@
 // apps/crawler/src/coolpc/parser/urls.ts
-// 管理 CoolPC 解析流程中的 URL 相關邏輯：分類頁組合、來源身分 key、商品圖片位址正規化與來源 URL 清理。
+// 管理 CoolPC 解析流程中的來源身分 key、商品圖片位址正規化與來源 URL 清理。
 
 import {
   COOLPC_OFFICIAL_BASE_URL,
   COOLPC_OFFICIAL_HOSTNAME,
   COOLPC_SOURCE_NAME,
-  createCoolpcCategoryUrl as createSharedCoolpcCategoryUrl,
 } from "@partsradar/shared";
-
-// 建立 CoolPC 分類頁 URL，預設使用官方 base URL，並保留 baseUrl 可覆寫（測試/環境覆寫用）。
-export function createCoolpcCategoryUrl(igrp: number, baseUrl = COOLPC_OFFICIAL_BASE_URL): string {
-  return createSharedCoolpcCategoryUrl(igrp, baseUrl);
-}
 
 // 組合 parser 的 source product key，維持來自 CoolPC 的來源唯一識別方式。
 export function createCoolpcSourceProductKey(igrp: number, ibuyToken: string): string {

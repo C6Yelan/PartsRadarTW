@@ -29,7 +29,7 @@ import type {
   DiscordBotClient,
   DiscordBotEmbed,
   DiscordBotMessage,
-  PriceReportNowResult,
+  PersonalPriceReportDeliveryResult,
   PriceReportTimeOfDay,
 } from "../types";
 
@@ -89,7 +89,9 @@ export function createPriceReportSettingsPanelMessage({
 }
 
 // 將立即預覽 DM 的發送結果轉成設定面板 notice，避免暴露 Discord 原始錯誤細節。
-export function formatPriceReportPreviewDmNotice(result: PriceReportNowResult): string {
+export function formatPriceReportPreviewDmNotice(
+  result: PersonalPriceReportDeliveryResult,
+): string {
   if (result.status === "sent") {
     return `已傳送預覽 DM：列出 ${result.listedCount} 筆，送出 ${result.messageCount} 則訊息。`;
   }

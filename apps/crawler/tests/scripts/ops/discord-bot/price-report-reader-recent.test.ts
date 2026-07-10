@@ -2,13 +2,10 @@
 // 驗證近期時間窗價格報告 reader 會彙整最新變價、新商品與商品關鍵字篩選結果。
 
 import { describe, expect, it } from "vitest";
-import {
-  readRecentPriceChanges,
-  readRecentPriceReport,
-} from "../../../../src/scripts/ops/discord-bot/price-report/reader";
+import { readRecentPriceReport } from "../../../../src/scripts/ops/discord-bot/price-report/reader";
 import { createPriceChangeClient, snapshot } from "./price-report-reader-support";
 
-describe("readRecentPriceChanges", () => {
+describe("readRecentPriceReport price changes", () => {
   it("returns each product's latest price change inside the requested window", async () => {
     const client = createPriceChangeClient([
       snapshot({
@@ -45,12 +42,12 @@ describe("readRecentPriceChanges", () => {
       }),
     ]);
 
-    await expect(
-      readRecentPriceChanges(client, {
-        since: new Date("2026-06-07T02:00:00.000Z"),
-        until: new Date("2026-06-07T05:00:00.000Z"),
-      }),
-    ).resolves.toEqual([
+    const report = await readRecentPriceReport(client, {
+      since: new Date("2026-06-07T02:00:00.000Z"),
+      until: new Date("2026-06-07T05:00:00.000Z"),
+    });
+
+    expect(report.priceChanges).toEqual([
       {
         productId: "product-1",
         productName: "GPU A",

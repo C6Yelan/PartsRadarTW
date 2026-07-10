@@ -3,12 +3,9 @@
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join, relative } from "node:path";
+import { createCoolpcCategoryUrl } from "@partsradar/shared";
 import { COOLPC_TARGET_CATEGORIES, type CoolpcTargetCategory } from "../../coolpc/categories";
-import {
-  createCoolpcCategoryUrl,
-  decodeCoolpcHtml,
-  parseCoolpcCategoryPage,
-} from "../../coolpc/parser";
+import { decodeCoolpcHtml, parseCoolpcCategoryPage } from "../../coolpc/parser";
 import {
   getNumberArg,
   getStringArg,

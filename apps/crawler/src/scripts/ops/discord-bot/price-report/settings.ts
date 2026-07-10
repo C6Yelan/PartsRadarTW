@@ -1,24 +1,11 @@
 // apps/crawler/src/scripts/ops/discord-bot/price-report/settings.ts
-// 管理 Discord 使用者的個人每日價格報告設定，包含啟用、停用、讀取與摘要文字。
+// 管理 Discord 使用者的個人每日價格報告設定，包含啟用、停用與讀取。
 
 import type { Prisma } from "@partsradar/db";
 import { TIME_ZONE } from "../constants";
 import type { DiscordBotClient, PriceReportTimeOfDay } from "../types";
-import {
-  formatPriceReportCategoryFilterLabel,
-  formatPriceReportContentFilterLabel,
-  formatPriceReportKeywordFilterLabel,
-  normalizePriceReportFilters,
-  type PriceReportCategoryOption,
-  toPriceReportFilters,
-} from "./filters";
-import {
-  calculateNextSendAt,
-  formatTaipeiMinute,
-  formatTaipeiTime,
-  formatWindowLabel,
-  toPriceReportWindow,
-} from "./schedule";
+import { normalizePriceReportFilters } from "./filters";
+import { calculateNextSendAt, toPriceReportWindow } from "./schedule";
 
 // 個人報告 runtime read model；legacy max_items 欄位保留於 DB，但不再讀取或寫入。
 export const PRICE_REPORT_SETTING_SELECT = {
@@ -151,25 +138,4 @@ export async function readPriceReportSetting({
     },
     select: PRICE_REPORT_SETTING_SELECT,
   });
-}
-
-// 格式化設定摘要文字，供舊版文字入口或測試檢查設定狀態。
-export function formatPriceReportSettingMessage(
-  setting: PriceReportSetting | null,
-  categories: PriceReportCategoryOption[] = [],
-): string {
-  if (!setting?.enabled) {
-    return "尚未開啟每日私訊價格報告。使用下方按鈕可開啟。";
-  }
-
-  const filters = toPriceReportFilters(setting);
-  return [
-    "每日私訊價格報告已開啟。",
-    `統計區間：${formatWindowLabel(setting.window)}`,
-    `分類：${formatPriceReportCategoryFilterLabel(filters, categories)}`,
-    `商品關鍵字：${formatPriceReportKeywordFilterLabel(filters)}`,
-    `內容：${formatPriceReportContentFilterLabel(filters)}`,
-    `每日時間：${formatTaipeiTime(setting.nextSendAt)}`,
-    `下一次：${formatTaipeiMinute(setting.nextSendAt)}`,
-  ].join("\n");
 }

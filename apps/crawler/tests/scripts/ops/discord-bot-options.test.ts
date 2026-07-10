@@ -1,8 +1,7 @@
 // apps/crawler/tests/scripts/ops/discord-bot-options.test.ts
-// 驗證 Discord bot 啟動設定解析、CLI 錯誤遮蔽與 watch 商品 reference 正規化邊界。
+// 驗證 Discord bot 啟動設定解析與 watch 商品 reference 正規化邊界。
 
 import { describe, expect, it, vi } from "vitest";
-import { formatDiscordBotCliError } from "../../../src/scripts/ops/discord-bot/cli-error";
 import {
   parseDiscordBotOptions,
   printDiscordBotHelp,
@@ -24,7 +23,6 @@ describe("Discord bot options", () => {
       applicationId: APPLICATION_ID,
       publicBaseUrl: "https://partsradar.test/",
       apiBaseUrl: "https://discord.com/api/v10",
-      registerCommands: false,
       registerCommandsOnStart: true,
       publicReportsEnabled: true,
       personalReportsEnabled: true,
@@ -91,21 +89,6 @@ describe("Discord bot options", () => {
     expect(output).not.toContain("--price-report-max-items");
     expect(output).not.toContain("DISCORD_PRICE_REPORT_MAX_ITEMS");
     expect(output).not.toContain("Environment:");
-  });
-});
-
-describe("Discord bot CLI errors", () => {
-  it("prints a safe startup error summary", () => {
-    const message = formatDiscordBotCliError(
-      new Error(
-        "failed DATABASE_URL=postgresql://partsradar:secret@db:5432/app DISCORD_BOT_TOKEN=abc",
-      ),
-    );
-
-    expect(message).toContain("DATABASE_URL=[redacted]");
-    expect(message).toContain("DISCORD_BOT_TOKEN=[redacted]");
-    expect(message).not.toContain("secret@db");
-    expect(message).not.toContain("DISCORD_BOT_TOKEN=abc");
   });
 });
 

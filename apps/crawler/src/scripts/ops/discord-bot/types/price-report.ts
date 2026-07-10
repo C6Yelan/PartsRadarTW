@@ -4,7 +4,7 @@
 import type { DiscordDeliveryFailureMetadata } from "./discord-api";
 
 // 個人價格報告 DM 發送結果，供即時預覽、手動 now 指令與排程流程共用。
-export type PriceReportNowResult =
+export type PersonalPriceReportDeliveryResult =
   | {
       status: "sent";
       changeCount: number;

@@ -21,23 +21,6 @@ import type {
   RecentPriceReport,
 } from "./reader-types";
 
-// 建立只包含價格變動的公開報告訊息，供舊有公開價格變動入口與測試共用。
-export function createPublicPriceChangeReportMessages(
-  priceChanges: PriceReportPriceChangeItem[],
-  options: {
-    publicBaseUrl: string;
-    generatedAt: Date;
-  },
-): DiscordBotMessage[] {
-  return createPublicPriceReportMessages(
-    {
-      priceChanges,
-      newProducts: [],
-    },
-    options,
-  );
-}
-
 // 建立公開頻道價格報告訊息，依項目上限列出價格變動與新增商品。
 export function createPublicPriceReportMessages(
   report: Pick<RecentPriceReport, "priceChanges" | "newProducts">,

@@ -175,5 +175,3 @@ export async function sendDueTargetPriceNotifications({
 
   return summary;
 }
-
-export { createTargetPriceReachedMessage } from "./target-price-notification/messages";

@@ -2,28 +2,28 @@
 // 驗證公開價格報告訊息會正確呈現價格變動、新增商品與 Discord embed 結構。
 
 import { describe, expect, it } from "vitest";
-import {
-  createPublicPriceChangeReportMessages,
-  createPublicPriceReportMessages,
-} from "../../../../src/scripts/ops/discord-bot/price-report";
+import { createPublicPriceReportMessages } from "../../../../src/scripts/ops/discord-bot/price-report/messages";
 import { PUBLIC_BASE_URL } from "./support";
 
 describe("public price report messages", () => {
   it("creates public price-change report messages with the bot embed format", () => {
-    const messages = createPublicPriceChangeReportMessages(
-      [
-        {
-          productId: "product-1",
-          productName: "華碩 GPU A",
-          category: { igrp: 12, displayName: "顯示卡" },
-          subcategory: { slug: "asus", displayName: "華碩" },
-          previousPrice: 12_000,
-          currentPrice: 10_990,
-          currency: "TWD",
-          changedAt: new Date("2026-06-07T03:00:00.000Z"),
-          delta: -1010,
-        },
-      ],
+    const messages = createPublicPriceReportMessages(
+      {
+        priceChanges: [
+          {
+            productId: "product-1",
+            productName: "華碩 GPU A",
+            category: { igrp: 12, displayName: "顯示卡" },
+            subcategory: { slug: "asus", displayName: "華碩" },
+            previousPrice: 12_000,
+            currentPrice: 10_990,
+            currency: "TWD",
+            changedAt: new Date("2026-06-07T03:00:00.000Z"),
+            delta: -1010,
+          },
+        ],
+        newProducts: [],
+      },
       {
         publicBaseUrl: PUBLIC_BASE_URL,
         generatedAt: new Date("2026-06-07T05:00:00.000Z"),

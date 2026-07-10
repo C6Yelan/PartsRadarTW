@@ -63,7 +63,7 @@ export function createTargetPriceReachedMessages({
 }
 
 // 建立單一商品達標通知，顯示商品連結、目前價格、目標價格與價格資料時間。
-export function createTargetPriceReachedMessage({
+function createTargetPriceReachedMessage({
   watch,
   publicBaseUrl,
 }: {

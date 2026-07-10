@@ -189,8 +189,6 @@ Discord bot 只保存 Discord user id 與必要偏好，不建立網站帳號，
 - `fetch_failed`
 - `suspected_block`
 - `parse_failed`
-- `skipped_overlap`
-- `backoff`
 
 `crawl_run_category_results.status` 概念：
 

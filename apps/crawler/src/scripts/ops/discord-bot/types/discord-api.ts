@@ -219,7 +219,6 @@ export interface DiscordInteractionComponent {
   value?: unknown;
   values?: string[];
   component?: DiscordInteractionComponent;
-  components?: DiscordInteractionComponent[];
 }
 
 // Discord 使用者最小識別資料，僅保留 bot 流程需要的 user id。

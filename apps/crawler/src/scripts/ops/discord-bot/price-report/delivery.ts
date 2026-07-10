@@ -9,7 +9,7 @@ import type {
   DiscordBotMessage,
   DiscordBotMessageSendResult,
   DiscordDirectMessageSendResult,
-  PriceReportNowResult,
+  PersonalPriceReportDeliveryResult,
 } from "../types";
 import {
   DEFAULT_PRICE_REPORT_FILTERS,
@@ -52,7 +52,7 @@ export async function sendPriceReportNow({
   filters?: PriceReportFilters;
   now?: Date;
   sendReportMessages: (messages: DiscordBotMessage[]) => Promise<DiscordBotMessageSendResult>;
-}): Promise<PriceReportNowResult> {
+}): Promise<PersonalPriceReportDeliveryResult> {
   return sendPriceReport({
     client,
     discordUserId,
@@ -86,7 +86,7 @@ export async function sendPriceReport({
   since?: Date;
   deliveryKind: "PRICE_REPORT_NOW" | "SCHEDULED_PRICE_REPORT";
   sendReportMessages: (messages: DiscordBotMessage[]) => Promise<DiscordBotMessageSendResult>;
-}): Promise<PriceReportNowResult> {
+}): Promise<PersonalPriceReportDeliveryResult> {
   const reportSince = since ?? new Date(now.getTime() - windowHours * HOUR_MS);
   const normalizedFilters = normalizePriceReportFilters(filters);
   const report = await readRecentPriceReport(client, {

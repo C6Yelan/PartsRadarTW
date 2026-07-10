@@ -20,8 +20,6 @@ enum CrawlRunStatus {
   FETCH_FAILED        @map("fetch_failed")
   SUSPECTED_BLOCK     @map("suspected_block")
   PARSE_FAILED        @map("parse_failed")
-  SKIPPED_OVERLAP     @map("skipped_overlap")
-  BACKOFF             @map("backoff")
 
   @@map("crawl_run_status")
 }

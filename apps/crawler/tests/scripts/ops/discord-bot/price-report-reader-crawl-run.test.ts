@@ -2,13 +2,10 @@
 // 驗證指定 crawl run 的價格報告 reader 會區分變價、新商品、未變價並排序變動幅度。
 
 import { describe, expect, it } from "vitest";
-import {
-  readCrawlRunPriceChangeSummary,
-  readCrawlRunPriceChanges,
-} from "../../../../src/scripts/ops/discord-bot/price-report/reader";
+import { readCrawlRunPriceChangeSummary } from "../../../../src/scripts/ops/discord-bot/price-report/reader";
 import { createPriceChangeClient, snapshot } from "./price-report-reader-support";
 
-describe("readCrawlRunPriceChanges", () => {
+describe("readCrawlRunPriceChangeSummary changes", () => {
   it("returns changed existing products and skips first-seen or unchanged snapshots", async () => {
     const client = createPriceChangeClient([
       snapshot({
@@ -53,7 +50,9 @@ describe("readCrawlRunPriceChanges", () => {
       }),
     ]);
 
-    await expect(readCrawlRunPriceChanges(client, "target-run")).resolves.toEqual([
+    const result = await readCrawlRunPriceChangeSummary(client, "target-run");
+
+    expect(result.changes).toEqual([
       {
         productId: "product-1",
         productName: "Changed GPU",
@@ -111,7 +110,7 @@ describe("readCrawlRunPriceChanges", () => {
       }),
     ]);
 
-    const changes = await readCrawlRunPriceChanges(client, "target-run");
+    const { changes } = await readCrawlRunPriceChangeSummary(client, "target-run");
 
     expect(changes.map((change) => change.productId)).toEqual(["large", "small"]);
   });

@@ -2,7 +2,7 @@
 // 驗證 CoolPC 分類頁內容檢核會正確區分有效頁、結構缺漏與疑似封鎖頁。
 
 import { describe, expect, it } from "vitest";
-import { validateCoolpcCategoryPage } from "../../src/coolpc/parser";
+import { validateCoolpcCategoryPage } from "../../src/coolpc/parser/content-validation";
 import { context, fixture } from "./parser-support";
 
 describe("CoolPC response content validation", () => {

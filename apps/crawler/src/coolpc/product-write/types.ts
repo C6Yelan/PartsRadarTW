@@ -57,7 +57,13 @@ export interface CoolpcProductWriteDelegates {
     create(args: { data: ProductCreateData; select: { id: true } }): Promise<{ id: string }>;
     update(args: {
       where: { id: string };
-      data: ProductUpdateData;
+      data:
+        | ProductSeenUpdateData
+        | {
+            isActive: boolean;
+            missingSince: Date;
+            missingSeenCount: number;
+          };
       select: { id: true };
     }): Promise<{ id: string }>;
   };
@@ -141,15 +147,6 @@ export interface ProductSeenUpdateData {
   missingSeenCount: 0;
   lastSeenAt: Date;
 }
-
-// 連續缺漏時用來標記停用與遞增缺漏次數。
-export interface ProductMissingUpdateData {
-  isActive: boolean;
-  missingSince: Date;
-  missingSeenCount: number;
-}
-
-export type ProductUpdateData = ProductSeenUpdateData | ProductMissingUpdateData;
 
 // 價格快照是變價歷史的最小單位：每次判定變價都新增一筆快照。
 export interface PriceSnapshotCreateData {

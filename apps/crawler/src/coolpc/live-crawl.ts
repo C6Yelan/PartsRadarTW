@@ -1,16 +1,15 @@
 // apps/crawler/src/coolpc/live-crawl.ts
 // Live crawl 進入點：驗證基礎設定、逐分類抓取官方來源頁面，並將結果交由 crawl-run 與 snapshot 寫入流程。
 import type { PrismaClient } from "@partsradar/db";
-import { COOLPC_OFFICIAL_BASE_URL } from "@partsradar/shared";
+import { COOLPC_OFFICIAL_BASE_URL, createCoolpcCategoryUrl } from "@partsradar/shared";
 import { processCoolpcCategorySnapshotWithPrisma } from "./category-snapshot";
 import {
   CRAWL_TRIGGER_TYPES,
-  runCoolpcCrawlOnceWithPrisma,
   type CrawlTriggerTypeValue,
   type RunCoolpcCrawlOnceResult,
+  runCoolpcCrawlOnceWithPrisma,
 } from "./crawl-run";
 import { fetchLiveCategorySnapshot } from "./live-crawl/fetch";
-import { createCoolpcCategoryUrl } from "./parser";
 import {
   resolveAllowlistedRawSnapshotStorage,
   tryAcquireRawSnapshotMutationLock,
