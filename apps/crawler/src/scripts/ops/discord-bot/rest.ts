@@ -6,13 +6,13 @@ import { sendDiscordRestRequest } from "./rest-request";
 import type {
   DiscordBotMessage,
   DiscordBotMessageSendResult,
+  DiscordDeliveryErrorCategory,
   DiscordDirectMessageChannel,
   DiscordDirectMessageSendResult,
   DiscordInteraction,
   FetchImpl,
 } from "./types";
 
-export { formatDiscordBotText } from "./message-text";
 export {
   deferInteractionMessageUpdate,
   deferInteractionResponse,
@@ -20,38 +20,37 @@ export {
   sendInteractionResponse,
   sendModalInteractionResponse,
 } from "./interaction-responses";
+export { formatDiscordBotText } from "./message-text";
 export { formatDiscordRestFailure } from "./rest-failure";
 export { sendDiscordRestRequest } from "./rest-request";
 
-// 將內部 Discord delivery 錯誤摘要轉成使用者可理解訊息，避免直接暴露 API 原始錯誤。
-export function formatDiscordDeliveryFailureForUser(errorMessage: string | null): string {
-  const issue = classifyDiscordDeliveryFailure(errorMessage);
-
-  if (issue === "dm_unavailable") {
+// 將 transport boundary 的分類轉成行動導向訊息；不讀取 legacy error_message。
+export function formatDiscordDeliveryFailureForUser(failure: {
+  errorCategory: DiscordDeliveryErrorCategory | null;
+  httpStatus: number | null;
+  providerErrorCode: number | null;
+}): string {
+  if (failure.errorCategory === "DM_UNAVAILABLE") {
     return "我目前無法傳送私訊給你。請確認你允許此伺服器成員私訊，或先傳訊息給 PartsRadarTW bot 後再試一次。";
   }
 
-  if (issue === "missing_access") {
-    return "我目前無法存取這個 Discord App 或指令。請伺服器管理員確認 PartsRadarTW bot 仍在伺服器中，且應用程式指令未被停用。";
+  if (failure.errorCategory === "PERMISSIONS") {
+    return "我目前缺少完成這次 Discord 發送所需的權限。請伺服器管理員檢查 PartsRadarTW bot 與目標頻道權限後再試一次。";
   }
 
-  if (issue === "missing_permissions") {
-    return "我目前缺少 Discord 要求的權限。請伺服器管理員確認 PartsRadarTW bot 的 App / 指令權限設定；公開安裝不需要 Administrator。";
+  if (failure.errorCategory === "RATE_LIMITED") {
+    return formatDiscordRateLimitForUser();
   }
 
-  if (issue === "invalid_token") {
-    return "Bot token 可能失效，請聯絡維運者。";
+  if (failure.errorCategory === "INTERACTION_EXPIRED") {
+    return "這次 Discord 指令回應已失效，請重新執行指令。";
   }
 
-  if (issue === "expired_interaction") {
-    return "Discord 指令回應已失效，請重新執行指令；若持續發生請聯絡維運者。";
+  if (failure.errorCategory === "TRANSPORT") {
+    return "目前無法連上 Discord，請稍後重試。";
   }
 
-  if (!errorMessage?.trim()) {
-    return "通知失敗，但 Discord 沒有回傳可判讀的原因；系統已保留紀錄供維運檢查。";
-  }
-
-  return "Discord 回傳通知失敗；系統已保留紀錄供維運檢查。若持續發生，請重新邀請 bot 或聯絡維運者。";
+  return "Discord 暫時無法完成通知，請稍後重試；若持續發生，請伺服器管理員檢查 PartsRadarTW bot 設定。";
 }
 
 // 將 Discord rate limit 統一轉成使用者可見的稍後重試提示。
@@ -89,6 +88,9 @@ export async function sendDiscordDirectMessages({
       status: "rate_limited",
       messageCount: messages.length,
       sentMessageCount: 0,
+      httpStatus: channelResult.httpStatus,
+      errorCategory: channelResult.errorCategory,
+      providerErrorCode: channelResult.providerErrorCode,
       retryAfterMs: channelResult.retryAfterMs,
       global: channelResult.global,
     };
@@ -100,7 +102,8 @@ export async function sendDiscordDirectMessages({
       messageCount: messages.length,
       sentMessageCount: 0,
       httpStatus: channelResult.httpStatus,
-      message: channelResult.message,
+      errorCategory: channelResult.errorCategory,
+      providerErrorCode: channelResult.providerErrorCode,
     };
   }
 
@@ -112,7 +115,8 @@ export async function sendDiscordDirectMessages({
       messageCount: messages.length,
       sentMessageCount: 0,
       httpStatus: channelResult.httpStatus,
-      message: "Discord API returned a DM channel without an id.",
+      errorCategory: "PROVIDER",
+      providerErrorCode: null,
     };
   }
 
@@ -161,6 +165,9 @@ export async function sendDiscordChannelMessages({
         status: "rate_limited",
         messageCount: messages.length,
         sentMessageCount: httpStatuses.length,
+        httpStatus: messageResult.httpStatus,
+        errorCategory: messageResult.errorCategory,
+        providerErrorCode: messageResult.providerErrorCode,
         retryAfterMs: messageResult.retryAfterMs,
         global: messageResult.global,
       };
@@ -171,7 +178,8 @@ export async function sendDiscordChannelMessages({
       messageCount: messages.length,
       sentMessageCount: httpStatuses.length,
       httpStatus: messageResult.httpStatus,
-      message: messageResult.message,
+      errorCategory: messageResult.errorCategory,
+      providerErrorCode: messageResult.providerErrorCode,
     };
   }
 
@@ -227,6 +235,9 @@ export async function sendDiscordInteractionMessages({
         status: "rate_limited",
         messageCount: messages.length,
         sentMessageCount: httpStatuses.length,
+        httpStatus: messageResult.httpStatus,
+        errorCategory: messageResult.errorCategory,
+        providerErrorCode: messageResult.providerErrorCode,
         retryAfterMs: messageResult.retryAfterMs,
         global: messageResult.global,
       };
@@ -237,7 +248,8 @@ export async function sendDiscordInteractionMessages({
       messageCount: messages.length,
       sentMessageCount: httpStatuses.length,
       httpStatus: messageResult.httpStatus,
-      message: messageResult.message,
+      errorCategory: messageResult.errorCategory,
+      providerErrorCode: messageResult.providerErrorCode,
     };
   }
 
@@ -246,39 +258,4 @@ export async function sendDiscordInteractionMessages({
     messageCount: messages.length,
     httpStatuses,
   };
-}
-
-// 以 Discord error code / message 做最小分類，讓使用者端只看到泛化後的處理建議。
-function classifyDiscordDeliveryFailure(
-  errorMessage: string | null,
-):
-  | "dm_unavailable"
-  | "missing_access"
-  | "missing_permissions"
-  | "invalid_token"
-  | "expired_interaction"
-  | "unknown" {
-  const normalized = errorMessage?.toLowerCase() ?? "";
-
-  if (normalized.includes("code=50007") || normalized.includes("cannot send messages")) {
-    return "dm_unavailable";
-  }
-
-  if (normalized.includes("code=50001") || normalized.includes("missing access")) {
-    return "missing_access";
-  }
-
-  if (normalized.includes("code=50013") || normalized.includes("missing permissions")) {
-    return "missing_permissions";
-  }
-
-  if (normalized.includes("http 401") || normalized.includes("unauthorized")) {
-    return "invalid_token";
-  }
-
-  if (normalized.includes("unknown interaction") || normalized.includes("code=10062")) {
-    return "expired_interaction";
-  }
-
-  return "unknown";
 }

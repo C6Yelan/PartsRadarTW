@@ -1,7 +1,6 @@
 // apps/crawler/src/scripts/ops/discord-bot/rest-request.ts
-// 封裝 Discord REST API 請求，統一處理 bot token、rate limit、JSON 解析與安全錯誤摘要。
+// 封裝 Discord REST API 請求，統一處理 bot token、rate limit、JSON 解析與安全錯誤分類。
 
-import { toSafeCliErrorMessage } from "../../shared/script-utils";
 import type { DiscordRestOptions, DiscordRestResult } from "./types";
 
 // 發送單次 Discord REST 請求，回傳給上層分流的技術結果；使用者文案需再經過 formatter 泛化。
@@ -30,6 +29,7 @@ export async function sendDiscordRestRequest<T>({
 
     if (response.status === 429) {
       const rateLimitBody = await readDiscordJson<{
+        code?: unknown;
         retry_after?: unknown;
         global?: unknown;
       }>(response);
@@ -39,18 +39,22 @@ export async function sendDiscordRestRequest<T>({
       return {
         status: "rate_limited",
         httpStatus: 429,
+        errorCategory: "RATE_LIMITED",
+        providerErrorCode: parseDiscordErrorCode(rateLimitBody),
         retryAfterMs,
         global: rateLimitBody?.global === true,
       };
     }
 
     if (!response.ok) {
-      const errorBody = await readDiscordJson<unknown>(response);
+      const errorBody = await readDiscordJson<Record<string, unknown>>(response);
+      const providerErrorCode = parseDiscordErrorCode(errorBody);
 
       return {
         status: "failed",
         httpStatus: response.status,
-        message: formatDiscordApiError(response.status, errorBody),
+        errorCategory: classifyDiscordDeliveryFailure(response.status, providerErrorCode),
+        providerErrorCode,
         retryAfterMs: parseRetryAfterHeader(response.headers),
       };
     }
@@ -60,11 +64,12 @@ export async function sendDiscordRestRequest<T>({
       httpStatus: response.status,
       body: await readDiscordJson<T>(response),
     };
-  } catch (error) {
+  } catch {
     return {
       status: "failed",
       httpStatus: null,
-      message: toSafeCliErrorMessage(error),
+      errorCategory: "TRANSPORT",
+      providerErrorCode: null,
     };
   }
 }
@@ -109,32 +114,36 @@ function createDiscordApiUrl(apiBaseUrl: string, path: string): string {
   return `${apiBaseUrl.replace(/\/+$/, "")}${path}`;
 }
 
-// 產生後台用 Discord API 錯誤摘要；不得直接顯示給使用者。
-function formatDiscordApiError(httpStatus: number, body: unknown): string {
-  const details = isRecord(body) ? body : null;
+// Discord provider code 只接受 PostgreSQL Int 可安全保存的非負整數；其他 body 欄位全部捨棄。
+function parseDiscordErrorCode(body: { code?: unknown } | null): number | null {
   const code =
-    typeof details?.code === "string" || typeof details?.code === "number"
-      ? ` code=${details.code}`
-      : "";
-  const message =
-    typeof details?.message === "string" && details.message.trim()
-      ? ` message=${details.message.trim()}`
-      : "";
-  const errors =
-    details?.errors === undefined ? "" : ` errors=${serializeDiscordErrors(details.errors)}`;
+    typeof body?.code === "number"
+      ? body.code
+      : typeof body?.code === "string" && /^\d{1,10}$/.test(body.code)
+        ? Number(body.code)
+        : null;
 
-  return `Discord API returned HTTP ${httpStatus}.${code}${message}${errors}`;
+  return code !== null && Number.isSafeInteger(code) && code >= 0 && code <= 2_147_483_647
+    ? code
+    : null;
 }
 
-// 限制 Discord errors 摘要長度，避免過大的錯誤 payload 進入 log 或 DB。
-function serializeDiscordErrors(errors: unknown): string {
-  try {
-    return JSON.stringify(errors).slice(0, 2_000);
-  } catch {
-    return "unserializable";
+// 只依 HTTP status 與數字 provider code 分類，不從 provider message / errors 反向猜測。
+function classifyDiscordDeliveryFailure(
+  httpStatus: number,
+  providerErrorCode: number | null,
+): "DM_UNAVAILABLE" | "INTERACTION_EXPIRED" | "PERMISSIONS" | "PROVIDER" {
+  if (providerErrorCode === 50007) {
+    return "DM_UNAVAILABLE";
   }
-}
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+  if (providerErrorCode === 10062) {
+    return "INTERACTION_EXPIRED";
+  }
+
+  if (providerErrorCode === 50001 || providerErrorCode === 50013 || httpStatus === 403) {
+    return "PERMISSIONS";
+  }
+
+  return "PROVIDER";
 }

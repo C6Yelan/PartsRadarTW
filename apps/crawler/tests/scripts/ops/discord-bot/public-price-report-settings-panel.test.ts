@@ -9,6 +9,11 @@ import {
   createDiscordBotOptions,
   createPublicReportButtonInteraction,
   createPublicReportInteraction,
+  publicPriceReportDelivery,
+  publicPriceReportSetting,
+  readEmbedFieldValue,
+  readResponseEmbed,
+  TEST_SOURCE_CATEGORIES,
 } from "./support";
 
 describe("public price report settings panel", () => {
@@ -94,6 +99,69 @@ describe("public price report settings panel", () => {
           }),
         ]),
       },
+    });
+  });
+
+  it("shows the most recently retried public delivery by updated timestamp", async () => {
+    const client = createDiscordBotClient(
+      [],
+      [],
+      [],
+      [...TEST_SOURCE_CATEGORIES],
+      [],
+      [
+        publicPriceReportDelivery({
+          id: "delivery-newer-row",
+          crawlRunId: "crawl-run-newer",
+          channelId: "999988887777666655",
+          status: "SENT",
+          itemCount: 3,
+          messageCount: 1,
+          deliveredAt: new Date("2026-06-07T01:00:00.000Z"),
+          createdAt: new Date("2026-06-07T01:00:00.000Z"),
+          updatedAt: new Date("2026-06-07T01:00:00.000Z"),
+        }),
+        publicPriceReportDelivery({
+          id: "delivery-retried",
+          crawlRunId: "crawl-run-old",
+          channelId: "999988887777666655",
+          status: "FAILED",
+          errorCategory: "TRANSPORT",
+          createdAt: new Date("2026-05-01T00:00:00.000Z"),
+          updatedAt: new Date("2026-06-07T02:00:00.000Z"),
+        }),
+      ],
+      [],
+      [publicPriceReportSetting({ id: "public-setting-1" })],
+    );
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createPublicReportInteraction({ subcommandName: "status" }),
+    });
+
+    const requestBody = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
+    const latestDelivery = readEmbedFieldValue(
+      readResponseEmbed(requestBody.data),
+      "最近一次公開報告",
+    );
+
+    expect(latestDelivery).toContain("失敗：06/07 10:00 GMT+8");
+    expect(client.discordPublicPriceReportDelivery.findFirst).toHaveBeenCalledWith({
+      where: {
+        channelId: "999988887777666655",
+      },
+      select: expect.objectContaining({
+        status: true,
+        updatedAt: true,
+      }),
+      orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
     });
   });
 

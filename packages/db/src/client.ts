@@ -25,5 +25,11 @@ if (process.env.NODE_ENV !== "production") {
   globalForPrisma.prisma = prisma;
 }
 
+export type {
+  CrawlRunStatus,
+  DiscordDeliveryErrorCategory,
+  DiscordPriceReportSetting,
+  ParseErrorType,
+  Prisma,
+} from "@prisma/client";
 export { PrismaClient };
-export type { CrawlRunStatus, DiscordPriceReportSetting, ParseErrorType, Prisma } from "@prisma/client";

@@ -92,7 +92,10 @@ describe("target price notification delivery", () => {
         itemCount: 1,
         messageCount: 1,
         deliveredAt: now,
+        errorCategory: null,
         errorMessage: null,
+        httpStatus: null,
+        providerErrorCode: null,
       },
     });
 

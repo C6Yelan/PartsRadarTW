@@ -120,7 +120,7 @@ describe("production smoke DB-backed checks", () => {
     );
   });
 
-  it("warns when recent Discord bot deliveries failed or were rate limited", async () => {
+  it("warns when recent personal or public Discord deliveries failed or were rate limited", async () => {
     const { crawlerCwd, workspaceRoot } = await createWorkspace();
     const imageDir = join(workspaceRoot, "product-images");
     await mkdir(imageDir);
@@ -141,6 +141,10 @@ describe("production smoke DB-backed checks", () => {
           failed: 1,
           rateLimited: 1,
         },
+        publicDiscordDeliveryCounts: {
+          failed: 1,
+          rateLimited: 1,
+        },
       }),
       options,
       new Date("2026-06-02T12:00:00.000Z"),
@@ -152,10 +156,15 @@ describe("production smoke DB-backed checks", () => {
         expect.objectContaining({
           name: "discord bot deliveries",
           status: "WARN",
-          message: "failed=1 rateLimited=1 in 24h",
+          message:
+            "personalFailed=1 personalRateLimited=1 publicFailed=1 publicRateLimited=1 in 24h",
         }),
       ]),
     );
+    const discordCheck = summary.checks.find((check) => check.name === "discord bot deliveries");
+
+    expect(JSON.stringify(discordCheck)).not.toContain("discord-user");
+    expect(JSON.stringify(discordCheck)).not.toContain("discord-channel");
   });
 
   it("still fails when true parse errors exceed the configured threshold", async () => {
@@ -198,7 +207,7 @@ describe("production smoke DB-backed checks", () => {
     );
   });
 
-  it("does not warn when a later successful Discord bot delivery resolves the failure", async () => {
+  it("does not warn when later successful personal and public deliveries resolve failures", async () => {
     const { crawlerCwd, workspaceRoot } = await createWorkspace();
     const imageDir = join(workspaceRoot, "product-images");
     await mkdir(imageDir);
@@ -233,6 +242,22 @@ describe("production smoke DB-backed checks", () => {
             createdAt: new Date("2026-06-02T11:00:00.000Z"),
           },
         ],
+        publicDiscordDeliveryRecords: [
+          {
+            id: "delivery-public-success",
+            channelId: "discord-channel-1",
+            status: "SENT",
+            createdAt: new Date("2026-06-02T11:20:00.000Z"),
+            updatedAt: new Date("2026-06-02T11:20:00.000Z"),
+          },
+          {
+            id: "delivery-public-failed",
+            channelId: "discord-channel-1",
+            status: "FAILED",
+            createdAt: new Date("2026-06-02T11:15:00.000Z"),
+            updatedAt: new Date("2026-06-02T11:15:00.000Z"),
+          },
+        ],
       }),
       options,
       new Date("2026-06-02T12:00:00.000Z"),
@@ -240,8 +265,64 @@ describe("production smoke DB-backed checks", () => {
 
     expect(summary.checks.find((check) => check.name === "discord bot deliveries")).toMatchObject({
       status: "OK",
-      message: "failed=0 rateLimited=0 in 24h",
+      message: "personalFailed=0 personalRateLimited=0 publicFailed=0 publicRateLimited=0 in 24h",
     });
     expect(summary.status).toBe("OK");
+  });
+
+  it("uses the public retry timestamp for the recent window and latest channel status", async () => {
+    const { crawlerCwd, workspaceRoot } = await createWorkspace();
+    const imageDir = join(workspaceRoot, "product-images");
+    await mkdir(imageDir);
+    await writeFile(join(imageDir, "product-1.webp"), "webp");
+    stubHealthyPublicApi();
+    const options = parseProductionSmokeOptions(
+      [],
+      {
+        PRODUCT_IMAGE_STORAGE_DIR: imageDir,
+      },
+      crawlerCwd,
+    );
+    const client = createSmokeClient({
+      invalidImageErrorCount: 0,
+      trueParseErrorCount: 0,
+      publicDiscordDeliveryRecords: [
+        {
+          id: "delivery-public-newer-row",
+          channelId: "discord-channel-1",
+          status: "SENT",
+          createdAt: new Date("2026-06-02T10:00:00.000Z"),
+          updatedAt: new Date("2026-06-02T10:00:00.000Z"),
+        },
+        {
+          id: "delivery-public-retried",
+          channelId: "discord-channel-1",
+          status: "FAILED",
+          createdAt: new Date("2026-05-01T00:00:00.000Z"),
+          updatedAt: new Date("2026-06-02T11:30:00.000Z"),
+        },
+      ],
+    });
+    const summary = await runProductionSmoke(client, options, new Date("2026-06-02T12:00:00.000Z"));
+
+    expect(summary.checks.find((check) => check.name === "discord bot deliveries")).toMatchObject({
+      status: "WARN",
+      message: "personalFailed=0 personalRateLimited=0 publicFailed=1 publicRateLimited=0 in 24h",
+    });
+    expect(client.discordPublicPriceReportDelivery.findMany).toHaveBeenCalledWith({
+      where: {
+        updatedAt: {
+          gte: new Date("2026-06-01T12:00:00.000Z"),
+        },
+      },
+      select: {
+        id: true,
+        channelId: true,
+        status: true,
+        updatedAt: true,
+      },
+      orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+      take: 500,
+    });
   });
 });

@@ -171,7 +171,8 @@ describe("public price report previews", () => {
         return new Response(
           JSON.stringify({
             code: 50013,
-            message: "Missing Permissions",
+            message: "Missing Permissions DISCORD_BOT_TOKEN=private-token",
+            errors: { authorization: "Bearer private-authorization" },
           }),
           { status: 403 },
         );
@@ -196,6 +197,8 @@ describe("public price report previews", () => {
     expect(responseBody.content).toContain("嵌入連結");
     expect(responseBody.content).not.toContain("50013");
     expect(responseBody.content).not.toContain("Missing Permissions");
+    expect(responseBody.content).not.toContain("private-token");
+    expect(responseBody.content).not.toContain("private-authorization");
     expect(responseBody.content).not.toContain("Administrator");
   });
 });

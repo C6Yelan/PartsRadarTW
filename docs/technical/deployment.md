@@ -215,6 +215,7 @@ Migration：
 - `20260702093000_add_discord_public_report_filters` 會替 `discord_public_price_report_settings` 新增公開報告篩選欄位；部署後既有公開報告預設維持全部分類、降價與漲價、無關鍵字、最多 50 筆。
 - 從舊版升級時，套用 G03 migration 前先用舊版 Compose definition 停止並移除 `maintenance-daemon` container，避免舊 process 在 table drop 後繼續存取已移除 schema。
 - `20260710120000_remove_product_link_health` 會刪除 link-health table 與 enums；部署前必須備份 DB，rollback 需使用備份或另寫反向 migration，不能假設 dropped data 可自動復原。
+- `20260710200000_add_discord_delivery_error_metadata` 只新增 nullable structured error 欄位並保留既有 delivery audit rows；部署時先停止所有舊版 `discord-bot` instance，再執行 `db:deploy`，成功後立即啟動新版 `discord-bot` / `smoke-daemon`。不得混跑新舊 bot，也不得讓舊 bot 在 migration 後繼續寫入 raw-ish `error_message`。
 - migration 失敗時不啟動新版服務。
 - schema 變更前需有備份與本機 / staging-like 驗證。
 
@@ -234,7 +235,7 @@ Backup：
 - backoff 狀態。
 - snapshot / image cache 容量。
 - 商品圖片 API 404 / fallback 是否異常增加。
-- Discord bot notification delivery failed / rate limited 是否異常增加。
+- Personal / public Discord delivery 最新 failed / rate limited 是否仍未恢復。
 
 ## Security And Rollback
 

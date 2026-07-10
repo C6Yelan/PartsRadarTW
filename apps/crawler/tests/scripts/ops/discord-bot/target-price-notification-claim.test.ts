@@ -43,7 +43,8 @@ describe("target price notification claims", () => {
         messageCount: 1,
         sentMessageCount: 0,
         httpStatus: 403,
-        message: "DM forbidden",
+        errorCategory: "DM_UNAVAILABLE" as const,
+        providerErrorCode: 50007,
       }),
     );
 
@@ -71,7 +72,10 @@ describe("target price notification claims", () => {
         status: "FAILED",
         dedupeKey: null,
         deliveredAt: null,
-        errorMessage: "DM forbidden",
+        errorMessage: null,
+        errorCategory: "DM_UNAVAILABLE",
+        httpStatus: 403,
+        providerErrorCode: 50007,
       }),
     });
   });

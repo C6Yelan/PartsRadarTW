@@ -131,7 +131,8 @@ describe("handleDiscordInteraction price report settings preview", () => {
         return new Response(
           JSON.stringify({
             code: 50007,
-            message: "Cannot send messages to this user",
+            message: "Cannot send messages to this user DISCORD_BOT_TOKEN=private-token",
+            errors: { authorization: "Bearer private-authorization" },
           }),
           { status: 403 },
         );
@@ -153,12 +154,24 @@ describe("handleDiscordInteraction price report settings preview", () => {
     expect(JSON.stringify(settingsBody)).toContain("我目前無法傳送私訊給你");
     expect(JSON.stringify(settingsBody)).not.toContain("50007");
     expect(JSON.stringify(settingsBody)).not.toContain("Cannot send messages");
+    expect(JSON.stringify(settingsBody)).not.toContain("private-token");
+    expect(JSON.stringify(settingsBody)).not.toContain("private-authorization");
     expect(client.discordNotificationDelivery.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         discordUserId: "111122223333444455",
         kind: "PRICE_REPORT_NOW",
         status: "FAILED",
+        errorCategory: "DM_UNAVAILABLE",
+        errorMessage: null,
+        httpStatus: 403,
+        providerErrorCode: 50007,
       }),
     });
+    expect(JSON.stringify(client.discordNotificationDelivery.create.mock.calls)).not.toContain(
+      "private-token",
+    );
+    expect(JSON.stringify(client.discordNotificationDelivery.create.mock.calls)).not.toContain(
+      "private-authorization",
+    );
   });
 });

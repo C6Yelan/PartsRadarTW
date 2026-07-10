@@ -2,10 +2,7 @@
 // 定義目標價 watch 流程共用的 Prisma select、查詢 payload 型別與操作結果 contract。
 
 import type { Prisma } from "@partsradar/db";
-import type {
-  TargetPriceWatchSortKey,
-  TargetPriceWatchStatusFilter,
-} from "../types";
+import type { TargetPriceWatchSortKey, TargetPriceWatchStatusFilter } from "../types";
 
 // watch 訊息只需要商品名稱與目前價格資料，避免查出不必要商品欄位。
 export const TARGET_PRICE_WATCH_PRODUCT_SELECT = {
@@ -56,7 +53,9 @@ export const TARGET_PRICE_WATCH_LIST_SELECT = {
 // 管理面板只顯示最近一次通知的使用者可見狀態，不讀取完整 delivery payload。
 export const TARGET_PRICE_WATCH_DELIVERY_STATUS_SELECT = {
   status: true,
-  errorMessage: true,
+  errorCategory: true,
+  httpStatus: true,
+  providerErrorCode: true,
   deliveredAt: true,
   createdAt: true,
 } as const satisfies Prisma.DiscordNotificationDeliverySelect;

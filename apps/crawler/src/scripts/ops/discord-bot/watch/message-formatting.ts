@@ -107,7 +107,7 @@ function formatWatchNotificationDeliveryField(
   if (delivery.status === "FAILED") {
     return {
       name: "最近一次通知",
-      value: `失敗：${happenedAt}。\n${formatDiscordDeliveryFailureForUser(delivery.errorMessage)}`,
+      value: `失敗：${happenedAt}。\n${formatDiscordDeliveryFailureForUser(delivery)}`,
     };
   }
 

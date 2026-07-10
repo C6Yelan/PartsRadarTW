@@ -1,19 +1,16 @@
 // apps/crawler/src/scripts/ops/discord-bot/target-price-notification.ts
 // 掃描達標的目標價 watch，負責 claim、分組發送 Discord DM，並記錄通知 delivery 結果。
 
-import { toSafeCliErrorMessage } from "../../shared/script-utils";
 import {
   MAX_TARGET_PRICE_NOTIFICATIONS_PER_CYCLE,
   TARGET_PRICE_NOTIFICATION_CLAIM_LEASE_MS,
 } from "./constants";
 import { recordTargetPriceNotificationDelivery } from "./target-price-notification/delivery";
+import { createTargetPriceReachedMessages } from "./target-price-notification/messages";
 import {
-  createTargetPriceReachedMessages,
-} from "./target-price-notification/messages";
-import {
-  TARGET_PRICE_NOTIFICATION_SELECT,
   groupTargetPriceWatchesByUser,
   isTargetPriceReached,
+  TARGET_PRICE_NOTIFICATION_SELECT,
   type TargetPriceNotificationWatch,
 } from "./target-price-notification/records";
 import type { DiscordBotClient, DiscordBotMessage, DiscordBotMessageSendResult } from "./types";
@@ -113,13 +110,14 @@ export async function sendDueTargetPriceNotifications({
 
     try {
       sendResult = await sendDirectMessages(discordUserId, messages);
-    } catch (error) {
+    } catch {
       sendResult = {
         status: "failed",
         messageCount: messages.length,
         sentMessageCount: 0,
         httpStatus: null,
-        message: toSafeCliErrorMessage(error),
+        errorCategory: "TRANSPORT",
+        providerErrorCode: null,
       };
     }
 

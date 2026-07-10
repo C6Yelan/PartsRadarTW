@@ -107,7 +107,7 @@ export function formatPriceReportPreviewDmNotice(result: PriceReportNowResult): 
     return formatDiscordRateLimitForUser();
   }
 
-  return formatDiscordDeliveryFailureForUser(result.message);
+  return formatDiscordDeliveryFailureForUser(result);
 }
 
 // 驗證分類 select 回傳值必須來自目前可見分類；空選或全選都代表不限制分類。
@@ -285,13 +285,17 @@ function formatPriceReportDeliveryStatus(delivery: PriceReportDeliveryStatus | n
   }
 
   if (delivery.status === "FAILED") {
-    return `失敗：${deliveredAt}。${formatPriceReportDeliveryError(delivery.errorMessage)}`;
+    return `失敗：${deliveredAt}。${formatPriceReportDeliveryError(delivery)}`;
   }
 
   return `${delivery.status}：${deliveredAt}，列出 ${delivery.itemCount} 筆。`;
 }
 
 // 將 Discord delivery 錯誤轉成短版使用者訊息，避免 embed 欄位過長。
-export function formatPriceReportDeliveryError(errorMessage: string | null): string {
-  return formatDiscordBotText(formatDiscordDeliveryFailureForUser(errorMessage), 220);
+export function formatPriceReportDeliveryError(failure: {
+  errorCategory: PriceReportDeliveryStatus["errorCategory"];
+  httpStatus: PriceReportDeliveryStatus["httpStatus"];
+  providerErrorCode: PriceReportDeliveryStatus["providerErrorCode"];
+}): string {
+  return formatDiscordBotText(formatDiscordDeliveryFailureForUser(failure), 220);
 }

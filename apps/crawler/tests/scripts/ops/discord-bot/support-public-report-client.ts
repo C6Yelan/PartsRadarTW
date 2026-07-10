@@ -128,12 +128,16 @@ export function createPublicReportClient({
     return { count: beforeCount - publicSettingRows.length };
   });
   const publicDeliveryFindFirst = vi.fn(
-    async (args: { where: { channelId: string }; select?: Record<string, boolean> }) => {
+    async (args: {
+      where: { channelId: string };
+      select?: Record<string, boolean>;
+      orderBy?: Array<Record<string, "asc" | "desc">>;
+    }) => {
       const delivery = publicDeliveryRows
         .filter((row) => row.channelId === args.where.channelId)
         .sort((left, right) => {
           return (
-            right.createdAt.getTime() - left.createdAt.getTime() || right.id.localeCompare(left.id)
+            right.updatedAt.getTime() - left.updatedAt.getTime() || right.id.localeCompare(left.id)
           );
         })[0];
 

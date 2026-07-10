@@ -2,9 +2,9 @@
 // 驗證個人即時價格報告的 Discord 訊息組裝、delivery 紀錄與長內容分段限制。
 
 import { describe, expect, it, vi } from "vitest";
+import { DISCORD_MESSAGE_EMBED_TOTAL_MAX_LENGTH } from "../../../../src/scripts/ops/discord-bot/constants";
 import { sendPriceReportNow } from "../../../../src/scripts/ops/discord-bot/price-report";
 import type { DiscordBotMessage } from "../../../../src/scripts/ops/discord-bot/types";
-import { DISCORD_MESSAGE_EMBED_TOTAL_MAX_LENGTH } from "../../../../src/scripts/ops/discord-bot/constants";
 
 import {
   calculateMessageEmbedTextLength,
@@ -106,7 +106,10 @@ describe("sendPriceReportNow delivery", () => {
         itemCount: 2,
         messageCount: 1,
         deliveredAt: new Date("2026-06-07T05:00:00.000Z"),
+        errorCategory: null,
         errorMessage: null,
+        httpStatus: null,
+        providerErrorCode: null,
       },
     });
   });

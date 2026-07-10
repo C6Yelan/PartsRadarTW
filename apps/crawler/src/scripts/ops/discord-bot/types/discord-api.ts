@@ -1,6 +1,17 @@
 // apps/crawler/src/scripts/ops/discord-bot/types/discord-api.ts
 // 定義 Discord REST、Gateway、message component、modal 與 interaction payload 的本地最小型別。
 
+import type { DiscordDeliveryErrorCategory as DbDiscordDeliveryErrorCategory } from "@partsradar/db";
+
+export type DiscordDeliveryErrorCategory = DbDiscordDeliveryErrorCategory;
+
+// Discord delivery 失敗在 transport boundary 產生的安全結構化資料。
+export interface DiscordDeliveryFailureMetadata {
+  errorCategory: DiscordDeliveryErrorCategory;
+  httpStatus: number | null;
+  providerErrorCode: number | null;
+}
+
 // 可替換的 fetch 介面，讓 REST 與 interaction handler 測試能注入 mock。
 export type FetchImpl = typeof fetch;
 
@@ -123,20 +134,18 @@ export type DiscordDirectMessageSendResult =
       messageCount: number;
       httpStatuses: number[];
     }
-  | {
+  | ({
       status: "rate_limited";
       messageCount: number;
       sentMessageCount: number;
       retryAfterMs: number;
       global: boolean;
-    }
-  | {
+    } & DiscordDeliveryFailureMetadata)
+  | ({
       status: "failed";
       messageCount: number;
       sentMessageCount: number;
-      httpStatus: number | null;
-      message: string;
-    };
+    } & DiscordDeliveryFailureMetadata);
 
 export type DiscordBotMessageSendResult = DiscordDirectMessageSendResult;
 
@@ -154,18 +163,16 @@ export type DiscordRestResult<T> =
       httpStatus: number;
       body: T | null;
     }
-  | {
+  | ({
       status: "rate_limited";
       httpStatus: 429;
       retryAfterMs: number;
       global: boolean;
-    }
-  | {
+    } & DiscordDeliveryFailureMetadata)
+  | ({
       status: "failed";
-      httpStatus: number | null;
-      message: string;
       retryAfterMs?: number;
-    };
+    } & DiscordDeliveryFailureMetadata);
 
 // Gateway 收到的原始 payload 外型，只保留 dispatch、sequence 與 event type 判斷所需欄位。
 export interface DiscordGatewayPayload {

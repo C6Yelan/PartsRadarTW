@@ -13,8 +13,8 @@ import {
   notificationDelivery,
   readEmbedFieldValue,
   snapshot,
-  targetPriceWatch,
   TEST_SOURCE_CATEGORIES,
+  targetPriceWatch,
   WATCH_DEFAULT_STATE,
   WATCH_PRODUCT_ID,
   WATCH_ROW_ID,
@@ -111,7 +111,10 @@ describe("handleDiscordInteraction watch manager list", () => {
           kind: "TARGET_PRICE",
           status: "FAILED",
           targetPriceWatchId: WATCH_ROW_ID,
-          errorMessage: "Discord API returned HTTP 403. code=50013 message=Missing Permissions",
+          errorCategory: "PERMISSIONS",
+          httpStatus: 403,
+          providerErrorCode: 50013,
+          errorMessage: "legacy raw Missing Permissions private-token",
           createdAt: new Date("2026-06-07T01:00:00.000Z"),
         }),
       ],
@@ -133,7 +136,7 @@ describe("handleDiscordInteraction watch manager list", () => {
     );
     const latestNotification = readEmbedFieldValue(requestBody.embeds[0], "最近一次通知");
 
-    expect(latestNotification).toContain("我目前缺少 Discord 要求的權限");
+    expect(latestNotification).toContain("我目前缺少完成這次 Discord 發送所需的權限");
     expect(latestNotification).not.toContain("50013");
     expect(latestNotification).not.toContain("Missing Permissions");
     expect(client.discordNotificationDelivery.findFirst).toHaveBeenCalledWith({
@@ -144,7 +147,9 @@ describe("handleDiscordInteraction watch manager list", () => {
       },
       select: expect.objectContaining({
         status: true,
-        errorMessage: true,
+        errorCategory: true,
+        httpStatus: true,
+        providerErrorCode: true,
       }),
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     });

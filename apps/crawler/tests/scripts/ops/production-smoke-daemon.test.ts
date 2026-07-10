@@ -11,12 +11,12 @@ import {
 } from "../../../src/scripts/ops/production-smoke-daemon";
 import { readSmokeDiscordNotificationState } from "../../../src/scripts/ops/smoke-discord-notification";
 import {
-  DISCORD_ADMIN_WEBHOOK_URL,
   createSmokeClient,
   createWorkspace,
+  DISCORD_ADMIN_WEBHOOK_URL,
   idleShutdown,
-  stubHealthyPublicApi,
   type SendDiscordWebhook,
+  stubHealthyPublicApi,
 } from "./production-smoke-support";
 
 afterEach(() => {
@@ -214,7 +214,7 @@ describe("production smoke daemon Discord notifications", () => {
       title: "PartsRadarTW smoke WARN",
     });
     expect(webhookCall.message.embeds?.[0]?.description).toContain(
-      "- WARN discord bot deliveries: failed=2 rateLimited=1 in 24h",
+      "- WARN discord bot deliveries: personalFailed=2 personalRateLimited=1 publicFailed=0 publicRateLimited=0 in 24h",
     );
     await expect(readSmokeDiscordNotificationState(stateFilePath)).resolves.toMatchObject({
       lastObservedStatus: "WARN",

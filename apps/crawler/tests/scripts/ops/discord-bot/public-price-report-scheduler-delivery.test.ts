@@ -8,6 +8,7 @@ import {
   crawlRun,
   createDiscordBotClient,
   createDiscordBotOptions,
+  publicPriceReportDelivery,
   publicPriceReportSetting,
   snapshot,
   TEST_SOURCE_CATEGORIES,
@@ -106,6 +107,109 @@ describe("public price report scheduler delivery", () => {
         deliveredAt: new Date("2026-06-07T05:00:00.000Z"),
       }),
     });
+  });
+
+  it("stores public rate limits as structured fields without concatenated technical details", async () => {
+    const legacyDelivery = publicPriceReportDelivery({
+      id: "legacy-public-delivery",
+      crawlRunId: "public-run-rate-limit",
+      channelId: "999988887777666655",
+      status: "FAILED",
+      errorMessage: "legacy provider body DISCORD_BOT_TOKEN=legacy-private-token",
+    });
+    const client = createDiscordBotClient(
+      [
+        snapshot({
+          id: "old-public-rate-limit",
+          productId: "product-public-rate-limit",
+          productName: "華碩 GPU Rate Limit",
+          crawlRunId: "old-run",
+          price: 12_000,
+          capturedAt: "2026-06-06T01:00:00.000Z",
+        }),
+        snapshot({
+          id: "new-public-rate-limit",
+          productId: "product-public-rate-limit",
+          productName: "華碩 GPU Rate Limit",
+          crawlRunId: "public-run-rate-limit",
+          price: 10_990,
+          capturedAt: "2026-06-07T03:00:00.000Z",
+        }),
+      ],
+      [],
+      [],
+      [...TEST_SOURCE_CATEGORIES],
+      [],
+      [legacyDelivery],
+      [
+        crawlRun({
+          id: "public-run-rate-limit",
+          finishedAt: new Date("2026-06-07T03:05:00.000Z"),
+        }),
+      ],
+      [publicPriceReportSetting({ id: "public-setting-rate-limit" })],
+    );
+    const sendChannelMessages = vi.fn(
+      async (_channelId: string, _messages: DiscordBotMessage[]) => ({
+        status: "rate_limited" as const,
+        messageCount: 2,
+        sentMessageCount: 1,
+        httpStatus: 429 as const,
+        errorCategory: "RATE_LIMITED" as const,
+        providerErrorCode: null,
+        retryAfterMs: 2500,
+        global: true,
+        rawTechnicalSummary:
+          "sentMessages=1/2 retryAfterMs=2500 global=yes DISCORD_BOT_TOKEN=private-token",
+      }),
+    );
+
+    await expect(
+      sendPendingPublicPriceReports({
+        client,
+        options: createDiscordBotOptions(),
+        now: new Date("2026-06-07T05:00:00.000Z"),
+        sendChannelMessages,
+      }),
+    ).resolves.toMatchObject({
+      processedCount: 1,
+      rateLimitedCount: 1,
+      failedCount: 0,
+    });
+
+    expect(client.discordPublicPriceReportDelivery.upsert).toHaveBeenCalledWith({
+      where: {
+        crawlRunId_channelId: {
+          crawlRunId: "public-run-rate-limit",
+          channelId: "999988887777666655",
+        },
+      },
+      create: expect.objectContaining({
+        status: "RATE_LIMITED",
+        errorCategory: "RATE_LIMITED",
+        errorMessage: null,
+        httpStatus: 429,
+        providerErrorCode: null,
+      }),
+      update: expect.objectContaining({
+        status: "RATE_LIMITED",
+        errorCategory: "RATE_LIMITED",
+        httpStatus: 429,
+        providerErrorCode: null,
+      }),
+    });
+    const upsert = client.discordPublicPriceReportDelivery.upsert.mock.calls[0]?.[0];
+
+    expect(upsert?.update).not.toHaveProperty("errorMessage");
+    expect(legacyDelivery.errorMessage).toBe(
+      "legacy provider body DISCORD_BOT_TOKEN=legacy-private-token",
+    );
+    const persisted = JSON.stringify(client.discordPublicPriceReportDelivery.upsert.mock.calls);
+
+    expect(persisted).not.toContain("sentMessages");
+    expect(persisted).not.toContain("retryAfterMs");
+    expect(persisted).not.toContain("global=yes");
+    expect(persisted).not.toContain("private-token");
   });
 
   it("sends pending public reports for new products when enabled", async () => {

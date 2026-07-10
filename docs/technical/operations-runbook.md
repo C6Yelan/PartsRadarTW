@@ -251,7 +251,7 @@ curl -i https://<domain>/api/source-status
 - display-ready active 商品數沒有低於門檻。
 - active 商品缺圖數沒有超過門檻。
 - raw snapshot metadata 沒有明顯超過 retention grace。
-- 近 24 小時 Discord bot delivery 最新狀態沒有未恢復的 failed / rate limited；若同一通知串後續已成功，舊失敗不再觸發 `WARN`。
+- 近 24 小時 personal 與 public Discord delivery 最新狀態沒有未恢復的 failed / rate limited；personal 依通知 stream、public 依報告頻道判斷，後續成功會覆蓋同 stream 的舊失敗。
 
 啟動：
 
@@ -322,7 +322,7 @@ SMOKE_PUBLIC_BASE_URL=https://partsradar.net
 
 ## Discord Admin Webhook Notification Foundation
 
-Discord webhook 僅保留給管理者告警。`smoke-daemon` 會在每輪 production smoke summary 後，依 notification policy 以 embed 對管理者頻道送出 `WARN` / `FAIL` / `RECOVERED` 通知，包含近 24 小時仍未被後續成功覆蓋的 Discord bot delivery failed / rate limited 訊號。公開價格報告由 Discord bot 發送，另見下方 bot 小節。
+Discord webhook 僅保留給管理者告警。`smoke-daemon` 會在每輪 production smoke summary 後，依 notification policy 以 embed 對管理者頻道送出 `WARN` / `FAIL` / `RECOVERED` 通知，包含近 24 小時仍未被後續成功覆蓋的 personal / public Discord delivery failed / rate limited 數量；摘要不包含 user id、channel id 或 delivery error message。公開價格報告由 Discord bot 發送，另見下方 bot 小節。
 
 可選 secret：
 
@@ -367,7 +367,7 @@ Bot 目標：
 - Discord slash command registration。
 - `/public-report status/manage/test`：管理伺服器公開價格報告，分別用於查看狀態、開啟設定面板與發送測試報告；此指令以 Discord command 權限限制可見性，只有具備管理伺服器權限的成員通常會看到。頻道設定、分類、商品名稱關鍵字、降價 / 漲價與顯示上限寫入 `discord_public_price_report_settings`，不再由主機端環境變數指定。公開報告目標頻道需允許 bot 傳送訊息與嵌入連結。
 - Public price report：bot daemon 讀取已啟用的 `discord_public_price_report_settings`，掃描 scheduled crawl 後尚未送出的 `crawlRunId`，讀取該輪新建立的 `price_snapshots`，和同商品上一筆 snapshot 比對，套用該伺服器的公開報告篩選後送到公開 Discord；第一批新品、沒有舊價的商品、同價更新不會送出。
-- Public price report 訊息使用 bot embed，依 DB 的 `sourceCategory.displayName` 大分類與 `vendorName` 小分類分組，列出 signed 漲跌金額、舊價、新價、商品名稱與站內商品連結。送達、略過、失敗與 rate limit 會寫入 `discord_public_price_report_deliveries`，以 `crawlRunId + channelId` 去重。
+- Public price report 訊息使用 bot embed，依 DB 的 `sourceCategory.displayName` 大分類與 `vendorName` 小分類分組，列出 signed 漲跌金額、舊價、新價、商品名稱與站內商品連結。送達、略過、失敗與 rate limit 會寫入 `discord_public_price_report_deliveries`，以 `crawlRunId + channelId` 去重；失敗只保存 structured category、HTTP status 與數字 Discord code。
 - `/price-report now`：使用者手動要求最近 `24h` / `12h` / `6h` 價格報告，bot 會在指令發出的頻道或私訊 context 以 embed 回覆中文報告；若使用者已有啟用中的每日設定，未明確覆蓋的手動報告會沿用該設定的分類、商品名稱關鍵字、內容類型與上限，方便手動確認報告內容。
 - Slash command 只註冊 global command，供伺服器與 DM 使用，避免 Discord client 同時顯示 global 與 guild 的重複 `/price-report`。
 - `/price-report now` 報告只為有資料的「價格變動」或「新增商品」產生 embed；摘要時間、統計數字與價格變動方向標題使用 Markdown emphasis 強化區隔；價格變動 embed 先分「降價」與「漲價」，商品列以單行呈現 signed 漲跌金額、舊價、新價與站內商品連結；新增商品 embed 以單行呈現目前價格與站內商品連結；兩者都依 DB 的 `sourceCategory.displayName` 大分類與 `vendorName` 小分類分組，並在小分類已顯示品牌時移除商品名稱開頭重複品牌；兩邊都沒資料時才送一個空報告摘要。

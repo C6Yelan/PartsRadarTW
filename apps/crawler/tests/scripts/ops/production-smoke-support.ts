@@ -143,6 +143,8 @@ export function createSmokeClient({
   trueParseErrorCount,
   discordDeliveryCounts = {},
   discordDeliveryRecords,
+  publicDiscordDeliveryCounts = {},
+  publicDiscordDeliveryRecords,
 }: {
   invalidImageErrorCount: number;
   trueParseErrorCount: number;
@@ -157,6 +159,17 @@ export function createSmokeClient({
     status: "SENT" | "SKIPPED" | "FAILED" | "RATE_LIMITED";
     targetPriceWatchId: string | null;
     createdAt: Date;
+  }>;
+  publicDiscordDeliveryCounts?: {
+    failed?: number;
+    rateLimited?: number;
+  };
+  publicDiscordDeliveryRecords?: Array<{
+    id: string;
+    channelId: string;
+    status: "SENT" | "SKIPPED" | "FAILED" | "RATE_LIMITED";
+    createdAt: Date;
+    updatedAt: Date;
   }>;
 }) {
   return {
@@ -242,6 +255,27 @@ export function createSmokeClient({
             createdAt: new Date(`2026-06-02T11:${String(40 - index).padStart(2, "0")}:00.000Z`),
           })),
         ],
+    },
+    discordPublicPriceReportDelivery: {
+      findMany: vi.fn(
+        async () =>
+          publicDiscordDeliveryRecords ?? [
+            ...Array.from({ length: publicDiscordDeliveryCounts.failed ?? 0 }, (_, index) => ({
+              id: `discord-public-failed-${index + 1}`,
+              channelId: `discord-channel-failed-${index + 1}`,
+              status: "FAILED" as const,
+              createdAt: new Date(`2026-06-02T11:${String(30 - index).padStart(2, "0")}:00.000Z`),
+              updatedAt: new Date(`2026-06-02T11:${String(30 - index).padStart(2, "0")}:00.000Z`),
+            })),
+            ...Array.from({ length: publicDiscordDeliveryCounts.rateLimited ?? 0 }, (_, index) => ({
+              id: `discord-public-rate-limited-${index + 1}`,
+              channelId: `discord-channel-rate-limited-${index + 1}`,
+              status: "RATE_LIMITED" as const,
+              createdAt: new Date(`2026-06-02T11:${String(20 - index).padStart(2, "0")}:00.000Z`),
+              updatedAt: new Date(`2026-06-02T11:${String(20 - index).padStart(2, "0")}:00.000Z`),
+            })),
+          ],
+      ),
     },
   } as unknown as Parameters<typeof runProductionSmoke>[0];
 }

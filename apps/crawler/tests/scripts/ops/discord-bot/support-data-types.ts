@@ -1,6 +1,8 @@
 // apps/crawler/tests/scripts/ops/discord-bot/support-data-types.ts
 // 定義 Discord bot 測試資料列型別，供 fixture factory 與 fake client 共用。
 
+import type { DiscordDeliveryErrorCategory } from "@partsradar/db";
+
 export interface TestSnapshot {
   id: string;
   productId: string;
@@ -80,6 +82,9 @@ export interface TestDiscordNotificationDelivery {
   messageCount: number;
   deliveredAt: Date | null;
   errorMessage: string | null;
+  errorCategory: DiscordDeliveryErrorCategory | null;
+  httpStatus: number | null;
+  providerErrorCode: number | null;
   createdAt: Date;
 }
 
@@ -92,6 +97,9 @@ export interface TestDiscordPublicPriceReportDelivery {
   messageCount: number;
   deliveredAt: Date | null;
   errorMessage: string | null;
+  errorCategory: DiscordDeliveryErrorCategory | null;
+  httpStatus: number | null;
+  providerErrorCode: number | null;
   createdAt: Date;
   updatedAt: Date;
 }

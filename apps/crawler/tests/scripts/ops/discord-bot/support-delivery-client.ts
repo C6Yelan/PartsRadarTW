@@ -20,6 +20,10 @@ export function createNotificationDeliveryClient(deliveries: TestDiscordNotifica
         productId: args.data.productId ?? null,
         targetPriceWatchId: args.data.targetPriceWatchId ?? null,
         dedupeKey: args.data.dedupeKey ?? null,
+        errorCategory: args.data.errorCategory ?? null,
+        errorMessage: args.data.errorMessage ?? null,
+        httpStatus: args.data.httpStatus ?? null,
+        providerErrorCode: args.data.providerErrorCode ?? null,
       };
       deliveryRows.push(created);
 

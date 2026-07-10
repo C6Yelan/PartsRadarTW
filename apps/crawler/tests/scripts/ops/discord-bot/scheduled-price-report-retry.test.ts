@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { sendDueScheduledPriceReports } from "../../../../src/scripts/ops/discord-bot/price-report";
 import type { DiscordBotMessage } from "../../../../src/scripts/ops/discord-bot/types";
 
-import { createDiscordBotClient, priceReportSetting, PUBLIC_BASE_URL, snapshot } from "./support";
+import { createDiscordBotClient, PUBLIC_BASE_URL, priceReportSetting, snapshot } from "./support";
 
 describe("scheduled price report retry", () => {
   it("retries scheduled reports soon after a failed delivery", async () => {
@@ -36,7 +36,8 @@ describe("scheduled price report retry", () => {
         messageCount: 1,
         sentMessageCount: 0,
         httpStatus: 400,
-        message: "MAX_EMBED_SIZE_EXCEEDED",
+        errorCategory: "PROVIDER" as const,
+        providerErrorCode: null,
       }),
     );
 
@@ -93,6 +94,9 @@ describe("scheduled price report retry", () => {
         status: "rate_limited" as const,
         messageCount: 1,
         sentMessageCount: 0,
+        httpStatus: 429 as const,
+        errorCategory: "RATE_LIMITED" as const,
+        providerErrorCode: null,
         retryAfterMs: 60_000,
         global: false,
       }),

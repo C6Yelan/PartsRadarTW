@@ -166,6 +166,13 @@ https://www.coolpc.com.tw/eachview.php?IGrp={分類編號}
 - scheduled crawler 使用 external fetch lock 避免多個 crawler process 同時打外部來源；新品圖片補圖只在價格 crawl lock 釋放後針對本輪新增商品執行。
 - manual crawler、scheduled crawler 與 image backfill 不應同時跑；手動 ops 前應先檢查 scheduled daemon 狀態或暫停相關 service。
 
+## Discord Delivery Errors
+
+- Discord REST provider body 的 `message`、`errors` 與未知欄位不得進入 result、DB、使用者回覆或 log；transport boundary 只接受數字 provider code。
+- failed / rate-limited delivery 只保存 allowlisted category、HTTP status 與數字 provider code；新寫入的 `error_message` 為 null。
+- 使用者提示只依 structured category 選擇行動建議，不解析或顯示 legacy `error_message`。
+- Production smoke 只輸出 personal / public stream 的最新失敗數量，不輸出 Discord user id、channel id 或錯誤內容。
+
 ## Raw Snapshot And Logging
 
 Raw snapshot：

@@ -153,6 +153,9 @@ export function notificationDelivery({
   messageCount = 0,
   deliveredAt = null,
   errorMessage = null,
+  errorCategory = null,
+  httpStatus = null,
+  providerErrorCode = null,
   createdAt = new Date("2026-06-07T00:00:00.000Z"),
 }: {
   id: string;
@@ -166,6 +169,9 @@ export function notificationDelivery({
   messageCount?: number;
   deliveredAt?: Date | null;
   errorMessage?: string | null;
+  errorCategory?: TestDiscordNotificationDelivery["errorCategory"];
+  httpStatus?: number | null;
+  providerErrorCode?: number | null;
   createdAt?: Date;
 }): TestDiscordNotificationDelivery {
   return {
@@ -180,6 +186,9 @@ export function notificationDelivery({
     messageCount,
     deliveredAt,
     errorMessage,
+    errorCategory,
+    httpStatus,
+    providerErrorCode,
     createdAt,
   };
 }
@@ -193,6 +202,9 @@ export function publicPriceReportDelivery({
   messageCount = 0,
   deliveredAt = null,
   errorMessage = null,
+  errorCategory = null,
+  httpStatus = null,
+  providerErrorCode = null,
   createdAt = new Date("2026-06-07T00:00:00.000Z"),
   updatedAt = new Date("2026-06-07T00:00:00.000Z"),
 }: {
@@ -204,6 +216,9 @@ export function publicPriceReportDelivery({
   messageCount?: number;
   deliveredAt?: Date | null;
   errorMessage?: string | null;
+  errorCategory?: TestDiscordPublicPriceReportDelivery["errorCategory"];
+  httpStatus?: number | null;
+  providerErrorCode?: number | null;
   createdAt?: Date;
   updatedAt?: Date;
 }): TestDiscordPublicPriceReportDelivery {
@@ -216,6 +231,9 @@ export function publicPriceReportDelivery({
     messageCount,
     deliveredAt,
     errorMessage,
+    errorCategory,
+    httpStatus,
+    providerErrorCode,
     createdAt,
     updatedAt,
   };

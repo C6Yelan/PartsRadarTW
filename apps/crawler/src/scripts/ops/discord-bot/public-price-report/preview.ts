@@ -1,18 +1,16 @@
 // apps/crawler/src/scripts/ops/discord-bot/public-price-report/preview.ts
 // 產生並發送公開價格報告測試訊息，供伺服器管理員驗證頻道與篩選設定。
 
-import { readRecentPriceReport } from "../price-report/reader";
 import { HOUR_MS } from "../constants";
 import { createPublicPriceReportMessages } from "../price-report/messages";
+import { readRecentPriceReport } from "../price-report/reader";
 import type {
   DiscordBotClient,
   DiscordBotMessage,
   DiscordBotMessageSendResult,
+  DiscordDeliveryFailureMetadata,
 } from "../types";
-import {
-  DEFAULT_PUBLIC_PRICE_REPORT_FILTERS,
-  type PriceReportFilters,
-} from "./filters";
+import { DEFAULT_PUBLIC_PRICE_REPORT_FILTERS, type PriceReportFilters } from "./filters";
 
 // 公開報告測試發送結果，供設定面板轉成使用者可讀狀態訊息。
 export type PublicPriceReportPreviewResult =
@@ -30,7 +28,7 @@ export type PublicPriceReportPreviewResult =
       listedCount: 0;
       messageCount: 0;
     }
-  | {
+  | ({
       status: "rate_limited";
       changeCount: number;
       newProductCount: number;
@@ -39,17 +37,15 @@ export type PublicPriceReportPreviewResult =
       sentMessageCount: number;
       retryAfterMs: number;
       global: boolean;
-    }
-  | {
+    } & DiscordDeliveryFailureMetadata)
+  | ({
       status: "failed";
       changeCount: number;
       newProductCount: number;
       listedCount: number;
       messageCount: number;
       sentMessageCount: number;
-      httpStatus: number | null;
-      message: string;
-    };
+    } & DiscordDeliveryFailureMetadata);
 
 // 讀取最近 24 小時公開報告內容並送到指定頻道；無內容時回傳 skipped，不建立 delivery 紀錄。
 export async function sendPublicPriceReportPreview({
@@ -114,6 +110,9 @@ export async function sendPublicPriceReportPreview({
       listedCount,
       messageCount: messages.length,
       sentMessageCount: result.sentMessageCount,
+      httpStatus: result.httpStatus,
+      errorCategory: result.errorCategory,
+      providerErrorCode: result.providerErrorCode,
       retryAfterMs: result.retryAfterMs,
       global: result.global,
     };
@@ -127,6 +126,7 @@ export async function sendPublicPriceReportPreview({
     messageCount: messages.length,
     sentMessageCount: result.sentMessageCount,
     httpStatus: result.httpStatus,
-    message: result.message,
+    errorCategory: result.errorCategory,
+    providerErrorCode: result.providerErrorCode,
   };
 }

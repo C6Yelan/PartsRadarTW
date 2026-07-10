@@ -132,11 +132,11 @@ export function formatPublicReportPreviewNotice(
     return formatDiscordRateLimitForUser();
   }
 
-  if (isDiscordMissingPermissionsError(result.message)) {
+  if (result.errorCategory === "PERMISSIONS") {
     return `我目前無法在 <#${channelId}> 發送公開價格報告。請確認 PartsRadarTW bot 在該頻道具備「傳送訊息」與「嵌入連結」權限。`;
   }
 
-  return formatDiscordDeliveryFailureForUser(result.message);
+  return formatDiscordDeliveryFailureForUser(result);
 }
 
 // 建立 public-report 設定 embed；互動面板與只讀狀態訊息共用相同欄位排列。
@@ -224,7 +224,7 @@ function formatPublicReportDeliveryStatus(
     return "尚無公開報告紀錄。";
   }
 
-  const deliveredAt = formatTaipeiMinute(delivery.deliveredAt ?? delivery.createdAt);
+  const deliveredAt = formatTaipeiMinute(delivery.deliveredAt ?? delivery.updatedAt);
 
   if (delivery.status === "SENT") {
     return `成功：${deliveredAt}，列出 ${delivery.itemCount} 筆，送出 ${delivery.messageCount} 則訊息。`;
@@ -239,7 +239,7 @@ function formatPublicReportDeliveryStatus(
   }
 
   if (delivery.status === "FAILED") {
-    return `失敗：${deliveredAt}。${formatPriceReportDeliveryError(delivery.errorMessage)} 下一輪掃描會重試。`;
+    return `失敗：${deliveredAt}。${formatPriceReportDeliveryError(delivery)} 下一輪掃描會重試。`;
   }
 
   return `${delivery.status}：${deliveredAt}，列出 ${delivery.itemCount} 筆。`;
@@ -278,11 +278,4 @@ function parseDiscordPermissionBitset(value: string | undefined): bigint | null 
   } catch {
     return null;
   }
-}
-
-// 判斷 Discord API 回覆是否是缺少權限，讓 preview 失敗時能顯示可操作的修正提示。
-function isDiscordMissingPermissionsError(message: string | null): boolean {
-  const normalized = message?.toLowerCase() ?? "";
-
-  return normalized.includes("code=50013") || normalized.includes("missing permissions");
 }

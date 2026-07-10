@@ -56,7 +56,8 @@ crawl_runs
 | `current_prices` | 網站目前價格指標 | `product_id` 為主鍵；指向同商品的 `price_snapshots`；價格值從 snapshot 取得。 |
 | `discord_price_report_settings` | Discord 個人價格變動報告設定 | 每個 Discord user id 一筆；保存 interval、window、scope、timezone、max items、分類 / 商品名稱關鍵字 / 內容篩選、enabled 與下次/上次發送時間。 |
 | `discord_target_price_watches` | Discord 個人目標價追蹤 | 以 Discord user id + product 建立目標價追蹤；不建立網站帳號；達標通知狀態由 watch 與 delivery log 控制。 |
-| `discord_notification_deliveries` | Discord 通知發送紀錄 | 記錄手動 price report interaction 回覆、定期 price report 或 target price 通知的 kind、status、item count、message count、錯誤摘要與 delivery time；供去重、維運檢視與後續排程使用。 |
+| `discord_notification_deliveries` | Discord 通知發送紀錄 | 記錄手動 price report interaction 回覆、定期 price report 或 target price 通知的 kind、status、item count、message count、結構化錯誤 metadata 與 delivery time；供去重、維運檢視與後續排程使用。 |
+| `discord_public_price_report_deliveries` | Discord 公開價格報告發送紀錄 | 以 crawl run + channel 去重，保存發送狀態、數量、結構化錯誤 metadata 與 delivery time。 |
 | `crawl_runs` | 整輪 crawler 摘要 | 保存 status、start / finish、trigger、error、backoff；不保存分類結果 JSON 或可推得的 count cache。 |
 | `crawl_run_category_results` | 單分類 crawl 結果 | `crawl_run_id + source_category_id` 唯一；保存狀態、raw snapshot、error。 |
 | `raw_snapshots` | fetch metadata | 保存 URL、fetch time、HTTP / content status、hash、gzip path、duplicate reference。 |
@@ -161,7 +162,10 @@ Discord bot 只保存 Discord user id 與必要偏好，不建立網站帳號，
 - nullable `dedupe_key`
 - `item_count`
 - `message_count`
-- nullable `error_message`
+- nullable `error_category`：`permissions`、`dm_unavailable`、`rate_limited`、`interaction_expired`、`transport` 或 `provider`；legacy / 未分類 row 維持 null
+- nullable `http_status`
+- nullable `provider_error_code`：只保存 Discord 數字 code
+- nullable `error_message`：只為 legacy audit 相容保留；新 delivery 不再寫入 provider message / errors 摘要
 - nullable `delivered_at`
 
 規則：
@@ -170,7 +174,8 @@ Discord bot 只保存 Discord user id 與必要偏好，不建立網站帳號，
 - `/price-report settings` 的按鈕與 modal 讀寫 `discord_price_report_settings`，並讀取最新 `scheduled_price_report` delivery log 顯示最近一次每日報告狀態；每日 DM 報告可設定台北時間 `HH:mm`、分類篩選、商品名稱關鍵字與內容類型篩選，下一次發送時間保存在 `next_send_at`。
 - `/watch` 統合管理介面會讀寫 `discord_target_price_watches`：以 PartsRadarTW 商品頁連結或站內商品 ID 新增追蹤、分頁讀取啟用中的追蹤、修改目標價，或經確認後停用追蹤；Discord component 內部使用完整 watch UUID，但不在使用者可見訊息顯示。
 - 目標價 worker 只讀取啟用、尚未成功通知且沒有有效 claim 的 watch；目前價格小於等於同幣別目標價時先取得 claim，再依 Discord user id 合併同輪達標項目後發送 DM。成功會寫入各 watch 的 `last_notified_at` 並清除 claim，因此同一設定只通知一次；修改或重新建立 watch 會重置兩欄，失敗或 rate limit 只清除 claim 供後續重試。
-- `error_message` 只保存安全摘要，不保存 token、source URL、raw HTML、DB URL、internal headers 或 raw IP。
+- personal、target 與 public delivery 共用相同 structured error 語意；sent / skipped 時錯誤欄位皆為 null。
+- 既有 `error_message` 不清理、不覆寫，也不再進入使用者 formatter；新寫入只保存分類、HTTP status 與數字 provider code。
 
 ## Crawler State
 

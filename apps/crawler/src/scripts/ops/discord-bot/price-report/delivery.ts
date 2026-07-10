@@ -2,8 +2,8 @@
 // 產生個人價格報告訊息並記錄 Discord DM 發送結果。
 
 import type { Prisma } from "@partsradar/db";
-import { readRecentPriceReport } from "./reader";
 import { HOUR_MS } from "../constants";
+import { toDiscordDeliveryErrorFields } from "../delivery-error-fields";
 import type {
   DiscordBotClient,
   DiscordBotMessage,
@@ -19,12 +19,15 @@ import {
 } from "./filters";
 import { clampPriceReportMaxItems } from "./limits";
 import { createPersonalPriceReportEmbedMessages } from "./messages";
+import { readRecentPriceReport } from "./reader";
 
 const PRICE_REPORT_DELIVERY_STATUS_SELECT = {
   status: true,
   itemCount: true,
   messageCount: true,
-  errorMessage: true,
+  errorCategory: true,
+  httpStatus: true,
+  providerErrorCode: true,
   deliveredAt: true,
   createdAt: true,
 } as const satisfies Prisma.DiscordNotificationDeliverySelect;
@@ -119,7 +122,7 @@ export async function sendPriceReport({
     itemCount: listedCount,
     messageCount: messages.length,
     deliveredAt: result.status === "sent" ? now : null,
-    errorMessage: result.status === "failed" ? result.message : null,
+    result,
   });
 
   if (result.status === "sent") {
@@ -140,6 +143,9 @@ export async function sendPriceReport({
       listedCount,
       messageCount: messages.length,
       sentMessageCount: result.sentMessageCount,
+      httpStatus: result.httpStatus,
+      errorCategory: result.errorCategory,
+      providerErrorCode: result.providerErrorCode,
       retryAfterMs: result.retryAfterMs,
       global: result.global,
     };
@@ -153,7 +159,8 @@ export async function sendPriceReport({
     messageCount: messages.length,
     sentMessageCount: result.sentMessageCount,
     httpStatus: result.httpStatus,
-    message: result.message,
+    errorCategory: result.errorCategory,
+    providerErrorCode: result.providerErrorCode,
   };
 }
 
@@ -184,7 +191,7 @@ export async function recordPriceReportDelivery({
   itemCount,
   messageCount,
   deliveredAt,
-  errorMessage,
+  result,
 }: {
   client: DiscordBotClient;
   discordUserId: string;
@@ -193,7 +200,7 @@ export async function recordPriceReportDelivery({
   itemCount: number;
   messageCount: number;
   deliveredAt: Date | null;
-  errorMessage: string | null;
+  result: DiscordDirectMessageSendResult;
 }): Promise<void> {
   await client.discordNotificationDelivery.create({
     data: {
@@ -203,7 +210,7 @@ export async function recordPriceReportDelivery({
       itemCount,
       messageCount,
       deliveredAt,
-      errorMessage,
+      ...toDiscordDeliveryErrorFields(result),
     },
   });
 }

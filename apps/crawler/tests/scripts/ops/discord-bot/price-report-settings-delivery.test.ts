@@ -101,8 +101,11 @@ describe("handleDiscordInteraction price report settings delivery", () => {
           discordUserId: "111122223333444455",
           kind: "SCHEDULED_PRICE_REPORT",
           status: "FAILED",
+          errorCategory: "DM_UNAVAILABLE",
+          httpStatus: 403,
+          providerErrorCode: 50007,
           errorMessage:
-            "Discord API returned HTTP 403. code=50007 message=Cannot send messages to this user",
+            "legacy raw message Authorization: Bot private-token errors={private-payload}",
           createdAt: new Date("2026-06-07T01:00:00.000Z"),
         }),
       ],
@@ -125,8 +128,56 @@ describe("handleDiscordInteraction price report settings delivery", () => {
     const deliveryStatus = readEmbedFieldValue(readResponseEmbed(requestBody), "最近一次每日報告");
 
     expect(deliveryStatus).toContain("我目前無法傳送私訊給你");
+    expect(deliveryStatus).not.toContain("private-token");
+    expect(deliveryStatus).not.toContain("private-payload");
+  });
+
+  it("does not classify or display legacy error_message content", async () => {
+    const client = createDiscordBotClient(
+      [],
+      [
+        priceReportSetting({
+          id: "setting-legacy",
+          discordUserId: "111122223333444455",
+          nextSendAt: new Date("2026-06-07T13:30:00.000Z"),
+        }),
+      ],
+      [],
+      [...TEST_SOURCE_CATEGORIES],
+      [
+        notificationDelivery({
+          id: "delivery-legacy-failed",
+          discordUserId: "111122223333444455",
+          kind: "SCHEDULED_PRICE_REPORT",
+          status: "FAILED",
+          errorCategory: null,
+          errorMessage:
+            "Discord API returned HTTP 403. code=50007 DISCORD_BOT_TOKEN=legacy-private-token",
+          createdAt: new Date("2026-06-07T01:00:00.000Z"),
+        }),
+      ],
+    );
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createInteraction("settings"),
+    });
+
+    const requestBody = JSON.parse(
+      String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body),
+    );
+    const deliveryStatus = readEmbedFieldValue(readResponseEmbed(requestBody), "最近一次每日報告");
+
+    expect(deliveryStatus).toContain("Discord 暫時無法完成通知");
     expect(deliveryStatus).not.toContain("50007");
-    expect(deliveryStatus).not.toContain("Cannot send messages");
+    expect(deliveryStatus).not.toContain("legacy-private-token");
+    expect(deliveryStatus).not.toContain("無法傳送私訊");
   });
 
   it("does not consume the price report cooldown for settings commands", async () => {

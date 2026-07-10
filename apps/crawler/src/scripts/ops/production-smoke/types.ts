@@ -104,5 +104,10 @@ export interface SourceImageAnomalyRecord {
 // production smoke 需要的 Prisma client 最小邊界，方便測試使用 fake client。
 export type ProductionSmokeClient = Pick<
   PrismaClient,
-  "crawlRun" | "discordNotificationDelivery" | "parseError" | "product" | "rawSnapshot"
+  | "crawlRun"
+  | "discordNotificationDelivery"
+  | "discordPublicPriceReportDelivery"
+  | "parseError"
+  | "product"
+  | "rawSnapshot"
 >;

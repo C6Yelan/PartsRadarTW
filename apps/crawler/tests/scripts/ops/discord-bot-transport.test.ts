@@ -3,9 +3,11 @@
 
 import { describe, expect, it, vi } from "vitest";
 import {
+  formatDiscordRestFailure,
   sendDiscordChannelMessages,
   sendDiscordDirectMessages,
   sendDiscordInteractionMessages,
+  sendDiscordRestRequest,
 } from "../../../src/scripts/ops/discord-bot/rest";
 
 import { API_BASE_URL, APPLICATION_ID, TOKEN } from "./discord-bot/support";
@@ -64,6 +66,9 @@ describe("sendDiscordDirectMessages", () => {
       status: "rate_limited",
       messageCount: 1,
       sentMessageCount: 0,
+      httpStatus: 429,
+      errorCategory: "RATE_LIMITED",
+      providerErrorCode: null,
       retryAfterMs: 1250,
       global: true,
     });
@@ -99,6 +104,97 @@ describe("sendDiscordChannelMessages", () => {
         parse: [],
       },
     });
+  });
+
+  it("discards provider messages and nested errors before result or log formatting", async () => {
+    const fetchMock = vi.fn<typeof fetch>(
+      async () =>
+        new Response(
+          JSON.stringify({
+            code: 50013,
+            message: "Missing Permissions DISCORD_BOT_TOKEN=private-token",
+            errors: {
+              authorization: "Bearer private-authorization",
+              nested: { token: "private-nested-token" },
+            },
+          }),
+          { status: 403 },
+        ),
+    );
+    const result = await sendDiscordRestRequest({
+      token: TOKEN,
+      apiBaseUrl: API_BASE_URL,
+      fetchImpl: fetchMock as typeof fetch,
+      method: "POST",
+      path: "/channels/999988887777666655/messages",
+      body: { content: "test" },
+    });
+
+    expect(result).toEqual({
+      status: "failed",
+      httpStatus: 403,
+      errorCategory: "PERMISSIONS",
+      providerErrorCode: 50013,
+      retryAfterMs: undefined,
+    });
+
+    if (result.status === "ok") {
+      throw new Error("Expected a failed Discord REST result.");
+    }
+
+    const safeOutput = JSON.stringify({ result, log: formatDiscordRestFailure(result) });
+
+    expect(safeOutput).not.toContain("private-token");
+    expect(safeOutput).not.toContain("private-authorization");
+    expect(safeOutput).not.toContain("private-nested-token");
+    expect(safeOutput).not.toContain("Missing Permissions");
+    expect(safeOutput).not.toContain("errors");
+  });
+
+  it("keeps invalid bot authentication out of the channel-permission category", async () => {
+    const result = await sendDiscordRestRequest({
+      token: TOKEN,
+      apiBaseUrl: API_BASE_URL,
+      fetchImpl: vi.fn<typeof fetch>(
+        async () =>
+          new Response(JSON.stringify({ message: "401: Unauthorized private-token" }), {
+            status: 401,
+          }),
+      ) as typeof fetch,
+      method: "POST",
+      path: "/channels/999988887777666655/messages",
+      body: { content: "test" },
+    });
+
+    expect(result).toEqual({
+      status: "failed",
+      httpStatus: 401,
+      errorCategory: "PROVIDER",
+      providerErrorCode: null,
+      retryAfterMs: undefined,
+    });
+    expect(JSON.stringify(result)).not.toContain("private-token");
+  });
+
+  it("classifies transport exceptions without forwarding their message", async () => {
+    const result = await sendDiscordRestRequest({
+      token: TOKEN,
+      apiBaseUrl: API_BASE_URL,
+      fetchImpl: vi.fn<typeof fetch>(async () => {
+        throw new Error("Authorization: Bot private-transport-token");
+      }),
+      method: "POST",
+      path: "/channels/999988887777666655/messages",
+      body: { content: "test" },
+    });
+
+    expect(result).toEqual({
+      status: "failed",
+      httpStatus: null,
+      errorCategory: "TRANSPORT",
+      providerErrorCode: null,
+    });
+    expect(JSON.stringify(result)).not.toContain("private-transport-token");
   });
 });
 

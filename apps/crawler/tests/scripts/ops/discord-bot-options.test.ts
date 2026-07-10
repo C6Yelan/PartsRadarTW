@@ -6,12 +6,7 @@ import { formatDiscordBotCliError } from "../../../src/scripts/ops/discord-bot/c
 import { parseDiscordBotOptions } from "../../../src/scripts/ops/discord-bot/options";
 import { normalizeWatchProductReference } from "../../../src/scripts/ops/discord-bot/watch";
 
-import {
-  APPLICATION_ID,
-  PUBLIC_BASE_URL,
-  TOKEN,
-  WATCH_PRODUCT_ID,
-} from "./discord-bot/support";
+import { APPLICATION_ID, PUBLIC_BASE_URL, TOKEN, WATCH_PRODUCT_ID } from "./discord-bot/support";
 
 describe("Discord bot options", () => {
   it("parses required bot settings and safe defaults", () => {
@@ -90,8 +85,8 @@ describe("Discord bot CLI errors", () => {
       ),
     );
 
-    expect(message).toContain("DATABASE_URL=***");
-    expect(message).toContain("DISCORD_BOT_TOKEN=***");
+    expect(message).toContain("DATABASE_URL=[redacted]");
+    expect(message).toContain("DISCORD_BOT_TOKEN=[redacted]");
     expect(message).not.toContain("secret@db");
     expect(message).not.toContain("DISCORD_BOT_TOKEN=abc");
   });

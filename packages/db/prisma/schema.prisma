@@ -102,6 +102,17 @@ enum DiscordNotificationStatus {
   @@map("discord_notification_status")
 }
 
+enum DiscordDeliveryErrorCategory {
+  PERMISSIONS         @map("permissions")
+  DM_UNAVAILABLE      @map("dm_unavailable")
+  RATE_LIMITED        @map("rate_limited")
+  INTERACTION_EXPIRED @map("interaction_expired")
+  TRANSPORT           @map("transport")
+  PROVIDER            @map("provider")
+
+  @@map("discord_delivery_error_category")
+}
+
 model SourceCategory {
   id              String                   @id @default(uuid()) @db.Uuid
   igrp            Int
@@ -237,20 +248,23 @@ model DiscordTargetPriceWatch {
 }
 
 model DiscordNotificationDelivery {
-  id                 String                    @id @default(uuid()) @db.Uuid
-  discordUserId      String                    @map("discord_user_id") @db.Text
+  id                 String                        @id @default(uuid()) @db.Uuid
+  discordUserId      String                        @map("discord_user_id") @db.Text
   kind               DiscordNotificationKind
   status             DiscordNotificationStatus
-  productId          String?                   @map("product_id") @db.Uuid
-  product            Product?                  @relation(fields: [productId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  targetPriceWatchId String?                   @map("target_price_watch_id") @db.Uuid
-  targetPriceWatch   DiscordTargetPriceWatch?  @relation(fields: [targetPriceWatchId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  dedupeKey          String?                   @unique(map: "discord_notification_deliveries_dedupe_key_key") @map("dedupe_key") @db.Text
-  itemCount          Int                       @default(0) @map("item_count")
-  messageCount       Int                       @default(0) @map("message_count")
-  errorMessage       String?                   @map("error_message") @db.Text
-  deliveredAt        DateTime?                 @map("delivered_at") @db.Timestamptz(6)
-  createdAt          DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
+  productId          String?                       @map("product_id") @db.Uuid
+  product            Product?                      @relation(fields: [productId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  targetPriceWatchId String?                       @map("target_price_watch_id") @db.Uuid
+  targetPriceWatch   DiscordTargetPriceWatch?      @relation(fields: [targetPriceWatchId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  dedupeKey          String?                       @unique(map: "discord_notification_deliveries_dedupe_key_key") @map("dedupe_key") @db.Text
+  itemCount          Int                           @default(0) @map("item_count")
+  messageCount       Int                           @default(0) @map("message_count")
+  errorMessage       String?                       @map("error_message") @db.Text
+  errorCategory      DiscordDeliveryErrorCategory? @map("error_category")
+  httpStatus         Int?                          @map("http_status")
+  providerErrorCode  Int?                          @map("provider_error_code")
+  deliveredAt        DateTime?                     @map("delivered_at") @db.Timestamptz(6)
+  createdAt          DateTime                      @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@index([discordUserId, createdAt], map: "discord_notification_deliveries_user_created_at_idx")
   @@index([kind, status, createdAt], map: "discord_notification_deliveries_kind_status_created_at_idx")
@@ -260,17 +274,20 @@ model DiscordNotificationDelivery {
 }
 
 model DiscordPublicPriceReportDelivery {
-  id           String                    @id @default(uuid()) @db.Uuid
-  crawlRunId   String                    @map("crawl_run_id") @db.Uuid
-  crawlRun     CrawlRun                  @relation(fields: [crawlRunId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  channelId    String                    @map("channel_id") @db.Text
-  status       DiscordNotificationStatus
-  itemCount    Int                       @default(0) @map("item_count")
-  messageCount Int                       @default(0) @map("message_count")
-  errorMessage String?                   @map("error_message") @db.Text
-  deliveredAt  DateTime?                 @map("delivered_at") @db.Timestamptz(6)
-  createdAt    DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt    DateTime                  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                String                        @id @default(uuid()) @db.Uuid
+  crawlRunId        String                        @map("crawl_run_id") @db.Uuid
+  crawlRun          CrawlRun                      @relation(fields: [crawlRunId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  channelId         String                        @map("channel_id") @db.Text
+  status            DiscordNotificationStatus
+  itemCount         Int                           @default(0) @map("item_count")
+  messageCount      Int                           @default(0) @map("message_count")
+  errorMessage      String?                       @map("error_message") @db.Text
+  errorCategory     DiscordDeliveryErrorCategory? @map("error_category")
+  httpStatus        Int?                          @map("http_status")
+  providerErrorCode Int?                          @map("provider_error_code")
+  deliveredAt       DateTime?                     @map("delivered_at") @db.Timestamptz(6)
+  createdAt         DateTime                      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime                      @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@unique([crawlRunId, channelId], map: "discord_public_report_deliveries_run_channel_key")
   @@index([channelId, createdAt], map: "discord_public_price_report_deliveries_channel_created_at_idx")

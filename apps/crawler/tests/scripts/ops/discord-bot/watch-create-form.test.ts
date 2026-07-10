@@ -2,14 +2,14 @@
 // 驗證 /watch 新增追蹤表單、空清單狀態、Discord 錯誤透出與欄位驗證提示。
 
 import { describe, expect, it, vi } from "vitest";
+import { MAX_TARGET_PRICE_WATCHES_PER_USER } from "../../../../src/scripts/ops/discord-bot/constants";
 import { CommandCooldowns } from "../../../../src/scripts/ops/discord-bot/cooldowns";
 import { handleDiscordInteraction } from "../../../../src/scripts/ops/discord-bot/interactions";
-import { MAX_TARGET_PRICE_WATCHES_PER_USER } from "../../../../src/scripts/ops/discord-bot/constants";
 import {
   createDiscordBotClient,
   createDiscordBotOptions,
-  createWatchButtonInteraction,
   createTargetPriceWatchModalSubmitInteraction,
+  createWatchButtonInteraction,
   createWatchOpenInteraction,
   WATCH_DEFAULT_STATE,
 } from "./support";
@@ -147,7 +147,9 @@ describe("handleDiscordInteraction watch create form", () => {
         fetchImpl: fetchMock as typeof fetch,
         interaction: createWatchOpenInteraction(),
       }),
-    ).rejects.toThrow(/Discord deferred interaction response failed:.*Invalid Form Body/);
+    ).rejects.toThrow(
+      "Discord deferred interaction response failed: failed category=PROVIDER httpStatus=400 providerErrorCode=50035",
+    );
   });
 
   it("rejects invalid watch modal values with field guidance", async () => {
