@@ -20,7 +20,6 @@ import {
   countIssues,
   createContext,
   createMarkdownReport,
-  createSampleFixture,
   type ValidationSummary,
 } from "./validate-coolpc-live/report";
 
@@ -29,12 +28,12 @@ const CONFIRM_FLAG = "--confirm-live-fetch";
 // 目標分流之間的預設等待毫秒數，保留原有預設值便於手動一致性。
 const DEFAULT_DELAY_MS = 5000;
 
-// 手動驗證主流程：解析參數、決定 live/raw 模式、逐分類抓取、寫入 raw/fixture，最後輸出摘要報表。
+// 手動驗證主流程：解析參數、決定 live/raw 模式、逐分類抓取、寫入 raw，最後輸出摘要報表。
 async function main() {
   const args = process.argv.slice(2);
   const fromRawDir = getStringArg(args, "--from-raw-dir");
 
-  // live 抓取採 opt-in，預設優先用 fixtures/raw 重放，避免日常驗證不必要打來源站。
+  // live 抓取採 opt-in；帶 --from-raw-dir 的離線重放不會連線來源站。
   if (!fromRawDir && !args.includes(CONFIRM_FLAG)) {
     throw new Error(
       `Refusing live CoolPC fetch. Re-run with ${CONFIRM_FLAG} because this command contacts the source site and must stay manual-only.`,
@@ -50,16 +49,14 @@ async function main() {
   // 重放資料與輸出目錄都以 workspace root 當基準，避免在不同工作目錄下路徑解讀偏移。
   const inputRawDir = fromRawDir ? resolveWorkspacePathArgument(workspaceRoot, fromRawDir) : null;
   const rawDir = join(outputDir, "raw");
-  const fixtureDir = join(outputDir, "fixtures");
   await mkdir(rawDir, { recursive: true });
-  await mkdir(fixtureDir, { recursive: true });
 
   const summaries: ValidationSummary[] = [];
 
   for (const [index, category] of COOLPC_TARGET_CATEGORIES.entries()) {
     const fetchedAt = new Date();
     const url = createCoolpcCategoryUrl(category.igrp);
-    const { html, httpStatus, byteLength } = inputRawDir
+    const { html, httpStatus } = inputRawDir
       ? await readRawSnapshot(inputRawDir, category.igrp)
       : await fetchLiveCategory(category, url);
     const context = createContext(category, fetchedAt, url);
@@ -67,38 +64,24 @@ async function main() {
     const rawPath = join(rawDir, `igrp-${category.igrp}.html`);
     await writeFile(rawPath, html, "utf8");
 
-    // fixture 只保留 parser 相關結構；完整 raw HTML 保留在 temp/ 作為人工重放依據。
-    if (result.items.length > 0) {
-      await writeFile(
-        join(fixtureDir, `igrp-${category.igrp}.sample.html`),
-        createSampleFixture(category, fetchedAt, result.items.slice(0, 3)),
-        "utf8",
-      );
-    }
-
     summaries.push({
       igrp: category.igrp,
       displayName: category.displayName,
-      sourceName: category.sourceName,
       url,
       fetchedAt: fetchedAt.toISOString(),
       httpStatus,
-      byteLength,
       validationStatus: result.validation.status,
       validationReason: result.validation.reason ?? null,
       title: result.validation.title,
       tokenCount: result.validation.tokenCount,
       nameCount: result.validation.nameCount,
       priceTextCount: result.validation.priceTextCount,
-      validCandidateCount: result.validation.validCandidateCount,
       parsedItemCount: result.items.length,
       deduplicatedItemCount: result.deduplicatedItemCount,
       issueCounts: countIssues(result.issues),
       canImport: result.canImport,
       firstItems: result.items.slice(0, 3).map((item) => ({
-        ibuyToken: item.ibuyToken,
         name: item.name,
-        primaryImageUrl: item.primaryImageUrl,
         price: item.price,
         sourceItemKey: item.sourceItemKey,
       })),
@@ -125,7 +108,7 @@ async function main() {
   console.log(`Report: ${relative(workspaceRoot, join(outputDir, "report.md"))}`);
 }
 
-// 對單一分類執行 live 抓取，保留來源回應 metadata 供後續驗證與報表輸出。
+// 對單一分類執行 live 抓取，保留回應狀態供後續驗證與報表輸出。
 async function fetchLiveCategory(category: CoolpcTargetCategory, url: string) {
   console.log(`Fetching IGrp=${category.igrp} ${category.displayName}: ${url}`);
 
@@ -143,11 +126,10 @@ async function fetchLiveCategory(category: CoolpcTargetCategory, url: string) {
   return {
     html: decodeCoolpcHtml(bytes),
     httpStatus: response.status,
-    byteLength: bytes.byteLength,
   };
 }
 
-// 從 raw 快照目錄讀取指定 IGrp 的 HTML；回傳最小化的 pseudo-response metadata，維持與 live 分支一致。
+// 從 raw 快照目錄讀取指定 IGrp 的 HTML；回傳 pseudo-response 狀態以維持與 live 分支一致。
 async function readRawSnapshot(rawDir: string, igrp: number) {
   const path = join(rawDir, `igrp-${igrp}.html`);
   console.log(`Reading IGrp=${igrp} from ${path}`);
@@ -156,7 +138,6 @@ async function readRawSnapshot(rawDir: string, igrp: number) {
   return {
     html,
     httpStatus: 200,
-    byteLength: Buffer.byteLength(html, "utf8"),
   };
 }
 

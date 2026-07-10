@@ -42,7 +42,6 @@ export function createDaemonOptions(
     lockStaleSeconds: 43200,
     lockRetrySeconds: 120,
     runOnce: false,
-    baseUrl: "https://www.coolpc.com.tw",
     newProductImageBackfill: {
       workspaceRoot: "/workspace",
       storageDir: "/workspace/storage/product-images",

@@ -78,7 +78,7 @@
 - `crawler-daemon` 與 `raw-snapshot-cleanup-daemon` 在 `scheduled-crawler` profile 啟動；crawler command 保留 `--confirm-live-fetch`。
 - `crawler-daemon` 使用 `EXTERNAL_FETCH_LOCK_DIR` 避免多個 crawler process 同時抓來源；lock contention 依 `CRAWLER_LOCK_RETRY_SECONDS` 重試。新品圖片快取只在每輪價格 crawl 完成並釋放 lock 後針對本輪新增商品執行，既有缺圖修復仍使用手動 backfill 工具。
 - `cloudflared` 放在 `compose.tunnel.yml`，只在 `public-tunnel` profile 啟動。
-- `COOLPC_BASE_URL` 在 production Compose 固定為 `https://www.coolpc.com.tw`。
+- scheduled 與 manual live crawl 固定使用官方 CoolPC URL；raw replay 只保留在 `manual:validate-coolpc-live`，且不再提供來源網址設定。
 - `web` 預設綁 `127.0.0.1:${WEB_PORT:-3000}`；公開流量走 Cloudflare Tunnel。
 - `POSTGRES_*` 在 Compose 中必填，不使用 development fallback。
 - `.env.example` 只放非敏感模板；正式 `.env` 不提交。

@@ -110,7 +110,6 @@ async function main() {
     printSummary({
       workspaceRoot: options.workspaceRoot,
       storageDir: options.storageDir,
-      fromRawDir: options.fromRawDir,
       beforeCounts,
       afterCounts,
       runResult,
@@ -130,10 +129,8 @@ async function runManualCrawl(
     client,
     workspaceRoot: options.workspaceRoot,
     storageDir: options.storageDir,
-    fromRawDir: options.fromRawDir,
     delayMs: options.delayMs,
     triggerType: CRAWL_TRIGGER_TYPES.MANUAL,
-    baseUrl: process.env.COOLPC_BASE_URL,
     fetchUserAgent: MANUAL_CRAWL_USER_AGENT,
     log: console.log,
   });
@@ -215,7 +212,6 @@ async function readPublicProductSmokeSummary(
 function printSummary({
   workspaceRoot,
   storageDir,
-  fromRawDir,
   beforeCounts,
   afterCounts,
   runResult,
@@ -223,7 +219,6 @@ function printSummary({
 }: {
   workspaceRoot: string;
   storageDir: string;
-  fromRawDir: string | null;
   beforeCounts: DbCounts;
   afterCounts: DbCounts;
   runResult: RunCoolpcCrawlOnceResult;
@@ -231,7 +226,7 @@ function printSummary({
 }) {
   console.log("");
   console.log("CoolPC manual crawl finished.");
-  console.log(`- Mode: ${fromRawDir ? `raw replay (${fromRawDir})` : "live fetch"}`);
+  console.log("- Mode: live fetch");
   console.log(`- Crawl run: ${runResult.crawlRunId}`);
   console.log(`- Status: ${runResult.status}`);
   console.log(`- Stopped by suspected block: ${runResult.stoppedBySuspectedBlock ? "yes" : "no"}`);

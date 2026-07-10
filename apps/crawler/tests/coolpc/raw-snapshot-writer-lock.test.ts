@@ -1,5 +1,5 @@
 // apps/crawler/tests/coolpc/raw-snapshot-writer-lock.test.ts
-// 驗證 scheduled、manual live 與 raw replay 都在共享 mutation lock 內執行並可靠 release。
+// 驗證 scheduled 與 manual live crawl 都在共享 mutation lock 內執行並可靠 release。
 
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -19,20 +19,12 @@ describe("raw snapshot writer mutation lock", () => {
     {
       name: "scheduled crawler",
       triggerType: CRAWL_TRIGGER_TYPES.SCHEDULED,
-      fromRawDir: null,
       expectedOwner: "scheduled-crawler",
     },
     {
       name: "manual live crawler",
       triggerType: CRAWL_TRIGGER_TYPES.MANUAL,
-      fromRawDir: null,
       expectedOwner: "manual-crawler",
-    },
-    {
-      name: "manual raw replay",
-      triggerType: CRAWL_TRIGGER_TYPES.MANUAL,
-      fromRawDir: "/tmp/offline-raw-replay",
-      expectedOwner: "manual-raw-replay",
     },
   ])("holds and releases the shared lock for $name", async (testCase) => {
     const { workspaceRoot, storageRoot } = await createWorkspace();
@@ -57,7 +49,6 @@ describe("raw snapshot writer mutation lock", () => {
         configuredStorageDir: null,
         additionalAllowedStorageRootsForTesting: [storageRoot],
         triggerType: testCase.triggerType,
-        fromRawDir: testCase.fromRawDir,
         fetchUserAgent: "test-agent",
       },
       {

@@ -1,7 +1,6 @@
 x-app-env: &app-env
   NODE_ENV: "production"
   DATABASE_URL: "postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}?schema=public"
-  COOLPC_BASE_URL: "https://www.coolpc.com.tw"
   SNAPSHOT_STORAGE_DIR: "/var/lib/partsradar/snapshots"
   PRODUCT_IMAGE_STORAGE_DIR: "/var/lib/partsradar/product-images"
   EXTERNAL_FETCH_LOCK_DIR: "/var/lib/partsradar/snapshots/.locks/external-fetch"

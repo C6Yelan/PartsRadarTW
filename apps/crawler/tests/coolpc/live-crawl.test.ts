@@ -1,66 +1,16 @@
 // apps/crawler/tests/coolpc/live-crawl.test.ts
-// 驗證 CoolPC live crawl 的來源安全限制、請求大小限制、錯誤格式與暫時性失敗重試。
+// 驗證 CoolPC live crawl 的時間限制、請求大小限制、錯誤格式與暫時性失敗重試。
 
 import { describe, expect, it, vi } from "vitest";
-import { CRAWL_TRIGGER_TYPES } from "../../src/coolpc/crawl-run";
 import {
   fetchLiveCategorySnapshot,
   formatCoolpcFetchError,
   MAX_COOLPC_RESPONSE_BODY_BYTES,
   readResponseBodyWithLimit,
-  validateCoolpcBaseUrl,
   validateCrawlTimingOptions,
-  validateRawReplayOptions,
 } from "../../src/coolpc/live-crawl";
 
 describe("CoolPC live crawl safety guards", () => {
-  it("allows only the official CoolPC base URL by default", () => {
-    expect(validateCoolpcBaseUrl("https://www.coolpc.com.tw")).toBe("https://www.coolpc.com.tw");
-    expect(validateCoolpcBaseUrl("https://www.coolpc.com.tw/")).toBe("https://www.coolpc.com.tw");
-  });
-
-  it("rejects non-CoolPC base URLs in production", () => {
-    expect(() =>
-      validateCoolpcBaseUrl("https://example.test", {
-        allowUnsafeBaseUrlForTesting: true,
-        nodeEnv: "production",
-      }),
-    ).toThrow("CoolPC base URL must be https://www.coolpc.com.tw.");
-    expect(() => validateCoolpcBaseUrl("http://169.254.169.254")).toThrow(
-      "CoolPC base URL must be https://www.coolpc.com.tw.",
-    );
-    expect(() => validateCoolpcBaseUrl("file:///tmp/coolpc.html")).toThrow(
-      "CoolPC base URL must be https://www.coolpc.com.tw.",
-    );
-  });
-
-  it("keeps non-CoolPC base URL overrides test-only", () => {
-    expect(
-      validateCoolpcBaseUrl("http://localhost:4173", {
-        allowUnsafeBaseUrlForTesting: true,
-        nodeEnv: "test",
-      }),
-    ).toBe("http://localhost:4173");
-  });
-
-  it("rejects raw replay for scheduled or production crawler runtime", () => {
-    expect(() =>
-      validateRawReplayOptions({
-        fromRawDir: "temp/raw",
-        triggerType: CRAWL_TRIGGER_TYPES.SCHEDULED,
-        nodeEnv: "development",
-      }),
-    ).toThrow("Scheduled CoolPC crawler cannot use raw HTML replay.");
-
-    expect(() =>
-      validateRawReplayOptions({
-        fromRawDir: "temp/raw",
-        triggerType: CRAWL_TRIGGER_TYPES.MANUAL,
-        nodeEnv: "production",
-      }),
-    ).toThrow("Raw HTML replay is disabled in production crawler runtime.");
-  });
-
   it("validates crawl timing option ranges", () => {
     expect(validateCrawlTimingOptions({ delayMs: 1000, fetchTimeoutMs: 5000 })).toEqual({
       delayMs: 1000,

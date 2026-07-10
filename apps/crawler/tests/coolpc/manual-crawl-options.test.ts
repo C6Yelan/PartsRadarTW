@@ -1,5 +1,5 @@
 // apps/crawler/tests/coolpc/manual-crawl-options.test.ts
-// 驗證 manual live/replay 共用 raw snapshot storage allowlist 與安全 default。
+// 驗證 manual live crawl 的確認旗標、raw snapshot storage allowlist 與安全 default。
 
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -14,10 +14,24 @@ afterEach(async () => {
 });
 
 describe("manual CoolPC crawl snapshot storage options", () => {
-  it("uses the shared built-in snapshot root for raw replay", async () => {
+  it("requires explicit live fetch confirmation", async () => {
+    const { crawlerCwd } = await createWorkspace();
+
+    expect(() => parseOptions([], crawlerCwd, {})).toThrow("Refusing live CoolPC fetch");
+  });
+
+  it("rejects the former raw replay flag instead of falling through to live fetch", async () => {
+    const { crawlerCwd } = await createWorkspace();
+
+    expect(() =>
+      parseOptions(["--from-raw-dir", "temp/replay", "--confirm-live-fetch"], crawlerCwd, {}),
+    ).toThrow("Use manual:validate-coolpc-live");
+  });
+
+  it("uses the shared built-in snapshot root for live crawl", async () => {
     const { workspaceRoot, crawlerCwd } = await createWorkspace();
 
-    expect(parseOptions(["--from-raw-dir", "temp/replay"], crawlerCwd, {})).toMatchObject({
+    expect(parseOptions(["--confirm-live-fetch"], crawlerCwd, {})).toMatchObject({
       workspaceRoot,
       storageDir: join(workspaceRoot, "temp", "coolpc-daemon", "snapshots"),
     });
@@ -29,16 +43,12 @@ describe("manual CoolPC crawl snapshot storage options", () => {
     await mkdir(configuredRoot);
 
     expect(
-      parseOptions(["--from-raw-dir", "temp/replay", "--storage-dir", configuredRoot], crawlerCwd, {
+      parseOptions(["--confirm-live-fetch", "--storage-dir", configuredRoot], crawlerCwd, {
         SNAPSHOT_STORAGE_DIR: configuredRoot,
       }).storageDir,
     ).toBe(configuredRoot);
     expect(() =>
-      parseOptions(
-        ["--from-raw-dir", "temp/replay", "--storage-dir", "temp/unrelated"],
-        crawlerCwd,
-        {},
-      ),
+      parseOptions(["--confirm-live-fetch", "--storage-dir", "temp/unrelated"], crawlerCwd, {}),
     ).toThrow("not within an allowlisted snapshot storage root");
   });
 });

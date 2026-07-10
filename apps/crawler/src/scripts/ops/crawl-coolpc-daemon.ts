@@ -136,7 +136,6 @@ export async function runScheduledCycle(
       storageDir: options.storageDir,
       triggerType: CRAWL_TRIGGER_TYPES.SCHEDULED,
       delayMs: options.categoryDelayMs,
-      baseUrl: options.baseUrl,
       fetchUserAgent: SCHEDULED_CRAWL_USER_AGENT,
       log,
     });

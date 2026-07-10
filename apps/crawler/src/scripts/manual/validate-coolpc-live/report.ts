@@ -1,6 +1,6 @@
 // apps/crawler/src/scripts/manual/validate-coolpc-live/report.ts
 // 產生 CoolPC 手動驗證流程的回報資料。
-// 負責將 parser 驗證結果轉成可閱讀的樣板、HTML fixture 與 issue 統計。
+// 負責將 parser 驗證結果轉成可閱讀的報表與 issue 統計。
 
 import type { CoolpcTargetCategory } from "../../../coolpc/categories";
 import type {
@@ -13,25 +13,20 @@ import type {
 export interface ValidationSummary {
   igrp: number;
   displayName: string;
-  sourceName: string;
   url: string;
   fetchedAt: string;
   httpStatus: number;
-  byteLength: number;
   validationStatus: string;
   validationReason: string | null;
   title: string;
   tokenCount: number;
   nameCount: number;
   priceTextCount: number;
-  validCandidateCount: number;
   parsedItemCount: number;
   deduplicatedItemCount: number;
   issueCounts: Record<string, number>;
   canImport: boolean;
-  firstItems: Array<
-    Pick<ParsedCoolpcProduct, "ibuyToken" | "name" | "primaryImageUrl" | "price" | "sourceItemKey">
-  >;
+  firstItems: Array<Pick<ParsedCoolpcProduct, "name" | "price" | "sourceItemKey">>;
 }
 
 export function createContext(
@@ -50,45 +45,6 @@ export function createContext(
       ? [...category.expectedTitleKeywords]
       : undefined,
   };
-}
-
-// 建立手動驗證共用的來源分類上下文，保留欄位複製以避免參數物件被外部意外修改。
-export function createSampleFixture(
-  category: CoolpcTargetCategory,
-  fetchedAt: Date,
-  items: ParsedCoolpcProduct[],
-): string {
-  const rows = items
-    .map(
-      (item) => `      <div class="item">
-        <div class="w">${escapeHtml(item.ibuyToken)}</div>
-        <span>
-          <img src="${escapeHtml(item.primaryImageUrl ?? "")}" alt="${escapeHtml(item.name)}">
-          <div class="t">${escapeHtml(item.name)}</div>
-          <div class="x">含稅：NT${formatPrice(item.price)}</div>
-        </span>
-      </div>`,
-    )
-    .join("\n");
-
-  return `<!--
-Fixture: sampled live CoolPC ${category.displayName} category structure.
-Source type: eachview.php?IGrp=${category.igrp} category page.
-Fixture date: ${fetchedAt.toISOString().slice(0, 10)}.
-This fixture is reduced from a manual live validation run and keeps only parser-relevant structure.
--->
-<!doctype html>
-<html lang="zh-Hant-TW">
-  <head>
-    <title>原價屋${escapeHtml(category.sourceName)}總覽</title>
-  </head>
-  <body>
-    <section class="category">
-${rows}
-    </section>
-  </body>
-</html>
-`;
 }
 
 // 將每個分類的驗證結果整理為 Markdown 報表，並註明是否為 raw 重放模式。
@@ -157,20 +113,6 @@ export function countIssues(issues: CoolpcParseIssue[]): Record<string, number> 
     counts[issue.type] = (counts[issue.type] ?? 0) + 1;
     return counts;
   }, {});
-}
-
-// 以英語區域格式輸出價格，對齊報表中現有可讀格式。
-function formatPrice(price: number): string {
-  return new Intl.NumberFormat("en-US").format(price);
-}
-
-// 轉義 HTML 字元，防止 fixture 內容在輸出時破壞標籤結構。
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
 }
 
 // 清理 Markdown 表格欄位值，避免 `|` 被當成欄位分隔符號。
