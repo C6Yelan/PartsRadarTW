@@ -29,6 +29,8 @@ describe("ProductDetailFacts", () => {
     expect(html).not.toContain("可能已下架或暫時無法確認");
     expect(html).not.toContain("最後在原價屋看到");
     expect(html).toContain("目前上架");
+    expect(html).toContain("NT$ 6,990");
+    expect(html).toContain("2026-07-10 16:00");
   });
 });
 

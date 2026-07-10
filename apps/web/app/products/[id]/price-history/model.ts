@@ -1,6 +1,7 @@
 // apps/web/app/products/[id]/price-history/model.ts
 // 將價格歷史 API points 轉成摘要、圖表座標、標記與價格變動紀錄。
 
+import { formatInteger } from "../../../_shared/formatting";
 import type {
   ChartConfig,
   ChartMarker,
@@ -130,7 +131,7 @@ function createChartTicks({
   const values = [maxValue, (maxValue + minValue) / 2, minValue];
 
   return values.map((value) => ({
-    label: new Intl.NumberFormat("zh-TW", { maximumFractionDigits: 0 }).format(Math.round(value)),
+    label: formatInteger(Math.round(value)),
     y: Number(
       (
         chartConfig.padding.top +

@@ -2,14 +2,16 @@
 // apps/web/app/products/[id]/price-history/chart.tsx
 // 繪製商品價格歷史走勢圖，包含 SVG 折線、互動點位、固定標記與空資料狀態。
 
-import { formatCompactDate, getInsufficientDataMessage, getPointAriaLabel } from "./format";
+import { formatTaipeiMonthDay } from "../../../_shared/time";
+import { FixedChartMarker, HistoryTooltip } from "./chart/overlays";
+import { getInsufficientDataMessage, getPointAriaLabel } from "./format";
 import type {
   ChartModel,
   HistoryViewSummary,
   PriceHistoryRangeDays,
   PriceHistoryRangeKey,
 } from "./types";
-import { FixedChartMarker, HistoryTooltip } from "./chart/overlays";
+
 export { useChartConfig } from "./chart/chart-config";
 
 // 呈現價格歷史 chart model，並把滑鼠、焦點與點擊事件轉成目前作用中的價格點。
@@ -113,8 +115,8 @@ export function PriceHistoryChart({
             {activePoint ? <HistoryTooltip chartConfig={chart.config} point={activePoint} /> : null}
           </div>
           <div className="history-chart-axis" aria-hidden="true">
-            <span>{formatCompactDate(summary.startedAt)}</span>
-            <span>{formatCompactDate(summary.endedAt)}</span>
+            <span>{formatTaipeiMonthDay(summary.startedAt)}</span>
+            <span>{formatTaipeiMonthDay(summary.endedAt)}</span>
           </div>
         </>
       ) : (

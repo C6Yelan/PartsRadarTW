@@ -4,7 +4,7 @@
 // 顯示批次 refresh 狀態、最近成功同步時間、手動重整與 browser-only 說明。
 
 import { API_RATE_LIMITED_MESSAGE } from "../../_shared/api-client";
-import { formatBuildListDateTime } from "../formatting";
+import { formatTaipeiDateTime } from "../../_shared/time";
 import type { BuildListRefreshState } from "../model";
 
 export default function BuildListRefreshStatus({
@@ -26,7 +26,7 @@ export default function BuildListRefreshStatus({
         <strong>{getRefreshMessage(state, missingItemCount, itemCount)}</strong>
         <span>
           最近成功同步：
-          {lastSuccessfulSyncAt ? formatBuildListDateTime(lastSuccessfulSyncAt) : "尚未成功同步"}
+          {lastSuccessfulSyncAt ? formatTaipeiDateTime(lastSuccessfulSyncAt) : "尚未成功同步"}
         </span>
         <span>配單只儲存在這個瀏覽器，不會跨裝置同步。</span>
       </div>

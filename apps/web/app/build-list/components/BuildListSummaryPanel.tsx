@@ -2,7 +2,7 @@
 // apps/web/app/build-list/components/BuildListSummaryPanel.tsx
 // 顯示當次 refresh 可確認的配單估算、未計價數量與匯出／清空入口。
 
-import { formatBuildListPrice } from "../formatting";
+import { formatTwdPrice } from "../../_shared/formatting";
 import type { BuildListSummary } from "../model";
 
 export default function BuildListSummaryPanel({
@@ -33,7 +33,7 @@ export default function BuildListSummaryPanel({
         </div>
         <div className="build-list-total-row">
           <dt>總價</dt>
-          <dd>{formatBuildListPrice(summary.totalAmount)}</dd>
+          <dd>{formatTwdPrice(summary.totalAmount)}</dd>
         </div>
       </dl>
 

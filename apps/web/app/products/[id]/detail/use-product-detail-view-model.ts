@@ -6,13 +6,7 @@ import { useEffect, useState } from "react";
 import { BUILD_LIST_MAX_QUANTITY } from "../../../build-list/model";
 import { useBuildList } from "../../../build-list/use-build-list";
 import type { ProductShareStatus } from "../product-share";
-import {
-  createProductShareUrl,
-  formatProductShareStatus,
-  shareProductUrl,
-  toVisibleProductShareStatus,
-} from "../product-share";
-import { formatProductPrice } from "./format";
+import { createProductShareUrl, formatProductShareStatus, shareProductUrl } from "../product-share";
 import { usePriceHistoryLoader } from "./use-price-history-loader";
 import { useProductDetail } from "./use-product-detail";
 
@@ -77,19 +71,17 @@ export function useProductDetailViewModel({
     setBuildListItemQuantity(product.id, currentBuildListQuantity - 1);
   }
 
-  async function shareCurrentProduct() {
+  async function copyCurrentProductLink() {
     if (!product) {
       return;
     }
 
     const result = await shareProductUrl({
       navigatorRef: navigator,
-      title: product.name,
-      text: `${product.name} - ${formatProductPrice(product.price.amount)}`,
       url: createProductShareUrl(window.location.origin, product.id),
     });
 
-    setShareStatus(toVisibleProductShareStatus(result));
+    setShareStatus(result);
   }
 
   return {
@@ -121,7 +113,7 @@ export function useProductDetailViewModel({
     },
     share: {
       statusMessage: formatProductShareStatus(shareStatus),
-      shareCurrentProduct,
+      copyCurrentProductLink,
     },
   };
 }

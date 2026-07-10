@@ -11,7 +11,7 @@ export default function ProductDetailActions({
   isProductLimitReached,
   onAddToBuildList,
   onDecreaseBuildListQuantity,
-  onShare,
+  onCopyLink,
   productName,
   shareStatusMessage,
   purchaseUrl,
@@ -21,7 +21,7 @@ export default function ProductDetailActions({
   isProductLimitReached: boolean;
   onAddToBuildList: () => void;
   onDecreaseBuildListQuantity: () => void;
-  onShare: () => void;
+  onCopyLink: () => void;
   productName: string;
   shareStatusMessage: string | null;
   purchaseUrl: string;
@@ -84,12 +84,12 @@ export default function ProductDetailActions({
           前往購買
         </a>
         <button
-          aria-label="分享商品連結"
+          aria-label="複製商品連結"
           className="detail-share-action"
           type="button"
-          onClick={onShare}
+          onClick={onCopyLink}
         >
-          分享
+          複製連結
         </button>
       </div>
       {shareStatusMessage ? (

@@ -1,7 +1,7 @@
 // apps/web/app/build-list/excel.ts
 // 產生 refresh-backed 配單 Excel worksheet、最小 XLSX package 與台北時區檔名。
 
-import { formatBuildListExportDateTime } from "./formatting";
+import { formatTaipeiDateTime } from "../_shared/time";
 import { type BuildListItem, getBuildListLineSubtotal, summarizeBuildListItems } from "./model";
 import { createStoredZipArchive } from "./xlsx-zip";
 
@@ -14,6 +14,11 @@ interface WorksheetHyperlink {
   cellRef: string;
   relationshipId: string;
   target: string;
+}
+
+// 將 Excel 中的時間轉為 Asia/Taipei；無效原值保留供匯出內容判讀。
+export function formatBuildListExportDateTime(value: string) {
+  return formatTaipeiDateTime(value, value);
 }
 
 export function createBuildListExcelFilename(now = new Date()) {

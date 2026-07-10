@@ -7,6 +7,7 @@
 - 首頁就是商品查詢頁。
 - Table-first / dense list 體驗，優先支援搜尋、篩選、排序、掃描價格。
 - 每筆商品需看得到主要圖片、名稱、分類、目前價格、資料狀態與來源連結。
+- 使用者可見價格統一顯示為 `NT$ 12,345`；使用者可見時間固定使用 `Asia/Taipei`。
 - crawler 失敗時不清空畫面；顯示最後一次成功處理的資料與低干擾 stale 提示。
 - 來源狀態只代表 crawler / parser / source data sync，不代表商品可購買。
 - 不顯示 raw snapshot、parse error 或 crawler internal details。
@@ -104,8 +105,10 @@ Inactive 規則：
 規則：
 
 - 商品存在但 inactive 仍顯示詳細頁。
-- 商品不存在顯示 404 / 找不到商品。
+- 商品 404 使用「找不到這項商品，或目前無法公開顯示」等中性文案，不把下架當成唯一原因。
 - 來源連結不包含 `PHPSESSID`。
+- 複製連結只寫入不含 query state 的 canonical 商品 URL；不啟動平台專屬分享流程。
+- 商品 metadata / Open Graph 標題需在整體長度限制內保留可讀的商品名、目前價格與站名；描述以自然中文呈現分類、目前價格、台北更新時間與公開來源邊界，canonical 不包含 query state。
 - 商品詳細主資料不顯示拆解規格、raw snapshot 或 crawler error。
 
 ## 第二版價格歷史區塊

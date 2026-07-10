@@ -3,7 +3,8 @@
 // 呈現 refresh-backed 配單列；missing 或失敗時保留 intent，但不顯示或計入價格。
 
 import Link from "next/link";
-import { formatBuildListDateTime, formatBuildListPrice } from "../formatting";
+import { formatTwdPrice } from "../../_shared/formatting";
+import { formatTaipeiDateTime } from "../../_shared/time";
 import { BUILD_LIST_MAX_QUANTITY, type BuildListItem, getBuildListLineSubtotal } from "../model";
 import BuildListItemImage from "./BuildListItemImage";
 
@@ -47,15 +48,15 @@ export default function BuildListItemRow({
         <dl className="build-list-item-facts">
           <div>
             <dt>目前價格</dt>
-            <dd>{product?.price ? formatBuildListPrice(product.price.amount) : "暫未計價"}</dd>
+            <dd>{product?.price ? formatTwdPrice(product.price.amount) : "暫未計價"}</dd>
           </div>
           <div>
             <dt>資料更新</dt>
-            <dd>{product ? formatBuildListDateTime(product.lastSeenAt) : "—"}</dd>
+            <dd>{product ? formatTaipeiDateTime(product.lastSeenAt) : "—"}</dd>
           </div>
           <div>
             <dt>小計</dt>
-            <dd>{subtotal === null ? "—" : formatBuildListPrice(subtotal)}</dd>
+            <dd>{subtotal === null ? "—" : formatTwdPrice(subtotal)}</dd>
           </div>
         </dl>
         {product ? (

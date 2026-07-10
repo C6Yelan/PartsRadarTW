@@ -46,12 +46,7 @@ export default function ProductDetail({
         </section>
       ) : null}
 
-      {state === "not-found" ? (
-        <section className="detail-empty">
-          <h1>這項商品目前無法顯示</h1>
-          <p>商品可能已下架，或暫時無法確認。你可以返回查詢頁重新搜尋。</p>
-        </section>
-      ) : null}
+      {state === "not-found" ? <ProductDetailNotFoundState /> : null}
 
       {state === "error" || state === "rate_limited" ? (
         <ProductDetailErrorState state={state} />
@@ -80,7 +75,7 @@ export default function ProductDetail({
               onDecreaseBuildListQuantity={
                 viewModel.buildList.decreaseCurrentProductBuildListQuantity
               }
-              onShare={viewModel.share.shareCurrentProduct}
+              onCopyLink={viewModel.share.copyCurrentProductLink}
             />
           </div>
         </section>
@@ -97,6 +92,15 @@ export default function ProductDetail({
       <FloatingBuildListLink summary={viewModel.buildList.summary} />
       <SiteDisclaimer />
     </main>
+  );
+}
+
+export function ProductDetailNotFoundState() {
+  return (
+    <section className="detail-empty">
+      <h1>找不到這項商品，或目前無法公開顯示</h1>
+      <p>請返回查詢頁重新搜尋，或稍後再試。</p>
+    </section>
   );
 }
 

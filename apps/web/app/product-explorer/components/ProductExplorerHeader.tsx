@@ -4,8 +4,8 @@
 
 import Link from "next/link";
 import type { MouseEvent, SyntheticEvent } from "react";
+import { formatTaipeiDateTime } from "../../_shared/time";
 import DiscordTopbarLink from "../../DiscordTopbarLink";
-import { formatDateTime } from "../formatting";
 import type { ProductsResponse, QueryState } from "../types";
 
 // 組裝首頁頂部列，將搜尋 draft 與提交 / 清除 / 返回首頁事件交給上層控制。
@@ -64,7 +64,7 @@ export function ProductExplorerHeader({
       </form>
 
       <div className="topbar-meta">
-        <span>資料最近更新：{formatDateTime(products?.meta.lastSuccessAt, "尚無資料")}</span>
+        <span>資料最近更新：{formatTaipeiDateTime(products?.meta.lastSuccessAt, "尚無資料")}</span>
       </div>
     </header>
   );

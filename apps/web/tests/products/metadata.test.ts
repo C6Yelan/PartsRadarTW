@@ -13,17 +13,19 @@ import {
 
 const PRODUCT_ID = "11111111-1111-1111-1111-111111111111";
 const PUBLIC_SITE_URL = "https://partsradar.net";
+const DESCRIPTION =
+  "這項商品屬於「顯示卡」分類，目前價格為 NT$ 6,990；價格資料更新於 2026-05-28 19:55（台北時間）。資料整理自原價屋，實際售價與供貨狀況以來源頁面為準。";
 
 describe("product detail metadata", () => {
   it("builds product Open Graph metadata with clean canonical URL and image URL", () => {
     const metadata = buildProductDetailMetadata(product(), PUBLIC_SITE_URL);
 
     expect(metadata.title).toBe("GPU RTX 4070 - NT$ 6,990 | PartsRadarTW");
-    expect(metadata.description).toBe("顯示卡 | NT$ 6,990 | 價格資料更新：2026-05-28 19:55");
+    expect(metadata.description).toBe(DESCRIPTION);
     expect(metadata.alternates?.canonical).toBe(`https://partsradar.net/products/${PRODUCT_ID}`);
     expect(metadata.openGraph).toMatchObject({
       title: "GPU RTX 4070 - NT$ 6,990 | PartsRadarTW",
-      description: "顯示卡 | NT$ 6,990 | 價格資料更新：2026-05-28 19:55",
+      description: DESCRIPTION,
       type: "website",
       siteName: "PartsRadarTW",
       locale: "zh_TW",
@@ -39,17 +41,41 @@ describe("product detail metadata", () => {
     expect(metadata.twitter).toMatchObject({
       card: "summary_large_image",
       title: "GPU RTX 4070 - NT$ 6,990 | PartsRadarTW",
-      description: "顯示卡 | NT$ 6,990 | 價格資料更新：2026-05-28 19:55",
+      description: DESCRIPTION,
       images: [`https://partsradar.net/api/product-images/${PRODUCT_ID}.webp`],
     });
     expect(JSON.stringify(metadata)).not.toContain("iBuyToken");
     expect(JSON.stringify(metadata)).not.toContain("raw_snapshot");
   });
 
+  it("limits the complete title while preserving price and brand for long product names", () => {
+    const metadata = buildProductDetailMetadata(
+      product({
+        name: `  ${"超長顯示卡型號 ".repeat(12)}  `,
+        currentPrice: {
+          lastSeenAt: new Date("2026-05-28T16:05:00.000Z"),
+          priceSnapshot: {
+            price: 6990,
+          },
+        },
+      }),
+      PUBLIC_SITE_URL,
+    );
+    const title = String(metadata.title);
+
+    expect(title.length).toBeLessThanOrEqual(70);
+    expect(title).toContain("超長顯示卡型號");
+    expect(title).toContain("…");
+    expect(title.endsWith(" - NT$ 6,990 | PartsRadarTW")).toBe(true);
+    expect(metadata.description).toContain("2026-05-29 00:05（台北時間）");
+    expect(metadata.description).toContain("資料整理自原價屋");
+    expect(metadata.description).not.toContain(" | ");
+  });
+
   it("queries public product fields for metadata without requiring image data", async () => {
     const client = fakeProductMetadataClient(product());
     const metadata = await createProductDetailMetadata(client, PRODUCT_ID.toUpperCase(), {
-      publicSiteUrl: "https://partsradar.net/some-path?ignored=1",
+      publicSiteUrl: "https://partsradar.net/products/old?returnTo=%2F%3Fcategory%3Dstorage",
     });
 
     expect(client.productFindFirstCallCount).toBe(1);
@@ -70,6 +96,9 @@ describe("product detail metadata", () => {
     expect(
       client.lastProductFindFirstArgs?.select.currentPrice.select.priceSnapshot.select,
     ).not.toHaveProperty("capturedAt");
+    expect(
+      client.lastProductFindFirstArgs?.select.currentPrice.select.priceSnapshot.select,
+    ).toEqual({ price: true });
     expect(metadata.alternates?.canonical).toBe(`https://partsradar.net/products/${PRODUCT_ID}`);
   });
 
@@ -156,7 +185,6 @@ function product(overrides: Partial<ProductMetadataRecord> = {}): ProductMetadat
       lastSeenAt: new Date("2026-05-28T11:55:00.000Z"),
       priceSnapshot: {
         price: 6990,
-        currency: "TWD",
       },
     },
     sourceCategory: {

@@ -1,12 +1,11 @@
 // apps/web/tests/products/product-share.test.ts
-// 驗證商品分享 URL、Web Share API、剪貼簿 fallback 與分享狀態顯示邊界。
+// 驗證商品 canonical URL、clipboard-only 複製與安全失敗提示。
 
 import { describe, expect, it, vi } from "vitest";
 import {
   createProductShareUrl,
   formatProductShareStatus,
   shareProductUrl,
-  toVisibleProductShareStatus,
 } from "../../app/products/[id]/product-share";
 
 describe("createProductShareUrl", () => {
@@ -24,76 +23,59 @@ describe("createProductShareUrl", () => {
 });
 
 describe("product share status", () => {
-  it("only shows status text for clipboard fallback and real failures", () => {
-    expect(toVisibleProductShareStatus("shared")).toBeNull();
-    expect(toVisibleProductShareStatus("cancelled")).toBeNull();
-    expect(toVisibleProductShareStatus("copied")).toBe("copied");
-    expect(toVisibleProductShareStatus("failed")).toBe("failed");
-
+  it("shows concise clipboard success and actionable failure copy", () => {
     expect(formatProductShareStatus(null)).toBe("");
-    expect(formatProductShareStatus("copied")).toBe("已複製連結");
-    expect(formatProductShareStatus("failed")).toBe("目前無法分享");
+    expect(formatProductShareStatus("copied")).toBe("已複製到剪貼簿");
+    expect(formatProductShareStatus("failed")).toBe("無法自動複製，請從瀏覽器網址列複製連結。");
   });
 });
 
 describe("shareProductUrl", () => {
-  it("uses Web Share API when available", async () => {
+  it("always copies the URL without calling Web Share", async () => {
     const share = vi.fn(async () => undefined);
-
-    await expect(
-      shareProductUrl({
-        navigatorRef: { share },
-        title: "GPU A",
-        text: "GPU A - NT$ 10,000",
-        url: "https://partsradar.test/products/product-1",
-      }),
-    ).resolves.toBe("shared");
-
-    expect(share).toHaveBeenCalledWith({
-      title: "GPU A",
-      text: "GPU A - NT$ 10,000",
-      url: "https://partsradar.test/products/product-1",
-    });
-  });
-
-  it("falls back to clipboard when native sharing is unavailable", async () => {
     const writeText = vi.fn(async () => undefined);
+    const navigatorRef = { clipboard: { writeText }, share };
 
     await expect(
       shareProductUrl({
-        navigatorRef: { clipboard: { writeText } },
-        title: "GPU A",
-        text: "GPU A - NT$ 10,000",
+        navigatorRef,
         url: "https://partsradar.test/products/product-1",
       }),
     ).resolves.toBe("copied");
 
     expect(writeText).toHaveBeenCalledWith("https://partsradar.test/products/product-1");
+    expect(share).not.toHaveBeenCalled();
   });
 
-  it("treats native share cancellation as a non-error result", async () => {
-    const share = vi.fn(async () => {
-      throw new DOMException("Share cancelled", "AbortError");
-    });
+  it("returns failed without falling back to Web Share when clipboard is missing", async () => {
+    const share = vi.fn(async () => undefined);
+    const navigatorRef = { clipboard: undefined, share };
 
     await expect(
       shareProductUrl({
-        navigatorRef: { share },
-        title: "GPU A",
-        text: "GPU A - NT$ 10,000",
-        url: "https://partsradar.test/products/product-1",
-      }),
-    ).resolves.toBe("cancelled");
-  });
-
-  it("returns failed when no share path is available", async () => {
-    await expect(
-      shareProductUrl({
-        navigatorRef: {},
-        title: "GPU A",
-        text: "GPU A - NT$ 10,000",
+        navigatorRef,
         url: "https://partsradar.test/products/product-1",
       }),
     ).resolves.toBe("failed");
+
+    expect(share).not.toHaveBeenCalled();
+  });
+
+  it("returns failed without exposing a rejected clipboard error", async () => {
+    const share = vi.fn(async () => undefined);
+    const writeText = vi.fn(async () => {
+      throw new Error("clipboard permission denied: private detail");
+    });
+    const navigatorRef = { clipboard: { writeText }, share };
+
+    await expect(
+      shareProductUrl({
+        navigatorRef,
+        url: "https://partsradar.test/products/product-1",
+      }),
+    ).resolves.toBe("failed");
+
+    expect(writeText).toHaveBeenCalledOnce();
+    expect(share).not.toHaveBeenCalled();
   });
 });

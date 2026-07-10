@@ -3,7 +3,8 @@
 // 顯示價格歷史中的實際漲跌紀錄，並在紀錄較多時提供本機分頁。
 
 import { useState } from "react";
-import { formatPrice, formatRecordDateTime, formatSignedPrice } from "./format";
+import { formatSignedTwdPrice, formatTwdPrice } from "../../../_shared/formatting";
+import { formatTaipeiMonthDayTime } from "../../../_shared/time";
 import type { PriceChangeRecord } from "./types";
 
 // 限制單頁變價紀錄數，避免商品詳細頁的價格歷史區塊過長。
@@ -32,11 +33,13 @@ export function HistoryRecordList({ records }: { records: PriceChangeRecord[] })
       <div className="history-record-list">
         {visibleRecords.map((record) => (
           <div className="history-record-row" key={record.key}>
-            <time dateTime={record.observedAt}>{formatRecordDateTime(record.observedAt)}</time>
+            <time dateTime={record.observedAt}>{formatTaipeiMonthDayTime(record.observedAt)}</time>
             <span className="history-record-price">
-              {`${formatPrice(record.beforeAmount)} ➙ ${formatPrice(record.afterAmount)}`}
+              {`${formatTwdPrice(record.beforeAmount)} ➙ ${formatTwdPrice(record.afterAmount)}`}
             </span>
-            <strong className={`is-${record.tone}`}>{formatSignedPrice(record.deltaAmount)}</strong>
+            <strong className={`is-${record.tone}`}>
+              {formatSignedTwdPrice(record.deltaAmount, "資料不足")}
+            </strong>
             <span className={`history-record-badge is-${record.tone}`}>{record.label}</span>
           </div>
         ))}
