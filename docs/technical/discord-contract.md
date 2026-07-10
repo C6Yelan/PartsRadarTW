@@ -11,8 +11,8 @@ Admin Discord webhook remains separate and is only for maintainer smoke / ops al
 Supported slash commands:
 
 - `/bot help`: returns an ephemeral Traditional Chinese help embed.
-- `/price-report now`: creates a recent price report in the command context. If the user has enabled daily report settings, omitted options can inherit those settings.
-- `/price-report settings`: opens an ephemeral settings panel for daily DM reports. Users can configure window, categories, content type, keyword, max items, Taipei send time, preview DM, enable, and disable.
+- `/price-report now`: creates a recent price report in the command context. If the user has enabled daily report settings, the report inherits its filters and can inherit its window.
+- `/price-report settings`: opens an ephemeral settings panel for daily DM reports. Users can configure window, categories, content type, up to five OR keyword groups, Taipei send time, preview DM, enable, and disable.
 - `/watch`: opens an ephemeral target-price watch manager. Users can add a watch from a PartsRadarTW product URL, `/products/<id>` URL, or product id; edit target price; remove one watch; batch remove watches; filter and sort their active watch list.
 - `/public-report status/manage/test`: lets a server manager view, configure, and test public price reports for the current guild.
 
@@ -23,7 +23,7 @@ The bot daemon also scans due scheduled personal reports, pending public reports
 - Public reports are server-level broadcasts configured per guild and channel.
 - Personal scheduled reports and target-price watch notifications are sent by DM.
 - `/price-report now` may reply in the command context, but personal watch lists and target-price settings must stay ephemeral or DM-only.
-- Price reports include price drops, price rises, and new products, subject to configured filters and item limits.
+- Price reports include price drops, price rises, and optionally new products, subject to configured filters and a fixed system limit of 50 listed items.
 - Target-price watch notifications are sent when current price is less than or equal to the target price and currency matches.
 - `/watch` and `watch:*` component IDs are compatibility wire names for target-price watch flows; internal TypeScript names should keep the target-price domain explicit.
 - A successfully notified watch is not sent again until the user updates or recreates the watch.

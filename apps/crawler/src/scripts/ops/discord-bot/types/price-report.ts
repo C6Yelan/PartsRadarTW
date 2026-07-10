@@ -42,7 +42,6 @@ export type ParsedPriceReportCommand =
   | {
       name: "now";
       windowHours: number | null;
-      maxItems: number | null;
     }
   | {
       name: "settings";
@@ -57,7 +56,7 @@ export type ParsedPriceReportComponent =
       name: "disable_daily_scheduled_report";
     }
   | {
-      name: "open_time_limit_modal";
+      name: "open_time_modal";
     }
   | {
       name: "open_keyword_modal";
@@ -86,9 +85,7 @@ export type ParsedPriceReportComponent =
 // 個人 price-report 設定 modal submit 的解析結果，保留輸入合法性供 handler 回覆錯誤。
 export type ParsedPriceReportModal =
   | {
-      name: "time_limit";
-      maxItems: number | null;
-      maxItemsInputValid: boolean;
+      name: "time";
       timeOfDay: PriceReportTimeOfDay | null;
       timeInputValid: boolean;
     }

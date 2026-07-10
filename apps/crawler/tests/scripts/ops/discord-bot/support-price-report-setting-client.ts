@@ -30,26 +30,35 @@ export function createPriceReportSettingClient(settings: TestPriceReportSetting[
     },
   );
   const settingFindMany = vi.fn(
-    async (args: { where: { nextSendAt?: { lte: Date }; enabled?: boolean } }) => {
+    async (args: {
+      where: { nextSendAt?: { lte: Date }; enabled?: boolean };
+      select?: Record<string, boolean>;
+    }) => {
       const nextSendAtLte = args.where.nextSendAt?.lte;
 
-      return settingRows.filter((setting) => {
-        if (args.where.enabled !== undefined && setting.enabled !== args.where.enabled) {
-          return false;
-        }
+      return settingRows
+        .filter((setting) => {
+          if (args.where.enabled !== undefined && setting.enabled !== args.where.enabled) {
+            return false;
+          }
 
-        return (
-          !nextSendAtLte ||
-          (setting.nextSendAt !== null && setting.nextSendAt.getTime() <= nextSendAtLte.getTime())
-        );
-      });
+          return (
+            !nextSendAtLte ||
+            (setting.nextSendAt !== null && setting.nextSendAt.getTime() <= nextSendAtLte.getTime())
+          );
+        })
+        .map((setting) => selectSettingFields(setting, args.select));
     },
   );
-  const settingFindUnique = vi.fn(async (args: { where: { discordUserId: string } }) => {
-    return (
-      settingRows.find((setting) => setting.discordUserId === args.where.discordUserId) ?? null
-    );
-  });
+  const settingFindUnique = vi.fn(
+    async (args: { where: { discordUserId: string }; select?: Record<string, boolean> }) => {
+      const setting = settingRows.find(
+        (setting) => setting.discordUserId === args.where.discordUserId,
+      );
+
+      return setting ? selectSettingFields(setting, args.select) : null;
+    },
+  );
   const settingUpdate = vi.fn(
     async (args: { where: { id: string }; data: Partial<TestPriceReportSetting> }) => {
       const setting = settingRows.find((row) => row.id === args.where.id);
@@ -92,7 +101,6 @@ export function createPriceReportSettingClient(settings: TestPriceReportSetting[
         | "window"
         | "scope"
         | "timezone"
-        | "maxItems"
         | "categoryIgrps"
         | "productKeyword"
         | "includePriceDrops"
@@ -103,6 +111,7 @@ export function createPriceReportSettingClient(settings: TestPriceReportSetting[
         | "notificationCursorAt"
       >;
       update: Partial<TestPriceReportSetting>;
+      select?: Record<string, boolean>;
     }) => {
       const existing = settingRows.find(
         (setting) => setting.discordUserId === args.where.discordUserId,
@@ -110,11 +119,12 @@ export function createPriceReportSettingClient(settings: TestPriceReportSetting[
 
       if (existing) {
         Object.assign(existing, args.update);
-        return existing;
+        return selectSettingFields(existing, args.select);
       }
 
       const created = {
         id: "setting-created",
+        maxItems: 50,
         lastSentAt: null,
         createdAt: new Date("2026-06-07T00:00:00.000Z"),
         updatedAt: new Date("2026-06-07T00:00:00.000Z"),
@@ -122,7 +132,7 @@ export function createPriceReportSettingClient(settings: TestPriceReportSetting[
       };
       settingRows.push(created);
 
-      return created;
+      return selectSettingFields(created, args.select);
     },
   );
 
@@ -134,4 +144,19 @@ export function createPriceReportSettingClient(settings: TestPriceReportSetting[
     updateMany: settingUpdateMany,
     upsert: settingUpsert,
   };
+}
+
+function selectSettingFields(
+  setting: TestPriceReportSetting,
+  select: Record<string, boolean> | undefined,
+): Partial<TestPriceReportSetting> {
+  if (!select) {
+    return setting;
+  }
+
+  return Object.fromEntries(
+    Object.entries(select)
+      .filter(([, selected]) => selected)
+      .map(([key]) => [key, setting[key as keyof TestPriceReportSetting]]),
+  );
 }

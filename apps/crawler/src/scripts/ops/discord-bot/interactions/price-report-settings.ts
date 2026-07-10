@@ -4,7 +4,6 @@
 import { createPriceReportSettingsComponents, type parsePriceReportModalSubmit } from "../commands";
 import {
   DISCORD_EMBED_COLOR,
-  MAX_PRICE_REPORT_ITEMS,
   MAX_PRICE_REPORT_KEYWORD_GROUPS,
   MAX_PRICE_REPORT_KEYWORD_LENGTH,
 } from "../constants";
@@ -30,7 +29,6 @@ import type {
   DiscordBotClient,
   DiscordBotEmbed,
   DiscordBotMessage,
-  DiscordBotOptions,
   PriceReportNowResult,
   PriceReportTimeOfDay,
 } from "../types";
@@ -40,7 +38,6 @@ interface PriceReportSettingsPanel {
   setting: Awaited<ReturnType<typeof readPriceReportSetting>>;
   categories: PriceReportCategoryOption[];
   latestDelivery: PriceReportDeliveryStatus | null;
-  options: DiscordBotOptions;
   notice?: string;
 }
 
@@ -48,12 +45,10 @@ interface PriceReportSettingsPanel {
 export async function readPriceReportSettingsPanel({
   client,
   discordUserId,
-  options,
   notice,
 }: {
   client: DiscordBotClient;
   discordUserId: string;
-  options: DiscordBotOptions;
   notice?: string;
 }): Promise<PriceReportSettingsPanel> {
   const [setting, categories, latestDelivery] = await Promise.all([
@@ -66,7 +61,6 @@ export async function readPriceReportSettingsPanel({
     setting,
     categories,
     latestDelivery,
-    options,
     notice,
   };
 }
@@ -76,15 +70,12 @@ export function createPriceReportSettingsPanelMessage({
   setting,
   categories,
   latestDelivery,
-  options,
   notice,
 }: PriceReportSettingsPanel): DiscordBotMessage {
   const filters = toPriceReportFilters(setting);
 
   return {
-    embeds: [
-      createPriceReportSettingsEmbed({ setting, categories, latestDelivery, options, notice }),
-    ],
+    embeds: [createPriceReportSettingsEmbed({ setting, categories, latestDelivery, notice })],
     components: createPriceReportSettingsComponents({
       windowHours: resolveWindowHours(setting?.window),
       categories,
@@ -148,12 +139,9 @@ export function formatPriceReportModalValidationMessage(
     return formatPriceReportKeywordValidationMessage();
   }
 
-  const messages = [
-    modal.maxItemsInputValid ? null : `最多商品數需為 1-${MAX_PRICE_REPORT_ITEMS} 的整數。`,
-    modal.timeInputValid ? null : "每日發送時間格式需為台北時間 HH:mm，例如 `09:30` 或 `21:00`。",
-  ].filter((message): message is string => message !== null);
-
-  return messages.join("\n");
+  return modal.timeInputValid
+    ? ""
+    : "每日發送時間格式需為台北時間 HH:mm，例如 `09:30` 或 `21:00`。";
 }
 
 // 建立商品關鍵字輸入錯誤訊息，對齊 modal 說明中的長度與分組限制。
@@ -208,7 +196,6 @@ function createPriceReportSettingsEmbed({
   setting,
   categories,
   latestDelivery,
-  options,
   notice,
 }: PriceReportSettingsPanel): DiscordBotEmbed {
   const enabled = setting?.enabled ?? false;
@@ -243,11 +230,6 @@ function createPriceReportSettingsEmbed({
       {
         name: "商品關鍵字",
         value: formatPriceReportKeywordFilterLabel(filters),
-        inline: true,
-      },
-      {
-        name: "每次最多",
-        value: `${setting?.maxItems ?? options.priceReportMaxItems} 筆`,
         inline: true,
       },
       {

@@ -141,11 +141,6 @@ export async function handleApplicationCommandInteraction({
         client,
         discordUserId,
         windowHours: command.windowHours ?? resolveWindowHours(activeSetting?.window),
-        maxItems:
-          command.maxItems ??
-          (activeSetting
-            ? Math.min(activeSetting.maxItems, options.priceReportMaxItems)
-            : options.priceReportMaxItems),
         publicBaseUrl: options.publicBaseUrl,
         filters: toPriceReportFilters(activeSetting),
         sendReportMessages: (messages) =>
@@ -164,7 +159,6 @@ export async function handleApplicationCommandInteraction({
     const panel = await readPriceReportSettingsPanel({
       client,
       discordUserId,
-      options,
     });
 
     await sendInteractionResponse({
@@ -209,7 +203,6 @@ export async function handleApplicationCommandInteraction({
       client,
       discordGuildId: publicContext.discordGuildId,
       currentChannelId: publicContext.channelId,
-      options,
     });
 
     await sendInteractionResponse({

@@ -104,53 +104,24 @@ export function createPublicReportSelectInteraction(
   };
 }
 
-// 建立公開報告最多商品數 modal submit interaction。
-export function createPublicReportLimitModalSubmitInteraction({
-  maxItems,
-  guildId = "guild-1",
-  channelId = "999988887777666655",
-}: {
-  maxItems: string;
-  guildId?: string;
-  channelId?: string;
-}): DiscordInteraction {
-  return {
-    id: "interaction-1",
-    token: "interaction-token",
-    type: 5,
-    guild_id: guildId,
-    channel_id: channelId,
-    data: {
-      custom_id: "public-report:limit-modal",
-      components: [
-        {
-          type: 18,
-          component: {
-            type: 4,
-            custom_id: "public-report:max-items",
-            value: maxItems,
-          },
-        },
-      ],
-    },
-    member: {
-      user: {
-        id: "111122223333444455",
-      },
-    },
-  };
-}
-
 // 建立公開報告商品關鍵字 modal submit interaction。
 export function createPublicReportKeywordModalSubmitInteraction({
-  keyword,
+  keywords,
   guildId = "guild-1",
   channelId = "999988887777666655",
 }: {
-  keyword: string;
+  keywords: string[];
   guildId?: string;
   channelId?: string;
 }): DiscordInteraction {
+  const customIds = [
+    "public-report:keyword-input",
+    "public-report:keyword-input:2",
+    "public-report:keyword-input:3",
+    "public-report:keyword-input:4",
+    "public-report:keyword-input:5",
+  ];
+
   return {
     id: "interaction-1",
     token: "interaction-token",
@@ -159,16 +130,14 @@ export function createPublicReportKeywordModalSubmitInteraction({
     channel_id: channelId,
     data: {
       custom_id: "public-report:keyword-modal",
-      components: [
-        {
-          type: 18,
-          component: {
-            type: 4,
-            custom_id: "public-report:keyword-input",
-            value: keyword,
-          },
+      components: customIds.map((customId, index) => ({
+        type: 18,
+        component: {
+          type: 4,
+          custom_id: customId,
+          value: keywords[index] ?? "",
         },
-      ],
+      })),
     },
     member: {
       user: {

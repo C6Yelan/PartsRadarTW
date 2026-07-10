@@ -5,18 +5,16 @@ import {
   DISCORD_APPLICATION_CONTEXT_BOT_DM,
   DISCORD_APPLICATION_CONTEXT_GUILD,
   DISCORD_COMMAND_TYPE_CHAT_INPUT,
-  DISCORD_OPTION_TYPE_INTEGER,
   DISCORD_OPTION_TYPE_STRING,
   DISCORD_OPTION_TYPE_SUBCOMMAND,
   DISCORD_PERMISSION_MANAGE_GUILD,
-  MAX_PRICE_REPORT_ITEMS,
 } from "../constants";
 
 // 建立 /price-report 指令定義，包含立即產生報告與管理個人每日報告設定的子命令。
 export function createPriceReportCommand(): Record<string, unknown> {
   return {
     name: "price-report",
-    description: "Send PartsRadarTW price change reports.",
+    description: "查看即時價格報告並管理每日私訊設定。",
     type: DISCORD_COMMAND_TYPE_CHAT_INPUT,
     contexts: [DISCORD_APPLICATION_CONTEXT_GUILD, DISCORD_APPLICATION_CONTEXT_BOT_DM],
     dm_permission: true,
@@ -36,14 +34,6 @@ export function createPriceReportCommand(): Record<string, unknown> {
               { name: "過去 12 小時", value: "12h" },
               { name: "過去 6 小時", value: "6h" },
             ],
-          },
-          {
-            type: DISCORD_OPTION_TYPE_INTEGER,
-            name: "max_items",
-            description: "最多列出的商品數。",
-            required: false,
-            min_value: 1,
-            max_value: MAX_PRICE_REPORT_ITEMS,
           },
         ],
       },

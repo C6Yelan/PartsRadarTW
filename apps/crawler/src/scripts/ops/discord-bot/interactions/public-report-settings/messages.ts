@@ -6,6 +6,7 @@ import {
   DISCORD_EMBED_COLOR,
   DISCORD_PERMISSION_EMBED_LINKS,
   DISCORD_PERMISSION_SEND_MESSAGES,
+  MAX_PRICE_REPORT_ITEMS,
 } from "../../constants";
 import {
   formatPriceReportCategoryFilterLabel,
@@ -21,12 +22,7 @@ import {
   toPublicPriceReportFilters,
 } from "../../public-price-report";
 import { formatDiscordDeliveryFailureForUser, formatDiscordRateLimitForUser } from "../../rest";
-import type {
-  DiscordBotEmbed,
-  DiscordBotMessage,
-  DiscordBotOptions,
-  DiscordInteraction,
-} from "../../types";
+import type { DiscordBotEmbed, DiscordBotMessage, DiscordInteraction } from "../../types";
 import { formatPriceReportDeliveryError } from "../price-report-settings";
 
 // public-report 設定面板訊息所需的資料契約，由設定讀取流程與 interaction handler 共用。
@@ -34,7 +30,6 @@ export interface PublicPriceReportSettingsPanel {
   setting: PublicPriceReportSetting | null;
   latestDelivery: PublicPriceReportDeliveryStatus | null;
   categories: PriceReportCategoryOption[];
-  options: DiscordBotOptions;
   currentChannelId: string;
   notice?: string;
 }
@@ -44,7 +39,6 @@ export function createPublicPriceReportSettingsPanelMessage({
   setting,
   latestDelivery,
   categories,
-  options,
   currentChannelId,
   notice,
 }: PublicPriceReportSettingsPanel): DiscordBotMessage {
@@ -56,7 +50,6 @@ export function createPublicPriceReportSettingsPanelMessage({
         setting,
         latestDelivery,
         categories,
-        options,
         currentChannelId,
         notice,
       }),
@@ -144,7 +137,6 @@ function createPublicPriceReportSettingsEmbed({
   setting,
   latestDelivery,
   categories,
-  options,
   currentChannelId,
   notice,
   title = "公開價格報告設定",
@@ -191,11 +183,6 @@ function createPublicPriceReportSettingsEmbed({
       {
         name: "內容",
         value: formatPriceReportContentFilterLabel(filters),
-        inline: true,
-      },
-      {
-        name: "最多列出",
-        value: `${setting?.maxItems ?? options.priceReportMaxItems} 筆`,
         inline: true,
       },
       {
@@ -257,7 +244,7 @@ function formatPublicReportSettingSummary(
     categories,
   )}；內容 ${formatPriceReportContentFilterLabel(filters)}；關鍵字 ${formatPriceReportKeywordFilterLabel(
     filters,
-  )}；最多 ${setting.maxItems} 筆。`;
+  )}；最多 ${MAX_PRICE_REPORT_ITEMS} 筆。`;
 }
 
 // 檢查 Discord permission bitset 是否包含指定權限，避免用字串比對權限組合。

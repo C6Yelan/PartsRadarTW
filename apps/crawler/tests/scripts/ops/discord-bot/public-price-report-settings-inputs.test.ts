@@ -1,18 +1,17 @@
 // apps/crawler/tests/scripts/ops/discord-bot/public-price-report-settings-inputs.test.ts
-// 驗證公開報告設定面板與 modal 輸入會正確更新分類、內容類型、上限與關鍵字。
+// 驗證公開報告設定面板與 modal 輸入會正確更新分類、內容類型與關鍵字。
 
 import { describe, expect, it, vi } from "vitest";
-import { CommandCooldowns } from "../../../../src/scripts/ops/discord-bot/cooldowns";
-import { handleDiscordInteraction } from "../../../../src/scripts/ops/discord-bot/interactions";
 import {
   MAX_PRICE_REPORT_KEYWORD_GROUPS,
   MAX_PRICE_REPORT_KEYWORD_LENGTH,
 } from "../../../../src/scripts/ops/discord-bot/constants";
+import { CommandCooldowns } from "../../../../src/scripts/ops/discord-bot/cooldowns";
+import { handleDiscordInteraction } from "../../../../src/scripts/ops/discord-bot/interactions";
 import {
   createDiscordBotClient,
   createDiscordBotOptions,
   createPublicReportKeywordModalSubmitInteraction,
-  createPublicReportLimitModalSubmitInteraction,
   createPublicReportSelectInteraction,
   publicPriceReportSetting,
   TEST_SOURCE_CATEGORIES,
@@ -144,44 +143,6 @@ describe("public price report settings inputs", () => {
     expect(JSON.stringify(updateBody.embeds)).toContain("降價、新增商品");
   });
 
-  it("updates the public report display limit from the limit modal", async () => {
-    const client = createDiscordBotClient(
-      [],
-      [],
-      [],
-      [...TEST_SOURCE_CATEGORIES],
-      [],
-      [],
-      [],
-      [publicPriceReportSetting({ id: "public-setting-1" })],
-    );
-    const fetchMock = vi.fn<typeof fetch>(
-      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
-    );
-
-    await handleDiscordInteraction({
-      client,
-      options: createDiscordBotOptions(),
-      cooldowns: new CommandCooldowns(60),
-      fetchImpl: fetchMock as typeof fetch,
-      interaction: createPublicReportLimitModalSubmitInteraction({ maxItems: "12" }),
-    });
-
-    expect(client.discordPublicPriceReportSetting.update).toHaveBeenCalledWith({
-      where: {
-        discordGuildId: "guild-1",
-      },
-      data: expect.objectContaining({
-        maxItems: 12,
-      }),
-      select: expect.any(Object),
-    });
-
-    const responseBody = String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body);
-    expect(responseBody).toContain("已更新公開報告顯示上限：12 筆");
-    expect(responseBody).toContain("12 筆");
-  });
-
   it("updates the public report product keyword from the keyword modal", async () => {
     const client = createDiscordBotClient(
       [],
@@ -202,7 +163,9 @@ describe("public price report settings inputs", () => {
       options: createDiscordBotOptions(),
       cooldowns: new CommandCooldowns(60),
       fetchImpl: fetchMock as typeof fetch,
-      interaction: createPublicReportKeywordModalSubmitInteraction({ keyword: "RTX 5090, DDR5" }),
+      interaction: createPublicReportKeywordModalSubmitInteraction({
+        keywords: ["RTX 5090", "DDR5", "SSD", "RAM", "CPU"],
+      }),
     });
 
     expect(client.discordPublicPriceReportSetting.update).toHaveBeenCalledWith({
@@ -210,14 +173,55 @@ describe("public price report settings inputs", () => {
         discordGuildId: "guild-1",
       },
       data: expect.objectContaining({
-        productKeyword: "RTX 5090, DDR5",
+        productKeyword: "RTX 5090, DDR5, SSD, RAM, CPU",
       }),
       select: expect.any(Object),
     });
 
     const responseBody = String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body);
-    expect(responseBody).toContain("已更新公開報告關鍵字：RTX 5090, DDR5");
-    expect(responseBody).toContain("RTX 5090, DDR5");
+    expect(responseBody).toContain("已更新公開報告關鍵字：RTX 5090, DDR5, SSD, RAM, CPU");
+    expect(responseBody).toContain("RTX 5090, DDR5, SSD, RAM, CPU");
+    const update = client.discordPublicPriceReportSetting.update.mock.calls[0]?.[0];
+    expect(update.data).not.toHaveProperty("maxItems");
+    expect(update.select).not.toHaveProperty("maxItems");
+    expect(update.select).not.toHaveProperty("createdByDiscordUserId");
+    expect(update.select).not.toHaveProperty("updatedByDiscordUserId");
+  });
+
+  it("clears the public report product keyword when all five fields are empty", async () => {
+    const client = createDiscordBotClient(
+      [],
+      [],
+      [],
+      [...TEST_SOURCE_CATEGORIES],
+      [],
+      [],
+      [],
+      [
+        publicPriceReportSetting({
+          id: "public-setting-1",
+          productKeyword: "RTX 5090",
+        }),
+      ],
+    );
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createPublicReportKeywordModalSubmitInteraction({ keywords: [] }),
+    });
+
+    expect(client.discordPublicPriceReportSetting.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ productKeyword: null }),
+      }),
+    );
+    expect(String(fetchMock.mock.calls[0]?.[1]?.body)).toContain("已清除公開報告關鍵字篩選");
   });
 
   it("rejects public report keywords with too many groups", async () => {
@@ -241,7 +245,7 @@ describe("public price report settings inputs", () => {
       cooldowns: new CommandCooldowns(60),
       fetchImpl: fetchMock as typeof fetch,
       interaction: createPublicReportKeywordModalSubmitInteraction({
-        keyword: "RTX 5090, DDR5, SSD, RAM, CPU, GPU",
+        keywords: ["RTX 5090, DDR5, SSD, RAM, CPU, GPU"],
       }),
     });
 

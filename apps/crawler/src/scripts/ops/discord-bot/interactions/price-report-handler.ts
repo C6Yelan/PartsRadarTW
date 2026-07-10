@@ -3,7 +3,7 @@
 
 import {
   createPriceReportKeywordModal,
-  createPriceReportTimeLimitModal,
+  createPriceReportTimeModal,
   type parsePriceReportComponentInteraction,
 } from "../commands";
 import type { CommandCooldowns } from "../cooldowns";
@@ -81,9 +81,6 @@ export async function handlePriceReportComponentInteraction({
       client,
       discordUserId,
       windowHours: resolveWindowHours(setting?.window),
-      maxItems: setting
-        ? Math.min(setting.maxItems, options.priceReportMaxItems)
-        : options.priceReportMaxItems,
       publicBaseUrl: options.publicBaseUrl,
       filters: toPriceReportFilters(setting),
       sendReportMessages: (messages) =>
@@ -98,7 +95,6 @@ export async function handlePriceReportComponentInteraction({
     const panel = await readPriceReportSettingsPanel({
       client,
       discordUserId,
-      options,
       notice: formatPriceReportPreviewDmNotice(previewResult),
     });
 
@@ -113,7 +109,7 @@ export async function handlePriceReportComponentInteraction({
     return;
   }
 
-  if (component.name === "open_time_limit_modal") {
+  if (component.name === "open_time_modal") {
     const setting = await readPriceReportSetting({ client, discordUserId });
 
     await sendModalInteractionResponse({
@@ -121,8 +117,7 @@ export async function handlePriceReportComponentInteraction({
       apiBaseUrl: options.apiBaseUrl,
       interaction,
       fetchImpl,
-      modal: createPriceReportTimeLimitModal({
-        maxItems: setting?.maxItems ?? options.priceReportMaxItems,
+      modal: createPriceReportTimeModal({
         timeValue: formatTaipeiTimeInput(setting?.nextSendAt),
       }),
     });
@@ -160,7 +155,6 @@ export async function handlePriceReportComponentInteraction({
     const currentPanel = await readPriceReportSettingsPanel({
       client,
       discordUserId,
-      options,
     });
     const currentFilters = toPriceReportFilters(currentPanel.setting);
     const categoryIgrps =
@@ -192,7 +186,6 @@ export async function handlePriceReportComponentInteraction({
         component.name === "update_window"
           ? component.windowHours
           : resolveWindowHours(currentPanel.setting?.window),
-      maxItems: currentPanel.setting?.maxItems ?? options.priceReportMaxItems,
       categoryIgrps,
       includePriceDrops:
         component.name === "update_content_filters"
@@ -218,7 +211,6 @@ export async function handlePriceReportComponentInteraction({
   const panel = await readPriceReportSettingsPanel({
     client,
     discordUserId,
-    options,
     notice,
   });
 

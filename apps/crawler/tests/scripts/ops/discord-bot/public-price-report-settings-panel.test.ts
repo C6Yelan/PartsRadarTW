@@ -100,6 +100,70 @@ describe("public price report settings panel", () => {
         ]),
       },
     });
+    expect(JSON.stringify(requestBody.data)).not.toContain("最多列出");
+    expect(JSON.stringify(requestBody.data)).not.toContain("public-report:limit");
+  });
+
+  it("opens five public keyword groups and prefills the canonical stored value", async () => {
+    const client = createDiscordBotClient(
+      [],
+      [],
+      [],
+      [...TEST_SOURCE_CATEGORIES],
+      [],
+      [],
+      [],
+      [
+        publicPriceReportSetting({
+          id: "public-setting-1",
+          maxItems: 12,
+          productKeyword: "RTX 5090, DDR5",
+        }),
+      ],
+    );
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createPublicReportButtonInteraction("public-report:keyword"),
+    });
+
+    const requestBody = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
+
+    expect(requestBody).toMatchObject({
+      type: 9,
+      data: {
+        custom_id: "public-report:keyword-modal",
+        components: expect.arrayContaining([
+          expect.objectContaining({
+            component: expect.objectContaining({
+              custom_id: "public-report:keyword-input",
+              value: "RTX 5090",
+            }),
+          }),
+          expect.objectContaining({
+            component: expect.objectContaining({
+              custom_id: "public-report:keyword-input:2",
+              value: "DDR5",
+            }),
+          }),
+        ]),
+      },
+    });
+    expect(requestBody.data.components).toHaveLength(5);
+    expect(client.discordPublicPriceReportSetting.findUnique).toHaveBeenCalledWith({
+      where: { discordGuildId: "guild-1" },
+      select: expect.not.objectContaining({
+        maxItems: true,
+        createdByDiscordUserId: true,
+        updatedByDiscordUserId: true,
+      }),
+    });
   });
 
   it("shows the most recently retried public delivery by updated timestamp", async () => {
@@ -196,7 +260,11 @@ describe("public price report settings panel", () => {
         enabled: true,
         updatedByDiscordUserId: "111122223333444455",
       }),
-      select: expect.any(Object),
+      select: expect.not.objectContaining({
+        maxItems: true,
+        createdByDiscordUserId: true,
+        updatedByDiscordUserId: true,
+      }),
     });
 
     const updateBody = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body));

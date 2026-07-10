@@ -16,7 +16,6 @@ export interface DiscordBotOptions {
   publicReportsEnabled: boolean;
   personalReportsEnabled: boolean;
   targetWatchesEnabled: boolean;
-  priceReportMaxItems: number;
   commandCooldownSeconds: number;
   priceReportScheduleIntervalSeconds: number;
 }

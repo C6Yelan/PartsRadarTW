@@ -46,7 +46,6 @@ describe("scheduled price report retry", () => {
         client,
         options: {
           publicBaseUrl: PUBLIC_BASE_URL,
-          priceReportMaxItems: 50,
         },
         now: new Date("2026-06-07T05:00:00.000Z"),
         sendDirectMessages,
@@ -107,7 +106,6 @@ describe("scheduled price report retry", () => {
         client,
         options: {
           publicBaseUrl: PUBLIC_BASE_URL,
-          priceReportMaxItems: 50,
         },
         now: new Date("2026-06-07T05:00:00.000Z"),
         sendDirectMessages,

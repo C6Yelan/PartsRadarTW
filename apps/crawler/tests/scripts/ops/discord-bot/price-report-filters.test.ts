@@ -74,7 +74,6 @@ describe("sendPriceReportNow filters", () => {
         client,
         discordUserId: "111122223333444455",
         windowHours: 24,
-        maxItems: 50,
         publicBaseUrl: PUBLIC_BASE_URL,
         filters: {
           categoryIgrps: [12],
@@ -169,7 +168,6 @@ describe("sendPriceReportNow filters", () => {
         client,
         discordUserId: "111122223333444455",
         windowHours: 24,
-        maxItems: 50,
         publicBaseUrl: PUBLIC_BASE_URL,
         filters: {
           categoryIgrps: [],

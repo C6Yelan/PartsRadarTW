@@ -26,7 +26,6 @@ describe("public price report messages", () => {
       ],
       {
         publicBaseUrl: PUBLIC_BASE_URL,
-        maxItems: 50,
         generatedAt: new Date("2026-06-07T05:00:00.000Z"),
       },
     );
@@ -65,7 +64,6 @@ describe("public price report messages", () => {
       },
       {
         publicBaseUrl: PUBLIC_BASE_URL,
-        maxItems: 50,
         generatedAt: new Date("2026-06-07T05:00:00.000Z"),
       },
     );
@@ -83,5 +81,31 @@ describe("public price report messages", () => {
     expect(messages[0]?.embeds?.[0]?.description).toContain(
       "\n**顯示卡**\n**華碩**\n- **NT$99,990** [RTX 5090 新品顯示卡]",
     );
+  });
+
+  it("uses the fixed system limit of 50 public report items", () => {
+    const messages = createPublicPriceReportMessages(
+      {
+        priceChanges: [],
+        newProducts: Array.from({ length: 51 }, (_, index) => ({
+          productId: `product-${index}`,
+          productName: `New Product ${index}`,
+          category: { igrp: 12, displayName: "顯示卡" },
+          subcategory: { slug: "asus", displayName: "華碩" },
+          currentPrice: 10_000 + index,
+          currency: "TWD",
+          firstSeenAt: new Date("2026-06-07T03:00:00.000Z"),
+        })),
+      },
+      {
+        publicBaseUrl: PUBLIC_BASE_URL,
+        generatedAt: new Date("2026-06-07T05:00:00.000Z"),
+      },
+    );
+    const output = JSON.stringify(messages);
+
+    expect(output).toContain("products/product-49");
+    expect(output).not.toContain("products/product-50");
+    expect(output).toContain("另有 1 個新增商品未列出");
   });
 });

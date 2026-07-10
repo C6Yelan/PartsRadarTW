@@ -1,11 +1,7 @@
 // apps/crawler/src/scripts/ops/discord-bot/commands/settings-input.ts
 // 驗證並正規化 Discord 設定面板送回的 select value 與 modal 文字輸入。
 
-import {
-  MAX_PRICE_REPORT_ITEMS,
-  MAX_PRICE_REPORT_KEYWORD_GROUPS,
-  MAX_PRICE_REPORT_KEYWORD_LENGTH,
-} from "../constants";
+import { MAX_PRICE_REPORT_KEYWORD_GROUPS, MAX_PRICE_REPORT_KEYWORD_LENGTH } from "../constants";
 import {
   PRICE_REPORT_CONTENT_NEW_PRODUCTS_VALUE,
   PRICE_REPORT_CONTENT_PRICE_DROPS_VALUE,
@@ -29,21 +25,8 @@ export function parseWindowHoursStrict(value: unknown): number | null {
   return null;
 }
 
-// 解析 modal 輸入的最多商品數，只接受正整數字串並限制在價格報告支援範圍內。
-export function parseMaxItemsInput(value: unknown): number | null {
-  if (typeof value !== "string" || !/^(0|[1-9][0-9]*)$/.test(value.trim())) {
-    return null;
-  }
-
-  const maxItems = Number(value.trim());
-
-  return Number.isSafeInteger(maxItems) && maxItems >= 1 && maxItems <= MAX_PRICE_REPORT_ITEMS
-    ? maxItems
-    : null;
-}
-
 // 解析商品關鍵字輸入；null 代表清空，undefined 代表格式或長度不合法。
-export function parseProductKeywordInput(value: unknown): string | null | undefined {
+function parseProductKeywordInput(value: unknown): string | null | undefined {
   if (value === undefined || value === null) {
     return null;
   }
@@ -62,6 +45,38 @@ export function parseProductKeywordInput(value: unknown): string | null | undefi
     countProductKeywordGroups(productKeyword) <= MAX_PRICE_REPORT_KEYWORD_GROUPS
     ? productKeyword
     : undefined;
+}
+
+// 將最多五個 OR 關鍵字欄依序合併成既有逗號分組格式；第一欄仍接受舊 modal 的逗號輸入。
+export function parseProductKeywordInputs(values: unknown[]): string | null | undefined {
+  if (values.length > MAX_PRICE_REPORT_KEYWORD_GROUPS) {
+    return undefined;
+  }
+
+  const groups: string[] = [];
+
+  for (const value of values) {
+    if (value === undefined || value === null) {
+      continue;
+    }
+
+    if (typeof value !== "string") {
+      return undefined;
+    }
+
+    groups.push(value);
+  }
+
+  return parseProductKeywordInput(groups.join(","));
+}
+
+// 將既有逗號分組格式拆成 modal 的五個輸入欄預填值。
+export function splitProductKeywordInputGroups(value: string): string[] {
+  return normalizeProductKeywordInput(value)
+    .split(",")
+    .map((group) => group.trim())
+    .filter(Boolean)
+    .slice(0, MAX_PRICE_REPORT_KEYWORD_GROUPS);
 }
 
 // 解析報告內容篩選 select value，要求至少一種內容類型且不得包含未知值。
@@ -96,7 +111,12 @@ export function parseTimeOfDay(value: unknown): { hour: number; minute: number }
     return null;
   }
 
-  const match = /^([01]?\d|2[0-3]):([0-5]\d)$/.exec(value.trim());
+  const normalized = value
+    .trim()
+    .replace(/[０-９]/g, (digit) => String(digit.charCodeAt(0) - "０".charCodeAt(0)))
+    .replace(/：/g, ":")
+    .replace(/[\s\u3000]*:[\s\u3000]*/g, ":");
+  const match = /^([01]?\d|2[0-3]):([0-5]\d)$/.exec(normalized);
 
   if (!match) {
     return null;

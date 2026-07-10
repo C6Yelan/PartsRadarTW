@@ -20,7 +20,9 @@ export const TEST_SOURCE_CATEGORIES = [
 ] as const;
 
 // 建立 Discord bot 測試用 options，允許個別案例覆寫 feature flags 或限制值。
-export function createDiscordBotOptions(overrides: Partial<DiscordBotOptions> = {}): DiscordBotOptions {
+export function createDiscordBotOptions(
+  overrides: Partial<DiscordBotOptions> = {},
+): DiscordBotOptions {
   return {
     token: TOKEN,
     applicationId: APPLICATION_ID,
@@ -32,7 +34,6 @@ export function createDiscordBotOptions(overrides: Partial<DiscordBotOptions> = 
     publicReportsEnabled: true,
     personalReportsEnabled: true,
     targetWatchesEnabled: true,
-    priceReportMaxItems: 50,
     commandCooldownSeconds: 60,
     priceReportScheduleIntervalSeconds: 300,
     ...overrides,

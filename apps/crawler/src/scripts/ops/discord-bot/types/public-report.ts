@@ -45,20 +45,11 @@ export type ParsedPublicReportComponent =
     }
   | {
       name: "open_keyword_modal";
-    }
-  | {
-      name: "open_limit_modal";
     };
 
 // public-report 設定 modal submit 的解析結果，保留輸入合法性供 handler 回覆錯誤。
-export type ParsedPublicReportModal =
-  | {
-      name: "limit";
-      maxItems: number | null;
-      maxItemsInputValid: boolean;
-    }
-  | {
-      name: "keyword";
-      productKeyword: string | null;
-      productKeywordInputValid: boolean;
-    };
+export type ParsedPublicReportModal = {
+  name: "keyword";
+  productKeyword: string | null;
+  productKeywordInputValid: boolean;
+};

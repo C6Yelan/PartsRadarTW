@@ -11,37 +11,31 @@ import type {
 import {
   PRICE_REPORT_SETTINGS_ALL_CATEGORIES_CUSTOM_ID,
   PRICE_REPORT_SETTINGS_CATEGORIES_CUSTOM_ID,
+  PRICE_REPORT_SETTINGS_CONTENT_FILTER_CUSTOM_ID,
   PRICE_REPORT_SETTINGS_DISABLE_CUSTOM_ID,
   PRICE_REPORT_SETTINGS_ENABLE_CUSTOM_ID,
-  PRICE_REPORT_SETTINGS_CONTENT_FILTER_CUSTOM_ID,
   PRICE_REPORT_SETTINGS_KEYWORD_CUSTOM_ID,
-  PRICE_REPORT_SETTINGS_KEYWORD_INPUT_CUSTOM_ID,
+  PRICE_REPORT_SETTINGS_KEYWORD_INPUT_CUSTOM_IDS,
   PRICE_REPORT_SETTINGS_KEYWORD_MODAL_CUSTOM_ID,
-  PRICE_REPORT_SETTINGS_MAX_ITEMS_CUSTOM_ID,
-  PRICE_REPORT_SETTINGS_OPEN_CUSTOM_ID,
   PRICE_REPORT_SETTINGS_PREVIEW_CUSTOM_ID,
-  PRICE_REPORT_SETTINGS_TIME_CUSTOM_ID,
-  PRICE_REPORT_SETTINGS_TIME_LIMIT_CUSTOM_ID,
-  PRICE_REPORT_SETTINGS_TIME_LIMIT_MODAL_CUSTOM_ID,
+  PRICE_REPORT_SETTINGS_TIME_BUTTON_CUSTOM_ID,
+  PRICE_REPORT_SETTINGS_TIME_INPUT_CUSTOM_ID,
+  PRICE_REPORT_SETTINGS_TIME_MODAL_CUSTOM_ID,
   PRICE_REPORT_SETTINGS_WINDOW_CUSTOM_ID,
   PUBLIC_REPORT_ALL_CATEGORIES_CUSTOM_ID,
   PUBLIC_REPORT_CATEGORIES_CUSTOM_ID,
   PUBLIC_REPORT_CLEAR_CUSTOM_ID,
+  PUBLIC_REPORT_CONTENT_FILTER_CUSTOM_ID,
   PUBLIC_REPORT_DISABLE_CUSTOM_ID,
   PUBLIC_REPORT_ENABLE_CUSTOM_ID,
-  PUBLIC_REPORT_CONTENT_FILTER_CUSTOM_ID,
   PUBLIC_REPORT_KEYWORD_CUSTOM_ID,
-  PUBLIC_REPORT_KEYWORD_INPUT_CUSTOM_ID,
+  PUBLIC_REPORT_KEYWORD_INPUT_CUSTOM_IDS,
   PUBLIC_REPORT_KEYWORD_MODAL_CUSTOM_ID,
-  PUBLIC_REPORT_LIMIT_CUSTOM_ID,
-  PUBLIC_REPORT_LIMIT_MODAL_CUSTOM_ID,
-  PUBLIC_REPORT_MAX_ITEMS_CUSTOM_ID,
   PUBLIC_REPORT_PREVIEW_CUSTOM_ID,
   PUBLIC_REPORT_SET_CHANNEL_CUSTOM_ID,
 } from "./ids";
 import {
-  parseMaxItemsInput,
-  parseProductKeywordInput,
+  parseProductKeywordInputs,
   parseReportContentFilters,
   parseTimeOfDay,
   parseWindowHoursStrict,
@@ -54,21 +48,15 @@ export function parsePriceReportComponentInteraction(
 ): ParsedPriceReportComponent | null {
   const customId = interaction.data?.custom_id;
 
-  if (customId === PRICE_REPORT_SETTINGS_OPEN_CUSTOM_ID) {
-    return {
-      name: "open_time_limit_modal",
-    };
-  }
-
   if (customId === PRICE_REPORT_SETTINGS_ENABLE_CUSTOM_ID) {
     return {
       name: "enable_daily_scheduled_report",
     };
   }
 
-  if (customId === PRICE_REPORT_SETTINGS_TIME_LIMIT_CUSTOM_ID) {
+  if (customId === PRICE_REPORT_SETTINGS_TIME_BUTTON_CUSTOM_ID) {
     return {
-      name: "open_time_limit_modal",
+      name: "open_time_modal",
     };
   }
 
@@ -165,10 +153,6 @@ export function parsePublicReportComponentInteraction(
     return { name: "open_keyword_modal" };
   }
 
-  if (customId === PUBLIC_REPORT_LIMIT_CUSTOM_ID) {
-    return { name: "open_limit_modal" };
-  }
-
   return null;
 }
 
@@ -184,33 +168,26 @@ export function parsePriceReportModalSubmit(
 
   const customId = data.custom_id;
 
-  if (customId === PRICE_REPORT_SETTINGS_TIME_LIMIT_MODAL_CUSTOM_ID) {
-    const maxItemsValue = readSubmittedComponentValue(
-      data.components,
-      PRICE_REPORT_SETTINGS_MAX_ITEMS_CUSTOM_ID,
-    );
+  if (customId === PRICE_REPORT_SETTINGS_TIME_MODAL_CUSTOM_ID) {
     const timeValue = readSubmittedComponentValue(
       data.components,
-      PRICE_REPORT_SETTINGS_TIME_CUSTOM_ID,
+      PRICE_REPORT_SETTINGS_TIME_INPUT_CUSTOM_ID,
     );
-    const maxItems = parseMaxItemsInput(maxItemsValue);
     const timeOfDay = parseTimeOfDay(timeValue);
 
     return {
-      name: "time_limit",
-      maxItems,
-      maxItemsInputValid: maxItems !== null,
+      name: "time",
       timeOfDay,
       timeInputValid: timeOfDay !== null,
     };
   }
 
   if (customId === PRICE_REPORT_SETTINGS_KEYWORD_MODAL_CUSTOM_ID) {
-    const productKeywordValue = readSubmittedComponentValue(
-      data.components,
-      PRICE_REPORT_SETTINGS_KEYWORD_INPUT_CUSTOM_ID,
+    const productKeyword = parseProductKeywordInputs(
+      PRICE_REPORT_SETTINGS_KEYWORD_INPUT_CUSTOM_IDS.map((customId) =>
+        readSubmittedComponentValue(data.components, customId),
+      ),
     );
-    const productKeyword = parseProductKeywordInput(productKeywordValue);
 
     return {
       name: "keyword",
@@ -232,26 +209,12 @@ export function parsePublicReportModalSubmit(
     return null;
   }
 
-  if (data.custom_id === PUBLIC_REPORT_LIMIT_MODAL_CUSTOM_ID) {
-    const maxItemsValue = readSubmittedComponentValue(
-      data.components,
-      PUBLIC_REPORT_MAX_ITEMS_CUSTOM_ID,
-    );
-    const maxItems = parseMaxItemsInput(maxItemsValue);
-
-    return {
-      name: "limit",
-      maxItems,
-      maxItemsInputValid: maxItems !== null,
-    };
-  }
-
   if (data.custom_id === PUBLIC_REPORT_KEYWORD_MODAL_CUSTOM_ID) {
-    const productKeywordValue = readSubmittedComponentValue(
-      data.components,
-      PUBLIC_REPORT_KEYWORD_INPUT_CUSTOM_ID,
+    const productKeyword = parseProductKeywordInputs(
+      PUBLIC_REPORT_KEYWORD_INPUT_CUSTOM_IDS.map((customId) =>
+        readSubmittedComponentValue(data.components, customId),
+      ),
     );
-    const productKeyword = parseProductKeywordInput(productKeywordValue);
 
     return {
       name: "keyword",

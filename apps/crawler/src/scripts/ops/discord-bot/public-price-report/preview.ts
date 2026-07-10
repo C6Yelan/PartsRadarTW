@@ -1,7 +1,7 @@
 // apps/crawler/src/scripts/ops/discord-bot/public-price-report/preview.ts
 // 產生並發送公開價格報告測試訊息，供伺服器管理員驗證頻道與篩選設定。
 
-import { HOUR_MS } from "../constants";
+import { HOUR_MS, MAX_PRICE_REPORT_ITEMS } from "../constants";
 import { createPublicPriceReportMessages } from "../price-report/messages";
 import { readRecentPriceReport } from "../price-report/reader";
 import type {
@@ -52,7 +52,6 @@ export async function sendPublicPriceReportPreview({
   client,
   channelId,
   publicBaseUrl,
-  maxItems,
   filters = DEFAULT_PUBLIC_PRICE_REPORT_FILTERS,
   now = new Date(),
   sendChannelMessages,
@@ -60,7 +59,6 @@ export async function sendPublicPriceReportPreview({
   client: DiscordBotClient;
   channelId: string;
   publicBaseUrl: string;
-  maxItems: number;
   filters?: PriceReportFilters;
   now?: Date;
   sendChannelMessages: (
@@ -75,10 +73,12 @@ export async function sendPublicPriceReportPreview({
   });
   const messages = createPublicPriceReportMessages(report, {
     publicBaseUrl,
-    maxItems,
     generatedAt: now,
   });
-  const listedCount = Math.min(report.priceChanges.length + report.newProducts.length, maxItems);
+  const listedCount = Math.min(
+    report.priceChanges.length + report.newProducts.length,
+    MAX_PRICE_REPORT_ITEMS,
+  );
 
   if (messages.length === 0) {
     return {

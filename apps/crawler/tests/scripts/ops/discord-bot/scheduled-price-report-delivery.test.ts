@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { sendDueScheduledPriceReports } from "../../../../src/scripts/ops/discord-bot/price-report";
 import type { DiscordBotMessage } from "../../../../src/scripts/ops/discord-bot/types";
 
-import { createDiscordBotClient, priceReportSetting, PUBLIC_BASE_URL, snapshot } from "./support";
+import { createDiscordBotClient, PUBLIC_BASE_URL, priceReportSetting, snapshot } from "./support";
 
 describe("scheduled price report delivery", () => {
   it("sends due scheduled daily reports by DM and advances the next run", async () => {
@@ -49,7 +49,6 @@ describe("scheduled price report delivery", () => {
         client,
         options: {
           publicBaseUrl: PUBLIC_BASE_URL,
-          priceReportMaxItems: 50,
         },
         now: new Date("2026-06-07T05:00:00.000Z"),
         sendDirectMessages,
@@ -130,7 +129,6 @@ describe("scheduled price report delivery", () => {
         client,
         options: {
           publicBaseUrl: PUBLIC_BASE_URL,
-          priceReportMaxItems: 50,
         },
         now: new Date("2026-06-07T05:00:00.000Z"),
         sendDirectMessages,
@@ -195,7 +193,6 @@ describe("scheduled price report delivery", () => {
       client,
       options: {
         publicBaseUrl: PUBLIC_BASE_URL,
-        priceReportMaxItems: 50,
       },
       now: new Date("2026-06-07T05:00:00.000Z"),
       sendDirectMessages,
@@ -212,5 +209,4 @@ describe("scheduled price report delivery", () => {
       },
     });
   });
-
 });

@@ -1,8 +1,8 @@
 // apps/crawler/src/scripts/ops/discord-bot/price-report/filters.ts
 // 定義 price-report 篩選條件，並提供分類、內容類型與商品關鍵字的正規化、套用與顯示文字。
 
-import type { PriceReportPriceChangeItem, PriceReportNewProductItem } from "./reader-types";
 import { MAX_PRICE_REPORT_KEYWORD_GROUPS, MAX_PRICE_REPORT_KEYWORD_LENGTH } from "../constants";
+import type { PriceReportNewProductItem, PriceReportPriceChangeItem } from "./reader-types";
 
 // Discord 設定面板使用的來源分類選項，對應 CoolPC sourceCategory 的 IGrp 與顯示名稱。
 export interface PriceReportCategoryOption {
@@ -33,7 +33,7 @@ export const DEFAULT_PRICE_REPORT_FILTERS: PriceReportFilters = {
   productKeyword: null,
   includePriceDrops: true,
   includePriceRises: true,
-  includeNewProducts: true,
+  includeNewProducts: false,
 };
 
 // 依篩選條件過濾價格變動項目，保留符合分類、價格方向與商品關鍵字的項目。

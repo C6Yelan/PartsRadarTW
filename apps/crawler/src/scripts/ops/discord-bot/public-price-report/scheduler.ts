@@ -5,6 +5,7 @@ import { CRAWL_RUN_STATUSES } from "../../../../coolpc/crawl-run";
 import {
   MAX_DUE_PUBLIC_PRICE_REPORT_SETTINGS_PER_CYCLE,
   MAX_DUE_PUBLIC_PRICE_REPORTS_PER_CYCLE,
+  MAX_PRICE_REPORT_ITEMS,
 } from "../constants";
 import { NO_DISCORD_DELIVERY_ERROR, toDiscordDeliveryErrorFields } from "../delivery-error-fields";
 import { filterNewProductsForReport, filterPriceChangesForReport } from "../price-report/filters";
@@ -38,7 +39,7 @@ export async function sendPendingPublicPriceReports({
   sendChannelMessages,
 }: {
   client: DiscordBotClient;
-  options: Pick<DiscordBotOptions, "publicBaseUrl" | "priceReportMaxItems">;
+  options: Pick<DiscordBotOptions, "publicBaseUrl">;
   now?: Date;
   sendChannelMessages: (
     channelId: string,
@@ -94,7 +95,7 @@ async function sendPendingPublicPriceReportsForSetting({
 }: {
   client: DiscordBotClient;
   setting: PublicPriceReportSetting;
-  options: Pick<DiscordBotOptions, "publicBaseUrl" | "priceReportMaxItems">;
+  options: Pick<DiscordBotOptions, "publicBaseUrl">;
   now: Date;
   sendChannelMessages: (
     channelId: string,
@@ -153,7 +154,6 @@ async function sendPendingPublicPriceReportsForSetting({
       client,
       setting,
       crawlRunId: crawlRun.id,
-      maxItems: Math.min(setting.maxItems, options.priceReportMaxItems),
       publicBaseUrl: options.publicBaseUrl,
       now,
       sendChannelMessages,
@@ -178,7 +178,6 @@ async function sendPublicPriceReportForCrawlRun({
   client,
   setting,
   crawlRunId,
-  maxItems,
   publicBaseUrl,
   now,
   sendChannelMessages,
@@ -186,7 +185,6 @@ async function sendPublicPriceReportForCrawlRun({
   client: DiscordBotClient;
   setting: PublicPriceReportSetting;
   crawlRunId: string;
-  maxItems: number;
   publicBaseUrl: string;
   now: Date;
   sendChannelMessages: (
@@ -219,12 +217,11 @@ async function sendPublicPriceReportForCrawlRun({
     { priceChanges: changes, newProducts },
     {
       publicBaseUrl,
-      maxItems,
       generatedAt: now,
     },
   );
   const result = await sendChannelMessages(channelId, messages);
-  const itemCount = Math.min(changes.length + newProducts.length, maxItems);
+  const itemCount = Math.min(changes.length + newProducts.length, MAX_PRICE_REPORT_ITEMS);
 
   if (result.status === "sent") {
     await recordPublicPriceReportDelivery({

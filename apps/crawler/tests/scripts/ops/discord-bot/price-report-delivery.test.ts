@@ -61,8 +61,14 @@ describe("sendPriceReportNow delivery", () => {
         client,
         discordUserId: "111122223333444455",
         windowHours: 24,
-        maxItems: 50,
         publicBaseUrl: PUBLIC_BASE_URL,
+        filters: {
+          categoryIgrps: [],
+          productKeyword: null,
+          includePriceDrops: true,
+          includePriceRises: true,
+          includeNewProducts: true,
+        },
         now: new Date("2026-06-07T05:00:00.000Z"),
         sendReportMessages,
       }),
@@ -136,8 +142,14 @@ describe("sendPriceReportNow delivery", () => {
       client,
       discordUserId: "111122223333444455",
       windowHours: 24,
-      maxItems: 50,
       publicBaseUrl: PUBLIC_BASE_URL,
+      filters: {
+        categoryIgrps: [],
+        productKeyword: null,
+        includePriceDrops: true,
+        includePriceRises: true,
+        includeNewProducts: true,
+      },
       now: new Date("2026-06-07T05:00:00.000Z"),
       sendReportMessages,
     });
@@ -152,7 +164,7 @@ describe("sendPriceReportNow delivery", () => {
   });
 
   it("splits long price reports by Discord message embed size", async () => {
-    const snapshots = Array.from({ length: 50 }, (_, index) =>
+    const snapshots = Array.from({ length: 51 }, (_, index) =>
       snapshot({
         id: `long-new-${index}`,
         productId: `long-product-${index}`,
@@ -174,21 +186,28 @@ describe("sendPriceReportNow delivery", () => {
         client,
         discordUserId: "111122223333444455",
         windowHours: 24,
-        maxItems: 50,
         publicBaseUrl: PUBLIC_BASE_URL,
+        filters: {
+          categoryIgrps: [],
+          productKeyword: null,
+          includePriceDrops: true,
+          includePriceRises: true,
+          includeNewProducts: true,
+        },
         now: new Date("2026-06-07T05:00:00.000Z"),
         sendReportMessages,
       }),
     ).resolves.toMatchObject({
       status: "sent",
-      newProductCount: 50,
+      newProductCount: 51,
       listedCount: 50,
     });
 
     const reportMessages = sendReportMessages.mock.calls[0]?.[0] ?? [];
 
     expect(reportMessages.length).toBeGreaterThan(1);
-    expect(JSON.stringify(reportMessages)).toContain("Long New Product 49");
+    expect(JSON.stringify(reportMessages)).toContain("long-product-50");
+    expect(JSON.stringify(reportMessages)).not.toContain("long-product-0");
 
     for (const message of reportMessages) {
       expect(message.embeds?.length ?? 0).toBeLessThanOrEqual(10);

@@ -46,6 +46,7 @@ describe("registerDiscordBotCommands", () => {
     expect(JSON.parse(String(globalRequestInit.body))).toEqual([
       expect.objectContaining({
         name: "price-report",
+        description: "查看即時價格報告並管理每日私訊設定。",
         contexts: [0, 1],
         dm_permission: true,
         options: [
@@ -80,6 +81,10 @@ describe("registerDiscordBotCommands", () => {
       }),
     ]);
     const registeredCommands = JSON.parse(String(globalRequestInit.body));
+    const priceReportCommand = registeredCommands.find(
+      (command: { name: string }) => command.name === "price-report",
+    );
+    expect(JSON.stringify(priceReportCommand)).not.toContain("max_items");
     expect(
       registeredCommands.find((command: { name: string }) => command.name === "watch"),
     ).not.toHaveProperty("options");

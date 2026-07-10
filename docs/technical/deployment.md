@@ -162,7 +162,7 @@ PRODUCT_IMAGE_STORAGE_DIR=/var/lib/partsradar/product-images
 | `DISCORD_BOT_TOKEN` / `DISCORD_APPLICATION_ID` | Discord bot token 與 application id；公開價格報告頻道由 `/public-report` 指令設定 |
 | `NEXT_PUBLIC_DISCORD_BOT_INVITE_URL` | 網站 `/discord` 邀請按鈕使用的公開 Discord bot invite URL；由 web runtime 讀取，不得放 token。 |
 | `DISCORD_BOT_REGISTER_COMMANDS_ON_START` / `DISCORD_FEATURE_PUBLIC_REPORTS_ENABLED` / `DISCORD_FEATURE_PERSONAL_REPORTS_ENABLED` / `DISCORD_FEATURE_TARGET_WATCHES_ENABLED` | Discord bot 指令註冊與 public / personal / target watch 子功能 runtime flags；flags 預設 `true`，可作為 emergency kill switch |
-| `DISCORD_PRICE_REPORT_MAX_ITEMS` / `DISCORD_BOT_COMMAND_COOLDOWN_SECONDS` / `DISCORD_PRICE_REPORT_SCHEDULE_INTERVAL_SECONDS` | Discord bot 報告列數、cooldown 與每日報告 fallback 掃描上限；近期待發報告會睡到 due time |
+| `DISCORD_BOT_COMMAND_COOLDOWN_SECONDS` / `DISCORD_PRICE_REPORT_SCHEDULE_INTERVAL_SECONDS` | Discord bot cooldown 與每日報告 fallback 掃描上限；近期待發報告會睡到 due time |
 | `CLOUDFLARED_IMAGE` | 固定版本 cloudflared image |
 | `CLOUDFLARE_TUNNEL_TOKEN` | Tunnel token |
 | `NODE_ENV` | production |
@@ -174,7 +174,7 @@ Discord bot 權限：
 - Developer Portal 不需要開啟 privileged gateway intents；程式以 `intents: 0` 連線。
 - 不要求 `Administrator`、`Read Message History` 或 `Message Content Intent`。
 - `/public-report` 註冊為管理者指令，只有具備管理伺服器權限的成員通常會在 Discord 指令清單看到；這是 command visibility 設定，不是 bot 安裝權限。
-- `/public-report status/manage/test` 分別用於查看狀態、調整公開報告頻道與發送測試報告；管理面板可調整分類、降價 / 漲價、商品關鍵字與顯示上限。
+- `/public-report status/manage/test` 分別用於查看狀態、調整公開報告頻道與發送測試報告；管理面板可調整分類、降價 / 漲價 / 新增商品與最多五組商品關鍵字。報告統一最多列 50 筆。
 - 公開價格報告目標頻道需允許 bot `Send Messages` 與 `Embed Links`；若缺少權限，bot 會在 `/public-report test` 或面板測試流程回覆可讀中文提示。
 - Slash command interaction response 與使用者 DM 不需要伺服器管理權限；admin 維運告警仍走 admin webhook。
 - 若使用者看不到指令，通常是 `applications.commands` 未安裝或伺服器整合設定限制；bot 收不到 interaction 時無法主動回覆，只能依安裝文件重新邀請或請伺服器管理員調整 Discord Integrations / App command permissions。
@@ -212,7 +212,7 @@ Discord bot 權限：
 Migration：
 
 - 正式部署使用 `prisma migrate deploy` 或 root `pnpm db:deploy`。
-- `20260702093000_add_discord_public_report_filters` 會替 `discord_public_price_report_settings` 新增公開報告篩選欄位；部署後既有公開報告預設維持全部分類、降價與漲價、無關鍵字、最多 50 筆。
+- `20260702093000_add_discord_public_report_filters` 會替 `discord_public_price_report_settings` 新增公開報告篩選欄位；既有 `max_items` 欄位與值仍保留供 schema 相容，但新版 runtime 不再讀寫，公開與個人報告統一最多列 50 筆。
 - 從舊版升級時，套用 G03 migration 前先用舊版 Compose definition 停止並移除 `maintenance-daemon` container，避免舊 process 在 table drop 後繼續存取已移除 schema。
 - `20260710120000_remove_product_link_health` 會刪除 link-health table 與 enums；部署前必須備份 DB，rollback 需使用備份或另寫反向 migration，不能假設 dropped data 可自動復原。
 - `20260710200000_add_discord_delivery_error_metadata` 只新增 nullable structured error 欄位並保留既有 delivery audit rows；部署時先停止所有舊版 `discord-bot` instance，再執行 `db:deploy`，成功後立即啟動新版 `discord-bot` / `smoke-daemon`。不得混跑新舊 bot，也不得讓舊 bot 在 migration 後繼續寫入 raw-ish `error_message`。

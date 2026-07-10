@@ -1,9 +1,12 @@
 // apps/crawler/tests/scripts/ops/discord-bot-options.test.ts
 // 驗證 Discord bot 啟動設定解析、CLI 錯誤遮蔽與 watch 商品 reference 正規化邊界。
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { formatDiscordBotCliError } from "../../../src/scripts/ops/discord-bot/cli-error";
-import { parseDiscordBotOptions } from "../../../src/scripts/ops/discord-bot/options";
+import {
+  parseDiscordBotOptions,
+  printDiscordBotHelp,
+} from "../../../src/scripts/ops/discord-bot/options";
 import { normalizeWatchProductReference } from "../../../src/scripts/ops/discord-bot/watch";
 
 import { APPLICATION_ID, PUBLIC_BASE_URL, TOKEN, WATCH_PRODUCT_ID } from "./discord-bot/support";
@@ -26,7 +29,6 @@ describe("Discord bot options", () => {
       publicReportsEnabled: true,
       personalReportsEnabled: true,
       targetWatchesEnabled: true,
-      priceReportMaxItems: 50,
       commandCooldownSeconds: 60,
       priceReportScheduleIntervalSeconds: 300,
     });
@@ -74,6 +76,21 @@ describe("Discord bot options", () => {
         DISCORD_APPLICATION_ID: "not-an-id",
       }),
     ).toThrow("DISCORD_APPLICATION_ID must be a Discord snowflake id");
+  });
+
+  it("keeps help focused on startup and one-shot command registration", () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+
+    printDiscordBotHelp();
+
+    const output = log.mock.calls.flat().join("\n");
+    log.mockRestore();
+
+    expect(output).toContain("Usage:");
+    expect(output).toContain("--register-commands");
+    expect(output).not.toContain("--price-report-max-items");
+    expect(output).not.toContain("DISCORD_PRICE_REPORT_MAX_ITEMS");
+    expect(output).not.toContain("Environment:");
   });
 });
 

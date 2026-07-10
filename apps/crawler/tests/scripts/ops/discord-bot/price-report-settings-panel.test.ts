@@ -43,9 +43,8 @@ describe("handleDiscordInteraction price report settings panel", () => {
             fields: expect.arrayContaining([
               expect.objectContaining({ name: "統計區間", value: "過去 24 小時" }),
               expect.objectContaining({ name: "分類", value: "全部分類" }),
-              expect.objectContaining({ name: "內容", value: "降價、漲價、新增商品" }),
+              expect.objectContaining({ name: "內容", value: "降價、漲價" }),
               expect.objectContaining({ name: "商品關鍵字", value: "不限" }),
-              expect.objectContaining({ name: "每次最多", value: "50 筆" }),
               expect.objectContaining({ name: "每日時間", value: "09:00" }),
               expect.objectContaining({ name: "下一次", value: "啟用後排程" }),
               expect.objectContaining({
@@ -109,7 +108,7 @@ describe("handleDiscordInteraction price report settings panel", () => {
               expect.objectContaining({
                 type: 2,
                 custom_id: "price-report:settings:time-limit",
-                label: "調整時間與上限",
+                label: "調整時間",
               }),
               expect.objectContaining({
                 type: 2,
@@ -124,6 +123,36 @@ describe("handleDiscordInteraction price report settings panel", () => {
     expect(requestBody.data).not.toHaveProperty("content");
     expect(JSON.stringify(requestBody.data.components)).not.toContain(
       "price-report:settings:all-categories",
+    );
+    expect(JSON.stringify(requestBody.data.embeds)).not.toContain("每次最多");
+    expect(client.discordPriceReportSetting.findUnique).toHaveBeenCalledWith({
+      where: { discordUserId: "111122223333444455" },
+      select: expect.not.objectContaining({ maxItems: true }),
+    });
+  });
+
+  it("omits the category select when no source categories are available", async () => {
+    const client = createDiscordBotClient([], [], [], []);
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createInteraction("settings"),
+    });
+
+    const requestBody = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
+    const components = requestBody.data.components.flatMap(
+      (row: { components?: unknown[] }) => row.components ?? [],
+    );
+
+    expect(JSON.stringify(components)).not.toContain("price-report:settings:categories");
+    expect(components).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ type: 3, options: [], max_values: 0 })]),
     );
   });
 

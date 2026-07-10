@@ -1,14 +1,9 @@
 // apps/crawler/src/scripts/ops/discord-bot/price-report/messages.ts
 // 將個人與公開價格報告資料組裝成可送往 Discord 的多則 embed 訊息。
 
-import type {
-  PriceReportPriceChangeItem,
-  PriceReportNewProductItem,
-  RecentPriceReport,
-} from "./reader-types";
-import { DISCORD_EMBED_COLOR } from "../constants";
+import { DISCORD_EMBED_COLOR, MAX_PRICE_REPORT_ITEMS } from "../constants";
 import type { DiscordBotEmbed, DiscordBotMessage } from "../types";
-import { clampPriceReportMaxItems } from "./limits";
+import { createReportMessages, createReportSectionEmbeds } from "./message-layout";
 import {
   countPriceChangeMovements,
   createPriceChangeMovementGroups,
@@ -20,14 +15,17 @@ import {
   formatPublicPriceReportSummary,
   type PriceChangeMovementCounts,
 } from "./message-lines";
-import { createReportMessages, createReportSectionEmbeds } from "./message-layout";
+import type {
+  PriceReportNewProductItem,
+  PriceReportPriceChangeItem,
+  RecentPriceReport,
+} from "./reader-types";
 
 // 建立只包含價格變動的公開報告訊息，供舊有公開價格變動入口與測試共用。
 export function createPublicPriceChangeReportMessages(
   priceChanges: PriceReportPriceChangeItem[],
   options: {
     publicBaseUrl: string;
-    maxItems: number;
     generatedAt: Date;
   },
 ): DiscordBotMessage[] {
@@ -45,7 +43,6 @@ export function createPublicPriceReportMessages(
   report: Pick<RecentPriceReport, "priceChanges" | "newProducts">,
   options: {
     publicBaseUrl: string;
-    maxItems: number;
     generatedAt: Date;
   },
 ): DiscordBotMessage[] {
@@ -53,9 +50,8 @@ export function createPublicPriceReportMessages(
     return [];
   }
 
-  const boundedMaxItems = clampPriceReportMaxItems(options.maxItems);
-  const listedPriceChanges = report.priceChanges.slice(0, boundedMaxItems);
-  const remainingItemLimit = Math.max(0, boundedMaxItems - listedPriceChanges.length);
+  const listedPriceChanges = report.priceChanges.slice(0, MAX_PRICE_REPORT_ITEMS);
+  const remainingItemLimit = Math.max(0, MAX_PRICE_REPORT_ITEMS - listedPriceChanges.length);
   const listedNewProducts = report.newProducts.slice(0, remainingItemLimit);
   const hiddenPriceChangeCount = report.priceChanges.length - listedPriceChanges.length;
   const hiddenNewProductCount = report.newProducts.length - listedNewProducts.length;
@@ -118,14 +114,13 @@ export function createPersonalPriceReportEmbedMessages(
   report: RecentPriceReport,
   options: {
     publicBaseUrl: string;
-    maxItems: number;
     windowHours: number;
     generatedAt: Date;
     hasActiveFilters: boolean;
   },
 ): DiscordBotMessage[] {
-  const listedPriceChanges = report.priceChanges.slice(0, options.maxItems);
-  const remainingItemLimit = Math.max(0, options.maxItems - listedPriceChanges.length);
+  const listedPriceChanges = report.priceChanges.slice(0, MAX_PRICE_REPORT_ITEMS);
+  const remainingItemLimit = Math.max(0, MAX_PRICE_REPORT_ITEMS - listedPriceChanges.length);
   const listedNewProducts = report.newProducts.slice(0, remainingItemLimit);
   const hiddenPriceChangeCount = report.priceChanges.length - listedPriceChanges.length;
   const hiddenNewProductCount = report.newProducts.length - listedNewProducts.length;

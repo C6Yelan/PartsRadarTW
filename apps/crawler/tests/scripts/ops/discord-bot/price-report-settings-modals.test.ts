@@ -4,7 +4,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { CommandCooldowns } from "../../../../src/scripts/ops/discord-bot/cooldowns";
 import { handleDiscordInteraction } from "../../../../src/scripts/ops/discord-bot/interactions";
-import { MAX_PRICE_REPORT_KEYWORD_GROUPS } from "../../../../src/scripts/ops/discord-bot/constants";
 import {
   createComponentInteraction,
   createDiscordBotClient,
@@ -14,7 +13,7 @@ import {
 } from "./support";
 
 describe("handleDiscordInteraction price report settings modals", () => {
-  it("opens a time and limit modal from the settings panel", async () => {
+  it("opens a time-only modal while preserving the existing wire ids", async () => {
     const client = createDiscordBotClient(
       [],
       [
@@ -22,9 +21,8 @@ describe("handleDiscordInteraction price report settings modals", () => {
           id: "setting-1",
           discordUserId: "111122223333444455",
           window: "HOURS_12",
-          maxItems: 12,
           categoryIgrps: [12],
-          includeNewProducts: false,
+          includeNewProducts: true,
           nextSendAt: new Date("2026-06-07T13:30:00.000Z"),
         }),
       ],
@@ -49,11 +47,14 @@ describe("handleDiscordInteraction price report settings modals", () => {
       type: 9,
       data: {
         custom_id: "price-report:settings:time-limit-modal",
-        title: "每日報告時間與上限",
+        title: "每日報告時間",
       },
     });
-    expect(JSON.stringify(requestBody.data.components)).toContain('"value":"12"');
+    expect(requestBody.data.components).toHaveLength(1);
     expect(JSON.stringify(requestBody.data.components)).toContain('"value":"21:30"');
+    expect(JSON.stringify(requestBody.data.components)).not.toContain(
+      "price-report:settings:max-items",
+    );
     expect(JSON.stringify(requestBody.data.components)).not.toContain(
       "price-report:settings:categories",
     );
@@ -66,7 +67,7 @@ describe("handleDiscordInteraction price report settings modals", () => {
         priceReportSetting({
           id: "setting-1",
           discordUserId: "111122223333444455",
-          productKeyword: "RTX 5090",
+          productKeyword: "RTX 5090, DDR5",
           nextSendAt: new Date("2026-06-07T13:30:00.000Z"),
         }),
       ],
@@ -94,39 +95,39 @@ describe("handleDiscordInteraction price report settings modals", () => {
         title: "價格報告關鍵字",
       },
     });
-    expect(JSON.stringify(requestBody.data.components)).toContain('"value":"RTX 5090"');
-    expect(requestBody.data.components[0]).toEqual({
-      type: 10,
-      content: [
-        "**格式說明**",
-        "留空：不限制商品名稱。",
-        "空白：同一組關鍵字都要符合，例如 `RTX 5090`。",
-        `逗號：多組擇一符合，最多 ${MAX_PRICE_REPORT_KEYWORD_GROUPS} 組，例如 \`RTX 5090, DDR5\`。`,
-      ].join("\n"),
-    });
-    expect(requestBody.data.components[1]).toMatchObject({
+    expect(requestBody.data.components).toHaveLength(5);
+    expect(requestBody.data.components[0]).toMatchObject({
       type: 18,
-      label: "商品名稱關鍵字",
+      label: "關鍵字組 1（不同格擇一）",
       component: {
         type: 4,
         custom_id: "price-report:settings:keyword-input",
         value: "RTX 5090",
       },
     });
-    expect(requestBody.data.components[1]).not.toHaveProperty("description");
+    expect(requestBody.data.components[1]).toMatchObject({
+      component: {
+        custom_id: "price-report:settings:keyword-input:2",
+        value: "DDR5",
+      },
+    });
+    expect(requestBody.data.components[4].component.custom_id).toBe(
+      "price-report:settings:keyword-input:5",
+    );
   });
 
-  it("updates daily report time and item limit from the settings modal", async () => {
+  it("normalizes full-width daily report time without rewriting dormant max-items", async () => {
     const client = createDiscordBotClient(
       [],
       [
         priceReportSetting({
           id: "setting-1",
           discordUserId: "111122223333444455",
+          maxItems: 8,
           window: "HOURS_12",
           categoryIgrps: [12],
           productKeyword: "RTX 5090",
-          includeNewProducts: false,
+          includeNewProducts: true,
           nextSendAt: new Date("2026-06-07T01:00:00.000Z"),
         }),
       ],
@@ -141,8 +142,7 @@ describe("handleDiscordInteraction price report settings modals", () => {
       cooldowns: new CommandCooldowns(60),
       fetchImpl: fetchMock as typeof fetch,
       interaction: createSettingsModalSubmitInteraction({
-        maxItems: "8",
-        time: "21:30",
+        time: "２１ ： ３０",
       }),
     });
 
@@ -150,32 +150,39 @@ describe("handleDiscordInteraction price report settings modals", () => {
       expect.objectContaining({
         create: expect.objectContaining({
           window: "HOURS_12",
-          maxItems: 8,
           categoryIgrps: [12],
           productKeyword: "RTX 5090",
           includePriceDrops: true,
           includePriceRises: true,
-          includeNewProducts: false,
+          includeNewProducts: true,
           enabled: true,
         }),
         update: expect.objectContaining({
           window: "HOURS_12",
-          maxItems: 8,
           categoryIgrps: [12],
           productKeyword: "RTX 5090",
           includePriceDrops: true,
           includePriceRises: true,
-          includeNewProducts: false,
+          includeNewProducts: true,
           enabled: true,
         }),
       }),
     );
+    const upsert = client.discordPriceReportSetting.upsert.mock.calls[0]?.[0];
+    expect(upsert.create).not.toHaveProperty("maxItems");
+    expect(upsert.update).not.toHaveProperty("maxItems");
     expect(String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body)).toContain(
       "已更新每日價格提醒",
     );
   });
 
-  it("rejects invalid daily report modal values", async () => {
+  it.each([
+    "２４：００",
+    "１２，３０",
+    "１２.３０",
+    "-1:30",
+    "12:30pm",
+  ])("rejects invalid daily report time %s", async (time) => {
     const client = createDiscordBotClient([]);
     const fetchMock = vi.fn<typeof fetch>(
       async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
@@ -187,14 +194,12 @@ describe("handleDiscordInteraction price report settings modals", () => {
       cooldowns: new CommandCooldowns(60),
       fetchImpl: fetchMock as typeof fetch,
       interaction: createSettingsModalSubmitInteraction({
-        maxItems: "0",
-        time: "25:99",
+        time,
       }),
     });
 
     const requestBody = String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body);
 
-    expect(requestBody).toContain("最多商品數需為 1-50 的整數");
     expect(requestBody).toContain("每日發送時間格式需為台北時間 HH:mm");
     expect(client.discordPriceReportSetting.upsert).not.toHaveBeenCalled();
   });

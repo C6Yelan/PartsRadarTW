@@ -6,7 +6,6 @@ import {
   parsePublicReportModalSubmit,
   parseTargetPriceWatchModalSubmit,
 } from "../commands";
-import { MAX_PRICE_REPORT_ITEMS } from "../constants";
 import {
   enableDailyScheduledPriceReport,
   formatTaipeiMinute,
@@ -16,6 +15,7 @@ import {
 import { toPublicPriceReportFilters, updatePublicPriceReportFilters } from "../public-price-report";
 import { sendInteractionResponse } from "../rest";
 import type { DiscordBotClient, DiscordBotOptions, DiscordInteraction, FetchImpl } from "../types";
+import { handleTargetPriceWatchModalSubmit } from "./modal-submit/watch";
 import {
   createPriceReportSettingsPanelMessage,
   formatPriceReportKeywordValidationMessage,
@@ -34,7 +34,6 @@ import {
   sendMissingUserResponse,
   sendUnsupportedInteractionResponse,
 } from "./responses";
-import { handleTargetPriceWatchModalSubmit } from "./modal-submit/watch";
 
 // 處理 modal submit 入口，先解析表單來源，再依功能開關、使用者與輸入驗證結果執行設定更新。
 export async function handleModalSubmitInteraction({
@@ -111,19 +110,13 @@ export async function handleModalSubmitInteraction({
       return;
     }
 
-    if (
-      (publicReportModal.name === "limit" && !publicReportModal.maxItemsInputValid) ||
-      (publicReportModal.name === "keyword" && !publicReportModal.productKeywordInputValid)
-    ) {
+    if (!publicReportModal.productKeywordInputValid) {
       await sendInteractionResponse({
         token: options.token,
         apiBaseUrl: options.apiBaseUrl,
         interaction,
         fetchImpl,
-        content:
-          publicReportModal.name === "limit"
-            ? `最多商品數需為 1-${MAX_PRICE_REPORT_ITEMS} 的整數。`
-            : formatPriceReportKeywordValidationMessage(),
+        content: formatPriceReportKeywordValidationMessage(),
       });
       return;
     }
@@ -132,7 +125,6 @@ export async function handleModalSubmitInteraction({
       client,
       discordGuildId: publicContext.discordGuildId,
       currentChannelId: publicContext.channelId,
-      options,
     });
 
     if (!currentPanel.setting) {
@@ -150,34 +142,23 @@ export async function handleModalSubmitInteraction({
     }
 
     const currentFilters = toPublicPriceReportFilters(currentPanel.setting);
-    const updatedSetting = await updatePublicPriceReportFilters({
+    await updatePublicPriceReportFilters({
       client,
       discordGuildId: publicContext.discordGuildId,
       discordUserId,
-      maxItems:
-        publicReportModal.name === "limit"
-          ? (publicReportModal.maxItems ?? currentPanel.setting.maxItems)
-          : currentPanel.setting.maxItems,
       categoryIgrps: currentFilters.categoryIgrps,
       includePriceDrops: currentFilters.includePriceDrops,
       includePriceRises: currentFilters.includePriceRises,
       includeNewProducts: currentFilters.includeNewProducts,
-      productKeyword:
-        publicReportModal.name === "keyword"
-          ? publicReportModal.productKeyword
-          : currentFilters.productKeyword,
+      productKeyword: publicReportModal.productKeyword,
     });
-    const notice =
-      publicReportModal.name === "limit"
-        ? `已更新公開報告顯示上限：${updatedSetting?.maxItems ?? currentPanel.setting.maxItems} 筆。`
-        : publicReportModal.productKeyword
-          ? `已更新公開報告關鍵字：${publicReportModal.productKeyword}。`
-          : "已清除公開報告關鍵字篩選。";
+    const notice = publicReportModal.productKeyword
+      ? `已更新公開報告關鍵字：${publicReportModal.productKeyword}。`
+      : "已清除公開報告關鍵字篩選。";
     const panel = await readPublicPriceReportSettingsPanel({
       client,
       discordGuildId: publicContext.discordGuildId,
       currentChannelId: publicContext.channelId,
-      options,
       notice,
     });
 
@@ -224,7 +205,6 @@ export async function handleModalSubmitInteraction({
       client,
       discordUserId,
       windowHours: resolveWindowHours(currentSetting?.window),
-      maxItems: currentSetting?.maxItems ?? options.priceReportMaxItems,
       categoryIgrps: currentFilters.categoryIgrps,
       includePriceDrops: currentFilters.includePriceDrops,
       includePriceRises: currentFilters.includePriceRises,
@@ -235,7 +215,6 @@ export async function handleModalSubmitInteraction({
     const panel = await readPriceReportSettingsPanel({
       client,
       discordUserId,
-      options,
       notice: modal.productKeyword
         ? `已更新商品關鍵字：${modal.productKeyword}。`
         : "已清除商品關鍵字篩選。",
@@ -251,7 +230,7 @@ export async function handleModalSubmitInteraction({
     return;
   }
 
-  if (!modal.maxItemsInputValid || !modal.timeInputValid) {
+  if (!modal.timeInputValid) {
     await sendInteractionResponse({
       token: options.token,
       apiBaseUrl: options.apiBaseUrl,
@@ -268,7 +247,6 @@ export async function handleModalSubmitInteraction({
     client,
     discordUserId,
     windowHours: resolveWindowHours(currentSetting?.window),
-    maxItems: modal.maxItems ?? options.priceReportMaxItems,
     categoryIgrps: currentFilters.categoryIgrps,
     includePriceDrops: currentFilters.includePriceDrops,
     includePriceRises: currentFilters.includePriceRises,
@@ -279,7 +257,6 @@ export async function handleModalSubmitInteraction({
   const panel = await readPriceReportSettingsPanel({
     client,
     discordUserId,
-    options,
     notice: `已更新每日價格提醒。下一次：${formatTaipeiMinute(setting.nextSendAt)}。`,
   });
 

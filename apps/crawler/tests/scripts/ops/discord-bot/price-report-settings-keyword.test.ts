@@ -2,12 +2,12 @@
 // 驗證個人價格報告關鍵字 modal 的輸入正規化、上限拒絕與清空流程。
 
 import { describe, expect, it, vi } from "vitest";
-import { CommandCooldowns } from "../../../../src/scripts/ops/discord-bot/cooldowns";
-import { handleDiscordInteraction } from "../../../../src/scripts/ops/discord-bot/interactions";
 import {
   MAX_PRICE_REPORT_KEYWORD_GROUPS,
   MAX_PRICE_REPORT_KEYWORD_LENGTH,
 } from "../../../../src/scripts/ops/discord-bot/constants";
+import { CommandCooldowns } from "../../../../src/scripts/ops/discord-bot/cooldowns";
+import { handleDiscordInteraction } from "../../../../src/scripts/ops/discord-bot/interactions";
 import {
   createDiscordBotClient,
   createDiscordBotOptions,
@@ -42,16 +42,17 @@ describe("handleDiscordInteraction price report settings keyword", () => {
       options: createDiscordBotOptions(),
       cooldowns: new CommandCooldowns(60),
       fetchImpl: fetchMock as typeof fetch,
-      interaction: createKeywordModalSubmitInteraction({ keyword: " RTX   5090，  DDR5 " }),
+      interaction: createKeywordModalSubmitInteraction({
+        keywords: [" RTX   5090，  DDR5 ", "", "SSD", " RAM ", "CPU"],
+      }),
     });
 
     expect(client.discordPriceReportSetting.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
         create: expect.objectContaining({
           window: "HOURS_12",
-          maxItems: 12,
           categoryIgrps: [12],
-          productKeyword: "RTX 5090, DDR5",
+          productKeyword: "RTX 5090, DDR5, SSD, RAM, CPU",
           includePriceDrops: true,
           includePriceRises: true,
           includeNewProducts: false,
@@ -59,9 +60,8 @@ describe("handleDiscordInteraction price report settings keyword", () => {
         }),
         update: expect.objectContaining({
           window: "HOURS_12",
-          maxItems: 12,
           categoryIgrps: [12],
-          productKeyword: "RTX 5090, DDR5",
+          productKeyword: "RTX 5090, DDR5, SSD, RAM, CPU",
           includePriceDrops: true,
           includePriceRises: true,
           includeNewProducts: false,
@@ -74,7 +74,7 @@ describe("handleDiscordInteraction price report settings keyword", () => {
     );
 
     expect(readEmbedFieldValue(readResponseEmbed(requestBody), "商品關鍵字")).toBe(
-      "RTX 5090, DDR5",
+      "RTX 5090, DDR5, SSD, RAM, CPU",
     );
   });
 
@@ -90,7 +90,7 @@ describe("handleDiscordInteraction price report settings keyword", () => {
       cooldowns: new CommandCooldowns(60),
       fetchImpl: fetchMock as typeof fetch,
       interaction: createKeywordModalSubmitInteraction({
-        keyword: "RTX 5090, DDR5, SSD, RAM, CPU, GPU",
+        keywords: ["RTX 5090, DDR5, SSD, RAM, CPU, GPU"],
       }),
     });
 
@@ -122,7 +122,7 @@ describe("handleDiscordInteraction price report settings keyword", () => {
       options: createDiscordBotOptions(),
       cooldowns: new CommandCooldowns(60),
       fetchImpl: fetchMock as typeof fetch,
-      interaction: createKeywordModalSubmitInteraction({ keyword: "" }),
+      interaction: createKeywordModalSubmitInteraction({ keywords: [] }),
     });
 
     expect(client.discordPriceReportSetting.upsert).toHaveBeenCalledWith(

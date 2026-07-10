@@ -2,7 +2,7 @@
 // 產生個人價格報告訊息並記錄 Discord DM 發送結果。
 
 import type { Prisma } from "@partsradar/db";
-import { HOUR_MS } from "../constants";
+import { HOUR_MS, MAX_PRICE_REPORT_ITEMS } from "../constants";
 import { toDiscordDeliveryErrorFields } from "../delivery-error-fields";
 import type {
   DiscordBotClient,
@@ -17,7 +17,6 @@ import {
   normalizePriceReportFilters,
   type PriceReportFilters,
 } from "./filters";
-import { clampPriceReportMaxItems } from "./limits";
 import { createPersonalPriceReportEmbedMessages } from "./messages";
 import { readRecentPriceReport } from "./reader";
 
@@ -41,7 +40,6 @@ export async function sendPriceReportNow({
   client,
   discordUserId,
   windowHours,
-  maxItems,
   publicBaseUrl,
   filters = DEFAULT_PRICE_REPORT_FILTERS,
   now = new Date(),
@@ -50,7 +48,6 @@ export async function sendPriceReportNow({
   client: DiscordBotClient;
   discordUserId: string;
   windowHours: number;
-  maxItems: number;
   publicBaseUrl: string;
   filters?: PriceReportFilters;
   now?: Date;
@@ -60,7 +57,6 @@ export async function sendPriceReportNow({
     client,
     discordUserId,
     windowHours,
-    maxItems,
     publicBaseUrl,
     filters,
     now,
@@ -74,7 +70,6 @@ export async function sendPriceReport({
   client,
   discordUserId,
   windowHours,
-  maxItems,
   publicBaseUrl,
   filters,
   now,
@@ -85,7 +80,6 @@ export async function sendPriceReport({
   client: DiscordBotClient;
   discordUserId: string;
   windowHours: number;
-  maxItems: number;
   publicBaseUrl: string;
   filters: PriceReportFilters;
   now: Date;
@@ -94,7 +88,6 @@ export async function sendPriceReport({
   sendReportMessages: (messages: DiscordBotMessage[]) => Promise<DiscordBotMessageSendResult>;
 }): Promise<PriceReportNowResult> {
   const reportSince = since ?? new Date(now.getTime() - windowHours * HOUR_MS);
-  const boundedMaxItems = clampPriceReportMaxItems(maxItems);
   const normalizedFilters = normalizePriceReportFilters(filters);
   const report = await readRecentPriceReport(client, {
     since: reportSince,
@@ -103,11 +96,10 @@ export async function sendPriceReport({
   });
   const listedCount = Math.min(
     report.priceChanges.length + report.newProducts.length,
-    boundedMaxItems,
+    MAX_PRICE_REPORT_ITEMS,
   );
   const messages = createPersonalPriceReportEmbedMessages(report, {
     publicBaseUrl,
-    maxItems: boundedMaxItems,
     windowHours,
     generatedAt: now,
     hasActiveFilters: hasActivePriceReportFilters(normalizedFilters),

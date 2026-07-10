@@ -3,7 +3,6 @@
 
 import {
   createPublicReportKeywordModal,
-  createPublicReportLimitModal,
   type parsePublicReportComponentInteraction,
 } from "../commands";
 import type { CommandCooldowns } from "../cooldowns";
@@ -77,24 +76,6 @@ export async function handlePublicReportComponentInteraction({
       fetchImpl,
       modal: createPublicReportKeywordModal({
         keywordValue: setting?.productKeyword ?? "",
-      }),
-    });
-    return;
-  }
-
-  if (component.name === "open_limit_modal") {
-    const setting = await readPublicPriceReportSetting({
-      client,
-      discordGuildId: publicContext.discordGuildId,
-    });
-
-    await sendModalInteractionResponse({
-      token: options.token,
-      apiBaseUrl: options.apiBaseUrl,
-      interaction,
-      fetchImpl,
-      modal: createPublicReportLimitModal({
-        maxItems: setting?.maxItems ?? options.priceReportMaxItems,
       }),
     });
     return;
@@ -177,7 +158,6 @@ export async function handlePublicReportComponentInteraction({
       client,
       discordGuildId: publicContext.discordGuildId,
       currentChannelId: publicContext.channelId,
-      options,
     });
     const currentFilters = toPublicPriceReportFilters(currentPanel.setting);
     const categoryIgrps =
@@ -242,7 +222,6 @@ export async function handlePublicReportComponentInteraction({
     client,
     discordGuildId: publicContext.discordGuildId,
     currentChannelId: publicContext.channelId,
-    options,
     notice,
   });
 
