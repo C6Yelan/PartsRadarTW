@@ -35,7 +35,6 @@
 | `web` | Next.js 網站與查詢 API |
 | `crawler` | 手動 crawl / backfill / ops tools |
 | `crawler-daemon` | scheduled CoolPC crawl + new-product image cache follow-up |
-| `maintenance-daemon` | scheduled link health check |
 | `raw-snapshot-cleanup-daemon` | scheduled raw snapshot cleanup |
 | `smoke-daemon` | scheduled production smoke and admin webhook notification |
 | `discord-bot` | Discord slash command bot for personal DM notifications |
@@ -51,7 +50,7 @@
 
 ## Compose 口徑
 
-正式部署與本機 PostgreSQL 開發共用 `compose.yml` 作為 core runtime；crawler / maintenance daemons 放在 `compose.crawler.yml`，smoke / Discord bot 放在 `compose.ops.yml`，public tunnel 放在 `compose.tunnel.yml`。
+正式部署與本機 PostgreSQL 開發共用 `compose.yml` 作為 core runtime；crawler / cleanup daemons 放在 `compose.crawler.yml`，smoke / Discord bot 放在 `compose.ops.yml`，public tunnel 放在 `compose.tunnel.yml`。
 
 預設 app stack：
 
@@ -64,7 +63,6 @@
 
 - `manual-crawler`
 - `scheduled-crawler`
-- `maintenance`
 - `ops`
 - `discord-bot`
 - `public-tunnel`
@@ -73,12 +71,12 @@
 
 - `storage-init` 以 root 執行一次性 `mkdir` / `chown`，只修正 mounted storage volume 權限，不跑 crawler、不連 DB。
 - Docker named volume 會覆蓋 image build 階段對 mount point 做過的 `chown`；初次部署或重建 volume 後需讓 `storage-init` 成功完成。
-- `web`、`crawler`、`crawler-daemon`、`maintenance-daemon`、`raw-snapshot-cleanup-daemon` 與 `smoke-daemon` 都等 `storage-init` 成功後才啟動；長時間 runtime 仍使用非 root user。
-- `crawler`、`crawler-daemon`、`maintenance-daemon` 與 `raw-snapshot-cleanup-daemon` 放在 `compose.crawler.yml`；啟動時需搭配 `-f compose.yml -f compose.crawler.yml`。
+- `web`、`crawler`、`crawler-daemon`、`raw-snapshot-cleanup-daemon` 與 `smoke-daemon` 都等 `storage-init` 成功後才啟動；長時間 runtime 仍使用非 root user。
+- `crawler`、`crawler-daemon` 與 `raw-snapshot-cleanup-daemon` 放在 `compose.crawler.yml`；啟動時需搭配 `-f compose.yml -f compose.crawler.yml`。
 - `smoke-daemon` 與 `discord-bot` 放在 `compose.ops.yml`；啟動時需搭配 `-f compose.yml -f compose.ops.yml`。
 - `crawler` 預設 command 是 help，避免 `docker compose up` 意外 live fetch。
-- `crawler-daemon` 與 `raw-snapshot-cleanup-daemon` 在 `scheduled-crawler` profile 啟動；`maintenance-daemon` 是明確 opt-in 的 `maintenance` profile，且 command 保留 `--confirm-live-fetch`。
-- `crawler-daemon` 與 `maintenance-daemon` 共用 `EXTERNAL_FETCH_LOCK_DIR`，避免定期價格抓取與連結檢查同時打外部來源；價格 crawler 到點時會發出短效 priority signal，讓 maintenance link health 在安全邊界暫停並延後幾分鐘繼續。price freshness 不需要啟動 scheduled link health。新品圖片快取只在每輪價格 crawl 完成並釋放 lock 後針對本輪新增商品執行，既有缺圖修復仍使用手動 backfill 工具。
+- `crawler-daemon` 與 `raw-snapshot-cleanup-daemon` 在 `scheduled-crawler` profile 啟動；crawler command 保留 `--confirm-live-fetch`。
+- `crawler-daemon` 使用 `EXTERNAL_FETCH_LOCK_DIR` 避免多個 crawler process 同時抓來源；lock contention 依 `CRAWLER_LOCK_RETRY_SECONDS` 重試。新品圖片快取只在每輪價格 crawl 完成並釋放 lock 後針對本輪新增商品執行，既有缺圖修復仍使用手動 backfill 工具。
 - `cloudflared` 放在 `compose.tunnel.yml`，只在 `public-tunnel` profile 啟動。
 - `COOLPC_BASE_URL` 在 production Compose 固定為 `https://www.coolpc.com.tw`。
 - `web` 預設綁 `127.0.0.1:${WEB_PORT:-3000}`；公開流量走 Cloudflare Tunnel。
@@ -159,9 +157,7 @@ PRODUCT_IMAGE_STORAGE_DIR=/var/lib/partsradar/product-images
 | `PRODUCT_IMAGE_STORAGE_DIR` | container 內縮圖 path |
 | `CRAWLER_INTERVAL_SECONDS` / `CRAWLER_BACKOFF_SECONDS` / `CRAWLER_LOCK_RETRY_SECONDS` / `CRAWLER_CATEGORY_DELAY_MS` | scheduled crawler 節奏 |
 | `CRAWLER_NEW_PRODUCT_IMAGE_MIN_DELAY_MS` / `CRAWLER_NEW_PRODUCT_IMAGE_MAX_DELAY_MS` / `CRAWLER_NEW_PRODUCT_IMAGE_TIMEOUT_MS` / `CRAWLER_NEW_PRODUCT_IMAGE_MAX_SOURCE_BYTES` | scheduled crawler 新增商品圖片快取節奏 |
-| `MAINTENANCE_INTERVAL_SECONDS` / `MAINTENANCE_INITIAL_DELAY_SECONDS` / `MAINTENANCE_PRICE_PRIORITY_PAUSE_SECONDS` | scheduled maintenance 節奏 |
-| `MAINTENANCE_LINK_LIMIT` / `MAINTENANCE_LINK_STALE_AFTER_HOURS` / `MAINTENANCE_LINK_MIN_DELAY_MS` / `MAINTENANCE_LINK_MAX_DELAY_MS` | link health maintenance 節奏 |
-| `EXTERNAL_FETCH_LOCK_DIR` / `EXTERNAL_FETCH_LOCK_STALE_SECONDS` / `EXTERNAL_FETCH_PRIORITY_TTL_SECONDS` | 外部抓取 shared lock 與 priority signal |
+| `EXTERNAL_FETCH_LOCK_DIR` / `EXTERNAL_FETCH_LOCK_STALE_SECONDS` | scheduled crawler 外部抓取鎖 |
 | `RAW_SNAPSHOT_CLEANUP_INTERVAL_SECONDS` | cleanup daemon 節奏 |
 | `DISCORD_BOT_TOKEN` / `DISCORD_APPLICATION_ID` | Discord bot token 與 application id；公開價格報告頻道由 `/public-report` 指令設定 |
 | `NEXT_PUBLIC_DISCORD_BOT_INVITE_URL` | 網站 `/discord` 邀請按鈕使用的公開 Discord bot invite URL；由 web runtime 讀取，不得放 token。 |
@@ -205,12 +201,11 @@ Discord bot 權限：
 10. private validation `/api/source-status`。
 11. 視需要先手動跑 product image backfill。
 12. 以 `compose.crawler.yml` 啟動 `scheduled-crawler` profile 中的 `crawler-daemon` 與 `raw-snapshot-cleanup-daemon`。
-13. 視需要以 `compose.crawler.yml` 啟動 `maintenance` profile 中的 `maintenance-daemon`。
-14. 以 `compose.ops.yml` 啟動 `ops` profile 中的 `smoke-daemon`。
-15. 若啟用 Discord 個人化通知，設定 bot secret 後以 `compose.ops.yml` 啟動 `discord-bot` profile。
-16. 建立 Cloudflare remotely-managed tunnel。
-17. 以 `compose.tunnel.yml` 啟動 `public-tunnel` profile。
-18. 驗證正式網域、API、圖片 API、crawler、maintenance、smoke、Discord bot 與資料狀態。
+13. 以 `compose.ops.yml` 啟動 `ops` profile 中的 `smoke-daemon`。
+14. 若啟用 Discord 個人化通知，設定 bot secret 後以 `compose.ops.yml` 啟動 `discord-bot` profile。
+15. 建立 Cloudflare remotely-managed tunnel。
+16. 以 `compose.tunnel.yml` 啟動 `public-tunnel` profile。
+17. 驗證正式網域、API、圖片 API、crawler、smoke、Discord bot 與資料狀態。
 
 ## Migration / Backup / Monitoring
 
@@ -218,6 +213,8 @@ Migration：
 
 - 正式部署使用 `prisma migrate deploy` 或 root `pnpm db:deploy`。
 - `20260702093000_add_discord_public_report_filters` 會替 `discord_public_price_report_settings` 新增公開報告篩選欄位；部署後既有公開報告預設維持全部分類、降價與漲價、無關鍵字、最多 50 筆。
+- 從舊版升級時，套用 G03 migration 前先用舊版 Compose definition 停止並移除 `maintenance-daemon` container，避免舊 process 在 table drop 後繼續存取已移除 schema。
+- `20260710120000_remove_product_link_health` 會刪除 link-health table 與 enums；部署前必須備份 DB，rollback 需使用備份或另寫反向 migration，不能假設 dropped data 可自動復原。
 - migration 失敗時不啟動新版服務。
 - schema 變更前需有備份與本機 / staging-like 驗證。
 
@@ -232,7 +229,7 @@ Backup：
 
 最小監控：
 
-- `web`、`crawler-daemon`、`smoke-daemon`、`discord-bot`、`postgres` 存活；若啟用 `maintenance` profile，另確認 `maintenance-daemon` 存活。
+- `web`、`crawler-daemon`、`smoke-daemon`、`discord-bot`、`postgres` 存活。
 - 最近 successful crawl。
 - backoff 狀態。
 - snapshot / image cache 容量。

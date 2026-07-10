@@ -3,7 +3,6 @@
 // 顯示商品詳細頁的配單操作、來源購買連結與分享操作區塊。
 
 import { BUILD_LIST_MAX_QUANTITY } from "../../../build-list/model";
-import type { ProductLinkHealth } from "./types";
 
 // 組裝商品詳細頁主要操作，依配單狀態切換加入按鈕或數量控制。
 export default function ProductDetailActions({
@@ -14,7 +13,6 @@ export default function ProductDetailActions({
   onShare,
   productName,
   shareStatusMessage,
-  sourceHealth,
   purchaseUrl,
 }: {
   canIncreaseBuildListQuantity: boolean;
@@ -24,7 +22,6 @@ export default function ProductDetailActions({
   onShare: () => void;
   productName: string;
   shareStatusMessage: string | null;
-  sourceHealth: ProductLinkHealth | null;
   purchaseUrl: string;
 }) {
   return (
@@ -69,7 +66,7 @@ export default function ProductDetailActions({
       <div className="detail-link-actions">
         <a
           aria-label="前往原價屋查看／購買，開新分頁"
-          className={toExternalActionClassName(sourceHealth)}
+          className="external-action"
           href={purchaseUrl}
           rel="noreferrer"
           target="_blank"
@@ -92,11 +89,4 @@ export default function ProductDetailActions({
       ) : null}
     </div>
   );
-}
-
-// 依來源連結健康狀態附加提示樣式，讓購買連結在需要確認時降低確定性。
-function toExternalActionClassName(health: ProductLinkHealth | null) {
-  return ["external-action", health && health.status !== "ok" ? "needs-link-check" : null]
-    .filter(Boolean)
-    .join(" ");
 }

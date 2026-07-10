@@ -20,7 +20,7 @@ Product detail, price-history, and image API checks need a real product id. Pref
 Do not expose or monitor these publicly:
 
 - PostgreSQL
-- crawler, maintenance, cleanup, or Discord bot containers
+- crawler, cleanup, or Discord bot containers
 - raw snapshot storage
 - Discord user ids, delivery error messages, or personal notification settings
 

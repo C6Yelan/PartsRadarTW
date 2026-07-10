@@ -58,11 +58,6 @@
   transform: translate(1px, -2px);
 }
 
-.detail-actions .external-action.needs-link-check {
-  border-color: rgba(245, 158, 11, 0.38);
-  color: var(--text);
-}
-
 .detail-share-action {
   min-width: 92px;
   background: rgba(18, 34, 47, 0.74);

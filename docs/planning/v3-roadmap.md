@@ -14,6 +14,7 @@
 
 - Discord bot 指令、通知、資料保存與隱私邊界以 [Discord Contract](../technical/discord-contract.md) 為準。
 - Production smoke、admin webhook 與外部監控邊界以 [Ops Contract](../technical/ops-contract.md) 為準。
+- 商品可用性提示由 crawler missing / inactive 狀態與 seen timestamps 提供，不維護獨立連結檢查服務。
 - 產品非目標與 accountless 邊界以 [產品邊界](product-boundary.md) 為準。
 - 部署與維運命令以 [部署設計](../technical/deployment.md)、[Operations Runbook](../technical/operations-runbook.md) 與 [外部監控](../technical/external-monitoring.md) 為準。
 

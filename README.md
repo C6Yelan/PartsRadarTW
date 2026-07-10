@@ -21,7 +21,7 @@ PartsRadarTW 是一個以原價屋電腦零組件價格查詢為核心的網站�
 - 商品詳細頁價格歷史、7 / 30 / 90 天與全部時間範圍切換。
 - 首頁近 30 天價格變動顯示與降幅 / 漲幅排序。
 - 不需帳號的 client-side 配單、數量調整、總價、Excel 匯出與可列印版面。
-- 商品連結健康檢查、缺圖補齊、production smoke 與 log 型維運監控。
+- Crawler 商品可用性狀態、缺圖補齊、production smoke 與 log 型維運監控。
 - Discord bot 公開價格報告、個人價格報告與個人目標價提醒；網站本身仍不建立帳號。
 - 管理者 Discord smoke 告警與 public-only 外部監控。
 
@@ -40,5 +40,5 @@ PartsRadarTW 以原價屋公開商品資料作為唯一資料來源。本站不�
 ## 未來方向
 
 - 原價屋商品分類與規格整理規則優化。
-- 持續維持 scheduled crawler、maintenance daemon、smoke daemon 與圖片快取觀察。
+- 持續維持 scheduled crawler、raw snapshot cleanup、smoke daemon 與圖片快取觀察。
 - 網站帳號、網站帳號綁定、跨站比價或自動推薦配單需另開產品與資安設計。

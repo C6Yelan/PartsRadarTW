@@ -62,20 +62,6 @@ enum ParseErrorType {
   @@map("parse_error_type")
 }
 
-enum ProductLinkKind {
-  SOURCE @map("source")
-
-  @@map("product_link_kind")
-}
-
-enum ProductLinkHealthStatus {
-  OK              @map("ok")
-  BROKEN          @map("broken")
-  TEMPORARY_ERROR @map("temporary_error")
-
-  @@map("product_link_health_status")
-}
-
 enum DiscordPriceReportInterval {
   DAILY     @map("daily")
   EVERY_12H @map("every_12h")
@@ -157,7 +143,6 @@ model Product {
   updatedAt             DateTime                      @updatedAt @map("updated_at") @db.Timestamptz(6)
   currentPrice          CurrentPrice?
   priceSnapshots        PriceSnapshot[]
-  linkHealthChecks      ProductLinkHealth[]
   discordTargetWatches  DiscordTargetPriceWatch[]
   discordDeliveries     DiscordNotificationDelivery[]
 
@@ -203,28 +188,6 @@ model CurrentPrice {
   @@unique([priceSnapshotId, productId], map: "current_prices_price_snapshot_id_product_id_key")
   @@index([lastSeenAt], map: "current_prices_last_seen_at_idx")
   @@map("current_prices")
-}
-
-model ProductLinkHealth {
-  id            String                  @id @default(uuid()) @db.Uuid
-  productId     String                  @map("product_id") @db.Uuid
-  product       Product                 @relation(fields: [productId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  linkKind      ProductLinkKind         @map("link_kind")
-  url           String                  @db.Text
-  status        ProductLinkHealthStatus
-  httpStatus    Int?                    @map("http_status")
-  checkedAt     DateTime                @map("checked_at") @db.Timestamptz(6)
-  lastOkAt      DateTime?               @map("last_ok_at") @db.Timestamptz(6)
-  lastFailureAt DateTime?               @map("last_failure_at") @db.Timestamptz(6)
-  failureCount  Int                     @default(0) @map("failure_count")
-  errorMessage  String?                 @map("error_message") @db.Text
-  createdAt     DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt     DateTime                @updatedAt @map("updated_at") @db.Timestamptz(6)
-
-  @@unique([productId, linkKind], map: "product_link_health_product_id_link_kind_key")
-  @@index([status], map: "product_link_health_status_idx")
-  @@index([checkedAt], map: "product_link_health_checked_at_idx")
-  @@map("product_link_health")
 }
 
 model DiscordPriceReportSetting {

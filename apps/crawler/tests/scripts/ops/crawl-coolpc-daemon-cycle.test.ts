@@ -1,5 +1,5 @@
 // apps/crawler/tests/scripts/ops/crawl-coolpc-daemon-cycle.test.ts
-// 驗證 scheduled CoolPC crawler 單輪執行的 external fetch lock、priority retry、backoff 與新商品圖片補圖協調。
+// 驗證 scheduled CoolPC crawler 單輪執行的 external fetch lock、retry、backoff 與新商品圖片補圖協調。
 
 import { describe, expect, it } from "vitest";
 import {
@@ -67,14 +67,11 @@ describe("CoolPC scheduled crawler daemon cycle", () => {
     ]);
   });
 
-  it("requests priority and retries soon when another external fetch task holds the lock", async () => {
+  it("retries soon without crawling when another process holds the lock", async () => {
     const calls: string[] = [];
 
     const result = await runScheduledCycle({} as never, createDaemonOptions(), {
       acquireLock: async () => null,
-      requestPriority: async ({ owner, ttlSeconds }) => {
-        calls.push(`request-priority:${owner}:${ttlSeconds}`);
-      },
       crawlCategories: async () => {
         calls.push("crawl-categories");
         throw new Error("should not crawl without lock");
@@ -82,7 +79,7 @@ describe("CoolPC scheduled crawler daemon cycle", () => {
     });
 
     expect(result).toEqual({ shouldBackoff: false, retryAfterSeconds: 120 });
-    expect(calls).toEqual(["request-priority:crawler-daemon:600"]);
+    expect(calls).toEqual([]);
   });
 
   it("skips new product image backfill when the crawl result should back off", async () => {

@@ -10,10 +10,7 @@ import {
   resolveWorkspacePathArgument,
   resolveWorkspaceRoot,
 } from "../../shared/script-utils";
-import {
-  DEFAULT_EXTERNAL_FETCH_LOCK_STALE_SECONDS,
-  DEFAULT_EXTERNAL_FETCH_PRIORITY_TTL_SECONDS,
-} from "../external-fetch-lock";
+import { DEFAULT_EXTERNAL_FETCH_LOCK_STALE_SECONDS } from "../external-fetch-lock";
 
 export const CONFIRM_LIVE_FETCH_FLAG = "--confirm-live-fetch";
 export const DEFAULT_STORAGE_DIR = "temp/coolpc-daemon/snapshots";
@@ -58,7 +55,6 @@ export interface CoolpcDaemonOptions {
   lockDir: string;
   lockStaleSeconds: number;
   lockRetrySeconds: number;
-  prioritySignalTtlSeconds: number;
   runOnce: boolean;
   baseUrl?: string;
   newProductImageBackfill: NewProductImageBackfillOptions;
@@ -149,15 +145,6 @@ export function parseDaemonOptions(
       fallback: DEFAULT_LOCK_RETRY_SECONDS,
       min: MIN_LOCK_RETRY_SECONDS,
       max: MAX_LOCK_RETRY_SECONDS,
-    }),
-    prioritySignalTtlSeconds: parseIntegerOption({
-      args,
-      argName: "--priority-signal-ttl-seconds",
-      env,
-      envName: "EXTERNAL_FETCH_PRIORITY_TTL_SECONDS",
-      fallback: DEFAULT_EXTERNAL_FETCH_PRIORITY_TTL_SECONDS,
-      min: 60,
-      max: 60 * 60,
     }),
     runOnce: args.includes("--run-once"),
     baseUrl: validateCoolpcBaseUrl(env.COOLPC_BASE_URL),

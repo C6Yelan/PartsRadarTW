@@ -1,6 +1,6 @@
 "use client";
 // apps/web/app/products/[id]/product-detail.tsx
-// 組裝商品詳細頁 client 介面，串接商品資料、配單操作、連結提示與價格歷史。
+// 組裝商品詳細頁 client 介面，串接商品資料、配單操作與價格歷史。
 
 import Link from "next/link";
 import FloatingBuildListLink from "../../build-list/FloatingBuildListLink";
@@ -8,7 +8,6 @@ import SiteDisclaimer from "../../site-disclaimer";
 import ProductDetailActions from "./detail/ProductDetailActions";
 import ProductDetailFacts from "./detail/ProductDetailFacts";
 import ProductDetailMedia from "./detail/ProductDetailMedia";
-import LinkHealthNotice from "./detail/link-health-notice";
 import { useProductDetailViewModel } from "./detail/use-product-detail-view-model";
 import PriceHistoryPanel from "./price-history-panel";
 
@@ -48,7 +47,7 @@ export default function ProductDetail({
       {state === "not-found" ? (
         <section className="detail-empty">
           <h1>這項商品目前無法顯示</h1>
-          <p>商品可能已下架，或連結已失效。你可以返回查詢頁重新搜尋。</p>
+          <p>商品可能已下架，或暫時無法確認。你可以返回查詢頁重新搜尋。</p>
         </section>
       ) : null}
 
@@ -77,14 +76,12 @@ export default function ProductDetail({
               productName={product.name}
               purchaseUrl={product.source.url}
               shareStatusMessage={viewModel.share.statusMessage}
-              sourceHealth={product.source.health}
               onAddToBuildList={viewModel.buildList.addCurrentProductToBuildList}
               onDecreaseBuildListQuantity={
                 viewModel.buildList.decreaseCurrentProductBuildListQuantity
               }
               onShare={viewModel.share.shareCurrentProduct}
             />
-            <LinkHealthNotice product={product} />
           </div>
         </section>
       ) : null}

@@ -10,7 +10,7 @@ export default function ProductDetailFacts({ product }: { product: ProductDetail
     <>
       {!product.status.isActive ? (
         <div className="quiet-alert warning" role="status">
-          這項商品目前沒有出現在原價屋列表，可能已下架或暫時無法確認。
+          這項商品目前未在來源頁面看到，可能已下架或暫時無法確認。
         </div>
       ) : null}
 

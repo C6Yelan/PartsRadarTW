@@ -1,5 +1,5 @@
 // apps/web/tests/api/products/[id]/handler.test.ts
-// 驗證商品詳細 API handler 的公開 response shape、購買連結重建、link health 與安全錯誤回應。
+// 驗證商品詳細 API handler 的公開 response shape、購買連結重建、availability 與安全錯誤回應。
 
 import { describe, expect, it } from "vitest";
 
@@ -56,7 +56,6 @@ describe("GET /api/products/{id} handler", () => {
       source: {
         name: "coolpc",
         url: "https://www.coolpc.com.tw/evaluate.php?iBuy=GPU-RTX-4070",
-        health: null,
       },
       status: {
         isActive: true,
@@ -69,6 +68,7 @@ describe("GET /api/products/{id} handler", () => {
     expect(JSON.stringify(body)).not.toContain("source_item_key");
     expect(JSON.stringify(body)).not.toContain("PHPSESSID");
     expect(body).not.toHaveProperty("introduction");
+    expect(body.source).not.toHaveProperty("health");
   });
 
   it("returns product details with a nullable image when primary image data is missing", async () => {
@@ -106,60 +106,6 @@ describe("GET /api/products/{id} handler", () => {
       status: {
         isActive: false,
         missingSince: "2026-05-28T12:00:00.000Z",
-      },
-    });
-  });
-
-  it("returns public link health status for the current source URL", async () => {
-    const response = await createGetProductHandler(
-      fakeProductDetailClient(
-        product({
-          linkHealthChecks: [
-            {
-              linkKind: "SOURCE",
-              url: "https://www.coolpc.com.tw/evaluate.php?iBuy=GPU-RTX-4070",
-              status: "OK",
-              httpStatus: 200,
-              checkedAt: new Date("2026-05-28T12:10:00.000Z"),
-            },
-          ],
-        }),
-      ),
-    )(PRODUCT_ID);
-
-    expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({
-      source: {
-        health: {
-          status: "ok",
-          httpStatus: 200,
-          checkedAt: "2026-05-28T12:10:00.000Z",
-        },
-      },
-    });
-  });
-
-  it("ignores stale link health records for previous URLs", async () => {
-    const response = await createGetProductHandler(
-      fakeProductDetailClient(
-        product({
-          linkHealthChecks: [
-            {
-              linkKind: "SOURCE",
-              url: "https://www.coolpc.com.tw/evaluate.php?iBuy=OLD-TOKEN",
-              status: "BROKEN",
-              httpStatus: 404,
-              checkedAt: new Date("2026-05-28T12:10:00.000Z"),
-            },
-          ],
-        }),
-      ),
-    )(PRODUCT_ID);
-
-    expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({
-      source: {
-        health: null,
       },
     });
   });
@@ -260,7 +206,6 @@ function product(overrides: Partial<NonNullable<ProductRecord>> = {}): NonNullab
         capturedAt: new Date("2026-05-28T11:45:00.000Z"),
       },
     },
-    linkHealthChecks: [],
     sourceCategory: {
       id: "category-12",
       igrp: 12,

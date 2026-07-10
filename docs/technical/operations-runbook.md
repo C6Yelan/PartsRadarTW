@@ -81,7 +81,7 @@ http://127.0.0.1:3000
 - `mkdir -p /var/lib/partsradar/snapshots /var/lib/partsradar/product-images`
 - `chown -R node:node /var/lib/partsradar/snapshots /var/lib/partsradar/product-images`
 
-它不連 DB、不抓 CoolPC、不跑 crawler，也不長期維持 root runtime。`web`、`crawler`、`crawler-daemon`、`maintenance-daemon`、`raw-snapshot-cleanup-daemon` 與 `smoke-daemon` 都會等 `storage-init` 成功完成後才啟動。
+它不連 DB、不抓 CoolPC、不跑 crawler，也不長期維持 root runtime。`web`、`crawler`、`crawler-daemon`、`raw-snapshot-cleanup-daemon` 與 `smoke-daemon` 都會等 `storage-init` 成功完成後才啟動。
 
 初次部署、重建 volume、或懷疑 owner 錯誤時可手動重跑：
 
@@ -171,11 +171,11 @@ curl -i https://<domain>/api/source-status
 啟動前條件：
 
 - 手動 `manual:crawl-coolpc-once` 已在同一台主機成功跑過，且 `/api/source-status` 可回 `ok`。
-- 若 `maintenance-daemon` 正在持有 external fetch lock，`crawler-daemon` 會寫入 price-priority signal 並在 `CRAWLER_LOCK_RETRY_SECONDS` 後重試；maintenance link health 會在下一個安全邊界讓路。
+- 若另一個 crawler process 正在持有 external fetch lock，`crawler-daemon` 會在 `CRAWLER_LOCK_RETRY_SECONDS` 後重試，不會並行抓來源。
 - `.env` 中的 `CRAWLER_INTERVAL_SECONDS`、`CRAWLER_BACKOFF_SECONDS` 與 `CRAWLER_CATEGORY_DELAY_MS` 已確認；預設分別為 `1800`、`3600`、`8000`。
 - `.env` 中的 `CRAWLER_LOCK_RETRY_SECONDS` 已確認；預設 `120`。
 - `.env` 中的 `PRODUCT_IMAGE_STORAGE_DIR` 與 `CRAWLER_NEW_PRODUCT_IMAGE_*` 已確認；crawler-daemon 只會在每輪價格 crawl 後補本輪新增商品圖片。
-- `.env` 中的 `EXTERNAL_FETCH_LOCK_DIR`、`EXTERNAL_FETCH_LOCK_STALE_SECONDS` 與 `EXTERNAL_FETCH_PRIORITY_TTL_SECONDS` 已確認；價格 crawl 與 link health check 共用 lock，但價格 crawl 的 priority signal 會讓 link health 暫停。
+- `.env` 中的 `EXTERNAL_FETCH_LOCK_DIR` 與 `EXTERNAL_FETCH_LOCK_STALE_SECONDS` 已確認。
 - `WEB_BIND_HOST` 與 `POSTGRES_BIND_HOST` 仍維持 `127.0.0.1`。
 
 啟動：
@@ -208,7 +208,7 @@ docker compose -f compose.yml -f compose.crawler.yml --profile scheduled-crawler
 - 疑似被來源站攔截時，當輪 crawl 會停止並進入 backoff。
 - 單分類 fetch 例外會短 retry；若仍失敗，分類結果會保存 `error.name`、`error.message`、`error.cause.code` 與 `error.cause.message`，避免 log 只剩 `fetch failed`。
 - 若整輪所有分類都是 `FETCH_FAILED`，daemon 會先用較短 retry 間隔重新嘗試，預設不超過 600 秒；其他 parse/block 失敗仍走 `CRAWLER_BACKOFF_SECONDS`。
-- 若 shared external fetch lock 被 maintenance task 持有，crawler 會要求 priority retry，不會並行抓來源，也不會等完整 30 分鐘才再試。
+- 若 external fetch lock 已被持有，crawler 會使用 `CRAWLER_LOCK_RETRY_SECONDS` 的短 retry，不會並行抓來源，也不會等完整 30 分鐘才再試。
 - daemon log 不應輸出 `.env`、`DATABASE_URL`、Cloudflare token 或其他 secret。
 
 驗證：
@@ -219,88 +219,14 @@ docker compose -f compose.yml -f compose.crawler.yml --profile scheduled-crawler
 curl -i https://<domain>/api/source-status
 ```
 
-## Product Link Health Check
+## Product Availability
 
-商品外部連結健康檢查由 crawler ops command 執行，只更新 `product_link_health` 狀態供 UI 低干擾提示使用。它不在使用者 request lifecycle 內執行，也不會刪除商品、停用商品或移除連結。Production 的低頻排程由 `maintenance-daemon` 負責，手動 command 主要用於 dry-run、單次驗證或緊急補跑。
+商品 availability 由 crawler 的既有 missing flow 提供，不執行獨立的來源連結檢查。只有成功 fetch 並解析的分類 crawl 才會累計 missing；fetch failed、suspected block 或 parse failed 不改變 missing 狀態。
 
-先看 persisted link health 診斷報表。這個 report 只讀 DB，不發送外部 request，也不列出原始 URL 或產品明細；它用來判讀 `source` 查看 / 購買連結的狀態、HTTP status 與 `failure_count` 分布：
-
-```bash
-docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler run --rm crawler \
-  pnpm ops:product-links:report
-```
-
-常用 report 選項：
-
-- `--kinds source`：只看指定連結種類；目前只支援 `source`。
-- `--include-inactive`：包含 inactive 商品；預設只看 active 商品，和 production smoke 的 link health scope 一致。
-
-先跑小批次 dry-run，確認候選數與 log 內容：
-
-```bash
-docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler run --rm crawler \
-  pnpm ops:product-links:check -- --dry-run --limit 25
-```
-
-確認後再跑 live check。live 模式必須明確加 `--confirm-live-fetch`，並保留 request delay。正式跑預設會檢查所有超過 168 小時未確認或 URL 已變更的候選連結，`--limit` 只作為小批次測試或緊急限量使用：
-
-```bash
-docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler run --rm crawler \
-  pnpm ops:product-links:check -- --confirm-live-fetch
-```
-
-常用選項：
-
-- `--kinds source`：檢查原價屋查看 / 購買連結；目前只支援 `source`。
-- `--igrp <number>`：限制單一分類。
-- `--stale-after-hours <hours>`：只重查超過指定時間的既有紀錄，預設 168。
-- `--failure-threshold <count>`：連續 404 / 410 達門檻才標記 broken，預設 3。
-- `--min-delay-ms` / `--max-delay-ms`：控制 live request 間隔，預設 10000 到 20000 ms，避免對來源站造成壓力。
-
-驗證重點：
-
-- command log 不應輸出 `.env`、`DATABASE_URL` 或 secret。
-- 首次 404 / 410 不應直接標記 `broken`，而是先累積為暫時失敗。
-- 商品詳情頁只顯示低干擾健康提示，不應阻止使用者自行開啟外部連結。
-- 若手動 live check，應先確認 `crawler-daemon` / `maintenance-daemon` 沒在持有 external fetch lock，避免額外來源壓力。
-
-## Scheduled Maintenance Daemon
-
-`maintenance-daemon` 負責低頻 product link health check：預設每週跑排程，只選超過 168 小時未確認或 URL 已變更的 due links；每輪預設最多 200 條。商品圖片補圖不在 scheduled maintenance 內執行，需使用手動 backfill 工具。
-
-此 service 只在明確 opt-in 的 `maintenance` profile 啟動；price freshness 只需要 `scheduled-crawler` profile。它和 `crawler-daemon` 共用 `EXTERNAL_FETCH_LOCK_DIR`，避免定期價格抓取與 link health check 同時抓外部來源。daemon 啟動後預設先等 900 秒，再開始第一輪，降低部署或重啟時多個 daemon 同時起跑的機率。若價格 crawler 到點但 lock 被 link health 持有，crawler 會寫入短效 priority signal；maintenance 會在下一筆 link request 前或 request 間 delay 後暫停、釋放 lock，並在 `MAINTENANCE_PRICE_PRIORITY_PAUSE_SECONDS` 後繼續下一輪。
-
-啟動：
-
-```bash
-docker compose -f compose.yml -f compose.crawler.yml --profile maintenance up -d maintenance-daemon
-docker compose -f compose.yml -f compose.crawler.yml --profile maintenance ps maintenance-daemon
-```
-
-查看 log：
-
-```bash
-docker compose -f compose.yml -f compose.crawler.yml --profile maintenance logs --tail=100 maintenance-daemon
-```
-
-常用設定：
-
-- `MAINTENANCE_INTERVAL_SECONDS`：maintenance cycle 間隔，預設 604800，允許 3600 到 604800。
-- `MAINTENANCE_INITIAL_DELAY_SECONDS`：daemon 啟動後第一次執行前的延遲，預設 900。
-- `MAINTENANCE_PRICE_PRIORITY_PAUSE_SECONDS`：因價格 crawler priority 暫停後多久再繼續，預設 300。
-- `MAINTENANCE_LINK_LIMIT`：每輪最多 purchase link targets，預設 200。
-- `MAINTENANCE_LINK_STALE_AFTER_HOURS`：link health due window，預設 168。
-- `MAINTENANCE_LINK_MIN_DELAY_MS` / `MAINTENANCE_LINK_MAX_DELAY_MS`：link live request delay，預設 10000 到 20000 ms。
-- `EXTERNAL_FETCH_LOCK_DIR`：crawler 與 maintenance 共用的外部抓取鎖路徑。
-- `EXTERNAL_FETCH_LOCK_STALE_SECONDS`：鎖超過此秒數視為 stale，預設 43200。
-- `EXTERNAL_FETCH_PRIORITY_TTL_SECONDS`：price-priority signal 有效秒數，預設 600。
-
-單次 dry-run 驗證：
-
-```bash
-docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler run --rm crawler \
-  pnpm ops:maintenance-daemon -- --dry-run --run-once --initial-delay-seconds 0
-```
+- 連續 6 次成功 crawl 都未看到商品後，`Product.isActive` 才會改為 false，並保留 `missingSince`、`lastSeenAt` 與價格歷史。
+- 商品重新出現時恢復 active、清除 missing state，並繼續原有商品歷史。
+- 商品詳情對 inactive 商品顯示「可能已下架或暫時無法確認」的保守提示，並顯示價格資料與最後看見時間。
+- `source.url` 仍供使用者前往原價屋自行確認；request lifecycle 不對來源站發送額外請求。
 
 ## Production Smoke Daemon
 
@@ -324,20 +250,8 @@ docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler ru
 - source image anomaly 是第三方來源圖片 URL 品質訊號，低於門檻只視為 OK/info，超過門檻才 WARN，不直接 FAIL。smoke 會同時顯示 rows、distinct products 與 distinct raw image urls，避免把每輪重複寫入的 parse error rows 誤解成同等數量的受影響商品。
 - display-ready active 商品數沒有低於門檻。
 - active 商品缺圖數沒有超過門檻。
-- active 商品 source link health 的 broken 與 temporary error 數沒有超過門檻。
 - raw snapshot metadata 沒有明顯超過 retention grace。
 - 近 24 小時 Discord bot delivery 最新狀態沒有未恢復的 failed / rate limited；若同一通知串後續已成功，舊失敗不再觸發 `WARN`。
-
-Link health smoke 只統計 `source`。`source` 代表 public `source.url` 的原價屋查看 / 購買連結；原價屋來源列中的產品介紹連結已移除，不再進 DB、API、UI、link checker 或 smoke 門檻。Compose 與新部署以 `SMOKE_SOURCE_*_LINK_*` 為 canonical env；`SMOKE_BROKEN_LINK_*` 與 `SMOKE_TEMPORARY_LINK_*` 舊變數只保留為 local CLI / script compatibility aliases。
-
-建議預設：
-
-```env
-SMOKE_SOURCE_BROKEN_LINK_WARN_COUNT=1
-SMOKE_SOURCE_BROKEN_LINK_FAIL_COUNT=50
-SMOKE_SOURCE_TEMPORARY_LINK_WARN_COUNT=100
-SMOKE_SOURCE_TEMPORARY_LINK_FAIL_COUNT=500
-```
 
 啟動：
 
@@ -360,7 +274,7 @@ docker compose -f compose.yml -f compose.ops.yml --profile ops run --rm smoke-da
   pnpm ops:production-smoke -- --base-url http://web:3000
 ```
 
-若只要從任意機器檢查公開 HTTP routes / APIs，不需要連部署主機 DB，可使用 public-only 模式。這會檢查首頁、第二版配單 routes、source-status、商品列表 / 詳情 / 圖片 / 價格歷史 API、rate-limit headers 與 source freshness；不會檢查 DB-backed crawler freshness、parse errors、missing image count、link health 或 raw snapshot retention：
+若只要從任意機器檢查公開 HTTP routes / APIs，不需要連部署主機 DB，可使用 public-only 模式。這會檢查首頁、第二版配單 routes、source-status、商品列表 / 詳情 / 圖片 / 價格歷史 API、rate-limit headers 與 source freshness；不會檢查 DB-backed crawler freshness、parse errors、missing image count 或 raw snapshot retention：
 
 ```bash
 pnpm ops:production-smoke -- --public-only --base-url https://partsradar.net
@@ -382,7 +296,7 @@ SMOKE_PUBLIC_BASE_URL=https://partsradar.net
 結果判讀：
 
 - `OK`：該項目前正常。
-- `WARN`：服務仍可用，但資料流或維運狀態需要觀察，例如來源成功時間偏舊、近期有 suspected block、source image anomaly、缺圖、壞連結或 Discord bot delivery 最新狀態仍是失敗 / rate limit。
+- `WARN`：服務仍可用，但資料流或維運狀態需要觀察，例如來源成功時間偏舊、近期有 suspected block、source image anomaly、缺圖或 Discord bot delivery 最新狀態仍是失敗 / rate limit。
 - `FAIL`：服務或資料流有明確失敗，例如 HTTP/API 掛掉、沒有 successful scheduled crawl、最新 crawler 疑似被擋、來源成功時間超過 fail 門檻。
 
 若 `product image api` 是 `FAIL`，代表商品列表已導出 `/api/product-images/...webp`，但公開圖片 API 無法回應圖片內容。優先檢查 `product_images` volume 是否有檔案、`PRODUCT_IMAGE_STORAGE_DIR` 是否正確、`storage-init` 是否已修權限，以及 `crawler-daemon` 新品圖片補圖或手動 image backfill 是否實際補過缺圖。
@@ -399,8 +313,6 @@ SMOKE_PUBLIC_BASE_URL=https://partsradar.net
 - `SMOKE_PARSE_ERROR_WARN_COUNT` / `SMOKE_PARSE_ERROR_FAIL_COUNT`：parse error 門檻，預設 20 / 100。
 - `SMOKE_INVALID_IMAGE_URL_WARN_COUNT`：source image anomaly rows WARN 門檻，預設 2000；真正使用者可見影響仍由 active products / missing product images 判斷。
 - `SMOKE_MISSING_IMAGE_WARN_COUNT` / `SMOKE_MISSING_IMAGE_FAIL_COUNT`：缺圖門檻，預設 200 / 500。
-- `SMOKE_SOURCE_BROKEN_LINK_WARN_COUNT` / `SMOKE_SOURCE_BROKEN_LINK_FAIL_COUNT`：source 購買 / 查看連結 broken 門檻，預設 1 / 50。
-- `SMOKE_SOURCE_TEMPORARY_LINK_WARN_COUNT` / `SMOKE_SOURCE_TEMPORARY_LINK_FAIL_COUNT`：source 購買 / 查看連結 temporary error 門檻，預設 100 / 500。
 
 注意事項：
 
@@ -534,7 +446,7 @@ fix(web): remove unstable coolpc import tool
 
 - `web` / `postgres` healthy。
 - `storage-init` / `migrate` / `seed` exit 0。
-- `crawler-daemon` / `smoke-daemon` / `raw-snapshot-cleanup-daemon` 持續執行；若啟用 `maintenance` profile，`maintenance-daemon` 也需持續執行。
+- `crawler-daemon` / `smoke-daemon` / `raw-snapshot-cleanup-daemon` 持續執行。
 - `/build-list` local / public 都回 `HTTP 200`。
 - `/tools/coolpc-import` local / public 都回 `HTTP 404`。
 - `/tools/coolpc-import.user.js` local / public 都回 `HTTP 404`。
@@ -544,7 +456,6 @@ fix(web): remove unstable coolpc import tool
 
 目前可接受的觀察項：
 
-- `link health: broken=0 temporary=111`：來源連結 temporary 狀態觀察，broken 為 0，不阻擋第二版完成。
 - `missing product images: 8/3000`：仍在 smoke `OK` 範圍內。
 
 若未來 public-only smoke 又顯示 `/build-list` 為 `HTTP 404`、`source freshness` 失敗或 `product image api` 抽樣 404，依下列順序收斂。所有指令仍假設在部署主機 repo 根目錄執行。
@@ -579,7 +490,7 @@ docker compose -f compose.yml -f compose.crawler.yml --profile scheduled-crawler
 curl -i https://partsradar.net/api/source-status
 ```
 
-若需要立即恢復 freshness，且確認沒有其他 live fetch 或 maintenance task 正在持有 external fetch lock，可手動跑一次低速 crawl。不要把此命令做成公開 API 或常駐入口：
+若需要立即恢復 freshness，且確認沒有其他 live fetch 或 crawler process 正在持有 external fetch lock，可手動跑一次低速 crawl。不要把此命令做成公開 API 或常駐入口：
 
 ```bash
 docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler run --rm crawler \
@@ -630,7 +541,7 @@ pnpm backup:restore-drill -- backups/<timestamp>
 KEEP_RESTORE_DRILL_DB=1 pnpm backup:restore-drill -- backups/<timestamp>
 ```
 
-正式還原到 production DB 前，需先停 `web`、`crawler-daemon`、`maintenance-daemon`、`discord-bot` 與其他會寫 DB 的服務，並另外寫明該次事故的還原目標與資料時間點；不要把 restore-drill 腳本改成直接覆蓋正式 DB。
+正式還原到 production DB 前，需先停 `web`、`crawler-daemon`、`discord-bot` 與其他會寫 DB 的服務，並另外寫明該次事故的還原目標與資料時間點；不要把 restore-drill 腳本改成直接覆蓋正式 DB。
 
 ## Raw Snapshot Cleanup
 
@@ -668,7 +579,7 @@ docker compose -f compose.yml -f compose.crawler.yml --profile scheduled-crawler
 
 ## Product Image Cache Backfill
 
-商品資料 crawl 主流程會把 `primary_image_url` 寫入 DB；`crawler-daemon` 在每輪價格 crawl 完成並釋放 external fetch lock 後，只針對本輪新增商品建立本地 WebP 縮圖。`maintenance-daemon` 不做圖片補圖；新主機、重建 volume 或大量缺圖修復仍使用手動 product image cache backfill，避免低優先度圖片維護反覆掃描既有商品並卡住價格資料更新。
+商品資料 crawl 主流程會把 `primary_image_url` 寫入 DB；`crawler-daemon` 在每輪價格 crawl 完成並釋放 external fetch lock 後，只針對本輪新增商品建立本地 WebP 縮圖。新主機、重建 volume 或大量缺圖修復仍使用手動 product image cache backfill，避免低優先度圖片維護反覆掃描既有商品並卡住價格資料更新。
 
 先跑小批次 dry-run：
 
@@ -724,6 +635,6 @@ docker compose exec -T web sh -lc 'find /var/lib/partsradar/product-images -type
 Backfill 規則：
 
 - 不使用 `--overwrite`，除非明確要重建已存在的圖片。
-- 不和 `manual:crawl-coolpc-once`、`crawler-daemon` 或 `maintenance-daemon` 同時執行，避免和 scheduled 新品補圖或其他外部來源檢查重疊。
+- 不和 `manual:crawl-coolpc-once` 或 `crawler-daemon` 同時執行，避免和 scheduled 新品補圖或其他外部來源請求重疊。
 - 中斷後可重跑；已存在的 `.webp` 會被 skipped。
 - 圖片寫入 volume 後通常不需要重啟 `web`，重新整理頁面即可讀到新檔案。

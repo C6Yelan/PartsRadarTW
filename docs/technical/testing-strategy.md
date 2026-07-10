@@ -30,7 +30,7 @@
 Root scripts separate daily signal from heavier operational detail:
 
 - `pnpm test` / `pnpm test:core`: core parser, data-flow, API, build-list, product UI helpers, and shared package tests.
-- `pnpm test:ops`: ops / maintenance / smoke / daemon tests that are not Discord bot specific.
+- `pnpm test:ops`: ops / smoke / daemon tests that are not Discord bot specific.
 - `pnpm test:discord`: Discord bot command, report, delivery, cooldown, and notification tests.
 - `pnpm test:all`: full Vitest regression.
 
@@ -109,9 +109,8 @@ Scheduled crawler 至少覆蓋：
 - 沒有 `--confirm-live-fetch` 時拒絕啟動。
 - interval、backoff、category delay 有下限。
 - Compose 預設不啟動 `crawler-daemon`。
-- crawler daemon 只在 `compose.crawler.yml` 的 `scheduled-crawler` profile 中啟動，maintenance daemon 只在明確 opt-in 的 `maintenance` profile 中啟動，且不開 host ports。
-- `crawler-daemon` 與 `maintenance-daemon` 共用 external fetch lock，避免同時抓外部來源。
-- `maintenance-daemon` 沒有 `--confirm-live-fetch` 或 `--dry-run` 時拒絕啟動；run-once / loop failure behavior 需有測試。
+- crawler daemon 只在 `compose.crawler.yml` 的 `scheduled-crawler` profile 中啟動，且不開 host ports。
+- `crawler-daemon` 使用 external fetch lock 避免多個 crawler process 同時抓外部來源；lock contention 只做 bounded retry。
 
 ## API Tests
 

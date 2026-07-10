@@ -131,7 +131,6 @@ export function createSmokeClient({
   trueParseErrorCount,
   discordDeliveryCounts = {},
   discordDeliveryRecords,
-  linkHealthCounts = {},
 }: {
   invalidImageErrorCount: number;
   trueParseErrorCount: number;
@@ -147,10 +146,6 @@ export function createSmokeClient({
     targetPriceWatchId: string | null;
     createdAt: Date;
   }>;
-  linkHealthCounts?: {
-    sourceBroken?: number;
-    sourceTemporary?: number;
-  };
 }) {
   return {
     crawlRun: {
@@ -200,21 +195,6 @@ export function createSmokeClient({
     product: {
       count: async () => 1,
       findMany: async () => [{ id: "product-1" }],
-    },
-    productLinkHealth: {
-      count: async ({
-        where,
-      }: {
-        where: { linkKind?: string; status?: "BROKEN" | "TEMPORARY_ERROR" };
-      }) => {
-        if (where.linkKind === "SOURCE" && where.status === "BROKEN") {
-          return linkHealthCounts.sourceBroken ?? 0;
-        }
-        if (where.linkKind === "SOURCE" && where.status === "TEMPORARY_ERROR") {
-          return linkHealthCounts.sourceTemporary ?? 0;
-        }
-        return 0;
-      },
     },
     rawSnapshot: {
       count: async () => 0,

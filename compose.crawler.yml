@@ -57,7 +57,6 @@ services:
       CRAWLER_NEW_PRODUCT_IMAGE_TIMEOUT_MS: "${CRAWLER_NEW_PRODUCT_IMAGE_TIMEOUT_MS:-15000}"
       CRAWLER_NEW_PRODUCT_IMAGE_MAX_SOURCE_BYTES: "${CRAWLER_NEW_PRODUCT_IMAGE_MAX_SOURCE_BYTES:-5242880}"
       EXTERNAL_FETCH_LOCK_STALE_SECONDS: "${EXTERNAL_FETCH_LOCK_STALE_SECONDS:-43200}"
-      EXTERNAL_FETCH_PRIORITY_TTL_SECONDS: "${EXTERNAL_FETCH_PRIORITY_TTL_SECONDS:-600}"
     volumes:
       - snapshots:/var/lib/partsradar/snapshots
       - product_images:/var/lib/partsradar/product-images
@@ -78,43 +77,6 @@ services:
         "--confirm-live-fetch",
         "--storage-dir",
         "/var/lib/partsradar/snapshots",
-      ]
-
-  maintenance-daemon:
-    profiles:
-      - maintenance
-    build:
-      context: .
-      target: crawler
-    restart: unless-stopped
-    environment:
-      <<: *app-env
-      MAINTENANCE_INTERVAL_SECONDS: "${MAINTENANCE_INTERVAL_SECONDS:-604800}"
-      MAINTENANCE_INITIAL_DELAY_SECONDS: "${MAINTENANCE_INITIAL_DELAY_SECONDS:-900}"
-      MAINTENANCE_PRICE_PRIORITY_PAUSE_SECONDS: "${MAINTENANCE_PRICE_PRIORITY_PAUSE_SECONDS:-300}"
-      MAINTENANCE_LINK_LIMIT: "${MAINTENANCE_LINK_LIMIT:-200}"
-      MAINTENANCE_LINK_STALE_AFTER_HOURS: "${MAINTENANCE_LINK_STALE_AFTER_HOURS:-168}"
-      MAINTENANCE_LINK_MIN_DELAY_MS: "${MAINTENANCE_LINK_MIN_DELAY_MS:-10000}"
-      MAINTENANCE_LINK_MAX_DELAY_MS: "${MAINTENANCE_LINK_MAX_DELAY_MS:-20000}"
-      EXTERNAL_FETCH_LOCK_STALE_SECONDS: "${EXTERNAL_FETCH_LOCK_STALE_SECONDS:-43200}"
-      EXTERNAL_FETCH_PRIORITY_TTL_SECONDS: "${EXTERNAL_FETCH_PRIORITY_TTL_SECONDS:-600}"
-    volumes:
-      - snapshots:/var/lib/partsradar/snapshots
-    depends_on:
-      storage-init:
-        condition: service_completed_successfully
-      postgres:
-        condition: service_healthy
-      seed:
-        condition: service_completed_successfully
-    command:
-      [
-        "pnpm",
-        "--filter",
-        "@partsradar/crawler",
-        "ops:maintenance-daemon",
-        "--",
-        "--confirm-live-fetch",
       ]
 
   raw-snapshot-cleanup-daemon:

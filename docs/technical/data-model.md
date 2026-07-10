@@ -28,7 +28,6 @@ source_categories
   -> products
        -> price_snapshots
        -> current_prices -> price_snapshots
-       -> product_link_health
        -> discord_target_price_watches
        -> discord_notification_deliveries
   -> raw_snapshots
@@ -54,7 +53,6 @@ crawl_runs
 | `products` | 商品主檔 | `source_category_id + ibuy_token` 唯一；保存名稱、vendor、主要圖片、來源頁、active / missing 狀態與 seen timestamps。 |
 | `price_snapshots` | 價格歷史 | 新商品或價格變動才新增；長期保留；`raw_snapshot_id` nullable，避免 raw snapshot 清理破壞價格歷史。 |
 | `current_prices` | 網站目前價格指標 | `product_id` 為主鍵；指向同商品的 `price_snapshots`；價格值從 snapshot 取得。 |
-| `product_link_health` | 商品外部連結健康狀態 | 每商品每 link kind 一筆；保存目前 URL、狀態、HTTP status、檢查時間、最後成功 / 失敗時間與連續失敗次數。 |
 | `discord_price_report_settings` | Discord 個人價格變動報告設定 | 每個 Discord user id 一筆；保存 interval、window、scope、timezone、max items、分類 / 商品名稱關鍵字 / 內容篩選、enabled 與下次/上次發送時間。 |
 | `discord_target_price_watches` | Discord 個人目標價追蹤 | 以 Discord user id + product 建立目標價追蹤；不建立網站帳號；達標通知狀態由 watch 與 delivery log 控制。 |
 | `discord_notification_deliveries` | Discord 通知發送紀錄 | 記錄手動 price report interaction 回覆、定期 price report 或 target price 通知的 kind、status、item count、message count、錯誤摘要與 delivery time；供去重、維運檢視與後續排程使用。 |
@@ -93,6 +91,7 @@ crawl_runs
 - 成功 crawl 沒解析到有效圖片時，不清空既有圖片。
 - 商品消失不刪除 product 或價格歷史；連續 6 次成功 crawl 都缺席才改 inactive。
 - 同 identity 重新出現時恢復 active 並延續歷史。
+- 商品詳情的可用性提示以 `is_active`、`missing_since` 與 seen timestamps 為準，不建立第二份 availability 狀態。
 
 ## `price_snapshots` 與 `current_prices`
 
@@ -119,29 +118,6 @@ crawl_runs
 - `current_prices(price_snapshot_id, product_id)` 應保證目前價格不會跨商品。
 - 價格未變時不新增 snapshot，只更新必要的 seen time。
 - fetch failed、suspected block、parse failed 不更新目前價格。
-
-## `product_link_health`
-
-`product_link_health` 保存：
-
-- `product_id`
-- `link_kind`：`source`
-- `url`
-- `status`：`ok`、`broken` 或 `temporary_error`
-- nullable `http_status`
-- `checked_at`
-- nullable `last_ok_at`
-- nullable `last_failure_at`
-- `failure_count`
-- nullable `error_message`
-
-規則：
-
-- link health 是 UI 提示與維運輔助，不是商品刪除或下架真相來源。
-- link checker 不在使用者 request lifecycle 執行。
-- 同一商品同一 link kind 只保留目前狀態；URL 改變時以新 URL 重算連續失敗次數。
-- 單次失敗不應立即判定失效；404 / 410 需達到連續失敗門檻才標記 `broken`。
-- `error_message` 只供內部維運，不公開到 API 或 UI。
 
 ## Discord Bot Notification Tables
 

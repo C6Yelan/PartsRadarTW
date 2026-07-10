@@ -27,15 +27,6 @@ export const PRODUCT_DETAIL_SELECT = {
       },
     },
   },
-  linkHealthChecks: {
-    select: {
-      linkKind: true,
-      url: true,
-      status: true,
-      httpStatus: true,
-      checkedAt: true,
-    },
-  },
   sourceCategory: {
     select: {
       id: true,
@@ -46,8 +37,9 @@ export const PRODUCT_DETAIL_SELECT = {
   },
 } as const satisfies Prisma.ProductSelect;
 
-export type ProductDetailRecord = Prisma.ProductGetPayload<{ select: typeof PRODUCT_DETAIL_SELECT }>;
-export type ProductLinkHealthRecord = ProductDetailRecord["linkHealthChecks"][number];
+export type ProductDetailRecord = Prisma.ProductGetPayload<{
+  select: typeof PRODUCT_DETAIL_SELECT;
+}>;
 
 type ProductDetailFindFirstArgs = Omit<Prisma.ProductFindFirstArgs, "select"> & {
   select: typeof PRODUCT_DETAIL_SELECT;

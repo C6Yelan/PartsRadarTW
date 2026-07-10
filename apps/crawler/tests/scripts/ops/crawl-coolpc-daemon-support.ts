@@ -12,7 +12,9 @@ export function createCrawlerDaemonTestEnvironment() {
 
   return {
     cleanup: async () => {
-      await Promise.all(tempRoots.splice(0).map((path) => rm(path, { recursive: true, force: true })));
+      await Promise.all(
+        tempRoots.splice(0).map((path) => rm(path, { recursive: true, force: true })),
+      );
     },
     createWorkspace: async (): Promise<{ workspaceRoot: string; crawlerCwd: string }> => {
       const workspaceRoot = await mkdtemp(join(tmpdir(), "partsradar-daemon-options-"));
@@ -39,7 +41,6 @@ export function createDaemonOptions(
     lockDir: "/workspace/storage/snapshots/.locks/external-fetch",
     lockStaleSeconds: 43200,
     lockRetrySeconds: 120,
-    prioritySignalTtlSeconds: 600,
     runOnce: false,
     baseUrl: "https://www.coolpc.com.tw",
     newProductImageBackfill: {

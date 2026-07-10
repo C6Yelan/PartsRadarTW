@@ -158,13 +158,13 @@ https://www.coolpc.com.tw/eachview.php?IGrp={分類編號}
 
 - 不接受公開使用者輸入 URL。
 - production base URL 只允許 `https://www.coolpc.com.tw`。
-- crawler / maintenance daemon 預設不隨 `docker compose up -d` 啟動，只能透過 `compose.crawler.yml` 的 `scheduled-crawler` profile。
+- crawler daemon 預設不隨 `docker compose up -d` 啟動，只能透過 `compose.crawler.yml` 的 `scheduled-crawler` profile。
 - daemon command 保留 `--confirm-live-fetch`。
 - 不對外開 port，不提供 HTTP trigger。
 - interval / backoff 不低於 60 秒，分類間 delay 不低於 3000 ms。
 - 疑似攔截停止當輪並 backoff。
-- scheduled crawler 與 maintenance daemon 共用 external fetch lock，避免價格抓取與連結檢查同時打外部來源；價格 crawler 可用短效 priority signal 讓 maintenance link health 在安全邊界暫停並延後幾分鐘繼續。scheduled crawler 的新品圖片補圖只在價格 crawl lock 釋放後針對本輪新增商品執行。
-- manual crawler、scheduled crawler、link checker、image backfill 不應同時跑；手動 ops 前應先檢查 scheduled daemon 狀態或暫停相關 service。
+- scheduled crawler 使用 external fetch lock 避免多個 crawler process 同時打外部來源；新品圖片補圖只在價格 crawl lock 釋放後針對本輪新增商品執行。
+- manual crawler、scheduled crawler 與 image backfill 不應同時跑；手動 ops 前應先檢查 scheduled daemon 狀態或暫停相關 service。
 
 ## Raw Snapshot And Logging
 

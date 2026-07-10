@@ -3,20 +3,18 @@
 
 import type { PrismaClient } from "@partsradar/db";
 import { CRAWL_TRIGGER_TYPES, type RunCoolpcCrawlOnceResult } from "../../coolpc/crawl-run";
+import { assertSeededCategories, runCoolpcCategoryCrawl } from "../../coolpc/live-crawl";
 import {
-  assertSeededCategories,
-  runCoolpcCategoryCrawl,
-} from "../../coolpc/live-crawl";
-import { loadWorkspaceEnv, resolveWorkspaceRoot, toSafeCliErrorMessage } from "../shared/script-utils";
+  loadWorkspaceEnv,
+  resolveWorkspaceRoot,
+  toSafeCliErrorMessage,
+} from "../shared/script-utils";
 import { printHelp } from "./crawl-coolpc-daemon/help";
 import {
   handleNewProductImageBackfill,
   type NewProductImageBackfillHandler,
 } from "./crawl-coolpc-daemon/new-product-images";
-import {
-  parseDaemonOptions,
-  type CoolpcDaemonOptions,
-} from "./crawl-coolpc-daemon/options";
+import { parseDaemonOptions, type CoolpcDaemonOptions } from "./crawl-coolpc-daemon/options";
 import {
   printCycleSummary,
   resolveAllFetchFailedRetrySeconds,
@@ -24,11 +22,7 @@ import {
   summarizeProductWrites,
   type ProductWriteSummaryTotals,
 } from "./crawl-coolpc-daemon/summary";
-import {
-  clearExternalFetchPriority,
-  requestExternalFetchPriority,
-  tryAcquireExternalFetchLock,
-} from "./external-fetch-lock";
+import { tryAcquireExternalFetchLock } from "./external-fetch-lock";
 import { createOpsLogger } from "./shared/logger";
 
 const SCHEDULED_CRAWL_USER_AGENT =
@@ -104,15 +98,11 @@ export async function runScheduledCycle(
   options: CoolpcDaemonOptions,
   dependencies: {
     acquireLock?: typeof tryAcquireExternalFetchLock;
-    requestPriority?: typeof requestExternalFetchPriority;
-    clearPriority?: typeof clearExternalFetchPriority;
     crawlCategories?: typeof runCoolpcCategoryCrawl;
     backfillNewProductImages?: NewProductImageBackfillHandler;
   } = {},
 ): Promise<ScheduledCycleResult> {
   const acquireLock = dependencies.acquireLock ?? tryAcquireExternalFetchLock;
-  const requestPriority = dependencies.requestPriority ?? requestExternalFetchPriority;
-  const clearPriority = dependencies.clearPriority ?? clearExternalFetchPriority;
   const crawlCategories = dependencies.crawlCategories ?? runCoolpcCategoryCrawl;
   const backfillNewProductImages =
     dependencies.backfillNewProductImages ?? handleNewProductImageBackfill;
@@ -123,13 +113,8 @@ export async function runScheduledCycle(
   });
 
   if (!lock) {
-    await requestPriority({
-      lockDir: options.lockDir,
-      owner: "crawler-daemon",
-      ttlSeconds: options.prioritySignalTtlSeconds,
-    });
     log(
-      `Skipping CoolPC scheduled crawl because another external fetch task holds the lock. Requested priority retry in ${options.lockRetrySeconds}s.`,
+      `Skipping CoolPC scheduled crawl because another crawler process holds the external fetch lock. Retrying in ${options.lockRetrySeconds}s.`,
     );
 
     return {
@@ -137,11 +122,6 @@ export async function runScheduledCycle(
       retryAfterSeconds: options.lockRetrySeconds,
     };
   }
-
-  await clearPriority({
-    lockDir: options.lockDir,
-    owner: "crawler-daemon",
-  });
 
   log("Starting CoolPC scheduled crawl cycle.");
 

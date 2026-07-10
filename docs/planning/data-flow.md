@@ -30,7 +30,7 @@
 
 第一版只啟用組電腦核心分類；第二版第一輪新增外接儲存 `8`、水冷 `11`、風扇 / 配件 `16`。其他原價屋分類仍需重新盤點與驗證後才可啟用。
 
-第二版可繼續重新盤點並擴充第一版以外的原價屋分類。新增分類必須先通過 manual live validation、raw snapshot replay、parser validation、圖片 URL 驗證與 link health 驗證，不應未驗證就一次全開所有 IGrp。
+第二版可繼續重新盤點並擴充第一版以外的原價屋分類。新增分類必須先通過 manual live validation、raw snapshot replay、parser validation、圖片 URL 與來源連結產生規則驗證，不應未驗證就一次全開所有 IGrp。
 
 ## 流程總覽
 

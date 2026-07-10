@@ -5,7 +5,6 @@ import {
   DEFAULT_BASE_URL,
   DEFAULT_INVALID_IMAGE_URL_WARN_COUNT,
   DEFAULT_PRODUCT_IMAGE_STORAGE_DIR,
-  DEFAULT_TEMPORARY_LINK_WARN_COUNT,
   DEFAULT_TIMEOUT_MS,
 } from "../constants";
 
@@ -28,8 +27,6 @@ Options:
   --recent-window-hours <hours>            Window for suspected block and parse error checks.
   --invalid-image-url-warn-count <count>   Warn only when source image URL anomalies exceed this.
                                            Default: ${DEFAULT_INVALID_IMAGE_URL_WARN_COUNT}
-  --source-temporary-link-warn-count <n>   Warn when source.url temporary link errors exceed this.
-                                           Default: ${DEFAULT_TEMPORARY_LINK_WARN_COUNT}
   --help                                   Show this help message.
 `);
 }

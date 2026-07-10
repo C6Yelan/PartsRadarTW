@@ -24,10 +24,6 @@ export interface ProductionSmokeOptions {
   minActiveProducts: number;
   missingImageWarnCount: number;
   missingImageFailCount: number;
-  sourceBrokenLinkWarnCount: number;
-  sourceBrokenLinkFailCount: number;
-  sourceTemporaryLinkWarnCount: number;
-  sourceTemporaryLinkFailCount: number;
   rawSnapshotNormalRetentionDays: number;
   rawSnapshotAbnormalRetentionDays: number;
   rawSnapshotRetentionGraceDays: number;
@@ -108,10 +104,5 @@ export interface SourceImageAnomalyRecord {
 // production smoke 需要的 Prisma client 最小邊界，方便測試使用 fake client。
 export type ProductionSmokeClient = Pick<
   PrismaClient,
-  | "crawlRun"
-  | "discordNotificationDelivery"
-  | "parseError"
-  | "product"
-  | "productLinkHealth"
-  | "rawSnapshot"
+  "crawlRun" | "discordNotificationDelivery" | "parseError" | "product" | "rawSnapshot"
 >;

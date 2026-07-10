@@ -137,8 +137,7 @@ Response shape：
 - 商品不存在回 `404`。
 - 缺少主要圖片資料不等於商品不存在；詳細頁仍回 `200`，`image` 為 `null`。
 - `source.url` 指向原價屋購買 / 查看導流，不含 session token。
-- `source.health` 來自已持久化的 link checker 結果；沒有檢查紀錄或 URL 已變更時回 `null`。
-- link health 只回傳 `status`、`checkedAt`、`httpStatus`，不回傳內部錯誤訊息。
+- 詳情頁以 `status.isActive` 與 `price.lastSeenAt` 顯示保守的商品可用性提示；API 不回傳連結檢查狀態。
 - 商品詳細 endpoint 不內嵌價格歷史、拆解規格、raw snapshot 或 parse error；價格歷史由獨立 endpoint 讀取。
 
 ## `GET /api/products/{id}/price-history`

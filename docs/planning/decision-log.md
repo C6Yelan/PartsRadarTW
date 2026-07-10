@@ -11,12 +11,13 @@
 | 第一版以查詢網站為主 | 第一版先完成商品搜尋、分類瀏覽、價格排序與基本篩選。 |
 | 第一版不做個人化功能 | 使用者帳號、收藏清單、個人價格提醒會影響資料模型與權限設計，第一版先不納入。 |
 | 第二版仍不做帳號與個人化功能 | 第二版不建立帳號、登入、收藏清單、追蹤清單、個人價格提醒或使用者導向 Discord bot；若未來真的需要，需另開產品與資安設計。 |
-| 第二版以價格洞察、配單與維運穩定性為主 | 第二版範圍聚焦價格歷史、近 30 天價格變動、商品連結健康檢查、正常瀏覽限流調整、配單與 Excel 匯出；營運監控先維持 `smoke-daemon` log 型監控。 |
+| 第二版以價格洞察、配單與維運穩定性為主 | 第二版範圍聚焦價格歷史、近 30 天價格變動、crawler 商品可用性狀態、正常瀏覽限流調整、配單與 Excel 匯出；營運監控先維持 `smoke-daemon` log 型監控。 |
+| 商品可用性由 crawler 狀態提供 | 商品詳情以 `Product.isActive`、missing flow 與 seen timestamps 顯示保守提示；不維護獨立連結檢查資料或訪客 request-time 檢查。 |
 | 價格歷史有使用者價值，但不等於網站帳號化價格追蹤 | 價格歷史、近期漲跌與分享配單中的價格變動提示可作為決策輔助；第三版可用 Discord bot 做低成本個人目標價提醒與個人價格變動報告，但網站仍維持 accountless，不建立登入、email 通知或跨平台帳號綁定。 |
 | Discord 通知分工已定案 | Discord bot 負責 public 價格變動報告、使用者 slash command 與個人化通知；webhook 僅保留給 admin smoke / ops 告警。Bot 第一輪做公開頻道價格報告、`/price-report settings/now`、統合新增 / 查看 / 編輯 / 移除的 `/watch` 管理介面與必要的通知發送，不做網站帳號、公開暴露個人追蹤清單、Discord 內保存配單、庫存通知或購買建議。 |
 | Discord 價格變動報告分成 public 與 personal | Public 價格報告由 `/public-report` 在 Discord 伺服器內設定發送頻道，`discord-bot` 掃描 scheduled crawl 後尚未送出的本輪價格變動並送到已啟用頻道；管理者可在 `/public-report manage` 調整分類、商品名稱關鍵字、降價 / 漲價與顯示上限，測試報告與自動報告共用同一組設定。Discord bot 的 `/price-report now` 在指令所在頻道或私訊 context 以 embed 回覆中文報告，只為有資料的「價格變動」或「新增商品」產生 embed，摘要與價格變動方向標題使用 Markdown emphasis，商品列以單行呈現關鍵價格與站內商品連結，且小分類已顯示品牌時不再重複商品名稱開頭品牌；`/price-report settings` 的按鈕與 modal 開放每日 DM 報告，依使用者設定的 window / max_items / 台北時間發送時間、分類、商品名稱關鍵字與內容類型列出特定時間段內實際變價商品。 |
 | 分享配單與 web 狀態介面暫緩 | 分享配單可先由 Excel 匯出或截圖滿足，server-side share token / retention / snapshot / abuse guard 的成本高於近期價值；公開或內網狀態頁的維護成本高於目前價值，維運訊號收斂到 production smoke、admin webhook、container logs、runbook 與外部 public-only monitoring。 |
-| 第二版重新盤點原價屋分類擴充 | 第一版只啟用 8 個組電腦核心分類；第二版可擴充第一版以外的原價屋公開分類，但必須先做 IGrp 盤點、manual live validation、raw snapshot replay、parser / image / link health 驗證，再分批啟用。不能未驗證就一次全開所有分類。 |
+| 第二版重新盤點原價屋分類擴充 | 第一版只啟用 8 個組電腦核心分類；第二版可擴充第一版以外的原價屋公開分類，但必須先做 IGrp 盤點、manual live validation、raw snapshot replay、parser / image / source URL 驗證，再分批啟用。不能未驗證就一次全開所有分類。 |
 | 第二版第一批分類擴充啟用 `IGrp=8/11/16` | 第一批先啟用外接儲存 `IGrp=8`、水冷 `IGrp=11`、風扇 / 配件 `IGrp=16`。這三類已可由 parser 取得 token、名稱、價格、來源連結與圖片欄位，並通過 manual live validation / raw snapshot replay；其他分類仍需另行盤點驗證。 |
 | 第二版配單採 accountless client-side state | 配單只作為一次性整理購買清單，不建立帳號、不保存伺服器端個人菜單、不做購物車、下單、自動購買、相容性檢查或自動推薦配單。配單可使用 localStorage 保存，匯出 Excel 時每件商品需附原價屋查看 / 購買網址。 |
 | 正常瀏覽不應被 API limiter 誤傷 | 公開 API 仍保留 app-level abuse guard，但正常使用者快速切分類、翻頁、排序與載入商品圖片時不應輕易觸發 `429`。第二版需確認 production rate limit env、client identity header、list / read / image 額度與前端多餘 request。 |
@@ -35,7 +36,7 @@
 | 商品識別採內部 ID 與原價屋鍵分離 | 資料庫使用內部 UUID 作為商品主鍵，並以 `source_category_id + ibuy_token` 作為商品唯一鍵；`source_category_id` 對應唯一 `IGrp`，crawler 需要字串識別時使用 computed `source_item_key`。 |
 | `source_item_key` 使用 `iBuy` token | 第一版 computed `source_item_key` 使用 `coolpc:igrp:{IGrp}:ibuy:{iBuyToken}`，但不存入 DB；沒有 `iBuyToken` 的單品不匯入正式商品但保留解析紀錄。此決策需在 Phase 2 以第一版目標分類 fixture 驗證，若某分類無法穩定取得 token，該分類先不匯入正式商品或另開決策。 |
 | raw snapshot 採資料庫 metadata 加壓縮檔案 | 重要資料與狀態存資料庫，原始 HTML 使用後壓縮保存成檔案；一般 snapshot 最長保留 30 天，異常 snapshot 最長保留 90 天，未來依實際狀況調整。raw snapshot 清理不得刪除價格歷史；長期價格資料若參照 raw snapshot，關聯需允許清空或以不破壞外鍵的方式處理。 |
-| crawler 每 30 分鐘檢查是否啟動下一輪 | 公開後避免價格 crawler 與 link checker 疊加造成來源站壓力，第二版起預設每 30 分鐘檢查一次；若上一輪尚未完成，不重疊啟動新的 crawl cycle。 |
+| crawler 每 30 分鐘檢查是否啟動下一輪 | 公開後避免多個 crawler process 或手動 live fetch 疊加造成來源站壓力，第二版起預設每 30 分鐘檢查一次；若上一輪尚未完成，不重疊啟動新的 crawl cycle。 |
 | 疑似攔截時立即停止當次 crawl | 遇到疑似攔截頁時立即停止當次 crawl，不更新正式商品與價格資料；下一次依 30 分鐘循環再嘗試，若連續失敗多次則延後 1 小時並保存異常狀況。 |
 | 網站目前價格讀取 `current_prices` | 價格歷史由 price snapshots 保存；`current_prices` 只保存目前 `price_snapshot` 指標與狀態時間，價格、幣別與 `captured_at` 由對應 price snapshot 取得。 |
 | HTTP 200 不代表抓取成功 | 原價屋在短時間內請求頻率過高時，可能回傳 HTTP 200 但內容為攔截頁或非商品資料頁；crawler 需做內容層驗證。 |

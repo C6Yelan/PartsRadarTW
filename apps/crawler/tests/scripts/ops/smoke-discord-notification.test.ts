@@ -7,7 +7,13 @@ import {
   createSmokeDiscordNotificationDecision,
   parseSmokeDiscordNotificationOptions,
 } from "../../../src/scripts/ops/smoke-discord-notification";
-import { check, createWorkspace, state, summary, WEBHOOK_URL } from "./smoke-discord-notification-support";
+import {
+  check,
+  createWorkspace,
+  state,
+  summary,
+  WEBHOOK_URL,
+} from "./smoke-discord-notification-support";
 
 describe("smoke Discord notification options", () => {
   it("uses disabled webhook defaults and workspace-relative state path", async () => {
@@ -180,7 +186,7 @@ describe("createSmokeDiscordNotificationDecision", () => {
     const decision = createSmokeDiscordNotificationDecision({
       summary: summary({
         status: "WARN",
-        checks: [check("link health", "WARN", "temporary=120")],
+        checks: [check("missing product images", "WARN", "missing=120")],
       }),
       previousState: state({
         status: "WARN",
@@ -194,7 +200,7 @@ describe("createSmokeDiscordNotificationDecision", () => {
     expect(decision).toMatchObject({
       action: "send",
       kind: "WARN",
-      notificationKey: "WARN:WARN:link health",
+      notificationKey: "WARN:WARN:missing product images",
     });
   });
 

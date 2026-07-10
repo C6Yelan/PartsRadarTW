@@ -1,5 +1,5 @@
 // apps/crawler/tests/scripts/ops/production-smoke-db.test.ts
-// 驗證 production smoke 的 DB-backed 檢查：parse error、圖片異常、link health 與 Discord delivery。
+// 驗證 production smoke 的 DB-backed 檢查：parse error、圖片異常與 Discord delivery。
 
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -115,44 +115,6 @@ describe("production smoke DB-backed checks", () => {
           status: "WARN",
           message:
             "2001 rows / 16 distinct products / 5 distinct raw image urls in 24h, warnAfter=2000",
-        }),
-      ]),
-    );
-  });
-
-  it("warns when source temporary link errors exceed the source threshold", async () => {
-    const { crawlerCwd, workspaceRoot } = await createWorkspace();
-    const imageDir = join(workspaceRoot, "product-images");
-    await mkdir(imageDir);
-    await writeFile(join(imageDir, "product-1.webp"), "webp");
-    stubHealthyPublicApi();
-    const options = parseProductionSmokeOptions(
-      [],
-      {
-        PRODUCT_IMAGE_STORAGE_DIR: imageDir,
-        SMOKE_TEMPORARY_LINK_WARN_COUNT: "100",
-      },
-      crawlerCwd,
-    );
-    const summary = await runProductionSmoke(
-      createSmokeClient({
-        invalidImageErrorCount: 0,
-        trueParseErrorCount: 0,
-        linkHealthCounts: {
-          sourceTemporary: 101,
-        },
-      }),
-      options,
-      new Date("2026-06-02T12:00:00.000Z"),
-    );
-
-    expect(summary.status).toBe("WARN");
-    expect(summary.checks).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          name: "link health",
-          status: "WARN",
-          message: "source broken=0 temporary=101",
         }),
       ]),
     );

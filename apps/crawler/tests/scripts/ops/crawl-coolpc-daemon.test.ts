@@ -33,7 +33,6 @@ describe("CoolPC scheduled crawler daemon options", () => {
         SNAPSHOT_STORAGE_DIR: "storage/snapshots",
         PRODUCT_IMAGE_STORAGE_DIR: "storage/product-images",
         EXTERNAL_FETCH_LOCK_STALE_SECONDS: "21600",
-        EXTERNAL_FETCH_PRIORITY_TTL_SECONDS: "300",
         COOLPC_BASE_URL: "https://www.coolpc.com.tw",
       },
       crawlerCwd,
@@ -48,7 +47,6 @@ describe("CoolPC scheduled crawler daemon options", () => {
       lockDir: join(workspaceRoot, "storage", "snapshots", ".locks", "external-fetch"),
       lockStaleSeconds: 21600,
       lockRetrySeconds: 90,
-      prioritySignalTtlSeconds: 300,
       runOnce: false,
       baseUrl: "https://www.coolpc.com.tw",
       newProductImageBackfill: {
@@ -151,5 +149,4 @@ describe("CoolPC scheduled crawler daemon options", () => {
       ),
     ).toThrow("--new-product-image-min-delay-ms/CRAWLER_NEW_PRODUCT_IMAGE_MIN_DELAY_MS");
   });
-
 });

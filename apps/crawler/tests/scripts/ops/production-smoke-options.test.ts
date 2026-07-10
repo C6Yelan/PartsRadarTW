@@ -36,10 +36,6 @@ describe("production smoke options", () => {
       minActiveProducts: 1,
       missingImageWarnCount: 200,
       missingImageFailCount: 500,
-      sourceBrokenLinkWarnCount: 1,
-      sourceBrokenLinkFailCount: 50,
-      sourceTemporaryLinkWarnCount: 100,
-      sourceTemporaryLinkFailCount: 500,
     });
     expect(options.productImageStorageDir).toBe(join(workspaceRoot, "storage", "product-images"));
   });
@@ -66,8 +62,6 @@ describe("production smoke options", () => {
         PRODUCT_IMAGE_STORAGE_DIR: "custom-images",
         SMOKE_CRAWLER_FAIL_AFTER_MINUTES: "240",
         SMOKE_INVALID_IMAGE_URL_WARN_COUNT: "3000",
-        SMOKE_TEMPORARY_LINK_WARN_COUNT: "77",
-        SMOKE_SOURCE_TEMPORARY_LINK_FAIL_COUNT: "123",
       },
       crawlerCwd,
     );
@@ -80,8 +74,6 @@ describe("production smoke options", () => {
     expect(options.crawlerFailAfterMinutes).toBe(240);
     expect(options.missingImageWarnCount).toBe(10);
     expect(options.invalidImageUrlWarnCount).toBe(3000);
-    expect(options.sourceTemporaryLinkWarnCount).toBe(77);
-    expect(options.sourceTemporaryLinkFailCount).toBe(123);
     expect(options.productImageStorageDir).toBe(join(workspaceRoot, "custom-images"));
   });
 

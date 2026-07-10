@@ -2,7 +2,6 @@
 // 輸出 scheduled CoolPC crawler daemon 的 CLI 使用說明，集中呈現可調整的排程、lock 與圖片補圖選項。
 
 import { DEFAULT_COOLPC_CATEGORY_DELAY_MS } from "../../../coolpc/live-crawl";
-import { DEFAULT_EXTERNAL_FETCH_PRIORITY_TTL_SECONDS } from "../external-fetch-lock";
 import {
   DEFAULT_BACKOFF_SECONDS,
   DEFAULT_INTERVAL_SECONDS,
@@ -54,9 +53,6 @@ Options:
                              Default: PRODUCT_IMAGE_STORAGE_DIR, then ${DEFAULT_PRODUCT_IMAGE_STORAGE_DIR}
   --lock-dir <path>          Shared external fetch lock directory.
   --lock-stale-seconds <sec> Break stale external fetch locks after this age.
-  --priority-signal-ttl-seconds <sec>
-                             Higher-priority external fetch signal TTL.
-                             Default: ${DEFAULT_EXTERNAL_FETCH_PRIORITY_TTL_SECONDS}
   --storage-dir <path>       Snapshot storage directory from the workspace root.
                              Default: ${DEFAULT_STORAGE_DIR}
 
@@ -66,7 +62,6 @@ Environment:
   CRAWLER_NEW_PRODUCT_IMAGE_MIN_DELAY_MS, CRAWLER_NEW_PRODUCT_IMAGE_MAX_DELAY_MS,
   CRAWLER_NEW_PRODUCT_IMAGE_TIMEOUT_MS, CRAWLER_NEW_PRODUCT_IMAGE_MAX_SOURCE_BYTES,
   SNAPSHOT_STORAGE_DIR, EXTERNAL_FETCH_LOCK_DIR, EXTERNAL_FETCH_LOCK_STALE_SECONDS,
-  EXTERNAL_FETCH_PRIORITY_TTL_SECONDS,
   PRODUCT_IMAGE_STORAGE_DIR, COOLPC_BASE_URL
 `);
 }

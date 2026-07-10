@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Ops tooling helps maintainers detect public availability issues, crawler/data-flow drift, image/link health problems, raw snapshot retention drift, and Discord delivery failures without exposing internal state to users.
+Ops tooling helps maintainers detect public availability issues, crawler/data-flow drift, product image problems, raw snapshot retention drift, and Discord delivery failures without exposing internal state to users.
 
 ## Current Behavior
 
@@ -17,7 +17,7 @@ Ops tooling helps maintainers detect public availability issues, crawler/data-fl
 - The runtime has no DB-backed status UI or maintainer-only web service; `web` serves only public application routes and APIs.
 - Production smoke must not live-fetch CoolPC or mutate product data.
 - Public-only smoke must not require DB access.
-- DB-backed smoke may read aggregate crawler, product image, link health, raw snapshot, and Discord delivery state.
+- DB-backed smoke may read aggregate crawler, product image, raw snapshot, and Discord delivery state.
 - Admin webhook must send only safe, summarized status and must not become a user notification channel.
 
 ## Security/Data Boundary
