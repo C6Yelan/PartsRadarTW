@@ -2,14 +2,14 @@
 // apps/web/app/product-explorer/use-product-build-list-actions.ts
 // 將商品探索頁列表商品接到配單 hook，提供加入與減少數量的頁面動作。
 
-import { toBuildListProduct } from "../build-list/model";
 import { useBuildList } from "../build-list/use-build-list";
 import type { ProductListItem } from "./types";
 
-// 建立商品探索頁使用的配單操作，負責把 ProductListItem 轉成配單商品快照。
+// 建立商品探索頁使用的配單操作；加入時只保存 product ID 與使用者 intent。
 export function useProductBuildListActions() {
   const {
     addBuildListProduct,
+    isProductLimitReached,
     quantityByProductId,
     removeBuildListItem,
     summary,
@@ -17,7 +17,7 @@ export function useProductBuildListActions() {
   } = useBuildList();
 
   function addProductToBuildList(product: ProductListItem) {
-    addBuildListProduct(toBuildListProduct(product));
+    addBuildListProduct(product.id);
   }
 
   function decreaseBuildListItemQuantity(product: ProductListItem) {
@@ -33,6 +33,7 @@ export function useProductBuildListActions() {
 
   return {
     quantities: quantityByProductId,
+    isProductLimitReached,
     summary,
     addProductToBuildList,
     decreaseBuildListItemQuantity,

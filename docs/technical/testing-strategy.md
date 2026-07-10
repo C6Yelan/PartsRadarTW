@@ -122,13 +122,15 @@ Scheduled crawler 至少覆蓋：
 - 商品列表與詳細有圖片時回站內圖片 URL，缺圖時回 `image: null` 並由前端 fallback。
 - 商品不存在 `404`。
 - inactive 商品詳細仍可 `200`。
+- `/api/build-list/refresh` 的 body bound、50 筆、單次 query、partial / all missing、nullable price 與獨立 limiter scope。
 - `/api/source-status` 的 `ok`、`stale`、`unavailable` 與分類聚合。
 - web runtime source 不含 `console.*`，避免 browser console 洩漏 internal state；此規則由 Biome `noConsole` 限定在 `apps/web/app` runtime source 執行，不放在 Vitest。
 
 Build-list tests are grouped by public boundary:
 
-- `apps/web/tests/build-list/model-storage.test.ts`: model normalization, quantity rules, localStorage persistence.
-- `apps/web/tests/build-list/export.test.ts`: worksheet rows, generated workbook / download, export date formatting.
+- `apps/web/tests/build-list/model-storage.test.ts`: v2 intent normalization, 50-item limit, v1 ignored, refresh join, unavailable pricing, localStorage persistence.
+- `apps/web/tests/build-list/refresh.test.ts`: batch client success, partial / all missing, rate limit, failure, abort, malformed response.
+- `apps/web/tests/build-list/export.test.ts`: refreshed / missing rows, Taipei time, freeze / filter, minimal workbook and download.
 
 不可暴露：
 
@@ -155,6 +157,12 @@ Build-list tests are grouped by public boundary:
 - 不存在商品顯示找不到。
 - 原始商品名稱、圖片、價格、來源與狀態顯示完整。
 - 來源連結不含 `PHPSESSID`。
+
+配單頁：
+
+- v2 intent 進頁後以 batch refresh 顯示目前資料，quantity / order 保留。
+- partial missing 與 refresh 失敗保留 intent，未知價格不計入總價，remove / undo 仍可運作。
+- 顯示 browser-only、最近同步、手動 refresh 與 50 個不同品項上限。
 
 Playwright 驗證需使用可設定 base URL 或相對導覽，避免硬寫單一 localhost port。
 

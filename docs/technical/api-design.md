@@ -20,6 +20,7 @@ API 只服務自家 Next.js 網站，不承諾第三方公開 API。所有 endpo
 | GET | `/api/products` | 商品列表、搜尋、篩選、排序、分頁 |
 | GET | `/api/products/{id}` | 商品詳細 |
 | GET | `/api/products/{id}/price-history` | 商品價格歷史 |
+| POST | `/api/build-list/refresh` | 依配單 product IDs 批次讀取目前商品資料 |
 | GET | `/api/product-images/{id}.webp` | 站內商品縮圖 |
 | GET | `/api/source-status` | 來源資料狀態 |
 
@@ -43,7 +44,7 @@ API 只服務自家 Next.js 網站，不承諾第三方公開 API。所有 endpo
 常見狀態碼：
 
 - `200` 成功。
-- `400` query 不合法。
+- `400` query 或 request body 不合法。
 - `404` 商品或圖片不存在。
 - `429` 同一 client 在短時間內請求過多。
 - `500` 未預期錯誤，訊息需泛用。
@@ -65,6 +66,29 @@ API 只服務自家 Next.js 網站，不承諾第三方公開 API。所有 endpo
 - 排序依目前啟用分類順序。
 - `slug` 由 web/API boundary 的單一 mapping 從 internal CoolPC `igrp` 產生，不寫入 DB。
 - enabled 分類若缺少 slug mapping，回傳泛用 `500`，不靜默省略分類。
+
+## `POST /api/build-list/refresh`
+
+Request body 是 product UUID 字串陣列，不接受 query parameter、URL 或額外 wrapper。只接受 `application/json`，raw array 最多 50 筆且 body 最多 4 KiB；UUID 正規化後去重並保留首次出現順序。空陣列直接回空結果，不查 DB。
+
+Content type、query、body size、shape 或 UUID 驗證失敗時回 `400 invalid_request`，不公開 parser 細節。
+
+Handler 使用一次 Prisma `findMany`，只讀 enabled 來源分類；不過濾 inactive 商品，也不因 `currentPrice = null` 把已存在商品列為 missing。回傳順序依 request，而不是 DB query 順序。
+
+Response shape：
+
+- `data[]`
+  - `id`
+  - `name`
+  - `image`：站內圖片 URL / alt 或 `null`
+  - `category.displayName`
+  - `price`：`amount` / `currency` 或 `null`
+  - `source.url`：由 `ibuyToken` 重建的查看 / 購買連結
+  - `status.isActive`
+  - `lastSeenAt`
+- `missingProductIds[]`
+
+此 endpoint 不回傳 `ibuyToken`、來源 raw image URL、missing counter 或 crawler health。它是 accountless 配單的 read-only 批次讀取，不保存配單或觸發 crawler。
 
 ## `GET /api/products`
 
@@ -224,5 +248,6 @@ Response shape：
 - 預設 `api:read` 為每 client 每 60 秒 120 次，涵蓋 categories、source-status 與 product detail。
 - 預設 `api:list` 為每 client 每 60 秒 360 次，涵蓋商品列表查詢，避免正常快速切分類、翻頁或排序時被一般 read 額度誤傷。
 - 預設 `api:image` 為每 client 每 60 秒 1200 次，涵蓋商品縮圖 API；pageSize 50 的正常瀏覽會一次載入大量圖片，圖片額度需比 list 額度更寬。
+- `api:build-list` 使用與 `api:read` 相同的預設數值，但有獨立 bucket，不消耗 detail、list 或 image 額度。
 - 正常快速切分類、翻頁、排序與載入列表圖片不應輕易觸發 `429`；production 需確認 list / image 額度與 client identity header 實際生效。
 - 成功 response 回傳 `X-RateLimit-*` headers 方便 production smoke 判斷 bucket 狀態；超限回 `429` 與 `Retry-After` / `X-RateLimit-*` headers；response 不回傳 IP、env、DB 或 internal state。

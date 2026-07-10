@@ -57,6 +57,7 @@ export function ProductExplorerResultsPanel({
   };
   table: {
     buildListQuantities: Map<string, number>;
+    isProductLimitReached: boolean;
     productListReturnTo: string;
     products: ProductsResponse | null;
     productState: LoadState;
@@ -94,6 +95,7 @@ export function ProductExplorerResultsPanel({
 
       <ProductTable
         buildListQuantities={table.buildListQuantities}
+        isProductLimitReached={table.isProductLimitReached}
         productListReturnTo={table.productListReturnTo}
         products={table.products}
         productState={table.productState}

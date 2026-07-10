@@ -1,16 +1,17 @@
 "use client";
 // apps/web/app/build-list/components/BuildListSummaryPanel.tsx
-// 顯示配單總計、來源資料提醒與匯出 / 清空操作入口。
+// 顯示當次 refresh 可確認的配單估算、未計價數量與匯出／清空入口。
 
 import { formatBuildListPrice } from "../formatting";
 import type { BuildListSummary } from "../model";
 
-// 呈現配單摘要側欄，將清空與下載事件交回頁面層處理。
 export default function BuildListSummaryPanel({
+  isDownloadDisabled,
   onClear,
   onDownloadExcel,
   summary,
 }: {
+  isDownloadDisabled: boolean;
   onClear: () => void;
   onDownloadExcel: () => void;
   summary: BuildListSummary;
@@ -26,16 +27,29 @@ export default function BuildListSummaryPanel({
           <dt>數量</dt>
           <dd>{summary.totalQuantity}</dd>
         </div>
+        <div>
+          <dt>未計價品項</dt>
+          <dd>{summary.unpricedItemCount}</dd>
+        </div>
         <div className="build-list-total-row">
           <dt>總價</dt>
           <dd>{formatBuildListPrice(summary.totalAmount)}</dd>
         </div>
       </dl>
 
-      <p>價格以網站最後收錄資料為準；實際商品資訊、價格、庫存、購買與售後仍以原價屋來源頁為準。</p>
+      <p>
+        {summary.unpricedItemCount > 0
+          ? `配單總價僅計入目前有價格的品項；另有 ${summary.unpricedItemCount} 個品項暫未計價。`
+          : "配單總價為目前已確認價格的估算。"}
+      </p>
 
       <div className="build-list-summary-actions">
-        <button className="control-button primary" type="button" onClick={onDownloadExcel}>
+        <button
+          className="control-button primary"
+          disabled={isDownloadDisabled}
+          type="button"
+          onClick={onDownloadExcel}
+        >
           下載 Excel
         </button>
         <button className="control-button secondary" type="button" onClick={onClear}>

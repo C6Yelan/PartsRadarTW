@@ -17,9 +17,10 @@ export interface BuildListExcelDownload {
 // 建立配單 Excel 下載內容，供瀏覽器下載流程與單元測試共用。
 export function createBuildListExcelDownload(
   items: BuildListItem[],
+  lastSuccessfulSyncAt: string | null,
   now = new Date(),
 ): BuildListExcelDownload {
-  const workbookBytes = buildBuildListWorkbook(items);
+  const workbookBytes = buildBuildListWorkbook(items, lastSuccessfulSyncAt);
   const workbookBuffer = new ArrayBuffer(workbookBytes.byteLength);
   new Uint8Array(workbookBuffer).set(workbookBytes);
 
@@ -32,8 +33,11 @@ export function createBuildListExcelDownload(
 }
 
 // 觸發瀏覽器下載配單 Excel，並在 click 後釋放暫時的 object URL。
-export function downloadBuildListExcel(items: BuildListItem[]) {
-  const { blob, filename } = createBuildListExcelDownload(items);
+export function downloadBuildListExcel(
+  items: BuildListItem[],
+  lastSuccessfulSyncAt: string | null,
+) {
+  const { blob, filename } = createBuildListExcelDownload(items, lastSuccessfulSyncAt);
   const downloadUrl = URL.createObjectURL(blob);
   const downloadLink = document.createElement("a");
   downloadLink.href = downloadUrl;

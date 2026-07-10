@@ -125,6 +125,7 @@ export function useProductExplorerViewModel() {
       },
       table: {
         buildListQuantities: buildList.quantities,
+        isProductLimitReached: buildList.isProductLimitReached,
         productListReturnTo,
         products,
         productState,

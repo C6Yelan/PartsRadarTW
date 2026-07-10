@@ -6,7 +6,7 @@ import { LRUCache } from "lru-cache";
 
 import { internalErrorResponse, rateLimitedResponse } from "./responses";
 
-export type RateLimitScope = "api:read" | "api:list" | "api:image";
+export type RateLimitScope = "api:read" | "api:list" | "api:image" | "api:build-list";
 export type ClientIdentifierSource = "cf" | "xff" | "unknown";
 
 export const RATE_LIMIT_DEFAULTS = {
@@ -166,6 +166,7 @@ export function resolveRateLimitConfig(env: RateLimitEnv = process.env): RateLim
       "api:read": readMax,
       "api:list": listMax,
       "api:image": imageMax,
+      "api:build-list": readMax,
     },
     windowMs: windowSeconds * 1000,
   };

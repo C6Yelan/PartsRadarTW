@@ -48,6 +48,15 @@
     padding-top: 14px;
   }
 
+  .build-list-refresh-status {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .build-list-refresh-status .control-button {
+    width: 100%;
+  }
+
   .build-list-item {
     grid-template-columns: 64px minmax(0, 1fr);
     grid-template-areas:

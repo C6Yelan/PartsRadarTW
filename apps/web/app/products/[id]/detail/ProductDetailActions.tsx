@@ -2,12 +2,13 @@
 // apps/web/app/products/[id]/detail/ProductDetailActions.tsx
 // 顯示商品詳細頁的配單操作、來源購買連結與分享操作區塊。
 
-import { BUILD_LIST_MAX_QUANTITY } from "../../../build-list/model";
+import { BUILD_LIST_MAX_QUANTITY, MAX_BUILD_LIST_PRODUCTS } from "../../../build-list/model";
 
 // 組裝商品詳細頁主要操作，依配單狀態切換加入按鈕或數量控制。
 export default function ProductDetailActions({
   canIncreaseBuildListQuantity,
   currentBuildListQuantity,
+  isProductLimitReached,
   onAddToBuildList,
   onDecreaseBuildListQuantity,
   onShare,
@@ -17,6 +18,7 @@ export default function ProductDetailActions({
 }: {
   canIncreaseBuildListQuantity: boolean;
   currentBuildListQuantity: number;
+  isProductLimitReached: boolean;
   onAddToBuildList: () => void;
   onDecreaseBuildListQuantity: () => void;
   onShare: () => void;
@@ -58,8 +60,16 @@ export default function ProductDetailActions({
             </button>
           </fieldset>
         ) : (
-          <button className="build-list-detail-action" type="button" onClick={onAddToBuildList}>
-            加入配單
+          <button
+            className="build-list-detail-action"
+            disabled={isProductLimitReached}
+            title={
+              isProductLimitReached ? `配單已達 ${MAX_BUILD_LIST_PRODUCTS} 個品項` : "加入配單"
+            }
+            type="button"
+            onClick={onAddToBuildList}
+          >
+            {isProductLimitReached ? `配單已達 ${MAX_BUILD_LIST_PRODUCTS} 個品項` : "加入配單"}
           </button>
         )}
       </div>

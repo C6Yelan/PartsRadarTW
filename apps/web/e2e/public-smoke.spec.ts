@@ -60,64 +60,91 @@ test.describe("public web smoke", () => {
     expect(new URL(page.url()).searchParams.has("igrp")).toBe(false);
   });
 
-  test("renders and updates a persisted build list item", async ({ page }) => {
+  test("refreshes v2 build-list intents while preserving quantity and undo", async ({ page }) => {
     const productId = "11111111-1111-1111-1111-111111111111";
+    const missingProductId = "22222222-2222-2222-2222-222222222222";
+
+    await page.route("**/api/build-list/refresh", async (route) => {
+      const productIds = route.request().postDataJSON() as string[];
+
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          data: productIds.includes(productId)
+            ? [
+                {
+                  id: productId,
+                  name: "最新測試顯示卡 RTX",
+                  image: null,
+                  category: {
+                    displayName: "顯示卡",
+                  },
+                  price: {
+                    amount: 7290,
+                    currency: "TWD",
+                  },
+                  source: {
+                    url: "https://www.coolpc.com.tw/evaluate.php?iBuy=GPU-RTX-4070",
+                  },
+                  status: {
+                    isActive: true,
+                  },
+                  lastSeenAt: "2026-05-28T11:55:00.000Z",
+                },
+              ]
+            : [],
+          missingProductIds: productIds.filter((id) => id === missingProductId),
+        }),
+      });
+    });
 
     await page.addInitScript(
-      ({ id }) => {
+      ({ id, missingId }) => {
         window.localStorage.setItem(
-          "partsradartw:build-list:v1",
+          "partsradartw:build-list:v2",
           JSON.stringify([
             {
-              id,
-              name: "測試顯示卡 RTX",
-              image: {
-                url: `/api/product-images/${id}.webp`,
-                alt: "測試顯示卡 RTX",
-              },
-              category: {
-                id: "category-12",
-                igrp: 12,
-                displayName: "顯示卡",
-                sourceName: "顯示卡 VGA",
-              },
-              price: {
-                amount: 6990,
-                currency: "TWD",
-                capturedAt: "2026-05-28T11:45:00.000Z",
-                lastSeenAt: "2026-05-28T11:55:00.000Z",
-              },
-              source: {
-                name: "coolpc",
-                url: "https://www.coolpc.com.tw/evaluate.php?iBuy=GPU-RTX-4070",
-              },
+              productId: id,
               quantity: 2,
+              order: 0,
               addedAt: "2026-05-28T12:00:00.000Z",
               updatedAt: "2026-05-28T12:00:00.000Z",
+            },
+            {
+              productId: missingId,
+              quantity: 1,
+              order: 1,
+              addedAt: "2026-05-28T12:01:00.000Z",
+              updatedAt: "2026-05-28T12:01:00.000Z",
             },
           ]),
         );
       },
-      { id: productId },
+      { id: productId, missingId: missingProductId },
     );
 
     await page.goto("/build-list");
-    const item = page.getByRole("article").filter({ hasText: "測試顯示卡 RTX" });
+    const item = page.getByRole("article").filter({ hasText: "最新測試顯示卡 RTX" });
+    const missingItem = page.getByRole("article").filter({ hasText: missingProductId });
 
-    await expect(page.getByText("2 件商品")).toBeVisible();
-    await expect(item.getByRole("heading", { name: "測試顯示卡 RTX" })).toBeVisible();
+    await expect(page.getByText("3 件商品")).toBeVisible();
+    await expect(page.getByText("已同步；有 1 個品項暫時查不到。")).toBeVisible();
+    await expect(page.getByText("配單只儲存在這個瀏覽器，不會跨裝置同步。")).toBeVisible();
+    await expect(item.getByRole("heading", { name: "最新測試顯示卡 RTX" })).toBeVisible();
     await expect(item.getByRole("spinbutton", { name: "數量" })).toHaveValue("2");
-    await expect(item.getByText("NT$ 13,980")).toBeVisible();
+    await expect(item.getByText("NT$ 14,580")).toBeVisible();
+    await expect(missingItem.getByText("暫時無法確認")).toBeVisible();
+    await expect(page.getByText("未計價品項")).toBeVisible();
 
     await item.getByRole("button", { name: "增加數量" }).click();
-    await expect(page.getByText("3 件商品")).toBeVisible();
+    await expect(page.getByText("4 件商品")).toBeVisible();
     await expect(item.getByRole("spinbutton", { name: "數量" })).toHaveValue("3");
-    await expect(item.getByText("NT$ 20,970")).toBeVisible();
+    await expect(item.getByText("NT$ 21,870")).toBeVisible();
 
     await item.getByRole("button", { name: "移除" }).click();
     await expect(page.getByText("已從配單移除")).toBeVisible();
     await page.getByRole("button", { name: "復原" }).click();
-    await expect(page.getByRole("article").filter({ hasText: "測試顯示卡 RTX" })).toBeVisible();
+    await expect(page.getByRole("article").filter({ hasText: "最新測試顯示卡 RTX" })).toBeVisible();
   });
 });
 

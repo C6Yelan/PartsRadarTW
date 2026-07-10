@@ -73,6 +73,7 @@ export default function ProductDetail({
             <ProductDetailActions
               canIncreaseBuildListQuantity={viewModel.buildList.canIncreaseBuildListQuantity}
               currentBuildListQuantity={viewModel.buildList.currentBuildListQuantity}
+              isProductLimitReached={viewModel.buildList.isProductLimitReached}
               productName={product.name}
               purchaseUrl={product.source.url}
               shareStatusMessage={viewModel.share.statusMessage}

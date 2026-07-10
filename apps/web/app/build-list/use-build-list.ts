@@ -1,33 +1,32 @@
 "use client";
 // apps/web/app/build-list/use-build-list.ts
-// 提供配單的 client-side hook，負責 localStorage 同步、摘要計算與配單操作入口。
+// 管理只含使用者意圖的配單 v2 localStorage，並同步同頁 hook 與其他分頁。
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   addProductToBuildList,
+  type BuildListIntent,
+  MAX_BUILD_LIST_PRODUCTS,
   removeBuildListItem as removeBuildListItemFromCollection,
   restoreBuildListItem as restoreBuildListItemToCollection,
-  summarizeBuildList,
-  type BuildListItem,
-  type BuildListProduct,
+  summarizeBuildListIntents,
   updateBuildListItemQuantity as updateBuildListItemQuantityInCollection,
 } from "./model";
 import {
   BUILD_LIST_STORAGE_KEY,
   BUILD_LIST_UPDATED_EVENT,
   dispatchBuildListUpdated,
-  readBuildListItems,
-  writeBuildListItems,
+  readBuildListIntents,
+  writeBuildListIntents,
 } from "./storage";
 
-// 管理瀏覽器本機配單狀態，並同步同頁 hook 與其他分頁的 localStorage 更新。
 export function useBuildList() {
-  const [items, setItems] = useState<BuildListItem[]>([]);
+  const [intents, setIntents] = useState<BuildListIntent[]>([]);
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
     function syncFromStorage() {
-      setItems(readBuildListItems());
+      setIntents(readBuildListIntents());
       setIsReady(true);
     }
 
@@ -47,57 +46,62 @@ export function useBuildList() {
     };
   }, []);
 
-  // 每次提交前重新讀取 storage，避免多個 hook 實例用舊 state 覆蓋較新的配單資料。
-  const commitItems = useCallback((updater: (currentItems: BuildListItem[]) => BuildListItem[]) => {
-    const nextItems = writeBuildListItems(updater(readBuildListItems()));
-    setItems(nextItems);
-    setIsReady(true);
-    dispatchBuildListUpdated();
-  }, []);
+  const commitIntents = useCallback(
+    (updater: (currentIntents: BuildListIntent[]) => BuildListIntent[]) => {
+      const nextIntents = writeBuildListIntents(updater(readBuildListIntents()));
+      setIntents(nextIntents);
+      setIsReady(true);
+      dispatchBuildListUpdated();
+    },
+    [],
+  );
 
   const addBuildListProduct = useCallback(
-    (product: BuildListProduct) => {
-      commitItems((currentItems) => addProductToBuildList(currentItems, product));
+    (productId: string) => {
+      commitIntents((currentIntents) => addProductToBuildList(currentIntents, productId));
     },
-    [commitItems],
+    [commitIntents],
   );
 
   const setBuildListItemQuantity = useCallback(
     (productId: string, quantity: number) => {
-      commitItems((currentItems) =>
-        updateBuildListItemQuantityInCollection(currentItems, productId, quantity),
+      commitIntents((currentIntents) =>
+        updateBuildListItemQuantityInCollection(currentIntents, productId, quantity),
       );
     },
-    [commitItems],
+    [commitIntents],
   );
 
   const removeBuildListItem = useCallback(
     (productId: string) => {
-      commitItems((currentItems) => removeBuildListItemFromCollection(currentItems, productId));
+      commitIntents((currentIntents) =>
+        removeBuildListItemFromCollection(currentIntents, productId),
+      );
     },
-    [commitItems],
+    [commitIntents],
   );
 
   const restoreBuildListItem = useCallback(
-    (item: BuildListItem) => {
-      commitItems((currentItems) => restoreBuildListItemToCollection(currentItems, item));
+    (intent: BuildListIntent) => {
+      commitIntents((currentIntents) => restoreBuildListItemToCollection(currentIntents, intent));
     },
-    [commitItems],
+    [commitIntents],
   );
 
   const clearBuildListItems = useCallback(() => {
-    commitItems(() => []);
-  }, [commitItems]);
+    commitIntents(() => []);
+  }, [commitIntents]);
 
   const quantityByProductId = useMemo(
-    () => new Map(items.map((item) => [item.id, item.quantity])),
-    [items],
+    () => new Map(intents.map((intent) => [intent.productId, intent.quantity])),
+    [intents],
   );
-  const summary = useMemo(() => summarizeBuildList(items), [items]);
+  const summary = useMemo(() => summarizeBuildListIntents(intents), [intents]);
 
   return {
-    items,
+    intents,
     isReady,
+    isProductLimitReached: intents.length >= MAX_BUILD_LIST_PRODUCTS,
     quantityByProductId,
     summary,
     addBuildListProduct,

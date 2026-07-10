@@ -14,12 +14,12 @@ export function formatBuildListDateTime(value: string) {
     day: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
-    hour12: false,
+    hourCycle: "h23",
     timeZone: "Asia/Taipei",
   }).format(new Date(value));
 }
 
-// 將 Excel 匯出的時間固定轉成 UTC+8 文字；無效值保留原文方便使用者判讀。
+// 將 Excel 匯出的時間固定轉成 Asia/Taipei 文字；無效值保留原文方便判讀。
 export function formatBuildListExportDateTime(value: string) {
   const date = new Date(value);
 
@@ -27,15 +27,16 @@ export function formatBuildListExportDateTime(value: string) {
     return value;
   }
 
-  const utcPlusEightDate = new Date(date.getTime() + 8 * 60 * 60 * 1000);
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    timeZone: "Asia/Taipei",
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
 
-  return `${utcPlusEightDate.getUTCFullYear()}-${pad2(
-    utcPlusEightDate.getUTCMonth() + 1,
-  )}-${pad2(utcPlusEightDate.getUTCDate())} ${pad2(utcPlusEightDate.getUTCHours())}:${pad2(
-    utcPlusEightDate.getUTCMinutes(),
-  )}`;
-}
-
-function pad2(value: number) {
-  return String(value).padStart(2, "0");
+  return `${values.year}-${values.month}-${values.day} ${values.hour}:${values.minute}`;
 }

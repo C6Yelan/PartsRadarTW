@@ -2,7 +2,7 @@
 // 呈現商品探索列表中的單筆商品列，包含圖片、價格、價格變動、上架狀態與配單控制。
 
 import Link from "next/link";
-import { BUILD_LIST_MAX_QUANTITY } from "../../build-list/model";
+import { BUILD_LIST_MAX_QUANTITY, MAX_BUILD_LIST_PRODUCTS } from "../../build-list/model";
 import { formatPrice, formatSignedPercent, formatSignedPrice } from "../formatting";
 import type { ProductListItem } from "../types";
 import { ProductImage } from "./ProductImage";
@@ -10,6 +10,7 @@ import { ProductImage } from "./ProductImage";
 interface ProductRowProps {
   buildListQuantity: number;
   detailHref: string;
+  isProductLimitReached: boolean;
   product: ProductListItem;
   onAddToBuildList(product: ProductListItem): void;
   onDecreaseBuildListQuantity(product: ProductListItem): void;
@@ -19,6 +20,7 @@ interface ProductRowProps {
 export function ProductRow({
   buildListQuantity,
   detailHref,
+  isProductLimitReached,
   product,
   onAddToBuildList,
   onDecreaseBuildListQuantity,
@@ -86,10 +88,14 @@ export function ProductRow({
         ) : (
           <button
             className="build-list-add-button"
+            disabled={isProductLimitReached}
+            title={
+              isProductLimitReached ? `配單已達 ${MAX_BUILD_LIST_PRODUCTS} 個品項` : "加入配單"
+            }
             type="button"
             onClick={() => onAddToBuildList(product)}
           >
-            加入
+            {isProductLimitReached ? `已達 ${MAX_BUILD_LIST_PRODUCTS} 項` : "加入"}
           </button>
         )}
       </div>

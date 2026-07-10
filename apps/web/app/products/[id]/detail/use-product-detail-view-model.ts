@@ -3,7 +3,7 @@
 // 組裝商品詳細頁所需的商品資料、價格歷史、配單、圖片、返回連結與分享狀態。
 
 import { useEffect, useState } from "react";
-import { BUILD_LIST_MAX_QUANTITY, toBuildListProduct } from "../../../build-list/model";
+import { BUILD_LIST_MAX_QUANTITY } from "../../../build-list/model";
 import { useBuildList } from "../../../build-list/use-build-list";
 import type { ProductShareStatus } from "../product-share";
 import {
@@ -33,6 +33,7 @@ export function useProductDetailViewModel({
   const [shareStatus, setShareStatus] = useState<ProductShareStatus>(null);
   const {
     addBuildListProduct,
+    isProductLimitReached,
     quantityByProductId,
     removeBuildListItem,
     summary,
@@ -40,7 +41,10 @@ export function useProductDetailViewModel({
   } = useBuildList();
 
   const currentBuildListQuantity = product ? (quantityByProductId.get(product.id) ?? 0) : 0;
-  const canIncreaseBuildListQuantity = currentBuildListQuantity < BUILD_LIST_MAX_QUANTITY;
+  const canIncreaseBuildListQuantity =
+    currentBuildListQuantity > 0
+      ? currentBuildListQuantity < BUILD_LIST_MAX_QUANTITY
+      : !isProductLimitReached;
   const returnLabel = returnHref.startsWith("/build-list") ? "返回配單" : "返回查詢";
 
   useEffect(() => {
@@ -57,7 +61,7 @@ export function useProductDetailViewModel({
       return;
     }
 
-    addBuildListProduct(toBuildListProduct(product));
+    addBuildListProduct(product.id);
   }
 
   function decreaseCurrentProductBuildListQuantity() {
@@ -102,6 +106,7 @@ export function useProductDetailViewModel({
     buildList: {
       canIncreaseBuildListQuantity,
       currentBuildListQuantity,
+      isProductLimitReached: currentBuildListQuantity === 0 && isProductLimitReached,
       summary,
       addCurrentProductToBuildList,
       decreaseCurrentProductBuildListQuantity,

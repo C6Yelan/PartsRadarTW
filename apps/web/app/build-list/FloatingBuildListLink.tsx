@@ -1,15 +1,13 @@
 // apps/web/app/build-list/FloatingBuildListLink.tsx
-// 提供商品頁面共用的浮動配單入口，顯示目前配單數量與總價的無障礙摘要。
+// 提供商品頁面共用的浮動配單入口，只顯示 persisted intent 的商品數量。
 
 import Link from "next/link";
-import { formatBuildListPrice } from "./formatting";
-import type { BuildListSummary } from "./model";
+import type { BuildListIntentSummary } from "./model";
 
-// 呈現固定位置的配單連結，讓使用者能從查詢或商品詳細頁快速回到配單。
-export default function FloatingBuildListLink({ summary }: { summary: BuildListSummary }) {
+export default function FloatingBuildListLink({ summary }: { summary: BuildListIntentSummary }) {
   return (
     <Link
-      aria-label={`開啟配單，目前 ${summary.totalQuantity} 件，總價 ${formatBuildListPrice(summary.totalAmount)}`}
+      aria-label={`開啟配單，目前 ${summary.totalQuantity} 件`}
       className="build-list-floating-link"
       href="/build-list"
       title="開啟配單"
@@ -27,7 +25,6 @@ export default function FloatingBuildListLink({ summary }: { summary: BuildListS
       <span className="build-list-floating-badge" aria-hidden="true">
         {summary.totalQuantity}
       </span>
-      <span className="sr-only">{formatBuildListPrice(summary.totalAmount)}</span>
     </Link>
   );
 }

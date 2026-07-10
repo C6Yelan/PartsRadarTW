@@ -18,8 +18,9 @@
 - `product`：商品資料本體，包含來源分類、價格、圖片、狀態與連結。
 - `vendor`：商品品牌 / 廠商分類，例如 GPU / RAM / power supply 的品牌篩選。不要用 `vendor` 表示來源站。
 - `buildList`：使用者端一次性配單。不要使用 `cart`、`basket`、`order`、`quote` 或 `estimate` 命名，避免暗示本站可下單或代購。
-- `BuildListProduct`：可加入配單的商品資料快照。
-- `BuildListItem`：已在配單中的品項，等於 `BuildListProduct` 加上 `quantity`、`addedAt` 與 `updatedAt`。
+- `BuildListIntent`：localStorage v2 保存的使用者意圖，只含 product ID、數量、排序與加入／更新時間。
+- `BuildListProductSnapshot`：配單頁當次 batch refresh 的記憶體商品資料，不持久化為 last-known truth。
+- `BuildListItem`：依 intent 順序組合 `BuildListIntent`、nullable `BuildListProductSnapshot` 與 availability 的頁面列。
 - `useBuildList` 對外操作需包含 `BuildList` 語彙，例如 `addBuildListProduct`、`setBuildListItemQuantity`、`removeBuildListItem`、`restoreBuildListItem`、`clearBuildListItems`。
 
 ## Time Fields

@@ -1,195 +1,251 @@
 // apps/web/app/build-list/model.ts
-// 定義配單 localStorage snapshot 的資料模型，並提供新增、數量調整、移除、復原與正規化純函式。
+// 定義配單 intent、暫存 refresh snapshot 與數量、排序、摘要純函式。
 
-import {
-  isRecord,
-  normalizeIsoDate,
-  toHttpUrl,
-  toImageUrl,
-  toNonEmptyString,
-  toNumber,
-} from "./model/validation";
+import { BUILD_LIST_MAX_QUANTITY, MAX_BUILD_LIST_PRODUCTS } from "./constants";
+import { isRecord, normalizeIsoDate } from "./model/validation";
+import { normalizeBuildListProductId } from "./product-id";
 
-export const BUILD_LIST_MAX_QUANTITY = 99;
+export { BUILD_LIST_MAX_QUANTITY, MAX_BUILD_LIST_PRODUCTS } from "./constants";
 
-// 配單保存的商品快照；目前不是即時查詢結果，後續刷新流程會更新這份 snapshot。
-export interface BuildListProduct {
-  id: string;
-  name: string;
-  image?: {
-    url: string;
-    alt: string;
-  };
-  category: {
-    id: string;
-    igrp: number;
-    displayName: string;
-    sourceName: string;
-  };
-  price: {
-    amount: number;
-    currency: "TWD";
-    capturedAt: string;
-    lastSeenAt: string;
-  };
-  source: {
-    name: "coolpc";
-    url: string;
-  };
-}
-
-// 配單單列品項，在商品快照外加上使用者選擇的數量與本機更新時間。
-export interface BuildListItem extends BuildListProduct {
+export interface BuildListIntent {
+  productId: string;
   quantity: number;
+  order: number;
   addedAt: string;
   updatedAt: string;
 }
 
-// 配單摘要資料，供浮動入口、頁面標題與總計側欄共用。
-export interface BuildListSummary {
+export interface BuildListProductSnapshot {
+  id: string;
+  name: string;
+  image: {
+    url: string;
+    alt: string;
+  } | null;
+  category: {
+    displayName: string;
+  };
+  price: {
+    amount: number;
+    currency: "TWD";
+  } | null;
+  source: {
+    url: string;
+  };
+  status: {
+    isActive: boolean;
+  };
+  lastSeenAt: string;
+}
+
+export type BuildListRefreshState = "idle" | "loading" | "ready" | "rate_limited" | "error";
+export type BuildListItemAvailability = "loading" | "available" | "missing" | "unavailable";
+
+export interface BuildListItem {
+  intent: BuildListIntent;
+  product: BuildListProductSnapshot | null;
+  availability: BuildListItemAvailability;
+}
+
+export interface BuildListIntentSummary {
   itemCount: number;
   totalQuantity: number;
+}
+
+export interface BuildListSummary extends BuildListIntentSummary {
   totalAmount: number;
+  unpricedItemCount: number;
 }
 
-interface BuildListProductInput extends Omit<BuildListProduct, "image"> {
-  image?: BuildListProduct["image"] | null;
-}
-
-// 將商品列表 / 詳細頁資料轉成配單商品快照，缺圖時回退到本機圖片 API。
-export function toBuildListProduct(product: BuildListProductInput): BuildListProduct {
-  const image =
-    normalizeBuildListImage(product.image, product.name) ??
-    createBuildListProductImage(product.id, product.name);
-
-  return {
-    id: product.id,
-    name: product.name,
-    image,
-    category: product.category,
-    price: product.price,
-    source: product.source,
-  };
-}
-
-// 加入商品到配單；已存在時增加數量並刷新商品快照，保留首次加入時間。
 export function addProductToBuildList(
-  items: BuildListItem[],
-  product: BuildListProduct,
+  intents: BuildListIntent[],
+  productId: string,
   now = new Date(),
-): BuildListItem[] {
-  const existingItem = items.find((item) => item.id === product.id);
-  const updatedAt = now.toISOString();
+): BuildListIntent[] {
+  const normalizedProductId = normalizeBuildListProductId(productId);
 
-  if (!existingItem) {
-    return [
-      ...items,
-      {
-        ...product,
-        quantity: 1,
-        addedAt: updatedAt,
-        updatedAt,
-      },
-    ];
+  if (!normalizedProductId) {
+    return intents;
   }
 
-  return items.map((item) =>
-    item.id === product.id
-      ? {
-          ...item,
-          ...product,
-          quantity: clampBuildListQuantity(item.quantity + 1),
-          addedAt: item.addedAt,
-          updatedAt,
-        }
-      : item,
-  );
+  const existingIntent = intents.find((intent) => intent.productId === normalizedProductId);
+  const updatedAt = now.toISOString();
+
+  if (existingIntent) {
+    return intents.map((intent) =>
+      intent.productId === normalizedProductId
+        ? {
+            ...intent,
+            quantity: clampBuildListQuantity(intent.quantity + 1),
+            updatedAt,
+          }
+        : intent,
+    );
+  }
+
+  if (intents.length >= MAX_BUILD_LIST_PRODUCTS) {
+    return intents;
+  }
+
+  const nextOrder = intents.reduce((maxOrder, intent) => Math.max(maxOrder, intent.order), -1) + 1;
+
+  return [
+    ...intents,
+    {
+      productId: normalizedProductId,
+      quantity: 1,
+      order: nextOrder,
+      addedAt: updatedAt,
+      updatedAt,
+    },
+  ];
 }
 
-// 更新單一配單品項數量，並將數量限制在配單允許範圍內。
 export function updateBuildListItemQuantity(
-  items: BuildListItem[],
+  intents: BuildListIntent[],
   productId: string,
   quantity: number,
   now = new Date(),
-): BuildListItem[] {
-  const normalizedQuantity = clampBuildListQuantity(quantity);
+): BuildListIntent[] {
+  const normalizedProductId = normalizeBuildListProductId(productId);
+
+  if (!normalizedProductId) {
+    return intents;
+  }
+
   const updatedAt = now.toISOString();
 
-  return items.map((item) =>
-    item.id === productId
+  return intents.map((intent) =>
+    intent.productId === normalizedProductId
       ? {
-          ...item,
-          quantity: normalizedQuantity,
+          ...intent,
+          quantity: clampBuildListQuantity(quantity),
           updatedAt,
         }
-      : item,
+      : intent,
   );
 }
 
-// 從配單移除指定商品 id，供單筆移除與 decrease-to-zero 流程共用。
-export function removeBuildListItem(items: BuildListItem[], productId: string): BuildListItem[] {
-  return items.filter((item) => item.id !== productId);
+export function removeBuildListItem(
+  intents: BuildListIntent[],
+  productId: string,
+): BuildListIntent[] {
+  return intents.filter((intent) => intent.productId !== productId);
 }
 
-// 還原被移除的品項；若品項已存在，使用復原 snapshot 覆蓋目前資料。
 export function restoreBuildListItem(
-  items: BuildListItem[],
-  restoredItem: BuildListItem,
-): BuildListItem[] {
-  const hasItem = items.some((item) => item.id === restoredItem.id);
+  intents: BuildListIntent[],
+  restoredIntent: BuildListIntent,
+): BuildListIntent[] {
+  const normalizedRestoredIntent = normalizeBuildListIntent(restoredIntent);
 
-  if (!hasItem) {
-    return [...items, restoredItem];
+  if (!normalizedRestoredIntent) {
+    return intents;
   }
 
-  return items.map((item) => (item.id === restoredItem.id ? restoredItem : item));
+  const existingIndex = intents.findIndex(
+    (intent) => intent.productId === normalizedRestoredIntent.productId,
+  );
+
+  if (existingIndex === -1 && intents.length >= MAX_BUILD_LIST_PRODUCTS) {
+    return intents;
+  }
+
+  const hasOrderCollision = intents.some(
+    (intent) => intent.order === normalizedRestoredIntent.order,
+  );
+  const restoredIntents =
+    existingIndex === -1
+      ? [
+          ...intents.map((intent) =>
+            hasOrderCollision && intent.order >= normalizedRestoredIntent.order
+              ? { ...intent, order: intent.order + 1 }
+              : intent,
+          ),
+          normalizedRestoredIntent,
+        ]
+      : intents.map((intent, index) =>
+          index === existingIndex ? normalizedRestoredIntent : intent,
+        );
+
+  return sortBuildListIntents(restoredIntents);
 }
 
-// 彙總配單品項數量與總金額，讓 UI 不需要重複計算摘要。
-export function summarizeBuildList(items: BuildListItem[]): BuildListSummary {
-  return items.reduce(
-    (summary, item) => ({
+export function summarizeBuildListIntents(intents: BuildListIntent[]): BuildListIntentSummary {
+  return intents.reduce(
+    (summary, intent) => ({
       itemCount: summary.itemCount + 1,
-      totalQuantity: summary.totalQuantity + item.quantity,
-      totalAmount: summary.totalAmount + getBuildListLineSubtotal(item),
+      totalQuantity: summary.totalQuantity + intent.quantity,
     }),
     {
       itemCount: 0,
       totalQuantity: 0,
-      totalAmount: 0,
     },
   );
 }
 
-// 計算單一配單品項小計，供頁面列與 Excel 匯出共用。
-export function getBuildListLineSubtotal(item: Pick<BuildListItem, "price" | "quantity">) {
-  return item.price.amount * item.quantity;
+export function resolveBuildListItems(
+  intents: BuildListIntent[],
+  products: BuildListProductSnapshot[],
+  refreshState: BuildListRefreshState,
+): BuildListItem[] {
+  const productsById = new Map(products.map((product) => [product.id, product]));
+
+  return intents.map((intent) => {
+    const product = productsById.get(intent.productId) ?? null;
+
+    return {
+      intent,
+      product,
+      availability: getBuildListItemAvailability(product, refreshState),
+    };
+  });
 }
 
-// 正規化 persisted 配單資料，丟棄無效品項並以 product id 去重。
-export function normalizeBuildListItems(value: unknown): BuildListItem[] {
+export function summarizeBuildListItems(items: BuildListItem[]): BuildListSummary {
+  return items.reduce(
+    (summary, item) => {
+      const subtotal = getBuildListLineSubtotal(item);
+
+      return {
+        itemCount: summary.itemCount + 1,
+        totalQuantity: summary.totalQuantity + item.intent.quantity,
+        totalAmount: summary.totalAmount + (subtotal ?? 0),
+        unpricedItemCount: summary.unpricedItemCount + (subtotal === null ? 1 : 0),
+      };
+    },
+    {
+      itemCount: 0,
+      totalQuantity: 0,
+      totalAmount: 0,
+      unpricedItemCount: 0,
+    },
+  );
+}
+
+export function getBuildListLineSubtotal(item: BuildListItem): number | null {
+  return item.product?.price ? item.product.price.amount * item.intent.quantity : null;
+}
+
+export function normalizeBuildListIntents(value: unknown): BuildListIntent[] {
   if (!Array.isArray(value)) {
     return [];
   }
 
-  const itemsById = new Map<string, BuildListItem>();
+  const intentsByProductId = new Map<string, BuildListIntent>();
 
   for (const candidate of value) {
-    const item = normalizeBuildListItem(candidate);
+    const intent = normalizeBuildListIntent(candidate);
 
-    if (!item) {
-      continue;
+    if (intent && !intentsByProductId.has(intent.productId)) {
+      intentsByProductId.set(intent.productId, intent);
     }
-
-    itemsById.set(item.id, item);
   }
 
-  return [...itemsById.values()];
+  return sortBuildListIntents([...intentsByProductId.values()]).slice(0, MAX_BUILD_LIST_PRODUCTS);
 }
 
-// 將使用者輸入或 persisted 數量限制在 1 到 BUILD_LIST_MAX_QUANTITY。
-export function clampBuildListQuantity(quantity: number) {
+export function clampBuildListQuantity(quantity: number): number {
   if (!Number.isFinite(quantity)) {
     return 1;
   }
@@ -197,115 +253,60 @@ export function clampBuildListQuantity(quantity: number) {
   return Math.min(Math.max(Math.trunc(quantity), 1), BUILD_LIST_MAX_QUANTITY);
 }
 
-// 正規化單一 persisted 配單品項，缺少時間時回退到 epoch 避免資料無法讀取。
-function normalizeBuildListItem(value: unknown): BuildListItem | null {
+function normalizeBuildListIntent(value: unknown): BuildListIntent | null {
   if (!isRecord(value)) {
     return null;
   }
 
-  const product = normalizeBuildListProduct(value);
-
-  if (!product) {
-    return null;
-  }
-
+  const productId = normalizeBuildListProductId(value.productId);
   const addedAt = normalizeIsoDate(value.addedAt);
   const updatedAt = normalizeIsoDate(value.updatedAt);
-
-  return {
-    ...product,
-    quantity: clampBuildListQuantity(toNumber(value.quantity)),
-    addedAt: addedAt ?? new Date(0).toISOString(),
-    updatedAt: updatedAt ?? addedAt ?? new Date(0).toISOString(),
-  };
-}
-
-// 正規化 persisted 商品快照，確保來源、價格、分類與連結仍符合配單模型。
-function normalizeBuildListProduct(value: Record<string, unknown>): BuildListProduct | null {
-  if (!isRecord(value.category) || !isRecord(value.price) || !isRecord(value.source)) {
-    return null;
-  }
-
-  const id = toNonEmptyString(value.id);
-  const name = toNonEmptyString(value.name);
-  const categoryId = toNonEmptyString(value.category.id);
-  const categoryDisplayName = toNonEmptyString(value.category.displayName);
-  const categorySourceName = toNonEmptyString(value.category.sourceName);
-  const categoryIgrp = toNumber(value.category.igrp);
-  const priceAmount = toNumber(value.price.amount);
-  const priceCurrency = value.price.currency;
-  const priceCapturedAt = normalizeIsoDate(value.price.capturedAt);
-  const priceLastSeenAt = normalizeIsoDate(value.price.lastSeenAt);
-  const sourceName = value.source.name;
-  const purchaseUrl = toHttpUrl(value.source.url);
-  const storedImage = normalizeBuildListImage(
-    value.image,
-    name ?? categoryDisplayName ?? "商品圖片",
-  );
+  const order = value.order;
+  const quantity = value.quantity;
 
   if (
-    !id ||
-    !name ||
-    !categoryId ||
-    !categoryDisplayName ||
-    !categorySourceName ||
-    !Number.isInteger(categoryIgrp) ||
-    !Number.isFinite(priceAmount) ||
-    priceAmount < 0 ||
-    priceCurrency !== "TWD" ||
-    !priceCapturedAt ||
-    !priceLastSeenAt ||
-    sourceName !== "coolpc" ||
-    !purchaseUrl
+    !productId ||
+    !addedAt ||
+    !updatedAt ||
+    typeof order !== "number" ||
+    !Number.isSafeInteger(order) ||
+    order < 0 ||
+    typeof quantity !== "number" ||
+    !Number.isFinite(quantity)
   ) {
     return null;
   }
 
   return {
-    id,
-    name,
-    image: storedImage ?? createBuildListProductImage(id, name),
-    category: {
-      id: categoryId,
-      igrp: categoryIgrp,
-      displayName: categoryDisplayName,
-      sourceName: categorySourceName,
-    },
-    price: {
-      amount: Math.trunc(priceAmount),
-      currency: "TWD",
-      capturedAt: priceCapturedAt,
-      lastSeenAt: priceLastSeenAt,
-    },
-    source: {
-      name: "coolpc",
-      url: purchaseUrl,
-    },
+    productId,
+    quantity: clampBuildListQuantity(quantity),
+    order,
+    addedAt,
+    updatedAt,
   };
 }
 
-// 建立商品圖片 fallback URL，支援舊版配單資料或 detail API 尚未帶圖的商品。
-function createBuildListProductImage(productId: string, alt: string) {
-  return {
-    url: `/api/product-images/${encodeURIComponent(productId)}.webp`,
-    alt,
-  };
+function sortBuildListIntents(intents: BuildListIntent[]): BuildListIntent[] {
+  return [...intents].sort(
+    (left, right) => left.order - right.order || left.productId.localeCompare(right.productId),
+  );
 }
 
-// 正規化配單圖片資料；圖片 URL 無效時交由呼叫端改用本機圖片 API。
-function normalizeBuildListImage(value: unknown, fallbackAlt: string) {
-  if (!isRecord(value)) {
-    return null;
+function getBuildListItemAvailability(
+  product: BuildListProductSnapshot | null,
+  refreshState: BuildListRefreshState,
+): BuildListItemAvailability {
+  if (product) {
+    return "available";
   }
 
-  const url = toImageUrl(value.url);
-
-  if (!url) {
-    return null;
+  if (refreshState === "ready") {
+    return "missing";
   }
 
-  return {
-    url,
-    alt: typeof value.alt === "string" && value.alt.trim() ? value.alt.trim() : fallbackAlt,
-  };
+  if (refreshState === "idle" || refreshState === "loading") {
+    return "loading";
+  }
+
+  return "unavailable";
 }

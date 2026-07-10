@@ -1,9 +1,9 @@
 // apps/web/app/build-list/storage.ts
-// 封裝配單 localStorage 讀寫、資料正規化與同頁同步事件。
+// 封裝配單 v2 intent 的 localStorage 讀寫、資料正規化與同頁同步事件。
 
-import { normalizeBuildListItems, type BuildListItem } from "./model";
+import { type BuildListIntent, normalizeBuildListIntents } from "./model";
 
-export const BUILD_LIST_STORAGE_KEY = "partsradartw:build-list:v1";
+export const BUILD_LIST_STORAGE_KEY = "partsradartw:build-list:v2";
 export const BUILD_LIST_UPDATED_EVENT = "partsradartw:build-list-updated";
 
 // 配單 storage 的最小介面，讓測試可注入 fake storage，不直接依賴瀏覽器物件。
@@ -14,7 +14,7 @@ export interface BuildListStorage {
 }
 
 // 讀取並正規化 persisted 配單資料；storage 不可用或 JSON 壞掉時回傳空配單。
-export function readBuildListItems(storage = getBrowserStorage()): BuildListItem[] {
+export function readBuildListIntents(storage = getBrowserStorage()): BuildListIntent[] {
   if (!storage) {
     return [];
   }
@@ -22,30 +22,30 @@ export function readBuildListItems(storage = getBrowserStorage()): BuildListItem
   try {
     const rawValue = storage.getItem(BUILD_LIST_STORAGE_KEY);
 
-    return rawValue ? normalizeBuildListItems(JSON.parse(rawValue)) : [];
+    return rawValue ? normalizeBuildListIntents(JSON.parse(rawValue)) : [];
   } catch {
     return [];
   }
 }
 
 // 寫入正規化後的配單資料；空配單直接移除 storage key。
-export function writeBuildListItems(
-  items: BuildListItem[],
+export function writeBuildListIntents(
+  intents: BuildListIntent[],
   storage = getBrowserStorage(),
-): BuildListItem[] {
-  const normalizedItems = normalizeBuildListItems(items);
+): BuildListIntent[] {
+  const normalizedIntents = normalizeBuildListIntents(intents);
 
   if (!storage) {
-    return normalizedItems;
+    return normalizedIntents;
   }
 
-  if (normalizedItems.length === 0) {
+  if (normalizedIntents.length === 0) {
     storage.removeItem(BUILD_LIST_STORAGE_KEY);
   } else {
-    storage.setItem(BUILD_LIST_STORAGE_KEY, JSON.stringify(normalizedItems));
+    storage.setItem(BUILD_LIST_STORAGE_KEY, JSON.stringify(normalizedIntents));
   }
 
-  return normalizedItems;
+  return normalizedIntents;
 }
 
 // 通知同一頁面內其他 hook 重新讀取配單；跨分頁同步由 browser storage event 負責。

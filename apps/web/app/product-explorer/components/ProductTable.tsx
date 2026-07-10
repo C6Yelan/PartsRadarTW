@@ -8,6 +8,7 @@ import { SkeletonRows } from "./SkeletonRows";
 
 interface ProductTableProps {
   buildListQuantities: Map<string, number>;
+  isProductLimitReached: boolean;
   productListReturnTo: string;
   products: ProductsResponse | null;
   productState: LoadState;
@@ -18,6 +19,7 @@ interface ProductTableProps {
 // 組裝商品列表狀態與每列商品資料，將配單操作事件傳遞給 ProductRow。
 export function ProductTable({
   buildListQuantities,
+  isProductLimitReached,
   productListReturnTo,
   products,
   productState,
@@ -63,6 +65,7 @@ export function ProductTable({
             <ProductRow
               buildListQuantity={buildListQuantities.get(product.id) ?? 0}
               detailHref={createProductDetailHref(product.id, productListReturnTo)}
+              isProductLimitReached={isProductLimitReached}
               key={product.id}
               product={product}
               onAddToBuildList={onAddToBuildList}

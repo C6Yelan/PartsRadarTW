@@ -31,7 +31,7 @@ export interface CategoryItem {
   sourceName: string;
 }
 
-// 商品列表 API 回傳項目，供列表列項、商品詳細連結與配單快照建立使用。
+// 商品列表 API 回傳項目，供列表列項、商品詳細連結與配單 intent 操作使用。
 export interface ProductListItem {
   id: string;
   name: string;
