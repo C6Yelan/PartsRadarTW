@@ -6,6 +6,8 @@
 
 - `source`：來源站或來源資料語境，第一版與第二版固定為 CoolPC / 原價屋。API 中 `source: "coolpc"` 是公開 attribution，不是 DB 多來源抽象。
 - `sourceCategory`：來源站分類，例如 CoolPC 的 `IGrp` 分類。DB / Prisma / crawler 使用 `sourceCategory`，不要改稱 `group`、`section` 或 `categorySource`。
+- `category` / `category slug`：網站 URL 與商品列表 API 使用的產品語意分類，例如 `cpu`、`gpu`。只在 web/API boundary 對應 internal `igrp`，不新增 DB slug 欄位。
+- `igrp`：CoolPC 來源分類代碼，保留在 DB、Prisma、crawler 與內部 domain model。Public products query 只把它當作暫時的 legacy read-only alias，新 URL 與 client query 不得產生它。
 - `sourceCategoryUrl`：crawler / parser 內部傳遞的來源分類頁 URL。它代表資料被抓取的 `eachview.php?IGrp=...` 頁面，不代表使用者查看 / 購買連結。
 - `sourceUrl`：DB / Prisma 相容欄位，對應 `products.source_url`，內容仍是來源分類頁 URL。新增內部變數時優先使用 `sourceCategoryUrl`，只有在組 Prisma data shape 或 mapper 時保留 `sourceUrl`。
 - `purchaseUrl` 或 `coolpcPurchaseUrl`：由 `ibuyToken` 產生的 `evaluate.php?iBuy=...` 使用者查看 / 購買連結。新增內部變數時應使用這個語彙。

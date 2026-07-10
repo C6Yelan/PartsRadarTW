@@ -10,16 +10,10 @@ interface CategoryOptionProps {
 }
 
 // 顯示分類名稱與來源站分類名稱，並把選取狀態交給原生 radio input。
-export function CategoryOption({
-  checked,
-  label,
-  subLabel,
-  value,
-  onChange,
-}: CategoryOptionProps) {
+export function CategoryOption({ checked, label, subLabel, value, onChange }: CategoryOptionProps) {
   return (
     <label className={checked ? "category-option is-active" : "category-option"}>
-      <input checked={checked} name="igrp" type="radio" value={value} onChange={onChange} />
+      <input checked={checked} name="category" type="radio" value={value} onChange={onChange} />
       <span className="option-copy">
         <span>{label}</span>
         <small>{subLabel}</small>

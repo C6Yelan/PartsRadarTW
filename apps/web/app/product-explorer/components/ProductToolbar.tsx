@@ -105,7 +105,7 @@ export function ProductToolbar({
         </div>
         <VendorFilter
           options={vendorOptions}
-          disabledLabel={query.igrp ? "無廠商資料" : "先選分類"}
+          disabledLabel={query.category ? "無廠商資料" : "先選分類"}
           selectedCategoryName={selectedCategoryName}
           selectedOptions={selectedVendorOptions}
           selectedValues={query.vendors}

@@ -193,7 +193,9 @@ export function isSmokeCategoriesResponse(value: unknown): value is SmokeCategor
   return (
     isRecord(value) &&
     Array.isArray(value.data) &&
-    value.data.every((category) => isRecord(category) && typeof category.igrp === "number")
+    value.data.every(
+      (category) => isRecord(category) && typeof category.slug === "string" && category.slug !== "",
+    )
   );
 }
 

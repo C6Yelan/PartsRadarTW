@@ -32,7 +32,19 @@ export async function createWorkspace(): Promise<{
 // Stub public HTTP endpoints，讓 production smoke 測試可控制頁面、API、圖片與 rate-limit header 狀態。
 export function stubHealthyPublicApi({
   buildListStatus = 200,
-  categoryIgrps = [4, 5, 6, 7, 8, 10, 11, 12, 14, 15, 16],
+  categorySlugs = [
+    "cpu",
+    "motherboard",
+    "memory",
+    "storage",
+    "external-storage",
+    "cooler",
+    "liquid-cooling",
+    "gpu",
+    "case",
+    "power-supply",
+    "fan-accessory",
+  ],
   imageStatus = 200,
   imageStatusByProductId = new Map<string, number>(),
   nullImageProductIds = new Set<string>(),
@@ -40,7 +52,7 @@ export function stubHealthyPublicApi({
   rateLimitClientSource = "cf",
 }: {
   buildListStatus?: number;
-  categoryIgrps?: number[];
+  categorySlugs?: string[];
   imageStatus?: number;
   imageStatusByProductId?: Map<string, number>;
   nullImageProductIds?: Set<string>;
@@ -69,7 +81,7 @@ export function stubHealthyPublicApi({
 
       if (url.pathname === "/api/categories") {
         return Response.json({
-          data: categoryIgrps.map((igrp) => ({ igrp })),
+          data: categorySlugs.map((slug) => ({ slug })),
         });
       }
 

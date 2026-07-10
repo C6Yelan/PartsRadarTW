@@ -11,7 +11,7 @@ export function useProducts(isReady: boolean, query: QueryState) {
   const [productState, setProductState] = useState<LoadState>("idle");
 
   useEffect(() => {
-    if (!isReady || !query.igrp) {
+    if (!isReady || !query.category) {
       return;
     }
 

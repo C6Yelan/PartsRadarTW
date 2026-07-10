@@ -16,7 +16,7 @@ describe("createProductShareUrl", () => {
     );
     expect(
       createProductShareUrl(
-        "https://partsradar.test/products/product-1?returnTo=%2F%3Figrp%3D7",
+        "https://partsradar.test/products/product-1?returnTo=%2F%3Fcategory%3Dstorage",
         "product-1",
       ),
     ).toBe("https://partsradar.test/products/product-1");

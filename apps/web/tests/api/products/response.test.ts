@@ -38,7 +38,7 @@ describe("GET /api/products response", () => {
       ],
     });
     const request = new Request(
-      "https://parts.example/api/products?q=RTX&igrp=12&minPrice=4000&maxPrice=9000&status=all&sort=name_asc&page=2&pageSize=1",
+      "https://parts.example/api/products?q=RTX&category=gpu&minPrice=4000&maxPrice=9000&status=all&sort=name_asc&page=2&pageSize=1",
     );
 
     const response = await createGetProductsHandler(client, { now: () => NOW })(request);

@@ -102,7 +102,7 @@ describe("production smoke public checks", () => {
 
   it("fails public-only checks when categories API has no category", async () => {
     const { crawlerCwd } = await createWorkspace();
-    stubHealthyPublicApi({ categoryIgrps: [] });
+    stubHealthyPublicApi({ categorySlugs: [] });
     const options = parseProductionSmokeOptions(["--public-only"], {}, crawlerCwd);
     const summary = await runProductionPublicSmoke(options, new Date("2026-06-02T12:00:00.000Z"));
 

@@ -3,6 +3,7 @@
 
 import type { Prisma } from "@partsradar/db";
 
+import { getCategoryIgrp, getCategorySlug } from "../../category-slugs";
 import {
   InvalidQueryError,
   parseEnumQuery,
@@ -13,6 +14,7 @@ import {
 import type { ProductVendorRecord } from "./data";
 
 const PRODUCT_SEARCH_MAX_LENGTH = 100;
+const PRODUCT_CATEGORY_MAX_LENGTH = 50;
 const PRODUCT_VENDOR_QUERY_MAX_LENGTH = 300;
 const PRODUCT_VENDOR_VALUE_PATTERN = /^[a-z0-9-]+$/;
 const PRODUCT_SORT_VALUES = [
@@ -48,7 +50,7 @@ export interface ProductListQuery {
 // 將 URL query 解析成商品列表查詢條件，並在 DB 查詢前擋下語意不明或超出範圍的輸入。
 export function parseProductListQuery(params: URLSearchParams): ProductListQuery {
   const pagination = parsePaginationQuery(params);
-  const igrp = parseOptionalIntegerQuery(params, "igrp", { min: 1 });
+  const igrp = parseCategoryIgrp(params);
   const minPrice = parseOptionalIntegerQuery(params, "minPrice", { min: 0 });
   const maxPrice = parseOptionalIntegerQuery(params, "maxPrice", { min: 0 });
 
@@ -221,7 +223,7 @@ function parseVendorQuery(params: URLSearchParams, igrp: number | undefined): st
   }
 
   if (igrp === undefined) {
-    throw new InvalidQueryError("vendors", "requires igrp");
+    throw new InvalidQueryError("vendors", "requires category");
   }
 
   const vendors = rawVendors
@@ -241,6 +243,28 @@ function parseVendorQuery(params: URLSearchParams, igrp: number | undefined): st
   }
 
   return vendors;
+}
+
+function parseCategoryIgrp(params: URLSearchParams): number | undefined {
+  const category = parseOptionalTextQuery(params, "category", {
+    maxLength: PRODUCT_CATEGORY_MAX_LENGTH,
+  });
+  const legacyIgrp = parseOptionalIntegerQuery(params, "igrp", { min: 1 });
+  const categoryIgrp = category ? getCategoryIgrp(category) : null;
+
+  if (category && categoryIgrp === null) {
+    throw new InvalidQueryError("category", "must be one of the supported category slugs");
+  }
+
+  if (legacyIgrp !== undefined && getCategorySlug(legacyIgrp) === null) {
+    throw new InvalidQueryError("igrp", "must map to a supported category");
+  }
+
+  if (categoryIgrp !== null && legacyIgrp !== undefined && categoryIgrp !== legacyIgrp) {
+    throw new InvalidQueryError("category", "must match igrp when both are provided");
+  }
+
+  return categoryIgrp ?? legacyIgrp;
 }
 
 function buildVendorWhere(query: ProductListQuery): Prisma.ProductWhereInput | null {

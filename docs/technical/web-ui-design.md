@@ -35,13 +35,15 @@
 URL state：
 
 ```text
-q, igrp, vendors, minPrice, maxPrice, sort, page, pageSize, status
+q, category, vendors, minPrice, maxPrice, sort, page, pageSize, status
 ```
 
 規則：
 
 - URL query 可分享與重新整理。
-- 無 `igrp` 時前端落到第一個支援分類。
+- `category` 使用產品語意 slug，例如 `cpu`、`gpu`；公開 URL 不產生 CoolPC `igrp`。
+- 只有 legacy `igrp` 時前端以 `history.replaceState` 轉成 canonical `category` URL，不重新載入頁面。
+- 無有效 `category` 時前端落到第一個支援分類。
 - 切換分類時清除廠商選項並回到第 1 頁。
 - 價格輸入需是整數 TWD；`minPrice > maxPrice` 時不送出查詢。
 - 搜尋無結果是空狀態，不是錯誤。

@@ -53,6 +53,13 @@ test.describe("public web smoke", () => {
     await expect(page.getByRole("heading", { name: "一般成員能用哪些指令？" })).toBeVisible();
   });
 
+  test("replaces a legacy category query with its semantic URL", async ({ page }) => {
+    await page.goto("/?igrp=12");
+
+    await expect.poll(() => new URL(page.url()).searchParams.get("category")).toBe("gpu");
+    expect(new URL(page.url()).searchParams.has("igrp")).toBe(false);
+  });
+
   test("renders and updates a persisted build list item", async ({ page }) => {
     const productId = "11111111-1111-1111-1111-111111111111";
 

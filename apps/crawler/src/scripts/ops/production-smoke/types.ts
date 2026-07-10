@@ -66,7 +66,7 @@ export interface SmokeProductsResponse {
 // 分類 API 在 smoke 中需要驗證的最小 response shape。
 export interface SmokeCategoriesResponse {
   data: Array<{
-    igrp: number;
+    slug: string;
   }>;
 }
 

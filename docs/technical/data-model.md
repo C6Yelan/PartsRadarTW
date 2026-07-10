@@ -14,6 +14,7 @@ not delete, squash, or rewrite historical migrations for cleanup-only reasons.
 - Domain truth tables 保持接近 3NF；API 查詢便利欄位放在 read projection 或 join。
 - 第一版只支援 CoolPC / 原價屋，不在核心表保存固定來源欄位。
 - 分類脈絡集中於 `source_categories`，其他表用 `source_category_id` 關聯取得 `igrp` 與分類名稱。
+- Public category slug 只由 web/API boundary mapping 產生，不新增到 `source_categories` 或商品資料列。
 - 商品唯一性為 `source_category_id + ibuy_token`。
 - `source_item_key` 只由程式層計算，不存 DB。
 - `current_prices` 只保存目前 price snapshot 指標，不重複保存價格、幣別或 captured time。

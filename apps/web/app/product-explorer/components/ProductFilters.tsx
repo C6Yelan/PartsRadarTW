@@ -9,8 +9,8 @@ interface ProductFiltersProps {
   categories: CategoryItem[];
   categoryState: LoadState;
   filtersOpen: boolean;
-  selectedIgrp: string;
-  onCategoryChange: (igrp: string) => void;
+  selectedCategory: string;
+  onCategoryChange: (category: string) => void;
   onKeepDesktopOpen: (event: MouseEvent<HTMLElement>) => void;
   onToggleOpen: (isOpen: boolean) => void;
 }
@@ -20,7 +20,7 @@ export function ProductFilters({
   categories,
   categoryState,
   filtersOpen,
-  selectedIgrp,
+  selectedCategory,
   onCategoryChange,
   onKeepDesktopOpen,
   onToggleOpen,
@@ -41,18 +41,16 @@ export function ProductFilters({
             <div className="category-list" role="radiogroup" aria-label="分類">
               {categories.map((category) => (
                 <CategoryOption
-                  checked={selectedIgrp === String(category.igrp)}
+                  checked={selectedCategory === category.slug}
                   key={category.id}
                   label={category.displayName}
                   subLabel={category.sourceName}
-                  value={String(category.igrp)}
-                  onChange={() => onCategoryChange(String(category.igrp))}
+                  value={category.slug}
+                  onChange={() => onCategoryChange(category.slug)}
                 />
               ))}
             </div>
-            {categoryState === "error" ? (
-              <p className="inline-error">分類暫時無法載入。</p>
-            ) : null}
+            {categoryState === "error" ? <p className="inline-error">分類暫時無法載入。</p> : null}
           </div>
         </div>
       </details>

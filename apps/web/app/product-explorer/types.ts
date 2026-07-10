@@ -1,6 +1,8 @@
 // apps/web/app/product-explorer/types.ts
 // 定義商品探索頁使用的 public API response、UI load state 與 URL query 狀態型別。
 
+import type { CategorySlug } from "../category-slugs";
+
 // 來源資料新鮮度狀態，對應 products API meta.sourceStatus。
 export type SourceStatus = "ok" | "stale" | "unavailable";
 
@@ -24,13 +26,9 @@ export type ApiErrorCode = "invalid_query" | "not_found" | "rate_limited" | "int
 // 分類 API 回傳項目，供左側分類篩選與預設分類選取使用。
 export interface CategoryItem {
   id: string;
-  source: "coolpc";
-  igrp: number;
+  slug: CategorySlug;
   displayName: string;
   sourceName: string;
-  enabled: boolean;
-  lastCheckedAt: string | null;
-  lastSuccessAt: string | null;
 }
 
 // 商品列表 API 回傳項目，供列表列項、商品詳細連結與配單快照建立使用。
@@ -94,7 +92,7 @@ export interface ProductsResponse {
 // 商品探索頁的 URL query / draft state，作為搜尋、篩選、排序與分頁的單一前端狀態。
 export interface QueryState {
   q: string;
-  igrp: string;
+  category: string;
   minPrice: string;
   maxPrice: string;
   status: ProductStatus;

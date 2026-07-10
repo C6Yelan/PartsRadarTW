@@ -4,7 +4,7 @@
 import { type FormEvent, type MouseEvent, useState } from "react";
 import {
   DEFAULT_QUERY,
-  getFallbackCategoryIgrp,
+  getFallbackCategorySlug,
   isNonNegativeInteger,
   validatePriceRange,
 } from "../query-state";
@@ -124,7 +124,7 @@ export function useProductExplorerActions({
     event.preventDefault();
     const homeQuery = {
       ...DEFAULT_QUERY,
-      igrp: getFallbackCategoryIgrp(categories, query.igrp),
+      category: getFallbackCategorySlug(categories, query.category),
     };
 
     commitQuery(homeQuery, {
@@ -152,8 +152,8 @@ export function useProductExplorerActions({
     setPageJumpValue("");
   }
 
-  function updateCategoryFilter(igrp: string) {
-    updateQuery({ igrp, vendors: DEFAULT_QUERY.vendors });
+  function updateCategoryFilter(category: string) {
+    updateQuery({ category, vendors: DEFAULT_QUERY.vendors });
   }
 
   function toggleVendorFilter(vendor: string) {

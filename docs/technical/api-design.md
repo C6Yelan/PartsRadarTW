@@ -55,20 +55,16 @@ API 只服務自家 Next.js 網站，不承諾第三方公開 API。所有 endpo
 回傳：
 
 - `id`
-- `source: "coolpc"`
-- `igrp`
+- `slug`：public category slug，例如 `cpu`、`gpu`
 - `displayName`
 - `sourceName`
-- `enabled`
-- `lastCheckedAt`
-- `lastSuccessAt`
 
 規則：
 
 - 只回傳 `enabled = true`。
 - 排序依目前啟用分類順序。
-- `lastCheckedAt` 是最近檢查，不等於成功更新。
-- `lastSuccessAt` 是最近成功處理有效資料，尚未成功時可為 `null`。
+- `slug` 由 web/API boundary 的單一 mapping 從 internal CoolPC `igrp` 產生，不寫入 DB。
+- enabled 分類若缺少 slug mapping，回傳泛用 `500`，不靜默省略分類。
 
 ## `GET /api/products`
 
@@ -77,8 +73,9 @@ Query：
 | 參數 | 型別 | 預設 | 說明 |
 | --- | --- | --- | --- |
 | `q` | string | 無 | 商品關鍵字 |
-| `igrp` | number | 無 | CoolPC 分類 |
-| `vendors` | string | 無 | 逗號分隔 vendor slug，需搭配 `igrp` |
+| `category` | string | 無 | Public category slug；API boundary 轉成 internal CoolPC `igrp` |
+| `igrp` | number | 無 | 暫時保留的 legacy read-only alias，不由網站產生 |
+| `vendors` | string | 無 | 逗號分隔 vendor slug，需搭配分類 |
 | `minPrice` | number | 無 | 整數 TWD |
 | `maxPrice` | number | 無 | 整數 TWD |
 | `status` | string | `active` | `active`、`inactive`、`all` |
@@ -105,6 +102,7 @@ Response shape：
 規則：
 
 - 預設只查 active 商品。
+- `category` 與 legacy `igrp` 同時存在時必須指向同一分類；不一致、未知 slug 或未 mapping 的 `igrp` 回 `400`，且不讀 DB。
 - 無目前價格的商品第一版不出現在列表。
 - `q` 以空白切詞，每個詞都需命中名稱、normalized name 或 vendor 欄位。
 - `vendors` 只接受目前分類可用的 `products.vendor_slug`。
@@ -113,7 +111,7 @@ Response shape：
 - `price_drop_desc` 與 `price_rise_desc` 依近 30 天變動排序，仍只回 read-only API 處理後的公開欄位。
 - `source.url` 指向原價屋查看 / 購買導流，使用 `evaluate.php?iBuy=...` 且不包含 `PHPSESSID`。
 - 有圖片資料時 `image.url` 使用 `/api/product-images/{productId}.webp`；缺圖不影響商品列出。
-- 若指定 `igrp`，`meta.sourceStatus` 優先回傳該分類狀態。
+- 若指定分類，`meta.sourceStatus` 優先回傳該分類狀態。
 
 ## `GET /api/products/{id}`
 

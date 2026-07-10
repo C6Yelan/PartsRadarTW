@@ -30,7 +30,7 @@ export default function ProductExplorer() {
             categories={viewModel.filters.categories}
             categoryState={viewModel.filters.categoryState}
             filtersOpen={viewModel.filters.filtersOpen}
-            selectedIgrp={viewModel.filters.selectedIgrp}
+            selectedCategory={viewModel.filters.selectedCategory}
             onCategoryChange={viewModel.filters.actions.updateCategoryFilter}
             onKeepDesktopOpen={viewModel.filters.actions.keepDesktopFiltersOpen}
             onToggleOpen={viewModel.filters.actions.syncFiltersOpenFromToggle}
