@@ -9,15 +9,11 @@ export const PRODUCT_DETAIL_SELECT = {
   ibuyToken: true,
   name: true,
   primaryImageUrl: true,
-  primaryImageCheckedAt: true,
   isActive: true,
-  missingSince: true,
-  firstSeenAt: true,
   lastSeenAt: true,
   currentPrice: {
     select: {
       lastSeenAt: true,
-      priceChangedAt: true,
       priceSnapshot: {
         select: {
           price: true,

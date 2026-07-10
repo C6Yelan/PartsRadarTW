@@ -87,6 +87,7 @@ describe("API query helpers", () => {
   });
 
   it("parses pagination defaults and limits", () => {
+    expect(DEFAULT_PAGE_SIZE).toBe(20);
     expect(parsePaginationQuery(new URLSearchParams())).toEqual({
       page: DEFAULT_PAGE,
       pageSize: DEFAULT_PAGE_SIZE,

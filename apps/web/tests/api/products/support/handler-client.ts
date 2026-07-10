@@ -132,7 +132,6 @@ export function priceSnapshot(overrides: Partial<PriceSnapshotRecord> = {}): Pri
   return {
     productId: PRODUCT_ID,
     price: 7590,
-    currency: "TWD",
     capturedAt: new Date("2026-05-01T08:00:00.000Z"),
     ...overrides,
   };
@@ -144,9 +143,7 @@ export function product(overrides: Partial<ProductRecord> = {}): ProductRecord {
     ibuyToken: "GPU-RTX-4070",
     name: "GPU RTX 4070",
     primaryImageUrl: "https://www.coolpc.com.tw/eval/12/gpu-rtx-4070.jpg",
-    primaryImageCheckedAt: new Date("2026-05-28T11:55:00.000Z"),
     isActive: true,
-    missingSince: null,
     currentPrice: {
       lastSeenAt: new Date("2026-05-28T11:55:00.000Z"),
       priceSnapshot: {

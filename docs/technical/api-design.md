@@ -81,7 +81,7 @@ Query：
 | `status` | string | `active` | `active`、`inactive`、`all` |
 | `sort` | string | `price_asc` | `price_asc`、`price_desc`、`price_drop_desc`、`price_rise_desc`、`name_asc` |
 | `page` | number | `1` | 從 1 開始 |
-| `pageSize` | number | `24` | 上限 `100` |
+| `pageSize` | number | `20` | 上限 `100` |
 
 Response shape：
 
@@ -126,7 +126,6 @@ Response shape：
 - `price`
 - `source`
 - `status`
-- `firstSeenAt`
 - `lastSeenAt`
 
 規則：
@@ -151,24 +150,12 @@ Query：
 
 Response shape：
 
-- `productId`
 - `range`：`7d`、`30d`、`90d`、`all`
 - `rangeDays`：`range=all` 時為 `null`；其餘為 `7`、`30`、`90`
 - `points[]`
   - `amount`
-  - `currency`
   - `observedAt`
-  - `source`
-- `summary`
-  - `pointCount`
-  - `startedAt`
-  - `endedAt`
-  - `lowest`
-  - `highest`
-  - `first`
-  - `latest`
-  - `deltaAmount`
-  - `deltaPercent`
+  - `observationType`
 
 規則：
 
@@ -178,8 +165,7 @@ Response shape：
 - `points` 依 `observedAt` 由舊到新排序。
 - `observationType = "price_snapshot"` 代表新商品或價格變動建立的 snapshot。
 - 若目前價格在 snapshot 後又被 crawler 看到且未變價，加入 `observationType = "current_price_confirmation"` 確認點，讓 UI 能畫出水平線。
-- `source` 保留為與 `observationType` 相同值的相容欄位，既有 client 可繼續讀取。
-- 價格摘要只描述資料庫已記錄或確認的價格觀測點，不代表來源站更新頻率保證。
+- 畫面摘要由前端依 `points` 計算，只描述資料庫已記錄或確認的價格觀測點，不代表來源站更新頻率保證。
 
 ## `GET /api/product-images/{id}.webp`
 

@@ -77,7 +77,7 @@ export function createGetProductPriceHistoryHandler(
       });
 
       return jsonOk<ProductPriceHistoryResponseBody>(
-        toPriceHistoryResponse(normalizedProductId, range, snapshots, product, since),
+        toPriceHistoryResponse(range, snapshots, product, since),
       );
     } catch (error) {
       if (error instanceof InvalidQueryError) {

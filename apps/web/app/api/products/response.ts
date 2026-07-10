@@ -31,7 +31,6 @@ interface ProductListResponseItem {
   image: {
     url: string;
     alt: string;
-    capturedAt: string;
   } | null;
   price: {
     amount: number;
@@ -50,7 +49,6 @@ interface ProductListResponseItem {
   };
   status: {
     isActive: boolean;
-    missingSince: string | null;
   };
 }
 
@@ -85,7 +83,10 @@ export function buildProductSourceStatus(
 }
 
 // 將 DB product projection 轉成單筆 public response，並重新產生公開購買連結。
-export function toProductResponseItem(product: ProductRecord): ProductListResponseItem {
+export function toProductResponseItemWithMovement(
+  product: ProductRecord,
+  movement: ProductListResponseItem["priceMovement"],
+): ProductListResponseItem {
   if (!product.currentPrice) {
     throw new Error("Product list query returned a product without current price.");
   }
@@ -106,7 +107,7 @@ export function toProductResponseItem(product: ProductRecord): ProductListRespon
       capturedAt: product.currentPrice.priceSnapshot.capturedAt.toISOString(),
       lastSeenAt: product.currentPrice.lastSeenAt.toISOString(),
     },
-    priceMovement: toProductPriceMovement(product, []),
+    priceMovement: movement,
     source: {
       name: COOLPC_SOURCE_NAME,
       // 使用 ibuyToken 重新組公開購買連結，避免 crawler 儲存的來源 URL 被直接外露。
@@ -114,14 +115,13 @@ export function toProductResponseItem(product: ProductRecord): ProductListRespon
     },
     status: {
       isActive: product.isActive,
-      missingSince: toIsoStringOrNull(product.missingSince),
     },
   };
 }
 
-// 將商品圖片欄位轉成列表用的公開圖片資訊；缺少快取檢查時間時視為沒有可用圖片。
+// 將商品圖片欄位轉成列表用的公開圖片資訊。
 function toProductListImage(product: ProductRecord): ProductListResponseItem["image"] {
-  if (!product.primaryImageUrl || !product.primaryImageCheckedAt) {
+  if (!product.primaryImageUrl) {
     return null;
   }
 
@@ -129,7 +129,6 @@ function toProductListImage(product: ProductRecord): ProductListResponseItem["im
     // 圖片路徑由 shared helper 產生，避免列表、詳細頁與 smoke test 的公開圖片 URL 漂移。
     url: createPublicProductImagePath(product.id),
     alt: product.name,
-    capturedAt: product.primaryImageCheckedAt.toISOString(),
   };
 }
 
@@ -153,17 +152,6 @@ export function buildProductPriceMovementMap(
       toProductPriceMovement(product, snapshotsByProductId.get(product.id) ?? [], now),
     ]),
   );
-}
-
-// 使用已計算好的 movement 覆蓋預設值，避免 response mapper 重複計算價格變動。
-export function toProductResponseItemWithMovement(
-  product: ProductRecord,
-  movement: ProductListResponseItem["priceMovement"],
-): ProductListResponseItem {
-  return {
-    ...toProductResponseItem(product),
-    priceMovement: movement,
-  };
 }
 
 // 計算目前價格相對於近 30 天基準價的變動；資料不足時回傳 null movement。
@@ -217,8 +205,4 @@ function toProductPriceMovement(
     deltaPercent:
       baseline.price === 0 ? null : Number(((deltaAmount / baseline.price) * 100).toFixed(2)),
   };
-}
-
-function toIsoStringOrNull(value: Date | null): string | null {
-  return value ? value.toISOString() : null;
 }

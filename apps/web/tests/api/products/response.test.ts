@@ -69,6 +69,8 @@ describe("GET /api/products response", () => {
     });
     expect(client.lastProductFindProductsArgs?.select).toHaveProperty("ibuyToken", true);
     expect(client.lastProductFindProductsArgs?.select).not.toHaveProperty("sourceUrl");
+    expect(client.lastProductFindProductsArgs?.select).not.toHaveProperty("primaryImageCheckedAt");
+    expect(client.lastProductFindProductsArgs?.select).not.toHaveProperty("missingSince");
     expect(client.lastProductCountArgs?.where).toEqual(client.lastProductFindProductsArgs?.where);
     expect(client.lastPriceSnapshotFindManyArgs).toMatchObject({
       where: {
@@ -80,6 +82,11 @@ describe("GET /api/products response", () => {
         },
       },
       orderBy: [{ productId: "asc" }, { capturedAt: "asc" }],
+    });
+    expect(client.lastPriceSnapshotFindManyArgs?.select).toEqual({
+      productId: true,
+      price: true,
+      capturedAt: true,
     });
     expect(client.lastSourceCategoryFindManyArgs).toEqual(SOURCE_STATUS_CATEGORY_QUERY);
     expect(body).toEqual({
@@ -96,7 +103,6 @@ describe("GET /api/products response", () => {
           image: {
             url: `/api/product-images/${PRODUCT_ID}.webp`,
             alt: "GPU RTX 4070",
-            capturedAt: "2026-05-28T11:55:00.000Z",
           },
           price: {
             amount: 6990,
@@ -115,7 +121,6 @@ describe("GET /api/products response", () => {
           },
           status: {
             isActive: true,
-            missingSince: null,
           },
         },
       ],
@@ -158,12 +163,12 @@ describe("GET /api/products response", () => {
       },
       orderBy: [{ currentPrice: { priceSnapshot: { price: "asc" } } }, { id: "asc" }],
       skip: 0,
-      take: 24,
+      take: 20,
     });
     expect(await response.json()).toMatchObject({
       pagination: {
         page: 1,
-        pageSize: 24,
+        pageSize: 20,
         totalItems: 0,
         totalPages: 0,
       },
@@ -180,7 +185,6 @@ describe("GET /api/products response", () => {
       products: [
         product({
           primaryImageUrl: null,
-          primaryImageCheckedAt: null,
         }),
       ],
       totalItems: 1,

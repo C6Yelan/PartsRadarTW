@@ -1,5 +1,5 @@
 // apps/web/tests/api/products/[id]/price-history/response.test.ts
-// 驗證商品價格歷史 API 的觀測點、目前價格確認點、range 查詢條件與摘要 response。
+// 驗證商品價格歷史 API 的精簡觀測點、目前價格確認點與 range 查詢條件。
 
 import { describe, expect, it } from "vitest";
 
@@ -7,11 +7,10 @@ import { createGetProductPriceHistoryHandler } from "../../../../../app/api/prod
 import { fakePriceHistoryClient, NOW, PRODUCT_ID, productRecord, snapshot } from "./support";
 
 describe("GET /api/products/{id}/price-history response", () => {
-  it("returns price history points and summary for a product with a current price", async () => {
+  it("returns price history points for a product with a current price", async () => {
     const client = fakePriceHistoryClient({
       productResult: productRecord({
         price: 5600,
-        capturedAt: "2026-05-31T08:00:00.000Z",
         lastSeenAt: "2026-05-31T08:00:00.000Z",
       }),
       snapshots: [
@@ -28,7 +27,6 @@ describe("GET /api/products/{id}/price-history response", () => {
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expectObservationTypeAliases(body.points);
     expect(client.lastProductFindFirstArgs).toMatchObject({
       where: {
         id: PRODUCT_ID,
@@ -51,56 +49,42 @@ describe("GET /api/products/{id}/price-history response", () => {
         capturedAt: "asc",
       },
     });
+    expect(client.lastProductFindFirstArgs?.select).toEqual({
+      currentPrice: {
+        select: {
+          lastSeenAt: true,
+          priceSnapshot: {
+            select: {
+              price: true,
+            },
+          },
+        },
+      },
+    });
+    expect(client.lastPriceSnapshotFindManyArgs?.select).toEqual({
+      price: true,
+      capturedAt: true,
+    });
     expect(body).toEqual({
-      productId: PRODUCT_ID,
       range: "30d",
       rangeDays: 30,
       points: [
         {
           amount: 5900,
-          currency: "TWD",
           observedAt: "2026-05-20T08:00:00.000Z",
           observationType: "price_snapshot",
-          source: "price_snapshot",
         },
         {
           amount: 6200,
-          currency: "TWD",
           observedAt: "2026-05-25T08:00:00.000Z",
           observationType: "price_snapshot",
-          source: "price_snapshot",
         },
         {
           amount: 5600,
-          currency: "TWD",
           observedAt: "2026-05-31T08:00:00.000Z",
           observationType: "price_snapshot",
-          source: "price_snapshot",
         },
       ],
-      summary: {
-        pointCount: 3,
-        startedAt: "2026-05-20T08:00:00.000Z",
-        endedAt: "2026-05-31T08:00:00.000Z",
-        lowest: {
-          amount: 5600,
-          observedAt: "2026-05-31T08:00:00.000Z",
-        },
-        highest: {
-          amount: 6200,
-          observedAt: "2026-05-25T08:00:00.000Z",
-        },
-        first: {
-          amount: 5900,
-          observedAt: "2026-05-20T08:00:00.000Z",
-        },
-        latest: {
-          amount: 5600,
-          observedAt: "2026-05-31T08:00:00.000Z",
-        },
-        deltaAmount: -300,
-        deltaPercent: -5.08,
-      },
     });
   });
 
@@ -108,7 +92,6 @@ describe("GET /api/products/{id}/price-history response", () => {
     const client = fakePriceHistoryClient({
       productResult: productRecord({
         price: 5900,
-        capturedAt: "2026-05-20T08:00:00.000Z",
         lastSeenAt: "2026-06-01T05:30:00.000Z",
       }),
       snapshots: [snapshot(5900, "2026-05-20T08:00:00.000Z")],
@@ -121,57 +104,27 @@ describe("GET /api/products/{id}/price-history response", () => {
 
     expect(response.status).toBe(200);
     const body = await response.json();
-    expectObservationTypeAliases(body.points);
     expect(body).toEqual({
-      productId: PRODUCT_ID,
       range: "90d",
       rangeDays: 90,
       points: [
         {
           amount: 5900,
-          currency: "TWD",
           observedAt: "2026-05-20T08:00:00.000Z",
           observationType: "price_snapshot",
-          source: "price_snapshot",
         },
         {
           amount: 5900,
-          currency: "TWD",
           observedAt: "2026-06-01T05:30:00.000Z",
           observationType: "current_price_confirmation",
-          source: "current_price_confirmation",
         },
       ],
-      summary: {
-        pointCount: 2,
-        startedAt: "2026-05-20T08:00:00.000Z",
-        endedAt: "2026-06-01T05:30:00.000Z",
-        lowest: {
-          amount: 5900,
-          observedAt: "2026-05-20T08:00:00.000Z",
-        },
-        highest: {
-          amount: 5900,
-          observedAt: "2026-05-20T08:00:00.000Z",
-        },
-        first: {
-          amount: 5900,
-          observedAt: "2026-05-20T08:00:00.000Z",
-        },
-        latest: {
-          amount: 5900,
-          observedAt: "2026-06-01T05:30:00.000Z",
-        },
-        deltaAmount: 0,
-        deltaPercent: 0,
-      },
     });
   });
 
   it("defaults to the 90 day range", async () => {
     const client = fakePriceHistoryClient({
       productResult: productRecord({
-        capturedAt: "2026-01-01T08:00:00.000Z",
         lastSeenAt: "2026-01-02T08:00:00.000Z",
       }),
       snapshots: [],
@@ -190,21 +143,10 @@ describe("GET /api/products/{id}/price-history response", () => {
         },
       },
     });
-    expect(await response.json()).toMatchObject({
+    expect(await response.json()).toEqual({
       range: "90d",
       rangeDays: 90,
       points: [],
-      summary: {
-        pointCount: 0,
-        startedAt: null,
-        endedAt: null,
-        lowest: null,
-        highest: null,
-        first: null,
-        latest: null,
-        deltaAmount: null,
-        deltaPercent: null,
-      },
     });
   });
 
@@ -212,7 +154,6 @@ describe("GET /api/products/{id}/price-history response", () => {
     const client = fakePriceHistoryClient({
       productResult: productRecord({
         price: 5400,
-        capturedAt: "2026-05-31T08:00:00.000Z",
         lastSeenAt: "2026-06-01T05:30:00.000Z",
       }),
       snapshots: [
@@ -229,7 +170,6 @@ describe("GET /api/products/{id}/price-history response", () => {
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expectObservationTypeAliases(body.points);
     expect(client.lastPriceSnapshotFindManyArgs).toMatchObject({
       where: {
         productId: PRODUCT_ID,
@@ -239,45 +179,31 @@ describe("GET /api/products/{id}/price-history response", () => {
       },
     });
     expect(client.lastPriceSnapshotFindManyArgs?.where).not.toHaveProperty("capturedAt");
-    expect(body).toMatchObject({
-      productId: PRODUCT_ID,
+    expect(body).toEqual({
       range: "all",
       rangeDays: null,
       points: [
         {
           amount: 6200,
           observedAt: "2026-01-10T08:00:00.000Z",
+          observationType: "price_snapshot",
         },
         {
           amount: 5800,
           observedAt: "2026-03-20T08:00:00.000Z",
+          observationType: "price_snapshot",
         },
         {
           amount: 5400,
           observedAt: "2026-05-31T08:00:00.000Z",
+          observationType: "price_snapshot",
         },
         {
           amount: 5400,
           observedAt: "2026-06-01T05:30:00.000Z",
           observationType: "current_price_confirmation",
-          source: "current_price_confirmation",
         },
       ],
-      summary: {
-        pointCount: 4,
-        startedAt: "2026-01-10T08:00:00.000Z",
-        endedAt: "2026-06-01T05:30:00.000Z",
-        deltaAmount: -800,
-        deltaPercent: -12.9,
-      },
     });
   });
 });
-
-function expectObservationTypeAliases(
-  points: Array<{ observationType?: string; source?: string }>,
-) {
-  expect(
-    points.every((point) => point.observationType && point.observationType === point.source),
-  ).toBe(true);
-}

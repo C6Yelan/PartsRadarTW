@@ -30,7 +30,6 @@ export interface ProductDetailBody {
   };
   status: {
     isActive: boolean;
-    missingSince: string | null;
   };
   lastSeenAt: string;
 }

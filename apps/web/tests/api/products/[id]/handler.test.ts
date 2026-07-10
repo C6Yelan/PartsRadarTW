@@ -32,6 +32,12 @@ describe("GET /api/products/{id} handler", () => {
     });
     expect(client.lastProductFindFirstArgs?.select).toHaveProperty("ibuyToken", true);
     expect(client.lastProductFindFirstArgs?.select).not.toHaveProperty("sourceUrl");
+    expect(client.lastProductFindFirstArgs?.select).not.toHaveProperty("primaryImageCheckedAt");
+    expect(client.lastProductFindFirstArgs?.select).not.toHaveProperty("missingSince");
+    expect(client.lastProductFindFirstArgs?.select).not.toHaveProperty("firstSeenAt");
+    expect(client.lastProductFindFirstArgs?.select.currentPrice?.select).not.toHaveProperty(
+      "priceChangedAt",
+    );
     expect(body).toEqual({
       id: PRODUCT_ID,
       name: "GPU RTX 4070",
@@ -44,14 +50,12 @@ describe("GET /api/products/{id} handler", () => {
       image: {
         url: `/api/product-images/${PRODUCT_ID}.webp`,
         alt: "GPU RTX 4070",
-        capturedAt: "2026-05-28T11:55:00.000Z",
       },
       price: {
         amount: 6990,
         currency: "TWD",
         capturedAt: "2026-05-28T11:45:00.000Z",
         lastSeenAt: "2026-05-28T11:55:00.000Z",
-        priceChangedAt: "2026-05-28T11:45:00.000Z",
       },
       source: {
         name: "coolpc",
@@ -59,9 +63,7 @@ describe("GET /api/products/{id} handler", () => {
       },
       status: {
         isActive: true,
-        missingSince: null,
       },
-      firstSeenAt: "2026-05-28T10:00:00.000Z",
       lastSeenAt: "2026-05-28T11:55:00.000Z",
     });
     expect(JSON.stringify(body)).not.toContain("iBuyToken");
@@ -76,7 +78,6 @@ describe("GET /api/products/{id} handler", () => {
       fakeProductDetailClient(
         product({
           primaryImageUrl: null,
-          primaryImageCheckedAt: null,
         }),
       ),
     )(PRODUCT_ID);
@@ -96,7 +97,6 @@ describe("GET /api/products/{id} handler", () => {
       fakeProductDetailClient(
         product({
           isActive: false,
-          missingSince: new Date("2026-05-28T12:00:00.000Z"),
         }),
       ),
     )(PRODUCT_ID);
@@ -105,7 +105,6 @@ describe("GET /api/products/{id} handler", () => {
     expect(await response.json()).toMatchObject({
       status: {
         isActive: false,
-        missingSince: "2026-05-28T12:00:00.000Z",
       },
     });
   });
@@ -192,14 +191,10 @@ function product(overrides: Partial<NonNullable<ProductRecord>> = {}): NonNullab
     ibuyToken: "GPU-RTX-4070",
     name: "GPU RTX 4070",
     primaryImageUrl: "https://www.coolpc.com.tw/eval/12/gpu-rtx-4070.jpg",
-    primaryImageCheckedAt: new Date("2026-05-28T11:55:00.000Z"),
     isActive: true,
-    missingSince: null,
-    firstSeenAt: new Date("2026-05-28T10:00:00.000Z"),
     lastSeenAt: new Date("2026-05-28T11:55:00.000Z"),
     currentPrice: {
       lastSeenAt: new Date("2026-05-28T11:55:00.000Z"),
-      priceChangedAt: new Date("2026-05-28T11:45:00.000Z"),
       priceSnapshot: {
         price: 6990,
         currency: "TWD",

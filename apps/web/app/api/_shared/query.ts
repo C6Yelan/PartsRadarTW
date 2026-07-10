@@ -2,7 +2,7 @@
 // 提供 web API route 共用的 query 解析規則，集中維持單值參數、型別檢查與分頁上限。
 
 export const DEFAULT_PAGE = 1;
-export const DEFAULT_PAGE_SIZE = 24;
+export const DEFAULT_PAGE_SIZE = 20;
 export const MAX_PAGE_SIZE = 100;
 
 const DECIMAL_INTEGER_PATTERN = /^-?\d+$/;

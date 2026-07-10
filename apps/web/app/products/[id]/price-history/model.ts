@@ -37,8 +37,6 @@ export function summarizePoints(points: PriceHistoryPoint[]): HistoryViewSummary
     endedAt: latest?.observedAt ?? null,
     lowest,
     highest,
-    first,
-    latest,
     averageAmount,
     rangePositionPercent,
     deltaAmount,
@@ -111,14 +109,12 @@ function createStepPath(points: ChartPoint[]) {
 
   const [firstPoint, ...restPoints] = points;
   let path = `M ${firstPoint.x} ${firstPoint.y}`;
-  let previousPoint = firstPoint;
 
   for (const point of restPoints) {
     path += ` H ${point.x} V ${point.y}`;
-    previousPoint = point;
   }
 
-  return previousPoint ? path : "";
+  return path;
 }
 
 // 建立固定三段式 Y 軸刻度，讓圖表顯示最高、中間與最低價格區間。

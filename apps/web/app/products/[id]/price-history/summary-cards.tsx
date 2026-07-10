@@ -33,7 +33,7 @@ export function HistoryRangeCard({
   rangeDays: PriceHistoryRangeDays | null;
   summary: HistoryViewSummary;
 }) {
-  if (!summary.lowest || !summary.highest || !summary.latest) {
+  if (!summary.lowest || !summary.highest) {
     return null;
   }
 

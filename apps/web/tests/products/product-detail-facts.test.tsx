@@ -14,7 +14,6 @@ describe("ProductDetailFacts", () => {
         product={product({
           status: {
             isActive: false,
-            missingSince: "2026-07-10T08:00:00.000Z",
           },
         })}
       />,
@@ -56,7 +55,6 @@ function product(overrides: Partial<ProductDetailBody> = {}): ProductDetailBody 
     },
     status: {
       isActive: true,
-      missingSince: null,
     },
     lastSeenAt: "2026-07-10T08:00:00.000Z",
     ...overrides,

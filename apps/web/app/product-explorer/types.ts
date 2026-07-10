@@ -44,7 +44,6 @@ export interface ProductListItem {
   image: {
     url: string;
     alt: string;
-    capturedAt: string;
   } | null;
   price: {
     amount: number;
@@ -63,7 +62,6 @@ export interface ProductListItem {
   };
   status: {
     isActive: boolean;
-    missingSince: string | null;
   };
 }
 

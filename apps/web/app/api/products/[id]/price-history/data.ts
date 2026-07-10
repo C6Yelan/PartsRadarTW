@@ -5,17 +5,17 @@ import type { Prisma } from "@partsradar/db";
 
 export const PRICE_HISTORY_SNAPSHOT_SELECT = {
   price: true,
-  currency: true,
   capturedAt: true,
 } as const satisfies Prisma.PriceSnapshotSelect;
 
 export const PRICE_HISTORY_PRODUCT_SELECT = {
-  id: true,
   currentPrice: {
     select: {
       lastSeenAt: true,
       priceSnapshot: {
-        select: PRICE_HISTORY_SNAPSHOT_SELECT,
+        select: {
+          price: true,
+        },
       },
     },
   },

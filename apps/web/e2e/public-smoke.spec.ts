@@ -154,7 +154,7 @@ test.describe("public API smoke", () => {
 
     const priceHistory = await request.get(`/api/products/${product.id}/price-history?range=90d`);
     expect(priceHistory.status()).toBe(200);
-    await expectJsonShape(priceHistory, ["points", "summary"]);
+    await expectJsonShape(priceHistory, ["range", "rangeDays", "points"]);
 
     if (!product.image?.url) {
       test.skip(true, "The first product has no cached image.");

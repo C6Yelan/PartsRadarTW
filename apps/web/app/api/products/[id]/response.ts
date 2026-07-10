@@ -22,14 +22,12 @@ export interface ProductDetailResponseBody {
   image: {
     url: string;
     alt: string;
-    capturedAt: string;
   } | null;
   price: {
     amount: number;
     currency: "TWD";
     capturedAt: string;
     lastSeenAt: string;
-    priceChangedAt: string;
   };
   source: {
     name: typeof COOLPC_SOURCE_NAME;
@@ -37,9 +35,7 @@ export interface ProductDetailResponseBody {
   };
   status: {
     isActive: boolean;
-    missingSince: string | null;
   };
-  firstSeenAt: string;
   lastSeenAt: string;
 }
 
@@ -66,7 +62,6 @@ export function toProductDetailResponse(product: ProductDetailRecord): ProductDe
       currency: product.currentPrice.priceSnapshot.currency,
       capturedAt: product.currentPrice.priceSnapshot.capturedAt.toISOString(),
       lastSeenAt: product.currentPrice.lastSeenAt.toISOString(),
-      priceChangedAt: product.currentPrice.priceChangedAt.toISOString(),
     },
     source: {
       name: COOLPC_SOURCE_NAME,
@@ -75,26 +70,19 @@ export function toProductDetailResponse(product: ProductDetailRecord): ProductDe
     },
     status: {
       isActive: product.isActive,
-      missingSince: toIsoStringOrNull(product.missingSince),
     },
-    firstSeenAt: product.firstSeenAt.toISOString(),
     lastSeenAt: product.lastSeenAt.toISOString(),
   };
 }
 
-// 只在圖片來源與檢查時間都存在時提供站內快取圖片路徑，避免回傳來源站 raw image URL。
+// 有來源圖片資料時提供站內快取圖片路徑，不回傳來源站 raw image URL。
 function toProductDetailImage(product: ProductDetailRecord): ProductDetailResponseBody["image"] {
-  if (!product.primaryImageUrl || !product.primaryImageCheckedAt) {
+  if (!product.primaryImageUrl) {
     return null;
   }
 
   return {
     url: createPublicProductImagePath(product.id),
     alt: product.name,
-    capturedAt: product.primaryImageCheckedAt.toISOString(),
   };
-}
-
-function toIsoStringOrNull(value: Date | null): string | null {
-  return value ? value.toISOString() : null;
 }

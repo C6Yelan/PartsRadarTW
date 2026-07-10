@@ -11,9 +11,7 @@ export const PRODUCT_SELECT = {
   ibuyToken: true,
   name: true,
   primaryImageUrl: true,
-  primaryImageCheckedAt: true,
   isActive: true,
-  missingSince: true,
   currentPrice: {
     select: {
       lastSeenAt: true,
@@ -43,16 +41,17 @@ export const PRODUCT_VENDOR_SELECT = {
 
 export const PRODUCT_PRICE_MOVEMENT_RANGE_DAYS = 30;
 
-// 價格變動摘要只需要歷史快照的價格、幣別與時間，不讀取商品完整資料。
+// 價格變動摘要只需要歷史快照的商品、價格與時間，不讀取商品完整資料。
 export const PRODUCT_PRICE_MOVEMENT_SNAPSHOT_SELECT = {
   productId: true,
   price: true,
-  currency: true,
   capturedAt: true,
 } as const satisfies Prisma.PriceSnapshotSelect;
 
 export type ProductRecord = Prisma.ProductGetPayload<{ select: typeof PRODUCT_SELECT }>;
-export type ProductVendorRecord = Prisma.ProductGetPayload<{ select: typeof PRODUCT_VENDOR_SELECT }>;
+export type ProductVendorRecord = Prisma.ProductGetPayload<{
+  select: typeof PRODUCT_VENDOR_SELECT;
+}>;
 export type ProductPriceMovementSnapshotRecord = Prisma.PriceSnapshotGetPayload<{
   select: typeof PRODUCT_PRICE_MOVEMENT_SNAPSHOT_SELECT;
 }>;

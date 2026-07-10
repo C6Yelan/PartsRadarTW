@@ -27,6 +27,7 @@
 - `fetchedAt`：crawler 抓到來源頁或 raw snapshot 的時間。
 - `capturedAt`：price snapshot / image record 被收錄的時間。
 - `observedAt`：public price-history point 對使用者呈現的觀測時間。
+- `observationType`：public price-history point 的觀測類型，例如 `price_snapshot` 或 `current_price_confirmation`。
 - `lastSeenAt`：crawler 最近一次確認商品或目前價格仍存在的時間。
 - `lastCheckedAt`：來源分類或 smoke 類檢查的最近檢查時間。
 - `lastSuccessAt`：來源分類最近一次成功處理有效資料的時間。
@@ -44,7 +45,6 @@
 下列名稱已是 public API 或 DB contract，短期內保留，但新增程式碼應避免擴大歧義：
 
 - `source.url`：public 商品 response 的查看 / 購買連結。內部新變數應叫 `purchaseUrl`。
-- price-history point 的 `observationType`：表示價格觀測點來源，例如 `price_snapshot` 或 `current_price_confirmation`。`source` 仍是相同值的 public API 相容 alias；內部新程式碼應使用 `observationType`。
 
 ## File Path Comments
 
