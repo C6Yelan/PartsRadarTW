@@ -7,8 +7,8 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   backfillProductVendors,
-  parseOptions,
   type ProductCandidate,
+  parseOptions,
 } from "../../../src/scripts/ops/backfill-product-vendors";
 
 const tempRoots: string[] = [];

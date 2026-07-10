@@ -72,7 +72,7 @@ Policy-style scans are not product tests. Do not add repo-wide source layout rul
 requirements, or broad text scans to `pnpm test` unless they directly protect a security boundary.
 
 Discord bot fake clients are split by contract boundary under
-`apps/crawler/tests/scripts/ops/discord-bot/support-*`:
+`apps/crawler/tests/scripts/ops/discord-bot/support/`:
 
 - price report reader delegates
 - delivery recorder delegates

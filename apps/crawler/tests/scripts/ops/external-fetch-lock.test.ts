@@ -4,9 +4,9 @@
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { tryAcquireExternalFetchLock } from "../../../src/scripts/ops/external-fetch-lock";
-import { createCrawlerDaemonTestEnvironment } from "./crawl-coolpc-daemon-support";
+import { createDaemonTestEnvironment } from "./crawl-coolpc-daemon/crawl-coolpc-daemon-support";
 
-const testEnv = createCrawlerDaemonTestEnvironment();
+const testEnv = createDaemonTestEnvironment();
 
 afterEach(testEnv.cleanup);
 

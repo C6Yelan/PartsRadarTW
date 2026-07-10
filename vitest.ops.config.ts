@@ -16,7 +16,6 @@ export default defineConfig({
       "**/out/**",
       "apps/web/e2e/**",
       "apps/crawler/tests/scripts/ops/discord-bot/**/*.{test,spec}.{ts,tsx}",
-      "apps/crawler/tests/scripts/ops/discord-bot-*.{test,spec}.{ts,tsx}",
     ],
   },
 });
