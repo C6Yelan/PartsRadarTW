@@ -1,6 +1,7 @@
 // apps/web/app/build-list/refresh.ts
 // 呼叫配單批次 refresh API，驗證 public response，並將失敗收斂成頁面狀態。
 
+import { isRateLimitedApiError, toApiRequestError } from "../_shared/api-client";
 import { MAX_BUILD_LIST_PRODUCTS } from "./constants";
 import type { BuildListProductSnapshot } from "./model";
 import {
@@ -51,12 +52,10 @@ export async function refreshBuildListProducts(
       signal: options.signal,
     });
 
-    if (response.status === 429) {
-      return { status: "rate_limited" };
-    }
-
     if (!response.ok) {
-      return { status: "error" };
+      const error = await toApiRequestError(response, "Failed to refresh build list.");
+
+      return { status: isRateLimitedApiError(error) ? "rate_limited" : "error" };
     }
 
     const result = normalizeBuildListRefreshResponse(await response.json(), productIds);

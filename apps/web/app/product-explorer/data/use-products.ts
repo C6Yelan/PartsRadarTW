@@ -2,7 +2,8 @@
 // 依商品探索頁 query 載入商品列表，並把 API 狀態轉成 UI 可用的 loadState。
 
 import { useEffect, useState } from "react";
-import { ApiRequestError, fetchProducts } from "../api";
+import { isRateLimitedApiError } from "../../_shared/api-client";
+import { fetchProducts } from "../api";
 import type { LoadState, ProductsResponse, QueryState } from "../types";
 
 // 在 query 準備完成且已選分類後抓取商品，並把 rate limit 與一般錯誤分開回報。
@@ -28,7 +29,7 @@ export function useProducts(isReady: boolean, query: QueryState) {
           return;
         }
 
-        if (error instanceof ApiRequestError && error.code === "rate_limited") {
+        if (isRateLimitedApiError(error)) {
           setProductState("rate_limited");
           return;
         }

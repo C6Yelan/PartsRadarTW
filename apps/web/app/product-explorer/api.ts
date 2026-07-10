@@ -1,29 +1,12 @@
 // apps/web/app/product-explorer/api.ts
-// 提供商品探索頁 client-side fetch helper，統一分類與商品列表 API 的錯誤轉換。
+// 提供商品探索頁分類與商品列表 API 的 client-side fetch helper。
 
+import { toApiRequestError } from "../_shared/api-client";
 import { toApiSearchParams } from "./query-state";
-import type { ApiErrorCode, CategoryItem, ProductsResponse, QueryState } from "./types";
+import type { CategoryItem, ProductsResponse, QueryState } from "./types";
 
 interface CategoriesResponse {
   data: CategoryItem[];
-}
-
-interface ApiErrorResponse {
-  error?: {
-    code?: ApiErrorCode;
-    message?: string;
-  };
-}
-
-// 封裝 public API 非 2xx 回應，讓 hooks 可依 status / code 判斷 UI 狀態。
-export class ApiRequestError extends Error {
-  constructor(
-    message: string,
-    public readonly status: number,
-    public readonly code: ApiErrorCode | null,
-  ) {
-    super(message);
-  }
 }
 
 // 讀取商品探索頁的來源分類清單，回傳前端篩選面板可直接使用的資料。
@@ -50,21 +33,4 @@ export async function fetchProducts(
   }
 
   return (await response.json()) as ProductsResponse;
-}
-
-// 將 public API 錯誤 response 轉成前端錯誤物件；無法解析時使用泛用 fallback。
-async function toApiRequestError(response: Response, fallbackMessage: string) {
-  let body: ApiErrorResponse | null = null;
-
-  try {
-    body = (await response.json()) as ApiErrorResponse;
-  } catch {
-    body = null;
-  }
-
-  return new ApiRequestError(
-    body?.error?.message ?? fallbackMessage,
-    response.status,
-    body?.error?.code ?? null,
-  );
 }

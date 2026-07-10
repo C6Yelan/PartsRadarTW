@@ -2,6 +2,7 @@
 // 載入商品探索頁使用的來源分類清單，並提供分類篩選所需的載入狀態。
 
 import { useEffect, useState } from "react";
+import { isRateLimitedApiError } from "../../_shared/api-client";
 import { fetchCategories } from "../api";
 import type { CategoryItem, LoadState } from "../types";
 
@@ -24,7 +25,7 @@ export function useCategories() {
           return;
         }
 
-        setCategoryState("error");
+        setCategoryState(isRateLimitedApiError(error) ? "rate_limited" : "error");
       });
 
     return () => controller.abort();

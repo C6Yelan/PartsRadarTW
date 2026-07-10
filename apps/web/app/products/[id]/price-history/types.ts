@@ -1,7 +1,13 @@
 // apps/web/app/products/[id]/price-history/types.ts
 // 定義商品價格歷史 API 回應、前端摘要模型與 SVG 圖表模型的共用型別。
 
-export type PriceHistoryLoadState = "idle" | "loading" | "ready" | "unavailable" | "error";
+export type PriceHistoryLoadState =
+  | "idle"
+  | "loading"
+  | "ready"
+  | "unavailable"
+  | "rate_limited"
+  | "error";
 export type PriceHistoryRangeDays = 7 | 30 | 90;
 export type PriceHistoryRange = PriceHistoryRangeDays | "all";
 export type PriceHistoryRangeKey = "7d" | "30d" | "90d" | "all";

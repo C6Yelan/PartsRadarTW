@@ -20,9 +20,6 @@ export type ProductSort =
 // 商品探索頁共用的 client-side 載入生命週期狀態。
 export type LoadState = "idle" | "loading" | "ready" | "error" | "rate_limited";
 
-// Public API 錯誤代碼，前端目前主要用於辨識 rate_limited 狀態。
-export type ApiErrorCode = "invalid_query" | "not_found" | "rate_limited" | "internal_error";
-
 // 分類 API 回傳項目，供左側分類篩選與預設分類選取使用。
 export interface CategoryItem {
   id: string;

@@ -3,11 +3,13 @@
 // 組裝商品詳細頁 client 介面，串接商品資料、配單操作與價格歷史。
 
 import Link from "next/link";
+import { API_RATE_LIMITED_MESSAGE } from "../../_shared/api-client";
 import FloatingBuildListLink from "../../build-list/FloatingBuildListLink";
 import SiteDisclaimer from "../../site-disclaimer";
 import ProductDetailActions from "./detail/ProductDetailActions";
 import ProductDetailFacts from "./detail/ProductDetailFacts";
 import ProductDetailMedia from "./detail/ProductDetailMedia";
+import type { ProductDetailLoadState } from "./detail/types";
 import { useProductDetailViewModel } from "./detail/use-product-detail-view-model";
 import PriceHistoryPanel from "./price-history-panel";
 
@@ -51,11 +53,8 @@ export default function ProductDetail({
         </section>
       ) : null}
 
-      {state === "error" ? (
-        <section className="detail-empty" role="alert">
-          <h1>商品資料暫時無法載入</h1>
-          <p>請稍後重新整理頁面再試一次。</p>
-        </section>
+      {state === "error" || state === "rate_limited" ? (
+        <ProductDetailErrorState state={state} />
       ) : null}
 
       {state === "ready" && product ? (
@@ -98,5 +97,18 @@ export default function ProductDetail({
       <FloatingBuildListLink summary={viewModel.buildList.summary} />
       <SiteDisclaimer />
     </main>
+  );
+}
+
+export function ProductDetailErrorState({
+  state,
+}: {
+  state: Extract<ProductDetailLoadState, "error" | "rate_limited">;
+}) {
+  return (
+    <section className="detail-empty" role="alert">
+      <h1>商品資料暫時無法載入</h1>
+      <p>{state === "rate_limited" ? API_RATE_LIMITED_MESSAGE : "請稍後重新整理頁面再試一次。"}</p>
+    </section>
   );
 }

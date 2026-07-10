@@ -2,6 +2,7 @@
 // 呈現商品探索頁左側分類篩選面板，桌面固定展開、手機可收合。
 
 import type { MouseEvent } from "react";
+import { API_RATE_LIMITED_MESSAGE } from "../../_shared/api-client";
 import type { CategoryItem, LoadState } from "../types";
 import { CategoryOption } from "./CategoryOption";
 
@@ -51,6 +52,9 @@ export function ProductFilters({
               ))}
             </div>
             {categoryState === "error" ? <p className="inline-error">分類暫時無法載入。</p> : null}
+            {categoryState === "rate_limited" ? (
+              <p className="inline-error">{API_RATE_LIMITED_MESSAGE}</p>
+            ) : null}
           </div>
         </div>
       </details>

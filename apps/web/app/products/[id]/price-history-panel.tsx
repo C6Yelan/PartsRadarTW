@@ -3,6 +3,7 @@
 // 組裝商品詳細頁的價格歷史區塊，串接期間選擇、摘要卡、走勢圖與變價紀錄。
 
 import { useMemo, useState } from "react";
+import { API_RATE_LIMITED_MESSAGE } from "../../_shared/api-client";
 import { PriceHistoryChart, useChartConfig } from "./price-history/chart";
 import { createChartModel, summarizePoints } from "./price-history/model";
 import { HistoryRecordList } from "./price-history/records";
@@ -50,7 +51,11 @@ export default function PriceHistoryPanel({
   );
   const isLoading = state === "idle" || state === "loading";
   const isInitialLoading = isLoading && !history;
-  const isUnavailable = state === "error" || state === "unavailable" || (!isLoading && !history);
+  const isUnavailable =
+    state === "error" ||
+    state === "unavailable" ||
+    state === "rate_limited" ||
+    (!isLoading && !history);
 
   return (
     <section className="history-panel" aria-busy={isLoading} aria-labelledby="price-history-title">
@@ -74,7 +79,9 @@ export default function PriceHistoryPanel({
       ) : null}
 
       {!isLoading && isUnavailable ? (
-        <p className="history-empty">價格歷史暫時無法載入。</p>
+        <p className="history-empty">
+          {state === "rate_limited" ? API_RATE_LIMITED_MESSAGE : "價格歷史暫時無法載入。"}
+        </p>
       ) : null}
 
       {history && !isUnavailable ? (

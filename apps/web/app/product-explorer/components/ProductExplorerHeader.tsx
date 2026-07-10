@@ -3,7 +3,7 @@
 // 呈現商品探索頁頂部品牌區、Discord 入口、全域搜尋與資料更新時間。
 
 import Link from "next/link";
-import type { FormEvent, MouseEvent } from "react";
+import type { MouseEvent, SyntheticEvent } from "react";
 import DiscordTopbarLink from "../../DiscordTopbarLink";
 import { formatDateTime } from "../formatting";
 import type { ProductsResponse, QueryState } from "../types";
@@ -22,7 +22,7 @@ export function ProductExplorerHeader({
   onClearSearchDraft: () => void;
   onReturnHome: (event: MouseEvent<HTMLAnchorElement>) => void;
   onSearchDraftChange: (value: string) => void;
-  onTextFiltersSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onTextFiltersSubmit: (event: SyntheticEvent<HTMLFormElement>) => void;
 }) {
   return (
     <header className="topbar">

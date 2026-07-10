@@ -1,7 +1,9 @@
 "use client";
+
 // apps/web/app/build-list/components/BuildListRefreshStatus.tsx
 // 顯示批次 refresh 狀態、最近成功同步時間、手動重整與 browser-only 說明。
 
+import { API_RATE_LIMITED_MESSAGE } from "../../_shared/api-client";
 import { formatBuildListDateTime } from "../formatting";
 import type { BuildListRefreshState } from "../model";
 
@@ -54,7 +56,7 @@ function getRefreshMessage(
   }
 
   if (state === "rate_limited") {
-    return "重新整理次數過快，品項暫時無法確認，請稍後再試。";
+    return API_RATE_LIMITED_MESSAGE;
   }
 
   if (state === "error") {
