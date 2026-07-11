@@ -1,9 +1,9 @@
-// apps/crawler/src/scripts/ops/discord-bot/price-report/reader-query.ts
+// packages/db/src/price-report/query.ts
 // 集中定義價格報告 reader 查詢 price snapshot 時共用的 Prisma select 與排序規則。
 
-import type { Prisma } from "@partsradar/db";
+import type { Prisma } from "@prisma/client";
 
-// 讀取本次報告期間的 price snapshot，並帶出組裝 Discord 報告需要的商品與分類欄位。
+// 讀取本次報告期間的 price snapshot，並帶出組裝價格報告需要的商品與分類欄位。
 export const PRICE_SNAPSHOT_WITH_PRODUCT_SELECT = {
   id: true,
   productId: true,

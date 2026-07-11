@@ -1,14 +1,14 @@
-// apps/crawler/src/scripts/ops/discord-bot/price-report/reader-utils.ts
+// packages/db/src/price-report/utils.ts
 // 提供價格報告 reader 共用的篩選正規化、Prisma 查詢條件、分組與排序規則。
 
-import type { Prisma } from "@partsradar/db";
+import type { Prisma } from "@prisma/client";
 import type {
   CrawlRunPriceSnapshot,
   PreviousPriceSnapshot,
   PriceReportPriceChangeItem,
   PriceReportNewProductItem,
   RecentPriceReportFilters,
-} from "./reader-types";
+} from "./types";
 
 // 正規化報告篩選條件，讓 reader 後續查詢與內容類型判斷使用完整預設值。
 export function normalizeRecentPriceReportFilters(

@@ -4,7 +4,7 @@
 import { getCategoryIgrp, getCategorySlug } from "../../category-slugs";
 
 const INTERNAL_RETURN_URL_ORIGIN = "https://return.partsradar.invalid";
-const ALLOWED_RETURN_PATHS = new Set(["/", "/build-list"]);
+const ALLOWED_RETURN_PATHS = new Set(["/", "/build-list", "/price-report"]);
 
 // 將 query string 中的 returnTo 轉成安全 href，避免外站或不支援路徑被放進返回連結。
 export function normalizeReturnHref(value: string | string[] | undefined) {

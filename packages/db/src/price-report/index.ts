@@ -1,6 +1,7 @@
-// apps/crawler/src/scripts/ops/discord-bot/price-report/reader-types.ts
-// 保留 Discord Bot 既有型別 import path，避免設定、訊息與測試一次改寫。
+// packages/db/src/price-report/index.ts
+// 公開價格報告的共用唯讀查詢入口，不初始化 Prisma client 或包含通知流程。
 
+export { readCrawlRunPriceChangeSummary, readRecentPriceReport } from "./reader";
 export type {
   CrawlRunPriceChangeReadResult,
   CrawlRunPriceSnapshot,
@@ -13,4 +14,4 @@ export type {
   RecentPriceChangeOptions,
   RecentPriceReport,
   RecentPriceReportFilters,
-} from "@partsradar/db/price-report";
+} from "./types";

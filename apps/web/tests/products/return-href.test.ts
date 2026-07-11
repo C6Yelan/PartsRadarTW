@@ -12,6 +12,11 @@ describe("product detail return href", () => {
     );
     expect(normalizeReturnHref(["/?status=inactive", "/?q=ignored"])).toBe("/?status=inactive");
     expect(normalizeReturnHref("/build-list")).toBe("/build-list");
+    expect(
+      normalizeReturnHref(
+        "/price-report?window=7d&type=drop&type=rise&category=gpu&page=2",
+      ),
+    ).toBe("/price-report?window=7d&type=drop&type=rise&category=gpu&page=2");
   });
 
   it("canonicalizes the legacy category alias and rejects conflicting category queries", () => {

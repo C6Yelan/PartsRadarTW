@@ -7,6 +7,7 @@ import type { MouseEvent, SyntheticEvent } from "react";
 import { BrandMarkIcon, ClearIcon, SearchIcon } from "../../_shared/icons";
 import { formatTaipeiDateTime } from "../../_shared/time";
 import DiscordTopbarLink from "../../DiscordTopbarLink";
+import PriceReportTopbarLink from "../../PriceReportTopbarLink";
 import type { ProductsResponse, QueryState } from "../types";
 
 // 組裝首頁頂部列，將搜尋 draft 與提交 / 清除 / 返回首頁事件交給上層控制。
@@ -35,6 +36,7 @@ export function ProductExplorerHeader({
             <span className="brand-subtitle">原價屋零件查詢</span>
           </span>
         </Link>
+        <PriceReportTopbarLink />
         <DiscordTopbarLink />
       </div>
 

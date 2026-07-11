@@ -168,12 +168,75 @@ test.beforeEach(async ({ page }) => {
       return;
     }
 
+    if (requestUrl.pathname === "/api/price-report") {
+      if (requestUrl.searchParams.get("q") === "error") {
+        await route.fulfill({ status: 503, body: "" });
+        return;
+      }
+
+      const isEmpty = requestUrl.searchParams.get("q") === "empty";
+      const isStale = requestUrl.searchParams.get("q") === "stale";
+      const pageNumber = Number(requestUrl.searchParams.get("page") ?? "1");
+
+      await fulfillJson(route, {
+        data: isEmpty
+          ? []
+          : [
+              {
+                productId: PRODUCT_ID,
+                productName:
+                  "視覺驗證超長商品名稱 NVIDIA GeForce RTX 顯示卡 OC Edition",
+                category: { igrp: 12, slug: "gpu", displayName: "顯示卡" },
+                previousPrice: 19_990,
+                currentPrice: 18_990,
+                currency: "TWD",
+                deltaAmount: -1_000,
+                deltaPercent: -5,
+                changedAt: OBSERVED_AT,
+                kind: "drop",
+              },
+              {
+                productId: "22222222-2222-4222-8222-222222222222",
+                productName: "視覺驗證漲價商品",
+                category: { igrp: 4, slug: "cpu", displayName: "CPU" },
+                previousPrice: 10_000,
+                currentPrice: 10_500,
+                currency: "TWD",
+                deltaAmount: 500,
+                deltaPercent: 5,
+                changedAt: OBSERVED_AT,
+                kind: "rise",
+              },
+            ],
+        summary: {
+          dropCount: isEmpty ? 0 : 20,
+          riseCount: isEmpty ? 0 : 20,
+          newProductCount: 0,
+        },
+        pagination: {
+          page: pageNumber,
+          pageSize: 20,
+          totalItems: isEmpty ? 0 : 40,
+          totalPages: isEmpty ? 0 : 2,
+        },
+        meta: {
+          window: "24h",
+          since: "2026-07-09T08:00:00.000Z",
+          until: OBSERVED_AT,
+          sourceStatus: isStale ? "stale" : "ok",
+          lastSuccessAt: OBSERVED_AT,
+        },
+      });
+      return;
+    }
+
     await route.fulfill({ status: 404, body: "" });
   });
 });
 
 test("captures the main pages without horizontal overflow", async ({ page }, testInfo) => {
   await page.goto("/?category=gpu&page=10");
+  await expect(page.getByRole("link", { name: "價格變動總覽" })).toBeVisible();
   await expect(page.getByRole("region", { name: "商品列表" })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "頁碼" })).toBeVisible();
 
@@ -200,6 +263,14 @@ test("captures the main pages without horizontal overflow", async ({ page }, tes
 
   await page.getByRole("searchbox", { name: "搜尋商品名稱" }).focus();
   await captureLayout(page, testInfo, "home");
+
+  await page.goto("/price-report");
+  await expect(
+    page.getByRole("heading", { exact: true, name: "價格變動總覽" }),
+  ).toBeVisible();
+  await expect(page.getByRole("region", { name: "價格變動列表" })).toBeVisible();
+  await page.getByRole("combobox", { name: "時間範圍" }).focus();
+  await captureLayout(page, testInfo, "price-report");
 
   await page.goto(`/products/${READY_ROUTE_SLUG}`);
   await expect(page.getByRole("heading", { name: product.name })).toBeVisible();
@@ -231,6 +302,7 @@ test("captures the main pages without horizontal overflow", async ({ page }, tes
     { productId: PRODUCT_ID, observedAt: OBSERVED_AT },
   );
   await page.goto("/build-list");
+  await expect(page.getByRole("link", { name: "價格變動總覽" })).toBeVisible();
   await expect(page.getByRole("heading", { name: product.name })).toBeVisible();
   await page.getByRole("link", { name: "原價屋查看／購買，開新分頁" }).focus();
   await captureLayout(page, testInfo, "build-list");

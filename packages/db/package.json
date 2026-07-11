@@ -8,6 +8,10 @@
     ".": {
       "types": "./src/client.ts",
       "default": "./src/client.ts"
+    },
+    "./price-report": {
+      "types": "./src/price-report/index.ts",
+      "default": "./src/price-report/index.ts"
     }
   },
   "scripts": {

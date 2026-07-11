@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeftIcon, BrandMarkIcon } from "../_shared/icons";
 import DiscordTopbarLink from "../DiscordTopbarLink";
+import PriceReportTopbarLink from "../PriceReportTopbarLink";
 import SiteDisclaimer from "../site-disclaimer";
 import BuildListEmptyState from "./components/BuildListEmptyState";
 import BuildListItemRow from "./components/BuildListItemRow";
@@ -105,6 +106,7 @@ export default function BuildListPageClient() {
               <span className="brand-subtitle">原價屋零件查詢</span>
             </span>
           </Link>
+          <PriceReportTopbarLink />
           <DiscordTopbarLink />
         </div>
 
