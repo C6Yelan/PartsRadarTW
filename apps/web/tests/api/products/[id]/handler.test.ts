@@ -4,10 +4,8 @@
 import { describe, expect, it } from "vitest";
 
 import { API_ERROR_MESSAGES } from "../../../../app/api/_shared/responses";
-import {
-  createGetProductHandler,
-  type ProductDetailReadClient,
-} from "../../../../app/api/products/[id]/handler";
+import type { ProductDetailReadClient } from "../../../../app/api/products/[id]/data";
+import { createGetProductHandler } from "../../../../app/api/products/[id]/handler";
 
 const PRODUCT_ID = "11111111-1111-1111-1111-111111111111";
 

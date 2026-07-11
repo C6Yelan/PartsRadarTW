@@ -3,7 +3,7 @@
 
 import type { Prisma } from "@partsradar/db";
 
-import type { SourceStatusReadClient } from "../source-status/handler";
+import type { SourceStatusReadClient } from "../source-status/data";
 
 // 限定商品列表可讀取的 public-safe 欄位；ibuyToken 僅用來組 outbound CoolPC purchase URL。
 export const PRODUCT_SELECT = {

@@ -1,5 +1,5 @@
 // apps/web/app/api/source-status/data.ts
-// 定義來源狀態 API 使用的分類查詢 projection 與可測試 read client contract。
+// 定義來源狀態 API 使用的分類查詢 projection 與最小 read client contract。
 
 // source-status response 判斷分類可用性所需的最小 sourceCategory 資料。
 export interface SourceStatusCategoryRecord {
@@ -65,7 +65,7 @@ export const SOURCE_STATUS_CATEGORY_QUERY = {
   },
 } as const satisfies SourceStatusFindManyArgs;
 
-// source-status handler 依賴的窄 client，讓 API 行為測試不直接依賴 Prisma client。
+// source-status handler 只依賴分類查詢能力，不綁定完整 Prisma client。
 export interface SourceStatusReadClient {
   sourceCategory: {
     findMany(args: SourceStatusFindManyArgs): Promise<SourceStatusCategoryRecord[]>;

@@ -35,7 +35,7 @@ type PriceSnapshotFindManyArgs = Omit<Prisma.PriceSnapshotFindManyArgs, "select"
   select: typeof PRICE_HISTORY_SNAPSHOT_SELECT;
 };
 
-// 限定價格歷史 handler 需要的 DB 讀取面，讓測試 fake client 不依賴完整 Prisma client。
+// 限定價格歷史 handler 需要的 DB 讀取面，不依賴完整 Prisma client。
 export interface ProductPriceHistoryReadClient {
   product: {
     findFirst(args: ProductFindFirstArgs): Promise<PriceHistoryProductRecord | null>;

@@ -6,11 +6,8 @@ import {
   createCoolpcPurchaseUrl,
   createPublicProductImagePath,
 } from "@partsradar/shared";
-import {
-  buildSourceStatusResponse,
-  type SourceStatus,
-  type SourceStatusCategoryRecord,
-} from "../source-status/handler";
+import type { SourceStatusCategoryRecord } from "../source-status/data";
+import { buildSourceStatusResponse, type SourceStatus } from "../source-status/response";
 import {
   PRODUCT_PRICE_MOVEMENT_RANGE_DAYS,
   type ProductPriceMovementSnapshotRecord,

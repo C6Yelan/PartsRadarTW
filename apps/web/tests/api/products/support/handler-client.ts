@@ -4,8 +4,8 @@
 import type {
   SOURCE_STATUS_CATEGORY_QUERY,
   SourceStatusCategoryRecord,
-} from "../../../../app/api/source-status/handler";
-import type { ProductsReadClient } from "../../../../app/api/products/handler";
+} from "../../../../app/api/source-status/data";
+import type { ProductsReadClient } from "../../../../app/api/products/data";
 
 export const NOW = new Date("2026-05-28T12:00:00.000Z");
 export const PRODUCT_ID = "11111111-1111-1111-1111-111111111111";

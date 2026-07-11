@@ -1,5 +1,5 @@
 // apps/web/tests/api/product-images/handler.test.ts
-// 驗證商品圖片 API handler 的 public path、快取檔讀取、image id 正規化與安全錯誤回應。
+// 驗證商品圖片 API handler 的快取檔讀取、image id 正規化與安全錯誤回應。
 
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -7,10 +7,7 @@ import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { API_ERROR_MESSAGES } from "../../../app/api/_shared/responses";
-import {
-  createGetProductImageHandler,
-  createPublicProductImagePath,
-} from "../../../app/api/product-images/handler";
+import { createGetProductImageHandler } from "../../../app/api/product-images/handler";
 
 const PRODUCT_ID = "11111111-1111-1111-1111-111111111111";
 const IMAGE_BYTES = Uint8Array.of(82, 73, 70, 70, 0, 0, 0, 0);
@@ -23,13 +20,6 @@ afterEach(async () => {
 });
 
 describe("product image API helpers", () => {
-  it("builds a public API path for product images", () => {
-    // 圖片對外只暴露 app route，不暴露實際 storage path。
-    expect(createPublicProductImagePath(PRODUCT_ID.toUpperCase())).toBe(
-      `/api/product-images/${PRODUCT_ID}.webp`,
-    );
-  });
-
   it("returns a cached webp image from the configured storage directory", async () => {
     const storageDir = await createTempDir();
     await writeFile(join(storageDir, `${PRODUCT_ID}.webp`), IMAGE_BYTES);

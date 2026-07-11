@@ -4,7 +4,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createGetProductsHandler } from "../../../app/api/products/handler";
-import { SOURCE_STATUS_CATEGORY_QUERY } from "../../../app/api/source-status/handler";
+import { SOURCE_STATUS_CATEGORY_QUERY } from "../../../app/api/source-status/data";
 import {
   fakeProductsClient,
   NOW,

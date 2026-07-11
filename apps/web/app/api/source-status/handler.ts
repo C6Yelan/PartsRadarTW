@@ -5,12 +5,6 @@ import { internalErrorResponse, jsonOk } from "../_shared/responses";
 import { SOURCE_STATUS_CATEGORY_QUERY, type SourceStatusReadClient } from "./data";
 import { buildSourceStatusResponse, type SourceStatusResponseBody } from "./response";
 
-// 暫由 handler 作為 source-status 子模組出口，供商品列表 API 共用來源狀態查詢與型別。
-export { SOURCE_STATUS_CATEGORY_QUERY } from "./data";
-export type { SourceStatusCategoryRecord, SourceStatusReadClient } from "./data";
-export { buildSourceStatusResponse } from "./response";
-export type { SourceStatus, SourceStatusResponseBody } from "./response";
-
 interface GetSourceStatusHandlerOptions {
   now?: () => Date;
 }

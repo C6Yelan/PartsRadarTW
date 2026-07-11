@@ -2,10 +2,8 @@
 // 提供商品價格歷史 API 的 Next.js route 接線，套用讀取限流並注入 Prisma read client。
 
 import { withRateLimit } from "../../../_shared/rate-limit";
-import {
-  createGetProductPriceHistoryHandler,
-  type ProductPriceHistoryReadClient,
-} from "./handler";
+import type { ProductPriceHistoryReadClient } from "./data";
+import { createGetProductPriceHistoryHandler } from "./handler";
 
 interface ProductPriceHistoryRouteContext {
   params: Promise<{
@@ -13,7 +11,7 @@ interface ProductPriceHistoryRouteContext {
   }>;
 }
 
-// 接收商品價格歷史 GET request，將 framework context 轉接給可測試的 handler。
+// 接收商品價格歷史 GET request，並將 route context 轉給 endpoint handler。
 export async function GET(
   request: Request,
   context: ProductPriceHistoryRouteContext,

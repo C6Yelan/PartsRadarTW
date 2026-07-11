@@ -1,5 +1,5 @@
 // apps/web/app/api/build-list/refresh/data.ts
-// 定義配單 refresh API 的單次 Prisma select 與可注入 read client contract。
+// 定義配單 refresh API 的單次 Prisma select 與最小 read client contract。
 
 import type { Prisma } from "@partsradar/db";
 

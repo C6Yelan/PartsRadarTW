@@ -3,7 +3,7 @@
 
 import { InvalidQueryError } from "../_shared/query";
 import { internalErrorResponse, invalidQueryResponse, jsonOk } from "../_shared/responses";
-import { SOURCE_STATUS_CATEGORY_QUERY } from "../source-status/handler";
+import { SOURCE_STATUS_CATEGORY_QUERY } from "../source-status/data";
 import {
   PRODUCT_PRICE_MOVEMENT_RANGE_DAYS,
   PRODUCT_VENDOR_SELECT,
@@ -22,8 +22,6 @@ import {
   type ProductsResponseBody,
   toProductResponseItemWithMovement,
 } from "./response";
-
-export type { ProductsReadClient } from "./data";
 
 interface GetProductsHandlerOptions {
   now?: () => Date;

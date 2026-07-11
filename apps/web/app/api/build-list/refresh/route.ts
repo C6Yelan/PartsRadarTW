@@ -2,7 +2,8 @@
 // 提供配單批次 refresh POST route，套用獨立限流並注入 Prisma read client。
 
 import { withRateLimit } from "../../_shared/rate-limit";
-import { type BuildListRefreshReadClient, createPostBuildListRefreshHandler } from "./handler";
+import type { BuildListRefreshReadClient } from "./data";
+import { createPostBuildListRefreshHandler } from "./handler";
 
 export async function POST(request: Request): Promise<Response> {
   return withRateLimit(request, "api:build-list", async () => {

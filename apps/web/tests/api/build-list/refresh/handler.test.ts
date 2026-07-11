@@ -4,10 +4,8 @@
 import { describe, expect, it } from "vitest";
 
 import { API_ERROR_MESSAGES } from "../../../../app/api/_shared/responses";
-import {
-  type BuildListRefreshReadClient,
-  createPostBuildListRefreshHandler,
-} from "../../../../app/api/build-list/refresh/handler";
+import type { BuildListRefreshReadClient } from "../../../../app/api/build-list/refresh/data";
+import { createPostBuildListRefreshHandler } from "../../../../app/api/build-list/refresh/handler";
 
 const PRODUCT_ID_1 = "11111111-1111-1111-1111-111111111111";
 const PRODUCT_ID_2 = "22222222-2222-2222-2222-222222222222";

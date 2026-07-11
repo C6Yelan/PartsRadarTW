@@ -41,7 +41,7 @@ type ProductDetailFindFirstArgs = Omit<Prisma.ProductFindFirstArgs, "select"> & 
   select: typeof PRODUCT_DETAIL_SELECT;
 };
 
-// 商品詳細 API handler 使用的最小讀取介面，讓測試能注入 fake client 而不依賴完整 Prisma client。
+// 商品詳細 API handler 使用的最小讀取介面，不依賴完整 Prisma client。
 export interface ProductDetailReadClient {
   product: {
     findFirst(args: ProductDetailFindFirstArgs): Promise<ProductDetailRecord | null>;

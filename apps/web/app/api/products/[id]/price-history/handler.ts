@@ -17,8 +17,6 @@ import {
 import { parsePriceHistoryRange, PRICE_HISTORY_MILLISECONDS_PER_DAY } from "./query";
 import { type ProductPriceHistoryResponseBody, toPriceHistoryResponse } from "./response";
 
-export type { ProductPriceHistoryReadClient } from "./data";
-
 interface ProductPriceHistoryHandlerOptions {
   now?: Date;
 }

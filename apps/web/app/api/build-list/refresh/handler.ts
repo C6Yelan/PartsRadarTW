@@ -6,8 +6,6 @@ import { BUILD_LIST_REFRESH_SELECT, type BuildListRefreshReadClient } from "./da
 import { type BuildListRefreshResponseBody, toBuildListRefreshProduct } from "./response";
 import { parseBuildListRefreshRequest } from "./validation";
 
-export type { BuildListRefreshReadClient } from "./data";
-
 export function createPostBuildListRefreshHandler(
   client: BuildListRefreshReadClient,
 ): (request: Request) => Promise<Response> {
