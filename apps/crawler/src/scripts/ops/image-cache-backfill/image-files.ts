@@ -4,7 +4,7 @@
 import { copyFile, mkdir, rename, stat, unlink, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import sharp from "sharp";
-import { toSafeCliErrorMessage } from "../../shared/script-utils";
+import { tryAcquireExternalFetchLock } from "../external-fetch-lock";
 import type { ImageBackfillOptions } from "./options";
 
 const THUMBNAIL_MAX_SIZE = 512;
@@ -37,11 +37,25 @@ export async function writeFileFromReusableImage(
 export async function fetchSourceImageBytes(
   url: string,
   options: ImageBackfillOptions,
+  onRequestStarted: () => void = () => {},
 ): Promise<Buffer> {
+  const externalFetchLock = await tryAcquireExternalFetchLock({
+    lockDir: options.externalFetchLockDir,
+    owner: "image-backfill",
+    staleSeconds: options.externalFetchLockStaleSeconds,
+  });
+
+  if (!externalFetchLock) {
+    throw new Error(
+      "Source image request deferred because another live source fetch holds the lock.",
+    );
+  }
+
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), options.timeoutMs);
 
   try {
+    onRequestStarted();
     const response = await fetch(url, {
       headers: {
         accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
@@ -82,6 +96,7 @@ export async function fetchSourceImageBytes(
     return bytes;
   } finally {
     clearTimeout(timeoutId);
+    await externalFetchLock.release();
   }
 }
 
@@ -131,11 +146,6 @@ export function formatBytes(bytes: number): string {
   }
 
   return `${(bytes / 1024).toFixed(1)} KiB`;
-}
-
-// 輸出補圖錯誤前套用 shared sanitizer，避免敏感字串進入 log。
-export function toErrorMessage(error: unknown): string {
-  return toSafeCliErrorMessage(error);
 }
 
 function parseContentLength(value: string | null): number | null {

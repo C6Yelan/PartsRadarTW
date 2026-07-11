@@ -13,7 +13,7 @@ import type { NewProductImageBackfillOptions } from "./options";
 
 const logger = createOpsLogger();
 
-// scheduled crawler 注入用的新商品圖片補圖 handler，讓主流程可測試替換而不綁定實際圖片下載。
+// scheduled crawler 的新商品補圖 contract，隔離價格 crawl 與圖片下載流程。
 export type NewProductImageBackfillHandler = (args: {
   client: PrismaClient;
   productIds: string[];
@@ -59,7 +59,7 @@ export async function handleNewProductImageBackfill({
     });
     logNewProductImageBackfillSummary(summary, uniqueProductIds.length);
   } catch (error) {
-    log(`New product image backfill failed: ${toSafeErrorMessage(error)}`);
+    log(`New product image backfill failed: ${toSafeCliErrorMessage(error)}`);
   }
 }
 
@@ -75,6 +75,8 @@ function createImageBackfillOptions(options: NewProductImageBackfillOptions): Im
     maxDelayMs: options.maxDelayMs,
     timeoutMs: options.timeoutMs,
     maxSourceBytes: options.maxSourceBytes,
+    externalFetchLockDir: options.externalFetchLockDir,
+    externalFetchLockStaleSeconds: options.externalFetchLockStaleSeconds,
     dryRun: false,
     overwrite: false,
   };
@@ -88,10 +90,6 @@ function logNewProductImageBackfillSummary(
   log(
     `New product image backfill finished. createdProducts=${createdProductCount} selected=${summary.selected} cached=${summary.cached} reused=${summary.reused} skipped=${summary.skipped} invalid=${summary.invalid} failed=${summary.failed} liveFetches=${summary.liveFetches}`,
   );
-}
-
-function toSafeErrorMessage(error: unknown): string {
-  return toSafeCliErrorMessage(error);
 }
 
 function log(message: string): void {

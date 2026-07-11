@@ -7,7 +7,13 @@ import {
   DEFAULT_RAW_SNAPSHOT_STORAGE_DIR,
   resolveAllowlistedRawSnapshotStorage,
 } from "../../../coolpc/raw-snapshot-storage";
-import { getNumberArg, getStringArg, resolveWorkspaceRoot } from "../../shared/script-utils";
+import {
+  getNumberArg,
+  getStringArg,
+  resolveWorkspacePathArgument,
+  resolveWorkspaceRoot,
+} from "../../shared/script-utils";
+import { parseExternalFetchLockStaleSeconds } from "../../ops/external-fetch-lock";
 
 // 要求使用者顯式加上此旗標，避免誤執行 live 網站抓取。
 const CONFIRM_LIVE_FETCH_FLAG = "--confirm-live-fetch";
@@ -16,6 +22,8 @@ export interface CrawlOptions {
   workspaceRoot: string;
   storageDir: string;
   delayMs: number;
+  externalFetchLockDir: string;
+  externalFetchLockStaleSeconds: number;
 }
 
 // 解析命令列引數，並回傳手動流程所需參數。
@@ -45,7 +53,7 @@ export function parseOptions(
     );
   }
 
-  const { storageDir } = resolveAllowlistedRawSnapshotStorage({
+  const { mutationRoot, storageDir } = resolveAllowlistedRawSnapshotStorage({
     workspaceRoot,
     requestedDir:
       getStringArg(args, "--storage-dir") ??
@@ -54,11 +62,19 @@ export function parseOptions(
     configuredDir: env.SNAPSHOT_STORAGE_DIR,
     additionalAllowedRootsForTesting: additionalAllowedStorageRootsForTesting,
   });
+  const externalFetchLockDir = resolveWorkspacePathArgument(
+    workspaceRoot,
+    env.EXTERNAL_FETCH_LOCK_DIR ?? `${mutationRoot}/.locks/external-fetch`,
+  );
 
   return {
     workspaceRoot,
     storageDir,
     delayMs: getNumberArg(args, "--delay-ms", DEFAULT_COOLPC_CATEGORY_DELAY_MS),
+    externalFetchLockDir,
+    externalFetchLockStaleSeconds: parseExternalFetchLockStaleSeconds(
+      env.EXTERNAL_FETCH_LOCK_STALE_SECONDS,
+    ),
   };
 }
 
@@ -75,5 +91,8 @@ Options:
                              Must equal the active root or its controlled child.
                              SNAPSHOT_STORAGE_DIR replaces the built-in default when set.
                              Default: SNAPSHOT_STORAGE_DIR or ${DEFAULT_RAW_SNAPSHOT_STORAGE_DIR}
+
+Environment:
+  EXTERNAL_FETCH_LOCK_DIR, EXTERNAL_FETCH_LOCK_STALE_SECONDS
 `);
 }

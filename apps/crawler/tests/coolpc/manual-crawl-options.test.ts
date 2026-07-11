@@ -34,19 +34,32 @@ describe("manual CoolPC crawl snapshot storage options", () => {
     expect(parseOptions(["--confirm-live-fetch"], crawlerCwd, {})).toMatchObject({
       workspaceRoot,
       storageDir: join(workspaceRoot, "temp", "coolpc-daemon", "snapshots"),
+      externalFetchLockDir: join(
+        workspaceRoot,
+        "temp",
+        "coolpc-daemon",
+        "snapshots",
+        ".locks",
+        "external-fetch",
+      ),
+      externalFetchLockStaleSeconds: 43200,
     });
   });
 
   it("allows the configured root and rejects unrelated storage paths", async () => {
     const { workspaceRoot, crawlerCwd } = await createWorkspace();
     const configuredRoot = join(workspaceRoot, "configured-snapshots");
-    await mkdir(configuredRoot);
+    const configuredChild = join(configuredRoot, "manual-child");
+    await mkdir(configuredChild, { recursive: true });
 
     expect(
-      parseOptions(["--confirm-live-fetch", "--storage-dir", configuredRoot], crawlerCwd, {
+      parseOptions(["--confirm-live-fetch", "--storage-dir", configuredChild], crawlerCwd, {
         SNAPSHOT_STORAGE_DIR: configuredRoot,
-      }).storageDir,
-    ).toBe(configuredRoot);
+      }),
+    ).toMatchObject({
+      storageDir: configuredChild,
+      externalFetchLockDir: join(configuredRoot, ".locks", "external-fetch"),
+    });
     expect(() =>
       parseOptions(["--confirm-live-fetch", "--storage-dir", "temp/unrelated"], crawlerCwd, {}),
     ).toThrow("not within an allowlisted snapshot storage root");

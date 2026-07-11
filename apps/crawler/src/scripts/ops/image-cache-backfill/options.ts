@@ -9,6 +9,8 @@ import {
   resolveWorkspacePathArgument,
   resolveWorkspaceRoot,
 } from "../../shared/script-utils";
+import { DEFAULT_RAW_SNAPSHOT_STORAGE_DIR } from "../../../coolpc/raw-snapshot-storage";
+import { parseExternalFetchLockStaleSeconds } from "../external-fetch-lock";
 
 const CONFIRM_LIVE_FETCH_FLAG = "--confirm-live-fetch";
 const DEFAULT_STORAGE_DIR = "storage/product-images";
@@ -28,6 +30,8 @@ export interface ImageBackfillOptions {
   maxDelayMs: number;
   timeoutMs: number;
   maxSourceBytes: number;
+  externalFetchLockDir: string;
+  externalFetchLockStaleSeconds: number;
   dryRun: boolean;
   overwrite: boolean;
 }
@@ -69,6 +73,7 @@ export function parseOptions(
 
   const minDelayMs = getNumberArg(args, "--min-delay-ms", DEFAULT_MIN_DELAY_MS);
   const maxDelayMs = getNumberArg(args, "--max-delay-ms", DEFAULT_MAX_DELAY_MS);
+  const snapshotStorageDir = env.SNAPSHOT_STORAGE_DIR ?? DEFAULT_RAW_SNAPSHOT_STORAGE_DIR;
 
   if (minDelayMs > maxDelayMs) {
     throw new Error("--min-delay-ms must be less than or equal to --max-delay-ms.");
@@ -87,6 +92,13 @@ export function parseOptions(
     maxDelayMs,
     timeoutMs: getNumberArg(args, "--timeout-ms", DEFAULT_TIMEOUT_MS),
     maxSourceBytes: getNumberArg(args, "--max-source-bytes", DEFAULT_MAX_SOURCE_BYTES),
+    externalFetchLockDir: resolveWorkspacePathArgument(
+      workspaceRoot,
+      env.EXTERNAL_FETCH_LOCK_DIR ?? `${snapshotStorageDir}/.locks/external-fetch`,
+    ),
+    externalFetchLockStaleSeconds: parseExternalFetchLockStaleSeconds(
+      env.EXTERNAL_FETCH_LOCK_STALE_SECONDS,
+    ),
     dryRun,
     overwrite: args.includes("--overwrite"),
   };
@@ -130,5 +142,8 @@ Options:
                              Default: ${DEFAULT_MAX_SOURCE_BYTES}
   --storage-dir <path>       Output directory from the workspace root, or an absolute path.
                              Default: PRODUCT_IMAGE_STORAGE_DIR, then ${DEFAULT_STORAGE_DIR}
+
+Environment:
+  EXTERNAL_FETCH_LOCK_DIR, EXTERNAL_FETCH_LOCK_STALE_SECONDS, SNAPSHOT_STORAGE_DIR
 `);
 }

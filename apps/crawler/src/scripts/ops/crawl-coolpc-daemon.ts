@@ -29,12 +29,6 @@ const SCHEDULED_CRAWL_USER_AGENT =
   "PartsRadarTW scheduled crawler (+https://github.com/C6Yelan/PartsRadarTW)";
 const logger = createOpsLogger();
 
-export type {
-  CoolpcDaemonOptions,
-  NewProductImageBackfillOptions,
-} from "./crawl-coolpc-daemon/options";
-export { parseDaemonOptions } from "./crawl-coolpc-daemon/options";
-
 interface ShutdownController {
   readonly requested: boolean;
   sleep(ms: number): Promise<void>;
@@ -92,7 +86,7 @@ async function main(): Promise<void> {
   }
 }
 
-// 執行單輪 scheduled crawl；先取得外部抓取 lock，再跑分類 crawl 與新增商品圖片補圖。
+// 執行單輪 scheduled crawl；分類抓取受 lock 保護，釋放後才處理不應延遲下一輪價格抓取的補圖。
 export async function runScheduledCycle(
   client: PrismaClient,
   options: CoolpcDaemonOptions,
@@ -144,7 +138,7 @@ export async function runScheduledCycle(
     shouldBackoff = shouldBackoffAfter(result);
     printCycleSummary(result, productWriteSummary, log);
   } catch (error) {
-    log(`CoolPC scheduled crawl cycle failed: ${toSafeErrorMessage(error)}`);
+    log(`CoolPC scheduled crawl cycle failed: ${toSafeCliErrorMessage(error)}`);
 
     return {
       shouldBackoff: true,
@@ -227,11 +221,6 @@ function createShutdownController(): ShutdownController {
   };
 }
 
-// 統一套用 CLI 錯誤遮蔽，避免 daemon log 直接輸出敏感 env 或連線字串。
-function toSafeErrorMessage(error: unknown): string {
-  return toSafeCliErrorMessage(error);
-}
-
 // 透過 ops logger 輸出 scheduled crawler 訊息，讓格式與其他 daemon 一致。
 function log(message: string): void {
   logger.info(message);
@@ -239,7 +228,7 @@ function log(message: string): void {
 
 if (require.main === module) {
   main().catch((error) => {
-    console.error(toSafeErrorMessage(error));
+    console.error(toSafeCliErrorMessage(error));
     process.exitCode = 1;
   });
 }

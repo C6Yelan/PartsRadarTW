@@ -24,7 +24,20 @@ describe("image cache backfill options", () => {
   it("enables live requests only with explicit confirmation", async () => {
     const crawlerCwd = await createWorkspace();
 
-    expect(parseOptions(["--confirm-live-fetch"], crawlerCwd, {}).dryRun).toBe(false);
+    expect(parseOptions(["--confirm-live-fetch"], crawlerCwd, {})).toMatchObject({
+      dryRun: false,
+      externalFetchLockDir: join(
+        crawlerCwd,
+        "..",
+        "..",
+        "temp",
+        "coolpc-daemon",
+        "snapshots",
+        ".locks",
+        "external-fetch",
+      ),
+      externalFetchLockStaleSeconds: 43200,
+    });
   });
 
   it("rejects contradictory dry-run and live confirmation flags", async () => {

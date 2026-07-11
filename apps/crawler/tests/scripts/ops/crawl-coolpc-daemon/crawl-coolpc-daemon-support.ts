@@ -4,7 +4,7 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { CoolpcDaemonOptions } from "../../../../src/scripts/ops/crawl-coolpc-daemon";
+import type { CoolpcDaemonOptions } from "../../../../src/scripts/ops/crawl-coolpc-daemon/options";
 
 // 建立隔離 workspace，讓 daemon option 測試可模擬 crawler package 工作目錄。
 export function createDaemonTestEnvironment() {
@@ -49,6 +49,8 @@ export function createDaemonOptions(
       maxDelayMs: 12000,
       timeoutMs: 15000,
       maxSourceBytes: 5 * 1024 * 1024,
+      externalFetchLockDir: "/workspace/storage/snapshots/.locks/external-fetch",
+      externalFetchLockStaleSeconds: 43200,
     },
     ...overrides,
   };

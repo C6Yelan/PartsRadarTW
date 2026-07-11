@@ -11,7 +11,7 @@ import {
   resolveWorkspacePathArgument,
   resolveWorkspaceRoot,
 } from "../../shared/script-utils";
-import { DEFAULT_EXTERNAL_FETCH_LOCK_STALE_SECONDS } from "../external-fetch-lock";
+import { parseExternalFetchLockStaleSeconds } from "../external-fetch-lock";
 
 export const CONFIRM_LIVE_FETCH_FLAG = "--confirm-live-fetch";
 export const DEFAULT_STORAGE_DIR = DEFAULT_RAW_SNAPSHOT_STORAGE_DIR;
@@ -58,6 +58,8 @@ export interface NewProductImageBackfillOptions {
   maxDelayMs: number;
   timeoutMs: number;
   maxSourceBytes: number;
+  externalFetchLockDir: string;
+  externalFetchLockStaleSeconds: number;
 }
 
 // scheduled CoolPC crawler daemon 的完整執行設定，供 CLI entrypoint 與測試共用。
@@ -109,13 +111,25 @@ export function parseDaemonOptions(
   }
 
   const workspaceRoot = resolveWorkspaceRoot(cwd);
-  const { storageDir } = resolveAllowlistedRawSnapshotStorage({
+  const { mutationRoot, storageDir } = resolveAllowlistedRawSnapshotStorage({
     workspaceRoot,
     requestedDir:
       getStringArg(args, "--storage-dir") ?? env.SNAPSHOT_STORAGE_DIR ?? DEFAULT_STORAGE_DIR,
     configuredDir: env.SNAPSHOT_STORAGE_DIR,
   });
-  const newProductImageBackfill = parseNewProductImageBackfillOptions(env, workspaceRoot);
+  const lockDir = resolveWorkspacePathArgument(
+    workspaceRoot,
+    env.EXTERNAL_FETCH_LOCK_DIR ?? `${mutationRoot}/.locks/external-fetch`,
+  );
+  const lockStaleSeconds = parseExternalFetchLockStaleSeconds(
+    env.EXTERNAL_FETCH_LOCK_STALE_SECONDS,
+  );
+  const newProductImageBackfill = parseNewProductImageBackfillOptions(
+    env,
+    workspaceRoot,
+    lockDir,
+    lockStaleSeconds,
+  );
 
   return {
     workspaceRoot,
@@ -139,17 +153,8 @@ export function parseDaemonOptions(
       min: MIN_CATEGORY_DELAY_MS,
       max: MAX_CATEGORY_DELAY_MS,
     }),
-    lockDir: resolveWorkspacePathArgument(
-      workspaceRoot,
-      env.EXTERNAL_FETCH_LOCK_DIR ?? `${storageDir}/.locks/external-fetch`,
-    ),
-    lockStaleSeconds: parseIntegerEnvironmentValue({
-      env,
-      envName: "EXTERNAL_FETCH_LOCK_STALE_SECONDS",
-      fallback: DEFAULT_EXTERNAL_FETCH_LOCK_STALE_SECONDS,
-      min: 60,
-      max: 7 * 24 * 60 * 60,
-    }),
+    lockDir,
+    lockStaleSeconds,
     lockRetrySeconds: parseIntegerEnvironmentValue({
       env,
       envName: "CRAWLER_LOCK_RETRY_SECONDS",
@@ -166,6 +171,8 @@ export function parseDaemonOptions(
 function parseNewProductImageBackfillOptions(
   env: NodeJS.ProcessEnv,
   workspaceRoot: string,
+  externalFetchLockDir: string,
+  externalFetchLockStaleSeconds: number,
 ): NewProductImageBackfillOptions {
   const minDelayMs = parseIntegerEnvironmentValue({
     env,
@@ -210,6 +217,8 @@ function parseNewProductImageBackfillOptions(
       min: MIN_NEW_PRODUCT_IMAGE_SOURCE_BYTES,
       max: MAX_NEW_PRODUCT_IMAGE_SOURCE_BYTES,
     }),
+    externalFetchLockDir,
+    externalFetchLockStaleSeconds,
   };
 }
 

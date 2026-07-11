@@ -11,6 +11,7 @@ import {
   resolveWorkspaceRoot,
   toSafeCliErrorMessage,
 } from "../shared/script-utils";
+import { tryAcquireExternalFetchLock } from "../ops/external-fetch-lock";
 import { parseOptions, type CrawlOptions } from "./crawl-coolpc-once/options";
 
 // 取樣輸出的商品筆數上限（僅供 smoke summary 顯示）。
@@ -125,15 +126,29 @@ async function runManualCrawl(
   client: PrismaClient,
   options: CrawlOptions,
 ): Promise<RunCoolpcCrawlOnceResult> {
-  return runCoolpcCategoryCrawl({
-    client,
-    workspaceRoot: options.workspaceRoot,
-    storageDir: options.storageDir,
-    delayMs: options.delayMs,
-    triggerType: CRAWL_TRIGGER_TYPES.MANUAL,
-    fetchUserAgent: MANUAL_CRAWL_USER_AGENT,
-    log: console.log,
+  const externalFetchLock = await tryAcquireExternalFetchLock({
+    lockDir: options.externalFetchLockDir,
+    owner: "manual-crawler",
+    staleSeconds: options.externalFetchLockStaleSeconds,
   });
+
+  if (!externalFetchLock) {
+    throw new Error("Another live source fetch currently holds the shared external fetch lock.");
+  }
+
+  try {
+    return await runCoolpcCategoryCrawl({
+      client,
+      workspaceRoot: options.workspaceRoot,
+      storageDir: options.storageDir,
+      delayMs: options.delayMs,
+      triggerType: CRAWL_TRIGGER_TYPES.MANUAL,
+      fetchUserAgent: MANUAL_CRAWL_USER_AGENT,
+      log: console.log,
+    });
+  } finally {
+    await externalFetchLock.release();
+  }
 }
 
 // 取得 DB 當前數據快照，用來計算單次爬取造成的變動。

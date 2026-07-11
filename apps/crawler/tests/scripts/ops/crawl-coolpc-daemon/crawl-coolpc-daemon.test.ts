@@ -3,7 +3,7 @@
 
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { parseDaemonOptions } from "../../../../src/scripts/ops/crawl-coolpc-daemon";
+import { parseDaemonOptions } from "../../../../src/scripts/ops/crawl-coolpc-daemon/options";
 import { createDaemonTestEnvironment } from "./crawl-coolpc-daemon-support";
 
 describe("CoolPC scheduled crawler daemon options", () => {
@@ -94,6 +94,14 @@ describe("CoolPC scheduled crawler daemon options", () => {
         maxDelayMs: 9000,
         timeoutMs: 18000,
         maxSourceBytes: 4194304,
+        externalFetchLockDir: join(
+          workspaceRoot,
+          "storage",
+          "snapshots",
+          ".locks",
+          "external-fetch",
+        ),
+        externalFetchLockStaleSeconds: 21600,
       },
     });
   });
@@ -148,6 +156,14 @@ describe("CoolPC scheduled crawler daemon options", () => {
         crawlerCwd,
       ),
     ).toThrow("CRAWLER_CATEGORY_DELAY_MS must be at most 60000");
+
+    expect(() =>
+      parseDaemonOptions(
+        ["--confirm-live-fetch"],
+        { EXTERNAL_FETCH_LOCK_STALE_SECONDS: "1799" },
+        crawlerCwd,
+      ),
+    ).toThrow("EXTERNAL_FETCH_LOCK_STALE_SECONDS must be at least 1800");
 
     expect(() =>
       parseDaemonOptions(

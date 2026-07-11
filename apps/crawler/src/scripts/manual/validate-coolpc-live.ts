@@ -5,10 +5,17 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { createCoolpcCategoryUrl } from "@partsradar/shared";
 import { COOLPC_TARGET_CATEGORIES, type CoolpcTargetCategory } from "../../coolpc/categories";
-import { decodeCoolpcHtml, parseCoolpcCategoryPage } from "../../coolpc/parser";
+import { DEFAULT_RAW_SNAPSHOT_STORAGE_DIR } from "../../coolpc/raw-snapshot-storage";
+import { fetchLiveCategorySnapshot } from "../../coolpc/live-crawl/fetch";
+import { parseCoolpcCategoryPage } from "../../coolpc/parser";
+import {
+  parseExternalFetchLockStaleSeconds,
+  tryAcquireExternalFetchLock,
+} from "../ops/external-fetch-lock";
 import {
   getNumberArg,
   getStringArg,
+  loadWorkspaceEnv,
   resolveWorkspacePathArgument,
   resolveWorkspaceRoot,
   toSafeCliErrorMessage,
@@ -24,6 +31,9 @@ import {
 const CONFIRM_FLAG = "--confirm-live-fetch";
 // 目標分流之間的預設等待毫秒數，保留原有預設值便於手動一致性。
 const DEFAULT_DELAY_MS = 5000;
+const VALIDATION_FETCH_TIMEOUT_MS = 30000;
+const VALIDATION_USER_AGENT =
+  "PartsRadarTW manual parser validation (+https://github.com/C6Yelan/PartsRadarTW)";
 
 // 手動驗證主流程：解析參數、決定 live/raw 模式、逐分類抓取、寫入 raw，最後輸出摘要報表。
 async function main() {
@@ -38,6 +48,11 @@ async function main() {
   }
 
   const workspaceRoot = resolveWorkspaceRoot();
+
+  if (!fromRawDir) {
+    await loadWorkspaceEnv(workspaceRoot);
+  }
+
   const delayMs = getNumberArg(args, "--delay-ms", DEFAULT_DELAY_MS);
   const outputDirArg =
     getStringArg(args, "--output-dir") ??
@@ -45,85 +60,114 @@ async function main() {
   const outputDir = resolveWorkspacePathArgument(workspaceRoot, outputDirArg);
   // 重放資料與輸出目錄都以 workspace root 當基準，避免在不同工作目錄下路徑解讀偏移。
   const inputRawDir = fromRawDir ? resolveWorkspacePathArgument(workspaceRoot, fromRawDir) : null;
-  const rawDir = join(outputDir, "raw");
-  await mkdir(rawDir, { recursive: true });
+  const externalFetchLock = inputRawDir
+    ? null
+    : await acquireValidationExternalFetchLock(workspaceRoot);
 
-  const summaries: ValidationSummary[] = [];
+  try {
+    const rawDir = join(outputDir, "raw");
+    await mkdir(rawDir, { recursive: true });
 
-  for (const [index, category] of COOLPC_TARGET_CATEGORIES.entries()) {
-    const fetchedAt = new Date();
-    const url = createCoolpcCategoryUrl(category.igrp);
-    const { html, httpStatus } = inputRawDir
-      ? await readRawSnapshot(inputRawDir, category.igrp)
-      : await fetchLiveCategory(category, url);
-    const context = createContext(category, fetchedAt, url);
-    const result = parseCoolpcCategoryPage(html, context);
-    const rawPath = join(rawDir, `igrp-${category.igrp}.html`);
-    await writeFile(rawPath, html, "utf8");
+    const summaries: ValidationSummary[] = [];
 
-    summaries.push({
-      igrp: category.igrp,
-      displayName: category.displayName,
-      url,
-      fetchedAt: fetchedAt.toISOString(),
-      httpStatus,
-      validationStatus: result.validation.status,
-      validationReason: result.validation.reason ?? null,
-      title: result.validation.title,
-      tokenCount: result.validation.tokenCount,
-      nameCount: result.validation.nameCount,
-      priceTextCount: result.validation.priceTextCount,
-      parsedItemCount: result.items.length,
-      deduplicatedItemCount: result.deduplicatedItemCount,
-      issueCounts: countIssues(result.issues),
-      canImport: result.canImport,
-      firstItems: result.items.slice(0, 3).map((item) => ({
-        name: item.name,
-        price: item.price,
-        sourceItemKey: item.sourceItemKey,
-      })),
-    });
+    for (const [index, category] of COOLPC_TARGET_CATEGORIES.entries()) {
+      const fetchedAt = new Date();
+      const url = createCoolpcCategoryUrl(category.igrp);
+      const { html, httpStatus } = inputRawDir
+        ? await readRawSnapshot(inputRawDir, category.igrp)
+        : await fetchLiveCategory(category, fetchedAt, url);
+      const context = createContext(category, fetchedAt, url);
+      const result = parseCoolpcCategoryPage(html, context);
+      const rawPath = join(rawDir, `igrp-${category.igrp}.html`);
+      await writeFile(rawPath, html, "utf8");
 
-    if (!inputRawDir && index < COOLPC_TARGET_CATEGORIES.length - 1) {
-      await delay(delayMs);
+      summaries.push({
+        igrp: category.igrp,
+        displayName: category.displayName,
+        url,
+        fetchedAt: fetchedAt.toISOString(),
+        httpStatus,
+        validationStatus: result.validation.status,
+        validationReason: result.validation.reason ?? null,
+        title: result.validation.title,
+        tokenCount: result.validation.tokenCount,
+        nameCount: result.validation.nameCount,
+        priceTextCount: result.validation.priceTextCount,
+        parsedItemCount: result.items.length,
+        deduplicatedItemCount: result.deduplicatedItemCount,
+        issueCounts: countIssues(result.issues),
+        canImport: result.canImport,
+        firstItems: result.items.slice(0, 3).map((item) => ({
+          name: item.name,
+          price: item.price,
+          sourceItemKey: item.sourceItemKey,
+        })),
+      });
+
+      if (!inputRawDir && index < COOLPC_TARGET_CATEGORIES.length - 1) {
+        await delay(delayMs);
+      }
     }
+
+    await writeFile(
+      join(outputDir, "summary.json"),
+      `${JSON.stringify(summaries, null, 2)}\n`,
+      "utf8",
+    );
+    await writeFile(
+      join(outputDir, "report.md"),
+      createMarkdownReport(summaries, outputDir, inputRawDir),
+      "utf8",
+    );
+
+    const validCount = summaries.filter((summary) => summary.validationStatus === "valid").length;
+    console.log(`Validated ${validCount}/${summaries.length} categories.`);
+    console.log(`Report: ${relative(workspaceRoot, join(outputDir, "report.md"))}`);
+  } finally {
+    await externalFetchLock?.release();
   }
-
-  await writeFile(
-    join(outputDir, "summary.json"),
-    `${JSON.stringify(summaries, null, 2)}\n`,
-    "utf8",
-  );
-  await writeFile(
-    join(outputDir, "report.md"),
-    createMarkdownReport(summaries, outputDir, inputRawDir),
-    "utf8",
-  );
-
-  const validCount = summaries.filter((summary) => summary.validationStatus === "valid").length;
-  console.log(`Validated ${validCount}/${summaries.length} categories.`);
-  console.log(`Report: ${relative(workspaceRoot, join(outputDir, "report.md"))}`);
 }
 
 // 對單一分類執行 live 抓取，保留回應狀態供後續驗證與報表輸出。
-async function fetchLiveCategory(category: CoolpcTargetCategory, url: string) {
-  console.log(`Fetching IGrp=${category.igrp} ${category.displayName}: ${url}`);
+async function fetchLiveCategory(category: CoolpcTargetCategory, fetchedAt: Date, url: string) {
+  const snapshot = await fetchLiveCategorySnapshot(
+    category.igrp,
+    fetchedAt,
+    url,
+    VALIDATION_USER_AGENT,
+    VALIDATION_FETCH_TIMEOUT_MS,
+    (message) => console.log(`${category.displayName}: ${message}`),
+  );
 
-  // User-Agent 包含專案識別字，讓來源站 log 可辨識為手動驗證流量。
-  const response = await fetch(url, {
-    headers: {
-      accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      "accept-language": "zh-TW,zh;q=0.9,en;q=0.8",
-      "user-agent":
-        "PartsRadarTW manual parser validation (+https://github.com/C6Yelan/PartsRadarTW)",
-    },
-  });
-  const bytes = new Uint8Array(await response.arrayBuffer());
+  if (typeof snapshot.rawHtml !== "string" || typeof snapshot.httpStatus !== "number") {
+    throw new Error(
+      `CoolPC live validation fetch failed for IGrp=${category.igrp}: ${snapshot.fetchError ?? "missing response"}`,
+    );
+  }
 
   return {
-    html: decodeCoolpcHtml(bytes),
-    httpStatus: response.status,
+    html: snapshot.rawHtml,
+    httpStatus: snapshot.httpStatus,
   };
+}
+
+async function acquireValidationExternalFetchLock(workspaceRoot: string) {
+  const snapshotStorageDir = process.env.SNAPSHOT_STORAGE_DIR ?? DEFAULT_RAW_SNAPSHOT_STORAGE_DIR;
+  const lockDir = resolveWorkspacePathArgument(
+    workspaceRoot,
+    process.env.EXTERNAL_FETCH_LOCK_DIR ?? `${snapshotStorageDir}/.locks/external-fetch`,
+  );
+  const lock = await tryAcquireExternalFetchLock({
+    lockDir,
+    owner: "manual-parser-validator",
+    staleSeconds: parseExternalFetchLockStaleSeconds(process.env.EXTERNAL_FETCH_LOCK_STALE_SECONDS),
+  });
+
+  if (!lock) {
+    throw new Error("Another live source fetch currently holds the shared external fetch lock.");
+  }
+
+  return lock;
 }
 
 // 從 raw 快照目錄讀取指定 IGrp 的 HTML；回傳 pseudo-response 狀態以維持與 live 分支一致。

@@ -4,12 +4,12 @@
 import { join, relative } from "node:path";
 import type { PrismaClient } from "@partsradar/db";
 import { normalizeCoolpcProductImageUrl } from "../../../coolpc/parser/urls";
+import { toSafeCliErrorMessage } from "../../shared/script-utils";
 import {
   createProductImageCandidateByIdsWhere,
   createProductImageCandidateSelect,
   createProductImageCandidateWhere,
   MISSING_IMAGE_CANDIDATE_BY_IDS_ORDER_BY,
-  MISSING_IMAGE_CANDIDATE_ORDER_BY,
   PRODUCT_IMAGE_CANDIDATE_ORDER_BY,
 } from "./candidate-query";
 import {
@@ -19,7 +19,6 @@ import {
   formatBytes,
   pathExists,
   randomDelayMs,
-  toErrorMessage,
   writeFileAtomically,
   writeFileFromReusableImage,
 } from "./image-files";
@@ -62,33 +61,6 @@ export async function readCandidates(
     orderBy: PRODUCT_IMAGE_CANDIDATE_ORDER_BY,
     take: options.limit ?? undefined,
   });
-}
-
-// 讀取目前本地尚未有 WebP 快取的候選，並在檔案檢查後才套用 limit。
-export async function readMissingImageCandidates(
-  client: PrismaClient,
-  options: ImageBackfillOptions,
-): Promise<ProductImageCandidate[]> {
-  const candidates = await client.product.findMany({
-    where: createProductImageCandidateWhere(options),
-    select: createProductImageCandidateSelect(),
-    orderBy: MISSING_IMAGE_CANDIDATE_ORDER_BY,
-  });
-  const missingCandidates: ProductImageCandidate[] = [];
-
-  for (const candidate of candidates) {
-    if (await pathExists(join(options.storageDir, `${candidate.id}.webp`))) {
-      continue;
-    }
-
-    missingCandidates.push(candidate);
-
-    if (options.limit !== null && missingCandidates.length >= options.limit) {
-      break;
-    }
-  }
-
-  return missingCandidates;
 }
 
 // scheduled crawler 只針對本輪新增商品補圖，因此以 product id 清單收斂查詢範圍。
@@ -248,9 +220,9 @@ async function processCandidate(
       await delay(waitMs);
     }
 
-    const sourceRequest = fetchSourceImageBytes(normalizedImageUrl, options);
-    didRequestSource = true;
-    const sourceBytes = await sourceRequest;
+    const sourceBytes = await fetchSourceImageBytes(normalizedImageUrl, options, () => {
+      didRequestSource = true;
+    });
     const thumbnailBytes = await createWebpThumbnail(sourceBytes);
     await writeFileAtomically(outputPath, thumbnailBytes);
     reusableImagePathsBySourceUrl.set(normalizedImageUrl, outputPath);
@@ -263,7 +235,7 @@ async function processCandidate(
 
     return { status: "cached", didRequestSource };
   } catch (error) {
-    log(`[failed] ${candidate.id} | ${toErrorMessage(error)} | ${candidate.name}`);
+    log(`[failed] ${candidate.id} | ${toSafeCliErrorMessage(error)} | ${candidate.name}`);
     return { status: "failed", didRequestSource };
   }
 }

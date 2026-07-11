@@ -4,6 +4,8 @@
 import { type FilesystemLockHandle, tryAcquireFilesystemLock } from "../../shared/filesystem-lock";
 
 export const DEFAULT_EXTERNAL_FETCH_LOCK_STALE_SECONDS = 12 * 60 * 60;
+const MIN_EXTERNAL_FETCH_LOCK_STALE_SECONDS = 1800;
+const MAX_EXTERNAL_FETCH_LOCK_STALE_SECONDS = 7 * 24 * 60 * 60;
 
 export type ExternalFetchLockHandle = FilesystemLockHandle;
 
@@ -27,4 +29,31 @@ export async function tryAcquireExternalFetchLock({
     staleSeconds,
     now,
   });
+}
+
+// 統一解析各 live-fetch 入口共用的 lock stale env，避免不同 CLI 使用不同安全範圍。
+export function parseExternalFetchLockStaleSeconds(raw: string | undefined): number {
+  if (raw === undefined || raw.trim() === "") {
+    return DEFAULT_EXTERNAL_FETCH_LOCK_STALE_SECONDS;
+  }
+
+  const value = Number.parseInt(raw, 10);
+
+  if (!Number.isFinite(value) || String(value) !== raw.trim()) {
+    throw new Error("EXTERNAL_FETCH_LOCK_STALE_SECONDS must be an integer.");
+  }
+
+  if (value < MIN_EXTERNAL_FETCH_LOCK_STALE_SECONDS) {
+    throw new Error(
+      `EXTERNAL_FETCH_LOCK_STALE_SECONDS must be at least ${MIN_EXTERNAL_FETCH_LOCK_STALE_SECONDS}.`,
+    );
+  }
+
+  if (value > MAX_EXTERNAL_FETCH_LOCK_STALE_SECONDS) {
+    throw new Error(
+      `EXTERNAL_FETCH_LOCK_STALE_SECONDS must be at most ${MAX_EXTERNAL_FETCH_LOCK_STALE_SECONDS}.`,
+    );
+  }
+
+  return value;
 }
