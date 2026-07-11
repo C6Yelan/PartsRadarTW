@@ -3,12 +3,12 @@
 
 import { describe, expect, it } from "vitest";
 
+import { MAX_BUILD_LIST_PRODUCTS } from "../../app/build-list/constants";
 import {
   addProductToBuildList,
   type BuildListIntent,
   type BuildListProductSnapshot,
   clampBuildListQuantity,
-  MAX_BUILD_LIST_PRODUCTS,
   normalizeBuildListIntents,
   removeBuildListItem,
   resolveBuildListItems,

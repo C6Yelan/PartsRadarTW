@@ -1,12 +1,12 @@
 "use client";
 // apps/web/app/build-list/use-build-list.ts
-// 管理只含使用者意圖的配單 v2 localStorage，並同步同頁 hook 與其他分頁。
+// 管理只含使用者意圖的配單 localStorage，並同步同頁 hook 與其他分頁。
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { MAX_BUILD_LIST_PRODUCTS } from "./constants";
 import {
   addProductToBuildList,
   type BuildListIntent,
-  MAX_BUILD_LIST_PRODUCTS,
   removeBuildListItem as removeBuildListItemFromCollection,
   restoreBuildListItem as restoreBuildListItemToCollection,
   summarizeBuildListIntents,

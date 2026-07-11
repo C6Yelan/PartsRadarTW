@@ -4,7 +4,7 @@
 // 顯示商品詳細頁的配單操作、來源購買連結與分享操作區塊。
 
 import { CopyIcon, ExternalLinkIcon } from "../../../_shared/icons";
-import { BUILD_LIST_MAX_QUANTITY, MAX_BUILD_LIST_PRODUCTS } from "../../../build-list/model";
+import { BUILD_LIST_MAX_QUANTITY, MAX_BUILD_LIST_PRODUCTS } from "../../../build-list/constants";
 
 // 組裝商品詳細頁主要操作，依配單狀態切換加入按鈕或數量控制。
 export default function ProductDetailActions({

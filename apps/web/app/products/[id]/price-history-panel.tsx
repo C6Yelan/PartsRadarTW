@@ -4,20 +4,14 @@
 
 import { useMemo, useState } from "react";
 import { API_RATE_LIMITED_MESSAGE } from "../../_shared/api-client";
-import { PriceHistoryChart, useChartConfig } from "./price-history/chart";
+import { PriceHistoryChart } from "./price-history/chart";
+import { useChartConfig } from "./price-history/chart/chart-config";
 import { createChartModel, summarizePoints } from "./price-history/model";
 import { HistoryRecordList } from "./price-history/records";
 import { HistoryRangeCard, PeriodDeltaCard } from "./price-history/summary-cards";
 import type {
   PriceHistoryLoadState,
   PriceHistoryRange,
-  ProductPriceHistoryBody,
-} from "./price-history/types";
-
-export type {
-  PriceHistoryLoadState,
-  PriceHistoryRange,
-  PriceHistoryRangeDays,
   ProductPriceHistoryBody,
 } from "./price-history/types";
 

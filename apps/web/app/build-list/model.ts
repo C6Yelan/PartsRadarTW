@@ -5,8 +5,6 @@ import { BUILD_LIST_MAX_QUANTITY, MAX_BUILD_LIST_PRODUCTS } from "./constants";
 import { isRecord, normalizeIsoDate } from "./model/validation";
 import { normalizeBuildListProductId } from "./product-id";
 
-export { BUILD_LIST_MAX_QUANTITY, MAX_BUILD_LIST_PRODUCTS } from "./constants";
-
 export interface BuildListIntent {
   productId: string;
   quantity: number;

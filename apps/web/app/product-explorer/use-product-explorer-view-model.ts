@@ -4,13 +4,9 @@
 
 import { useEffect, useMemo } from "react";
 import { useProductExplorerActions } from "./actions/use-product-explorer-actions";
-import {
-  useCategories,
-  usePendingPageScroll,
-  useProductExplorerQuery,
-  useProducts,
-  useResponsiveFiltersOpen,
-} from "./hooks";
+import { useCategories } from "./data/use-categories";
+import { useProducts } from "./data/use-products";
+import { usePendingPageScroll, useProductExplorerQuery, useResponsiveFiltersOpen } from "./hooks";
 import { DEFAULT_QUERY, getVisiblePages, toUrl } from "./query-state";
 import { useProductBuildListActions } from "./use-product-build-list-actions";
 

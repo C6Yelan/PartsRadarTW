@@ -7,7 +7,7 @@ import type {
   PriceHistoryLoadState,
   PriceHistoryRange,
   ProductPriceHistoryBody,
-} from "../price-history-panel";
+} from "../price-history/types";
 import type { ProductDetailBody } from "./types";
 
 // 在商品詳細資料可用後載入價格歷史，並讓價格走勢面板切換 7/30/90 天或全部範圍。

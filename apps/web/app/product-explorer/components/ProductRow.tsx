@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import { formatSignedTwdPrice, formatTwdPrice } from "../../_shared/formatting";
-import { BUILD_LIST_MAX_QUANTITY, MAX_BUILD_LIST_PRODUCTS } from "../../build-list/model";
+import { BUILD_LIST_MAX_QUANTITY, MAX_BUILD_LIST_PRODUCTS } from "../../build-list/constants";
 import type { ProductListItem } from "../types";
 import { ProductImage } from "./ProductImage";
 

@@ -6,7 +6,8 @@ import Link from "next/link";
 import { formatTwdPrice } from "../../_shared/formatting";
 import { ExternalLinkIcon } from "../../_shared/icons";
 import { formatTaipeiDateTime } from "../../_shared/time";
-import { BUILD_LIST_MAX_QUANTITY, type BuildListItem, getBuildListLineSubtotal } from "../model";
+import { BUILD_LIST_MAX_QUANTITY } from "../constants";
+import { type BuildListItem, getBuildListLineSubtotal } from "../model";
 import BuildListItemImage from "./BuildListItemImage";
 
 export default function BuildListItemRow({

@@ -3,7 +3,7 @@
 // 組裝商品詳細頁所需的商品資料、價格歷史、配單、圖片、返回連結與分享狀態。
 
 import { useEffect, useState } from "react";
-import { BUILD_LIST_MAX_QUANTITY } from "../../../build-list/model";
+import { BUILD_LIST_MAX_QUANTITY } from "../../../build-list/constants";
 import { useBuildList } from "../../../build-list/use-build-list";
 import type { ProductShareStatus } from "../product-share";
 import { createProductShareUrl, formatProductShareStatus, shareProductUrl } from "../product-share";

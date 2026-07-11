@@ -12,9 +12,6 @@ import {
 } from "./query-state";
 import type { LoadState, ProductsResponse, QueryState } from "./types";
 
-export { useCategories } from "./data/use-categories";
-export { useProducts } from "./data/use-products";
-
 // 對齊 CSS mobile breakpoint max-width: 760px，桌面端強制維持分類面板展開。
 const DESKTOP_FILTER_MEDIA_QUERY_VALUE = "(min-width: 761px)";
 

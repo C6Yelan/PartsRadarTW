@@ -12,8 +12,6 @@ import type {
   PriceHistoryRangeKey,
 } from "./types";
 
-export { useChartConfig } from "./chart/chart-config";
-
 // 呈現價格歷史 chart model，並把滑鼠、焦點與點擊事件轉成目前作用中的價格點。
 export function PriceHistoryChart({
   activePointKey,
