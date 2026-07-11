@@ -3,6 +3,7 @@
 
 import type { ParsedCoolpcProduct } from "../../../src/coolpc/parser/types";
 import type { CoolpcProductWriteClient } from "../../../src/coolpc/product-write";
+import { extractProductFilterTags } from "@partsradar/shared";
 
 export interface FakeProduct {
   id: string;
@@ -12,6 +13,7 @@ export interface FakeProduct {
   normalizedName: string;
   vendorSlug: string | null;
   vendorName: string | null;
+  filterTags: string[];
   primaryImageUrl: string | null;
   primaryImageCheckedAt: Date | null;
   sourceUrl: string;
@@ -106,6 +108,7 @@ export class FakeCoolpcProductWriteClient implements CoolpcProductWriteClient {
         normalizedName: data.normalizedName,
         vendorSlug: data.vendorSlug,
         vendorName: data.vendorName,
+        filterTags: data.filterTags,
         primaryImageUrl: data.primaryImageUrl,
         primaryImageCheckedAt: data.primaryImageCheckedAt,
         sourceUrl: data.sourceUrl,
@@ -224,6 +227,7 @@ export class FakeCoolpcProductWriteClient implements CoolpcProductWriteClient {
       normalizedName: item.normalizedName,
       vendorSlug: item.vendorSlug,
       vendorName: item.vendorName,
+      filterTags: extractProductFilterTags(item.igrp, item.name),
       primaryImageUrl: item.primaryImageUrl,
       primaryImageCheckedAt: item.fetchedAt,
       sourceUrl: item.sourceUrl,

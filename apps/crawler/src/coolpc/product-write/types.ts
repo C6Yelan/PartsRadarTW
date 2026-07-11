@@ -123,6 +123,7 @@ export interface ProductCreateData {
   normalizedName: string;
   vendorSlug: string | null;
   vendorName: string | null;
+  filterTags: string[];
   primaryImageUrl: string | null;
   primaryImageCheckedAt: Date | null;
   sourceUrl: string;
@@ -139,6 +140,7 @@ export interface ProductSeenUpdateData {
   normalizedName: string;
   vendorSlug: string | null;
   vendorName: string | null;
+  filterTags: string[];
   primaryImageUrl?: string;
   primaryImageCheckedAt?: Date;
   sourceUrl: string;

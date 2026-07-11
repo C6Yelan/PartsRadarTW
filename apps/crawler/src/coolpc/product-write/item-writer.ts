@@ -1,5 +1,6 @@
 // apps/crawler/src/coolpc/product-write/item-writer.ts
 // 角色：將單筆已解析的 Coolpc 商品觀測資料，寫入商品主檔並同步價格歷史與 current_price 狀態。
+import { extractProductFilterTags } from "@partsradar/shared";
 import type { ParsedCoolpcProduct } from "../parser";
 import type {
   CoolpcProductWriteDelegates,
@@ -178,6 +179,7 @@ function buildProductSeenUpdateData(parsedProduct: ParsedCoolpcProduct): Product
     normalizedName: parsedProduct.normalizedName,
     vendorSlug: parsedProduct.vendorSlug,
     vendorName: parsedProduct.vendorName,
+    filterTags: extractProductFilterTags(parsedProduct.igrp, parsedProduct.name),
     ...(parsedProduct.primaryImageUrl
       ? {
           primaryImageUrl: parsedProduct.primaryImageUrl,
@@ -246,6 +248,7 @@ function createProductData(parsedProduct: ParsedCoolpcProduct): ProductCreateDat
     normalizedName: parsedProduct.normalizedName,
     vendorSlug: parsedProduct.vendorSlug,
     vendorName: parsedProduct.vendorName,
+    filterTags: extractProductFilterTags(parsedProduct.igrp, parsedProduct.name),
     primaryImageUrl: parsedProduct.primaryImageUrl,
     primaryImageCheckedAt: parsedProduct.primaryImageUrl ? parsedProduct.fetchedAt : null,
     sourceUrl: parsedProduct.sourceUrl,

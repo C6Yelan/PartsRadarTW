@@ -27,6 +27,7 @@
     "ops:production-smoke": "pnpm --filter @partsradar/crawler ops:production-smoke",
     "ops:production-smoke-daemon": "pnpm --filter @partsradar/crawler ops:production-smoke-daemon",
     "ops:product-vendors:backfill": "pnpm --filter @partsradar/crawler ops:product-vendors:backfill",
+    "ops:product-filter-tags:backfill": "pnpm --filter @partsradar/crawler ops:product-filter-tags:backfill",
     "ops:raw-snapshots:cleanup": "pnpm --filter @partsradar/crawler ops:raw-snapshots:cleanup",
     "ops:raw-snapshots:cleanup-daemon": "pnpm --filter @partsradar/crawler ops:raw-snapshots:cleanup-daemon",
     "manual:crawl-coolpc-once": "pnpm --filter @partsradar/crawler manual:crawl-coolpc-once",

@@ -10,6 +10,7 @@
     "ops:production-smoke": "tsx src/scripts/ops/production-smoke.ts",
     "ops:production-smoke-daemon": "tsx src/scripts/ops/production-smoke-daemon.ts",
     "ops:product-vendors:backfill": "tsx src/scripts/ops/backfill-product-vendors.ts",
+    "ops:product-filter-tags:backfill": "tsx src/scripts/ops/backfill-product-filter-tags.ts",
     "ops:raw-snapshots:cleanup": "tsx src/scripts/ops/cleanup-raw-snapshots.ts",
     "ops:raw-snapshots:cleanup-daemon": "tsx src/scripts/ops/cleanup-raw-snapshots-daemon.ts",
     "manual:crawl-coolpc-once": "tsx src/scripts/manual/crawl-coolpc-once.ts",

@@ -38,6 +38,7 @@ describe("CoolPC category product observation writer", () => {
       normalizedName: item.normalizedName,
       vendorSlug: item.vendorSlug,
       vendorName: item.vendorName,
+      filterTags: ["socket:am5", "cpu_family:ryzen-5"],
       primaryImageUrl: item.primaryImageUrl,
       primaryImageCheckedAt: item.fetchedAt,
       firstSeenAt: item.fetchedAt,
@@ -155,6 +156,38 @@ describe("CoolPC category product observation writer", () => {
       priceChangedAt: previousSeenAt,
     });
     expect(client.products[0]?.lastSeenAt).toEqual(nextSeenAt);
+  });
+
+  it("refreshes filter tags when a product name changes without a price change", async () => {
+    const client = new FakeCoolpcProductWriteClient();
+    const previousItem = productItem({
+      name: "AMD Ryzen 5 7500F MPK【6核/12緒】3.7G",
+      normalizedName: "amd ryzen 5 7500f mpk【6核/12緒】3.7g",
+      price: 4880,
+    });
+    client.seedProductWithCurrentPrice(previousItem);
+    const nextSeenAt = new Date("2026-05-27T11:00:00.000Z");
+    const nextItem = productItem({
+      name: "AMD R7 9700X【8核/16緒】3.8G / 具內顯",
+      normalizedName: "amd r7 9700x【8核/16緒】3.8g / 具內顯",
+      price: 4880,
+      fetchedAt: nextSeenAt,
+    });
+
+    const result = await writeCoolpcCategoryProductObservation({
+      client,
+      crawlRunId: "crawl-run-2",
+      sourceCategoryId: nextItem.sourceCategoryId,
+      fetchedAt: nextSeenAt,
+      parsedProducts: [nextItem],
+    });
+
+    expect(result.priceSnapshotCreatedCount).toBe(0);
+    expect(client.products[0]?.filterTags).toEqual([
+      "socket:am5",
+      "cpu_family:ryzen-7",
+      "integrated_graphics:yes",
+    ]);
   });
 
   it("preserves an existing primary image when the latest parsed item has no valid image URL", async () => {
