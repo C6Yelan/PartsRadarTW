@@ -40,7 +40,7 @@ export async function readLatestPublicPriceReportDelivery({
   });
 }
 
-// 以 crawl run 與頻道為唯一鍵寫入公開報告 delivery，避免同輪重複建立發送紀錄。
+// 以 crawl run 與頻道為唯一鍵寫入公開報告 delivery；retry 會清除既有 legacy 技術摘要。
 export async function recordPublicPriceReportDelivery({
   client,
   crawlRunId,
@@ -87,6 +87,7 @@ export async function recordPublicPriceReportDelivery({
       messageCount,
       deliveredAt,
       errorCategory,
+      errorMessage,
       httpStatus,
       providerErrorCode,
     },

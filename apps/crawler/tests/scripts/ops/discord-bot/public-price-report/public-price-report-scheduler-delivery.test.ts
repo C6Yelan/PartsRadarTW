@@ -184,16 +184,15 @@ describe("public price report scheduler delivery", () => {
       update: expect.objectContaining({
         status: "RATE_LIMITED",
         errorCategory: "RATE_LIMITED",
+        errorMessage: null,
         httpStatus: 429,
         providerErrorCode: null,
       }),
     });
     const upsert = client.discordPublicPriceReportDelivery.upsert.mock.calls[0]?.[0];
 
-    expect(upsert?.update).not.toHaveProperty("errorMessage");
-    expect(legacyDelivery.errorMessage).toBe(
-      "legacy provider body DISCORD_BOT_TOKEN=legacy-private-token",
-    );
+    expect(upsert?.update).toHaveProperty("errorMessage", null);
+    expect(legacyDelivery.errorMessage).toBeNull();
     const persisted = JSON.stringify(client.discordPublicPriceReportDelivery.upsert.mock.calls);
 
     expect(persisted).not.toContain("sentMessages");

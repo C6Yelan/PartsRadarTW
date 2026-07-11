@@ -17,7 +17,7 @@ export const NO_DISCORD_DELIVERY_ERROR = {
   providerErrorCode: null,
 } as const satisfies DiscordDeliveryErrorFields;
 
-// 新寫入只保存分類與必要數值；legacy error_message 保留但不再新增技術摘要。
+// 只回傳分類與必要數值，不產生可持久化的技術摘要。
 export function toDiscordDeliveryErrorFields(
   result: DiscordMessageSendResult,
 ): DiscordDeliveryErrorFields {
