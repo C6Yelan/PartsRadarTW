@@ -231,7 +231,7 @@ describe("sendDiscordWebhookMessage", () => {
     }
     expect(result.message).not.toContain("token_ABC");
     expect(result.message).not.toContain("user:pass");
-    expect(result.message).toContain("DATABASE_URL=***");
+    expect(result.message).toContain("DATABASE_URL=[redacted]");
   });
 
   it("rejects empty messages before sending", async () => {

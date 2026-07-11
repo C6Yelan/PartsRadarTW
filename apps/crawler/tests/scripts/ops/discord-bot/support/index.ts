@@ -36,16 +36,6 @@ export function findMessageComponent(
     .find((component) => component.custom_id === customId);
 }
 
-// 在 message component tree 中依 custom id prefix 找出元件。
-export function findMessageComponentByPrefix(
-  body: DiscordBotMessage,
-  customIdPrefix: string,
-): NonNullable<DiscordBotMessage["components"]>[number]["components"][number] | undefined {
-  return body.components
-    ?.flatMap((row) => row.components)
-    .find((component) => component.custom_id.startsWith(customIdPrefix));
-}
-
 // 計算 message 內所有 embed 文字長度，對齊 Discord embed size 測試。
 export function calculateMessageEmbedTextLength(message: DiscordBotMessage): number {
   return (message.embeds ?? []).reduce(
@@ -62,11 +52,15 @@ export function calculateMessageEmbedTextLength(message: DiscordBotMessage): num
   );
 }
 
-export function textLength(value: string | undefined): number {
+function textLength(value: string | undefined): number {
   return value?.length ?? 0;
 }
 
 export * from "./client";
-export * from "./data";
-export * from "./interactions";
+export * from "./data-factories";
+export type * from "./data-types";
+export * from "./interactions-core";
+export * from "./interactions-price-report";
+export * from "./interactions-public-report";
+export * from "./interactions-watch";
 export * from "./watch-clients";

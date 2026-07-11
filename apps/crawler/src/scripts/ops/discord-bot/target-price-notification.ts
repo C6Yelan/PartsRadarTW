@@ -13,7 +13,7 @@ import {
   TARGET_PRICE_NOTIFICATION_SELECT,
   type TargetPriceNotificationWatch,
 } from "./target-price-notification/records";
-import type { DiscordBotClient, DiscordBotMessage, DiscordBotMessageSendResult } from "./types";
+import type { DiscordBotClient, DiscordBotMessage, DiscordMessageSendResult } from "./types";
 
 // 單輪目標價通知掃描結果，供 daemon log 與維運觀察本輪處理狀態。
 export interface TargetPriceNotificationSummary {
@@ -38,7 +38,7 @@ export async function sendDueTargetPriceNotifications({
   sendDirectMessages: (
     discordUserId: string,
     messages: DiscordBotMessage[],
-  ) => Promise<DiscordBotMessageSendResult>;
+  ) => Promise<DiscordMessageSendResult>;
 }): Promise<TargetPriceNotificationSummary> {
   const staleClaimBefore = new Date(now.getTime() - TARGET_PRICE_NOTIFICATION_CLAIM_LEASE_MS);
   const candidates = await client.discordTargetPriceWatch.findMany({
@@ -106,7 +106,7 @@ export async function sendDueTargetPriceNotifications({
     }
 
     const messages = createTargetPriceReachedMessages({ watches: claimedWatches, publicBaseUrl });
-    let sendResult: DiscordBotMessageSendResult;
+    let sendResult: DiscordMessageSendResult;
 
     try {
       sendResult = await sendDirectMessages(discordUserId, messages);

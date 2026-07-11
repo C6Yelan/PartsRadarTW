@@ -7,8 +7,7 @@ import { toDiscordDeliveryErrorFields } from "../delivery-error-fields";
 import type {
   DiscordBotClient,
   DiscordBotMessage,
-  DiscordBotMessageSendResult,
-  DiscordDirectMessageSendResult,
+  DiscordMessageSendResult,
   PersonalPriceReportDeliveryResult,
 } from "../types";
 import {
@@ -51,7 +50,7 @@ export async function sendPriceReportNow({
   publicBaseUrl: string;
   filters?: PriceReportFilters;
   now?: Date;
-  sendReportMessages: (messages: DiscordBotMessage[]) => Promise<DiscordBotMessageSendResult>;
+  sendReportMessages: (messages: DiscordBotMessage[]) => Promise<DiscordMessageSendResult>;
 }): Promise<PersonalPriceReportDeliveryResult> {
   return sendPriceReport({
     client,
@@ -85,7 +84,7 @@ export async function sendPriceReport({
   now: Date;
   since?: Date;
   deliveryKind: "PRICE_REPORT_NOW" | "SCHEDULED_PRICE_REPORT";
-  sendReportMessages: (messages: DiscordBotMessage[]) => Promise<DiscordBotMessageSendResult>;
+  sendReportMessages: (messages: DiscordBotMessage[]) => Promise<DiscordMessageSendResult>;
 }): Promise<PersonalPriceReportDeliveryResult> {
   const reportSince = since ?? new Date(now.getTime() - windowHours * HOUR_MS);
   const normalizedFilters = normalizePriceReportFilters(filters);
@@ -188,11 +187,11 @@ export async function recordPriceReportDelivery({
   client: DiscordBotClient;
   discordUserId: string;
   kind: "PRICE_REPORT_NOW" | "SCHEDULED_PRICE_REPORT";
-  status: DiscordDirectMessageSendResult["status"];
+  status: DiscordMessageSendResult["status"];
   itemCount: number;
   messageCount: number;
   deliveredAt: Date | null;
-  result: DiscordDirectMessageSendResult;
+  result: DiscordMessageSendResult;
 }): Promise<void> {
   await client.discordNotificationDelivery.create({
     data: {

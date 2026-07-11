@@ -5,7 +5,7 @@ import { HOUR_MS, MAX_DUE_PRICE_REPORT_SETTINGS_PER_CYCLE } from "../constants";
 import type {
   DiscordBotClient,
   DiscordBotMessage,
-  DiscordBotMessageSendResult,
+  DiscordMessageSendResult,
   DiscordBotOptions,
 } from "../types";
 import { sendPriceReport } from "./delivery";
@@ -34,7 +34,7 @@ export async function sendDueScheduledPriceReports({
   sendDirectMessages: (
     discordUserId: string,
     messages: DiscordBotMessage[],
-  ) => Promise<DiscordBotMessageSendResult>;
+  ) => Promise<DiscordMessageSendResult>;
 }): Promise<ScheduledPriceReportSummary> {
   const settings = await client.discordPriceReportSetting.findMany({
     where: {

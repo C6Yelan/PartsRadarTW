@@ -9,6 +9,7 @@ import {
 } from "../commands";
 import type { CommandCooldowns } from "../cooldowns";
 import { readPriceReportSetting, sendPriceReportNow, toPriceReportFilters } from "../price-report";
+import { toWindowHours } from "../price-report/schedule";
 import {
   deferInteractionResponse,
   editDeferredInteractionResponse,
@@ -20,7 +21,6 @@ import { createBotHelpMessage } from "./bot-help";
 import {
   createPriceReportSettingsPanelMessage,
   readPriceReportSettingsPanel,
-  resolveWindowHours,
 } from "./price-report-settings";
 import {
   createPublicPriceReportSettingsPanelMessage,
@@ -140,7 +140,7 @@ export async function handleApplicationCommandInteraction({
       await sendPriceReportNow({
         client,
         discordUserId,
-        windowHours: command.windowHours ?? resolveWindowHours(activeSetting?.window),
+        windowHours: command.windowHours ?? toWindowHours(activeSetting?.window),
         publicBaseUrl: options.publicBaseUrl,
         filters: toPriceReportFilters(activeSetting),
         sendReportMessages: (messages) =>

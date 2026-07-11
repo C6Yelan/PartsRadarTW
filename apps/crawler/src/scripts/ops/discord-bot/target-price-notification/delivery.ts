@@ -2,7 +2,7 @@
 // 寫入目標價通知的 Discord delivery 紀錄，供通知去重、狀態追蹤與維運檢查使用。
 
 import { toDiscordDeliveryErrorFields } from "../delivery-error-fields";
-import type { DiscordBotClient, DiscordBotMessageSendResult } from "../types";
+import type { DiscordBotClient, DiscordMessageSendResult } from "../types";
 
 // 寫入 delivery 紀錄所需的 watch 最小資料，避免通知流程依賴完整 watch row。
 export interface TargetPriceNotificationDeliveryWatch {
@@ -21,7 +21,7 @@ export async function recordTargetPriceNotificationDelivery({
 }: {
   client: DiscordBotClient;
   watch: TargetPriceNotificationDeliveryWatch;
-  result: DiscordBotMessageSendResult;
+  result: DiscordMessageSendResult;
   now: Date;
 }): Promise<void> {
   await client.discordNotificationDelivery.create({

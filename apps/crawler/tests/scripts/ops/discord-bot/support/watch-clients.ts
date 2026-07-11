@@ -1,7 +1,7 @@
 // apps/crawler/tests/scripts/ops/discord-bot/support/watch-clients.ts
 // 建立 watch 測試常用的 Discord bot fake client 情境。
 import { createDiscordBotClient } from "./client";
-import { snapshot, targetPriceWatch } from "./data";
+import { snapshot, targetPriceWatch } from "./data-factories";
 import { WATCH_PRODUCT_ID, WATCH_ROW_ID } from "./options";
 
 // 建立單一 watch 商品的管理面板測試 client。

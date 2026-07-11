@@ -14,7 +14,7 @@ import { readCrawlRunPriceChangeSummary } from "../price-report/reader";
 import type {
   DiscordBotClient,
   DiscordBotMessage,
-  DiscordBotMessageSendResult,
+  DiscordMessageSendResult,
   DiscordBotOptions,
 } from "../types";
 import { type PublicPriceReportStatus, recordPublicPriceReportDelivery } from "./delivery";
@@ -44,7 +44,7 @@ export async function sendPendingPublicPriceReports({
   sendChannelMessages: (
     channelId: string,
     messages: DiscordBotMessage[],
-  ) => Promise<DiscordBotMessageSendResult>;
+  ) => Promise<DiscordMessageSendResult>;
 }): Promise<PublicPriceReportSummary> {
   const summary: PublicPriceReportSummary = {
     settingCount: 0,
@@ -100,7 +100,7 @@ async function sendPendingPublicPriceReportsForSetting({
   sendChannelMessages: (
     channelId: string,
     messages: DiscordBotMessage[],
-  ) => Promise<DiscordBotMessageSendResult>;
+  ) => Promise<DiscordMessageSendResult>;
 }): Promise<Omit<PublicPriceReportSummary, "settingCount">> {
   const summary = {
     processedCount: 0,
@@ -190,7 +190,7 @@ async function sendPublicPriceReportForCrawlRun({
   sendChannelMessages: (
     channelId: string,
     messages: DiscordBotMessage[],
-  ) => Promise<DiscordBotMessageSendResult>;
+  ) => Promise<DiscordMessageSendResult>;
 }): Promise<PublicPriceReportStatus> {
   const readResult = await readCrawlRunPriceChangeSummary(client, crawlRunId);
   const filters = toPublicPriceReportFilters(setting);

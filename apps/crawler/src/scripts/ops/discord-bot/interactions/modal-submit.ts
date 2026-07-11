@@ -12,6 +12,7 @@ import {
   readPriceReportSetting,
   toPriceReportFilters,
 } from "../price-report";
+import { toWindowHours } from "../price-report/schedule";
 import { toPublicPriceReportFilters, updatePublicPriceReportFilters } from "../public-price-report";
 import { sendInteractionResponse } from "../rest";
 import type { DiscordBotClient, DiscordBotOptions, DiscordInteraction, FetchImpl } from "../types";
@@ -22,7 +23,6 @@ import {
   formatPriceReportModalValidationMessage,
   readPriceReportSettingsPanel,
   resolveTimeOfDay,
-  resolveWindowHours,
 } from "./price-report-settings";
 import {
   createPublicPriceReportSettingsPanelMessage,
@@ -204,7 +204,7 @@ export async function handleModalSubmitInteraction({
     await enableDailyScheduledPriceReport({
       client,
       discordUserId,
-      windowHours: resolveWindowHours(currentSetting?.window),
+      windowHours: toWindowHours(currentSetting?.window),
       categoryIgrps: currentFilters.categoryIgrps,
       includePriceDrops: currentFilters.includePriceDrops,
       includePriceRises: currentFilters.includePriceRises,
@@ -246,7 +246,7 @@ export async function handleModalSubmitInteraction({
   const setting = await enableDailyScheduledPriceReport({
     client,
     discordUserId,
-    windowHours: resolveWindowHours(currentSetting?.window),
+    windowHours: toWindowHours(currentSetting?.window),
     categoryIgrps: currentFilters.categoryIgrps,
     includePriceDrops: currentFilters.includePriceDrops,
     includePriceRises: currentFilters.includePriceRises,

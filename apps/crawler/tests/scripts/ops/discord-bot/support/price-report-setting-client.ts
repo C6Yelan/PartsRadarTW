@@ -1,7 +1,7 @@
 // apps/crawler/tests/scripts/ops/discord-bot/support/price-report-setting-client.ts
 // 模擬個人價格報告設定 delegate，支援設定查詢、更新與 upsert。
 import { vi } from "vitest";
-import type { TestPriceReportSetting } from "./data";
+import type { TestPriceReportSetting } from "./data-types";
 
 // 建立可檢查 find / update / upsert 呼叫的 in-memory setting client。
 export function createPriceReportSettingClient(settings: TestPriceReportSetting[]) {

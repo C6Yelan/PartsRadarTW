@@ -101,7 +101,7 @@ export function toPriceReportWindow(windowHours: number): DiscordPriceReportSett
 }
 
 // 將 DB report window enum 轉回實際查詢使用的小時數。
-export function toWindowHours(window: DiscordPriceReportSetting["window"]): number {
+export function toWindowHours(window: DiscordPriceReportSetting["window"] | undefined): number {
   if (window === "HOURS_6") {
     return 6;
   }

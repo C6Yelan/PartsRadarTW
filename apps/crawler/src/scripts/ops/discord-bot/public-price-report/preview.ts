@@ -7,7 +7,7 @@ import { readRecentPriceReport } from "../price-report/reader";
 import type {
   DiscordBotClient,
   DiscordBotMessage,
-  DiscordBotMessageSendResult,
+  DiscordMessageSendResult,
   DiscordDeliveryFailureMetadata,
 } from "../types";
 import { DEFAULT_PUBLIC_PRICE_REPORT_FILTERS, type PriceReportFilters } from "./filters";
@@ -64,7 +64,7 @@ export async function sendPublicPriceReportPreview({
   sendChannelMessages: (
     channelId: string,
     messages: DiscordBotMessage[],
-  ) => Promise<DiscordBotMessageSendResult>;
+  ) => Promise<DiscordMessageSendResult>;
 }): Promise<PublicPriceReportPreviewResult> {
   const report = await readRecentPriceReport(client, {
     since: new Date(now.getTime() - 24 * HOUR_MS),

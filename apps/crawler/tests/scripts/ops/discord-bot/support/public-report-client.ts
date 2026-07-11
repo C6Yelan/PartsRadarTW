@@ -5,7 +5,7 @@ import type {
   TestCrawlRun,
   TestDiscordPublicPriceReportDelivery,
   TestDiscordPublicPriceReportSetting,
-} from "./data";
+} from "./data-types";
 
 // 建立公開報告測試用 in-memory client，支援設定面板與排程發送流程。
 export function createPublicReportClient({

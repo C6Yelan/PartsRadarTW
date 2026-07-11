@@ -2,7 +2,7 @@
 // 模擬目標價 watch delegate，支援 watch 管理面板與達標通知流程。
 import { vi } from "vitest";
 import { toPrismaWatchListRecord } from "./client-mappers";
-import type { TestSnapshot, TestTargetPriceWatch } from "./data";
+import type { TestSnapshot, TestTargetPriceWatch } from "./data-types";
 
 type WatchWhere = {
   id?: string;

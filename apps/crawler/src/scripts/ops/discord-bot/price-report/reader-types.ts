@@ -54,7 +54,7 @@ export interface RecentPriceReportFilters {
   includeNewProducts?: boolean;
 }
 
-// 價格報告 reader 只需要 priceSnapshot delegate，方便測試與 Discord bot client 組合。
+// 價格報告 reader 只依賴 priceSnapshot delegate，不綁定完整 PrismaClient。
 export type PriceReportReaderClient = Pick<PrismaClient, "priceSnapshot">;
 
 // 本次報告期間的 price snapshot 查詢結果，包含組裝報告需要的商品欄位。

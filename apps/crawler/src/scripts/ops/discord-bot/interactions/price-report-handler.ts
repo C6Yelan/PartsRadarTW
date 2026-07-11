@@ -15,6 +15,7 @@ import {
   sendPriceReportNow,
   toPriceReportFilters,
 } from "../price-report";
+import { toWindowHours } from "../price-report/schedule";
 import {
   deferInteractionMessageUpdate,
   deferInteractionResponse,
@@ -30,7 +31,6 @@ import {
   formatTaipeiTimeInput,
   readPriceReportSettingsPanel,
   resolveTimeOfDay,
-  resolveWindowHours,
 } from "./price-report-settings";
 
 type PriceReportComponent = NonNullable<ReturnType<typeof parsePriceReportComponentInteraction>>;
@@ -80,7 +80,7 @@ export async function handlePriceReportComponentInteraction({
     const previewResult = await sendPriceReportNow({
       client,
       discordUserId,
-      windowHours: resolveWindowHours(setting?.window),
+      windowHours: toWindowHours(setting?.window),
       publicBaseUrl: options.publicBaseUrl,
       filters: toPriceReportFilters(setting),
       sendReportMessages: (messages) =>
@@ -185,7 +185,7 @@ export async function handlePriceReportComponentInteraction({
       windowHours:
         component.name === "update_window"
           ? component.windowHours
-          : resolveWindowHours(currentPanel.setting?.window),
+          : toWindowHours(currentPanel.setting?.window),
       categoryIgrps,
       includePriceDrops:
         component.name === "update_content_filters"

@@ -11,7 +11,7 @@ import type {
   TestSnapshot,
   TestSourceCategory,
   TestTargetPriceWatch,
-} from "./data";
+} from "./data-types";
 import { createNotificationDeliveryClient } from "./delivery-client";
 import { TEST_SOURCE_CATEGORIES } from "./options";
 import { createPriceReportReaderClient } from "./price-report-reader-client";

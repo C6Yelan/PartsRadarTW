@@ -1,6 +1,7 @@
 // apps/crawler/tests/scripts/ops/discord-bot/support/price-report-reader-client.ts
 // 模擬個人價格報告 reader 需要的 product、priceSnapshot 與 sourceCategory delegate。
 import { vi } from "vitest";
+import type { PriceReportReaderClient } from "../../../../../src/scripts/ops/discord-bot/price-report/reader-types";
 import {
   compareCapturedAtAsc,
   comparePreviousSnapshotOrder,
@@ -8,15 +9,21 @@ import {
   toPrismaSnapshotWithProduct,
   toPrismaWatchProduct,
 } from "./client-mappers";
-import type { TestProductWhere, TestSnapshot, TestSourceCategory } from "./data";
+import type { TestProductWhere, TestSnapshot, TestSourceCategory } from "./data-types";
+
+type TestPriceReportReaderClient = PriceReportReaderClient & {
+  product: { findFirst: ReturnType<typeof vi.fn> };
+  priceSnapshot: { findMany: ReturnType<typeof vi.fn> };
+  sourceCategory: { findMany: ReturnType<typeof vi.fn> };
+};
 
 // 依測試 snapshots 建立可查 crawl run、時間窗與前一筆價格的 in-memory reader client。
 export function createPriceReportReaderClient({
   snapshots,
-  categories,
+  categories = [],
 }: {
   snapshots: TestSnapshot[];
-  categories: TestSourceCategory[];
+  categories?: TestSourceCategory[];
 }) {
   const productFindFirst = vi.fn(async (args: { where: { id?: string } }) => {
     const productId = args.where.id;
@@ -72,12 +79,14 @@ export function createPriceReportReaderClient({
     }
 
     const productIdFilter = where.productId as { in: string[] };
+    const crawlRunFilter = where.crawlRunId as { not: string } | undefined;
     const capturedAtFilter = where.capturedAt as { lt: Date };
 
     return snapshots
       .filter(
         (snapshot) =>
           productIdFilter.in.includes(snapshot.productId) &&
+          (!crawlRunFilter || snapshot.crawlRunId !== crawlRunFilter.not) &&
           snapshot.capturedAt.getTime() < capturedAtFilter.lt.getTime(),
       )
       .sort(comparePreviousSnapshotOrder)
@@ -100,5 +109,5 @@ export function createPriceReportReaderClient({
     sourceCategory: {
       findMany: sourceCategoryFindMany,
     },
-  };
+  } as unknown as TestPriceReportReaderClient;
 }

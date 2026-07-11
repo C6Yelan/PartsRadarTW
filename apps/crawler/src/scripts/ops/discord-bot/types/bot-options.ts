@@ -19,7 +19,7 @@ export interface DiscordBotOptions {
   priceReportScheduleIntervalSeconds: number;
 }
 
-// Discord bot 流程需要的最小資料存取介面，讓 runtime 與測試都不用依賴完整 PrismaClient。
+// Discord bot 流程需要的最小資料存取介面，不直接依賴完整 PrismaClient。
 export type DiscordBotClient = PriceReportReaderClient &
   Pick<
     PrismaClient,
@@ -33,7 +33,7 @@ export type DiscordBotClient = PriceReportReaderClient &
     | "sourceCategory"
   >;
 
-// daemon 主迴圈使用的關閉控制介面，讓測試可替換 sleep 並模擬停止訊號。
+// daemon 主迴圈使用的關閉控制介面，統一停止狀態與可中斷 sleep。
 export interface ShutdownController {
   readonly requested: boolean;
   onStop(callback: () => void): void;

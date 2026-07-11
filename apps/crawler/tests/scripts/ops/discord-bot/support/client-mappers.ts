@@ -1,6 +1,6 @@
 // apps/crawler/tests/scripts/ops/discord-bot/support/client-mappers.ts
 // 將 Discord bot 測試資料轉成 fake Prisma client 需要的回傳形狀。
-import type { TestProductWhere, TestSnapshot, TestTargetPriceWatch } from "./data";
+import type { TestProductWhere, TestSnapshot, TestTargetPriceWatch } from "./data-types";
 
 // 將測試 snapshot 包成 price report reader 會讀到的 product 關聯 payload。
 export function toPrismaSnapshotWithProduct(snapshot: TestSnapshot) {

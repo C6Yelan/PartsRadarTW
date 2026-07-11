@@ -6,11 +6,10 @@ import { formatDiscordBotText } from "./message-text";
 import { sendDiscordRestRequest } from "./rest-request";
 import type {
   DiscordBotMessage,
-  DiscordBotMessageSendResult,
   DiscordDeliveryErrorCategory,
   DiscordDirectMessageChannel,
-  DiscordDirectMessageSendResult,
   DiscordInteraction,
+  DiscordMessageSendResult,
   FetchImpl,
 } from "./types";
 
@@ -80,7 +79,7 @@ export async function sendDiscordDirectMessages({
   userId: string;
   messages: DiscordBotMessage[];
   fetchImpl?: FetchImpl;
-}): Promise<DiscordDirectMessageSendResult> {
+}): Promise<DiscordMessageSendResult> {
   const channelResult = await sendDiscordRestRequest<DiscordDirectMessageChannel>({
     token,
     apiBaseUrl,
@@ -151,7 +150,7 @@ export async function sendDiscordChannelMessages({
   channelId: string;
   messages: DiscordBotMessage[];
   fetchImpl?: FetchImpl;
-}): Promise<DiscordBotMessageSendResult> {
+}): Promise<DiscordMessageSendResult> {
   const httpStatuses: number[] = [];
 
   for (const message of messages) {
@@ -216,7 +215,7 @@ export async function sendDiscordInteractionMessages({
   messages: DiscordBotMessage[];
   fetchImpl?: FetchImpl;
   ephemeral?: boolean;
-}): Promise<DiscordBotMessageSendResult> {
+}): Promise<DiscordMessageSendResult> {
   const httpStatuses: number[] = [];
 
   for (const [index, message] of messages.entries()) {

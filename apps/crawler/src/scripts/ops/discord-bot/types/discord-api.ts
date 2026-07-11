@@ -12,7 +12,7 @@ export interface DiscordDeliveryFailureMetadata {
   providerErrorCode: number | null;
 }
 
-// 可替換的 fetch 介面，讓 REST 與 interaction handler 測試能注入 mock。
+// REST 與 interaction handler 共用的最小 fetch contract。
 export type FetchImpl = typeof fetch;
 
 // Discord embed 訊息欄位，供價格報告、目標價通知與設定面板共用。
@@ -128,7 +128,7 @@ export interface DiscordModalTextInputComponent {
 }
 
 // Discord 發送訊息的統一結果，區分成功、rate limit 與一般失敗。
-export type DiscordDirectMessageSendResult =
+export type DiscordMessageSendResult =
   | {
       status: "sent";
       messageCount: number;
@@ -146,8 +146,6 @@ export type DiscordDirectMessageSendResult =
       messageCount: number;
       sentMessageCount: number;
     } & DiscordDeliveryFailureMetadata);
-
-export type DiscordBotMessageSendResult = DiscordDirectMessageSendResult;
 
 // Discord REST 呼叫所需的共用選項。
 export interface DiscordRestOptions {
@@ -231,7 +229,7 @@ export interface DiscordDirectMessageChannel {
   id?: unknown;
 }
 
-// Gateway WebSocket wrapper 的最小事件外型，讓 runtime 與測試可共用相同介面。
+// Gateway WebSocket wrapper 的最小事件 contract，隔離 runtime WebSocket 實作。
 export interface MinimalWebSocketEvent {
   data?: unknown;
 }

@@ -21,6 +21,7 @@ import {
   readPriceReportSetting,
   toPriceReportFilters,
 } from "../price-report";
+import { toWindowHours } from "../price-report/schedule";
 import {
   formatDiscordDeliveryFailureFieldValue,
   formatDiscordDeliveryFailureForUser,
@@ -78,7 +79,7 @@ export function createPriceReportSettingsPanelMessage({
   return {
     embeds: [createPriceReportSettingsEmbed({ setting, categories, latestDelivery, notice })],
     components: createPriceReportSettingsComponents({
-      windowHours: resolveWindowHours(setting?.window),
+      windowHours: toWindowHours(setting?.window),
       categories,
       categoryIgrps: filters.categoryIgrps,
       includePriceDrops: filters.includePriceDrops,
@@ -120,19 +121,6 @@ export function formatPriceReportModalValidationMessage(
 // 建立商品關鍵字輸入錯誤訊息，對齊 modal 說明中的長度與分組限制。
 export function formatPriceReportKeywordValidationMessage(): string {
   return `商品關鍵字最多 ${MAX_PRICE_REPORT_KEYWORD_LENGTH} 個字，且最多 ${MAX_PRICE_REPORT_KEYWORD_GROUPS} 組。`;
-}
-
-// 將 persisted window enum 轉回小時數；未知或未設定時回到 24 小時。
-export function resolveWindowHours(window: string | undefined): number {
-  if (window === "HOURS_6") {
-    return 6;
-  }
-
-  if (window === "HOURS_12") {
-    return 12;
-  }
-
-  return 24;
 }
 
 // 將既有 nextSendAt 轉為 modal 可用的台北時間；無法解析時回到 09:00。
