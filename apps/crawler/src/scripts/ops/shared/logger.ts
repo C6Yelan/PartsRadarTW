@@ -4,7 +4,7 @@ import { sanitizeSensitiveText } from "../../shared/script-utils";
 
 export type OpsLogLevel = "debug" | "info" | "warn" | "error";
 
-// ops 腳本使用的最小 logger 介面，方便測試注入 sink 並避免直接散落 console 呼叫。
+// ops 腳本共用的最小 logger 介面，避免各 daemon 分散處理輸出格式與遮蔽。
 export interface OpsLogger {
   debug(message: string, fields?: Record<string, unknown>): void;
   info(message: string, fields?: Record<string, unknown>): void;

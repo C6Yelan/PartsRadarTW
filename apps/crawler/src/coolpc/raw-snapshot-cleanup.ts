@@ -66,7 +66,7 @@ type CompressedPathFindManyArgs = {
   select: { compressedHtmlPath: true };
 };
 
-// 抽象化 Prisma 介面，保留查詢與刪除用的最小委派，方便測試與單元替身。
+// 保留清理流程需要的查詢與刪除委派，不讓檔案清理邏輯依賴完整 PrismaClient。
 export interface RawSnapshotCleanupClient {
   rawSnapshot: {
     findMany(args: CandidateFindManyArgs): Promise<RawSnapshotCleanupCandidate[]>;
@@ -103,7 +103,7 @@ export interface CleanupRawSnapshotsResult {
 // 對外提供 Prisma client 的最小掛接型別，避免把整個 Prisma type 外洩到流程邏輯。
 export type PrismaRawSnapshotCleanupClient = Pick<PrismaClient, "rawSnapshot">;
 
-// 將 Prisma client 轉成模組內部 delegate 型別後，重用同一套清理主流程，方便在測試中替換 client 行為。
+// 將 Prisma delegate 接到清理主流程，隔離 Prisma 泛型介面與窄版清理 contract。
 export function cleanupRawSnapshotsWithPrisma(
   options: Omit<CleanupRawSnapshotsOptions, "client"> & {
     client: PrismaRawSnapshotCleanupClient;

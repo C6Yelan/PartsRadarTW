@@ -30,16 +30,13 @@ import {
 
 const logger = createOpsLogger();
 
-export type { ProductionSmokeDaemonOptions } from "./production-smoke-daemon/options";
-export { parseProductionSmokeDaemonOptions } from "./production-smoke-daemon/options";
-
-// daemon shutdown 抽象，讓測試能控制停止狀態與 sleep 行為。
+// daemon loop 使用的停止狀態與可中斷 sleep contract。
 export interface ShutdownController {
   readonly requested: boolean;
   sleep(ms: number): Promise<void>;
 }
 
-// production smoke daemon 的可注入依賴，供 CLI entrypoint 與單元測試共用。
+// 集中 production smoke daemon 的 client、檢查執行器、logger 與關閉控制。
 interface RunProductionSmokeDaemonOptions {
   client: PrismaClient;
   options: ProductionSmokeDaemonOptions;

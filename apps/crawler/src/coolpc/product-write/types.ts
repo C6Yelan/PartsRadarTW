@@ -24,7 +24,7 @@ export interface WriteCoolpcCategoryProductObservationResult {
   markedInactiveProductCount: number;
 }
 
-// 僅保留寫入流程實際會使用的 Prisma delegates，避免商品寫入模組綁死整個 PrismaClient（測試可替代注入）。
+// 僅保留寫入流程實際使用的 Prisma delegates，避免商品寫入模組綁死整個 PrismaClient。
 export interface CoolpcProductWriteClient extends CoolpcProductWriteDelegates {
   $transaction<T>(operation: (client: CoolpcProductWriteDelegates) => Promise<T>): Promise<T>;
 }

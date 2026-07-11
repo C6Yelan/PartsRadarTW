@@ -2,7 +2,7 @@
 // 處理 CoolPC 分類頁抓取結果與 crawl run 的銜接：
 // 先落 raw snapshot，成功解析後再交給分類商品觀測寫入流程。
 
-import type { PrismaClient, ParseErrorType as PrismaParseErrorType } from "@partsradar/db";
+import type { ParseErrorType as PrismaParseErrorType } from "@partsradar/db";
 import { createCoolpcCategoryUrl } from "@partsradar/shared";
 import {
   buildParseFailureMessage,
@@ -102,22 +102,6 @@ export type WriteCoolpcCategoryProductObservation = (options: {
   fetchedAt: Date;
   parsedProducts: ParsedCoolpcProduct[];
 }) => Promise<WriteCoolpcCategoryProductObservationResult>;
-
-export type PrismaCoolpcCategorySnapshotClient = Pick<
-  PrismaClient,
-  "rawSnapshot" | "parseError" | "product" | "priceSnapshot" | "currentPrice" | "$transaction"
->;
-
-/**
- * 以 Prisma client 進入點呼叫共用流程，讓測試時可注入較窄 client。
- */
-export function processCoolpcCategorySnapshotWithPrisma(
-  options: ProcessCoolpcCategorySnapshotBaseOptions & {
-    client: PrismaCoolpcCategorySnapshotClient;
-  },
-): Promise<ProcessCrawlCategoryResult> {
-  return processCoolpcCategorySnapshot(options);
-}
 
 /**
  * 落 raw snapshot 並依 parser 結果決定 crawl run 分類結果狀態。

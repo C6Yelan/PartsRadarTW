@@ -6,9 +6,9 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   logProductionSmokeDaemonSummary,
-  parseProductionSmokeDaemonOptions,
   runProductionSmokeDaemon,
 } from "../../../../src/scripts/ops/production-smoke-daemon";
+import { parseProductionSmokeDaemonOptions } from "../../../../src/scripts/ops/production-smoke-daemon/options";
 import { readSmokeDiscordNotificationState } from "../../../../src/scripts/ops/smoke-discord-notification";
 import {
   createSmokeClient,

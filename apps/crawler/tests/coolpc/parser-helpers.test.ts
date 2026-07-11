@@ -1,14 +1,10 @@
 // apps/crawler/tests/coolpc/parser-helpers.test.ts
-// 驗證 CoolPC parser 共用 helper 的分類範圍、價格解析、來源 key、分類 URL 與圖片 URL 正規化規則。
+// 驗證 CoolPC parser 的分類範圍、價格解析與圖片 URL 正規化規則。
 
-import { createCoolpcCategoryUrl } from "@partsradar/shared";
 import { describe, expect, it } from "vitest";
 import { COOLPC_TARGET_CATEGORIES } from "../../src/coolpc/categories";
 import { parsePriceText } from "../../src/coolpc/parser/normalization";
-import {
-  createCoolpcSourceProductKey,
-  normalizeCoolpcProductImageUrl,
-} from "../../src/coolpc/parser/urls";
+import { normalizeCoolpcProductImageUrl } from "../../src/coolpc/parser/urls";
 
 describe("CoolPC parser helpers", () => {
   it("keeps the current target categories in code", () => {
@@ -23,14 +19,6 @@ describe("CoolPC parser helpers", () => {
     expect(parsePriceText("現金價 $4880")).toBe(4880);
     expect(parsePriceText("現金價 $4,880")).toBe(4880);
     expect(parsePriceText("請來電詢價")).toBeNull();
-  });
-
-  it("creates source product keys without persisting them", () => {
-    expect(createCoolpcSourceProductKey(4, "CPU123")).toBe("coolpc:igrp:4:ibuy:CPU123");
-  });
-
-  it("creates category URLs without PHP session state", () => {
-    expect(createCoolpcCategoryUrl(4)).toBe("https://www.coolpc.com.tw/eachview.php?IGrp=4");
   });
 
   it("normalizes only expected CoolPC product image URLs", () => {

@@ -7,8 +7,8 @@ import {
   formatCoolpcFetchError,
   MAX_COOLPC_RESPONSE_BODY_BYTES,
   readResponseBodyWithLimit,
-  validateCrawlTimingOptions,
-} from "../../src/coolpc/live-crawl";
+} from "../../src/coolpc/live-crawl/fetch";
+import { validateCrawlTimingOptions } from "../../src/coolpc/live-crawl";
 
 describe("CoolPC live crawl safety guards", () => {
   it("validates crawl timing option ranges", () => {

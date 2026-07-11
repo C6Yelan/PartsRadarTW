@@ -53,6 +53,8 @@ describe("production smoke options", () => {
         "--public-only",
         "--source-warn-after-minutes",
         "45",
+        "--invalid-image-url-warn-count",
+        "1500",
         "--missing-image-warn-count",
         "10",
       ],
@@ -73,21 +75,8 @@ describe("production smoke options", () => {
     expect(options.sourceWarnAfterMinutes).toBe(45);
     expect(options.crawlerFailAfterMinutes).toBe(240);
     expect(options.missingImageWarnCount).toBe(10);
-    expect(options.invalidImageUrlWarnCount).toBe(3000);
-    expect(options.productImageStorageDir).toBe(join(workspaceRoot, "custom-images"));
-  });
-
-  it("accepts a CLI source image anomaly threshold override", async () => {
-    const { crawlerCwd } = await createWorkspace();
-    const options = parseProductionSmokeOptions(
-      ["--invalid-image-url-warn-count", "1500"],
-      {
-        SMOKE_INVALID_IMAGE_URL_WARN_COUNT: "3000",
-      },
-      crawlerCwd,
-    );
-
     expect(options.invalidImageUrlWarnCount).toBe(1500);
+    expect(options.productImageStorageDir).toBe(join(workspaceRoot, "custom-images"));
   });
 
   it("rejects invalid URLs and invalid integer ranges", async () => {

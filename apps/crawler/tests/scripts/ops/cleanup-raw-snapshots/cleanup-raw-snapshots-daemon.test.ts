@@ -5,11 +5,11 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { runRawSnapshotCleanupDaemon } from "../../../../src/scripts/ops/cleanup-raw-snapshots-daemon";
 import {
   parseRawSnapshotCleanupDaemonOptions,
   type RawSnapshotCleanupDaemonOptions,
-  runRawSnapshotCleanupDaemon,
-} from "../../../../src/scripts/ops/cleanup-raw-snapshots-daemon";
+} from "../../../../src/scripts/ops/cleanup-raw-snapshots-daemon/options";
 
 const tempRoots: string[] = [];
 const SUCCESSFUL_CLEANUP_RESULT = {

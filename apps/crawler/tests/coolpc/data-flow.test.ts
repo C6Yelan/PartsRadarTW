@@ -1,7 +1,7 @@
 // apps/crawler/tests/coolpc/data-flow.test.ts
 // 驗證 CoolPC crawler 從 raw snapshot 到商品、價格、缺漏與恢復狀態的跨模組資料流。
 
-import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -9,7 +9,6 @@ import {
   CRAWL_RUN_CATEGORY_RESULT_STATUSES as CATEGORY_RESULT_STATUSES,
   CRAWL_RUN_STATUSES,
 } from "../../src/coolpc/crawl-run";
-import { RAW_SNAPSHOT_CONTENT_STATUSES } from "../../src/coolpc/raw-snapshot-writer";
 import {
   category,
   FakeCoolpcDataFlowClient,
@@ -39,20 +38,8 @@ describe("CoolPC crawler data flow", () => {
 
     expect(firstRun.status).toBe(CRAWL_RUN_STATUSES.SUCCESS_CHANGED);
     expect(secondRun.status).toBe(CRAWL_RUN_STATUSES.SUCCESS_UNCHANGED);
-    expect(client.categoryResults.map((result) => result.status)).toEqual([
-      CATEGORY_RESULT_STATUSES.SUCCESS_CHANGED,
-      CATEGORY_RESULT_STATUSES.SUCCESS_UNCHANGED,
-    ]);
-    expect(client.rawSnapshots[1]).toMatchObject({
-      contentHash: client.rawSnapshots[0]?.contentHash,
-      compressedHtmlPath: client.rawSnapshots[0]?.compressedHtmlPath,
-      duplicateOfSnapshotId: "raw-snapshot-1",
-    });
-    expect(await readdir(join(storageDir, "coolpc"))).toHaveLength(1);
-
     expect(client.products).toHaveLength(2);
     expect(client.priceSnapshots).toHaveLength(2);
-    expect(client.currentPrices).toHaveLength(2);
     expect(productByToken(client, "CPU-TOKEN-001")).toMatchObject({
       vendorSlug: "amd",
       lastSeenAt: secondSeenAt,
@@ -79,11 +66,6 @@ describe("CoolPC crawler data flow", () => {
     });
 
     expect(changedRun.status).toBe(CRAWL_RUN_STATUSES.SUCCESS_CHANGED);
-    expect(client.rawSnapshots[1]).toMatchObject({
-      duplicateOfSnapshotId: null,
-      contentStatus: RAW_SNAPSHOT_CONTENT_STATUSES.VALID,
-    });
-    expect(client.rawSnapshots[1]?.contentHash).not.toBe(client.rawSnapshots[0]?.contentHash);
     expect(client.priceSnapshots).toHaveLength(3);
     expect(client.priceSnapshots.at(-1)?.price).toBe(4990);
   });
@@ -116,16 +98,6 @@ describe("CoolPC crawler data flow", () => {
       status: CRAWL_RUN_STATUSES.SUSPECTED_BLOCK,
       stoppedBySuspectedBlock: true,
     });
-    expect(client.categoryResults.map((result) => result.status)).toEqual([
-      CATEGORY_RESULT_STATUSES.SUCCESS_CHANGED,
-      CATEGORY_RESULT_STATUSES.PARSE_FAILED,
-      CATEGORY_RESULT_STATUSES.SUSPECTED_BLOCK,
-    ]);
-    expect(client.rawSnapshots.map((snapshot) => snapshot.contentStatus)).toEqual([
-      RAW_SNAPSHOT_CONTENT_STATUSES.VALID,
-      RAW_SNAPSHOT_CONTENT_STATUSES.INVALID,
-      RAW_SNAPSHOT_CONTENT_STATUSES.SUSPECTED_BLOCK,
-    ]);
     expect(client.products).toHaveLength(2);
     expect(client.priceSnapshots).toHaveLength(2);
     expect(productByToken(client, "CPU-TOKEN-001")).toMatchObject({

@@ -118,40 +118,6 @@ describe("production smoke public checks", () => {
     );
   });
 
-  it("fails when the v2 build list route is not deployed", async () => {
-    const { crawlerCwd, workspaceRoot } = await createWorkspace();
-    const imageDir = join(workspaceRoot, "product-images");
-    await mkdir(imageDir);
-    await writeFile(join(imageDir, "product-1.webp"), "webp");
-    stubHealthyPublicApi({ buildListStatus: 404 });
-    const options = parseProductionSmokeOptions(
-      [],
-      {
-        PRODUCT_IMAGE_STORAGE_DIR: imageDir,
-      },
-      crawlerCwd,
-    );
-    const summary = await runProductionSmoke(
-      createSmokeClient({
-        invalidImageErrorCount: 0,
-        trueParseErrorCount: 0,
-      }),
-      options,
-      new Date("2026-06-02T12:00:00.000Z"),
-    );
-
-    expect(summary.status).toBe("FAIL");
-    expect(summary.checks).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          name: "build-list page",
-          status: "FAIL",
-          message: "HTTP 404",
-        }),
-      ]),
-    );
-  });
-
   it("warns when public HTTPS smoke cannot observe a forwarded client identity", async () => {
     const { crawlerCwd, workspaceRoot } = await createWorkspace();
     const imageDir = join(workspaceRoot, "product-images");

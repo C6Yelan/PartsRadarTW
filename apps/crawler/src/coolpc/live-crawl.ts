@@ -2,12 +2,12 @@
 // Live crawl 進入點：驗證基礎設定、逐分類抓取官方來源頁面，並將結果交由 crawl-run 與 snapshot 寫入流程。
 import type { PrismaClient } from "@partsradar/db";
 import { COOLPC_OFFICIAL_BASE_URL, createCoolpcCategoryUrl } from "@partsradar/shared";
-import { processCoolpcCategorySnapshotWithPrisma } from "./category-snapshot";
+import { processCoolpcCategorySnapshot } from "./category-snapshot";
 import {
   CRAWL_TRIGGER_TYPES,
   type CrawlTriggerTypeValue,
   type RunCoolpcCrawlOnceResult,
-  runCoolpcCrawlOnceWithPrisma,
+  runCoolpcCrawlOnce,
 } from "./crawl-run";
 import { fetchLiveCategorySnapshot } from "./live-crawl/fetch";
 import {
@@ -42,15 +42,8 @@ interface CrawlTimingOptions {
 
 interface RunCoolpcCategoryCrawlDependencies {
   acquireMutationLock?: typeof tryAcquireRawSnapshotMutationLock;
-  runCrawl?: typeof runCoolpcCrawlOnceWithPrisma;
+  runCrawl?: typeof runCoolpcCrawlOnce;
 }
-
-export {
-  fetchLiveCategorySnapshot,
-  formatCoolpcFetchError,
-  MAX_COOLPC_RESPONSE_BODY_BYTES,
-  readResponseBodyWithLimit,
-} from "./live-crawl/fetch";
 
 /**
  * 執行單次 CoolPC 類別抓取流程：先驗證參數與環境，再逐分類抓取並交給 crawl-run 進行後續分類處理與狀態彙總。
@@ -80,7 +73,7 @@ export async function runCoolpcCategoryCrawl(
   });
 
   const acquireMutationLock = dependencies.acquireMutationLock ?? tryAcquireRawSnapshotMutationLock;
-  const runCrawl = dependencies.runCrawl ?? runCoolpcCrawlOnceWithPrisma;
+  const runCrawl = dependencies.runCrawl ?? runCoolpcCrawlOnce;
   const mutationLock = await acquireMutationLock({
     mutationRoot: storageLocation.mutationRoot,
     owner: triggerType === CRAWL_TRIGGER_TYPES.SCHEDULED ? "scheduled-crawler" : "manual-crawler",
@@ -114,7 +107,7 @@ export async function runCoolpcCategoryCrawl(
           log,
         );
 
-        return processCoolpcCategorySnapshotWithPrisma({
+        return processCoolpcCategorySnapshot({
           client,
           storageDir: storageLocation.mutationRoot,
           storagePathPrefix: storageLocation.storagePathPrefix,

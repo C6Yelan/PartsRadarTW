@@ -101,7 +101,7 @@ export interface SourceImageAnomalyRecord {
   rawImageUrl: string | null;
 }
 
-// production smoke 需要的 Prisma client 最小邊界，方便測試使用 fake client。
+// production smoke 只依賴檢查所需的 Prisma delegates，不綁定其他資料存取能力。
 export type ProductionSmokeClient = Pick<
   PrismaClient,
   | "crawlRun"

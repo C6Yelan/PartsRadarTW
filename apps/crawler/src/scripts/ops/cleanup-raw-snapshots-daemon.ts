@@ -24,16 +24,13 @@ import { createOpsLogger } from "./shared/logger";
 
 const logger = createOpsLogger();
 
-export type { RawSnapshotCleanupDaemonOptions } from "./cleanup-raw-snapshots-daemon/options";
-export { parseRawSnapshotCleanupDaemonOptions } from "./cleanup-raw-snapshots-daemon/options";
-
-// 抽象化 daemon 的停止狀態與 sleep 行為，讓測試能驗證 loop 行為而不依賴真實 process signal。
+// 描述 daemon loop 需要的停止狀態與可中斷 sleep 行為。
 export interface ShutdownController {
   readonly requested: boolean;
   sleep(ms: number): Promise<void>;
 }
 
-// 啟動 daemon loop 所需的依賴集合；production 使用 Prisma cleanup，測試可替換 cleanup 與 log。
+// 集中 daemon loop 的清理執行器、logger 與關閉控制。
 export interface RunRawSnapshotCleanupDaemonOptions {
   client: PrismaRawSnapshotCleanupClient;
   options: RawSnapshotCleanupDaemonOptions;
@@ -43,7 +40,7 @@ export interface RunRawSnapshotCleanupDaemonOptions {
   logMessage?: (message: string) => void;
 }
 
-// CLI 入口：載入環境、建立 DB client，並把實際循環交給可測試的 daemon runner。
+// CLI 入口載入環境、建立 DB client，並啟動可安全停止的 cleanup loop。
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
 
@@ -134,7 +131,7 @@ async function runCleanupCycle({
 
     return { ok: true };
   } catch (error) {
-    logMessage(`Raw snapshot cleanup cycle failed: ${toLogErrorMessage(error)}`);
+    logMessage(`Raw snapshot cleanup cycle failed: ${toSafeCliErrorMessage(error)}`);
 
     return { ok: false, error };
   }
@@ -192,18 +189,13 @@ function printCleanupSummary(
   );
 }
 
-// 統一套用 CLI 錯誤遮蔽，避免 daemon log 直接輸出敏感 env 或連線字串。
-function toLogErrorMessage(error: unknown): string {
-  return toSafeCliErrorMessage(error);
-}
-
 function log(message: string): void {
   logger.info(message);
 }
 
 if (require.main === module) {
   main().catch((error) => {
-    console.error(toLogErrorMessage(error));
+    console.error(toSafeCliErrorMessage(error));
     process.exitCode = 1;
   });
 }

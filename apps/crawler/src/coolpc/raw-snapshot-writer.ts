@@ -6,7 +6,6 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join, posix } from "node:path";
 import { promisify } from "node:util";
 import { gzip } from "node:zlib";
-import type { PrismaClient } from "@partsradar/db";
 
 const gzipAsync = promisify(gzip);
 const SNAPSHOT_SUBDIR = "coolpc";
@@ -80,17 +79,6 @@ export interface RecordRawSnapshotResult {
   compressedHtmlPath: string | null;
   duplicateOfSnapshotId: string | null;
   wroteCompressedFile: boolean;
-}
-
-export type PrismaRawSnapshotWriteClient = Pick<PrismaClient, "rawSnapshot">;
-
-export function recordRawSnapshotWithPrisma(
-  options: Omit<RecordRawSnapshotOptions, "client"> & {
-    client: PrismaRawSnapshotWriteClient;
-  },
-): Promise<RecordRawSnapshotResult> {
-  // 以可注入的 writer client 便於測試，並提供 Prisma 型別入口供實際 crawler 流程使用。
-  return recordRawSnapshot(options);
 }
 
 export async function recordRawSnapshot({
