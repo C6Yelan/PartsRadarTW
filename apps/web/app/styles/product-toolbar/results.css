@@ -60,3 +60,38 @@
   background: var(--surface-hover);
   color: var(--text);
 }
+
+.active-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
+
+.active-filter-chip {
+  display: inline-flex;
+  gap: 7px;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--accent-surface);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.active-filter-chip:hover {
+  background: var(--surface-hover);
+}
+
+.active-filter-chip span:last-child {
+  color: var(--accent-strong);
+  font-size: 15px;
+  line-height: 1;
+}

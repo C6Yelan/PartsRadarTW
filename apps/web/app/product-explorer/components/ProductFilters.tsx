@@ -12,8 +12,10 @@ interface ProductFiltersProps {
   categoryState: LoadState;
   filtersOpen: boolean;
   selectedCategory: string;
+  selectedFacets: string[];
   onCategoryChange: (category: string) => void;
   onKeepDesktopOpen: (event: MouseEvent<HTMLElement>) => void;
+  onToggleFacet: (tag: string) => void;
   onToggleOpen: (isOpen: boolean) => void;
 }
 
@@ -23,10 +25,15 @@ export function ProductFilters({
   categoryState,
   filtersOpen,
   selectedCategory,
+  selectedFacets,
   onCategoryChange,
   onKeepDesktopOpen,
+  onToggleFacet,
   onToggleOpen,
 }: ProductFiltersProps) {
+  const facetDefinitions =
+    categories.find((category) => category.slug === selectedCategory)?.facets ?? [];
+
   return (
     <aside className="filter-panel">
       <details open={filtersOpen} onToggle={(event) => onToggleOpen(event.currentTarget.open)}>
@@ -57,6 +64,41 @@ export function ProductFilters({
               <p className="inline-error">{API_RATE_LIMITED_MESSAGE}</p>
             ) : null}
           </div>
+
+          {facetDefinitions.length > 0 ? (
+            <section className="facet-groups" aria-labelledby="advanced-filters-title">
+              <span className="filter-title" id="advanced-filters-title">
+                進階篩選
+              </span>
+
+              {facetDefinitions.map((definition) => (
+                <fieldset className="facet-group" key={definition.key}>
+                  <legend>{definition.label}</legend>
+                  <div className="facet-option-list">
+                    {definition.options.map((option) => {
+                      const tag = `${definition.key}:${option.value}`;
+                      const checked = selectedFacets.includes(tag);
+
+                      return (
+                        <label
+                          className={checked ? "facet-option is-active" : "facet-option"}
+                          key={tag}
+                        >
+                          <input
+                            checked={checked}
+                            type="checkbox"
+                            value={tag}
+                            onChange={() => onToggleFacet(tag)}
+                          />
+                          <span>{option.label}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </fieldset>
+              ))}
+            </section>
+          ) : null}
         </div>
       </details>
     </aside>

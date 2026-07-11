@@ -9,7 +9,13 @@ import {
   STATUS_OPTIONS,
   toPriceDigits,
 } from "../query-state";
-import type { ProductSort, ProductStatus, ProductVendorOption, QueryState } from "../types";
+import type {
+  ProductSort,
+  ProductStatus,
+  ProductVendorOption,
+  QueryState,
+  SelectedFacetChip,
+} from "../types";
 import { VendorFilter } from "./VendorFilter";
 
 interface ProductToolbarProps {
@@ -18,6 +24,7 @@ interface ProductToolbarProps {
   hasActiveFilters: boolean;
   query: QueryState;
   selectedCategoryName: string;
+  selectedFacetChips: SelectedFacetChip[];
   selectedVendorOptions: ProductVendorOption[];
   totalItems: number;
   vendorOptions: ProductVendorOption[];
@@ -27,6 +34,7 @@ interface ProductToolbarProps {
   onSortChange: (sort: ProductSort) => void;
   onStatusChange: (status: ProductStatus) => void;
   onPageSizeChange: (pageSize: number) => void;
+  onRemoveFacet: (tag: string) => void;
   onToggleVendor: (vendor: string) => void;
 }
 
@@ -37,6 +45,7 @@ export function ProductToolbar({
   hasActiveFilters,
   query,
   selectedCategoryName,
+  selectedFacetChips,
   selectedVendorOptions,
   totalItems,
   vendorOptions,
@@ -46,6 +55,7 @@ export function ProductToolbar({
   onSortChange,
   onStatusChange,
   onPageSizeChange,
+  onRemoveFacet,
   onToggleVendor,
 }: ProductToolbarProps) {
   return (
@@ -143,6 +153,22 @@ export function ProductToolbar({
           </select>
         </label>
       </div>
+      {selectedFacetChips.length > 0 ? (
+        <fieldset className="active-filter-chips" aria-label="已選進階篩選">
+          {selectedFacetChips.map((chip) => (
+            <button
+              aria-label={`移除篩選：${chip.label}`}
+              className="active-filter-chip"
+              key={chip.tag}
+              type="button"
+              onClick={() => onRemoveFacet(chip.tag)}
+            >
+              <span>{chip.label}</span>
+              <span aria-hidden="true">×</span>
+            </button>
+          ))}
+        </fieldset>
+      ) : null}
       {formError ? (
         <p className="toolbar-error" role="alert">
           價格範圍錯誤：{formError}

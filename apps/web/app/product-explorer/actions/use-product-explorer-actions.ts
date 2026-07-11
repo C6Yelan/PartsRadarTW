@@ -6,6 +6,7 @@ import {
   DEFAULT_QUERY,
   getFallbackCategorySlug,
   isNonNegativeInteger,
+  normalizeFacetValues,
   validatePriceRange,
 } from "../query-state";
 import type { CategoryItem, ProductVendorOption, QueryState } from "../types";
@@ -105,6 +106,7 @@ export function useProductExplorerActions({
       maxPrice: DEFAULT_QUERY.maxPrice,
       status: DEFAULT_QUERY.status,
       vendors: DEFAULT_QUERY.vendors,
+      facets: DEFAULT_QUERY.facets,
       page: 1,
     });
   }
@@ -153,7 +155,21 @@ export function useProductExplorerActions({
   }
 
   function updateCategoryFilter(category: string) {
-    updateQuery({ category, vendors: DEFAULT_QUERY.vendors });
+    updateQuery({
+      category,
+      vendors: DEFAULT_QUERY.vendors,
+      facets: DEFAULT_QUERY.facets,
+    });
+  }
+
+  function toggleFacetFilter(tag: string) {
+    const nextFacets = query.facets.includes(tag)
+      ? query.facets.filter((facet) => facet !== tag)
+      : [...query.facets, tag];
+
+    updateQuery({
+      facets: normalizeFacetValues(nextFacets, query.category),
+    });
   }
 
   function toggleVendorFilter(vendor: string) {
@@ -181,6 +197,7 @@ export function useProductExplorerActions({
     resetFilters,
     returnHome,
     setPageJumpValue,
+    toggleFacetFilter,
     toggleVendorFilter,
     updateCategoryFilter,
     updateQuery,

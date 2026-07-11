@@ -11,6 +11,7 @@ import type {
   ProductsResponse,
   ProductVendorOption,
   QueryState,
+  SelectedFacetChip,
 } from "../types";
 import { Pagination } from "./Pagination";
 import { ProductTable } from "./ProductTable";
@@ -29,6 +30,7 @@ export function ProductExplorerResultsPanel({
       clearVendors: () => void;
       draftChange: (draft: QueryState) => void;
       pageSizeChange: (pageSize: number) => void;
+      removeFacet: (tag: string) => void;
       resetFilters: () => void;
       sortChange: (sort: ProductSort) => void;
       statusChange: (status: ProductStatus) => void;
@@ -68,6 +70,7 @@ export function ProductExplorerResultsPanel({
     hasActiveFilters: boolean;
     query: QueryState;
     selectedCategoryName: string;
+    selectedFacetChips: SelectedFacetChip[];
     selectedVendorOptions: ProductVendorOption[];
     totalItems: number;
     vendorOptions: ProductVendorOption[];
@@ -81,12 +84,14 @@ export function ProductExplorerResultsPanel({
         hasActiveFilters={toolbar.hasActiveFilters}
         query={toolbar.query}
         selectedCategoryName={toolbar.selectedCategoryName}
+        selectedFacetChips={toolbar.selectedFacetChips}
         selectedVendorOptions={toolbar.selectedVendorOptions}
         totalItems={toolbar.totalItems}
         vendorOptions={toolbar.vendorOptions}
         onClearVendors={actions.toolbar.clearVendors}
         onDraftChange={actions.toolbar.draftChange}
         onPageSizeChange={actions.toolbar.pageSizeChange}
+        onRemoveFacet={actions.toolbar.removeFacet}
         onResetFilters={actions.toolbar.resetFilters}
         onSortChange={actions.toolbar.sortChange}
         onStatusChange={actions.toolbar.statusChange}

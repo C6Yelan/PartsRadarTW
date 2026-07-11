@@ -20,8 +20,10 @@ describe("public API rate-limit copy", () => {
           categoryState="rate_limited"
           filtersOpen={true}
           selectedCategory=""
+          selectedFacets={[]}
           onCategoryChange={() => undefined}
           onKeepDesktopOpen={() => undefined}
+          onToggleFacet={() => undefined}
           onToggleOpen={() => undefined}
         />,
       ),

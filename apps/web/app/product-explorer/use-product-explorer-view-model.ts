@@ -36,6 +36,7 @@ export function useProductExplorerViewModel() {
         ...query,
         category: categories[0].slug,
         vendors: DEFAULT_QUERY.vendors,
+        facets: DEFAULT_QUERY.facets,
         page: 1,
       },
       {
@@ -54,6 +55,21 @@ export function useProductExplorerViewModel() {
     );
   }, [categories, query.category]);
 
+  const selectedFacetChips = useMemo(() => {
+    const definitions =
+      categories.find((category) => category.slug === query.category)?.facets ?? [];
+    const selectedFacets = new Set(query.facets);
+
+    return definitions.flatMap((definition) =>
+      definition.options
+        .map((option) => ({
+          tag: `${definition.key}:${option.value}`,
+          label: `${definition.label}：${option.label}`,
+        }))
+        .filter((chip) => selectedFacets.has(chip.tag)),
+    );
+  }, [categories, query.category, query.facets]);
+
   const totalItems = products?.pagination.totalItems ?? 0;
   const totalPages = products?.pagination.totalPages ?? 0;
   const visiblePages = getVisiblePages(query.page, totalPages);
@@ -70,6 +86,7 @@ export function useProductExplorerViewModel() {
     query.minPrice !== DEFAULT_QUERY.minPrice ||
     query.maxPrice !== DEFAULT_QUERY.maxPrice ||
     query.status !== DEFAULT_QUERY.status ||
+    query.facets.length > 0 ||
     query.vendors.length > 0;
   const actions = useProductExplorerActions({
     categories,
@@ -99,8 +116,10 @@ export function useProductExplorerViewModel() {
       categoryState,
       filtersOpen,
       selectedCategory: query.category,
+      selectedFacets: query.facets,
       actions: {
         updateCategoryFilter: actions.updateCategoryFilter,
+        toggleFacetFilter: actions.toggleFacetFilter,
         keepDesktopFiltersOpen,
         syncFiltersOpenFromToggle,
       },
@@ -115,6 +134,7 @@ export function useProductExplorerViewModel() {
         hasActiveFilters,
         query,
         selectedCategoryName,
+        selectedFacetChips,
         selectedVendorOptions,
         totalItems,
         vendorOptions,
@@ -139,6 +159,7 @@ export function useProductExplorerViewModel() {
           clearVendors: () => actions.updateQuery({ vendors: DEFAULT_QUERY.vendors }),
           draftChange: setDraft,
           pageSizeChange: (pageSize: number) => actions.updateQuery({ pageSize }),
+          removeFacet: actions.toggleFacetFilter,
           resetFilters: actions.resetFilters,
           sortChange: (sort: typeof query.sort) => actions.updateQuery({ sort }),
           statusChange: (status: typeof query.status) => actions.updateQuery({ status }),

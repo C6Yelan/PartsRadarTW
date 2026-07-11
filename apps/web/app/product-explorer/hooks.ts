@@ -4,6 +4,7 @@
 import { type MouseEvent, useCallback, useEffect, useRef, useState } from "react";
 import {
   DEFAULT_QUERY,
+  normalizeFacetValues,
   normalizeVendorValues,
   PAGE_SIZE_OPTIONS,
   readQueryFromLocation,
@@ -43,6 +44,7 @@ export function useProductExplorerQuery() {
     (nextQuery: QueryState, options?: { draftQuery?: QueryState; replace?: boolean }) => {
       const normalizedQuery = {
         ...nextQuery,
+        facets: normalizeFacetValues(nextQuery.facets, nextQuery.category),
         vendors: normalizeVendorValues(nextQuery.vendors, nextQuery.category),
         page: Math.max(1, nextQuery.page),
         pageSize: PAGE_SIZE_OPTIONS.includes(

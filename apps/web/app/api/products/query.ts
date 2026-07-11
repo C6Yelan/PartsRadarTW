@@ -2,6 +2,10 @@
 // 定義商品列表 API 的 public query contract，集中驗證篩選、排序、品牌與分頁語意。
 
 import type { Prisma } from "@partsradar/db";
+import {
+  isProductFilterTagSupported,
+  parseProductFilterTag,
+} from "@partsradar/shared";
 
 import { getCategoryIgrp, getCategorySlug } from "../../category-slugs";
 import {
@@ -16,6 +20,8 @@ import type { ProductVendorRecord } from "./data";
 const PRODUCT_SEARCH_MAX_LENGTH = 100;
 const PRODUCT_CATEGORY_MAX_LENGTH = 50;
 const PRODUCT_VENDOR_QUERY_MAX_LENGTH = 300;
+const PRODUCT_FACET_MAX_COUNT = 50;
+const PRODUCT_FACET_MAX_LENGTH = 100;
 const PRODUCT_VENDOR_VALUE_PATTERN = /^[a-z0-9-]+$/;
 const PRODUCT_SORT_VALUES = [
   "price_asc",
@@ -43,6 +49,7 @@ export interface ProductListQuery {
   status: ProductStatus;
   sort: ProductSort;
   vendors: string[];
+  facetTags: string[];
   page: number;
   pageSize: number;
 }
@@ -66,6 +73,7 @@ export function parseProductListQuery(params: URLSearchParams): ProductListQuery
     status: parseEnumQuery(params, "status", PRODUCT_STATUS_VALUES, "active"),
     sort: parseEnumQuery(params, "sort", PRODUCT_SORT_VALUES, "price_asc"),
     vendors: parseVendorQuery(params, igrp),
+    facetTags: parseFacetQuery(params, igrp),
     page: pagination.page,
     pageSize: pagination.pageSize,
   };
@@ -98,6 +106,7 @@ export function buildProductWhere(
   }
 
   const andConditions = buildProductSearchWhere(query.q);
+  andConditions.push(...buildFacetWhere(query.facetTags));
   const vendorWhere = options.includeVendors ? buildVendorWhere(query) : null;
 
   if (vendorWhere) {
@@ -243,6 +252,68 @@ function parseVendorQuery(params: URLSearchParams, igrp: number | undefined): st
   }
 
   return vendors;
+}
+
+function parseFacetQuery(params: URLSearchParams, igrp: number | undefined): string[] {
+  const rawTags = params.getAll("facet");
+
+  if (rawTags.length === 0) {
+    return [];
+  }
+
+  if (igrp === undefined) {
+    throw new InvalidQueryError("facet", "requires category");
+  }
+
+  if (rawTags.length > PRODUCT_FACET_MAX_COUNT) {
+    throw new InvalidQueryError(
+      "facet",
+      `must be provided ${PRODUCT_FACET_MAX_COUNT} times or fewer`,
+    );
+  }
+
+  const tags = rawTags.map((tag) => tag.trim());
+
+  if (tags.some((tag) => tag.length === 0 || tag.length > PRODUCT_FACET_MAX_LENGTH)) {
+    throw new InvalidQueryError(
+      "facet",
+      `must contain non-empty values of ${PRODUCT_FACET_MAX_LENGTH} characters or fewer`,
+    );
+  }
+
+  if (new Set(tags).size !== tags.length) {
+    throw new InvalidQueryError("facet", "must contain unique values");
+  }
+
+  for (const tag of tags) {
+    if (!isProductFilterTagSupported(igrp, tag)) {
+      throw new InvalidQueryError("facet", "must be supported by the selected category");
+    }
+  }
+
+  return tags;
+}
+
+function buildFacetWhere(facetTags: string[]): Prisma.ProductWhereInput[] {
+  const tagsByKey = new Map<string, string[]>();
+
+  for (const tag of facetTags) {
+    const parsedTag = parseProductFilterTag(tag);
+
+    if (!parsedTag) {
+      throw new InvalidQueryError("facet", "must use the key:value format");
+    }
+
+    const tags = tagsByKey.get(parsedTag.key) ?? [];
+    tags.push(tag);
+    tagsByKey.set(parsedTag.key, tags);
+  }
+
+  return [...tagsByKey.values()].map((tags) => ({
+    filterTags: {
+      hasSome: tags,
+    },
+  }));
 }
 
 function parseCategoryIgrp(params: URLSearchParams): number | undefined {

@@ -1,6 +1,7 @@
 // apps/web/tests/api/categories/handler.test.ts
 // 驗證公開分類 API handler 的 enabled 篩選、來源排序、response shape 與安全錯誤回應。
 
+import { getProductFacetDefinitions } from "@partsradar/shared";
 import { describe, expect, it } from "vitest";
 
 import { API_ERROR_MESSAGES } from "../../../app/api/_shared/responses";
@@ -51,12 +52,14 @@ describe("GET /api/categories handler", () => {
           slug: "cpu",
           displayName: "CPU",
           sourceName: "處理器 CPU",
+          facets: getProductFacetDefinitions(4),
         },
         {
           id: "category-5",
           slug: "motherboard",
           displayName: "主機板",
           sourceName: "主機板 MB",
+          facets: getProductFacetDefinitions(5),
         },
       ],
     });

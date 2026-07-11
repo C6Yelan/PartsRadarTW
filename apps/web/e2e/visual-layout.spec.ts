@@ -52,6 +52,24 @@ test.beforeEach(async ({ page }) => {
             slug: "gpu",
             displayName: product.category.displayName,
             sourceName: product.category.sourceName,
+            facets: [
+              {
+                key: "gpu_chip",
+                label: "GPU 晶片",
+                options: [
+                  { value: "nvidia", label: "NVIDIA" },
+                  { value: "amd", label: "AMD" },
+                ],
+              },
+              {
+                key: "vram_gb",
+                label: "顯示記憶體",
+                options: [
+                  { value: "8", label: "8 GB" },
+                  { value: "16", label: "16 GB" },
+                ],
+              },
+            ],
           },
         ],
       });
@@ -158,6 +176,28 @@ test("captures the main pages without horizontal overflow", async ({ page }, tes
   await page.goto("/?category=gpu&page=10");
   await expect(page.getByRole("region", { name: "商品列表" })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "頁碼" })).toBeVisible();
+
+  if ((page.viewportSize()?.width ?? 0) <= 760) {
+    await page.locator(".filter-panel summary").click();
+    await expect(page.locator(".filter-panel details")).toHaveAttribute("open", "");
+  }
+
+  await page.getByRole("checkbox", { name: "NVIDIA" }).check();
+  await page.getByRole("checkbox", { name: "16 GB" }).check();
+  await expect
+    .poll(() => new URL(page.url()).searchParams.getAll("facet"))
+    .toEqual(["gpu_chip:nvidia", "vram_gb:16"]);
+  await expect(
+    page.getByRole("button", {
+      name: "移除篩選：GPU 晶片：NVIDIA",
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", {
+      name: "移除篩選：顯示記憶體：16 GB",
+    }),
+  ).toBeVisible();
+
   await page.getByRole("searchbox", { name: "搜尋商品名稱" }).focus();
   await captureLayout(page, testInfo, "home");
 
@@ -251,6 +291,10 @@ async function captureLayout(page: Page, testInfo: TestInfo, name: string) {
 function expectedViewport(projectName: string) {
   if (projectName === "chromium-desktop") {
     return { width: 1440, height: 900 };
+  }
+
+  if (projectName === "chromium-tablet") {
+    return { width: 1024, height: 768 };
   }
 
   if (projectName === "chromium-mobile") {

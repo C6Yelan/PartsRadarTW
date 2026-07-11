@@ -1,6 +1,7 @@
 // apps/web/app/product-explorer/types.ts
 // 定義商品探索頁使用的 public API response、UI load state 與 URL query 狀態型別。
 
+import type { ProductFacetDefinition } from "@partsradar/shared";
 import type { CategorySlug } from "../category-slugs";
 
 // 來源資料新鮮度狀態，對應 products API meta.sourceStatus。
@@ -26,6 +27,7 @@ export interface CategoryItem {
   slug: CategorySlug;
   displayName: string;
   sourceName: string;
+  facets: readonly ProductFacetDefinition[];
 }
 
 // 商品列表 API 回傳項目，供列表列項、商品詳細連結與配單 intent 操作使用。
@@ -68,6 +70,11 @@ export interface ProductVendorOption {
   name: string;
 }
 
+export interface SelectedFacetChip {
+  tag: string;
+  label: string;
+}
+
 // 商品列表 API response contract，包含列表資料、分頁資訊與本次查詢的 meta。
 export interface ProductsResponse {
   data: ProductListItem[];
@@ -88,6 +95,7 @@ export interface ProductsResponse {
 export interface QueryState {
   q: string;
   category: string;
+  facets: string[];
   minPrice: string;
   maxPrice: string;
   status: ProductStatus;

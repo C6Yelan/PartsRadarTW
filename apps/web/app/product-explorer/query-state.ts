@@ -1,6 +1,10 @@
 // apps/web/app/product-explorer/query-state.ts
 // 集中商品探索頁的 URL query、API search params、篩選選項與分頁狀態轉換規則。
 
+import {
+  getProductFacetDefinitions,
+  isProductFilterTagSupported,
+} from "@partsradar/shared";
 import { getCategoryIgrp, getCategorySlug } from "../category-slugs";
 import type { CategoryItem, ProductSort, ProductStatus, QueryState } from "./types";
 
@@ -8,6 +12,7 @@ import type { CategoryItem, ProductSort, ProductStatus, QueryState } from "./typ
 export const DEFAULT_QUERY: QueryState = {
   q: "",
   category: "",
+  facets: [],
   minPrice: "",
   maxPrice: "",
   status: "active",
@@ -49,6 +54,7 @@ export function readQueryFromSearchParams(params: URLSearchParams): QueryState {
   return {
     q: (params.get("q") ?? "").trim().slice(0, 100),
     category,
+    facets: normalizeFacetValues(params.getAll("facet"), category),
     minPrice: parsePriceParam(params.get("minPrice")) ?? "",
     maxPrice: parsePriceParam(params.get("maxPrice")) ?? "",
     status: parseAllowedValue(params.get("status"), ["active", "inactive", "all"], "active"),
@@ -71,6 +77,7 @@ export function toApiSearchParams(query: QueryState) {
 
   appendIfPresent(params, "q", query.q);
   appendIfPresent(params, "category", query.category);
+  appendFacets(params, query.facets);
   appendIfPresent(params, "minPrice", query.minPrice);
   appendIfPresent(params, "maxPrice", query.maxPrice);
   appendVendorsIfPresent(params, query.vendors);
@@ -88,6 +95,7 @@ export function toUrl(query: QueryState) {
 
   appendIfPresent(params, "q", query.q);
   appendIfPresent(params, "category", query.category);
+  appendFacets(params, query.facets);
   appendIfPresent(params, "minPrice", query.minPrice);
   appendIfPresent(params, "maxPrice", query.maxPrice);
   appendVendorsIfPresent(params, query.vendors);
@@ -172,6 +180,32 @@ export function normalizeVendorValues(vendors: string[], category: string | null
   return normalizedVendors;
 }
 
+export function normalizeFacetValues(
+  facets: string[],
+  category: string | null | undefined,
+): string[] {
+  if (!category) {
+    return [];
+  }
+
+  const igrp = getCategoryIgrp(category);
+  if (igrp === null) {
+    return [];
+  }
+
+  const selectedFacets = new Set(
+    facets
+      .map((facet) => facet.trim())
+      .filter((facet) => isProductFilterTagSupported(igrp, facet)),
+  );
+
+  return getProductFacetDefinitions(igrp).flatMap((definition) =>
+    definition.options
+      .map((option) => `${definition.key}:${option.value}`)
+      .filter((tag) => selectedFacets.has(tag)),
+  );
+}
+
 // 回首頁或重設時選擇可用分類；沒有分類資料時保留呼叫端提供的 fallback。
 export function getFallbackCategorySlug(categories: CategoryItem[], fallback: string) {
   return categories.length > 0 ? categories[0].slug : fallback;
@@ -205,6 +239,12 @@ function appendIfPresent(params: URLSearchParams, name: string, value: string) {
 
   if (trimmed) {
     params.set(name, trimmed);
+  }
+}
+
+function appendFacets(params: URLSearchParams, facets: string[]) {
+  for (const facet of facets) {
+    params.append("facet", facet);
   }
 }
 

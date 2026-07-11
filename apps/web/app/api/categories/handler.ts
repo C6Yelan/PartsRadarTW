@@ -1,6 +1,11 @@
 // apps/web/app/api/categories/handler.ts
 // 處理公開分類 API 的 enabled sourceCategory 讀取、slug mapping 與安全 JSON 回應。
 
+import {
+  getProductFacetDefinitions,
+  type ProductFacetDefinition,
+} from "@partsradar/shared";
+
 import { getCategorySlug, type CategorySlug } from "../../category-slugs";
 import { internalErrorResponse, jsonOk } from "../_shared/responses";
 
@@ -37,6 +42,7 @@ interface CategoryResponseItem {
   slug: CategorySlug;
   displayName: string;
   sourceName: string;
+  facets: readonly ProductFacetDefinition[];
 }
 
 interface CategoriesResponseBody {
@@ -80,5 +86,6 @@ function toCategoryResponseItem(category: CategoryRecord): CategoryResponseItem 
     slug,
     displayName: category.displayName,
     sourceName: category.sourceName,
+    facets: getProductFacetDefinitions(category.igrp),
   };
 }
