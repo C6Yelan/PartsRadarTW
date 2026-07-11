@@ -1,4 +1,5 @@
 // playwright.config.ts
+// 定義 desktop／mobile 瀏覽器矩陣與隔離的本機測試伺服器。
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { defineConfig, devices } from "@playwright/test";
@@ -47,6 +48,7 @@ export default defineConfig({
     },
     {
       name: "chromium-mobile",
+      grepInvert: /@desktop-only/,
       use: {
         ...devices["Pixel 7"],
         viewport: { width: 390, height: 844 },

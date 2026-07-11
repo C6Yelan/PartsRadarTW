@@ -1,20 +1,20 @@
 // apps/web/e2e/visual-layout.spec.ts
-// 以本地 mock API 驗證 G18 指定 viewport 的主要頁面、focus、空狀態與水平 overflow。
+// 以本地 mock API 驗證指定 viewport 的主要頁面、focus、空狀態與水平 overflow。
 
-import { expect, type Page, type Route, type TestInfo, test } from "@playwright/test";
+import { expect, type Locator, type Page, type Route, type TestInfo, test } from "@playwright/test";
 import { expectImagesLoaded } from "./support/images";
 
 const visualBaseUrl = new URL(process.env.E2E_BASE_URL ?? "http://127.0.0.1:3100");
 const isLoopback = ["127.0.0.1", "localhost", "::1"].includes(visualBaseUrl.hostname);
 
 const PRODUCT_ID = "11111111-1111-4111-8111-111111111111";
-const READY_ROUTE_SLUG = "g18-ready-product";
-const ERROR_ROUTE_SLUG = "g18-error-product";
+const READY_ROUTE_SLUG = "visual-ready-product";
+const ERROR_ROUTE_SLUG = "visual-error-product";
 const OBSERVED_AT = "2026-07-10T08:00:00.000Z";
 
 const product = {
   id: PRODUCT_ID,
-  name: "G18 視覺驗證顯示卡 RTX",
+  name: "視覺驗證顯示卡 RTX",
   category: {
     id: "33333333-3333-4333-8333-333333333333",
     igrp: 12,
@@ -30,7 +30,7 @@ const product = {
   },
   source: {
     name: "coolpc",
-    url: "https://coolpc.invalid/products/g18",
+    url: "https://coolpc.invalid/products/visual-layout",
   },
   status: {
     isActive: true,
@@ -39,7 +39,7 @@ const product = {
 };
 
 test.beforeEach(async ({ page }) => {
-  test.skip(!isLoopback, "G18 visual-layout evidence only runs against a loopback web server.");
+  test.skip(!isLoopback, "Visual layout tests only run against a loopback web server.");
 
   await page.route("**/api/**", async (route) => {
     const requestUrl = new URL(route.request().url());
@@ -85,7 +85,7 @@ test.beforeEach(async ({ page }) => {
         meta: {
           sourceStatus: "ok",
           lastSuccessAt: OBSERVED_AT,
-          vendors: [{ slug: "g18-vendor", name: "G18 Vendor" }],
+          vendors: [{ slug: "visual-vendor", name: "Visual Vendor" }],
         },
       });
       return;
@@ -218,6 +218,24 @@ test("keeps error and empty states usable", async ({ page }) => {
   await expectNoHorizontalOverflow(page);
 });
 
+test("suppresses authored transitions when reduced motion is requested", {
+  tag: "@desktop-only",
+}, async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/");
+
+  expect(
+    await page.evaluate(() => window.matchMedia("(prefers-reduced-motion: reduce)").matches),
+  ).toBe(true);
+  await expectTransitionDurationAtMost(page.getByRole("searchbox", { name: "搜尋商品名稱" }), 0.01);
+
+  await page.goto(`/products/${READY_ROUTE_SLUG}`);
+  const copyButton = page.getByRole("button", { name: "複製商品連結" });
+  await expect(copyButton).toBeVisible();
+  await expectTransitionDurationAtMost(copyButton, 0.01);
+  await expectTransitionDurationAtMost(copyButton.locator(".detail-action-icon"), 0.01);
+});
+
 async function captureLayout(page: Page, testInfo: TestInfo, name: string) {
   const viewport = expectedViewport(testInfo.project.name);
   expect(page.viewportSize()).toEqual(viewport);
@@ -239,7 +257,7 @@ function expectedViewport(projectName: string) {
     return { width: 390, height: 844 };
   }
 
-  throw new Error(`No G18 viewport is defined for Playwright project: ${projectName}`);
+  throw new Error(`No viewport is defined for Playwright project: ${projectName}`);
 }
 
 async function expectFocusedControlToBeVisible(page: Page) {
@@ -263,6 +281,20 @@ async function expectNoHorizontalOverflow(page: Page) {
   }));
 
   expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth);
+}
+
+async function expectTransitionDurationAtMost(locator: Locator, maximumMs: number) {
+  const durationsMs = await locator.evaluate((element) =>
+    window
+      .getComputedStyle(element)
+      .transitionDuration.split(",")
+      .map((duration) => duration.trim())
+      .map((duration) =>
+        duration.endsWith("ms") ? Number.parseFloat(duration) : Number.parseFloat(duration) * 1_000,
+      ),
+  );
+
+  expect(Math.max(...durationsMs)).toBeLessThanOrEqual(maximumMs);
 }
 
 async function fulfillJson(route: Route, body: unknown) {

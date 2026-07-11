@@ -14,7 +14,9 @@ interface ProductListResponse {
 }
 
 test.describe("public web smoke", () => {
-  test("does not expose the removed internal ops route", async ({ request }) => {
+  test("does not expose the removed internal ops route", { tag: "@desktop-only" }, async ({
+    request,
+  }) => {
     const response = await request.get("/ops/status");
 
     expect(response.status()).toBe(404);
@@ -160,7 +162,9 @@ test.describe("public web smoke", () => {
 });
 
 test.describe("public API smoke", () => {
-  test("checks public data and rate-limit headers", async ({ request }) => {
+  test("checks public data and rate-limit headers", { tag: "@desktop-only" }, async ({
+    request,
+  }) => {
     const sourceStatus = await request.get("/api/source-status");
     expect(sourceStatus.status()).toBe(200);
     await expectJsonShape(sourceStatus, ["status"]);
@@ -177,9 +181,9 @@ test.describe("public API smoke", () => {
     await expectJsonShape(products, ["data", "pagination"]);
   });
 
-  test("checks product detail, price history, and image API when a product exists", async ({
-    request,
-  }) => {
+  test("checks product detail, price history, and image API when a product exists", {
+    tag: "@desktop-only",
+  }, async ({ request }) => {
     const product = await fetchFirstProduct(request);
     if (!product) {
       test.skip(true, "No product exists in this environment.");

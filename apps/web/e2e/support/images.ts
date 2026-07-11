@@ -1,5 +1,5 @@
 // apps/web/e2e/support/images.ts
-// 等待 lazy-loaded 圖片取得有效內容，供 smoke 與視覺證據測試共用。
+// 等待 lazy-loaded 圖片取得有效內容，供 smoke 與視覺版面測試共用。
 
 import { expect, type Locator } from "@playwright/test";
 
