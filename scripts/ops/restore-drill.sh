@@ -11,10 +11,16 @@ if [[ -z "$BACKUP_PATH" ]]; then
   BACKUP_PATH="$(find "$BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d | sort | tail -n 1)"
 fi
 
-if [[ -z "$BACKUP_PATH" || ! -f "$BACKUP_PATH/postgres.dump" ]]; then
-  echo "Backup directory with postgres.dump was not found." >&2
+if [[ -z "$BACKUP_PATH" || ! -f "$BACKUP_PATH/postgres.dump" || ! -f "$BACKUP_PATH/SHA256SUMS" ]]; then
+  echo "Backup directory with postgres.dump and SHA256SUMS was not found." >&2
   exit 1
 fi
+
+echo "Verifying backup checksums..."
+(
+  cd "$BACKUP_PATH"
+  sha256sum --check SHA256SUMS
+)
 
 POSTGRES_DB_NAME="$(docker compose exec -T postgres sh -c 'printf "%s" "$POSTGRES_DB"')"
 DRILL_DB="${RESTORE_DRILL_DB:-${POSTGRES_DB_NAME}_restore_drill}"
@@ -30,6 +36,16 @@ validate_identifier() {
 }
 
 validate_identifier "$DRILL_DB" "RESTORE_DRILL_DB"
+
+if [[
+  "$DRILL_DB" == "$POSTGRES_DB_NAME" ||
+    "$DRILL_DB" == "postgres" ||
+    "$DRILL_DB" == "template0" ||
+    "$DRILL_DB" == "template1"
+]]; then
+  echo "RESTORE_DRILL_DB must not name the production or a PostgreSQL system database: $DRILL_DB" >&2
+  exit 1
+fi
 
 echo "Restoring $BACKUP_PATH/postgres.dump into temporary database $DRILL_DB..."
 docker compose exec -T postgres sh -c \
