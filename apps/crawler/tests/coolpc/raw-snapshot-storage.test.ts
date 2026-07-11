@@ -1,7 +1,7 @@
 // apps/crawler/tests/coolpc/raw-snapshot-storage.test.ts
 // 驗證 raw snapshot storage allowlist、symlink 防護與 feature-local mutation lock。
 
-import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, symlink, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -307,6 +307,35 @@ describe("raw snapshot mutation lock", () => {
     await expect(
       tryAcquireRawSnapshotMutationLock({ mutationRoot, owner: "second-writer" }),
     ).resolves.toBeNull();
+  });
+
+  it("reclaims an expired lock with corrupt metadata using the directory lease", async () => {
+    const mutationRoot = await createTempRoot();
+    const lockDir = join(mutationRoot, ".locks", "raw-snapshot-mutation");
+    const expiredAt = new Date("2026-07-10T00:00:00.000Z");
+    await mkdir(lockDir, { recursive: true });
+    await writeFile(join(lockDir, "lock.json"), "{", "utf8");
+    await utimes(lockDir, expiredAt, expiredAt);
+
+    const replacementLock = await tryAcquireRawSnapshotMutationLock({
+      mutationRoot,
+      owner: "replacement-writer",
+      staleSeconds: 60,
+      now: () => new Date("2026-07-10T00:02:00.000Z"),
+    });
+
+    expect(replacementLock).not.toBeNull();
+    const metadata = JSON.parse(await readFile(join(lockDir, "lock.json"), "utf8")) as Record<
+      string,
+      unknown
+    >;
+
+    expect(metadata).toMatchObject({
+      owner: "replacement-writer",
+      token: expect.any(String),
+      acquiredAt: "2026-07-10T00:02:00.000Z",
+    });
+    await replacementLock?.release();
   });
 
   it("rejects a lock parent symlink outside the mutation root", async () => {

@@ -1,7 +1,8 @@
 // apps/crawler/tests/scripts/ops/external-fetch-lock.test.ts
 // 驗證外部來源抓取鎖的互斥取得與釋放流程。
 
-import { lstat, mkdir, rm, utimes, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { lstat, mkdir, rename, rm, utimes, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { tryAcquireExternalFetchLock } from "../../../src/scripts/ops/external-fetch-lock";
@@ -51,6 +52,41 @@ describe("external fetch lock", () => {
 
     expect(acquiredLocks).toHaveLength(1);
     await expect(lstat(guardDir)).rejects.toMatchObject({ code: "ENOENT" });
+    await acquiredLocks[0]?.release();
+  });
+
+  it("fails closed while a matching corrupt retired tombstone is occupied", async () => {
+    const { workspaceRoot } = await testEnv.createWorkspace();
+    const lockDir = join(workspaceRoot, "external-fetch.lock");
+    const guardDir = `${lockDir}.state-guard`;
+    const guardToken = "occupied-retired-tombstone";
+    const acquiredAt = "2000-01-01T00:00:00.000Z";
+    const identity = createHash("sha256").update(`token:${guardToken}`).digest("hex");
+    const retiredDir = `${guardDir}.retired-${identity}`;
+    await mkdir(guardDir);
+    await writeFile(
+      join(guardDir, "guard.json"),
+      `${JSON.stringify({ token: guardToken, pid: 0, acquiredAt })}\n`,
+      "utf8",
+    );
+    await mkdir(retiredDir);
+    await writeFile(join(retiredDir, "retired.json"), "{", "utf8");
+
+    let settledCount = 0;
+    const acquisitions = Array.from({ length: 8 }, (_, index) =>
+      tryAcquireExternalFetchLock({ lockDir, owner: `contender-${index}` }).finally(() => {
+        settledCount += 1;
+      }),
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    const settledBeforeUnblock = settledCount;
+    await rename(retiredDir, join(workspaceRoot, "blocked-retired-tombstone-fixture"));
+    const locks = await Promise.all(acquisitions);
+    const acquiredLocks = locks.filter((lock) => lock !== null);
+
+    expect(settledBeforeUnblock).toBe(0);
+    expect(acquiredLocks).toHaveLength(1);
     await acquiredLocks[0]?.release();
   });
 
