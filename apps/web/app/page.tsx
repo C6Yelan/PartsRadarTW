@@ -3,13 +3,21 @@
 
 import { Suspense } from "react";
 
+import {
+  findActivePinnedAnnouncement,
+  PUBLIC_ANNOUNCEMENTS,
+} from "./announcements/data";
 import ProductExplorer from "./product-explorer/ProductExplorer";
+
+export const revalidate = 3600;
 
 // 呈現商品查詢首頁，讓 URL query 驅動的探索介面在 client 端完成初始化。
 export default function HomePage() {
+  const announcement = findActivePinnedAnnouncement(PUBLIC_ANNOUNCEMENTS, new Date());
+
   return (
     <Suspense fallback={<div className="page-loading">載入查詢工具</div>}>
-      <ProductExplorer />
+      <ProductExplorer announcement={announcement} />
     </Suspense>
   );
 }

@@ -236,7 +236,10 @@ test.beforeEach(async ({ page }) => {
 
 test("captures the main pages without horizontal overflow", async ({ page }, testInfo) => {
   await page.goto("/?category=gpu&page=10");
-  await expect(page.getByRole("link", { name: "價格變動總覽" })).toBeVisible();
+  await expect(page.getByRole("status", { name: "網站公告" })).toBeVisible();
+  await expect(
+    page.locator(".topbar").getByRole("link", { name: "價格變動總覽" }),
+  ).toBeVisible();
   await expect(page.getByRole("region", { name: "商品列表" })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "頁碼" })).toBeVisible();
 
@@ -272,6 +275,22 @@ test("captures the main pages without horizontal overflow", async ({ page }, tes
   await page.getByRole("combobox", { name: "時間範圍" }).focus();
   await captureLayout(page, testInfo, "price-report");
 
+  await page.goto("/privacy");
+  await expect(
+    page.getByRole("heading", { exact: true, name: "隱私權政策" }),
+  ).toBeVisible();
+  await expect(page.getByText(/localStorage/)).toBeVisible();
+  await page.getByRole("link", { name: "返回查詢" }).focus();
+  await captureLayout(page, testInfo, "privacy");
+
+  await page.goto("/announcements");
+  await expect(
+    page.getByRole("heading", { exact: true, name: "網站公告" }),
+  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "網站公開測試中" })).toBeVisible();
+  await page.getByRole("link", { name: "返回查詢" }).focus();
+  await captureLayout(page, testInfo, "announcements");
+
   await page.goto(`/products/${READY_ROUTE_SLUG}`);
   await expect(page.getByRole("heading", { name: product.name })).toBeVisible();
   await expect(page.getByRole("heading", { name: "價格走勢" })).toBeVisible();
@@ -302,7 +321,9 @@ test("captures the main pages without horizontal overflow", async ({ page }, tes
     { productId: PRODUCT_ID, observedAt: OBSERVED_AT },
   );
   await page.goto("/build-list");
-  await expect(page.getByRole("link", { name: "價格變動總覽" })).toBeVisible();
+  await expect(
+    page.locator(".topbar").getByRole("link", { name: "價格變動總覽" }),
+  ).toBeVisible();
   await expect(page.getByRole("heading", { name: product.name })).toBeVisible();
   await page.getByRole("link", { name: "原價屋查看／購買，開新分頁" }).focus();
   await captureLayout(page, testInfo, "build-list");

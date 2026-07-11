@@ -28,6 +28,16 @@ test.describe("public web smoke", () => {
     await expect(page.getByRole("searchbox", { name: "搜尋商品名稱" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Discord 通知" })).toBeVisible();
     await expect(page.getByRole("region", { name: "商品列表" })).toBeVisible();
+    await expect(page.getByRole("status", { name: "網站公告" })).toBeVisible();
+
+    const homepageFooter = page.getByRole("contentinfo");
+    await expect(homepageFooter.getByRole("link", { name: "關於本站" })).toBeVisible();
+    await expect(homepageFooter.getByRole("link", { name: "隱私權政策" })).toBeVisible();
+    await expect(homepageFooter.getByRole("link", { name: "使用條款" })).toBeVisible();
+    await expect(homepageFooter.getByRole("link", { name: "公告" })).toBeVisible();
+    await expect(
+      homepageFooter.getByRole("link", { name: "價格變動總覽" }),
+    ).toBeVisible();
 
     await page.goto("/build-list");
     await expect(page.getByRole("heading", { exact: true, name: "配單" })).toBeVisible();
@@ -64,6 +74,42 @@ test.describe("public web smoke", () => {
     await expect(page.getByRole("img", { name: "公開價格報告管理面板截圖" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "常見問題" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "一般成員能用哪些指令？" })).toBeVisible();
+  });
+
+  test("loads the public information pages", async ({ page }) => {
+    await page.goto("/about");
+    await expect(
+      page.getByRole("heading", { exact: true, name: "關於本站" }),
+    ).toBeVisible();
+    await expect(
+      page.locator("main").getByText(/商品名稱、分類、價格與來源連結整理自原價屋公開頁面/),
+    ).toBeVisible();
+
+    await page.goto("/privacy");
+    await expect(
+      page.getByRole("heading", { exact: true, name: "隱私權政策" }),
+    ).toBeVisible();
+    await expect(page.getByText(/localStorage/)).toBeVisible();
+
+    await page.goto("/terms");
+    await expect(
+      page.getByRole("heading", { exact: true, name: "使用條款" }),
+    ).toBeVisible();
+    await expect(page.getByText(/非官方、非商業/).first()).toBeVisible();
+
+    await page.goto("/announcements");
+    await expect(
+      page.getByRole("heading", { exact: true, name: "網站公告" }),
+    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "網站公開測試中" })).toBeVisible();
+
+    const announcementsFooter = page.getByRole("contentinfo");
+    await expect(
+      announcementsFooter.getByRole("link", { name: "隱私權政策" }),
+    ).toBeVisible();
+    await expect(
+      announcementsFooter.getByRole("link", { name: "使用條款" }),
+    ).toBeVisible();
   });
 
   test("replaces a legacy category query with its semantic URL", async ({ page }) => {
