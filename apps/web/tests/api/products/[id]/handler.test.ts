@@ -1,13 +1,11 @@
 // apps/web/tests/api/products/[id]/handler.test.ts
-// 驗證商品詳細 API handler 的公開 response shape、購買連結重建、link health 與安全錯誤回應。
+// 驗證商品詳細 API handler 的公開 response shape、購買連結重建、availability 與安全錯誤回應。
 
 import { describe, expect, it } from "vitest";
 
 import { API_ERROR_MESSAGES } from "../../../../app/api/_shared/responses";
-import {
-  createGetProductHandler,
-  type ProductDetailReadClient,
-} from "../../../../app/api/products/[id]/handler";
+import type { ProductDetailReadClient } from "../../../../app/api/products/[id]/data";
+import { createGetProductHandler } from "../../../../app/api/products/[id]/handler";
 
 const PRODUCT_ID = "11111111-1111-1111-1111-111111111111";
 
@@ -32,6 +30,12 @@ describe("GET /api/products/{id} handler", () => {
     });
     expect(client.lastProductFindFirstArgs?.select).toHaveProperty("ibuyToken", true);
     expect(client.lastProductFindFirstArgs?.select).not.toHaveProperty("sourceUrl");
+    expect(client.lastProductFindFirstArgs?.select).not.toHaveProperty("primaryImageCheckedAt");
+    expect(client.lastProductFindFirstArgs?.select).not.toHaveProperty("missingSince");
+    expect(client.lastProductFindFirstArgs?.select).not.toHaveProperty("firstSeenAt");
+    expect(client.lastProductFindFirstArgs?.select.currentPrice?.select).not.toHaveProperty(
+      "priceChangedAt",
+    );
     expect(body).toEqual({
       id: PRODUCT_ID,
       name: "GPU RTX 4070",
@@ -44,31 +48,27 @@ describe("GET /api/products/{id} handler", () => {
       image: {
         url: `/api/product-images/${PRODUCT_ID}.webp`,
         alt: "GPU RTX 4070",
-        capturedAt: "2026-05-28T11:55:00.000Z",
       },
       price: {
         amount: 6990,
         currency: "TWD",
         capturedAt: "2026-05-28T11:45:00.000Z",
         lastSeenAt: "2026-05-28T11:55:00.000Z",
-        priceChangedAt: "2026-05-28T11:45:00.000Z",
       },
       source: {
         name: "coolpc",
         url: "https://www.coolpc.com.tw/evaluate.php?iBuy=GPU-RTX-4070",
-        health: null,
       },
       status: {
         isActive: true,
-        missingSince: null,
       },
-      firstSeenAt: "2026-05-28T10:00:00.000Z",
       lastSeenAt: "2026-05-28T11:55:00.000Z",
     });
     expect(JSON.stringify(body)).not.toContain("iBuyToken");
     expect(JSON.stringify(body)).not.toContain("source_item_key");
     expect(JSON.stringify(body)).not.toContain("PHPSESSID");
     expect(body).not.toHaveProperty("introduction");
+    expect(body.source).not.toHaveProperty("health");
   });
 
   it("returns product details with a nullable image when primary image data is missing", async () => {
@@ -76,7 +76,6 @@ describe("GET /api/products/{id} handler", () => {
       fakeProductDetailClient(
         product({
           primaryImageUrl: null,
-          primaryImageCheckedAt: null,
         }),
       ),
     )(PRODUCT_ID);
@@ -96,7 +95,6 @@ describe("GET /api/products/{id} handler", () => {
       fakeProductDetailClient(
         product({
           isActive: false,
-          missingSince: new Date("2026-05-28T12:00:00.000Z"),
         }),
       ),
     )(PRODUCT_ID);
@@ -105,61 +103,6 @@ describe("GET /api/products/{id} handler", () => {
     expect(await response.json()).toMatchObject({
       status: {
         isActive: false,
-        missingSince: "2026-05-28T12:00:00.000Z",
-      },
-    });
-  });
-
-  it("returns public link health status for the current source URL", async () => {
-    const response = await createGetProductHandler(
-      fakeProductDetailClient(
-        product({
-          linkHealthChecks: [
-            {
-              linkKind: "SOURCE",
-              url: "https://www.coolpc.com.tw/evaluate.php?iBuy=GPU-RTX-4070",
-              status: "OK",
-              httpStatus: 200,
-              checkedAt: new Date("2026-05-28T12:10:00.000Z"),
-            },
-          ],
-        }),
-      ),
-    )(PRODUCT_ID);
-
-    expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({
-      source: {
-        health: {
-          status: "ok",
-          httpStatus: 200,
-          checkedAt: "2026-05-28T12:10:00.000Z",
-        },
-      },
-    });
-  });
-
-  it("ignores stale link health records for previous URLs", async () => {
-    const response = await createGetProductHandler(
-      fakeProductDetailClient(
-        product({
-          linkHealthChecks: [
-            {
-              linkKind: "SOURCE",
-              url: "https://www.coolpc.com.tw/evaluate.php?iBuy=OLD-TOKEN",
-              status: "BROKEN",
-              httpStatus: 404,
-              checkedAt: new Date("2026-05-28T12:10:00.000Z"),
-            },
-          ],
-        }),
-      ),
-    )(PRODUCT_ID);
-
-    expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({
-      source: {
-        health: null,
       },
     });
   });
@@ -246,21 +189,16 @@ function product(overrides: Partial<NonNullable<ProductRecord>> = {}): NonNullab
     ibuyToken: "GPU-RTX-4070",
     name: "GPU RTX 4070",
     primaryImageUrl: "https://www.coolpc.com.tw/eval/12/gpu-rtx-4070.jpg",
-    primaryImageCheckedAt: new Date("2026-05-28T11:55:00.000Z"),
     isActive: true,
-    missingSince: null,
-    firstSeenAt: new Date("2026-05-28T10:00:00.000Z"),
     lastSeenAt: new Date("2026-05-28T11:55:00.000Z"),
     currentPrice: {
       lastSeenAt: new Date("2026-05-28T11:55:00.000Z"),
-      priceChangedAt: new Date("2026-05-28T11:45:00.000Z"),
       priceSnapshot: {
         price: 6990,
         currency: "TWD",
         capturedAt: new Date("2026-05-28T11:45:00.000Z"),
       },
     },
-    linkHealthChecks: [],
     sourceCategory: {
       id: "category-12",
       igrp: 12,

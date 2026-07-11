@@ -3,7 +3,11 @@
 // 此檔是 ops CLI entrypoint，不是 scheduled crawler 的常態補圖流程。
 
 import type { PrismaClient } from "@partsradar/db";
-import { loadWorkspaceEnv, toSafeCliErrorMessage } from "../shared/script-utils";
+import {
+  loadWorkspaceEnv,
+  resolveWorkspaceRoot,
+  toSafeCliErrorMessage,
+} from "../shared/script-utils";
 import { parseOptions, printSummary } from "./image-cache-backfill/options";
 import { backfillImages, readCandidates } from "./image-cache-backfill/processor";
 import { createOpsLogger } from "./shared/logger";
@@ -12,11 +16,16 @@ const logger = createOpsLogger();
 
 // 載入工作區 env 與 Prisma client，執行一次手動圖片補圖並確保 DB 連線收尾。
 async function main() {
-  const options = parseOptions(process.argv.slice(2));
+  const args = process.argv.slice(2);
+
+  if (!args.includes("--help")) {
+    await loadWorkspaceEnv(resolveWorkspaceRoot());
+  }
+
+  const options = parseOptions(args);
   let client: PrismaClient | null = null;
 
   try {
-    await loadWorkspaceEnv(options.workspaceRoot);
     const db = await import("@partsradar/db");
     client = db.prisma;
 

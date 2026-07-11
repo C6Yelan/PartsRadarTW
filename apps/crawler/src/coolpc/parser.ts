@@ -2,6 +2,7 @@
 // CoolPC parser 入口，負責把分類頁 HTML 轉成 parsed products 與 issues 清單；
 // 同時重用 parser helpers 做頁面驗證、候選擷取、欄位正規化與 vendor 分類判斷。
 
+import { createCoolpcCategoryUrl } from "@partsradar/shared";
 import { load } from "cheerio";
 import { decode } from "iconv-lite";
 import { extractCoolpcProductCandidates } from "./parser/candidates";
@@ -18,7 +19,6 @@ import type {
   SourceCategoryContext,
 } from "./parser/types";
 import {
-  createCoolpcCategoryUrl,
   createCoolpcSourceProductKey,
   normalizeCoolpcProductImageUrl,
   sanitizeCoolpcSourceCategoryUrl,
@@ -26,26 +26,13 @@ import {
 import { classifyProductVendor } from "./vendor-classification";
 
 export type {
-  ContentValidationResult,
   ContentValidationStatus,
   CoolpcParseIssue,
   CoolpcParseResult,
-  CoolpcProductCandidate,
-  Currency,
   ParsedCoolpcProduct,
   ParseErrorType,
   SourceCategoryContext,
 } from "./parser/types";
-export { validateCoolpcCategoryPage } from "./parser/content-validation";
-export {
-  normalizeProductName,
-  parsePriceText,
-} from "./parser/normalization";
-export {
-  createCoolpcCategoryUrl,
-  createCoolpcSourceProductKey,
-  normalizeCoolpcProductImageUrl,
-} from "./parser/urls";
 
 // 將抓到的來源位元組資料以 Big5 解碼成字串，供 parser pipeline 後續使用。
 export function decodeCoolpcHtml(buffer: Buffer | Uint8Array, encoding = "big5"): string {
@@ -168,7 +155,7 @@ export function parseCoolpcCategoryPage(
       ibuyToken,
       sourceItemKey: sourceProductKey,
       name,
-      normalizedName: normalizeProductName(name).toLocaleLowerCase("zh-TW"),
+      normalizedName: name.toLocaleLowerCase("zh-TW"),
       vendorSlug: vendor?.slug ?? null,
       vendorName: vendor?.name ?? null,
       primaryImageUrl,

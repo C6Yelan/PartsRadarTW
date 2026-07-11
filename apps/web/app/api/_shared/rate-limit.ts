@@ -6,7 +6,7 @@ import { LRUCache } from "lru-cache";
 
 import { internalErrorResponse, rateLimitedResponse } from "./responses";
 
-export type RateLimitScope = "api:read" | "api:list" | "api:image";
+export type RateLimitScope = "api:read" | "api:list" | "api:image" | "api:build-list";
 export type ClientIdentifierSource = "cf" | "xff" | "unknown";
 
 export const RATE_LIMIT_DEFAULTS = {
@@ -93,7 +93,7 @@ export function checkRateLimit(request: Request, scope: RateLimitScope): RateLim
   };
 }
 
-// 建立可測試的 rate limiter 實例，使用固定時間窗口與 LRU bucket 控制記憶體用量。
+// 建立固定時間窗口的 rate limiter，並以 LRU bucket 限制記憶體用量。
 export function createRateLimiter(options: RateLimiterOptions = {}): RateLimiter {
   const config = options.config ?? resolveRateLimitConfig();
   const nowMs = options.nowMs ?? Date.now;
@@ -166,12 +166,13 @@ export function resolveRateLimitConfig(env: RateLimitEnv = process.env): RateLim
       "api:read": readMax,
       "api:list": listMax,
       "api:image": imageMax,
+      "api:build-list": readMax,
     },
     windowMs: windowSeconds * 1000,
   };
 }
 
-// 回傳目前 request 的 client identifier；主要供測試與 smoke 檢查確認來源判斷。
+// 解析目前 request 的 client identifier，供 rate limit 與 smoke 觀察來源判斷。
 export function getClientIdentifier(request: Request): string {
   return getClientIdentifierInfo(request).value;
 }

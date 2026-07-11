@@ -1,7 +1,18 @@
 // apps/crawler/src/scripts/ops/discord-bot/types/discord-api.ts
 // 定義 Discord REST、Gateway、message component、modal 與 interaction payload 的本地最小型別。
 
-// 可替換的 fetch 介面，讓 REST 與 interaction handler 測試能注入 mock。
+import type { DiscordDeliveryErrorCategory as DbDiscordDeliveryErrorCategory } from "@partsradar/db";
+
+export type DiscordDeliveryErrorCategory = DbDiscordDeliveryErrorCategory;
+
+// Discord delivery 失敗在 transport boundary 產生的安全結構化資料。
+export interface DiscordDeliveryFailureMetadata {
+  errorCategory: DiscordDeliveryErrorCategory;
+  httpStatus: number | null;
+  providerErrorCode: number | null;
+}
+
+// REST 與 interaction handler 共用的最小 fetch contract。
 export type FetchImpl = typeof fetch;
 
 // Discord embed 訊息欄位，供價格報告、目標價通知與設定面板共用。
@@ -117,28 +128,24 @@ export interface DiscordModalTextInputComponent {
 }
 
 // Discord 發送訊息的統一結果，區分成功、rate limit 與一般失敗。
-export type DiscordDirectMessageSendResult =
+export type DiscordMessageSendResult =
   | {
       status: "sent";
       messageCount: number;
       httpStatuses: number[];
     }
-  | {
+  | ({
       status: "rate_limited";
       messageCount: number;
       sentMessageCount: number;
       retryAfterMs: number;
       global: boolean;
-    }
-  | {
+    } & DiscordDeliveryFailureMetadata)
+  | ({
       status: "failed";
       messageCount: number;
       sentMessageCount: number;
-      httpStatus: number | null;
-      message: string;
-    };
-
-export type DiscordBotMessageSendResult = DiscordDirectMessageSendResult;
+    } & DiscordDeliveryFailureMetadata);
 
 // Discord REST 呼叫所需的共用選項。
 export interface DiscordRestOptions {
@@ -154,18 +161,16 @@ export type DiscordRestResult<T> =
       httpStatus: number;
       body: T | null;
     }
-  | {
+  | ({
       status: "rate_limited";
       httpStatus: 429;
       retryAfterMs: number;
       global: boolean;
-    }
-  | {
+    } & DiscordDeliveryFailureMetadata)
+  | ({
       status: "failed";
-      httpStatus: number | null;
-      message: string;
       retryAfterMs?: number;
-    };
+    } & DiscordDeliveryFailureMetadata);
 
 // Gateway 收到的原始 payload 外型，只保留 dispatch、sequence 與 event type 判斷所需欄位。
 export interface DiscordGatewayPayload {
@@ -212,7 +217,6 @@ export interface DiscordInteractionComponent {
   value?: unknown;
   values?: string[];
   component?: DiscordInteractionComponent;
-  components?: DiscordInteractionComponent[];
 }
 
 // Discord 使用者最小識別資料，僅保留 bot 流程需要的 user id。
@@ -225,7 +229,7 @@ export interface DiscordDirectMessageChannel {
   id?: unknown;
 }
 
-// Gateway WebSocket wrapper 的最小事件外型，讓 runtime 與測試可共用相同介面。
+// Gateway WebSocket wrapper 的最小事件 contract，隔離 runtime WebSocket 實作。
 export interface MinimalWebSocketEvent {
   data?: unknown;
 }

@@ -8,6 +8,7 @@ import {
   API_ERROR_MESSAGES,
   internalErrorResponse,
   invalidQueryResponse,
+  invalidRequestResponse,
   jsonOk,
   notFoundResponse,
   rateLimitedResponse,
@@ -33,6 +34,18 @@ describe("API response helpers", () => {
       error: {
         code: "invalid_query",
         message: API_ERROR_MESSAGES.invalidQuery,
+      },
+    });
+  });
+
+  it("uses a distinct invalid request error for body validation", async () => {
+    const response = invalidRequestResponse();
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: {
+        code: "invalid_request",
+        message: API_ERROR_MESSAGES.invalidRequest,
       },
     });
   });

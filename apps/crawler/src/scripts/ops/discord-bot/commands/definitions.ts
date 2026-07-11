@@ -5,18 +5,16 @@ import {
   DISCORD_APPLICATION_CONTEXT_BOT_DM,
   DISCORD_APPLICATION_CONTEXT_GUILD,
   DISCORD_COMMAND_TYPE_CHAT_INPUT,
-  DISCORD_OPTION_TYPE_INTEGER,
   DISCORD_OPTION_TYPE_STRING,
   DISCORD_OPTION_TYPE_SUBCOMMAND,
   DISCORD_PERMISSION_MANAGE_GUILD,
-  MAX_PRICE_REPORT_ITEMS,
 } from "../constants";
 
-// 建立 /price-report 指令定義，包含立即產生報告與管理個人每日報告設定的子命令。
+// 建立 /price-report 指令定義，包含即時價格報告與每日私訊價格報告設定。
 export function createPriceReportCommand(): Record<string, unknown> {
   return {
     name: "price-report",
-    description: "Send PartsRadarTW price change reports.",
+    description: "查看即時價格報告並管理每日私訊價格報告。",
     type: DISCORD_COMMAND_TYPE_CHAT_INPUT,
     contexts: [DISCORD_APPLICATION_CONTEXT_GUILD, DISCORD_APPLICATION_CONTEXT_BOT_DM],
     dm_permission: true,
@@ -24,7 +22,7 @@ export function createPriceReportCommand(): Record<string, unknown> {
       {
         type: DISCORD_OPTION_TYPE_SUBCOMMAND,
         name: "now",
-        description: "立即在目前頻道或私訊顯示價格報告。",
+        description: "立即在目前頻道或私訊顯示即時價格報告。",
         options: [
           {
             type: DISCORD_OPTION_TYPE_STRING,
@@ -37,20 +35,12 @@ export function createPriceReportCommand(): Record<string, unknown> {
               { name: "過去 6 小時", value: "6h" },
             ],
           },
-          {
-            type: DISCORD_OPTION_TYPE_INTEGER,
-            name: "max_items",
-            description: "最多列出的商品數。",
-            required: false,
-            min_value: 1,
-            max_value: MAX_PRICE_REPORT_ITEMS,
-          },
         ],
       },
       {
         type: DISCORD_OPTION_TYPE_SUBCOMMAND,
         name: "settings",
-        description: "查看並管理每日價格報告設定。",
+        description: "查看並管理每日私訊價格報告設定。",
       },
     ],
   };

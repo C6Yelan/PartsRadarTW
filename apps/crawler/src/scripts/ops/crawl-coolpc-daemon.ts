@@ -3,43 +3,31 @@
 
 import type { PrismaClient } from "@partsradar/db";
 import { CRAWL_TRIGGER_TYPES, type RunCoolpcCrawlOnceResult } from "../../coolpc/crawl-run";
+import { assertSeededCategories, runCoolpcCategoryCrawl } from "../../coolpc/live-crawl";
 import {
-  assertSeededCategories,
-  runCoolpcCategoryCrawl,
-} from "../../coolpc/live-crawl";
-import { loadWorkspaceEnv, resolveWorkspaceRoot, toSafeCliErrorMessage } from "../shared/script-utils";
+  loadWorkspaceEnv,
+  resolveWorkspaceRoot,
+  toSafeCliErrorMessage,
+} from "../shared/script-utils";
 import { printHelp } from "./crawl-coolpc-daemon/help";
 import {
   handleNewProductImageBackfill,
   type NewProductImageBackfillHandler,
 } from "./crawl-coolpc-daemon/new-product-images";
+import { type CoolpcDaemonOptions, parseDaemonOptions } from "./crawl-coolpc-daemon/options";
 import {
-  parseDaemonOptions,
-  type CoolpcDaemonOptions,
-} from "./crawl-coolpc-daemon/options";
-import {
+  type ProductWriteSummaryTotals,
   printCycleSummary,
   resolveAllFetchFailedRetrySeconds,
   shouldBackoffAfter,
   summarizeProductWrites,
-  type ProductWriteSummaryTotals,
 } from "./crawl-coolpc-daemon/summary";
-import {
-  clearExternalFetchPriority,
-  requestExternalFetchPriority,
-  tryAcquireExternalFetchLock,
-} from "./external-fetch-lock";
+import { tryAcquireExternalFetchLock } from "./external-fetch-lock";
 import { createOpsLogger } from "./shared/logger";
 
 const SCHEDULED_CRAWL_USER_AGENT =
   "PartsRadarTW scheduled crawler (+https://github.com/C6Yelan/PartsRadarTW)";
 const logger = createOpsLogger();
-
-export { parseDaemonOptions } from "./crawl-coolpc-daemon/options";
-export type {
-  CoolpcDaemonOptions,
-  NewProductImageBackfillOptions,
-} from "./crawl-coolpc-daemon/options";
 
 interface ShutdownController {
   readonly requested: boolean;
@@ -98,21 +86,17 @@ async function main(): Promise<void> {
   }
 }
 
-// 執行單輪 scheduled crawl；先取得外部抓取 lock，再跑分類 crawl 與新增商品圖片補圖。
+// 執行單輪 scheduled crawl；分類抓取受 lock 保護，釋放後才處理不應延遲下一輪價格抓取的補圖。
 export async function runScheduledCycle(
   client: PrismaClient,
   options: CoolpcDaemonOptions,
   dependencies: {
     acquireLock?: typeof tryAcquireExternalFetchLock;
-    requestPriority?: typeof requestExternalFetchPriority;
-    clearPriority?: typeof clearExternalFetchPriority;
     crawlCategories?: typeof runCoolpcCategoryCrawl;
     backfillNewProductImages?: NewProductImageBackfillHandler;
   } = {},
 ): Promise<ScheduledCycleResult> {
   const acquireLock = dependencies.acquireLock ?? tryAcquireExternalFetchLock;
-  const requestPriority = dependencies.requestPriority ?? requestExternalFetchPriority;
-  const clearPriority = dependencies.clearPriority ?? clearExternalFetchPriority;
   const crawlCategories = dependencies.crawlCategories ?? runCoolpcCategoryCrawl;
   const backfillNewProductImages =
     dependencies.backfillNewProductImages ?? handleNewProductImageBackfill;
@@ -123,13 +107,8 @@ export async function runScheduledCycle(
   });
 
   if (!lock) {
-    await requestPriority({
-      lockDir: options.lockDir,
-      owner: "crawler-daemon",
-      ttlSeconds: options.prioritySignalTtlSeconds,
-    });
     log(
-      `Skipping CoolPC scheduled crawl because another external fetch task holds the lock. Requested priority retry in ${options.lockRetrySeconds}s.`,
+      `Skipping CoolPC scheduled crawl because another crawler process holds the external fetch lock. Retrying in ${options.lockRetrySeconds}s.`,
     );
 
     return {
@@ -137,11 +116,6 @@ export async function runScheduledCycle(
       retryAfterSeconds: options.lockRetrySeconds,
     };
   }
-
-  await clearPriority({
-    lockDir: options.lockDir,
-    owner: "crawler-daemon",
-  });
 
   log("Starting CoolPC scheduled crawl cycle.");
 
@@ -152,10 +126,10 @@ export async function runScheduledCycle(
   try {
     result = await crawlCategories({
       client,
+      workspaceRoot: options.workspaceRoot,
       storageDir: options.storageDir,
       triggerType: CRAWL_TRIGGER_TYPES.SCHEDULED,
       delayMs: options.categoryDelayMs,
-      baseUrl: options.baseUrl,
       fetchUserAgent: SCHEDULED_CRAWL_USER_AGENT,
       log,
     });
@@ -164,7 +138,7 @@ export async function runScheduledCycle(
     shouldBackoff = shouldBackoffAfter(result);
     printCycleSummary(result, productWriteSummary, log);
   } catch (error) {
-    log(`CoolPC scheduled crawl cycle failed: ${toSafeErrorMessage(error)}`);
+    log(`CoolPC scheduled crawl cycle failed: ${toSafeCliErrorMessage(error)}`);
 
     return {
       shouldBackoff: true,
@@ -232,24 +206,19 @@ function createShutdownController(): ShutdownController {
       }
 
       return new Promise<void>((resolve) => {
-        const timeout = setTimeout(() => {
+        const timeoutId = setTimeout(() => {
           wakeSleeper = null;
           resolve();
         }, ms);
 
         wakeSleeper = () => {
-          clearTimeout(timeout);
+          clearTimeout(timeoutId);
           wakeSleeper = null;
           resolve();
         };
       });
     },
   };
-}
-
-// 統一套用 CLI 錯誤遮蔽，避免 daemon log 直接輸出敏感 env 或連線字串。
-function toSafeErrorMessage(error: unknown): string {
-  return toSafeCliErrorMessage(error);
 }
 
 // 透過 ops logger 輸出 scheduled crawler 訊息，讓格式與其他 daemon 一致。
@@ -259,7 +228,7 @@ function log(message: string): void {
 
 if (require.main === module) {
   main().catch((error) => {
-    console.error(toSafeErrorMessage(error));
+    console.error(toSafeCliErrorMessage(error));
     process.exitCode = 1;
   });
 }

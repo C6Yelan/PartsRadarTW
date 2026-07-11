@@ -3,9 +3,10 @@
 // 呈現商品探索頁頂部品牌區、Discord 入口、全域搜尋與資料更新時間。
 
 import Link from "next/link";
-import type { FormEvent, MouseEvent } from "react";
+import type { MouseEvent, SyntheticEvent } from "react";
+import { BrandMarkIcon, ClearIcon, SearchIcon } from "../../_shared/icons";
+import { formatTaipeiDateTime } from "../../_shared/time";
 import DiscordTopbarLink from "../../DiscordTopbarLink";
-import { formatDateTime } from "../formatting";
 import type { ProductsResponse, QueryState } from "../types";
 
 // 組裝首頁頂部列，將搜尋 draft 與提交 / 清除 / 返回首頁事件交給上層控制。
@@ -22,13 +23,13 @@ export function ProductExplorerHeader({
   onClearSearchDraft: () => void;
   onReturnHome: (event: MouseEvent<HTMLAnchorElement>) => void;
   onSearchDraftChange: (value: string) => void;
-  onTextFiltersSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onTextFiltersSubmit: (event: SyntheticEvent<HTMLFormElement>) => void;
 }) {
   return (
     <header className="topbar">
       <div className="topbar-brand-area">
         <Link className="brand-lockup" href="/" onClick={onReturnHome}>
-          <span className="brand-mark" aria-hidden="true" />
+          <BrandMarkIcon />
           <span>
             <span className="brand-name">PartsRadarTW</span>
             <span className="brand-subtitle">原價屋零件查詢</span>
@@ -41,7 +42,7 @@ export function ProductExplorerHeader({
         <label className="sr-only" htmlFor="global-search">
           搜尋商品名稱
         </label>
-        <span className="search-glyph" aria-hidden="true" />
+        <SearchIcon className="search-glyph" />
         <input
           id="global-search"
           maxLength={100}
@@ -56,7 +57,9 @@ export function ProductExplorerHeader({
             className="search-clear-button"
             type="button"
             onClick={onClearSearchDraft}
-          />
+          >
+            <ClearIcon />
+          </button>
         ) : null}
         <button className="control-button primary" type="submit">
           搜尋
@@ -64,7 +67,7 @@ export function ProductExplorerHeader({
       </form>
 
       <div className="topbar-meta">
-        <span>資料最近更新：{formatDateTime(products?.meta.lastSuccessAt, "尚無資料")}</span>
+        <span>資料最近更新：{formatTaipeiDateTime(products?.meta.lastSuccessAt, "尚無資料")}</span>
       </div>
     </header>
   );

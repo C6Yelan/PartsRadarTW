@@ -1,6 +1,7 @@
 // apps/web/app/products/[id]/price-history/model.ts
 // 將價格歷史 API points 轉成摘要、圖表座標、標記與價格變動紀錄。
 
+import { formatInteger } from "../../../_shared/formatting";
 import type {
   ChartConfig,
   ChartMarker,
@@ -37,8 +38,6 @@ export function summarizePoints(points: PriceHistoryPoint[]): HistoryViewSummary
     endedAt: latest?.observedAt ?? null,
     lowest,
     highest,
-    first,
-    latest,
     averageAmount,
     rangePositionPercent,
     deltaAmount,
@@ -111,14 +110,12 @@ function createStepPath(points: ChartPoint[]) {
 
   const [firstPoint, ...restPoints] = points;
   let path = `M ${firstPoint.x} ${firstPoint.y}`;
-  let previousPoint = firstPoint;
 
   for (const point of restPoints) {
     path += ` H ${point.x} V ${point.y}`;
-    previousPoint = point;
   }
 
-  return previousPoint ? path : "";
+  return path;
 }
 
 // 建立固定三段式 Y 軸刻度，讓圖表顯示最高、中間與最低價格區間。
@@ -134,7 +131,7 @@ function createChartTicks({
   const values = [maxValue, (maxValue + minValue) / 2, minValue];
 
   return values.map((value) => ({
-    label: new Intl.NumberFormat("zh-TW", { maximumFractionDigits: 0 }).format(Math.round(value)),
+    label: formatInteger(Math.round(value)),
     y: Number(
       (
         chartConfig.padding.top +

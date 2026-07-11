@@ -9,10 +9,8 @@ import {
   DISCORD_COMPONENT_TYPE_BUTTON,
   DISCORD_COMPONENT_TYPE_LABEL,
   DISCORD_COMPONENT_TYPE_STRING_SELECT,
-  DISCORD_COMPONENT_TYPE_TEXT_DISPLAY,
   DISCORD_COMPONENT_TYPE_TEXT_INPUT,
   DISCORD_TEXT_INPUT_STYLE_SHORT,
-  MAX_PRICE_REPORT_ITEMS,
   MAX_PRICE_REPORT_KEYWORD_LENGTH,
 } from "../constants";
 import type { DiscordMessageComponent, DiscordModal } from "../types";
@@ -21,22 +19,21 @@ import {
   PRICE_REPORT_CONTENT_NEW_PRODUCTS_VALUE,
   PRICE_REPORT_CONTENT_PRICE_DROPS_VALUE,
   PRICE_REPORT_CONTENT_PRICE_RISES_VALUE,
-  PRICE_REPORT_KEYWORD_FORMAT_DESCRIPTION,
   PRICE_REPORT_SETTINGS_ALL_CATEGORIES_CUSTOM_ID,
   PRICE_REPORT_SETTINGS_CATEGORIES_CUSTOM_ID,
+  PRICE_REPORT_SETTINGS_CONTENT_FILTER_CUSTOM_ID,
   PRICE_REPORT_SETTINGS_DISABLE_CUSTOM_ID,
   PRICE_REPORT_SETTINGS_ENABLE_CUSTOM_ID,
-  PRICE_REPORT_SETTINGS_CONTENT_FILTER_CUSTOM_ID,
   PRICE_REPORT_SETTINGS_KEYWORD_CUSTOM_ID,
-  PRICE_REPORT_SETTINGS_KEYWORD_INPUT_CUSTOM_ID,
+  PRICE_REPORT_SETTINGS_KEYWORD_INPUT_CUSTOM_IDS,
   PRICE_REPORT_SETTINGS_KEYWORD_MODAL_CUSTOM_ID,
-  PRICE_REPORT_SETTINGS_MAX_ITEMS_CUSTOM_ID,
   PRICE_REPORT_SETTINGS_PREVIEW_CUSTOM_ID,
-  PRICE_REPORT_SETTINGS_TIME_CUSTOM_ID,
-  PRICE_REPORT_SETTINGS_TIME_LIMIT_CUSTOM_ID,
-  PRICE_REPORT_SETTINGS_TIME_LIMIT_MODAL_CUSTOM_ID,
+  PRICE_REPORT_SETTINGS_TIME_BUTTON_CUSTOM_ID,
+  PRICE_REPORT_SETTINGS_TIME_INPUT_CUSTOM_ID,
+  PRICE_REPORT_SETTINGS_TIME_MODAL_CUSTOM_ID,
   PRICE_REPORT_SETTINGS_WINDOW_CUSTOM_ID,
 } from "./ids";
+import { splitProductKeywordInputGroups } from "./settings-input";
 
 // 建立個人 price-report 設定面板的 select menu 與操作按鈕，對應 settings parser 的 custom_id contract。
 export function createPriceReportSettingsComponents({
@@ -64,6 +61,24 @@ export function createPriceReportSettingsComponents({
     value: String(category.igrp),
     default: allCategoriesSelected || selectedCategoryIgrps.has(category.igrp),
   }));
+  const categoryRows: DiscordMessageComponent[] =
+    categoryOptions.length === 0
+      ? []
+      : [
+          {
+            type: DISCORD_COMPONENT_TYPE_ACTION_ROW,
+            components: [
+              {
+                type: DISCORD_COMPONENT_TYPE_STRING_SELECT,
+                custom_id: PRICE_REPORT_SETTINGS_CATEGORIES_CUSTOM_ID,
+                placeholder: "分類篩選",
+                min_values: 1,
+                max_values: Math.min(PRICE_REPORT_CATEGORY_OPTION_LIMIT, categoryOptions.length),
+                options: categoryOptions,
+              },
+            ],
+          },
+        ];
 
   return [
     {
@@ -95,20 +110,8 @@ export function createPriceReportSettingsComponents({
         },
       ],
     },
-    {
-      type: DISCORD_COMPONENT_TYPE_ACTION_ROW,
-      components: [
-        {
-          type: DISCORD_COMPONENT_TYPE_STRING_SELECT,
-          custom_id: PRICE_REPORT_SETTINGS_CATEGORIES_CUSTOM_ID,
-          placeholder: "分類篩選",
-          min_values: 1,
-          max_values: Math.min(PRICE_REPORT_CATEGORY_OPTION_LIMIT, categoryOptions.length),
-          options: categoryOptions,
-        },
-      ],
-    },
-    ...(allCategoriesSelected
+    ...categoryRows,
+    ...(allCategoriesSelected || categoryOptions.length === 0
       ? []
       : [
           {
@@ -170,8 +173,8 @@ export function createPriceReportSettingsComponents({
         {
           type: DISCORD_COMPONENT_TYPE_BUTTON,
           style: DISCORD_BUTTON_STYLE_SECONDARY,
-          custom_id: PRICE_REPORT_SETTINGS_TIME_LIMIT_CUSTOM_ID,
-          label: "調整時間與上限",
+          custom_id: PRICE_REPORT_SETTINGS_TIME_BUTTON_CUSTOM_ID,
+          label: "調整時間",
         },
         {
           type: DISCORD_COMPONENT_TYPE_BUTTON,
@@ -179,50 +182,29 @@ export function createPriceReportSettingsComponents({
           custom_id: enabled
             ? PRICE_REPORT_SETTINGS_DISABLE_CUSTOM_ID
             : PRICE_REPORT_SETTINGS_ENABLE_CUSTOM_ID,
-          label: enabled ? "關閉每日報告" : "開啟每日報告",
+          label: enabled ? "關閉每日私訊價格報告" : "開啟每日私訊價格報告",
         },
       ],
     },
   ];
 }
 
-// 建立每日報告發送時間與最多商品數設定 modal，交由 modal submit parser 驗證輸入內容。
-export function createPriceReportTimeLimitModal({
-  maxItems,
-  timeValue,
-}: {
-  maxItems: number;
-  timeValue: string;
-}): DiscordModal {
+// 建立每日私訊價格報告發送時間 modal；沿用既有 wire custom_id 以相容已發出的設定面板。
+export function createPriceReportTimeModal({ timeValue }: { timeValue: string }): DiscordModal {
   return {
-    custom_id: PRICE_REPORT_SETTINGS_TIME_LIMIT_MODAL_CUSTOM_ID,
-    title: "每日報告時間與上限",
+    custom_id: PRICE_REPORT_SETTINGS_TIME_MODAL_CUSTOM_ID,
+    title: "每日私訊價格報告時間",
     components: [
-      {
-        type: DISCORD_COMPONENT_TYPE_LABEL,
-        label: "最多列出的商品數",
-        description: `1-${MAX_PRICE_REPORT_ITEMS}`,
-        component: {
-          type: DISCORD_COMPONENT_TYPE_TEXT_INPUT,
-          custom_id: PRICE_REPORT_SETTINGS_MAX_ITEMS_CUSTOM_ID,
-          style: DISCORD_TEXT_INPUT_STYLE_SHORT,
-          min_length: 1,
-          max_length: 2,
-          required: true,
-          value: String(maxItems),
-          placeholder: "50",
-        },
-      },
       {
         type: DISCORD_COMPONENT_TYPE_LABEL,
         label: "每日私訊發送時間",
         description: "台北時間 HH:mm",
         component: {
           type: DISCORD_COMPONENT_TYPE_TEXT_INPUT,
-          custom_id: PRICE_REPORT_SETTINGS_TIME_CUSTOM_ID,
+          custom_id: PRICE_REPORT_SETTINGS_TIME_INPUT_CUSTOM_ID,
           style: DISCORD_TEXT_INPUT_STYLE_SHORT,
           min_length: 4,
-          max_length: 5,
+          max_length: 9,
           required: true,
           value: timeValue,
           placeholder: "09:00",
@@ -238,27 +220,24 @@ export function createPriceReportKeywordModal({
 }: {
   keywordValue: string;
 }): DiscordModal {
+  const keywordGroups = splitProductKeywordInputGroups(keywordValue);
+
   return {
     custom_id: PRICE_REPORT_SETTINGS_KEYWORD_MODAL_CUSTOM_ID,
     title: "價格報告關鍵字",
-    components: [
-      {
-        type: DISCORD_COMPONENT_TYPE_TEXT_DISPLAY,
-        content: PRICE_REPORT_KEYWORD_FORMAT_DESCRIPTION,
+    components: PRICE_REPORT_SETTINGS_KEYWORD_INPUT_CUSTOM_IDS.map((customId, index) => ({
+      type: DISCORD_COMPONENT_TYPE_LABEL,
+      label: `關鍵字組 ${index + 1}（不同格擇一）`,
+      description: index === 0 ? "同一格以空白分隔，需全部符合；全部留空代表不限。" : undefined,
+      component: {
+        type: DISCORD_COMPONENT_TYPE_TEXT_INPUT,
+        custom_id: customId,
+        style: DISCORD_TEXT_INPUT_STYLE_SHORT,
+        max_length: MAX_PRICE_REPORT_KEYWORD_LENGTH,
+        required: false,
+        value: keywordGroups[index] ?? "",
+        placeholder: index === 0 ? "RTX 5090" : index === 1 ? "DDR5" : undefined,
       },
-      {
-        type: DISCORD_COMPONENT_TYPE_LABEL,
-        label: "商品名稱關鍵字",
-        component: {
-          type: DISCORD_COMPONENT_TYPE_TEXT_INPUT,
-          custom_id: PRICE_REPORT_SETTINGS_KEYWORD_INPUT_CUSTOM_ID,
-          style: DISCORD_TEXT_INPUT_STYLE_SHORT,
-          max_length: MAX_PRICE_REPORT_KEYWORD_LENGTH,
-          required: false,
-          value: keywordValue,
-          placeholder: "RTX 5090, DDR5",
-        },
-      },
-    ],
+    })),
   };
 }

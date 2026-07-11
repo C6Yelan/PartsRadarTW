@@ -2,6 +2,7 @@
 // 讀寫公開價格報告的 Discord 頻道發送紀錄，供排程去重與設定面板顯示狀態。
 
 import type { Prisma } from "@partsradar/db";
+import type { DiscordDeliveryErrorFields } from "../delivery-error-fields";
 import type { DiscordBotClient } from "../types";
 
 // 公開價格報告 delivery 的持久化狀態，對應成功、略過、失敗與 Discord rate limit。
@@ -11,9 +12,11 @@ const PUBLIC_PRICE_REPORT_DELIVERY_STATUS_SELECT = {
   status: true,
   itemCount: true,
   messageCount: true,
-  errorMessage: true,
+  errorCategory: true,
+  httpStatus: true,
+  providerErrorCode: true,
   deliveredAt: true,
-  createdAt: true,
+  updatedAt: true,
 } as const satisfies Prisma.DiscordPublicPriceReportDeliverySelect;
 
 export type PublicPriceReportDeliveryStatus = Prisma.DiscordPublicPriceReportDeliveryGetPayload<{
@@ -33,11 +36,11 @@ export async function readLatestPublicPriceReportDelivery({
       channelId,
     },
     select: PUBLIC_PRICE_REPORT_DELIVERY_STATUS_SELECT,
-    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
   });
 }
 
-// 以 crawl run 與頻道為唯一鍵寫入公開報告 delivery，避免同輪重複建立發送紀錄。
+// 以 crawl run 與頻道為唯一鍵寫入公開報告 delivery；retry 會清除既有 legacy 技術摘要。
 export async function recordPublicPriceReportDelivery({
   client,
   crawlRunId,
@@ -46,7 +49,10 @@ export async function recordPublicPriceReportDelivery({
   itemCount,
   messageCount,
   deliveredAt,
+  errorCategory,
   errorMessage,
+  httpStatus,
+  providerErrorCode,
 }: {
   client: DiscordBotClient;
   crawlRunId: string;
@@ -55,8 +61,7 @@ export async function recordPublicPriceReportDelivery({
   itemCount: number;
   messageCount: number;
   deliveredAt: Date | null;
-  errorMessage: string | null;
-}): Promise<void> {
+} & DiscordDeliveryErrorFields): Promise<void> {
   await client.discordPublicPriceReportDelivery.upsert({
     where: {
       crawlRunId_channelId: {
@@ -71,14 +76,20 @@ export async function recordPublicPriceReportDelivery({
       itemCount,
       messageCount,
       deliveredAt,
+      errorCategory,
       errorMessage,
+      httpStatus,
+      providerErrorCode,
     },
     update: {
       status,
       itemCount,
       messageCount,
       deliveredAt,
+      errorCategory,
       errorMessage,
+      httpStatus,
+      providerErrorCode,
     },
   });
 }

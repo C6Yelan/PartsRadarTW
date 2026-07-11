@@ -2,14 +2,13 @@
 // 產生個人價格報告訊息並記錄 Discord DM 發送結果。
 
 import type { Prisma } from "@partsradar/db";
-import { readRecentPriceReport } from "./reader";
-import { HOUR_MS } from "../constants";
+import { HOUR_MS, MAX_PRICE_REPORT_ITEMS } from "../constants";
+import { toDiscordDeliveryErrorFields } from "../delivery-error-fields";
 import type {
   DiscordBotClient,
   DiscordBotMessage,
-  DiscordBotMessageSendResult,
-  DiscordDirectMessageSendResult,
-  PriceReportNowResult,
+  DiscordMessageSendResult,
+  PersonalPriceReportDeliveryResult,
 } from "../types";
 import {
   DEFAULT_PRICE_REPORT_FILTERS,
@@ -17,14 +16,16 @@ import {
   normalizePriceReportFilters,
   type PriceReportFilters,
 } from "./filters";
-import { clampPriceReportMaxItems } from "./limits";
 import { createPersonalPriceReportEmbedMessages } from "./messages";
+import { readRecentPriceReport } from "./reader";
 
 const PRICE_REPORT_DELIVERY_STATUS_SELECT = {
   status: true,
   itemCount: true,
   messageCount: true,
-  errorMessage: true,
+  errorCategory: true,
+  httpStatus: true,
+  providerErrorCode: true,
   deliveredAt: true,
   createdAt: true,
 } as const satisfies Prisma.DiscordNotificationDeliverySelect;
@@ -38,7 +39,6 @@ export async function sendPriceReportNow({
   client,
   discordUserId,
   windowHours,
-  maxItems,
   publicBaseUrl,
   filters = DEFAULT_PRICE_REPORT_FILTERS,
   now = new Date(),
@@ -47,17 +47,15 @@ export async function sendPriceReportNow({
   client: DiscordBotClient;
   discordUserId: string;
   windowHours: number;
-  maxItems: number;
   publicBaseUrl: string;
   filters?: PriceReportFilters;
   now?: Date;
-  sendReportMessages: (messages: DiscordBotMessage[]) => Promise<DiscordBotMessageSendResult>;
-}): Promise<PriceReportNowResult> {
+  sendReportMessages: (messages: DiscordBotMessage[]) => Promise<DiscordMessageSendResult>;
+}): Promise<PersonalPriceReportDeliveryResult> {
   return sendPriceReport({
     client,
     discordUserId,
     windowHours,
-    maxItems,
     publicBaseUrl,
     filters,
     now,
@@ -71,7 +69,6 @@ export async function sendPriceReport({
   client,
   discordUserId,
   windowHours,
-  maxItems,
   publicBaseUrl,
   filters,
   now,
@@ -82,16 +79,14 @@ export async function sendPriceReport({
   client: DiscordBotClient;
   discordUserId: string;
   windowHours: number;
-  maxItems: number;
   publicBaseUrl: string;
   filters: PriceReportFilters;
   now: Date;
   since?: Date;
   deliveryKind: "PRICE_REPORT_NOW" | "SCHEDULED_PRICE_REPORT";
-  sendReportMessages: (messages: DiscordBotMessage[]) => Promise<DiscordBotMessageSendResult>;
-}): Promise<PriceReportNowResult> {
+  sendReportMessages: (messages: DiscordBotMessage[]) => Promise<DiscordMessageSendResult>;
+}): Promise<PersonalPriceReportDeliveryResult> {
   const reportSince = since ?? new Date(now.getTime() - windowHours * HOUR_MS);
-  const boundedMaxItems = clampPriceReportMaxItems(maxItems);
   const normalizedFilters = normalizePriceReportFilters(filters);
   const report = await readRecentPriceReport(client, {
     since: reportSince,
@@ -100,11 +95,10 @@ export async function sendPriceReport({
   });
   const listedCount = Math.min(
     report.priceChanges.length + report.newProducts.length,
-    boundedMaxItems,
+    MAX_PRICE_REPORT_ITEMS,
   );
   const messages = createPersonalPriceReportEmbedMessages(report, {
     publicBaseUrl,
-    maxItems: boundedMaxItems,
     windowHours,
     generatedAt: now,
     hasActiveFilters: hasActivePriceReportFilters(normalizedFilters),
@@ -119,7 +113,7 @@ export async function sendPriceReport({
     itemCount: listedCount,
     messageCount: messages.length,
     deliveredAt: result.status === "sent" ? now : null,
-    errorMessage: result.status === "failed" ? result.message : null,
+    result,
   });
 
   if (result.status === "sent") {
@@ -140,6 +134,9 @@ export async function sendPriceReport({
       listedCount,
       messageCount: messages.length,
       sentMessageCount: result.sentMessageCount,
+      httpStatus: result.httpStatus,
+      errorCategory: result.errorCategory,
+      providerErrorCode: result.providerErrorCode,
       retryAfterMs: result.retryAfterMs,
       global: result.global,
     };
@@ -153,7 +150,8 @@ export async function sendPriceReport({
     messageCount: messages.length,
     sentMessageCount: result.sentMessageCount,
     httpStatus: result.httpStatus,
-    message: result.message,
+    errorCategory: result.errorCategory,
+    providerErrorCode: result.providerErrorCode,
   };
 }
 
@@ -184,16 +182,16 @@ export async function recordPriceReportDelivery({
   itemCount,
   messageCount,
   deliveredAt,
-  errorMessage,
+  result,
 }: {
   client: DiscordBotClient;
   discordUserId: string;
   kind: "PRICE_REPORT_NOW" | "SCHEDULED_PRICE_REPORT";
-  status: DiscordDirectMessageSendResult["status"];
+  status: DiscordMessageSendResult["status"];
   itemCount: number;
   messageCount: number;
   deliveredAt: Date | null;
-  errorMessage: string | null;
+  result: DiscordMessageSendResult;
 }): Promise<void> {
   await client.discordNotificationDelivery.create({
     data: {
@@ -203,7 +201,7 @@ export async function recordPriceReportDelivery({
       itemCount,
       messageCount,
       deliveredAt,
-      errorMessage,
+      ...toDiscordDeliveryErrorFields(result),
     },
   });
 }

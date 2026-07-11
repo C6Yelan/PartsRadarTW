@@ -2,27 +2,8 @@
 // 處理 CoolPC 分類頁抓取結果與 crawl run 的銜接：
 // 先落 raw snapshot，成功解析後再交給分類商品觀測寫入流程。
 
-import type { ParseErrorType as PrismaParseErrorType, PrismaClient } from "@partsradar/db";
-import {
-  CRAWL_RUN_CATEGORY_RESULT_STATUSES,
-  type CrawlRunSourceCategory,
-  type ProcessCrawlCategoryResult,
-} from "./crawl-run";
-import {
-  createCoolpcCategoryUrl,
-  parseCoolpcCategoryPage,
-  type ParsedCoolpcProduct,
-} from "./parser";
-import {
-  writeCoolpcCategoryProductObservation,
-  type CoolpcProductWriteClient,
-  type WriteCoolpcCategoryProductObservationResult,
-} from "./product-write";
-import {
-  RAW_SNAPSHOT_CONTENT_STATUSES,
-  recordRawSnapshot,
-  type RawSnapshotWriteClient,
-} from "./raw-snapshot-writer";
+import type { ParseErrorType as PrismaParseErrorType } from "@partsradar/db";
+import { createCoolpcCategoryUrl } from "@partsradar/shared";
 import {
   buildParseFailureMessage,
   createCategoryContext,
@@ -31,6 +12,22 @@ import {
   recordParseIssues,
   toRawSnapshotContentStatus,
 } from "./category-snapshot/parse-result";
+import {
+  CRAWL_RUN_CATEGORY_RESULT_STATUSES,
+  type CrawlRunSourceCategory,
+  type ProcessCrawlCategoryResult,
+} from "./crawl-run";
+import { type ParsedCoolpcProduct, parseCoolpcCategoryPage } from "./parser";
+import {
+  type CoolpcProductWriteClient,
+  type WriteCoolpcCategoryProductObservationResult,
+  writeCoolpcCategoryProductObservation,
+} from "./product-write";
+import {
+  RAW_SNAPSHOT_CONTENT_STATUSES,
+  type RawSnapshotWriteClient,
+  recordRawSnapshot,
+} from "./raw-snapshot-writer";
 
 export interface CoolpcCategorySnapshotInput {
   url?: string;
@@ -42,6 +39,7 @@ export interface CoolpcCategorySnapshotInput {
 
 interface ProcessCoolpcCategorySnapshotBaseOptions {
   storageDir: string;
+  storagePathPrefix?: string;
   crawlRunId: string;
   category: CrawlRunSourceCategory;
   snapshot: CoolpcCategorySnapshotInput;
@@ -105,22 +103,6 @@ export type WriteCoolpcCategoryProductObservation = (options: {
   parsedProducts: ParsedCoolpcProduct[];
 }) => Promise<WriteCoolpcCategoryProductObservationResult>;
 
-export type PrismaCoolpcCategorySnapshotClient = Pick<
-  PrismaClient,
-  "rawSnapshot" | "parseError" | "product" | "priceSnapshot" | "currentPrice" | "$transaction"
->;
-
-/**
- * 以 Prisma client 進入點呼叫共用流程，讓測試時可注入較窄 client。
- */
-export function processCoolpcCategorySnapshotWithPrisma(
-  options: ProcessCoolpcCategorySnapshotBaseOptions & {
-    client: PrismaCoolpcCategorySnapshotClient;
-  },
-): Promise<ProcessCrawlCategoryResult> {
-  return processCoolpcCategorySnapshot(options);
-}
-
 /**
  * 落 raw snapshot 並依 parser 結果決定 crawl run 分類結果狀態。
  * 僅當內容可匯入時，才進入分類商品觀測寫入流程，避免污染資料。
@@ -128,7 +110,7 @@ export function processCoolpcCategorySnapshotWithPrisma(
 export async function processCoolpcCategorySnapshot(
   options: ProcessCoolpcCategorySnapshotOptions,
 ): Promise<ProcessCrawlCategoryResult> {
-  const { client, storageDir, crawlRunId, category, snapshot } = options;
+  const { client, storageDir, storagePathPrefix, crawlRunId, category, snapshot } = options;
   const productWriter = options.writeProducts
     ? options.writeProducts
     : createDefaultProductWriter(options.client);
@@ -139,6 +121,7 @@ export async function processCoolpcCategorySnapshot(
     const rawSnapshot = await recordRawSnapshot({
       client,
       storageDir,
+      storagePathPrefix,
       crawlRunId,
       sourceCategoryId: category.id,
       url,
@@ -168,6 +151,7 @@ export async function processCoolpcCategorySnapshot(
   const rawSnapshot = await recordRawSnapshot({
     client,
     storageDir,
+    storagePathPrefix,
     crawlRunId,
     sourceCategoryId: category.id,
     url,

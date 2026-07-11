@@ -32,7 +32,7 @@
     grid-template-areas:
       "icon input clear"
       "submit submit submit";
-    grid-template-columns: 18px minmax(0, 1fr) 32px;
+    grid-template-columns: 18px minmax(0, 1fr) 44px;
     gap: 8px 10px;
     width: 100%;
     overflow: hidden;

@@ -2,7 +2,7 @@
 // apps/web/app/product-explorer/components/ProductExplorerResultsPanel.tsx
 // 組裝商品探索結果區塊，將 toolbar、商品表格與分頁控制接到 view model。
 
-import type { FormEvent, RefObject } from "react";
+import type { RefObject, SyntheticEvent } from "react";
 import type {
   LoadState,
   ProductListItem,
@@ -40,7 +40,7 @@ export function ProductExplorerResultsPanel({
     };
     pagination: {
       goToPage: (page: number) => void;
-      jumpSubmit: (event: FormEvent<HTMLFormElement>) => void;
+      jumpSubmit: (event: SyntheticEvent<HTMLFormElement>) => void;
       pageJumpValueChange: (value: string) => void;
     };
   };
@@ -57,6 +57,7 @@ export function ProductExplorerResultsPanel({
   };
   table: {
     buildListQuantities: Map<string, number>;
+    isProductLimitReached: boolean;
     productListReturnTo: string;
     products: ProductsResponse | null;
     productState: LoadState;
@@ -94,6 +95,7 @@ export function ProductExplorerResultsPanel({
 
       <ProductTable
         buildListQuantities={table.buildListQuantities}
+        isProductLimitReached={table.isProductLimitReached}
         productListReturnTo={table.productListReturnTo}
         products={table.products}
         productState={table.productState}

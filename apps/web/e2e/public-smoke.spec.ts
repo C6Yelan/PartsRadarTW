@@ -2,6 +2,7 @@
 // 以 Playwright 驗證公開網站主要頁面、配單互動與 public API 的基本可用性。
 
 import { type APIRequestContext, expect, test } from "@playwright/test";
+import { expectImagesLoaded } from "./support/images";
 
 interface ProductListResponse {
   data: Array<{
@@ -13,6 +14,14 @@ interface ProductListResponse {
 }
 
 test.describe("public web smoke", () => {
+  test("does not expose the removed internal ops route", { tag: "@desktop-only" }, async ({
+    request,
+  }) => {
+    const response = await request.get("/ops/status");
+
+    expect(response.status()).toBe(404);
+  });
+
   test("loads the homepage and build list on desktop and mobile", async ({ page }) => {
     await page.goto("/");
     await expect(page.getByText("PartsRadarTW").first()).toBeVisible();
@@ -27,89 +36,135 @@ test.describe("public web smoke", () => {
 
     await page.goto("/discord");
     await expect(page.getByRole("heading", { exact: true, name: "Discord 通知" })).toBeVisible();
-    await expect(page.getByRole("img", { name: "Discord 指令選單截圖" })).toBeVisible();
+    const heroScreenshot = page.getByAltText("Discord 指令選單截圖");
+    await expect(heroScreenshot).toBeAttached();
+    if ((page.viewportSize()?.width ?? 0) > 520) {
+      await expect(heroScreenshot).toBeVisible();
+    } else {
+      await expect(heroScreenshot).toBeHidden();
+    }
     await expect(page.getByRole("heading", { name: "快速開始" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "指令說明" })).toBeVisible();
     const commandsSection = page.getByRole("region", { name: "指令說明" });
     await expect(
-      commandsSection.getByRole("heading", { exact: true, name: "即時目標價提醒" }),
+      commandsSection.getByRole("heading", { exact: true, name: "目標價提醒" }),
     ).toBeVisible();
     await expect(
-      commandsSection.getByRole("heading", { exact: true, name: "個人價格報告" }),
+      commandsSection.getByRole("heading", {
+        exact: true,
+        name: "即時價格報告與每日私訊價格報告",
+      }),
     ).toBeVisible();
     await expect(
-      commandsSection.getByRole("heading", { exact: true, name: "伺服器公開報告" }),
+      commandsSection.getByRole("heading", { exact: true, name: "公開價格報告" }),
     ).toBeVisible();
-    await expect(page.getByRole("img", { name: "/watch 即時目標價提醒面板截圖" })).toBeVisible();
-    await expect(page.getByRole("img", { name: "個人價格報告設定截圖" })).toBeVisible();
-    await expect(page.getByRole("img", { name: "伺服器公開報告管理面板截圖" })).toBeVisible();
+    await expectImagesLoaded(page.locator(".discord-guide-image"));
+    await expect(page.getByRole("img", { name: "/watch 目標價提醒面板截圖" })).toBeVisible();
+    await expect(page.getByRole("img", { name: "每日私訊價格報告設定截圖" })).toBeVisible();
+    await expect(page.getByRole("img", { name: "公開價格報告管理面板截圖" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "常見問題" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "一般成員能用哪些指令？" })).toBeVisible();
   });
 
-  test("renders and updates a persisted build list item", async ({ page }) => {
+  test("replaces a legacy category query with its semantic URL", async ({ page }) => {
+    await page.goto("/?igrp=12");
+
+    await expect.poll(() => new URL(page.url()).searchParams.get("category")).toBe("gpu");
+    expect(new URL(page.url()).searchParams.has("igrp")).toBe(false);
+  });
+
+  test("refreshes v2 build-list intents while preserving quantity and undo", async ({ page }) => {
     const productId = "11111111-1111-1111-1111-111111111111";
+    const missingProductId = "22222222-2222-2222-2222-222222222222";
+
+    await page.route("**/api/build-list/refresh", async (route) => {
+      const productIds = route.request().postDataJSON() as string[];
+
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          data: productIds.includes(productId)
+            ? [
+                {
+                  id: productId,
+                  name: "最新測試顯示卡 RTX",
+                  image: null,
+                  category: {
+                    displayName: "顯示卡",
+                  },
+                  price: {
+                    amount: 7290,
+                    currency: "TWD",
+                  },
+                  source: {
+                    url: "https://www.coolpc.com.tw/evaluate.php?iBuy=GPU-RTX-4070",
+                  },
+                  status: {
+                    isActive: true,
+                  },
+                  lastSeenAt: "2026-05-28T11:55:00.000Z",
+                },
+              ]
+            : [],
+          missingProductIds: productIds.filter((id) => id === missingProductId),
+        }),
+      });
+    });
 
     await page.addInitScript(
-      ({ id }) => {
+      ({ id, missingId }) => {
         window.localStorage.setItem(
-          "partsradartw:build-list:v1",
+          "partsradartw:build-list:v2",
           JSON.stringify([
             {
-              id,
-              name: "測試顯示卡 RTX",
-              image: {
-                url: `/api/product-images/${id}.webp`,
-                alt: "測試顯示卡 RTX",
-              },
-              category: {
-                id: "category-12",
-                igrp: 12,
-                displayName: "顯示卡",
-                sourceName: "顯示卡 VGA",
-              },
-              price: {
-                amount: 6990,
-                currency: "TWD",
-                capturedAt: "2026-05-28T11:45:00.000Z",
-                lastSeenAt: "2026-05-28T11:55:00.000Z",
-              },
-              source: {
-                name: "coolpc",
-                url: "https://www.coolpc.com.tw/evaluate.php?iBuy=GPU-RTX-4070",
-              },
+              productId: id,
               quantity: 2,
+              order: 0,
               addedAt: "2026-05-28T12:00:00.000Z",
               updatedAt: "2026-05-28T12:00:00.000Z",
+            },
+            {
+              productId: missingId,
+              quantity: 1,
+              order: 1,
+              addedAt: "2026-05-28T12:01:00.000Z",
+              updatedAt: "2026-05-28T12:01:00.000Z",
             },
           ]),
         );
       },
-      { id: productId },
+      { id: productId, missingId: missingProductId },
     );
 
     await page.goto("/build-list");
-    const item = page.getByRole("article").filter({ hasText: "測試顯示卡 RTX" });
+    const item = page.getByRole("article").filter({ hasText: "最新測試顯示卡 RTX" });
+    const missingItem = page.getByRole("article").filter({ hasText: missingProductId });
 
-    await expect(page.getByText("2 件商品")).toBeVisible();
-    await expect(item.getByRole("heading", { name: "測試顯示卡 RTX" })).toBeVisible();
+    await expect(page.getByText("3 件商品")).toBeVisible();
+    await expect(page.getByText("已同步；有 1 個品項暫時查不到。")).toBeVisible();
+    await expect(page.getByText("配單只儲存在這個瀏覽器，不會跨裝置同步。")).toBeVisible();
+    await expect(item.getByRole("heading", { name: "最新測試顯示卡 RTX" })).toBeVisible();
     await expect(item.getByRole("spinbutton", { name: "數量" })).toHaveValue("2");
-    await expect(item.getByText("NT$ 13,980")).toBeVisible();
+    await expect(item.getByText("NT$ 14,580")).toBeVisible();
+    await expect(missingItem.getByText("暫時無法確認")).toBeVisible();
+    await expect(page.getByText("未計價品項")).toBeVisible();
 
     await item.getByRole("button", { name: "增加數量" }).click();
-    await expect(page.getByText("3 件商品")).toBeVisible();
+    await expect(page.getByText("4 件商品")).toBeVisible();
     await expect(item.getByRole("spinbutton", { name: "數量" })).toHaveValue("3");
-    await expect(item.getByText("NT$ 20,970")).toBeVisible();
+    await expect(item.getByText("NT$ 21,870")).toBeVisible();
 
     await item.getByRole("button", { name: "移除" }).click();
     await expect(page.getByText("已從配單移除")).toBeVisible();
     await page.getByRole("button", { name: "復原" }).click();
-    await expect(page.getByRole("article").filter({ hasText: "測試顯示卡 RTX" })).toBeVisible();
+    await expect(page.getByRole("article").filter({ hasText: "最新測試顯示卡 RTX" })).toBeVisible();
   });
 });
 
 test.describe("public API smoke", () => {
-  test("checks public data and rate-limit headers", async ({ request }) => {
+  test("checks public data and rate-limit headers", { tag: "@desktop-only" }, async ({
+    request,
+  }) => {
     const sourceStatus = await request.get("/api/source-status");
     expect(sourceStatus.status()).toBe(200);
     await expectJsonShape(sourceStatus, ["status"]);
@@ -126,9 +181,9 @@ test.describe("public API smoke", () => {
     await expectJsonShape(products, ["data", "pagination"]);
   });
 
-  test("checks product detail, price history, and image API when a product exists", async ({
-    request,
-  }) => {
+  test("checks product detail, price history, and image API when a product exists", {
+    tag: "@desktop-only",
+  }, async ({ request }) => {
     const product = await fetchFirstProduct(request);
     if (!product) {
       test.skip(true, "No product exists in this environment.");
@@ -141,7 +196,7 @@ test.describe("public API smoke", () => {
 
     const priceHistory = await request.get(`/api/products/${product.id}/price-history?range=90d`);
     expect(priceHistory.status()).toBe(200);
-    await expectJsonShape(priceHistory, ["points", "summary"]);
+    await expectJsonShape(priceHistory, ["range", "rangeDays", "points"]);
 
     if (!product.image?.url) {
       test.skip(true, "The first product has no cached image.");

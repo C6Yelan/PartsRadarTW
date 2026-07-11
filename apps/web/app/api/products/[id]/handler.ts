@@ -6,8 +6,6 @@ import { PRODUCT_DETAIL_SELECT, type ProductDetailReadClient } from "./data";
 import { normalizeProductId } from "./product-id";
 import { type ProductDetailResponseBody, toProductDetailResponse } from "./response";
 
-export type { ProductDetailReadClient } from "./data";
-
 // 建立商品詳細 API handler，只回傳啟用來源分類且仍有目前價格的公開商品資料。
 export function createGetProductHandler(
   client: ProductDetailReadClient,

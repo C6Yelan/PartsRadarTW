@@ -2,14 +2,15 @@
 // 呈現商品探索列表中的單筆商品列，包含圖片、價格、價格變動、上架狀態與配單控制。
 
 import Link from "next/link";
-import { BUILD_LIST_MAX_QUANTITY } from "../../build-list/model";
-import { formatPrice, formatSignedPercent, formatSignedPrice } from "../formatting";
+import { formatSignedTwdPrice, formatTwdPrice } from "../../_shared/formatting";
+import { BUILD_LIST_MAX_QUANTITY, MAX_BUILD_LIST_PRODUCTS } from "../../build-list/constants";
 import type { ProductListItem } from "../types";
 import { ProductImage } from "./ProductImage";
 
 interface ProductRowProps {
   buildListQuantity: number;
   detailHref: string;
+  isProductLimitReached: boolean;
   product: ProductListItem;
   onAddToBuildList(product: ProductListItem): void;
   onDecreaseBuildListQuantity(product: ProductListItem): void;
@@ -19,6 +20,7 @@ interface ProductRowProps {
 export function ProductRow({
   buildListQuantity,
   detailHref,
+  isProductLimitReached,
   product,
   onAddToBuildList,
   onDecreaseBuildListQuantity,
@@ -37,7 +39,7 @@ export function ProductRow({
       </div>
       <div className="table-cell row-price">
         <span className="cell-label">目前價格</span>
-        <strong>{formatPrice(product.price.amount)}</strong>
+        <strong>{formatTwdPrice(product.price.amount)}</strong>
       </div>
       <div className={`table-cell row-movement${priceMovementIsEmpty ? " is-empty" : ""}`}>
         <span className="cell-label">近 {product.priceMovement.rangeDays} 天</span>
@@ -86,10 +88,14 @@ export function ProductRow({
         ) : (
           <button
             className="build-list-add-button"
+            disabled={isProductLimitReached}
+            title={
+              isProductLimitReached ? `配單已達 ${MAX_BUILD_LIST_PRODUCTS} 個品項` : "加入配單"
+            }
             type="button"
             onClick={() => onAddToBuildList(product)}
           >
-            加入
+            {isProductLimitReached ? `已達 ${MAX_BUILD_LIST_PRODUCTS} 項` : "加入"}
           </button>
         )}
       </div>
@@ -105,10 +111,18 @@ function formatPriceMovement(movement: ProductListItem["priceMovement"]) {
   }
 
   if (movement.deltaPercent === null) {
-    return formatSignedPrice(deltaAmount);
+    return formatSignedTwdPrice(deltaAmount);
   }
 
-  return `${formatSignedPrice(deltaAmount)} / ${formatSignedPercent(movement.deltaPercent)}`;
+  return `${formatSignedTwdPrice(deltaAmount)} / ${formatSignedPercent(movement.deltaPercent)}`;
+}
+
+function formatSignedPercent(percent: number) {
+  if (percent === 0) {
+    return "0%";
+  }
+
+  return `${percent > 0 ? "+" : ""}${percent.toFixed(1)}%`;
 }
 
 function getPriceMovementTone(movement: ProductListItem["priceMovement"]) {

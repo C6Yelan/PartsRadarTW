@@ -6,6 +6,7 @@ import {
   DISCORD_EMBED_COLOR,
   DISCORD_PERMISSION_EMBED_LINKS,
   DISCORD_PERMISSION_SEND_MESSAGES,
+  MAX_PRICE_REPORT_ITEMS,
 } from "../../constants";
 import {
   formatPriceReportCategoryFilterLabel,
@@ -20,21 +21,17 @@ import {
   type PublicPriceReportSetting,
   toPublicPriceReportFilters,
 } from "../../public-price-report";
-import { formatDiscordDeliveryFailureForUser, formatDiscordRateLimitForUser } from "../../rest";
-import type {
-  DiscordBotEmbed,
-  DiscordBotMessage,
-  DiscordBotOptions,
-  DiscordInteraction,
-} from "../../types";
-import { formatPriceReportDeliveryError } from "../price-report-settings";
+import {
+  formatDiscordDeliveryFailureFieldValue,
+  formatDiscordDeliveryFailureForUser,
+} from "../../rest";
+import type { DiscordBotEmbed, DiscordBotMessage, DiscordInteraction } from "../../types";
 
 // public-report 設定面板訊息所需的資料契約，由設定讀取流程與 interaction handler 共用。
 export interface PublicPriceReportSettingsPanel {
   setting: PublicPriceReportSetting | null;
   latestDelivery: PublicPriceReportDeliveryStatus | null;
   categories: PriceReportCategoryOption[];
-  options: DiscordBotOptions;
   currentChannelId: string;
   notice?: string;
 }
@@ -44,7 +41,6 @@ export function createPublicPriceReportSettingsPanelMessage({
   setting,
   latestDelivery,
   categories,
-  options,
   currentChannelId,
   notice,
 }: PublicPriceReportSettingsPanel): DiscordBotMessage {
@@ -56,7 +52,6 @@ export function createPublicPriceReportSettingsPanelMessage({
         setting,
         latestDelivery,
         categories,
-        options,
         currentChannelId,
         notice,
       }),
@@ -82,7 +77,7 @@ export function createPublicPriceReportStatusMessage(
       createPublicPriceReportSettingsEmbed({
         ...panel,
         title: "公開價格報告狀態",
-        description: "目前即時公開價格報告的設定與最近一次發送紀錄。",
+        description: "目前公開價格報告的設定與最近一次發送紀錄。",
       }),
     ],
   };
@@ -121,22 +116,22 @@ export function formatPublicReportPreviewNotice(
   const settingSummary = formatPublicReportSettingSummary(setting, categories);
 
   if (result.status === "sent") {
-    return `已發送測試公開報告到 <#${channelId}>：價格變動 ${result.changeCount}，新增商品 ${result.newProductCount}，列出 ${result.listedCount} 筆，送出 ${result.messageCount} 則訊息。\n${settingSummary}`;
+    return `已發送單次測試公開報告到 <#${channelId}>：價格變動 ${result.changeCount}，新增商品 ${result.newProductCount}，列出 ${result.listedCount} 筆，送出 ${result.messageCount} 則訊息。這次測試不會改變排程進度。\n${settingSummary}`;
   }
 
   if (result.status === "skipped") {
-    return `過去 24 小時沒有符合設定的公開報告內容，未發送測試報告。\n${settingSummary}`;
+    return `過去 24 小時沒有符合設定的公開報告內容，未發送單次測試報告；這次測試不會改變排程進度。\n${settingSummary}`;
   }
 
   if (result.status === "rate_limited") {
-    return formatDiscordRateLimitForUser();
+    return "Discord 暫時限制訊息發送，本次測試未送出且不會自動重試；請稍後重新執行測試。";
   }
 
-  if (isDiscordMissingPermissionsError(result.message)) {
-    return `我目前無法在 <#${channelId}> 發送公開價格報告。請確認 PartsRadarTW bot 在該頻道具備「傳送訊息」與「嵌入連結」權限。`;
+  if (result.errorCategory === "PERMISSIONS") {
+    return `本次測試未送出且不會自動重試。我目前無法在 <#${channelId}> 發送公開價格報告。請確認 PartsRadarTW bot 在該頻道具備「傳送訊息」與「嵌入連結」權限。`;
   }
 
-  return formatDiscordDeliveryFailureForUser(result.message);
+  return `本次測試未送出且不會自動重試。${formatDiscordDeliveryFailureForUser(result)}`;
 }
 
 // 建立 public-report 設定 embed；互動面板與只讀狀態訊息共用相同欄位排列。
@@ -144,12 +139,11 @@ function createPublicPriceReportSettingsEmbed({
   setting,
   latestDelivery,
   categories,
-  options,
   currentChannelId,
   notice,
   title = "公開價格報告設定",
   description:
-    baseDescription = "即時公開價格報告會在排程爬蟲完成且有符合設定的價格變動或新增商品時，自動發送到指定頻道。",
+    baseDescription = "公開價格報告會在排程爬蟲完成且有符合設定的價格變動或新增商品時，自動發送到指定頻道；啟用後只處理後續輪次，不補發先前輪次。",
 }: PublicPriceReportSettingsPanel & {
   title?: string;
   description?: string;
@@ -194,11 +188,6 @@ function createPublicPriceReportSettingsEmbed({
         inline: true,
       },
       {
-        name: "最多列出",
-        value: `${setting?.maxItems ?? options.priceReportMaxItems} 筆`,
-        inline: true,
-      },
-      {
         name: "商品關鍵字",
         value: formatPriceReportKeywordFilterLabel(filters),
         inline: true,
@@ -208,9 +197,9 @@ function createPublicPriceReportSettingsEmbed({
         value: formatPublicReportDeliveryStatus(latestDelivery),
       },
       {
-        name: "重試行為",
+        name: "排程與測試",
         value:
-          "失敗或 Discord 限流的排程公開報告會在下一輪 bot 掃描時重試；已成功或已略過的輪次不會重送。",
+          "失敗或 Discord 限流的排程公開報告會在下一次排程檢查時重試；手動測試是單次操作，不會自動重試，也不會改變排程進度。",
       },
     ],
   };
@@ -224,22 +213,22 @@ function formatPublicReportDeliveryStatus(
     return "尚無公開報告紀錄。";
   }
 
-  const deliveredAt = formatTaipeiMinute(delivery.deliveredAt ?? delivery.createdAt);
+  const deliveredAt = formatTaipeiMinute(delivery.deliveredAt ?? delivery.updatedAt);
 
   if (delivery.status === "SENT") {
     return `成功：${deliveredAt}，列出 ${delivery.itemCount} 筆，送出 ${delivery.messageCount} 則訊息。`;
   }
 
   if (delivery.status === "SKIPPED") {
-    return `略過：${deliveredAt}，本輪沒有符合設定的公開報告內容，不會重送。`;
+    return `略過：${deliveredAt}，本輪沒有符合設定的公開報告內容，不需補發。`;
   }
 
   if (delivery.status === "RATE_LIMITED") {
-    return `Discord 限流：${deliveredAt}。${formatDiscordRateLimitForUser()} 下一輪掃描會重試。`;
+    return `Discord 限流：${deliveredAt}。下一次排程檢查時會重試。`;
   }
 
   if (delivery.status === "FAILED") {
-    return `失敗：${deliveredAt}。${formatPriceReportDeliveryError(delivery.errorMessage)} 下一輪掃描會重試。`;
+    return `失敗：${deliveredAt}。${formatDiscordDeliveryFailureFieldValue(delivery)} 下一次排程檢查時會重試。`;
   }
 
   return `${delivery.status}：${deliveredAt}，列出 ${delivery.itemCount} 筆。`;
@@ -257,7 +246,7 @@ function formatPublicReportSettingSummary(
     categories,
   )}；內容 ${formatPriceReportContentFilterLabel(filters)}；關鍵字 ${formatPriceReportKeywordFilterLabel(
     filters,
-  )}；最多 ${setting.maxItems} 筆。`;
+  )}；最多 ${MAX_PRICE_REPORT_ITEMS} 筆。`;
 }
 
 // 檢查 Discord permission bitset 是否包含指定權限，避免用字串比對權限組合。
@@ -278,11 +267,4 @@ function parseDiscordPermissionBitset(value: string | undefined): bigint | null 
   } catch {
     return null;
   }
-}
-
-// 判斷 Discord API 回覆是否是缺少權限，讓 preview 失敗時能顯示可操作的修正提示。
-function isDiscordMissingPermissionsError(message: string | null): boolean {
-  const normalized = message?.toLowerCase() ?? "";
-
-  return normalized.includes("code=50013") || normalized.includes("missing permissions");
 }

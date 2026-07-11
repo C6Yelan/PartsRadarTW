@@ -1,23 +1,17 @@
 // apps/crawler/src/scripts/ops/discord-bot/price-report/scheduler.ts
 // 執行到期的個人每日價格報告發送，並計算 Discord bot daemon 的下一次喚醒時間。
 
-import {
-  HOUR_MS,
-  MAX_DUE_PRICE_REPORT_SETTINGS_PER_CYCLE,
-} from "../constants";
+import { HOUR_MS, MAX_DUE_PRICE_REPORT_SETTINGS_PER_CYCLE } from "../constants";
 import type {
   DiscordBotClient,
   DiscordBotMessage,
-  DiscordBotMessageSendResult,
+  DiscordMessageSendResult,
   DiscordBotOptions,
 } from "../types";
 import { sendPriceReport } from "./delivery";
 import { toPriceReportFilters } from "./filters";
-import { clampPriceReportMaxItems } from "./limits";
-import {
-  calculateNextScheduledPriceReportSendAtAfterDelivery,
-  toWindowHours,
-} from "./schedule";
+import { calculateNextScheduledPriceReportSendAtAfterDelivery, toWindowHours } from "./schedule";
+import { PRICE_REPORT_SETTING_SELECT } from "./settings";
 
 // 單輪個人價格報告排程處理摘要，供 daemon log 與維運觀察使用。
 export interface ScheduledPriceReportSummary {
@@ -35,12 +29,12 @@ export async function sendDueScheduledPriceReports({
   sendDirectMessages,
 }: {
   client: DiscordBotClient;
-  options: Pick<DiscordBotOptions, "publicBaseUrl" | "priceReportMaxItems">;
+  options: Pick<DiscordBotOptions, "publicBaseUrl">;
   now?: Date;
   sendDirectMessages: (
     discordUserId: string,
     messages: DiscordBotMessage[],
-  ) => Promise<DiscordBotMessageSendResult>;
+  ) => Promise<DiscordMessageSendResult>;
 }): Promise<ScheduledPriceReportSummary> {
   const settings = await client.discordPriceReportSetting.findMany({
     where: {
@@ -51,6 +45,7 @@ export async function sendDueScheduledPriceReports({
     },
     orderBy: [{ nextSendAt: "asc" }, { id: "asc" }],
     take: MAX_DUE_PRICE_REPORT_SETTINGS_PER_CYCLE,
+    select: PRICE_REPORT_SETTING_SELECT,
   });
   const summary: ScheduledPriceReportSummary = {
     processedCount: 0,
@@ -66,7 +61,6 @@ export async function sendDueScheduledPriceReports({
       client,
       discordUserId: setting.discordUserId,
       windowHours: toWindowHours(setting.window),
-      maxItems: clampPriceReportMaxItems(Math.min(setting.maxItems, options.priceReportMaxItems)),
       publicBaseUrl: options.publicBaseUrl,
       filters: toPriceReportFilters(setting),
       now,

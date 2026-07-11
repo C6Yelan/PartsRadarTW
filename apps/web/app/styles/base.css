@@ -50,6 +50,13 @@ a {
   text-decoration: none;
 }
 
+.ui-icon {
+  display: block;
+  flex: 0 0 auto;
+  width: 1em;
+  height: 1em;
+}
+
 button,
 input,
 select {
@@ -101,4 +108,3 @@ input::placeholder {
   white-space: nowrap;
   border: 0;
 }
-

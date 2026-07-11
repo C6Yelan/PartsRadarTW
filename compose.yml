@@ -1,13 +1,8 @@
 name: partsradar-tw
 
-x-app-env: &app-env
+x-database-env: &database-env
   NODE_ENV: "production"
   DATABASE_URL: "postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}?schema=public"
-  COOLPC_BASE_URL: "https://www.coolpc.com.tw"
-  SNAPSHOT_STORAGE_DIR: "/var/lib/partsradar/snapshots"
-  PRODUCT_IMAGE_STORAGE_DIR: "/var/lib/partsradar/product-images"
-  EXTERNAL_FETCH_LOCK_DIR: "/var/lib/partsradar/snapshots/.locks/external-fetch"
-  PARTSRADAR_PUBLIC_BASE_URL: "${PARTSRADAR_PUBLIC_BASE_URL:-https://partsradar.net}"
 
 services:
   postgres:
@@ -17,6 +12,7 @@ services:
       POSTGRES_DB: "${POSTGRES_DB:?POSTGRES_DB is required}"
       POSTGRES_USER: "${POSTGRES_USER:?POSTGRES_USER is required}"
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}"
+      PGDATA: "/var/lib/postgresql/data"
     ports:
       - "${POSTGRES_BIND_HOST:-127.0.0.1}:${POSTGRES_PORT:-5432}:5432"
     volumes:
@@ -29,29 +25,32 @@ services:
       start_period: 10s
 
   migrate:
+    image: "${PARTSRADAR_MIGRATE_IMAGE:-partsradar-tw-migrate:local}"
     build:
       context: .
       target: migrate
     restart: "no"
     environment:
-      <<: *app-env
+      <<: *database-env
     depends_on:
       postgres:
         condition: service_healthy
 
   seed:
+    image: "${PARTSRADAR_MIGRATE_IMAGE:-partsradar-tw-migrate:local}"
     build:
       context: .
       target: migrate
     restart: "no"
     command: ["pnpm", "db:seed"]
     environment:
-      <<: *app-env
+      <<: *database-env
     depends_on:
       migrate:
         condition: service_completed_successfully
 
   storage-init:
+    image: "${PARTSRADAR_CRAWLER_IMAGE:-partsradar-tw-crawler:local}"
     build:
       context: .
       target: crawler
@@ -68,21 +67,26 @@ services:
       - product_images:/var/lib/partsradar/product-images
 
   web:
+    image: "${PARTSRADAR_WEB_IMAGE:-partsradar-tw-web:local}"
     build:
       context: .
       target: web
+      args:
+        CSP_MODE: "${CSP_MODE:-enforce}"
+        CSP_REPORT_URI: "${CSP_REPORT_URI:-}"
     restart: unless-stopped
     environment:
-      <<: *app-env
+      <<: *database-env
       PORT: 3000
       HOSTNAME: 0.0.0.0
+      PRODUCT_IMAGE_STORAGE_DIR: "/var/lib/partsradar/product-images"
+      PARTSRADAR_PUBLIC_BASE_URL: "${PARTSRADAR_PUBLIC_BASE_URL:-https://partsradar.net}"
       API_READ_RATE_LIMIT_MAX: "${API_READ_RATE_LIMIT_MAX:-120}"
       API_LIST_RATE_LIMIT_MAX: "${API_LIST_RATE_LIMIT_MAX:-360}"
       API_IMAGE_RATE_LIMIT_MAX: "${API_IMAGE_RATE_LIMIT_MAX:-1200}"
       API_RATE_LIMIT_WINDOW_SECONDS: "${API_RATE_LIMIT_WINDOW_SECONDS:-60}"
       API_RATE_LIMIT_CACHE_SIZE: "${API_RATE_LIMIT_CACHE_SIZE:-5000}"
-      NEXT_PUBLIC_DISCORD_BOT_INVITE_URL: "${NEXT_PUBLIC_DISCORD_BOT_INVITE_URL:-}"
-      OPS_STATUS_ENABLED: "false"
+      DISCORD_BOT_INVITE_URL: "${DISCORD_BOT_INVITE_URL:-}"
     ports:
       - "${WEB_BIND_HOST:-127.0.0.1}:${WEB_PORT:-3000}:3000"
     volumes:

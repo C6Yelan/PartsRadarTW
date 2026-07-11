@@ -102,13 +102,15 @@
   z-index: 1;
   display: grid;
   gap: 2px;
-  min-width: 102px;
+  left: clamp(0px, calc(var(--history-overlay-left) - 56px), calc(100% - 112px));
+  width: 112px;
+  min-width: 0;
   padding: 8px 10px;
   border: 1px solid var(--border-strong);
   border-radius: 7px;
   background: rgba(13, 24, 32, 0.94);
   pointer-events: none;
-  transform: translate(-50%, calc(-100% - 10px));
+  transform: translateY(calc(-100% - 10px));
 }
 
 .history-chart-marker span {
@@ -164,7 +166,9 @@
   position: absolute;
   z-index: 2;
   display: grid;
-  min-width: 170px;
+  left: clamp(0px, calc(var(--history-overlay-left) - 85px), calc(100% - 170px));
+  width: 170px;
+  min-width: 0;
   gap: 5px;
   padding: 11px 12px;
   border: 1px solid var(--border-strong);
@@ -172,7 +176,12 @@
   background: rgba(13, 24, 32, 0.96);
   box-shadow: 0 12px 28px var(--shadow);
   pointer-events: none;
-  transform: translate(-50%, calc(-100% - 10px));
+  transform: translateY(calc(-100% - 10px));
+}
+
+.history-chart-marker.is-below,
+.history-tooltip.is-below {
+  transform: translateY(10px);
 }
 
 .history-tooltip span,

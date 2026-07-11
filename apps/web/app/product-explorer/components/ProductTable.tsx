@@ -1,6 +1,7 @@
 // apps/web/app/product-explorer/components/ProductTable.tsx
 // 呈現商品探索結果表格，依載入狀態切換 skeleton、錯誤、空結果與商品列。
 
+import { API_RATE_LIMITED_MESSAGE } from "../../_shared/api-client";
 import { createProductDetailHref } from "../query-state";
 import type { LoadState, ProductListItem, ProductsResponse } from "../types";
 import { ProductRow } from "./ProductRow";
@@ -8,6 +9,7 @@ import { SkeletonRows } from "./SkeletonRows";
 
 interface ProductTableProps {
   buildListQuantities: Map<string, number>;
+  isProductLimitReached: boolean;
   productListReturnTo: string;
   products: ProductsResponse | null;
   productState: LoadState;
@@ -18,6 +20,7 @@ interface ProductTableProps {
 // 組裝商品列表狀態與每列商品資料，將配單操作事件傳遞給 ProductRow。
 export function ProductTable({
   buildListQuantities,
+  isProductLimitReached,
   productListReturnTo,
   products,
   productState,
@@ -46,8 +49,8 @@ export function ProductTable({
 
       {productState === "rate_limited" ? (
         <div className="empty-state" role="alert">
-          <h2>瀏覽速度過快</h2>
-          <p>請稍等幾秒再繼續切換分類、頁數或排序。</p>
+          <h2>商品資料暫時無法載入</h2>
+          <p>{API_RATE_LIMITED_MESSAGE}</p>
         </div>
       ) : null}
 
@@ -63,6 +66,7 @@ export function ProductTable({
             <ProductRow
               buildListQuantity={buildListQuantities.get(product.id) ?? 0}
               detailHref={createProductDetailHref(product.id, productListReturnTo)}
+              isProductLimitReached={isProductLimitReached}
               key={product.id}
               product={product}
               onAddToBuildList={onAddToBuildList}

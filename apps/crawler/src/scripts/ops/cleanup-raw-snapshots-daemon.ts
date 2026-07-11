@@ -4,14 +4,16 @@
 import type { PrismaClient } from "@partsradar/db";
 import {
   type CleanupRawSnapshotsResult,
-  type PrismaRawSnapshotCleanupClient,
   cleanupRawSnapshotsWithPrisma,
+  type PrismaRawSnapshotCleanupClient,
 } from "../../coolpc/raw-snapshot-cleanup";
+import { tryAcquireRawSnapshotMutationLock } from "../../coolpc/raw-snapshot-storage";
 import {
   loadWorkspaceEnv,
   resolveWorkspaceRoot,
   toSafeCliErrorMessage,
 } from "../shared/script-utils";
+import { type RawSnapshotCleanupExecutor, runRawSnapshotCleanup } from "./cleanup-raw-snapshots";
 import {
   HELP_FLAG,
   parseRawSnapshotCleanupDaemonOptions,
@@ -22,34 +24,23 @@ import { createOpsLogger } from "./shared/logger";
 
 const logger = createOpsLogger();
 
-export { parseRawSnapshotCleanupDaemonOptions } from "./cleanup-raw-snapshots-daemon/options";
-export type { RawSnapshotCleanupDaemonOptions } from "./cleanup-raw-snapshots-daemon/options";
-
-// 抽象化 daemon 的停止狀態與 sleep 行為，讓測試能驗證 loop 行為而不依賴真實 process signal。
+// 描述 daemon loop 需要的停止狀態與可中斷 sleep 行為。
 export interface ShutdownController {
   readonly requested: boolean;
   sleep(ms: number): Promise<void>;
 }
 
-// 單輪 raw snapshot cleanup 的執行器介面，讓 daemon loop 可注入測試替身並保留 production 實作。
-export type RawSnapshotCleanupExecutor = (options: {
-  client: PrismaRawSnapshotCleanupClient;
-  storageDir: string;
-  normalRetentionDays: number;
-  abnormalRetentionDays: number;
-  dryRun: boolean;
-}) => Promise<CleanupRawSnapshotsResult>;
-
-// 啟動 daemon loop 所需的依賴集合；production 使用 Prisma cleanup，測試可替換 cleanup 與 log。
+// 集中 daemon loop 的清理執行器、logger 與關閉控制。
 export interface RunRawSnapshotCleanupDaemonOptions {
   client: PrismaRawSnapshotCleanupClient;
   options: RawSnapshotCleanupDaemonOptions;
   shutdown: ShutdownController;
   cleanup?: RawSnapshotCleanupExecutor;
+  acquireMutationLock?: typeof tryAcquireRawSnapshotMutationLock;
   logMessage?: (message: string) => void;
 }
 
-// CLI 入口：載入環境、建立 DB client，並把實際循環交給可測試的 daemon runner。
+// CLI 入口載入環境、建立 DB client，並啟動可安全停止的 cleanup loop。
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
 
@@ -84,6 +75,7 @@ export async function runRawSnapshotCleanupDaemon({
   options,
   shutdown,
   cleanup = cleanupRawSnapshotsWithPrisma,
+  acquireMutationLock = tryAcquireRawSnapshotMutationLock,
   logMessage = log,
 }: RunRawSnapshotCleanupDaemonOptions): Promise<void> {
   do {
@@ -91,6 +83,7 @@ export async function runRawSnapshotCleanupDaemon({
       client,
       options,
       cleanup,
+      acquireMutationLock,
       logMessage,
     });
 
@@ -114,29 +107,31 @@ async function runCleanupCycle({
   client,
   options,
   cleanup,
+  acquireMutationLock,
   logMessage,
 }: {
   client: PrismaRawSnapshotCleanupClient;
   options: RawSnapshotCleanupDaemonOptions;
   cleanup: RawSnapshotCleanupExecutor;
+  acquireMutationLock: typeof tryAcquireRawSnapshotMutationLock;
   logMessage: (message: string) => void;
 }): Promise<{ ok: true } | { ok: false; error: unknown }> {
   logMessage("Starting raw snapshot cleanup cycle.");
 
   try {
-    const result = await cleanup({
+    const result = await runRawSnapshotCleanup({
       client,
-      storageDir: options.storageDir,
-      normalRetentionDays: options.normalRetentionDays,
-      abnormalRetentionDays: options.abnormalRetentionDays,
-      dryRun: false,
+      options,
+      owner: "raw-snapshot-cleanup-daemon",
+      cleanup,
+      acquireMutationLock,
     });
 
     printCleanupSummary(result, logMessage);
 
     return { ok: true };
   } catch (error) {
-    logMessage(`Raw snapshot cleanup cycle failed: ${toLogErrorMessage(error)}`);
+    logMessage(`Raw snapshot cleanup cycle failed: ${toSafeCliErrorMessage(error)}`);
 
     return { ok: false, error };
   }
@@ -169,13 +164,13 @@ function createShutdownController(): ShutdownController {
       }
 
       return new Promise<void>((resolve) => {
-        const timeout = setTimeout(() => {
+        const timeoutId = setTimeout(() => {
           wakeSleeper = null;
           resolve();
         }, ms);
 
         wakeSleeper = () => {
-          clearTimeout(timeout);
+          clearTimeout(timeoutId);
           wakeSleeper = null;
           resolve();
         };
@@ -194,18 +189,13 @@ function printCleanupSummary(
   );
 }
 
-// 統一套用 CLI 錯誤遮蔽，避免 daemon log 直接輸出敏感 env 或連線字串。
-function toLogErrorMessage(error: unknown): string {
-  return toSafeCliErrorMessage(error);
-}
-
 function log(message: string): void {
   logger.info(message);
 }
 
 if (require.main === module) {
   main().catch((error) => {
-    console.error(toLogErrorMessage(error));
+    console.error(toSafeCliErrorMessage(error));
     process.exitCode = 1;
   });
 }

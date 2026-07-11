@@ -1,13 +1,7 @@
 // apps/web/app/product-explorer/hooks.ts
 // 集中商品探索頁的 client-side UI hooks，管理 query、響應式篩選面板與分頁後捲動。
 
-import {
-  type MouseEvent,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { type MouseEvent, useCallback, useEffect, useRef, useState } from "react";
 import {
   DEFAULT_QUERY,
   normalizeVendorValues,
@@ -17,9 +11,6 @@ import {
   validatePriceRange,
 } from "./query-state";
 import type { LoadState, ProductsResponse, QueryState } from "./types";
-
-export { useCategories } from "./data/use-categories";
-export { useProducts } from "./data/use-products";
 
 // 對齊 CSS mobile breakpoint max-width: 760px，桌面端強制維持分類面板展開。
 const DESKTOP_FILTER_MEDIA_QUERY_VALUE = "(min-width: 761px)";
@@ -32,13 +23,13 @@ export function useProductExplorerQuery() {
   const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
-    const initialQuery = readQueryFromLocation();
+    const initialQuery = readCanonicalQueryFromLocation();
     setQuery(initialQuery);
     setDraft(initialQuery);
     setIsReady(true);
 
     const handlePopState = () => {
-      const nextQuery = readQueryFromLocation();
+      const nextQuery = readCanonicalQueryFromLocation();
       setQuery(nextQuery);
       setDraft(nextQuery);
       setFormError(null);
@@ -52,7 +43,7 @@ export function useProductExplorerQuery() {
     (nextQuery: QueryState, options?: { draftQuery?: QueryState; replace?: boolean }) => {
       const normalizedQuery = {
         ...nextQuery,
-        vendors: normalizeVendorValues(nextQuery.vendors, nextQuery.igrp),
+        vendors: normalizeVendorValues(nextQuery.vendors, nextQuery.category),
         page: Math.max(1, nextQuery.page),
         pageSize: PAGE_SIZE_OPTIONS.includes(
           nextQuery.pageSize as (typeof PAGE_SIZE_OPTIONS)[number],
@@ -114,6 +105,18 @@ export function useProductExplorerQuery() {
     setFormError,
     commitQuery,
   };
+}
+
+function readCanonicalQueryFromLocation() {
+  const query = readQueryFromLocation();
+  const canonicalUrl = toUrl(query);
+  const currentUrl = `${window.location.pathname}${window.location.search}`;
+
+  if (currentUrl !== canonicalUrl) {
+    window.history.replaceState(null, "", canonicalUrl);
+  }
+
+  return query;
 }
 
 // 控制分類篩選面板的響應式開合，桌面維持展開、手機允許使用者收合。

@@ -9,10 +9,8 @@ import {
   DISCORD_COMPONENT_TYPE_BUTTON,
   DISCORD_COMPONENT_TYPE_LABEL,
   DISCORD_COMPONENT_TYPE_STRING_SELECT,
-  DISCORD_COMPONENT_TYPE_TEXT_DISPLAY,
   DISCORD_COMPONENT_TYPE_TEXT_INPUT,
   DISCORD_TEXT_INPUT_STYLE_SHORT,
-  MAX_PRICE_REPORT_ITEMS,
   MAX_PRICE_REPORT_KEYWORD_LENGTH,
 } from "../constants";
 import type { DiscordMessageComponent, DiscordModal } from "../types";
@@ -21,22 +19,19 @@ import {
   PRICE_REPORT_CONTENT_NEW_PRODUCTS_VALUE,
   PRICE_REPORT_CONTENT_PRICE_DROPS_VALUE,
   PRICE_REPORT_CONTENT_PRICE_RISES_VALUE,
-  PRICE_REPORT_KEYWORD_FORMAT_DESCRIPTION,
   PUBLIC_REPORT_ALL_CATEGORIES_CUSTOM_ID,
   PUBLIC_REPORT_CATEGORIES_CUSTOM_ID,
   PUBLIC_REPORT_CLEAR_CUSTOM_ID,
+  PUBLIC_REPORT_CONTENT_FILTER_CUSTOM_ID,
   PUBLIC_REPORT_DISABLE_CUSTOM_ID,
   PUBLIC_REPORT_ENABLE_CUSTOM_ID,
-  PUBLIC_REPORT_CONTENT_FILTER_CUSTOM_ID,
   PUBLIC_REPORT_KEYWORD_CUSTOM_ID,
-  PUBLIC_REPORT_KEYWORD_INPUT_CUSTOM_ID,
+  PUBLIC_REPORT_KEYWORD_INPUT_CUSTOM_IDS,
   PUBLIC_REPORT_KEYWORD_MODAL_CUSTOM_ID,
-  PUBLIC_REPORT_LIMIT_CUSTOM_ID,
-  PUBLIC_REPORT_LIMIT_MODAL_CUSTOM_ID,
-  PUBLIC_REPORT_MAX_ITEMS_CUSTOM_ID,
   PUBLIC_REPORT_PREVIEW_CUSTOM_ID,
   PUBLIC_REPORT_SET_CHANNEL_CUSTOM_ID,
 } from "./ids";
+import { splitProductKeywordInputGroups } from "./settings-input";
 
 // 建立 public-report 設定面板，依目前頻道設定狀態控制分類、篩選、測試與啟停操作。
 export function createPublicReportSettingsComponents({
@@ -155,13 +150,6 @@ export function createPublicReportSettingsComponents({
           label: "調整關鍵字",
           disabled: !hasChannel,
         },
-        {
-          type: DISCORD_COMPONENT_TYPE_BUTTON,
-          style: DISCORD_BUTTON_STYLE_SECONDARY,
-          custom_id: PUBLIC_REPORT_LIMIT_CUSTOM_ID,
-          label: "調整上限",
-          disabled: !hasChannel,
-        },
       ],
     },
     {
@@ -186,58 +174,30 @@ export function createPublicReportSettingsComponents({
   ];
 }
 
-// 建立公開報告顯示上限設定 modal，交由 modal submit parser 驗證輸入範圍。
-export function createPublicReportLimitModal({ maxItems }: { maxItems: number }): DiscordModal {
-  return {
-    custom_id: PUBLIC_REPORT_LIMIT_MODAL_CUSTOM_ID,
-    title: "公開報告顯示上限",
-    components: [
-      {
-        type: DISCORD_COMPONENT_TYPE_LABEL,
-        label: "最多列出的商品數",
-        description: `1-${MAX_PRICE_REPORT_ITEMS}`,
-        component: {
-          type: DISCORD_COMPONENT_TYPE_TEXT_INPUT,
-          custom_id: PUBLIC_REPORT_MAX_ITEMS_CUSTOM_ID,
-          style: DISCORD_TEXT_INPUT_STYLE_SHORT,
-          min_length: 1,
-          max_length: 2,
-          required: true,
-          value: String(maxItems),
-          placeholder: "50",
-        },
-      },
-    ],
-  };
-}
-
 // 建立公開報告商品關鍵字 modal，與個人報告共用關鍵字格式說明與 parser 規則。
 export function createPublicReportKeywordModal({
   keywordValue,
 }: {
   keywordValue: string;
 }): DiscordModal {
+  const keywordGroups = splitProductKeywordInputGroups(keywordValue);
+
   return {
     custom_id: PUBLIC_REPORT_KEYWORD_MODAL_CUSTOM_ID,
     title: "公開報告關鍵字",
-    components: [
-      {
-        type: DISCORD_COMPONENT_TYPE_TEXT_DISPLAY,
-        content: PRICE_REPORT_KEYWORD_FORMAT_DESCRIPTION,
+    components: PUBLIC_REPORT_KEYWORD_INPUT_CUSTOM_IDS.map((customId, index) => ({
+      type: DISCORD_COMPONENT_TYPE_LABEL,
+      label: `關鍵字組 ${index + 1}（不同格擇一）`,
+      description: index === 0 ? "同一格以空白分隔，需全部符合；全部留空代表不限。" : undefined,
+      component: {
+        type: DISCORD_COMPONENT_TYPE_TEXT_INPUT,
+        custom_id: customId,
+        style: DISCORD_TEXT_INPUT_STYLE_SHORT,
+        max_length: MAX_PRICE_REPORT_KEYWORD_LENGTH,
+        required: false,
+        value: keywordGroups[index] ?? "",
+        placeholder: index === 0 ? "RTX 5090" : index === 1 ? "DDR5" : undefined,
       },
-      {
-        type: DISCORD_COMPONENT_TYPE_LABEL,
-        label: "商品名稱關鍵字",
-        component: {
-          type: DISCORD_COMPONENT_TYPE_TEXT_INPUT,
-          custom_id: PUBLIC_REPORT_KEYWORD_INPUT_CUSTOM_ID,
-          style: DISCORD_TEXT_INPUT_STYLE_SHORT,
-          max_length: MAX_PRICE_REPORT_KEYWORD_LENGTH,
-          required: false,
-          value: keywordValue,
-          placeholder: "RTX 5090, DDR5",
-        },
-      },
-    ],
+    })),
   };
 }

@@ -4,8 +4,8 @@
 import {
   loadWorkspaceEnv,
   resolveWorkspaceRoot,
+  toSafeCliErrorMessage,
 } from "../shared/script-utils";
-import { formatDiscordBotCliError } from "./discord-bot/cli-error";
 import { runDiscordBotDaemon } from "./discord-bot/daemon";
 import { parseDiscordBotOptions, printDiscordBotHelp } from "./discord-bot/options";
 import { registerDiscordBotCommands } from "./discord-bot/registration";
@@ -22,6 +22,7 @@ function log(message: string): void {
 // 載入工作區 env 與 Discord bot options，依 CLI 參數執行 command registration 或 daemon runtime。
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
+  const registerCommands = args.includes("--register-commands");
 
   if (args.includes("--help")) {
     printDiscordBotHelp();
@@ -32,7 +33,7 @@ async function main(): Promise<void> {
   await loadWorkspaceEnv(workspaceRoot);
   const options = parseDiscordBotOptions(args);
 
-  if (options.registerCommands) {
+  if (registerCommands) {
     // 一次性註冊 slash commands 後結束，不啟動 gateway 或背景通知 loop。
     const result = await registerDiscordBotCommands(options);
 
@@ -59,7 +60,7 @@ async function main(): Promise<void> {
 
 if (require.main === module) {
   main().catch((error) => {
-    console.error(formatDiscordBotCliError(error));
+    console.error(toSafeCliErrorMessage(error));
     process.exitCode = 1;
   });
 }

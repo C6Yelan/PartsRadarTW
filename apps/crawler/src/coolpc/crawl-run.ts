@@ -1,6 +1,6 @@
 // apps/crawler/src/coolpc/crawl-run.ts
 // 這是 crawler 的主流程總管：建立一次 crawlRun、逐分類呼叫處理器並彙整結果，最後回傳整體狀態。
-import type { PrismaClient } from "@partsradar/db";
+
 import {
   CRAWL_RUN_CATEGORY_RESULT_STATUSES,
   CRAWL_RUN_STATUSES,
@@ -12,7 +12,7 @@ import {
   type CrawlTriggerTypeValue,
 } from "./crawl-run/status";
 
-// 類別處理流程與狀態常數集中重導出，raw snapshot / 商品價格寫入維持在專門模組，保留可測試邊界。
+// crawl-run 的狀態語彙由此公開入口統一提供，raw snapshot 與商品價格寫入維持各自模組。
 export {
   CRAWL_RUN_CATEGORY_RESULT_STATUSES,
   CRAWL_RUN_STATUSES,
@@ -118,20 +118,6 @@ export interface RunCoolpcCrawlOnceResult {
   status: CrawlRunStatusValue;
   stoppedBySuspectedBlock: boolean;
   categoryResults: RecordedCrawlRunCategoryResult[];
-}
-
-export type PrismaCrawlRunWriteClient = Pick<
-  PrismaClient,
-  "sourceCategory" | "crawlRun" | "crawlRunCategoryResult"
->;
-
-export function runCoolpcCrawlOnceWithPrisma(
-  options: Omit<RunCoolpcCrawlOnceOptions, "client"> & {
-    client: PrismaCrawlRunWriteClient;
-  },
-): Promise<RunCoolpcCrawlOnceResult> {
-  // 核心 runner 採依賴注入，方便測試；同時保留 Prisma 進入點給實際排程流程使用。
-  return runCoolpcCrawlOnce(options);
 }
 
 export async function runCoolpcCrawlOnce({

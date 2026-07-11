@@ -1,7 +1,13 @@
 // apps/web/app/products/[id]/price-history/types.ts
 // 定義商品價格歷史 API 回應、前端摘要模型與 SVG 圖表模型的共用型別。
 
-export type PriceHistoryLoadState = "idle" | "loading" | "ready" | "unavailable" | "error";
+export type PriceHistoryLoadState =
+  | "idle"
+  | "loading"
+  | "ready"
+  | "unavailable"
+  | "rate_limited"
+  | "error";
 export type PriceHistoryRangeDays = 7 | 30 | 90;
 export type PriceHistoryRange = PriceHistoryRangeDays | "all";
 export type PriceHistoryRangeKey = "7d" | "30d" | "90d" | "all";
@@ -9,37 +15,18 @@ export type PriceSignalTone = "low" | "high" | "middle" | "flat";
 export type PriceRecordTone = "down" | "up";
 export type PriceHistoryObservationType = "price_snapshot" | "current_price_confirmation";
 
-// 商品價格歷史 API 的前端消費契約，包含原始 points 與目前仍回傳的相容 summary。
+// 商品價格歷史 API 的前端消費契約；畫面摘要由 points 在 client 端計算。
 export interface ProductPriceHistoryBody {
-  productId: string;
   range: PriceHistoryRangeKey;
   rangeDays: PriceHistoryRangeDays | null;
   points: PriceHistoryPoint[];
-  summary: {
-    pointCount: number;
-    startedAt: string | null;
-    endedAt: string | null;
-    lowest: PriceHistorySummaryPoint | null;
-    highest: PriceHistorySummaryPoint | null;
-    first: PriceHistorySummaryPoint | null;
-    latest: PriceHistorySummaryPoint | null;
-    deltaAmount: number | null;
-    deltaPercent: number | null;
-  };
 }
 
-// 價格歷史圖使用的單一觀測點；source 目前保留為 observationType 的相容 alias。
+// 價格歷史圖使用的單一觀測點。
 export interface PriceHistoryPoint {
   amount: number;
-  currency: "TWD";
   observedAt: string;
   observationType: PriceHistoryObservationType;
-  source: PriceHistoryObservationType;
-}
-
-export interface PriceHistorySummaryPoint {
-  amount: number;
-  observedAt: string;
 }
 
 // 前端從 API points 重新彙整出的畫面摘要，供摘要卡、區間軸與變價紀錄共用。
@@ -49,8 +36,6 @@ export interface HistoryViewSummary {
   endedAt: string | null;
   lowest: PriceHistoryPoint | null;
   highest: PriceHistoryPoint | null;
-  first: PriceHistoryPoint | null;
-  latest: PriceHistoryPoint | null;
   averageAmount: number | null;
   rangePositionPercent: number;
   deltaAmount: number | null;

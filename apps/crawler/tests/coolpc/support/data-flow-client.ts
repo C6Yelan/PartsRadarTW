@@ -14,19 +14,14 @@ import {
 } from "../../../src/coolpc/crawl-run";
 import type { CoolpcProductWriteClient } from "../../../src/coolpc/product-write";
 import type { RawSnapshotWriteClient } from "../../../src/coolpc/raw-snapshot-writer";
-import {
-  type FakeCurrentPrice,
-  FakeCoolpcProductWriteClient,
-  type FakeProduct,
-} from "./product-write-client";
 import type {
   FakeCategoryResult,
   FakeCrawlRun,
   FakeParseError,
   FakeRawSnapshot,
   FakeSourceCategory,
-  FakeSourceCategoryUpdate,
 } from "./data-flow-records";
+import { FakeCoolpcProductWriteClient, type FakeProduct } from "./product-write-client";
 
 // 串接 crawl run、category snapshot 與 product write 的記憶體 fake client，供 data-flow 測試驗證跨模組資料變化。
 export class FakeCoolpcDataFlowClient
@@ -36,7 +31,6 @@ export class FakeCoolpcDataFlowClient
   readonly sourceCategories: FakeSourceCategory[];
   readonly crawlRuns: FakeCrawlRun[] = [];
   readonly categoryResults: FakeCategoryResult[] = [];
-  readonly sourceCategoryUpdates: FakeSourceCategoryUpdate[] = [];
   readonly rawSnapshots: FakeRawSnapshot[] = [];
   readonly parseErrors: FakeParseError[] = [];
 
@@ -68,13 +62,6 @@ export class FakeCoolpcDataFlowClient
       if ("lastSuccessAt" in data) {
         sourceCategory.lastSuccessAt = data.lastSuccessAt ?? null;
       }
-
-      this.sourceCategoryUpdates.push({
-        sourceCategoryId: where.id,
-        lastCheckedAt: data.lastCheckedAt,
-        lastSuccessAt: data.lastSuccessAt,
-        updatedLastSuccessAt: "lastSuccessAt" in data,
-      });
 
       return { id: where.id };
     },
@@ -277,30 +264,4 @@ export function productByToken(client: FakeCoolpcDataFlowClient, ibuyToken: stri
   }
 
   return product;
-}
-
-// 依 ibuy token 找目前價格，讓測試能檢查 current price 是否指向正確 price snapshot。
-export function currentPriceByToken(
-  client: FakeCoolpcDataFlowClient,
-  ibuyToken: string,
-): FakeCurrentPrice {
-  const product = productByToken(client, ibuyToken);
-  const currentPrice = client.currentPrices.find((candidate) => candidate.productId === product.id);
-
-  if (!currentPrice) {
-    throw new Error(`Missing current price: ${ibuyToken}`);
-  }
-
-  return currentPrice;
-}
-
-// 取陣列最後一筆資料；空陣列代表測試前置流程沒有產生預期紀錄。
-export function last<T>(items: T[]): T {
-  const item = items[items.length - 1];
-
-  if (!item) {
-    throw new Error("Expected at least one item.");
-  }
-
-  return item;
 }

@@ -1,6 +1,5 @@
 /* apps/web/app/styles/product-table/states.css */
-.row-state,
-.status-badge {
+.row-state {
   display: inline-flex;
   gap: 8px;
   align-items: center;
@@ -9,8 +8,7 @@
   font-weight: 700;
 }
 
-.row-state::before,
-.status-badge::before {
+.row-state::before {
   display: inline-block;
   width: 8px;
   aspect-ratio: 1;
@@ -19,18 +17,12 @@
   content: "";
 }
 
-.row-state.ok,
-.status-badge.ok {
+.row-state.ok {
   color: var(--success);
 }
 
-.row-state.warning,
-.status-badge.stale {
+.row-state.warning {
   color: var(--warning);
-}
-
-.status-badge.unavailable {
-  color: var(--danger);
 }
 
 .empty-state {

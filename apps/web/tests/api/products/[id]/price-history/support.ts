@@ -1,7 +1,7 @@
 // apps/web/tests/api/products/[id]/price-history/support.ts
 // 提供商品價格歷史 API 測試共用的 fake read client、固定時間與價格資料 builder。
 
-import type { ProductPriceHistoryReadClient } from "../../../../../app/api/products/[id]/price-history/handler";
+import type { ProductPriceHistoryReadClient } from "../../../../../app/api/products/[id]/price-history/data";
 
 export const PRODUCT_ID = "11111111-1111-1111-1111-111111111111";
 export const NOW = new Date("2026-06-01T12:00:00.000Z");
@@ -69,25 +69,23 @@ export function fakePriceHistoryClient({
 export function snapshot(price: number, capturedAt: string): SnapshotRecord {
   return {
     price,
-    currency: "TWD",
     capturedAt: new Date(capturedAt),
   };
 }
 
 export function productRecord({
   price = 5900,
-  capturedAt = "2026-05-20T08:00:00.000Z",
-  lastSeenAt = capturedAt,
+  lastSeenAt = "2026-05-20T08:00:00.000Z",
 }: {
   price?: number;
-  capturedAt?: string;
   lastSeenAt?: string;
 } = {}): NonNullable<ProductRecord> {
   return {
-    id: PRODUCT_ID,
     currentPrice: {
       lastSeenAt: new Date(lastSeenAt),
-      priceSnapshot: snapshot(price, capturedAt),
+      priceSnapshot: {
+        price,
+      },
     },
   };
 }

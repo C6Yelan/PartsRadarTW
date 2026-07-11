@@ -6,7 +6,14 @@ import {
   DISCORD_TARGET_PRICE_REACHED_COLOR,
   PRODUCT_NAME_MAX_LENGTH,
 } from "../constants";
-import { formatDiscordBotText } from "../message-text";
+import {
+  createProductUrl,
+  escapeMarkdownLinkText,
+  formatDiscordBotText,
+  formatTaipeiMinute,
+  formatTaiwanDollar,
+  toSingleLine,
+} from "../message-text";
 import type { DiscordBotMessage } from "../types";
 
 const DISCORD_MESSAGE_MAX_EMBEDS = 10;
@@ -56,7 +63,7 @@ export function createTargetPriceReachedMessages({
 }
 
 // 建立單一商品達標通知，顯示商品連結、目前價格、目標價格與價格資料時間。
-export function createTargetPriceReachedMessage({
+function createTargetPriceReachedMessage({
   watch,
   publicBaseUrl,
 }: {
@@ -64,9 +71,11 @@ export function createTargetPriceReachedMessage({
   publicBaseUrl: string;
 }): DiscordBotMessage {
   const currentPrice = watch.product.currentPrice?.priceSnapshot.price;
-  const currentCurrency = watch.product.currentPrice?.priceSnapshot.currency ?? watch.currency;
   const capturedAt = watch.product.currentPrice?.priceSnapshot.capturedAt;
-  const productName = formatDiscordBotText(watch.product.name, PRODUCT_NAME_MAX_LENGTH);
+  const productName = formatDiscordBotText(
+    toSingleLine(watch.product.name),
+    PRODUCT_NAME_MAX_LENGTH,
+  );
 
   return {
     embeds: [
@@ -80,12 +89,12 @@ export function createTargetPriceReachedMessage({
         fields: [
           {
             name: "目前價格",
-            value: formatCurrency(currentPrice ?? watch.targetPrice, currentCurrency),
+            value: formatTaiwanDollar(currentPrice ?? watch.targetPrice),
             inline: true,
           },
           {
             name: "目標價格",
-            value: formatCurrency(watch.targetPrice, watch.currency),
+            value: formatTaiwanDollar(watch.targetPrice),
             inline: true,
           },
         ],
@@ -129,15 +138,14 @@ function formatTargetPriceDigestLines(
   publicBaseUrl: string,
 ): string[] {
   const currentPrice = watch.product.currentPrice?.priceSnapshot.price;
-  const currentCurrency = watch.product.currentPrice?.priceSnapshot.currency ?? watch.currency;
-  const productName = formatDiscordBotText(watch.product.name, PRODUCT_NAME_MAX_LENGTH);
+  const productName = formatDiscordBotText(
+    toSingleLine(watch.product.name),
+    PRODUCT_NAME_MAX_LENGTH,
+  );
 
   return [
     `[${escapeMarkdownLinkText(productName)}](${createProductUrl(publicBaseUrl, watch.product.id)})`,
-    `目前 ${formatCurrency(currentPrice ?? watch.targetPrice, currentCurrency)} / 目標 ${formatCurrency(
-      watch.targetPrice,
-      watch.currency,
-    )}`,
+    `目前 ${formatTaiwanDollar(currentPrice ?? watch.targetPrice)} / 目標 ${formatTaiwanDollar(watch.targetPrice)}`,
     "",
   ];
 }
@@ -165,33 +173,4 @@ function createDescriptionChunks(lines: string[]): string[] {
   }
 
   return chunks;
-}
-
-function formatCurrency(amount: number, currency: string): string {
-  return currency === "TWD"
-    ? `NT$${amount.toLocaleString("en-US")}`
-    : `${currency} ${amount.toLocaleString("en-US")}`;
-}
-
-function formatTaipeiMinute(value: Date): string {
-  const parts = new Intl.DateTimeFormat("zh-TW", {
-    timeZone: "Asia/Taipei",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    hourCycle: "h23",
-  }).formatToParts(value);
-  const byType = new Map(parts.map((part) => [part.type, part.value]));
-
-  return `${byType.get("month")}/${byType.get("day")} ${byType.get("hour")}:${byType.get("minute")} GMT+8`;
-}
-
-function createProductUrl(publicBaseUrl: string, productId: string): string {
-  return new URL(`/products/${productId}`, publicBaseUrl).toString();
-}
-
-function escapeMarkdownLinkText(value: string): string {
-  return value.replace(/[[\]\\]/g, "\\$&");
 }

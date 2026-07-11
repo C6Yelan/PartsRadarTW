@@ -17,10 +17,10 @@ export function formatTargetPriceWatchModalValidationMessage(
   const messages = [
     modal.action !== "create" || modal.productInputValid
       ? null
-      : "請貼上 PartsRadarTW 商品頁完整網址，或輸入網址 `/products/` 後面的商品 ID。",
+      : "請貼上商品頁網址或網址最後那串ID。",
     modal.targetPriceInputValid
       ? null
-      : `目標價格需為 1-${MAX_TARGET_PRICE.toLocaleString("en-US")} 的新台幣整數，請不要輸入 NT$、逗號或空格。`,
+      : `目標價格請輸入 1-${MAX_TARGET_PRICE.toLocaleString("en-US")} 範圍內純數字，不要加NT$、逗號或空格。`,
   ].filter((message): message is string => message !== null);
 
   return messages.join("\n");
@@ -31,21 +31,15 @@ export async function readTargetPriceWatchManagerPage({
   client,
   discordUserId,
   page,
-  statusFilter = "all",
-  sortKey = "recent",
 }: {
   client: DiscordBotClient;
   discordUserId: string;
   page: number;
-  statusFilter?: Parameters<typeof readTargetPriceWatchlist>[0]["statusFilter"];
-  sortKey?: Parameters<typeof readTargetPriceWatchlist>[0]["sortKey"];
 }) {
   const result = await readTargetPriceWatchlist({
     client,
     discordUserId,
     page,
-    statusFilter,
-    sortKey,
   });
 
   if (result.watches.length === 0 && result.hasPreviousPage) {
@@ -53,8 +47,6 @@ export async function readTargetPriceWatchManagerPage({
       client,
       discordUserId,
       page: page - 1,
-      statusFilter: result.statusFilter,
-      sortKey: result.sortKey,
     });
   }
 

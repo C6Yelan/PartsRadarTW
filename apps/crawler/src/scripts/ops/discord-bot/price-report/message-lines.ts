@@ -1,23 +1,22 @@
 // apps/crawler/src/scripts/ops/discord-bot/price-report/message-lines.ts
 // 組裝價格報告 embed 內的分類標題、價格變動摘要與商品連結行文字。
 
+import { PRODUCT_NAME_MAX_LENGTH } from "../constants";
+import {
+  createProductUrl,
+  escapeMarkdownLinkText,
+  formatDiscordBotText,
+  formatTaiwanDollar,
+  toSingleLine,
+} from "../message-text";
+import { escapeMarkdownText, formatSignedTaiwanDollar } from "./message-text";
 import type {
-  PriceReportPriceChangeItem,
   PriceReportNewProductItem,
+  PriceReportPriceChangeItem,
   PriceReportProductCategory,
   PriceReportProductSubcategory,
   RecentPriceReport,
 } from "./reader-types";
-import { PRODUCT_NAME_MAX_LENGTH } from "../constants";
-import { formatDiscordBotText } from "../rest";
-import {
-  createProductUrl,
-  escapeMarkdownLinkText,
-  escapeMarkdownText,
-  formatSignedTaiwanDollar,
-  formatTaiwanDollar,
-  toSingleLine,
-} from "./message-text";
 
 // 報告行分組所需的商品分類資訊與已格式化行文字。
 export interface GroupedReportLineItem {
@@ -275,13 +274,10 @@ export function formatPersonalPriceChangeEmbedLine(
 ): string {
   const productName = formatReportProductLinkText(change.productName, change.subcategory);
   const productUrl = createProductUrl(publicBaseUrl, change.productId);
-  const delta = formatSignedTaiwanDollar(change.delta, change.currency);
+  const delta = formatSignedTaiwanDollar(change.delta);
 
   return formatDiscordBotText(
-    `- **${delta}** ${formatTaiwanDollar(change.previousPrice, change.currency)} -> ${formatTaiwanDollar(
-      change.currentPrice,
-      change.currency,
-    )} [${productName}](${productUrl})`,
+    `- **${delta}** ${formatTaiwanDollar(change.previousPrice)} -> ${formatTaiwanDollar(change.currentPrice)} [${productName}](${productUrl})`,
     320,
   );
 }
@@ -295,7 +291,7 @@ export function formatNewProductEmbedLine(
   const productUrl = createProductUrl(publicBaseUrl, product.productId);
 
   return formatDiscordBotText(
-    `- **${formatTaiwanDollar(product.currentPrice, product.currency)}** [${productName}](${productUrl})`,
+    `- **${formatTaiwanDollar(product.currentPrice)}** [${productName}](${productUrl})`,
     280,
   );
 }

@@ -15,7 +15,7 @@ import {
 } from "./smoke-discord-notification/state";
 
 const DEFAULT_STATE_FILE = "storage/ops/smoke-discord-state.json";
-const DEFAULT_COOLDOWN_SECONDS = 3600;
+const DEFAULT_COOLDOWN_SECONDS = 6 * 60 * 60;
 const MAX_COOLDOWN_SECONDS = 7 * 24 * 60 * 60;
 
 export {

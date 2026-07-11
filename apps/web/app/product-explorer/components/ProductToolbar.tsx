@@ -1,8 +1,7 @@
 // apps/web/app/product-explorer/components/ProductToolbar.tsx
 // 呈現商品探索結果上方的篩選、排序、每頁數量與重設控制列。
 
-import type { ProductStatus, ProductSort, ProductVendorOption, QueryState } from "../types";
-import { formatInteger } from "../formatting";
+import { formatInteger } from "../../_shared/formatting";
 import {
   DEFAULT_QUERY,
   PAGE_SIZE_OPTIONS,
@@ -10,6 +9,7 @@ import {
   STATUS_OPTIONS,
   toPriceDigits,
 } from "../query-state";
+import type { ProductSort, ProductStatus, ProductVendorOption, QueryState } from "../types";
 import { VendorFilter } from "./VendorFilter";
 
 interface ProductToolbarProps {
@@ -105,7 +105,7 @@ export function ProductToolbar({
         </div>
         <VendorFilter
           options={vendorOptions}
-          disabledLabel={query.igrp ? "無廠商資料" : "先選分類"}
+          disabledLabel={query.category ? "無廠商資料" : "先選分類"}
           selectedCategoryName={selectedCategoryName}
           selectedOptions={selectedVendorOptions}
           selectedValues={query.vendors}

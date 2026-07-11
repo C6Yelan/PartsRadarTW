@@ -6,7 +6,7 @@ import {
   DISCORD_EMBED_DESCRIPTION_MAX_LENGTH,
   DISCORD_MESSAGE_EMBED_TOTAL_MAX_LENGTH,
 } from "../constants";
-import { formatDiscordBotText } from "../rest";
+import { formatDiscordBotText } from "../message-text";
 import type { DiscordBotEmbed, DiscordBotMessage } from "../types";
 
 const DISCORD_MESSAGE_MAX_EMBEDS = 10;

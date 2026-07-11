@@ -75,8 +75,6 @@ export async function handleTargetPriceWatchModalSubmit({
       client,
       discordUserId,
       page: targetPriceWatchModal.page,
-      statusFilter: targetPriceWatchModal.statusFilter,
-      sortKey: targetPriceWatchModal.sortKey,
     });
 
     await editDeferredInteractionResponse({

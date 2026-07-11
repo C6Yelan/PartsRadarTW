@@ -1,11 +1,13 @@
 // apps/crawler/src/scripts/ops/discord-bot/watch/message-formatting.ts
-// 組裝目標價 watch 訊息中的商品選項、摘要欄位、金額、時間與 Markdown 文字格式。
+// 組裝目標價 watch 訊息中的商品選項、摘要欄位與通知狀態。
 
 import {
   formatDiscordBotText,
-  formatDiscordDeliveryFailureForUser,
-  formatDiscordRateLimitForUser,
-} from "../rest";
+  formatTaipeiMinute,
+  formatTaiwanDollar,
+  toSingleLine,
+} from "../message-text";
+import { formatDiscordDeliveryFailureForUser, formatDiscordRateLimitForUser } from "../rest";
 import type { TargetPriceWatchDeliveryStatus, TargetPriceWatchListRecord } from "./records";
 import { WATCH_SELECT_VALUE_PREFIX } from "./reference";
 
@@ -23,16 +25,15 @@ export function formatWatchSelectOption(
   default?: boolean;
 } {
   const currentPrice = watch.product.currentPrice?.priceSnapshot.price ?? null;
-  const currentCurrency = watch.product.currentPrice?.priceSnapshot.currency ?? watch.currency;
   const currentPriceLabel =
-    currentPrice === null ? "目前價格未知" : formatTaiwanDollar(currentPrice, currentCurrency);
+    currentPrice === null ? "目前價格未知" : `目前 ${formatTaiwanDollar(currentPrice)}`;
   const productName = toSingleLine(watch.product.name);
 
   return {
     label: formatDiscordBotText(productName, WATCH_SELECT_LABEL_MAX_LENGTH),
     value: `${WATCH_SELECT_VALUE_PREFIX}${watch.id}`,
     description: formatDiscordBotText(
-      `${currentPriceLabel} / 目標 ${formatTaiwanDollar(watch.targetPrice, watch.currency)}`,
+      `${currentPriceLabel}，目標 ${formatTaiwanDollar(watch.targetPrice)}`,
       WATCH_SELECT_DESCRIPTION_MAX_LENGTH,
     ),
     default: selected || undefined,
@@ -49,7 +50,6 @@ export function formatWatchSummaryFields(
   inline?: boolean;
 }> {
   const currentPrice = watch.product.currentPrice?.priceSnapshot.price ?? null;
-  const currentCurrency = watch.product.currentPrice?.priceSnapshot.currency ?? watch.currency;
   const priceSeenAt =
     watch.product.currentPrice?.lastSeenAt ??
     watch.product.currentPrice?.priceSnapshot.capturedAt ??
@@ -58,8 +58,7 @@ export function formatWatchSummaryFields(
   const fields = [
     {
       name: "目前價格",
-      value:
-        currentPrice === null ? "目前價格未知" : formatTaiwanDollar(currentPrice, currentCurrency),
+      value: currentPrice === null ? "目前價格未知" : formatTaiwanDollar(currentPrice),
       inline: true,
     },
     {
@@ -69,7 +68,7 @@ export function formatWatchSummaryFields(
     },
     {
       name: "目標價格",
-      value: formatTaiwanDollar(watch.targetPrice, watch.currency),
+      value: formatTaiwanDollar(watch.targetPrice),
       inline: true,
     },
     {
@@ -77,8 +76,6 @@ export function formatWatchSummaryFields(
       value: formatWatchStatus({
         currentPrice,
         targetPrice: watch.targetPrice,
-        currency: currentCurrency,
-        lastNotifiedAt: watch.lastNotifiedAt,
       }),
     },
   ];
@@ -107,7 +104,7 @@ function formatWatchNotificationDeliveryField(
   if (delivery.status === "FAILED") {
     return {
       name: "最近一次通知",
-      value: `失敗：${happenedAt}。\n${formatDiscordDeliveryFailureForUser(delivery.errorMessage)}`,
+      value: `失敗：${happenedAt}。\n${formatDiscordDeliveryFailureForUser(delivery)}`,
     };
   }
 
@@ -117,62 +114,17 @@ function formatWatchNotificationDeliveryField(
 function formatWatchStatus({
   currentPrice,
   targetPrice,
-  currency,
-  lastNotifiedAt,
 }: {
   currentPrice: number | null;
   targetPrice: number;
-  currency: string;
-  lastNotifiedAt: Date | null;
 }): string {
   if (currentPrice === null) {
     return "等待商品價格資料更新。";
   }
 
   if (currentPrice <= targetPrice) {
-    return lastNotifiedAt
-      ? "已達到目標價格，且已發送通知。"
-      : "已達到目標價格；目前價格低於或等於目標價。";
+    return "目前價格已達標。";
   }
 
-  return `尚未達標；目前價格仍高於目標價 ${formatTaiwanDollar(currentPrice - targetPrice, currency)}。`;
-}
-
-// 建立站內商品頁 URL，讓 Discord 訊息可直接連回 PartsRadarTW 商品頁。
-export function createProductUrl(publicBaseUrl: string, productId: string): string {
-  return new URL(`/products/${productId}`, publicBaseUrl).toString();
-}
-
-// 將時間格式化為 Discord 訊息使用的台北時間分鐘粒度。
-export function formatTaipeiMinute(value: Date): string {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "Asia/Taipei",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    hourCycle: "h23",
-  }).formatToParts(value);
-  const byType = new Map(parts.map((part) => [part.type, part.value]));
-
-  return `${byType.get("month")}/${byType.get("day")} ${byType.get("hour")}:${byType.get("minute")} GMT+8`;
-}
-
-// 將金額格式化為 watch 訊息使用的價格文字。
-export function formatTaiwanDollar(amount: number, currency: string): string {
-  if (currency === "TWD") {
-    return `NT$${amount.toLocaleString("en-US")}`;
-  }
-
-  return `${currency} ${amount.toLocaleString("en-US")}`;
-}
-
-// 跳脫 Discord Markdown link 文字中會破壞連結語法的字元。
-export function escapeMarkdownLinkText(value: string): string {
-  return value.replace(/[[\]\\]/g, "\\$&");
-}
-
-function toSingleLine(value: string): string {
-  return value.replace(/\s+/g, " ").trim();
+  return `尚未達標；目前價格仍高於目標價 ${formatTaiwanDollar(currentPrice - targetPrice)}。`;
 }

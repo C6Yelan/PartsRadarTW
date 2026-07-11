@@ -2,6 +2,7 @@
 // 啟動 Discord bot daemon，協調 slash command 註冊、gateway session 與背景通知掃描。
 
 import { toSafeCliErrorMessage } from "../../shared/script-utils";
+import { createOpsLogger } from "../shared/logger";
 import { CommandCooldowns } from "./cooldowns";
 import { createShutdownController, getWebSocketConstructor, runGatewaySession } from "./gateway";
 import {
@@ -24,7 +25,6 @@ import type {
   MinimalWebSocketConstructor,
   ShutdownController,
 } from "./types";
-import { createOpsLogger } from "../shared/logger";
 
 const logger = createOpsLogger();
 
@@ -42,7 +42,7 @@ export async function runDiscordBotDaemon({
   WebSocketCtor?: MinimalWebSocketConstructor;
   logMessage?: (message: string) => void;
 }): Promise<void> {
-  if (options.registerCommands || options.registerCommandsOnStart) {
+  if (options.registerCommandsOnStart) {
     const result = await registerDiscordBotCommands({
       token: options.token,
       applicationId: options.applicationId,
@@ -55,10 +55,6 @@ export async function runDiscordBotDaemon({
     }
 
     logMessage(`Discord bot commands registered. scope=global httpStatus=${result.httpStatus}`);
-
-    if (options.registerCommands) {
-      return;
-    }
   }
 
   const shutdown = createShutdownController(logMessage);

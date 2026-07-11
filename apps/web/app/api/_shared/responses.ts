@@ -3,12 +3,18 @@
 
 export const API_ERROR_MESSAGES = {
   invalidQuery: "Invalid query parameter.",
+  invalidRequest: "Invalid request.",
   notFound: "Resource not found.",
   rateLimited: "Too many requests. Please try again later.",
   internalError: "Internal server error.",
 } as const;
 
-export type ApiErrorCode = "invalid_query" | "not_found" | "rate_limited" | "internal_error";
+export type ApiErrorCode =
+  | "invalid_query"
+  | "invalid_request"
+  | "not_found"
+  | "rate_limited"
+  | "internal_error";
 
 export interface ApiErrorResponseBody {
   error: {
@@ -55,6 +61,11 @@ function jsonError(
 // 回應 query 驗證失敗；訊息固定泛用，避免暴露具體 parser 或資料查詢細節。
 export function invalidQueryResponse(): Response {
   return jsonError(400, "invalid_query", API_ERROR_MESSAGES.invalidQuery);
+}
+
+// 回應 request body、content type 或 method-specific input 驗證失敗。
+export function invalidRequestResponse(): Response {
+  return jsonError(400, "invalid_request", API_ERROR_MESSAGES.invalidRequest);
 }
 
 // 回應找不到資源；不區分不存在、未啟用或不可公開等內部原因。

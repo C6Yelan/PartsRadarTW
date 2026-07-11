@@ -3,8 +3,9 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { createCoolpcCategoryUrl } from "@partsradar/shared";
 import { COOLPC_TARGET_CATEGORIES, type CoolpcTargetCategory } from "../../src/coolpc/categories";
-import { createCoolpcCategoryUrl, type SourceCategoryContext } from "../../src/coolpc/parser";
+import type { SourceCategoryContext } from "../../src/coolpc/parser/types";
 
 const fixtureDir = join(__dirname, "fixtures");
 

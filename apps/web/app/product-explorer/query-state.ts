@@ -1,12 +1,13 @@
 // apps/web/app/product-explorer/query-state.ts
 // 集中商品探索頁的 URL query、API search params、篩選選項與分頁狀態轉換規則。
 
+import { getCategoryIgrp, getCategorySlug } from "../category-slugs";
 import type { CategoryItem, ProductSort, ProductStatus, QueryState } from "./types";
 
 // 商品探索頁的初始查詢狀態；URL 產生時會省略與預設值相同的欄位。
 export const DEFAULT_QUERY: QueryState = {
   q: "",
-  igrp: "",
+  category: "",
   minPrice: "",
   maxPrice: "",
   status: "active",
@@ -38,11 +39,16 @@ export const MAX_PRICE_DIGITS = 9;
 
 // 從目前瀏覽器 URL 讀取商品探索 query，無效參數會改用預設值避免頁面狀態失效。
 export function readQueryFromLocation(): QueryState {
-  const params = new URLSearchParams(window.location.search);
+  return readQueryFromSearchParams(new URLSearchParams(window.location.search));
+}
+
+// 將 browser search params 轉成 canonical slug state；legacy IGrp 只在沒有 category 時讀取。
+export function readQueryFromSearchParams(params: URLSearchParams): QueryState {
+  const category = parseCategoryParam(params.get("category"), params.get("igrp"));
 
   return {
     q: (params.get("q") ?? "").trim().slice(0, 100),
-    igrp: parseNonNegativeIntegerParam(params.get("igrp")) ?? "",
+    category,
     minPrice: parsePriceParam(params.get("minPrice")) ?? "",
     maxPrice: parsePriceParam(params.get("maxPrice")) ?? "",
     status: parseAllowedValue(params.get("status"), ["active", "inactive", "all"], "active"),
@@ -51,7 +57,7 @@ export function readQueryFromLocation(): QueryState {
       ["price_asc", "price_desc", "price_drop_desc", "price_rise_desc", "name_asc"],
       "price_asc",
     ),
-    vendors: normalizeVendorValues(parseVendorsParam(params.get("vendors")), params.get("igrp")),
+    vendors: normalizeVendorValues(parseVendorsParam(params.get("vendors")), category),
     page: Number(parseNonNegativeIntegerParam(params.get("page")) ?? DEFAULT_QUERY.page),
     pageSize: Number(
       parseNonNegativeIntegerParam(params.get("pageSize")) ?? DEFAULT_QUERY.pageSize,
@@ -64,7 +70,7 @@ export function toApiSearchParams(query: QueryState) {
   const params = new URLSearchParams();
 
   appendIfPresent(params, "q", query.q);
-  appendIfPresent(params, "igrp", query.igrp);
+  appendIfPresent(params, "category", query.category);
   appendIfPresent(params, "minPrice", query.minPrice);
   appendIfPresent(params, "maxPrice", query.maxPrice);
   appendVendorsIfPresent(params, query.vendors);
@@ -81,7 +87,7 @@ export function toUrl(query: QueryState) {
   const params = new URLSearchParams();
 
   appendIfPresent(params, "q", query.q);
-  appendIfPresent(params, "igrp", query.igrp);
+  appendIfPresent(params, "category", query.category);
   appendIfPresent(params, "minPrice", query.minPrice);
   appendIfPresent(params, "maxPrice", query.maxPrice);
   appendVendorsIfPresent(params, query.vendors);
@@ -146,8 +152,8 @@ export function toPriceDigits(value: string) {
 }
 
 // 正規化廠商篩選值；沒有選定分類時直接清空，避免跨分類保留無效廠商。
-export function normalizeVendorValues(vendors: string[], igrp: string | number | null | undefined) {
-  if (!igrp) {
+export function normalizeVendorValues(vendors: string[], category: string | null | undefined) {
+  if (!category) {
     return [];
   }
 
@@ -167,8 +173,8 @@ export function normalizeVendorValues(vendors: string[], igrp: string | number |
 }
 
 // 回首頁或重設時選擇可用分類；沒有分類資料時保留呼叫端提供的 fallback。
-export function getFallbackCategoryIgrp(categories: CategoryItem[], fallback: string) {
-  return categories.length > 0 ? String(categories[0].igrp) : fallback;
+export function getFallbackCategorySlug(categories: CategoryItem[], fallback: string) {
+  return categories.length > 0 ? categories[0].slug : fallback;
 }
 
 // 建立分頁列顯示項目；頁碼間距過大時插入 gap marker 讓 UI 顯示省略。
@@ -222,6 +228,31 @@ function parsePriceParam(value: string | null) {
   const normalizedValue = parseNonNegativeIntegerParam(value);
 
   return normalizedValue ? normalizedValue.slice(0, MAX_PRICE_DIGITS) : null;
+}
+
+function parseCategoryParam(categoryValue: string | null, legacyIgrpValue: string | null) {
+  const category = categoryValue?.trim() ?? "";
+
+  if (category) {
+    const categoryIgrp = getCategoryIgrp(category);
+
+    if (categoryIgrp === null) {
+      return "";
+    }
+
+    if (legacyIgrpValue !== null) {
+      const legacyIgrp = parseNonNegativeIntegerParam(legacyIgrpValue);
+
+      if (!legacyIgrp || Number(legacyIgrp) !== categoryIgrp) {
+        return "";
+      }
+    }
+
+    return category;
+  }
+
+  const legacyIgrp = parseNonNegativeIntegerParam(legacyIgrpValue);
+  return legacyIgrp ? (getCategorySlug(Number(legacyIgrp)) ?? "") : "";
 }
 
 function parseVendorsParam(value: string | null) {

@@ -1,21 +1,17 @@
 // apps/web/app/products/[id]/price-history/summary-cards.tsx
 // 呈現價格歷史摘要卡片，包含期間變動、歷史區間位置與高低均價資訊。
 
+import { formatSignedTwdPrice, formatTwdPrice } from "../../../_shared/formatting";
+import { formatTaipeiMonthDay } from "../../../_shared/time";
+import { formatHistoryPointCount, formatSignedPercent } from "./format";
 import type { HistoryViewSummary, PriceHistoryRangeDays, PriceHistoryRangeKey } from "./types";
-import {
-  formatCompactDate,
-  formatHistoryPointCount,
-  formatPrice,
-  formatSignedPercent,
-  formatSignedPrice,
-} from "./format";
 
 // 顯示選定期間首尾價格差與價格訊號，提供價格趨勢的快速判讀。
 export function PeriodDeltaCard({ summary }: { summary: HistoryViewSummary }) {
   return (
     <div className={`history-period-card is-${summary.signal.tone}`}>
       <span>期間變動</span>
-      <strong>{`${formatSignedPrice(summary.deltaAmount)} / ${formatSignedPercent(
+      <strong>{`${formatSignedTwdPrice(summary.deltaAmount, "資料不足")} / ${formatSignedPercent(
         summary.deltaPercent,
       )}`}</strong>
       <small>{summary.signal.label}</small>
@@ -33,7 +29,7 @@ export function HistoryRangeCard({
   rangeDays: PriceHistoryRangeDays | null;
   summary: HistoryViewSummary;
 }) {
-  if (!summary.lowest || !summary.highest || !summary.latest) {
+  if (!summary.lowest || !summary.highest) {
     return null;
   }
 
@@ -48,11 +44,11 @@ export function HistoryRangeCard({
         <div className="history-range-endpoints">
           <span className="history-range-endpoint is-low">
             <span>最低</span>
-            <strong>{formatPrice(summary.lowest.amount)}</strong>
+            <strong>{formatTwdPrice(summary.lowest.amount)}</strong>
           </span>
           <span className="history-range-endpoint is-high">
             <span>最高</span>
-            <strong>{formatPrice(summary.highest.amount)}</strong>
+            <strong>{formatTwdPrice(summary.highest.amount)}</strong>
           </span>
         </div>
         <div className="history-range-track" aria-hidden="true">
@@ -65,18 +61,18 @@ export function HistoryRangeCard({
       <div className="history-range-stats">
         <div className="history-range-stat is-low">
           <span>最低</span>
-          <strong>{formatPrice(summary.lowest.amount)}</strong>
-          <small>{formatCompactDate(summary.lowest.observedAt)}</small>
+          <strong>{formatTwdPrice(summary.lowest.amount)}</strong>
+          <small>{formatTaipeiMonthDay(summary.lowest.observedAt)}</small>
         </div>
         <div className="history-range-stat is-high">
           <span>最高</span>
-          <strong>{formatPrice(summary.highest.amount)}</strong>
-          <small>{formatCompactDate(summary.highest.observedAt)}</small>
+          <strong>{formatTwdPrice(summary.highest.amount)}</strong>
+          <small>{formatTaipeiMonthDay(summary.highest.observedAt)}</small>
         </div>
         <div className="history-range-stat is-average">
           <span>均價</span>
           <strong>
-            {summary.averageAmount === null ? "-" : formatPrice(summary.averageAmount)}
+            {summary.averageAmount === null ? "-" : formatTwdPrice(summary.averageAmount)}
           </strong>
           <small>區間平均</small>
         </div>

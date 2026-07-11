@@ -3,7 +3,8 @@
 
 import {
   createPriceReportKeywordModal,
-  createPriceReportTimeLimitModal,
+  createPriceReportTimeModal,
+  parsePriceReportCategorySelection,
   type parsePriceReportComponentInteraction,
 } from "../commands";
 import type { CommandCooldowns } from "../cooldowns";
@@ -14,6 +15,7 @@ import {
   sendPriceReportNow,
   toPriceReportFilters,
 } from "../price-report";
+import { toWindowHours } from "../price-report/schedule";
 import {
   deferInteractionMessageUpdate,
   deferInteractionResponse,
@@ -27,10 +29,8 @@ import {
   createPriceReportSettingsPanelMessage,
   formatPriceReportPreviewDmNotice,
   formatTaipeiTimeInput,
-  parsePriceReportCategorySelection,
   readPriceReportSettingsPanel,
   resolveTimeOfDay,
-  resolveWindowHours,
 } from "./price-report-settings";
 
 type PriceReportComponent = NonNullable<ReturnType<typeof parsePriceReportComponentInteraction>>;
@@ -80,10 +80,7 @@ export async function handlePriceReportComponentInteraction({
     const previewResult = await sendPriceReportNow({
       client,
       discordUserId,
-      windowHours: resolveWindowHours(setting?.window),
-      maxItems: setting
-        ? Math.min(setting.maxItems, options.priceReportMaxItems)
-        : options.priceReportMaxItems,
+      windowHours: toWindowHours(setting?.window),
       publicBaseUrl: options.publicBaseUrl,
       filters: toPriceReportFilters(setting),
       sendReportMessages: (messages) =>
@@ -98,7 +95,6 @@ export async function handlePriceReportComponentInteraction({
     const panel = await readPriceReportSettingsPanel({
       client,
       discordUserId,
-      options,
       notice: formatPriceReportPreviewDmNotice(previewResult),
     });
 
@@ -113,7 +109,7 @@ export async function handlePriceReportComponentInteraction({
     return;
   }
 
-  if (component.name === "open_time_limit_modal") {
+  if (component.name === "open_time_modal") {
     const setting = await readPriceReportSetting({ client, discordUserId });
 
     await sendModalInteractionResponse({
@@ -121,8 +117,7 @@ export async function handlePriceReportComponentInteraction({
       apiBaseUrl: options.apiBaseUrl,
       interaction,
       fetchImpl,
-      modal: createPriceReportTimeLimitModal({
-        maxItems: setting?.maxItems ?? options.priceReportMaxItems,
+      modal: createPriceReportTimeModal({
         timeValue: formatTaipeiTimeInput(setting?.nextSendAt),
       }),
     });
@@ -155,12 +150,11 @@ export async function handlePriceReportComponentInteraction({
 
   if (component.name === "disable_daily_scheduled_report") {
     const disabledCount = await disablePriceReport({ client, discordUserId });
-    notice = disabledCount > 0 ? "已關閉每日價格提醒。" : "目前沒有開啟每日價格提醒。";
+    notice = disabledCount > 0 ? "已關閉每日私訊價格報告。" : "目前沒有開啟每日私訊價格報告。";
   } else {
     const currentPanel = await readPriceReportSettingsPanel({
       client,
       discordUserId,
-      options,
     });
     const currentFilters = toPriceReportFilters(currentPanel.setting);
     const categoryIgrps =
@@ -191,8 +185,7 @@ export async function handlePriceReportComponentInteraction({
       windowHours:
         component.name === "update_window"
           ? component.windowHours
-          : resolveWindowHours(currentPanel.setting?.window),
-      maxItems: currentPanel.setting?.maxItems ?? options.priceReportMaxItems,
+          : toWindowHours(currentPanel.setting?.window),
       categoryIgrps,
       includePriceDrops:
         component.name === "update_content_filters"
@@ -211,14 +204,13 @@ export async function handlePriceReportComponentInteraction({
     });
     notice =
       component.name === "enable_daily_scheduled_report"
-        ? "已開啟每日價格提醒。"
-        : "已更新每日價格提醒設定。";
+        ? "已開啟每日私訊價格報告。"
+        : "已更新每日私訊價格報告設定。";
   }
 
   const panel = await readPriceReportSettingsPanel({
     client,
     discordUserId,
-    options,
     notice,
   });
 

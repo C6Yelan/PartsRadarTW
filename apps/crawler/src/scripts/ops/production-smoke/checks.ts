@@ -13,11 +13,7 @@ import {
 import { checkCrawlerFreshness, checkRecentSuspectedBlocks } from "./checks/crawler-runs";
 import { checkDiscordBotDeliveries } from "./checks/discord-deliveries";
 import { checkRecentParseErrors, checkSourceImageAnomalies } from "./checks/parse-errors";
-import {
-  checkActiveProductCount,
-  checkLinkHealth,
-  checkMissingProductImages,
-} from "./checks/product-health";
+import { checkActiveProductCount, checkMissingProductImages } from "./checks/product-health";
 import { checkPublicEndpoints } from "./checks/public-http";
 import { checkRawSnapshotRetention } from "./checks/raw-snapshot-retention";
 import type {
@@ -44,8 +40,6 @@ export async function runProductionSmoke(
   checks.push(await checkSourceImageAnomalies(client, options, now));
   checks.push(await checkActiveProductCount(client, options));
   checks.push(await checkMissingProductImages(client, options));
-  // 此檢查屬於 link health maintenance 功能線；後續整線移除時一併從 smoke 編排移除。
-  checks.push(await checkLinkHealth(client, options));
   checks.push(await checkRawSnapshotRetention(client, options, now));
   checks.push(await checkDiscordBotDeliveries(client, options, now));
 

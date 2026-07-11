@@ -3,10 +3,9 @@
 
 import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join, posix } from "node:path";
 import { promisify } from "node:util";
 import { gzip } from "node:zlib";
-import type { PrismaClient } from "@partsradar/db";
 
 const gzipAsync = promisify(gzip);
 const SNAPSHOT_SUBDIR = "coolpc";
@@ -62,6 +61,7 @@ export interface RawSnapshotWriteClient {
 export interface RecordRawSnapshotOptions {
   client: RawSnapshotWriteClient;
   storageDir: string;
+  storagePathPrefix?: string;
   crawlRunId: string;
   sourceCategoryId: string;
   url: string;
@@ -81,20 +81,10 @@ export interface RecordRawSnapshotResult {
   wroteCompressedFile: boolean;
 }
 
-export type PrismaRawSnapshotWriteClient = Pick<PrismaClient, "rawSnapshot">;
-
-export function recordRawSnapshotWithPrisma(
-  options: Omit<RecordRawSnapshotOptions, "client"> & {
-    client: PrismaRawSnapshotWriteClient;
-  },
-): Promise<RecordRawSnapshotResult> {
-  // 以可注入的 writer client 便於測試，並提供 Prisma 型別入口供實際 crawler 流程使用。
-  return recordRawSnapshot(options);
-}
-
 export async function recordRawSnapshot({
   client,
   storageDir,
+  storagePathPrefix = "",
   crawlRunId,
   sourceCategoryId,
   url,
@@ -111,7 +101,7 @@ export async function recordRawSnapshot({
   const existingSnapshot = contentHash ? await findExistingSnapshot(client, contentHash) : null;
   const compressedHtmlPath =
     existingSnapshot?.compressedHtmlPath ??
-    (contentHash ? createCompressedHtmlPath(contentHash) : null);
+    (contentHash ? createCompressedHtmlPath(contentHash, storagePathPrefix) : null);
   const duplicateOfSnapshotId = existingSnapshot?.id ?? null;
   let wroteCompressedFile = false;
 
@@ -159,9 +149,23 @@ function createSha256Hash(content: Buffer): string {
   return createHash("sha256").update(content).digest("hex");
 }
 
-function createCompressedHtmlPath(contentHash: string): string {
+function createCompressedHtmlPath(contentHash: string, storagePathPrefix: string): string {
   // 以 content hash 決定儲存路徑，避免同一內容因抓取時間或 query 參數不同而重複落地。
-  return `${SNAPSHOT_SUBDIR}/${contentHash}.html.gz`;
+  const normalizedPrefix = posix.normalize(storagePathPrefix.replaceAll("\\", "/"));
+
+  if (
+    posix.isAbsolute(normalizedPrefix) ||
+    normalizedPrefix === ".." ||
+    normalizedPrefix.startsWith("../")
+  ) {
+    throw new Error("Raw snapshot storage path prefix must stay within its mutation root.");
+  }
+
+  return posix.join(
+    normalizedPrefix === "." ? "" : normalizedPrefix,
+    SNAPSHOT_SUBDIR,
+    `${contentHash}.html.gz`,
+  );
 }
 
 async function findExistingSnapshot(
@@ -188,7 +192,7 @@ async function writeCompressedHtml({
   content: Buffer;
 }): Promise<void> {
   const outputPath = join(storageDir, relativePath);
-  await mkdir(join(storageDir, SNAPSHOT_SUBDIR), { recursive: true });
+  await mkdir(dirname(outputPath), { recursive: true });
   await writeFile(outputPath, await gzipAsync(content));
 }
 

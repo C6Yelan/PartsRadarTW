@@ -3,18 +3,13 @@
 
 import type { Prisma } from "@partsradar/db";
 import type { DiscordBotClient } from "../types";
-import {
-  clampPublicPriceReportMaxItems,
-  normalizePublicPriceReportFilters,
-  toPublicPriceReportFilters,
-} from "./filters";
+import { normalizePublicPriceReportFilters, toPublicPriceReportFilters } from "./filters";
 
 // 公開報告設定讀取時固定使用的欄位集合，供設定面板與排程共用。
 export const PUBLIC_PRICE_REPORT_SETTING_SELECT = {
   id: true,
   discordGuildId: true,
   channelId: true,
-  maxItems: true,
   categoryIgrps: true,
   productKeyword: true,
   includePriceDrops: true,
@@ -22,8 +17,6 @@ export const PUBLIC_PRICE_REPORT_SETTING_SELECT = {
   includeNewProducts: true,
   enabled: true,
   notificationCursorAt: true,
-  createdByDiscordUserId: true,
-  updatedByDiscordUserId: true,
   createdAt: true,
   updatedAt: true,
 } as const satisfies Prisma.DiscordPublicPriceReportSettingSelect;
@@ -137,12 +130,11 @@ export async function setPublicPriceReportEnabled({
   });
 }
 
-// 更新公開價格報告的篩選條件與顯示上限，並重設 notification cursor。
+// 更新公開價格報告篩選條件，並重設 notification cursor。
 export async function updatePublicPriceReportFilters({
   client,
   discordGuildId,
   discordUserId,
-  maxItems,
   categoryIgrps,
   productKeyword,
   includePriceDrops,
@@ -153,7 +145,6 @@ export async function updatePublicPriceReportFilters({
   client: DiscordBotClient;
   discordGuildId: string;
   discordUserId: string;
-  maxItems?: number;
   categoryIgrps?: number[];
   productKeyword?: string | null;
   includePriceDrops?: boolean;
@@ -182,7 +173,6 @@ export async function updatePublicPriceReportFilters({
       discordGuildId,
     },
     data: {
-      maxItems: clampPublicPriceReportMaxItems(maxItems ?? current.maxItems),
       categoryIgrps: filters.categoryIgrps,
       productKeyword: filters.productKeyword,
       includePriceDrops: filters.includePriceDrops,

@@ -1,5 +1,5 @@
 // packages/db/prisma/seed.ts
-// 寫入 PartsRadarTW 第一版使用的 CoolPC sourceCategory 基礎分類資料。
+// 寫入 PartsRadarTW 支援的 CoolPC sourceCategory 基礎分類資料。
 
 import { prisma } from "../src/client";
 

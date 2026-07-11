@@ -17,8 +17,6 @@ import {
 import { parsePriceHistoryRange, PRICE_HISTORY_MILLISECONDS_PER_DAY } from "./query";
 import { type ProductPriceHistoryResponseBody, toPriceHistoryResponse } from "./response";
 
-export type { ProductPriceHistoryReadClient } from "./data";
-
 interface ProductPriceHistoryHandlerOptions {
   now?: Date;
 }
@@ -77,7 +75,7 @@ export function createGetProductPriceHistoryHandler(
       });
 
       return jsonOk<ProductPriceHistoryResponseBody>(
-        toPriceHistoryResponse(normalizedProductId, range, snapshots, product, since),
+        toPriceHistoryResponse(range, snapshots, product, since),
       );
     } catch (error) {
       if (error instanceof InvalidQueryError) {

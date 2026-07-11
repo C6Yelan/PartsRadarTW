@@ -1,0 +1,3 @@
+ALTER TABLE "discord_public_price_report_deliveries"
+RENAME CONSTRAINT "discord_public_report_deliveries_crawl_run_id_fkey"
+TO "discord_public_price_report_deliveries_crawl_run_id_fkey";

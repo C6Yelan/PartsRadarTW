@@ -8,10 +8,17 @@ import { dirname, join, resolve } from "node:path";
 const ENV_KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const NON_NEGATIVE_INTEGER_PATTERN = /^(0|[1-9][0-9]*)$/;
 const SECRET_ENV_ASSIGNMENT_PATTERN =
-  /\b([A-Z0-9_]*(?:DATABASE_URL|PASSWORD|PHPSESSID|SECRET|TOKEN)[A-Z0-9_]*=)[^\s]+/g;
-const SECRET_FLAG_PATTERN = /(--(?:database-url|password|secret|token)\s+)[^\s]+/gi;
+  /\b((?:DATABASE_URL|PHPSESSID|(?:[A-Z0-9_]+_)?(?:TOKEN|PASSWORD|SECRET)|(?:[A-Z0-9_]+_)?WEBHOOK_?URL)\s*=\s*)(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\s]+)/gi;
+const AUTHORIZATION_CREDENTIAL_PATTERN =
+  /(\bAuthorization\s*[:=]\s*(?:Bearer|Bot)\s+)(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\s,;]+)/gi;
+const SECRET_FLAG_PATTERN =
+  /(--(?:database-url|password|secret|token)\s+)(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\s]+)/gi;
+const SECRET_COLON_PATTERN =
+  /(\b(?:token|password|secret)\s*:\s*)(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\s,;]+)/gi;
 const URL_CREDENTIAL_PATTERN = /([a-z][a-z0-9+.-]*:\/\/)[^/\s:@]+:[^@\s/]+@/gi;
-const POSTGRES_URL_PATTERN = /postgres(?:ql)?:\/\/[^\s@]+@[^\s]+/gi;
+const POSTGRES_URL_PATTERN = /postgres(?:ql)?:\/\/[^\s'"<>]+/gi;
+const DISCORD_WEBHOOK_URL_PATTERN =
+  /https?:\/\/(?:canary\.|ptb\.)?discord(?:app)?\.com\/api(?:\/v\d+)?\/webhooks\/[^\s'"<>]+/gi;
 const PHP_SESSION_QUERY_PATTERN = /([?&]PHPSESSID=)[^&\s]+/gi;
 const WORKSPACE_ROOT_MARKER = "pnpm-workspace.yaml";
 
@@ -36,13 +43,9 @@ export function resolveWorkspaceRoot(cwd = process.cwd()): string {
   }
 }
 
-// 僅在可控邊界內載入環境；正式環境只讀 .env，避免本機覆寫注入來源與既有值。
+// 僅讀取 workspace .env，且不覆寫既有 process env。
 export async function loadWorkspaceEnv(workspaceRoot: string): Promise<void> {
-  await loadEnvFile(join(workspaceRoot, ".env"), false);
-
-  if (shouldLoadLocalEnv()) {
-    await loadEnvFile(join(workspaceRoot, ".env.local"), shouldOverrideLocalEnvFile());
-  }
+  await loadEnvFile(join(workspaceRoot, ".env"), ".env");
 }
 
 // 讀取指定 CLI flag 後方的字串值；缺值或下一個 token 是 flag 時直接報錯。
@@ -111,21 +114,24 @@ export function resolveWorkspacePathArgument(workspaceRoot: string, path: string
 
 // 輸出 CLI 錯誤前先套用遮蔽規則，避免密鑰字串外流。
 export function toSafeCliErrorMessage(error: unknown): string {
-  return sanitizeCliLogMessage(error instanceof Error ? error.message : String(error));
+  return sanitizeSensitiveText(error instanceof Error ? error.message : String(error));
 }
 
-// 遮蔽 CLI/log 常見敏感片段；完整規則後續需和 ops logger 收斂成同一來源。
-function sanitizeCliLogMessage(message: string): string {
-  return message
-    .replace(POSTGRES_URL_PATTERN, "postgresql://***")
-    .replace(URL_CREDENTIAL_PATTERN, "$1***:***@")
-    .replace(SECRET_ENV_ASSIGNMENT_PATTERN, "$1***")
-    .replace(SECRET_FLAG_PATTERN, "$1***")
-    .replace(PHP_SESSION_QUERY_PATTERN, "$1***");
+// 遮蔽 CLI 與 ops log 已確認會出現的敏感格式，讓所有輸出共用同一規則。
+export function sanitizeSensitiveText(value: string): string {
+  return value
+    .replace(DISCORD_WEBHOOK_URL_PATTERN, "https://discord.com/api/webhooks/[redacted]")
+    .replace(POSTGRES_URL_PATTERN, "postgresql://[redacted]")
+    .replace(URL_CREDENTIAL_PATTERN, "$1[redacted]:[redacted]@")
+    .replace(SECRET_ENV_ASSIGNMENT_PATTERN, "$1[redacted]")
+    .replace(AUTHORIZATION_CREDENTIAL_PATTERN, "$1[redacted]")
+    .replace(SECRET_FLAG_PATTERN, "$1[redacted]")
+    .replace(SECRET_COLON_PATTERN, "$1[redacted]")
+    .replace(PHP_SESSION_QUERY_PATTERN, "$1[redacted]");
 }
 
-// 對 .env/ .env.local 進行逐行解析；缺行列格式會直接中斷，避免載入半套值到程式環境。
-async function loadEnvFile(path: string, override: boolean): Promise<void> {
+// 對 .env 進行逐行解析；缺行列格式會直接中斷，且錯誤不回顯原始內容。
+async function loadEnvFile(path: string, displayPath: string): Promise<void> {
   let content: string;
 
   try {
@@ -138,7 +144,7 @@ async function loadEnvFile(path: string, override: boolean): Promise<void> {
     throw error;
   }
 
-  for (const line of content.split(/\r?\n/)) {
+  for (const [lineIndex, line] of content.split(/\r?\n/).entries()) {
     const trimmed = line.trim();
 
     if (!trimmed || trimmed.startsWith("#")) {
@@ -148,31 +154,21 @@ async function loadEnvFile(path: string, override: boolean): Promise<void> {
     const separatorIndex = trimmed.indexOf("=");
 
     if (separatorIndex <= 0) {
-      throw new Error(`Invalid env assignment in ${path}: ${trimmed}`);
+      throw new Error(`Invalid env assignment in ${displayPath} at line ${lineIndex + 1}.`);
     }
 
     const key = trimmed.slice(0, separatorIndex).trim();
 
     if (!ENV_KEY_PATTERN.test(key)) {
-      throw new Error(`Invalid env key "${key}" in ${path}.`);
+      throw new Error(`Invalid env key in ${displayPath} at line ${lineIndex + 1}.`);
     }
 
     const value = unquoteEnvValue(trimmed.slice(separatorIndex + 1).trim());
 
-    if (override || process.env[key] === undefined) {
+    if (process.env[key] === undefined) {
       process.env[key] = value;
     }
   }
-}
-
-// 判斷是否載入 .env.local；production 不載入本機覆寫檔，避免部署環境被 local 設定影響。
-function shouldLoadLocalEnv(): boolean {
-  return process.env.NODE_ENV !== "production";
-}
-
-// 判斷 .env.local 是否覆寫既有 env；目前與載入條件一致，後續可合併為單一 helper。
-function shouldOverrideLocalEnvFile(): boolean {
-  return process.env.NODE_ENV !== "production";
 }
 
 // 移除 env value 外層成對引號；不處理 shell escape，維持簡單 .env parser 邊界。

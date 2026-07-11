@@ -1,24 +1,29 @@
 "use client";
 // apps/web/app/build-list/components/BuildListItemImage.tsx
-// 顯示配單品項縮圖，並在圖片缺失或載入失敗時提供可讀的 fallback。
+// 顯示當次 refresh 商品縮圖，未知或載入失敗時使用不含舊 snapshot 的 fallback。
 
 import { useState } from "react";
-import type { BuildListItem } from "../model";
+import type { BuildListProductSnapshot } from "../model";
 
-// 呈現單一配單品項圖片；圖片失敗後固定改顯示分類 fallback，避免重複觸發錯誤載入。
-export default function BuildListItemImage({ item }: { item: BuildListItem }) {
+export default function BuildListItemImage({
+  product,
+}: {
+  product: BuildListProductSnapshot | null;
+}) {
   const [hasError, setHasError] = useState(false);
 
-  if (!item.image || hasError) {
+  if (!product?.image || hasError) {
+    const fallbackLabel = product?.category.displayName ?? "商品資料";
+
     return (
       <div
         className="build-list-item-image fallback"
-        aria-label={`${item.category.displayName}圖片暫時無法顯示`}
+        aria-label={`${fallbackLabel}圖片暫時無法顯示`}
         role="img"
       >
         <span className="image-fallback-copy">
           <strong>無圖</strong>
-          <small>{item.category.displayName}</small>
+          <small>{fallbackLabel}</small>
         </span>
       </div>
     );
@@ -27,12 +32,12 @@ export default function BuildListItemImage({ item }: { item: BuildListItem }) {
   return (
     // biome-ignore lint/performance/noImgElement: Product images are served by the local API; plain img keeps the fallback path direct.
     <img
-      alt={item.image.alt}
+      alt={product.image.alt}
       className="build-list-item-image"
       draggable={false}
       loading="lazy"
       referrerPolicy="no-referrer"
-      src={item.image.url}
+      src={product.image.url}
       onContextMenu={(event) => event.preventDefault()}
       onError={() => setHasError(true)}
     />

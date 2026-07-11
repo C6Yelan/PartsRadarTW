@@ -1,22 +1,19 @@
 // apps/crawler/src/scripts/ops/discord-bot/target-price-notification.ts
 // 掃描達標的目標價 watch，負責 claim、分組發送 Discord DM，並記錄通知 delivery 結果。
 
-import { toSafeCliErrorMessage } from "../../shared/script-utils";
 import {
   MAX_TARGET_PRICE_NOTIFICATIONS_PER_CYCLE,
   TARGET_PRICE_NOTIFICATION_CLAIM_LEASE_MS,
 } from "./constants";
 import { recordTargetPriceNotificationDelivery } from "./target-price-notification/delivery";
+import { createTargetPriceReachedMessages } from "./target-price-notification/messages";
 import {
-  createTargetPriceReachedMessages,
-} from "./target-price-notification/messages";
-import {
-  TARGET_PRICE_NOTIFICATION_SELECT,
   groupTargetPriceWatchesByUser,
   isTargetPriceReached,
+  TARGET_PRICE_NOTIFICATION_SELECT,
   type TargetPriceNotificationWatch,
 } from "./target-price-notification/records";
-import type { DiscordBotClient, DiscordBotMessage, DiscordBotMessageSendResult } from "./types";
+import type { DiscordBotClient, DiscordBotMessage, DiscordMessageSendResult } from "./types";
 
 // 單輪目標價通知掃描結果，供 daemon log 與維運觀察本輪處理狀態。
 export interface TargetPriceNotificationSummary {
@@ -41,7 +38,7 @@ export async function sendDueTargetPriceNotifications({
   sendDirectMessages: (
     discordUserId: string,
     messages: DiscordBotMessage[],
-  ) => Promise<DiscordBotMessageSendResult>;
+  ) => Promise<DiscordMessageSendResult>;
 }): Promise<TargetPriceNotificationSummary> {
   const staleClaimBefore = new Date(now.getTime() - TARGET_PRICE_NOTIFICATION_CLAIM_LEASE_MS);
   const candidates = await client.discordTargetPriceWatch.findMany({
@@ -109,17 +106,18 @@ export async function sendDueTargetPriceNotifications({
     }
 
     const messages = createTargetPriceReachedMessages({ watches: claimedWatches, publicBaseUrl });
-    let sendResult: DiscordBotMessageSendResult;
+    let sendResult: DiscordMessageSendResult;
 
     try {
       sendResult = await sendDirectMessages(discordUserId, messages);
-    } catch (error) {
+    } catch {
       sendResult = {
         status: "failed",
         messageCount: messages.length,
         sentMessageCount: 0,
         httpStatus: null,
-        message: toSafeCliErrorMessage(error),
+        errorCategory: "TRANSPORT",
+        providerErrorCode: null,
       };
     }
 
@@ -177,5 +175,3 @@ export async function sendDueTargetPriceNotifications({
 
   return summary;
 }
-
-export { createTargetPriceReachedMessage } from "./target-price-notification/messages";

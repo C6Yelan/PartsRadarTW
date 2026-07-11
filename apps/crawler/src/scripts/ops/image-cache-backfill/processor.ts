@@ -3,13 +3,13 @@
 
 import { join, relative } from "node:path";
 import type { PrismaClient } from "@partsradar/db";
-import { normalizeCoolpcProductImageUrl } from "../../../coolpc/parser";
+import { normalizeCoolpcProductImageUrl } from "../../../coolpc/parser/urls";
+import { toSafeCliErrorMessage } from "../../shared/script-utils";
 import {
   createProductImageCandidateByIdsWhere,
   createProductImageCandidateSelect,
   createProductImageCandidateWhere,
   MISSING_IMAGE_CANDIDATE_BY_IDS_ORDER_BY,
-  MISSING_IMAGE_CANDIDATE_ORDER_BY,
   PRODUCT_IMAGE_CANDIDATE_ORDER_BY,
 } from "./candidate-query";
 import {
@@ -19,7 +19,6 @@ import {
   formatBytes,
   pathExists,
   randomDelayMs,
-  toErrorMessage,
   writeFileAtomically,
   writeFileFromReusableImage,
 } from "./image-files";
@@ -43,7 +42,7 @@ type ProcessStatus = "cached" | "dry-run" | "failed" | "invalid" | "reused" | "s
 
 interface ProcessResult {
   status: ProcessStatus;
-  didFetch: boolean;
+  didRequestSource: boolean;
 }
 
 interface BackfillLoggers {
@@ -62,33 +61,6 @@ export async function readCandidates(
     orderBy: PRODUCT_IMAGE_CANDIDATE_ORDER_BY,
     take: options.limit ?? undefined,
   });
-}
-
-// 讀取目前本地尚未有 WebP 快取的候選，並在檔案檢查後才套用 limit。
-export async function readMissingImageCandidates(
-  client: PrismaClient,
-  options: ImageBackfillOptions,
-): Promise<ProductImageCandidate[]> {
-  const candidates = await client.product.findMany({
-    where: createProductImageCandidateWhere(options),
-    select: createProductImageCandidateSelect(),
-    orderBy: MISSING_IMAGE_CANDIDATE_ORDER_BY,
-  });
-  const missingCandidates: ProductImageCandidate[] = [];
-
-  for (const candidate of candidates) {
-    if (await pathExists(join(options.storageDir, `${candidate.id}.webp`))) {
-      continue;
-    }
-
-    missingCandidates.push(candidate);
-
-    if (options.limit !== null && missingCandidates.length >= options.limit) {
-      break;
-    }
-  }
-
-  return missingCandidates;
 }
 
 // scheduled crawler 只針對本輪新增商品補圖，因此以 product id 清單收斂查詢範圍。
@@ -162,7 +134,7 @@ export async function backfillImages(
     );
     summary[result.status === "dry-run" ? "dryRun" : result.status] += 1;
 
-    if (result.didFetch) {
+    if (result.didRequestSource) {
       summary.liveFetches += 1;
     }
   }
@@ -180,13 +152,14 @@ async function processCandidate(
 ): Promise<ProcessResult> {
   const outputPath = join(options.storageDir, `${candidate.id}.webp`);
   const label = `${candidate.sourceCategory.displayName} IGrp=${candidate.sourceCategory.igrp}`;
+  let didRequestSource = false;
 
   try {
     const sourceImageUrl = candidate.primaryImageUrl;
 
     if (!sourceImageUrl) {
       log(`[invalid] ${candidate.id} | missing image URL | ${candidate.name}`);
-      return { status: "invalid", didFetch: false };
+      return { status: "invalid", didRequestSource };
     }
 
     const normalizedImageUrl = normalizeCoolpcProductImageUrl(
@@ -196,7 +169,7 @@ async function processCandidate(
 
     if (!normalizedImageUrl) {
       log(`[invalid] ${candidate.id} | invalid source image URL | ${sourceImageUrl}`);
-      return { status: "invalid", didFetch: false };
+      return { status: "invalid", didRequestSource };
     }
 
     if (!options.overwrite && (await pathExists(outputPath))) {
@@ -207,7 +180,7 @@ async function processCandidate(
       debugLog(
         `[skipped] ${candidate.id} | existing ${relative(options.workspaceRoot, outputPath)} | ${candidate.name}`,
       );
-      return { status: "skipped", didFetch: false };
+      return { status: "skipped", didRequestSource };
     }
 
     // 相同來源圖片只下載一次，後續商品直接複製已產生的本地縮圖。
@@ -223,7 +196,7 @@ async function processCandidate(
           reusableImagePath ? "reuse local thumbnail" : normalizedImageUrl
         } -> ${relative(options.workspaceRoot, outputPath)}`,
       );
-      return { status: "dry-run", didFetch: false };
+      return { status: "dry-run", didRequestSource };
     }
 
     if (reusableImagePath) {
@@ -237,7 +210,7 @@ async function processCandidate(
         )} | ${candidate.name}`,
       );
 
-      return { status: "reused", didFetch: false };
+      return { status: "reused", didRequestSource };
     }
 
     // 第一筆 live request 不等待；從第二筆開始套用隨機延遲，降低手動補圖對來源站的壓力。
@@ -247,7 +220,9 @@ async function processCandidate(
       await delay(waitMs);
     }
 
-    const sourceBytes = await fetchSourceImageBytes(normalizedImageUrl, options);
+    const sourceBytes = await fetchSourceImageBytes(normalizedImageUrl, options, () => {
+      didRequestSource = true;
+    });
     const thumbnailBytes = await createWebpThumbnail(sourceBytes);
     await writeFileAtomically(outputPath, thumbnailBytes);
     reusableImagePathsBySourceUrl.set(normalizedImageUrl, outputPath);
@@ -258,9 +233,9 @@ async function processCandidate(
       )} | ${candidate.name}`,
     );
 
-    return { status: "cached", didFetch: true };
+    return { status: "cached", didRequestSource };
   } catch (error) {
-    log(`[failed] ${candidate.id} | ${toErrorMessage(error)} | ${candidate.name}`);
-    return { status: "failed", didFetch: true };
+    log(`[failed] ${candidate.id} | ${toSafeCliErrorMessage(error)} | ${candidate.name}`);
+    return { status: "failed", didRequestSource };
   }
 }

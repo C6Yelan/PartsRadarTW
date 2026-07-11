@@ -3,7 +3,6 @@
 
 import { readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
-export { createPublicProductImagePath } from "@partsradar/shared";
 
 import { internalErrorResponse, notFoundResponse } from "../_shared/responses";
 

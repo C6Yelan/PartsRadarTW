@@ -122,7 +122,6 @@ export async function sendPublicReportTest({
     client,
     channelId: setting.channelId,
     publicBaseUrl: options.publicBaseUrl,
-    maxItems: Math.min(setting.maxItems, options.priceReportMaxItems),
     filters: toPublicPriceReportFilters(setting),
     sendChannelMessages: (channelId, messages) =>
       sendDiscordChannelMessages({
@@ -150,13 +149,11 @@ export async function readPublicPriceReportSettingsPanel({
   client,
   discordGuildId,
   currentChannelId,
-  options,
   notice,
 }: {
   client: DiscordBotClient;
   discordGuildId: string;
   currentChannelId: string;
-  options: DiscordBotOptions;
   notice?: string;
 }): Promise<PublicPriceReportSettingsPanel> {
   const [setting, categories] = await Promise.all([
@@ -171,7 +168,6 @@ export async function readPublicPriceReportSettingsPanel({
     setting,
     latestDelivery,
     categories,
-    options,
     currentChannelId,
     notice,
   };

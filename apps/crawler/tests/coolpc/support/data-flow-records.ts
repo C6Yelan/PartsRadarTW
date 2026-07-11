@@ -30,13 +30,6 @@ export interface FakeCategoryResult {
   errorMessage: string | null;
 }
 
-export interface FakeSourceCategoryUpdate {
-  sourceCategoryId: string;
-  lastCheckedAt: Date;
-  lastSuccessAt?: Date;
-  updatedLastSuccessAt: boolean;
-}
-
 export interface FakeRawSnapshot {
   id: string;
   crawlRunId: string;

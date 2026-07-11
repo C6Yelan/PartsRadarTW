@@ -1,9 +1,9 @@
 // apps/web/app/product-explorer/components/Pagination.tsx
 // 呈現商品列表分頁控制、頁碼按鈕與大量頁數時的跳頁輸入。
 
-import type { FormEvent } from "react";
-import type { LoadState } from "../types";
+import type { SyntheticEvent } from "react";
 import { toDigitsOnly } from "../query-state";
+import type { LoadState } from "../types";
 
 interface PaginationProps {
   page: number;
@@ -13,7 +13,7 @@ interface PaginationProps {
   totalPages: number;
   visiblePages: Array<number | string>;
   onGoToPage: (page: number) => void;
-  onJumpSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onJumpSubmit: (event: SyntheticEvent<HTMLFormElement>) => void;
   onPageJumpValueChange: (value: string) => void;
 }
 

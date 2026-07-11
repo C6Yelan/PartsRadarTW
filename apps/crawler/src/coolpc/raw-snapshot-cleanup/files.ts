@@ -1,7 +1,8 @@
 // apps/crawler/src/coolpc/raw-snapshot-cleanup/files.ts
 // 處理 raw snapshot 壓縮檔清理流程中的路徑驗證、預檢與刪除執行，確保只操作 storage 內的檔案且不會越權刪除。
 
-import { lstat, unlink } from "node:fs/promises";
+import type { Stats } from "node:fs";
+import { lstat, realpath, unlink } from "node:fs/promises";
 import { isAbsolute, relative, resolve } from "node:path";
 
 export function validateCompressedHtmlPaths(
@@ -20,23 +21,7 @@ export async function preflightCompressedHtmlFiles(
 ): Promise<void> {
   // 刪除前預檢：檔案不存在可忽略，非檔案類型直接阻擋，避免刪到目錄或特殊檔。
   for (const relativePath of compressedHtmlPaths) {
-    const outputPath = resolveCompressedHtmlPath(storageDir, relativePath);
-
-    try {
-      const stats = await lstat(outputPath);
-
-      if (!stats.isFile()) {
-        throw new Error(
-          `Refusing to delete raw snapshot path because it is not a regular file: ${relativePath}`,
-        );
-      }
-    } catch (error) {
-      if (isNodeError(error) && error.code === "ENOENT") {
-        continue;
-      }
-
-      throw error;
-    }
+    await inspectCompressedHtmlFile(storageDir, relativePath);
   }
 }
 
@@ -49,8 +34,15 @@ export async function deleteCompressedHtmlFiles(
   let missing = 0;
 
   for (const relativePath of compressedHtmlPaths) {
+    const outputPath = await inspectCompressedHtmlFile(storageDir, relativePath);
+
+    if (outputPath === null) {
+      missing += 1;
+      continue;
+    }
+
     try {
-      await unlink(resolveCompressedHtmlPath(storageDir, relativePath));
+      await unlink(outputPath);
       deleted += 1;
     } catch (error) {
       if (isNodeError(error) && error.code === "ENOENT") {
@@ -63,6 +55,42 @@ export async function deleteCompressedHtmlFiles(
   }
 
   return { deleted, missing };
+}
+
+async function inspectCompressedHtmlFile(
+  storageDir: string,
+  relativePath: string,
+): Promise<string | null> {
+  const outputPath = resolveCompressedHtmlPath(storageDir, relativePath);
+  let stats: Stats;
+
+  try {
+    stats = await lstat(outputPath);
+  } catch (error) {
+    if (isNodeError(error) && error.code === "ENOENT") {
+      return null;
+    }
+
+    throw error;
+  }
+
+  if (!stats.isFile()) {
+    throw new Error(
+      `Refusing to delete raw snapshot path because it is not a regular file: ${relativePath}`,
+    );
+  }
+
+  const canonicalRoot = await realpath(resolve(storageDir));
+  const canonicalOutputPath = await realpath(outputPath);
+  const canonicalRelativePath = relative(canonicalRoot, canonicalOutputPath);
+
+  if (canonicalRelativePath.startsWith("..") || isAbsolute(canonicalRelativePath)) {
+    throw new Error(
+      `Refusing to delete raw snapshot path because a symlink resolves outside storage dir: ${relativePath}`,
+    );
+  }
+
+  return outputPath;
 }
 
 function resolveCompressedHtmlPath(storageDir: string, relativePath: string): string {

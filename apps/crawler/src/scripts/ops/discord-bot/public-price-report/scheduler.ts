@@ -2,31 +2,24 @@
 // 掃描已完成的 scheduled crawl run，對啟用的公開報告頻道發送尚未送出的價格報告。
 
 import { CRAWL_RUN_STATUSES } from "../../../../coolpc/crawl-run";
-import { readCrawlRunPriceChangeSummary } from "../price-report/reader";
 import {
-  MAX_DUE_PUBLIC_PRICE_REPORTS_PER_CYCLE,
   MAX_DUE_PUBLIC_PRICE_REPORT_SETTINGS_PER_CYCLE,
+  MAX_DUE_PUBLIC_PRICE_REPORTS_PER_CYCLE,
+  MAX_PRICE_REPORT_ITEMS,
 } from "../constants";
-import {
-  filterNewProductsForReport,
-  filterPriceChangesForReport,
-} from "../price-report/filters";
+import { NO_DISCORD_DELIVERY_ERROR, toDiscordDeliveryErrorFields } from "../delivery-error-fields";
+import { filterNewProductsForReport, filterPriceChangesForReport } from "../price-report/filters";
 import { createPublicPriceReportMessages } from "../price-report/messages";
+import { readCrawlRunPriceChangeSummary } from "../price-report/reader";
 import type {
   DiscordBotClient,
   DiscordBotMessage,
-  DiscordBotMessageSendResult,
+  DiscordMessageSendResult,
   DiscordBotOptions,
 } from "../types";
-import {
-  recordPublicPriceReportDelivery,
-  type PublicPriceReportStatus,
-} from "./delivery";
+import { type PublicPriceReportStatus, recordPublicPriceReportDelivery } from "./delivery";
 import { toPublicPriceReportFilters } from "./filters";
-import {
-  PUBLIC_PRICE_REPORT_SETTING_SELECT,
-  type PublicPriceReportSetting,
-} from "./settings";
+import { PUBLIC_PRICE_REPORT_SETTING_SELECT, type PublicPriceReportSetting } from "./settings";
 
 // 單輪公開價格報告排程處理摘要，供 Discord bot daemon log 與維運觀察使用。
 export interface PublicPriceReportSummary {
@@ -46,12 +39,12 @@ export async function sendPendingPublicPriceReports({
   sendChannelMessages,
 }: {
   client: DiscordBotClient;
-  options: Pick<DiscordBotOptions, "publicBaseUrl" | "priceReportMaxItems">;
+  options: Pick<DiscordBotOptions, "publicBaseUrl">;
   now?: Date;
   sendChannelMessages: (
     channelId: string,
     messages: DiscordBotMessage[],
-  ) => Promise<DiscordBotMessageSendResult>;
+  ) => Promise<DiscordMessageSendResult>;
 }): Promise<PublicPriceReportSummary> {
   const summary: PublicPriceReportSummary = {
     settingCount: 0,
@@ -102,12 +95,12 @@ async function sendPendingPublicPriceReportsForSetting({
 }: {
   client: DiscordBotClient;
   setting: PublicPriceReportSetting;
-  options: Pick<DiscordBotOptions, "publicBaseUrl" | "priceReportMaxItems">;
+  options: Pick<DiscordBotOptions, "publicBaseUrl">;
   now: Date;
   sendChannelMessages: (
     channelId: string,
     messages: DiscordBotMessage[],
-  ) => Promise<DiscordBotMessageSendResult>;
+  ) => Promise<DiscordMessageSendResult>;
 }): Promise<Omit<PublicPriceReportSummary, "settingCount">> {
   const summary = {
     processedCount: 0,
@@ -161,7 +154,6 @@ async function sendPendingPublicPriceReportsForSetting({
       client,
       setting,
       crawlRunId: crawlRun.id,
-      maxItems: Math.min(setting.maxItems, options.priceReportMaxItems),
       publicBaseUrl: options.publicBaseUrl,
       now,
       sendChannelMessages,
@@ -186,7 +178,6 @@ async function sendPublicPriceReportForCrawlRun({
   client,
   setting,
   crawlRunId,
-  maxItems,
   publicBaseUrl,
   now,
   sendChannelMessages,
@@ -194,13 +185,12 @@ async function sendPublicPriceReportForCrawlRun({
   client: DiscordBotClient;
   setting: PublicPriceReportSetting;
   crawlRunId: string;
-  maxItems: number;
   publicBaseUrl: string;
   now: Date;
   sendChannelMessages: (
     channelId: string,
     messages: DiscordBotMessage[],
-  ) => Promise<DiscordBotMessageSendResult>;
+  ) => Promise<DiscordMessageSendResult>;
 }): Promise<PublicPriceReportStatus> {
   const readResult = await readCrawlRunPriceChangeSummary(client, crawlRunId);
   const filters = toPublicPriceReportFilters(setting);
@@ -217,7 +207,7 @@ async function sendPublicPriceReportForCrawlRun({
       itemCount: 0,
       messageCount: 0,
       deliveredAt: null,
-      errorMessage: "no_report_items",
+      ...NO_DISCORD_DELIVERY_ERROR,
     });
 
     return "SKIPPED";
@@ -227,12 +217,11 @@ async function sendPublicPriceReportForCrawlRun({
     { priceChanges: changes, newProducts },
     {
       publicBaseUrl,
-      maxItems,
       generatedAt: now,
     },
   );
   const result = await sendChannelMessages(channelId, messages);
-  const itemCount = Math.min(changes.length + newProducts.length, maxItems);
+  const itemCount = Math.min(changes.length + newProducts.length, MAX_PRICE_REPORT_ITEMS);
 
   if (result.status === "sent") {
     await recordPublicPriceReportDelivery({
@@ -243,7 +232,7 @@ async function sendPublicPriceReportForCrawlRun({
       itemCount,
       messageCount: messages.length,
       deliveredAt: now,
-      errorMessage: null,
+      ...toDiscordDeliveryErrorFields(result),
     });
 
     return "SENT";
@@ -258,7 +247,7 @@ async function sendPublicPriceReportForCrawlRun({
       itemCount,
       messageCount: messages.length,
       deliveredAt: null,
-      errorMessage: `Discord rate limited public report. sentMessages=${result.sentMessageCount}/${result.messageCount} retryAfterMs=${result.retryAfterMs} global=${result.global ? "yes" : "no"}`,
+      ...toDiscordDeliveryErrorFields(result),
     });
 
     return "RATE_LIMITED";
@@ -272,7 +261,7 @@ async function sendPublicPriceReportForCrawlRun({
     itemCount,
     messageCount: messages.length,
     deliveredAt: null,
-    errorMessage: result.message,
+    ...toDiscordDeliveryErrorFields(result),
   });
 
   return "FAILED";

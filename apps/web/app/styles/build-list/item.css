@@ -7,6 +7,10 @@
   padding: 18px;
 }
 
+.build-list-item.is-unconfirmed {
+  border-color: rgba(224, 178, 104, 0.34);
+}
+
 .build-list-item-image {
   display: block;
   width: 84px;
@@ -50,6 +54,17 @@
   min-width: 0;
   gap: 12px;
   justify-items: start;
+}
+
+.build-list-item-labels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.build-list-item-labels .row-state {
+  font-size: 12px;
 }
 
 .build-list-item-main h2 {
@@ -121,11 +136,10 @@
 }
 
 .build-list-link-icon {
+  width: 14px;
+  height: 14px;
   color: currentColor;
-  font-size: 11px;
-  line-height: 1;
   opacity: 0.68;
-  transform: translateY(-1px);
   transition:
     opacity 140ms ease,
     transform 140ms ease;
@@ -134,7 +148,7 @@
 .build-list-links a:hover .build-list-link-icon,
 .build-list-links a:focus-visible .build-list-link-icon {
   opacity: 1;
-  transform: translate(1px, -2px);
+  transform: translate(1px, -1px);
 }
 
 .build-list-item-controls {

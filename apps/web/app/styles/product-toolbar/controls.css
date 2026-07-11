@@ -30,17 +30,9 @@
   font-size: 13px;
 }
 
-.toolbar-price-filter {
-  grid-template-columns: auto minmax(0, 1fr);
-}
-
 .toolbar-price-grid {
   gap: 8px;
   min-width: 0;
-}
-
-.toolbar-status-filter {
-  grid-template-columns: auto minmax(0, 1fr);
 }
 
 .toolbar-segmented-control {

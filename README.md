@@ -1,44 +1,38 @@
 # PartsRadarTW
 
-PartsRadarTW 是一個以原價屋電腦零組件價格查詢為核心的網站專案，目標是提供比原價屋報價頁面更清楚、易搜尋、易篩選的查詢體驗。
+PartsRadarTW 是一個非官方的台灣電腦零組件價格查詢工具，將原價屋公開商品資料整理成更容易搜尋、篩選與比較近期價格變化的介面。
 
-本專案只鎖定原價屋資料來源，整理商品名稱、主要商品圖片、分類、價格與更新時間，讓使用者可以更有效率地查找 CPU、顯示卡、主機板、記憶體、儲存裝置、電源供應器等電腦零組件資訊。
+[開啟 PartsRadarTW](https://partsradar.net/)
 
-## 專案目標
+## 你可以做什麼
 
-- 提供乾淨、直覺的電腦零組件價格查詢介面。
-- 改善商品搜尋、分類瀏覽與價格排序體驗。
-- 保存商品價格與更新時間，讓價格歷史與近期價格變動更容易被追蹤與檢視。
-- 提供不需帳號的配單、Excel 匯出、可列印版面與資料可信度檢查。
+- 依關鍵字、零組件分類、品牌、價格與商品狀態篩選商品。
+- 查看目前價格、近 30 天漲跌與 7／30／90 天或全部價格歷史。
+- 開啟商品詳細資料與原價屋查看／購買連結。
+- 不登入帳號即可在瀏覽器建立配單、調整數量、列印或匯出 Excel。
+- 透過 Discord 查看價格報告、設定個人每日報告與目標價提醒。
+- 由 Discord 伺服器管理員設定公開價格變動報告。
 
-## 主要功能
+配單只保存在目前瀏覽器。網站本身沒有會員帳號，也不提供下單、自動購買、零組件相容性檢查或跨商店比價。
 
-目前核心功能包含：
+## 資料來源與限制
 
-- 商品關鍵字搜尋、分類瀏覽、廠商篩選、價格篩選與排序。
-- 商品主要圖片、目前價格、價格最後確認時間與來源資料狀態顯示。
-- 商品詳細頁與原價屋查看 / 購買連結。
-- 商品詳細頁價格歷史、7 / 30 / 90 天與全部時間範圍切換。
-- 首頁近 30 天價格變動顯示與降幅 / 漲幅排序。
-- 不需帳號的 client-side 配單、數量調整、總價、Excel 匯出與可列印版面。
-- 商品連結健康檢查、缺圖補齊、production smoke 與 log 型維運監控。
-- Discord bot 公開價格報告、個人價格報告與個人目標價提醒；網站本身仍不建立帳號。
-- 受保護的內部 `/ops/status` 頁面與管理者 Discord smoke alerting。
+PartsRadarTW 只整理原價屋公開資料，與原價屋沒有隸屬或商業合作關係。
 
-## 資料來源
-
-PartsRadarTW 以原價屋公開商品資料作為唯一資料來源。本站不隸屬於原價屋，也不代表原價屋官方服務。
-
-第一版資料庫不做多來源抽象；原價屋分類以 `IGrp` 作為外部鍵，商品唯一識別由分類與 `iBuyToken` 組成。
-
-商品價格與資料狀態可能因資料更新時間、原始頁面變動或人工調整而產生差異，實際商品資訊仍應以原始商家網站公告為準。
+價格與商品資訊可能受資料更新時間、來源頁面調整或解析狀態影響，不代表即時庫存或成交價格。購買前請以原價屋頁面顯示的資訊為準。
 
 ## 文件
 
-專案規劃文件位於 [docs](docs/README.md)。目前 runtime contract 以 [Discord Contract](docs/technical/discord-contract.md)、[Ops Contract](docs/technical/ops-contract.md)、[Operations Runbook](docs/technical/operations-runbook.md) 與 [Deployment](docs/technical/deployment.md) 為準。
+| 想了解的內容 | 文件 |
+| --- | --- |
+| 參與開發與本機啟動 | [CONTRIBUTING.md](CONTRIBUTING.md) |
+| 安全與資料處理界線 | [SECURITY.md](SECURITY.md) |
+| 系統組成與資料流 | [docs/architecture.md](docs/architecture.md) |
+| 公開 API | [docs/api.md](docs/api.md) |
+| Discord bot | [docs/discord.md](docs/discord.md) |
+| 部署 | [docs/deployment.md](docs/deployment.md) |
+| 維運操作 | [docs/operations.md](docs/operations.md) |
 
-## 未來方向
+## License
 
-- 原價屋商品分類與規格整理規則優化。
-- 持續維持 scheduled crawler、maintenance daemon、smoke daemon 與圖片快取觀察。
-- 網站帳號、網站帳號綁定、跨站比價或自動推薦配單需另開產品與資安設計。
+[MIT](LICENSE)

@@ -9,6 +9,7 @@ import {
 } from "../commands";
 import type { CommandCooldowns } from "../cooldowns";
 import { readPriceReportSetting, sendPriceReportNow, toPriceReportFilters } from "../price-report";
+import { toWindowHours } from "../price-report/schedule";
 import {
   deferInteractionResponse,
   editDeferredInteractionResponse,
@@ -20,7 +21,6 @@ import { createBotHelpMessage } from "./bot-help";
 import {
   createPriceReportSettingsPanelMessage,
   readPriceReportSettingsPanel,
-  resolveWindowHours,
 } from "./price-report-settings";
 import {
   createPublicPriceReportSettingsPanelMessage,
@@ -80,7 +80,7 @@ export async function handleApplicationCommandInteraction({
       interaction,
       options,
       fetchImpl,
-      content: "個人價格報告目前已由維運暫停。",
+      featureName: command.name === "now" ? "即時價格報告" : "每日私訊價格報告",
     });
     return;
   }
@@ -90,7 +90,7 @@ export async function handleApplicationCommandInteraction({
       interaction,
       options,
       fetchImpl,
-      content: "公開價格報告目前已由維運暫停。",
+      featureName: "公開價格報告",
     });
     return;
   }
@@ -100,7 +100,7 @@ export async function handleApplicationCommandInteraction({
       interaction,
       options,
       fetchImpl,
-      content: "目標價提醒目前已由維運暫停。",
+      featureName: "目標價提醒",
     });
     return;
   }
@@ -140,12 +140,7 @@ export async function handleApplicationCommandInteraction({
       await sendPriceReportNow({
         client,
         discordUserId,
-        windowHours: command.windowHours ?? resolveWindowHours(activeSetting?.window),
-        maxItems:
-          command.maxItems ??
-          (activeSetting
-            ? Math.min(activeSetting.maxItems, options.priceReportMaxItems)
-            : options.priceReportMaxItems),
+        windowHours: command.windowHours ?? toWindowHours(activeSetting?.window),
         publicBaseUrl: options.publicBaseUrl,
         filters: toPriceReportFilters(activeSetting),
         sendReportMessages: (messages) =>
@@ -164,7 +159,6 @@ export async function handleApplicationCommandInteraction({
     const panel = await readPriceReportSettingsPanel({
       client,
       discordUserId,
-      options,
     });
 
     await sendInteractionResponse({
@@ -209,7 +203,6 @@ export async function handleApplicationCommandInteraction({
       client,
       discordGuildId: publicContext.discordGuildId,
       currentChannelId: publicContext.channelId,
-      options,
     });
 
     await sendInteractionResponse({

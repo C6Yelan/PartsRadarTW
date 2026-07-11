@@ -4,13 +4,9 @@
 
 import { useEffect, useMemo } from "react";
 import { useProductExplorerActions } from "./actions/use-product-explorer-actions";
-import {
-  useCategories,
-  usePendingPageScroll,
-  useProductExplorerQuery,
-  useProducts,
-  useResponsiveFiltersOpen,
-} from "./hooks";
+import { useCategories } from "./data/use-categories";
+import { useProducts } from "./data/use-products";
+import { usePendingPageScroll, useProductExplorerQuery, useResponsiveFiltersOpen } from "./hooks";
 import { DEFAULT_QUERY, getVisiblePages, toUrl } from "./query-state";
 import { useProductBuildListActions } from "./use-product-build-list-actions";
 
@@ -30,15 +26,15 @@ export function useProductExplorerViewModel() {
       return;
     }
 
-    const categoryIgrps = new Set(categories.map((category) => String(category.igrp)));
-    if (query.igrp && categoryIgrps.has(query.igrp)) {
+    const categorySlugs = new Set<string>(categories.map((category) => category.slug));
+    if (query.category && categorySlugs.has(query.category)) {
       return;
     }
 
     commitQuery(
       {
         ...query,
-        igrp: String(categories[0].igrp),
+        category: categories[0].slug,
         vendors: DEFAULT_QUERY.vendors,
         page: 1,
       },
@@ -49,15 +45,14 @@ export function useProductExplorerViewModel() {
   }, [categories, categoryState, commitQuery, isReady, query]);
 
   const selectedCategoryName = useMemo(() => {
-    if (!query.igrp) {
+    if (!query.category) {
       return "選擇分類";
     }
 
     return (
-      categories.find((category) => String(category.igrp) === query.igrp)?.displayName ??
-      `IGrp ${query.igrp}`
+      categories.find((category) => category.slug === query.category)?.displayName ?? query.category
     );
-  }, [categories, query.igrp]);
+  }, [categories, query.category]);
 
   const totalItems = products?.pagination.totalItems ?? 0;
   const totalPages = products?.pagination.totalPages ?? 0;
@@ -65,7 +60,7 @@ export function useProductExplorerViewModel() {
   const shouldShowPageJump = totalPages > 10;
   const productListReturnTo = toUrl(query);
   const vendorOptions =
-    productState === "ready" && query.igrp ? (products?.meta.vendors ?? []) : [];
+    productState === "ready" && query.category ? (products?.meta.vendors ?? []) : [];
   const selectedVendorOptions = useMemo(
     () => vendorOptions.filter((option) => query.vendors.includes(option.slug)),
     [query.vendors, vendorOptions],
@@ -103,7 +98,7 @@ export function useProductExplorerViewModel() {
       categories,
       categoryState,
       filtersOpen,
-      selectedIgrp: query.igrp,
+      selectedCategory: query.category,
       actions: {
         updateCategoryFilter: actions.updateCategoryFilter,
         keepDesktopFiltersOpen,
@@ -126,6 +121,7 @@ export function useProductExplorerViewModel() {
       },
       table: {
         buildListQuantities: buildList.quantities,
+        isProductLimitReached: buildList.isProductLimitReached,
         productListReturnTo,
         products,
         productState,

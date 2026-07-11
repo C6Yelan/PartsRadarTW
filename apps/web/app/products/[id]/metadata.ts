@@ -4,13 +4,15 @@
 import type { Prisma } from "@partsradar/db";
 import { createPublicProductImagePath } from "@partsradar/shared";
 import type { Metadata } from "next";
+import { formatTwdPrice } from "../../_shared/formatting";
+import { formatTaipeiDateTime } from "../../_shared/time";
 import { normalizeProductId } from "../../api/products/[id]/product-id";
 
 const SITE_NAME = "PartsRadarTW";
 const DEFAULT_PUBLIC_SITE_URL = "https://partsradar.net";
 const FALLBACK_TITLE = `商品資訊 | ${SITE_NAME}`;
 const FALLBACK_DESCRIPTION = "原價屋電腦零組件價格查詢工具";
-const TITLE_PRODUCT_NAME_MAX_LENGTH = 88;
+const TITLE_MAX_LENGTH = 70;
 
 const PRODUCT_METADATA_SELECT = {
   id: true,
@@ -21,7 +23,6 @@ const PRODUCT_METADATA_SELECT = {
       priceSnapshot: {
         select: {
           price: true,
-          currency: true,
         },
       },
     },
@@ -99,13 +100,14 @@ export function buildProductDetailMetadata(
 
   const productUrl = createAbsoluteUrl(publicSiteUrl, `/products/${product.id}`);
   const imageUrl = createAbsoluteUrl(publicSiteUrl, createPublicProductImagePath(product.id));
-  const price = formatMetadataPrice(product.currentPrice.priceSnapshot.price);
-  const title = `${truncateMetadataText(product.name, TITLE_PRODUCT_NAME_MAX_LENGTH)} - ${price} | ${SITE_NAME}`;
-  const description = [
-    product.sourceCategory.displayName,
-    price,
-    `價格資料更新：${formatTaipeiDateTime(product.currentPrice.lastSeenAt)}`,
-  ].join(" | ");
+  const price = formatTwdPrice(product.currentPrice.priceSnapshot.price);
+  const titleSuffix = ` - ${price} | ${SITE_NAME}`;
+  const productName = truncateMetadataText(
+    product.name,
+    Math.max(1, TITLE_MAX_LENGTH - titleSuffix.length),
+  );
+  const title = `${productName}${titleSuffix}`;
+  const description = `這項商品屬於「${product.sourceCategory.displayName}」分類，目前價格為 ${price}；價格資料更新於 ${formatTaipeiDateTime(product.currentPrice.lastSeenAt)}（台北時間）。資料整理自原價屋，實際售價與供貨狀況以來源頁面為準。`;
 
   return {
     title,
@@ -189,35 +191,7 @@ function createAbsoluteUrl(publicSiteUrl: string, path: string) {
   return new URL(path, `${publicSiteUrl}/`).toString();
 }
 
-// 將 metadata 中的價格格式化為台幣顯示文字。
-function formatMetadataPrice(amount: number) {
-  return `NT$ ${new Intl.NumberFormat("zh-TW").format(amount)}`;
-}
-
-// 將 metadata 更新時間固定轉成台灣時間，避免伺服器時區影響分享描述。
-function formatTaipeiDateTime(value: Date) {
-  const parts = new Intl.DateTimeFormat("zh-TW", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-    timeZone: "Asia/Taipei",
-  }).formatToParts(value);
-
-  return `${getDateTimePart(parts, "year")}-${getDateTimePart(parts, "month")}-${getDateTimePart(
-    parts,
-    "day",
-  )} ${getDateTimePart(parts, "hour")}:${getDateTimePart(parts, "minute")}`;
-}
-
-// 從 Intl formatToParts 結果取出指定日期時間片段。
-function getDateTimePart(parts: Intl.DateTimeFormatPart[], type: Intl.DateTimeFormatPartTypes) {
-  return parts.find((part) => part.type === type)?.value ?? "";
-}
-
-// 壓縮 metadata title 文字，避免商品名稱過長讓分享標題失焦。
+// 壓縮 metadata title 中的商品名稱，並把價格與品牌保留在整體長度上限內。
 function truncateMetadataText(value: string, maxLength: number) {
   const normalizedValue = value.replace(/\s+/g, " ").trim();
 
@@ -225,5 +199,5 @@ function truncateMetadataText(value: string, maxLength: number) {
     return normalizedValue;
   }
 
-  return `${normalizedValue.slice(0, maxLength - 3).trimEnd()}...`;
+  return `${normalizedValue.slice(0, Math.max(0, maxLength - 1)).trimEnd()}…`;
 }

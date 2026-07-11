@@ -3,7 +3,7 @@
 
 import type { DiscordInteractionComponent } from "../types";
 
-// 遞迴搜尋 action row、label component 與巢狀 components，支援文字輸入與 select value 的共用讀取。
+// 搜尋目前 Discord modal 的 label component，讀取內層 input 的文字或 select value。
 export function readSubmittedComponentValue(
   components: DiscordInteractionComponent[] | undefined,
   customId: string,
@@ -19,12 +19,6 @@ export function readSubmittedComponentValue(
       if (value !== undefined) {
         return value;
       }
-    }
-
-    const value = readSubmittedComponentValue(component.components, customId);
-
-    if (value !== undefined) {
-      return value;
     }
   }
 

@@ -4,8 +4,8 @@
 import type {
   SOURCE_STATUS_CATEGORY_QUERY,
   SourceStatusCategoryRecord,
-} from "../../../../app/api/source-status/handler";
-import type { ProductsReadClient } from "../../../../app/api/products/handler";
+} from "../../../../app/api/source-status/data";
+import type { ProductsReadClient } from "../../../../app/api/products/data";
 
 export const NOW = new Date("2026-05-28T12:00:00.000Z");
 export const PRODUCT_ID = "11111111-1111-1111-1111-111111111111";
@@ -132,7 +132,6 @@ export function priceSnapshot(overrides: Partial<PriceSnapshotRecord> = {}): Pri
   return {
     productId: PRODUCT_ID,
     price: 7590,
-    currency: "TWD",
     capturedAt: new Date("2026-05-01T08:00:00.000Z"),
     ...overrides,
   };
@@ -144,9 +143,7 @@ export function product(overrides: Partial<ProductRecord> = {}): ProductRecord {
     ibuyToken: "GPU-RTX-4070",
     name: "GPU RTX 4070",
     primaryImageUrl: "https://www.coolpc.com.tw/eval/12/gpu-rtx-4070.jpg",
-    primaryImageCheckedAt: new Date("2026-05-28T11:55:00.000Z"),
     isActive: true,
-    missingSince: null,
     currentPrice: {
       lastSeenAt: new Date("2026-05-28T11:55:00.000Z"),
       priceSnapshot: {

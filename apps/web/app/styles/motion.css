@@ -1,4 +1,6 @@
 /* apps/web/app/styles/motion.css */
+/* 集中定義載入動畫與 reduced-motion 覆寫。 */
+/* biome-ignore-all lint/complexity/noImportantStyles: Reduced-motion 規則必須優先於既有 transition 與 animation。 */
 @keyframes skeleton-shimmer {
   0% {
     background-position: 120% 0;
@@ -14,8 +16,8 @@
   *::before,
   *::after {
     scroll-behavior: auto;
-    transition-duration: 0.01ms;
-    animation-duration: 0.01ms;
-    animation-iteration-count: 1;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
   }
 }

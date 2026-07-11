@@ -48,6 +48,15 @@
     padding-top: 14px;
   }
 
+  .build-list-refresh-status {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .build-list-refresh-status .control-button {
+    width: 100%;
+  }
+
   .build-list-item {
     grid-template-columns: 64px minmax(0, 1fr);
     grid-template-areas:
@@ -77,22 +86,22 @@
   }
 
   .quantity-stepper {
-    flex: 0 0 122px;
-    grid-template-columns: 32px minmax(0, 1fr) 32px;
+    flex: 0 0 144px;
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
   }
 
   .quantity-stepper button,
   .quantity-stepper input {
-    min-height: 36px;
+    min-height: 44px;
   }
 
   .quantity-stepper input {
-    line-height: 36px;
+    line-height: 44px;
   }
 
   .build-list-remove-button {
     flex: 0 0 auto;
-    min-height: 36px;
+    min-height: 44px;
     padding: 0 10px;
   }
 }

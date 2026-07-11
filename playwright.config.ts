@@ -1,5 +1,14 @@
 // playwright.config.ts
+// 定義 desktop／mobile 瀏覽器矩陣與隔離的本機測試伺服器。
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { defineConfig, devices } from "@playwright/test";
+
+const workspaceEnvFile = join(process.cwd(), ".env");
+
+if (existsSync(workspaceEnvFile)) {
+  process.loadEnvFile(workspaceEnvFile);
+}
 
 const baseURL = process.env.E2E_BASE_URL ?? "http://127.0.0.1:3100";
 const shouldStartLocalServer = !process.env.E2E_BASE_URL;
@@ -34,12 +43,15 @@ export default defineConfig({
       name: "chromium-desktop",
       use: {
         ...devices["Desktop Chrome"],
+        viewport: { width: 1440, height: 900 },
       },
     },
     {
       name: "chromium-mobile",
+      grepInvert: /@desktop-only/,
       use: {
         ...devices["Pixel 7"],
+        viewport: { width: 390, height: 844 },
       },
     },
   ],

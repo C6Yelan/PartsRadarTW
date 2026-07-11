@@ -3,15 +3,14 @@
 
 import { MAX_TARGET_PRICE } from "../constants";
 import type { DiscordBotClient } from "../types";
-import { normalizeWatchId } from "./reference";
 import {
-  TARGET_PRICE_WATCH_LIST_SELECT,
   type DisableTargetPriceWatchResult,
-  type DisableTargetPriceWatchesResult,
+  TARGET_PRICE_WATCH_LIST_SELECT,
   type TargetPriceWatchListRecord,
   type TargetPriceWatchLookupResult,
   type UpdateTargetPriceWatchResult,
 } from "./records";
+import { normalizeWatchId } from "./reference";
 
 export { createTargetPriceWatch } from "./crud/create";
 
@@ -40,40 +39,6 @@ export async function disableTargetPriceWatch({
     discordUserId,
     watch: result.watch,
   });
-}
-
-// 僅供待移除的批次移除流程使用；新增功能不要再依賴此函式。
-export async function disableTargetPriceWatches({
-  client,
-  discordUserId,
-  targetPriceWatchInputs,
-}: {
-  client: DiscordBotClient;
-  discordUserId: string;
-  targetPriceWatchInputs: string[];
-}): Promise<DisableTargetPriceWatchesResult> {
-  const uniqueWatchInputs = [...new Set(targetPriceWatchInputs)];
-  let disabledCount = 0;
-  let unavailableCount = 0;
-
-  for (const targetPriceWatchInput of uniqueWatchInputs) {
-    const result = await disableTargetPriceWatch({
-      client,
-      discordUserId,
-      targetPriceWatchInput,
-    });
-
-    if (result.status === "disabled") {
-      disabledCount += 1;
-    } else {
-      unavailableCount += 1;
-    }
-  }
-
-  return {
-    disabledCount,
-    unavailableCount,
-  };
 }
 
 // 更新既有 watch 的目標價，並重設通知游標避免用舊價格立即觸發通知。
@@ -132,8 +97,6 @@ export async function updateTargetPriceWatch({
         watch: {
           ...result.watch,
           targetPrice,
-          lastNotifiedAt: null,
-          notificationCursorAt: now,
         },
       };
 }

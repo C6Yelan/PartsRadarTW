@@ -2,6 +2,7 @@
 // 管理商品詳細頁主資料 API 載入，並把 HTTP 結果轉成頁面載入狀態。
 
 import { useEffect, useState } from "react";
+import { isRateLimitedApiError, toApiRequestError } from "../../../_shared/api-client";
 import type { ProductDetailBody, ProductDetailLoadState } from "./types";
 
 // 依 product id 載入商品詳細資料；404 顯示 not-found，其餘失敗交給頁面錯誤狀態。
@@ -16,20 +17,13 @@ export function useProductDetail(productId: string) {
 
     async function loadProductDetail() {
       try {
-        const productResponse = await fetch(`/api/products/${productId}`, {
-          signal: controller.signal,
-        });
+        const nextProduct = await fetchProductDetail(productId, controller.signal);
 
-        if (productResponse.status === 404) {
+        if (!nextProduct) {
           setState("not-found");
           return;
         }
 
-        if (!productResponse.ok) {
-          throw new Error("Failed to load product.");
-        }
-
-        const nextProduct = (await productResponse.json()) as ProductDetailBody;
         setProduct(nextProduct);
         setState("ready");
       } catch (error: unknown) {
@@ -37,7 +31,7 @@ export function useProductDetail(productId: string) {
           return;
         }
 
-        setState("error");
+        setState(isRateLimitedApiError(error) ? "rate_limited" : "error");
       }
     }
 
@@ -47,4 +41,21 @@ export function useProductDetail(productId: string) {
   }, [productId]);
 
   return { product, state };
+}
+
+export async function fetchProductDetail(
+  productId: string,
+  signal: AbortSignal,
+): Promise<ProductDetailBody | null> {
+  const response = await fetch(`/api/products/${productId}`, { signal });
+
+  if (response.status === 404) {
+    return null;
+  }
+
+  if (!response.ok) {
+    throw await toApiRequestError(response, "Failed to load product.");
+  }
+
+  return (await response.json()) as ProductDetailBody;
 }

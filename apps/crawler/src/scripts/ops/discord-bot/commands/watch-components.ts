@@ -7,11 +7,7 @@ import {
   DISCORD_TEXT_INPUT_STYLE_SHORT,
   MAX_TARGET_PRICE,
 } from "../constants";
-import type {
-  DiscordModal,
-  TargetPriceWatchSortKey,
-  TargetPriceWatchStatusFilter,
-} from "../types";
+import type { DiscordModal } from "../types";
 import {
   WATCH_CREATE_MODAL_CUSTOM_ID,
   WATCH_EDIT_MODAL_CUSTOM_ID_PREFIX,
@@ -34,7 +30,7 @@ export function createWatchModal({
       {
         type: DISCORD_COMPONENT_TYPE_LABEL,
         label: "PartsRadarTW 商品",
-        description: "貼上商品頁完整網址，或輸入網址 /products/ 後面的商品 ID。",
+        description: "貼上商品頁網址或網址最後那串ID。",
         component: {
           type: DISCORD_COMPONENT_TYPE_TEXT_INPUT,
           custom_id: WATCH_PRODUCT_CUSTOM_ID,
@@ -49,7 +45,7 @@ export function createWatchModal({
       {
         type: DISCORD_COMPONENT_TYPE_LABEL,
         label: "理想入手價格（新台幣）",
-        description: "輸入希望入手的價格，只填整數，不要加 NT$、逗號或空格。",
+        description: `輸入 1-${MAX_TARGET_PRICE.toLocaleString("en-US")} 範圍內純數字，不要加NT$、逗號或空格。`,
         component: {
           type: DISCORD_COMPONENT_TYPE_TEXT_INPUT,
           custom_id: WATCH_TARGET_PRICE_CUSTOM_ID,
@@ -65,28 +61,24 @@ export function createWatchModal({
   };
 }
 
-// 建立修改既有 watch 目標價格的 modal，並把列表狀態編入 custom_id 供提交後回到原頁。
+// 建立修改既有 watch 目標價格的 modal，並把頁碼編入 custom_id 供提交後回到原頁。
 export function createWatchEditModal({
   watchId,
   targetPrice,
   page,
-  statusFilter = "all",
-  sortKey = "recent",
 }: {
   watchId: string;
   targetPrice: number;
   page: number;
-  statusFilter?: TargetPriceWatchStatusFilter;
-  sortKey?: TargetPriceWatchSortKey;
 }): DiscordModal {
   return {
-    custom_id: `${WATCH_EDIT_MODAL_CUSTOM_ID_PREFIX}${watchId}:${page}:${statusFilter}:${sortKey}`,
+    custom_id: `${WATCH_EDIT_MODAL_CUSTOM_ID_PREFIX}${watchId}:${page}`,
     title: "修改商品目標價",
     components: [
       {
         type: DISCORD_COMPONENT_TYPE_LABEL,
         label: "新的目標價格（新台幣）",
-        description: "只會修改目前選取的商品；請填整數，不要加 NT$、逗號或空格。",
+        description: `只會修改目前選取的商品；輸入 1-${MAX_TARGET_PRICE.toLocaleString("en-US")} 範圍內純數字，不要加NT$、逗號或空格。`,
         component: {
           type: DISCORD_COMPONENT_TYPE_TEXT_INPUT,
           custom_id: WATCH_TARGET_PRICE_CUSTOM_ID,

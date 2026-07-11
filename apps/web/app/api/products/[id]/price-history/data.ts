@@ -5,17 +5,17 @@ import type { Prisma } from "@partsradar/db";
 
 export const PRICE_HISTORY_SNAPSHOT_SELECT = {
   price: true,
-  currency: true,
   capturedAt: true,
 } as const satisfies Prisma.PriceSnapshotSelect;
 
 export const PRICE_HISTORY_PRODUCT_SELECT = {
-  id: true,
   currentPrice: {
     select: {
       lastSeenAt: true,
       priceSnapshot: {
-        select: PRICE_HISTORY_SNAPSHOT_SELECT,
+        select: {
+          price: true,
+        },
       },
     },
   },
@@ -35,7 +35,7 @@ type PriceSnapshotFindManyArgs = Omit<Prisma.PriceSnapshotFindManyArgs, "select"
   select: typeof PRICE_HISTORY_SNAPSHOT_SELECT;
 };
 
-// 限定價格歷史 handler 需要的 DB 讀取面，讓測試 fake client 不依賴完整 Prisma client。
+// 限定價格歷史 handler 需要的 DB 讀取面，不依賴完整 Prisma client。
 export interface ProductPriceHistoryReadClient {
   product: {
     findFirst(args: ProductFindFirstArgs): Promise<PriceHistoryProductRecord | null>;

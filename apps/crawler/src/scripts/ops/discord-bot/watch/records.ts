@@ -2,10 +2,6 @@
 // 定義目標價 watch 流程共用的 Prisma select、查詢 payload 型別與操作結果 contract。
 
 import type { Prisma } from "@partsradar/db";
-import type {
-  TargetPriceWatchSortKey,
-  TargetPriceWatchStatusFilter,
-} from "../types";
 
 // watch 訊息只需要商品名稱與目前價格資料，避免查出不必要商品欄位。
 export const TARGET_PRICE_WATCH_PRODUCT_SELECT = {
@@ -28,26 +24,13 @@ export const TARGET_PRICE_WATCH_PRODUCT_SELECT = {
 // 新增或重新啟用 watch 後回傳的 watch 欄位。
 export const TARGET_PRICE_WATCH_SELECT = {
   id: true,
-  discordUserId: true,
-  productId: true,
   targetPrice: true,
-  currency: true,
-  enabled: true,
-  lastNotifiedAt: true,
-  notificationCursorAt: true,
 } as const satisfies Prisma.DiscordTargetPriceWatchSelect;
 
-// watch 管理清單與單筆查詢共用的欄位，包含顯示商品與排序需要的資料。
+// watch 管理清單與單筆查詢共用的欄位。
 export const TARGET_PRICE_WATCH_LIST_SELECT = {
   id: true,
-  discordUserId: true,
-  productId: true,
   targetPrice: true,
-  currency: true,
-  enabled: true,
-  lastNotifiedAt: true,
-  notificationCursorAt: true,
-  updatedAt: true,
   product: {
     select: TARGET_PRICE_WATCH_PRODUCT_SELECT,
   },
@@ -56,7 +39,9 @@ export const TARGET_PRICE_WATCH_LIST_SELECT = {
 // 管理面板只顯示最近一次通知的使用者可見狀態，不讀取完整 delivery payload。
 export const TARGET_PRICE_WATCH_DELIVERY_STATUS_SELECT = {
   status: true,
-  errorMessage: true,
+  errorCategory: true,
+  httpStatus: true,
+  providerErrorCode: true,
   deliveredAt: true,
   createdAt: true,
 } as const satisfies Prisma.DiscordNotificationDeliverySelect;
@@ -95,19 +80,15 @@ export type CreateTargetPriceWatchResult =
       product: TargetPriceWatchProductRecord;
       watch: SavedTargetPriceWatchRecord;
       currentPrice: number;
-      currency: string;
       capturedAt: Date;
       reached: boolean;
     };
 
-// watch 管理清單的資料 contract，包含當頁資料、篩選排序狀態與分頁旗標。
+// watch 管理清單的資料 contract，包含當頁資料、總筆數與分頁旗標。
 export interface TargetPriceWatchlistResult {
   watches: TargetPriceWatchListRecord[];
   page: number;
-  statusFilter: TargetPriceWatchStatusFilter;
-  sortKey: TargetPriceWatchSortKey;
   totalCount: number;
-  filteredCount: number;
   hasPreviousPage: boolean;
   hasNextPage: boolean;
 }
@@ -124,12 +105,6 @@ export type DisableTargetPriceWatchResult =
       status: "disabled";
       watch: TargetPriceWatchListRecord;
     };
-
-// 僅供待移除的批次移除流程使用，統計成功停用與不可用 watch 數量。
-export interface DisableTargetPriceWatchesResult {
-  disabledCount: number;
-  unavailableCount: number;
-}
 
 // 依 watch reference 查詢單筆 watch 的結果，限定同一 Discord 使用者與啟用狀態。
 export type TargetPriceWatchLookupResult =

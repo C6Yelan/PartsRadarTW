@@ -4,25 +4,28 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
+import { ArrowLeftIcon, BrandMarkIcon, ExternalLinkIcon } from "../_shared/icons";
 import SiteDisclaimer from "../site-disclaimer";
 import {
   discordFaqItems,
   heroScreenshot,
   personalReportCommandGuides,
   quickStartSteps,
+  screenshotFreshnessNotice,
   serverReportCommandGuides,
   targetPriceCommandGuides,
 } from "./content";
 
 export const metadata: Metadata = {
   title: "Discord 通知 | PartsRadarTW",
-  description: "邀請 PartsRadarTW Discord bot，設定即時目標價提醒、個人價格報告與伺服器公開報告。",
+  description:
+    "邀請 PartsRadarTW Discord bot，設定目標價提醒、即時價格報告、每日私訊價格報告與公開價格報告。",
 };
 
-// 邀請連結由 runtime env 控制，讓部署端可在不重建 image 的情況下開關或更換 URL。
+// Server-only runtime env keeps invite changes independent from the web image build.
 export const dynamic = "force-dynamic";
 
-const discordInviteUrl = process.env.NEXT_PUBLIC_DISCORD_BOT_INVITE_URL?.trim();
+const discordInviteUrl = process.env.DISCORD_BOT_INVITE_URL?.trim();
 
 // 組裝 Discord 介紹頁，將靜態內容資料分派到 hero、快速開始、指令教學與 FAQ 區塊。
 export default function DiscordPage() {
@@ -32,7 +35,7 @@ export default function DiscordPage() {
     <div className="app-shell discord-shell">
       <header className="topbar discord-topbar">
         <Link className="brand-lockup" href="/">
-          <span className="brand-mark" aria-hidden="true" />
+          <BrandMarkIcon />
           <span>
             <span className="brand-name">PartsRadarTW</span>
             <span className="brand-subtitle">原價屋零件查詢</span>
@@ -41,13 +44,14 @@ export default function DiscordPage() {
 
         <div className="discord-topbar-title">
           <h1>Discord 通知</h1>
-          <span>指令教學與公開報告</span>
+          <span>指令教學與公開價格報告</span>
         </div>
       </header>
 
       <main className="discord-page">
         <div className="discord-page-nav">
-          <Link className="back-link discord-back-link" href="/">
+          <Link className="back-link" href="/">
+            <ArrowLeftIcon />
             返回查詢
           </Link>
         </div>
@@ -56,27 +60,29 @@ export default function DiscordPage() {
           <div className="discord-hero-copy">
             <span className="eyebrow">PartsRadarTW Discord bot</span>
             <h2 id="discord-title">Discord 價格通知</h2>
-            <p>用 Discord 接收即時目標價提醒、個人價格報告與伺服器公開報告。</p>
+            <p>用 Discord 管理目標價提醒、即時價格報告、每日私訊價格報告與公開價格報告。</p>
             <div className="discord-actions">
               {hasInviteUrl ? (
                 <a
+                  aria-label="邀請 PartsRadarTW Discord bot，開新分頁"
                   className="control-button primary"
                   href={discordInviteUrl}
                   rel="noreferrer"
                   target="_blank"
                 >
                   邀請機器人
+                  <ExternalLinkIcon className="discord-invite-icon" />
                 </a>
               ) : (
                 <span className="control-button primary is-disabled" aria-disabled="true">
                   邀請連結準備中
                 </span>
               )}
-              <a className="control-button secondary" href="#discord-admin">
-                公開報告設定
+              <a className="control-button secondary" href="#quick-start">
+                快速開始
               </a>
-              <a className="control-button secondary" href="#discord-commands">
-                指令教學
+              <a className="control-button secondary" href="#discord-admin">
+                管理公開價格報告
               </a>
             </div>
           </div>
@@ -96,11 +102,11 @@ export default function DiscordPage() {
           </aside>
         </section>
 
-        <section className="discord-section" aria-labelledby="quick-start-title">
+        <section className="discord-section" id="quick-start" aria-labelledby="quick-start-title">
           <div className="discord-section-heading">
             <span className="eyebrow">Quick start</span>
             <h2 id="quick-start-title">快速開始</h2>
-            <p>先完成邀請，再依需求選擇即時提醒、個人報告或公開報告。</p>
+            <p>先完成邀請，再依需求選擇目標價提醒、即時或每日報告，以及公開價格報告。</p>
           </div>
 
           <ol className="discord-step-list">
@@ -122,14 +128,16 @@ export default function DiscordPage() {
             <span className="eyebrow">Commands</span>
             <h2 id="commands-title">指令說明</h2>
             <p>
-              /watch 是即時達標提醒；/price-report 是個人彙整；/public-report 是伺服器公開彙整。
+              /watch 管理目標價提醒；/price-report 提供即時與每日私訊價格報告；/public-report
+              管理公開價格報告。
             </p>
+            <p>{screenshotFreshnessNotice}</p>
           </div>
 
           <div className="discord-command-group">
-            <h3>即時目標價提醒</h3>
+            <h3>目標價提醒</h3>
             <p className="discord-command-group-summary">
-              追蹤單一商品。價格資料更新後若達到目標價，bot 會私訊通知你。
+              追蹤單一商品。價格資料更新後若達到目標價，bot 會嘗試透過 DM 傳送提醒。
             </p>
             <div className="discord-command-guide-list">
               {targetPriceCommandGuides.map((guide, index) => (
@@ -140,7 +148,6 @@ export default function DiscordPage() {
                         alt={guide.image.alt}
                         className="discord-guide-image"
                         height={guide.image.height}
-                        loading="eager"
                         src={guide.image.src}
                         width={guide.image.width}
                       />
@@ -159,9 +166,9 @@ export default function DiscordPage() {
           </div>
 
           <div className="discord-command-group">
-            <h3>個人價格報告</h3>
+            <h3>即時價格報告與每日私訊價格報告</h3>
             <p className="discord-command-group-summary">
-              依你的分類、關鍵字與上限產生私訊彙整報告；通常不是即時通知。
+              即時報告回覆在目前伺服器頻道或 DM；每日報告依台北時間與個人篩選設定傳到 DM。
             </p>
             <div className="discord-command-guide-list">
               {personalReportCommandGuides.map((guide, index) => (
@@ -172,7 +179,6 @@ export default function DiscordPage() {
                         alt={guide.image.alt}
                         className="discord-guide-image"
                         height={guide.image.height}
-                        loading="eager"
                         src={guide.image.src}
                         width={guide.image.width}
                       />
@@ -191,9 +197,9 @@ export default function DiscordPage() {
           </div>
 
           <div className="discord-command-group" id="discord-admin">
-            <h3>伺服器公開報告</h3>
+            <h3>公開價格報告</h3>
             <p className="discord-command-group-summary">
-              管理者指定公開頻道，讓整個伺服器看到自動產生的價格彙整。
+              具備「管理伺服器」權限的成員可指定頻道，讓伺服器看到自動產生的價格彙整。
             </p>
             <div className="discord-command-guide-list">
               {serverReportCommandGuides.map((guide, index) => (
@@ -204,7 +210,6 @@ export default function DiscordPage() {
                         alt={guide.image.alt}
                         className="discord-guide-image"
                         height={guide.image.height}
-                        loading="eager"
                         src={guide.image.src}
                         width={guide.image.width}
                       />
@@ -227,7 +232,7 @@ export default function DiscordPage() {
           <div className="discord-section-heading">
             <span className="eyebrow">FAQ</span>
             <h2 id="discord-faq-title">常見問題</h2>
-            <p>只保留使用者最可能卡住的權限與通知問題。</p>
+            <p>遇到指令權限或私訊問題時，先從這裡確認使用範圍與必要設定。</p>
           </div>
 
           <div className="discord-faq-list">

@@ -1,8 +1,10 @@
 // apps/crawler/src/scripts/ops/discord-bot/types/price-report.ts
 // 定義個人 price-report 指令、設定面板、modal 與發送結果使用的共用型別。
 
+import type { DiscordDeliveryFailureMetadata } from "./discord-api";
+
 // 個人價格報告 DM 發送結果，供即時預覽、手動 now 指令與排程流程共用。
-export type PriceReportNowResult =
+export type PersonalPriceReportDeliveryResult =
   | {
       status: "sent";
       changeCount: number;
@@ -10,7 +12,7 @@ export type PriceReportNowResult =
       listedCount: number;
       messageCount: number;
     }
-  | {
+  | ({
       status: "rate_limited";
       changeCount: number;
       newProductCount: number;
@@ -19,17 +21,15 @@ export type PriceReportNowResult =
       sentMessageCount: number;
       retryAfterMs: number;
       global: boolean;
-    }
-  | {
+    } & DiscordDeliveryFailureMetadata)
+  | ({
       status: "failed";
       changeCount: number;
       newProductCount: number;
       listedCount: number;
       messageCount: number;
       sentMessageCount: number;
-      httpStatus: number | null;
-      message: string;
-    };
+    } & DiscordDeliveryFailureMetadata);
 
 // 使用者設定每日私訊價格報告的台北時間。
 export interface PriceReportTimeOfDay {
@@ -42,7 +42,6 @@ export type ParsedPriceReportCommand =
   | {
       name: "now";
       windowHours: number | null;
-      maxItems: number | null;
     }
   | {
       name: "settings";
@@ -57,7 +56,7 @@ export type ParsedPriceReportComponent =
       name: "disable_daily_scheduled_report";
     }
   | {
-      name: "open_time_limit_modal";
+      name: "open_time_modal";
     }
   | {
       name: "open_keyword_modal";
@@ -86,9 +85,7 @@ export type ParsedPriceReportComponent =
 // 個人 price-report 設定 modal submit 的解析結果，保留輸入合法性供 handler 回覆錯誤。
 export type ParsedPriceReportModal =
   | {
-      name: "time_limit";
-      maxItems: number | null;
-      maxItemsInputValid: boolean;
+      name: "time";
       timeOfDay: PriceReportTimeOfDay | null;
       timeInputValid: boolean;
     }

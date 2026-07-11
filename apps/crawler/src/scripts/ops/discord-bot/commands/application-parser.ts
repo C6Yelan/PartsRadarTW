@@ -1,7 +1,7 @@
 // apps/crawler/src/scripts/ops/discord-bot/commands/application-parser.ts
 // 解析 Discord application command interaction，將原始 payload 收斂成 bot 內部可分派的命令型別。
 
-import { DISCORD_OPTION_TYPE_SUBCOMMAND, MAX_PRICE_REPORT_ITEMS } from "../constants";
+import { DISCORD_OPTION_TYPE_SUBCOMMAND } from "../constants";
 import type {
   DiscordInteraction,
   ParsedPriceReportCommand,
@@ -25,13 +25,11 @@ export function parsePriceReportInteraction(
   }
 
   const windowOption = subcommand.options?.find((option) => option.name === "window");
-  const maxItemsOption = subcommand.options?.find((option) => option.name === "max_items");
 
   if (subcommand.name === "now") {
     return {
       name: subcommand.name,
       windowHours: windowOption ? parseWindowHours(windowOption.value) : null,
-      maxItems: parseMaxItems(maxItemsOption?.value),
     };
   }
 
@@ -96,13 +94,4 @@ function parseWindowHours(value: unknown): number {
   }
 
   return 24;
-}
-
-// 將 max_items 限制在 handler 支援範圍內；缺值或非整數代表使用 handler 預設。
-function parseMaxItems(value: unknown): number | null {
-  if (typeof value !== "number" || !Number.isSafeInteger(value)) {
-    return null;
-  }
-
-  return Math.min(Math.max(value, 1), MAX_PRICE_REPORT_ITEMS);
 }

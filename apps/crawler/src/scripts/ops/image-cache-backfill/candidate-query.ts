@@ -57,15 +57,6 @@ export const PRODUCT_IMAGE_CANDIDATE_ORDER_BY: Prisma.ProductOrderByWithRelation
   { id: "asc" },
 ];
 
-// 缺圖候選優先處理較新的商品，再以分類與 product id 穩定排序。
-export const MISSING_IMAGE_CANDIDATE_ORDER_BY: Prisma.ProductOrderByWithRelationInput[] = [
-  { firstSeenAt: "desc" },
-  { lastSeenAt: "desc" },
-  { primaryImageCheckedAt: "desc" },
-  { sourceCategory: { igrp: "asc" } },
-  { id: "asc" },
-];
-
 // 指定 product id 缺圖候選同樣以新商品優先，不讓 primaryImageCheckedAt 影響補圖順序。
 export const MISSING_IMAGE_CANDIDATE_BY_IDS_ORDER_BY: Prisma.ProductOrderByWithRelationInput[] = [
   { firstSeenAt: "desc" },

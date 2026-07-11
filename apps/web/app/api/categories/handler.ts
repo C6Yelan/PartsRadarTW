@@ -1,7 +1,7 @@
 // apps/web/app/api/categories/handler.ts
-// 處理公開分類 API 的 enabled sourceCategory 讀取、排序與安全 JSON 回應。
+// 處理公開分類 API 的 enabled sourceCategory 讀取、slug mapping 與安全 JSON 回應。
 
-import { COOLPC_SOURCE_NAME } from "@partsradar/shared";
+import { getCategorySlug, type CategorySlug } from "../../category-slugs";
 import { internalErrorResponse, jsonOk } from "../_shared/responses";
 
 interface CategoryRecord {
@@ -9,9 +9,6 @@ interface CategoryRecord {
   igrp: number;
   displayName: string;
   sourceName: string;
-  enabled: boolean;
-  lastCheckedAt: Date | null;
-  lastSuccessAt: Date | null;
 }
 
 interface CategoryFindManyArgs {
@@ -26,9 +23,6 @@ interface CategoryFindManyArgs {
     igrp: true;
     displayName: true;
     sourceName: true;
-    enabled: true;
-    lastCheckedAt: true;
-    lastSuccessAt: true;
   };
 }
 
@@ -40,20 +34,16 @@ export interface CategoriesReadClient {
 
 interface CategoryResponseItem {
   id: string;
-  source: typeof COOLPC_SOURCE_NAME;
-  igrp: number;
+  slug: CategorySlug;
   displayName: string;
   sourceName: string;
-  enabled: boolean;
-  lastCheckedAt: string | null;
-  lastSuccessAt: string | null;
 }
 
 interface CategoriesResponseBody {
   data: CategoryResponseItem[];
 }
 
-// 建立分類列表 API handler，只公開已啟用分類與前端篩選需要的來源健康時間欄位。
+// 建立分類列表 API handler，只公開已啟用分類與前端篩選實際使用的欄位。
 export function createGetCategoriesHandler(client: CategoriesReadClient): () => Promise<Response> {
   return async () => {
     try {
@@ -65,9 +55,6 @@ export function createGetCategoriesHandler(client: CategoriesReadClient): () => 
           igrp: true,
           displayName: true,
           sourceName: true,
-          enabled: true,
-          lastCheckedAt: true,
-          lastSuccessAt: true,
         },
       });
 
@@ -80,20 +67,18 @@ export function createGetCategoriesHandler(client: CategoriesReadClient): () => 
   };
 }
 
-// 將 DB category row 轉成 public API item，固定 source attribution 並把時間轉成 UTC ISO。
+// 將 DB category row 轉成 public slug；未登錄的 enabled IGrp 視為 server contract error。
 function toCategoryResponseItem(category: CategoryRecord): CategoryResponseItem {
+  const slug = getCategorySlug(category.igrp);
+
+  if (!slug) {
+    throw new Error("Enabled category is missing a public slug mapping.");
+  }
+
   return {
     id: category.id,
-    source: COOLPC_SOURCE_NAME,
-    igrp: category.igrp,
+    slug,
     displayName: category.displayName,
     sourceName: category.sourceName,
-    enabled: category.enabled,
-    lastCheckedAt: toIsoStringOrNull(category.lastCheckedAt),
-    lastSuccessAt: toIsoStringOrNull(category.lastSuccessAt),
   };
-}
-
-function toIsoStringOrNull(value: Date | null): string | null {
-  return value ? value.toISOString() : null;
 }

@@ -5,12 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { API_ERROR_MESSAGES } from "../../../app/api/_shared/responses";
 import { createGetProductsHandler } from "../../../app/api/products/handler";
-import {
-  fakeProductsClient,
-  NOW,
-  searchTokenWhere,
-  vendorOption,
-} from "./support/handler-client";
+import { fakeProductsClient, NOW, searchTokenWhere, vendorOption } from "./support/handler-client";
 
 describe("GET /api/products query validation", () => {
   it("applies vendor filtering within the selected category", async () => {
@@ -25,7 +20,7 @@ describe("GET /api/products query validation", () => {
     });
 
     const response = await createGetProductsHandler(client, { now: () => NOW })(
-      new Request("https://parts.example/api/products?igrp=12&vendors=asus,msi"),
+      new Request("https://parts.example/api/products?category=gpu&vendors=asus,msi"),
     );
 
     expect(response.status).toBe(200);
@@ -58,6 +53,54 @@ describe("GET /api/products query validation", () => {
         ],
       },
     });
+  });
+
+  it.each([
+    "igrp=12",
+    "category=gpu&igrp=12",
+  ])("accepts the temporary legacy category alias: %s", async (categoryQuery) => {
+    const client = fakeProductsClient({
+      products: [],
+      totalItems: 0,
+      sourceCategories: [],
+    });
+
+    const response = await createGetProductsHandler(client, { now: () => NOW })(
+      new Request(`https://parts.example/api/products?${categoryQuery}`),
+    );
+
+    expect(response.status).toBe(200);
+    expect(client.lastProductFindProductsArgs).toMatchObject({
+      where: {
+        sourceCategory: {
+          enabled: true,
+          igrp: 12,
+        },
+      },
+    });
+  });
+
+  it.each([
+    "category=unknown",
+    "igrp=99",
+    "category=cpu&igrp=12",
+  ])("rejects an unknown or conflicting category before reading data: %s", async (categoryQuery) => {
+    const client = fakeProductsClient({
+      products: [],
+      totalItems: 0,
+      sourceCategories: [],
+    });
+
+    const response = await createGetProductsHandler(client)(
+      new Request(`https://parts.example/api/products?${categoryQuery}`),
+    );
+
+    expect(response.status).toBe(400);
+    expect(client.productFindProductsCallCount).toBe(0);
+    expect(client.productFindVendorOptionsCallCount).toBe(0);
+    expect(client.productCountCallCount).toBe(0);
+    expect(client.priceSnapshotFindManyCallCount).toBe(0);
+    expect(client.sourceCategoryFindManyCallCount).toBe(0);
   });
 
   it("splits search text into required order-independent tokens", async () => {

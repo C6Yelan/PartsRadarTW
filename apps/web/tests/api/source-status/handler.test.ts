@@ -4,10 +4,8 @@
 import { describe, expect, it } from "vitest";
 
 import { API_ERROR_MESSAGES } from "../../../app/api/_shared/responses";
-import {
-  createGetSourceStatusHandler,
-  type SourceStatusReadClient,
-} from "../../../app/api/source-status/handler";
+import type { SourceStatusReadClient } from "../../../app/api/source-status/data";
+import { createGetSourceStatusHandler } from "../../../app/api/source-status/handler";
 
 const NOW = new Date("2026-05-28T12:00:00.000Z");
 

@@ -7,6 +7,16 @@ import {
   PREVIOUS_PRICE_SNAPSHOT_SELECT,
   PRICE_SNAPSHOT_WITH_PRODUCT_SELECT,
 } from "./reader-query";
+import type {
+  CrawlRunPriceChangeReadResult,
+  CrawlRunPriceSnapshot,
+  PreviousPriceSnapshot,
+  PriceReportNewProductItem,
+  PriceReportPriceChangeItem,
+  PriceReportReaderClient,
+  RecentPriceChangeOptions,
+  RecentPriceReport,
+} from "./reader-types";
 import {
   compareNewProducts,
   comparePriceChanges,
@@ -15,24 +25,6 @@ import {
   normalizeRecentPriceReportFilters,
   toProductSubcategory,
 } from "./reader-utils";
-import type {
-  CrawlRunPriceChangeReadResult,
-  CrawlRunPriceSnapshot,
-  PreviousPriceSnapshot,
-  PriceReportReaderClient,
-  PriceReportPriceChangeItem,
-  PriceReportNewProductItem,
-  RecentPriceChangeOptions,
-  RecentPriceReport,
-} from "./reader-types";
-
-// 讀取指定 crawl run 的價格變動項目，供只需要變動清單的公開報告入口使用。
-export async function readCrawlRunPriceChanges(
-  client: PriceReportReaderClient,
-  crawlRunId: string,
-): Promise<PriceReportPriceChangeItem[]> {
-  return (await readCrawlRunPriceChangeSummary(client, crawlRunId)).changes;
-}
 
 // 讀取指定 crawl run 的價格變動、新增商品與比對統計，供公開報告排程判斷與記錄。
 export async function readCrawlRunPriceChangeSummary(
@@ -139,14 +131,6 @@ export async function readCrawlRunPriceChangeSummary(
     unchangedSnapshotCount,
     currencyMismatchCount,
   };
-}
-
-// 讀取指定時間窗的近期價格變動，保留給只需要變動清單的呼叫端。
-export async function readRecentPriceChanges(
-  client: PriceReportReaderClient,
-  { since, until = new Date() }: RecentPriceChangeOptions,
-): Promise<PriceReportPriceChangeItem[]> {
-  return (await readRecentPriceReport(client, { since, until })).priceChanges;
 }
 
 // 讀取指定時間窗的完整價格報告，包含符合篩選的價格變動與新增商品。

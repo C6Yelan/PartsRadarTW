@@ -1,24 +1,21 @@
 // apps/crawler/tests/scripts/ops/external-fetch-lock.test.ts
-// 驗證外部來源抓取鎖的互斥取得、釋放流程與短效 priority signal TTL 行為。
+// 驗證外部來源抓取鎖的互斥取得與釋放流程。
 
+import { createHash } from "node:crypto";
+import { lstat, mkdir, rename, rm, utimes, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import {
-  clearExternalFetchPriority,
-  hasActiveExternalFetchPriority,
-  requestExternalFetchPriority,
-  tryAcquireExternalFetchLock,
-} from "../../../src/scripts/ops/external-fetch-lock";
-import {
-  cleanupMaintenanceTempRoots,
-  createTempRoot,
-} from "./maintenance-daemon-support";
+import { tryAcquireExternalFetchLock } from "../../../src/scripts/ops/external-fetch-lock";
+import { createDaemonTestEnvironment } from "./crawl-coolpc-daemon/crawl-coolpc-daemon-support";
 
-afterEach(cleanupMaintenanceTempRoots);
+const testEnv = createDaemonTestEnvironment();
+
+afterEach(testEnv.cleanup);
 
 describe("external fetch lock", () => {
   it("allows only one holder and can be released", async () => {
-    const lockDir = join(await createTempRoot(), "external-fetch.lock");
+    const { workspaceRoot } = await testEnv.createWorkspace();
+    const lockDir = join(workspaceRoot, "external-fetch.lock");
     const firstLock = await tryAcquireExternalFetchLock({ lockDir, owner: "first" });
 
     expect(firstLock).not.toBeNull();
@@ -31,37 +28,86 @@ describe("external fetch lock", () => {
     await secondLock?.release();
   });
 
-  it("tracks short-lived crawler priority signals", async () => {
-    const lockDir = join(await createTempRoot(), "external-fetch.lock");
+  it("recovers an orphaned state guard without allowing multiple holders", async () => {
+    const { workspaceRoot } = await testEnv.createWorkspace();
+    const lockDir = join(workspaceRoot, "external-fetch.lock");
+    const guardDir = `${lockDir}.state-guard`;
+    const expiredRetiredDir = `${guardDir}.retired-expired-fixture`;
+    const oldTimestamp = new Date("2000-01-01T00:00:00.000Z");
+    await mkdir(guardDir);
+    await utimes(guardDir, oldTimestamp, oldTimestamp);
+    await mkdir(expiredRetiredDir);
+    await writeFile(
+      join(expiredRetiredDir, "retired.json"),
+      `${JSON.stringify({ identity: "expired-fixture", retiredAt: oldTimestamp.toISOString() })}\n`,
+      "utf8",
+    );
 
-    await requestExternalFetchPriority({
-      lockDir,
-      owner: "crawler-daemon",
-      now: () => new Date("2026-06-12T10:00:00.000Z"),
+    const locks = await Promise.all(
+      Array.from({ length: 16 }, (_, index) =>
+        tryAcquireExternalFetchLock({ lockDir, owner: `contender-${index}` }),
+      ),
+    );
+    const acquiredLocks = locks.filter((lock) => lock !== null);
+
+    expect(acquiredLocks).toHaveLength(1);
+    await expect(lstat(guardDir)).rejects.toMatchObject({ code: "ENOENT" });
+    await acquiredLocks[0]?.release();
+  });
+
+  it("fails closed while a matching corrupt retired tombstone is occupied", async () => {
+    const { workspaceRoot } = await testEnv.createWorkspace();
+    const lockDir = join(workspaceRoot, "external-fetch.lock");
+    const guardDir = `${lockDir}.state-guard`;
+    const guardToken = "occupied-retired-tombstone";
+    const acquiredAt = "2000-01-01T00:00:00.000Z";
+    const identity = createHash("sha256").update(`token:${guardToken}`).digest("hex");
+    const retiredDir = `${guardDir}.retired-${identity}`;
+    await mkdir(guardDir);
+    await writeFile(
+      join(guardDir, "guard.json"),
+      `${JSON.stringify({ token: guardToken, pid: 0, acquiredAt })}\n`,
+      "utf8",
+    );
+    await mkdir(retiredDir);
+    await writeFile(join(retiredDir, "retired.json"), "{", "utf8");
+
+    let settledCount = 0;
+    const acquisitions = Array.from({ length: 8 }, (_, index) =>
+      tryAcquireExternalFetchLock({ lockDir, owner: `contender-${index}` }).finally(() => {
+        settledCount += 1;
+      }),
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    const settledBeforeUnblock = settledCount;
+    await rename(retiredDir, join(workspaceRoot, "blocked-retired-tombstone-fixture"));
+    const locks = await Promise.all(acquisitions);
+    const acquiredLocks = locks.filter((lock) => lock !== null);
+
+    expect(settledBeforeUnblock).toBe(0);
+    expect(acquiredLocks).toHaveLength(1);
+    await acquiredLocks[0]?.release();
+  });
+
+  it("waits for a fresh legacy guard instead of reclaiming it", async () => {
+    const { workspaceRoot } = await testEnv.createWorkspace();
+    const lockDir = join(workspaceRoot, "external-fetch.lock");
+    const guardDir = `${lockDir}.state-guard`;
+    await mkdir(guardDir);
+
+    let settled = false;
+    const acquisition = tryAcquireExternalFetchLock({ lockDir, owner: "waiting" }).finally(() => {
+      settled = true;
     });
 
-    await expect(
-      hasActiveExternalFetchPriority({
-        lockDir,
-        owner: "crawler-daemon",
-        ttlSeconds: 600,
-        now: () => new Date("2026-06-12T10:05:00.000Z"),
-      }),
-    ).resolves.toBe(true);
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    expect(settled).toBe(false);
 
-    await expect(
-      hasActiveExternalFetchPriority({
-        lockDir,
-        owner: "crawler-daemon",
-        ttlSeconds: 600,
-        now: () => new Date("2026-06-12T10:11:00.000Z"),
-      }),
-    ).resolves.toBe(false);
+    await rm(guardDir, { recursive: true });
+    const lock = await acquisition;
 
-    await requestExternalFetchPriority({ lockDir, owner: "crawler-daemon" });
-    await clearExternalFetchPriority({ lockDir, owner: "crawler-daemon" });
-    await expect(hasActiveExternalFetchPriority({ lockDir, owner: "crawler-daemon" })).resolves.toBe(
-      false,
-    );
+    expect(lock).not.toBeNull();
+    await lock?.release();
   });
 });

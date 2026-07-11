@@ -1,30 +1,31 @@
 "use client";
+
 // apps/web/app/products/[id]/detail/ProductDetailActions.tsx
 // 顯示商品詳細頁的配單操作、來源購買連結與分享操作區塊。
 
-import { BUILD_LIST_MAX_QUANTITY } from "../../../build-list/model";
-import type { ProductLinkHealth } from "./types";
+import { CopyIcon, ExternalLinkIcon } from "../../../_shared/icons";
+import { BUILD_LIST_MAX_QUANTITY, MAX_BUILD_LIST_PRODUCTS } from "../../../build-list/constants";
 
 // 組裝商品詳細頁主要操作，依配單狀態切換加入按鈕或數量控制。
 export default function ProductDetailActions({
   canIncreaseBuildListQuantity,
   currentBuildListQuantity,
+  isProductLimitReached,
   onAddToBuildList,
   onDecreaseBuildListQuantity,
-  onShare,
+  onCopyLink,
   productName,
   shareStatusMessage,
-  sourceHealth,
   purchaseUrl,
 }: {
   canIncreaseBuildListQuantity: boolean;
   currentBuildListQuantity: number;
+  isProductLimitReached: boolean;
   onAddToBuildList: () => void;
   onDecreaseBuildListQuantity: () => void;
-  onShare: () => void;
+  onCopyLink: () => void;
   productName: string;
   shareStatusMessage: string | null;
-  sourceHealth: ProductLinkHealth | null;
   purchaseUrl: string;
 }) {
   return (
@@ -61,28 +62,38 @@ export default function ProductDetailActions({
             </button>
           </fieldset>
         ) : (
-          <button className="build-list-detail-action" type="button" onClick={onAddToBuildList}>
-            加入配單
+          <button
+            className="build-list-detail-action"
+            disabled={isProductLimitReached}
+            title={
+              isProductLimitReached ? `配單已達 ${MAX_BUILD_LIST_PRODUCTS} 個品項` : "加入配單"
+            }
+            type="button"
+            onClick={onAddToBuildList}
+          >
+            {isProductLimitReached ? `配單已達 ${MAX_BUILD_LIST_PRODUCTS} 個品項` : "加入配單"}
           </button>
         )}
       </div>
       <div className="detail-link-actions">
         <a
           aria-label="前往原價屋查看／購買，開新分頁"
-          className={toExternalActionClassName(sourceHealth)}
+          className="external-action"
           href={purchaseUrl}
           rel="noreferrer"
           target="_blank"
         >
           前往購買
+          <ExternalLinkIcon className="detail-action-icon" />
         </a>
         <button
-          aria-label="分享商品連結"
+          aria-label="複製商品連結"
           className="detail-share-action"
           type="button"
-          onClick={onShare}
+          onClick={onCopyLink}
         >
-          分享
+          <CopyIcon className="detail-action-icon" />
+          複製連結
         </button>
       </div>
       {shareStatusMessage ? (
@@ -92,11 +103,4 @@ export default function ProductDetailActions({
       ) : null}
     </div>
   );
-}
-
-// 依來源連結健康狀態附加提示樣式，讓購買連結在需要確認時降低確定性。
-function toExternalActionClassName(health: ProductLinkHealth | null) {
-  return ["external-action", health && health.status !== "ok" ? "needs-link-check" : null]
-    .filter(Boolean)
-    .join(" ");
 }

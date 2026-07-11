@@ -8,8 +8,8 @@ import {
   getClientIdentifier,
   getClientIdentifierInfo,
   RATE_LIMIT_DEFAULTS,
-  resolveRateLimitConfig,
   type RateLimitConfig,
+  resolveRateLimitConfig,
   withRateLimitHeaders,
 } from "../../../app/api/_shared/rate-limit";
 
@@ -19,6 +19,7 @@ const BASE_CONFIG: RateLimitConfig = {
     "api:read": 2,
     "api:list": 3,
     "api:image": 4,
+    "api:build-list": 2,
   },
   windowMs: 1000,
 };
@@ -99,7 +100,7 @@ describe("API rate limiter", () => {
     });
   });
 
-  it("keeps list, image, and read scopes independent", () => {
+  it("keeps list, image, read, and build-list scopes independent", () => {
     const limiter = createRateLimiter({ config: BASE_CONFIG, nowMs: () => 1_000_000 });
     const request = requestFromIp("203.0.113.20");
 
@@ -115,6 +116,11 @@ describe("API rate limiter", () => {
       allowed: true,
       limit: 4,
       remaining: 3,
+    });
+    expect(limiter.check(request, "api:build-list")).toMatchObject({
+      allowed: true,
+      limit: 2,
+      remaining: 1,
     });
   });
 
@@ -185,6 +191,7 @@ describe("API rate limiter", () => {
         "api:read": 250,
         "api:list": 500,
         "api:image": 900,
+        "api:build-list": 250,
       },
       windowMs: 120_000,
     });
@@ -203,6 +210,7 @@ describe("API rate limiter", () => {
         "api:read": RATE_LIMIT_DEFAULTS.readMax,
         "api:list": RATE_LIMIT_DEFAULTS.listMax,
         "api:image": RATE_LIMIT_DEFAULTS.imageMax,
+        "api:build-list": RATE_LIMIT_DEFAULTS.readMax,
       },
       windowMs: RATE_LIMIT_DEFAULTS.windowSeconds * 1000,
     });

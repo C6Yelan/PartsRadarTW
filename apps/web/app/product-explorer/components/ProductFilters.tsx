@@ -2,6 +2,8 @@
 // 呈現商品探索頁左側分類篩選面板，桌面固定展開、手機可收合。
 
 import type { MouseEvent } from "react";
+import { API_RATE_LIMITED_MESSAGE } from "../../_shared/api-client";
+import { ChevronDownIcon } from "../../_shared/icons";
 import type { CategoryItem, LoadState } from "../types";
 import { CategoryOption } from "./CategoryOption";
 
@@ -9,8 +11,8 @@ interface ProductFiltersProps {
   categories: CategoryItem[];
   categoryState: LoadState;
   filtersOpen: boolean;
-  selectedIgrp: string;
-  onCategoryChange: (igrp: string) => void;
+  selectedCategory: string;
+  onCategoryChange: (category: string) => void;
   onKeepDesktopOpen: (event: MouseEvent<HTMLElement>) => void;
   onToggleOpen: (isOpen: boolean) => void;
 }
@@ -20,7 +22,7 @@ export function ProductFilters({
   categories,
   categoryState,
   filtersOpen,
-  selectedIgrp,
+  selectedCategory,
   onCategoryChange,
   onKeepDesktopOpen,
   onToggleOpen,
@@ -32,26 +34,27 @@ export function ProductFilters({
         <summary onClick={onKeepDesktopOpen}>
           <span>搜尋與篩選</span>
           <span className="filter-summary-meta">
-            <span className="filter-chevron" aria-hidden="true" />
+            <ChevronDownIcon className="filter-chevron" />
           </span>
         </summary>
         <div className="filter-stack">
-          <div className="filter-group">
+          <div>
             <span className="filter-title">分類</span>
             <div className="category-list" role="radiogroup" aria-label="分類">
               {categories.map((category) => (
                 <CategoryOption
-                  checked={selectedIgrp === String(category.igrp)}
+                  checked={selectedCategory === category.slug}
                   key={category.id}
                   label={category.displayName}
                   subLabel={category.sourceName}
-                  value={String(category.igrp)}
-                  onChange={() => onCategoryChange(String(category.igrp))}
+                  value={category.slug}
+                  onChange={() => onCategoryChange(category.slug)}
                 />
               ))}
             </div>
-            {categoryState === "error" ? (
-              <p className="inline-error">分類暫時無法載入。</p>
+            {categoryState === "error" ? <p className="inline-error">分類暫時無法載入。</p> : null}
+            {categoryState === "rate_limited" ? (
+              <p className="inline-error">{API_RATE_LIMITED_MESSAGE}</p>
             ) : null}
           </div>
         </div>

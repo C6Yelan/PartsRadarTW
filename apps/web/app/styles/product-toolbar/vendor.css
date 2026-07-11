@@ -37,7 +37,7 @@
 }
 
 .vendor-menu.is-open .filter-chevron {
-  transform: rotate(225deg);
+  transform: rotate(180deg);
 }
 
 .vendor-filter-disabled {

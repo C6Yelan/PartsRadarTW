@@ -1,11 +1,7 @@
 // apps/crawler/src/scripts/ops/discord-bot/public-price-report/filters.ts
 // 定義公開價格報告的預設篩選條件，並轉接共用 price-report 篩選正規化邏輯。
 
-import { MAX_PRICE_REPORT_ITEMS } from "../constants";
-import {
-  normalizePriceReportFilters,
-  type PriceReportFilters,
-} from "../price-report/filters";
+import { normalizePriceReportFilters, type PriceReportFilters } from "../price-report/filters";
 
 export type { PriceReportFilters };
 
@@ -42,11 +38,6 @@ export function toPublicPriceReportFilters(
     includePriceRises: setting.includePriceRises,
     includeNewProducts: setting.includeNewProducts,
   });
-}
-
-// 限制公開報告最多列出的商品數，避免 Discord 頻道報告過長。
-export function clampPublicPriceReportMaxItems(value: number): number {
-  return Math.min(Math.max(value, 1), MAX_PRICE_REPORT_ITEMS);
 }
 
 // 正規化公開報告篩選；若內容類型全關閉，回到公開報告預設值避免產生空設定。

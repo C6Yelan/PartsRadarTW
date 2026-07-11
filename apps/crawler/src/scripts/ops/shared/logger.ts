@@ -1,8 +1,10 @@
 // apps/crawler/src/scripts/ops/shared/logger.ts
 // 提供 ops daemon / CLI 共用的 key-value logger，統一 log level、時間戳與敏感字串遮蔽。
+import { sanitizeSensitiveText } from "../../shared/script-utils";
+
 export type OpsLogLevel = "debug" | "info" | "warn" | "error";
 
-// ops 腳本使用的最小 logger 介面，方便測試注入 sink 並避免直接散落 console 呼叫。
+// ops 腳本共用的最小 logger 介面，避免各 daemon 分散處理輸出格式與遮蔽。
 export interface OpsLogger {
   debug(message: string, fields?: Record<string, unknown>): void;
   info(message: string, fields?: Record<string, unknown>): void;
@@ -19,7 +21,7 @@ const LEVEL_ORDER: Record<OpsLogLevel, number> = {
 
 // 建立具 level filter 的 ops logger；預設輸出到 console.log。
 export function createOpsLogger({
-  level = parseOpsLogLevel(process.env.LOG_LEVEL),
+  level,
   now = () => new Date(),
   sink = console.log,
 }: {
@@ -27,8 +29,14 @@ export function createOpsLogger({
   now?: () => Date;
   sink?: (line: string) => void;
 } = {}): OpsLogger {
+  let resolvedLevel = level;
+
   function write(nextLevel: OpsLogLevel, message: string, fields: Record<string, unknown> = {}) {
-    if (LEVEL_ORDER[nextLevel] < LEVEL_ORDER[level]) {
+    // Entrypoints load the workspace .env after module imports, so resolve the
+    // implicit level on first use instead of capturing process.env at import time.
+    resolvedLevel ??= parseOpsLogLevel(process.env.LOG_LEVEL);
+
+    if (LEVEL_ORDER[nextLevel] < LEVEL_ORDER[resolvedLevel]) {
       return;
     }
 
@@ -57,7 +65,7 @@ export function formatOpsLogLine(
   return [
     timestamp.toISOString(),
     `level=${level}`,
-    `message=${formatOpsLogValue(redactSensitiveText(message))}`,
+    `message=${formatOpsLogValue(message)}`,
     ...fieldEntries,
   ].join(" ");
 }
@@ -77,16 +85,7 @@ function formatOpsLogValue(value: unknown): string {
     return String(value);
   }
 
-  const text = redactSensitiveText(String(value));
+  const text = sanitizeSensitiveText(String(value));
 
   return /^[A-Za-z0-9._:/-]+$/.test(text) ? text : JSON.stringify(text);
-}
-
-// 遮蔽常見 key=value secret 片段，避免 token、password、secret 與 webhook URL 進入 ops log。
-function redactSensitiveText(value: string): string {
-  return value
-    .replace(/(token=)[^\s]+/gi, "$1[redacted]")
-    .replace(/(password=)[^\s]+/gi, "$1[redacted]")
-    .replace(/(secret=)[^\s]+/gi, "$1[redacted]")
-    .replace(/(webhookUrl=)[^\s]+/gi, "$1[redacted]");
 }

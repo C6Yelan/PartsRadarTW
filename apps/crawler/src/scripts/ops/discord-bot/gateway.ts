@@ -83,13 +83,13 @@ export async function runGatewaySession({
       }
 
       if (payload.op === GATEWAY_OP_HELLO) {
-        const heartbeatInterval = readHeartbeatInterval(payload.d);
+        const heartbeatIntervalMs = readHeartbeatIntervalMs(payload.d);
         heartbeatTimer = setInterval(() => {
           sendGatewayPayload(socket, {
             op: GATEWAY_OP_HEARTBEAT,
             d: sequence,
           });
-        }, heartbeatInterval);
+        }, heartbeatIntervalMs);
         sendIdentifyPayload(socket, options.token);
         return;
       }
@@ -147,7 +147,7 @@ function sendGatewayPayload(socket: MinimalWebSocket, payload: Record<string, un
 }
 
 // 讀取 Discord HELLO payload 的 heartbeat interval，缺值時回到保守預設。
-function readHeartbeatInterval(value: unknown): number {
+function readHeartbeatIntervalMs(value: unknown): number {
   if (
     value &&
     typeof value === "object" &&
@@ -191,7 +191,9 @@ export function getWebSocketConstructor(): MinimalWebSocketConstructor {
 }
 
 // 建立 SIGINT/SIGTERM shutdown controller，提供 gateway 與背景 loop 共用的停止旗標與可中止 sleep。
-export function createShutdownController(logMessage: (message: string) => void): ShutdownController {
+export function createShutdownController(
+  logMessage: (message: string) => void,
+): ShutdownController {
   let stopRequested = false;
   let wakeSleeper: (() => void) | null = null;
   const stopCallbacks = new Set<() => void>();
@@ -225,13 +227,13 @@ export function createShutdownController(logMessage: (message: string) => void):
       }
 
       return new Promise<void>((resolve) => {
-        const timeout = setTimeout(() => {
+        const timeoutId = setTimeout(() => {
           wakeSleeper = null;
           resolve();
         }, ms);
 
         wakeSleeper = () => {
-          clearTimeout(timeout);
+          clearTimeout(timeoutId);
           wakeSleeper = null;
           resolve();
         };

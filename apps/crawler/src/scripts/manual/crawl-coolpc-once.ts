@@ -4,15 +4,14 @@
 import { relative } from "node:path";
 import type { Prisma, PrismaClient } from "@partsradar/db";
 import { createPublicProductImagePath } from "@partsradar/shared";
-import {
-  assertSeededCategories,
-  runCoolpcCategoryCrawl,
-} from "../../coolpc/live-crawl";
+import { assertSeededCategories, runCoolpcCategoryCrawl } from "../../coolpc/live-crawl";
 import { CRAWL_TRIGGER_TYPES, type RunCoolpcCrawlOnceResult } from "../../coolpc/crawl-run";
 import {
   loadWorkspaceEnv,
+  resolveWorkspaceRoot,
   toSafeCliErrorMessage,
 } from "../shared/script-utils";
+import { tryAcquireExternalFetchLock } from "../ops/external-fetch-lock";
 import { parseOptions, type CrawlOptions } from "./crawl-coolpc-once/options";
 
 // 取樣輸出的商品筆數上限（僅供 smoke summary 顯示）。
@@ -89,11 +88,16 @@ interface PublicProductSmokeSummary {
 
 // 手動流程主入口：解析參數、載入環境、執行爬蟲並輸出報表。
 async function main() {
-  const options = parseOptions(process.argv.slice(2));
+  const args = process.argv.slice(2);
+
+  if (!args.includes("--help")) {
+    await loadWorkspaceEnv(resolveWorkspaceRoot());
+  }
+
+  const options = parseOptions(args);
   let client: PrismaClient | null = null;
 
   try {
-    await loadWorkspaceEnv(options.workspaceRoot);
     const db = await import("@partsradar/db");
     client = db.prisma;
 
@@ -107,7 +111,6 @@ async function main() {
     printSummary({
       workspaceRoot: options.workspaceRoot,
       storageDir: options.storageDir,
-      fromRawDir: options.fromRawDir,
       beforeCounts,
       afterCounts,
       runResult,
@@ -123,16 +126,29 @@ async function runManualCrawl(
   client: PrismaClient,
   options: CrawlOptions,
 ): Promise<RunCoolpcCrawlOnceResult> {
-  return runCoolpcCategoryCrawl({
-    client,
-    storageDir: options.storageDir,
-    fromRawDir: options.fromRawDir,
-    delayMs: options.delayMs,
-    triggerType: CRAWL_TRIGGER_TYPES.MANUAL,
-    baseUrl: process.env.COOLPC_BASE_URL,
-    fetchUserAgent: MANUAL_CRAWL_USER_AGENT,
-    log: console.log,
+  const externalFetchLock = await tryAcquireExternalFetchLock({
+    lockDir: options.externalFetchLockDir,
+    owner: "manual-crawler",
+    staleSeconds: options.externalFetchLockStaleSeconds,
   });
+
+  if (!externalFetchLock) {
+    throw new Error("Another live source fetch currently holds the shared external fetch lock.");
+  }
+
+  try {
+    return await runCoolpcCategoryCrawl({
+      client,
+      workspaceRoot: options.workspaceRoot,
+      storageDir: options.storageDir,
+      delayMs: options.delayMs,
+      triggerType: CRAWL_TRIGGER_TYPES.MANUAL,
+      fetchUserAgent: MANUAL_CRAWL_USER_AGENT,
+      log: console.log,
+    });
+  } finally {
+    await externalFetchLock.release();
+  }
 }
 
 // 取得 DB 當前數據快照，用來計算單次爬取造成的變動。
@@ -211,7 +227,6 @@ async function readPublicProductSmokeSummary(
 function printSummary({
   workspaceRoot,
   storageDir,
-  fromRawDir,
   beforeCounts,
   afterCounts,
   runResult,
@@ -219,7 +234,6 @@ function printSummary({
 }: {
   workspaceRoot: string;
   storageDir: string;
-  fromRawDir: string | null;
   beforeCounts: DbCounts;
   afterCounts: DbCounts;
   runResult: RunCoolpcCrawlOnceResult;
@@ -227,7 +241,7 @@ function printSummary({
 }) {
   console.log("");
   console.log("CoolPC manual crawl finished.");
-  console.log(`- Mode: ${fromRawDir ? `raw replay (${fromRawDir})` : "live fetch"}`);
+  console.log("- Mode: live fetch");
   console.log(`- Crawl run: ${runResult.crawlRunId}`);
   console.log(`- Status: ${runResult.status}`);
   console.log(`- Stopped by suspected block: ${runResult.stoppedBySuspectedBlock ? "yes" : "no"}`);
@@ -273,7 +287,9 @@ function printCountDelta(label: string, before: number, after: number): void {
   console.log(`- ${label}: ${after} (${sign}${delta})`);
 }
 
-main().catch((error) => {
-  console.error(toSafeCliErrorMessage(error));
-  process.exitCode = 1;
-});
+if (require.main === module) {
+  main().catch((error) => {
+    console.error(toSafeCliErrorMessage(error));
+    process.exitCode = 1;
+  });
+}

@@ -36,7 +36,6 @@ export interface DiscordWebhookEmbed {
 export interface DiscordWebhookMessage {
   content?: string;
   username?: string;
-  avatarUrl?: string;
   embeds?: DiscordWebhookEmbed[];
 }
 
@@ -79,7 +78,6 @@ interface DiscordRateLimitBody {
 interface DiscordWebhookPayload {
   content?: string;
   username?: string;
-  avatar_url?: string;
   embeds?: Array<{
     title?: string;
     description?: string;
@@ -149,7 +147,7 @@ export async function sendDiscordWebhookMessage({
   const normalizedWebhookUrl = normalizeDiscordWebhookUrl(webhookUrl);
   const payload = toDiscordWebhookPayload(message);
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const response = await fetchImpl(normalizedWebhookUrl, {
@@ -196,7 +194,7 @@ export async function sendDiscordWebhookMessage({
       ),
     };
   } finally {
-    clearTimeout(timeout);
+    clearTimeout(timeoutId);
   }
 }
 
@@ -214,7 +212,6 @@ function toDiscordWebhookPayload(message: DiscordWebhookMessage): DiscordWebhook
   return {
     content,
     username: message.username ? formatDiscordWebhookText(message.username, 80).trim() : undefined,
-    avatar_url: message.avatarUrl,
     embeds,
     allowed_mentions: {
       parse: [],
@@ -226,9 +223,7 @@ function toDiscordWebhookPayload(message: DiscordWebhookMessage): DiscordWebhook
 function toDiscordEmbed(embed: DiscordWebhookEmbed): DiscordWebhookPayloadEmbed {
   return {
     title: embed.title ? formatDiscordWebhookText(embed.title, 256).trim() : undefined,
-    description: embed.description
-      ? formatDiscordWebhookText(embed.description).trim()
-      : undefined,
+    description: embed.description ? formatDiscordWebhookText(embed.description).trim() : undefined,
     color: embed.color,
     fields: embed.fields?.map((field) => ({
       name: formatDiscordWebhookText(field.name, DISCORD_FIELD_NAME_MAX_LENGTH).trim(),
@@ -253,20 +248,22 @@ async function resolveRetryAfterMs(response: Response): Promise<number> {
   }
 
   const body = await readRateLimitBody(response);
-  const retryAfter = typeof body?.retry_after === "number" ? body.retry_after : null;
+  const retryAfterSeconds = typeof body?.retry_after === "number" ? body.retry_after : null;
 
-  return retryAfter !== null && Number.isFinite(retryAfter) ? Math.ceil(retryAfter * 1000) : 0;
+  return retryAfterSeconds !== null && Number.isFinite(retryAfterSeconds)
+    ? Math.ceil(retryAfterSeconds * 1000)
+    : 0;
 }
 
 // 將 Discord retry-after 秒數 header 轉成毫秒；無效值視為未提供。
 function parseRetryAfterHeader(headers: Headers): number | undefined {
-  const retryAfter = headers.get("retry-after");
+  const retryAfterSecondsText = headers.get("retry-after");
 
-  if (!retryAfter) {
+  if (!retryAfterSecondsText) {
     return undefined;
   }
 
-  const retryAfterSeconds = Number(retryAfter);
+  const retryAfterSeconds = Number(retryAfterSecondsText);
 
   if (!Number.isFinite(retryAfterSeconds) || retryAfterSeconds < 0) {
     return undefined;

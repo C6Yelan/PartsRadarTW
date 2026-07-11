@@ -11,11 +11,11 @@ import {
   loadWorkspaceEnv,
   resolveWorkspacePathArgument,
   resolveWorkspaceRoot,
+  sanitizeSensitiveText,
   toSafeCliErrorMessage,
 } from "../../../src/scripts/shared/script-utils";
 
 const TEST_ENV_KEYS = [
-  "NODE_ENV",
   "PARTSRADAR_SCRIPT_UTILS_VALUE",
   "PARTSRADAR_SCRIPT_UTILS_EXISTING",
   "PARTSRADAR_SCRIPT_UTILS_LOCAL_ONLY",
@@ -48,7 +48,7 @@ afterEach(async () => {
 });
 
 describe("script utils", () => {
-  it("does not load .env.local or override existing env values in production", async () => {
+  it("loads only .env and preserves existing process env values", async () => {
     const workspaceRoot = await createWorkspace({
       ".env": [
         "PARTSRADAR_SCRIPT_UTILS_VALUE=from_env",
@@ -60,7 +60,6 @@ describe("script utils", () => {
       ].join("\n"),
     });
 
-    process.env.NODE_ENV = "production";
     process.env.PARTSRADAR_SCRIPT_UTILS_EXISTING = "from_process";
 
     await loadWorkspaceEnv(workspaceRoot);
@@ -70,35 +69,24 @@ describe("script utils", () => {
     expect(process.env.PARTSRADAR_SCRIPT_UTILS_LOCAL_ONLY).toBeUndefined();
   });
 
-  it("keeps .env.local override behavior in development", async () => {
+  it("reports invalid env keys by relative path and line without echoing input", async () => {
     const workspaceRoot = await createWorkspace({
-      ".env": [
-        "PARTSRADAR_SCRIPT_UTILS_VALUE=from_env",
-        "PARTSRADAR_SCRIPT_UTILS_EXISTING=from_env",
-      ].join("\n"),
-      ".env.local": [
-        "PARTSRADAR_SCRIPT_UTILS_VALUE=from_local",
-        "PARTSRADAR_SCRIPT_UTILS_EXISTING=from_local",
-        "PARTSRADAR_SCRIPT_UTILS_LOCAL_ONLY=from_local",
-      ].join("\n"),
+      ".env": "VALID=value\nBAD-KEY=fake-secret-value",
     });
 
-    process.env.NODE_ENV = "development";
-    process.env.PARTSRADAR_SCRIPT_UTILS_EXISTING = "from_process";
-
-    await loadWorkspaceEnv(workspaceRoot);
-
-    expect(process.env.PARTSRADAR_SCRIPT_UTILS_VALUE).toBe("from_local");
-    expect(process.env.PARTSRADAR_SCRIPT_UTILS_EXISTING).toBe("from_local");
-    expect(process.env.PARTSRADAR_SCRIPT_UTILS_LOCAL_ONLY).toBe("from_local");
+    await expect(loadWorkspaceEnv(workspaceRoot)).rejects.toThrow(
+      /^Invalid env key in \.env at line 2\.$/,
+    );
   });
 
-  it("throws on invalid env keys", async () => {
+  it("does not echo malformed env assignment content", async () => {
     const workspaceRoot = await createWorkspace({
-      ".env": "BAD-KEY=value",
+      ".env": "VALID=value\nDISCORD_BOT_TOKEN fake-secret-value",
     });
 
-    await expect(loadWorkspaceEnv(workspaceRoot)).rejects.toThrow('Invalid env key "BAD-KEY"');
+    await expect(loadWorkspaceEnv(workspaceRoot)).rejects.toThrow(
+      /^Invalid env assignment in \.env at line 2\.$/,
+    );
   });
 
   it("strictly parses non-negative integer CLI args", () => {
@@ -154,16 +142,52 @@ describe("script utils", () => {
   it("redacts secrets from CLI error messages", () => {
     const message = toSafeCliErrorMessage(
       new Error(
-        "failed DATABASE_URL=postgresql://partsradar:secret@db:5432/app --token abc PHPSESSID=local",
+        "failed DATABASE_URL=postgresql://fake-user:fake-password@db:5432/app --token fake-cli-token PHPSESSID=fake-session",
       ),
     );
 
-    expect(message).toContain("DATABASE_URL=***");
-    expect(message).toContain("--token ***");
-    expect(message).toContain("PHPSESSID=***");
-    expect(message).not.toContain("secret");
-    expect(message).not.toContain("abc");
-    expect(message).not.toContain("local");
+    expect(message).toContain("DATABASE_URL=[redacted]");
+    expect(message).toContain("--token [redacted]");
+    expect(message).toContain("PHPSESSID=[redacted]");
+    expect(message).not.toContain("fake-password");
+    expect(message).not.toContain("fake-cli-token");
+    expect(message).not.toContain("fake-session");
+  });
+
+  it("uses one sanitizer for confirmed secret formats without changing ordinary text", () => {
+    const message = sanitizeSensitiveText(
+      [
+        "API_TOKEN=fake-env-token",
+        "ADMIN_PASSWORD=fake-env-password",
+        "CLIENT_SECRET=fake-env-secret",
+        "Authorization: Bearer fake-bearer-token",
+        "authorization=Bot fake-bot-token",
+        "--password fake-cli-password",
+        "token: fake-colon-token",
+        "postgresql://fake-user:fake-password@db.example/app",
+        "https://discord.com/api/webhooks/123/fake-webhook-token",
+        "https://www.coolpc.com.tw/evaluate.php?i=123",
+        "產品 5090 目前價格 12345",
+      ].join("\n"),
+    );
+
+    for (const secret of [
+      "fake-env-token",
+      "fake-env-password",
+      "fake-env-secret",
+      "fake-bearer-token",
+      "fake-bot-token",
+      "fake-cli-password",
+      "fake-colon-token",
+      "fake-user",
+      "fake-password",
+      "fake-webhook-token",
+    ]) {
+      expect(message).not.toContain(secret);
+    }
+
+    expect(message).toContain("https://www.coolpc.com.tw/evaluate.php?i=123");
+    expect(message).toContain("產品 5090 目前價格 12345");
   });
 });
 

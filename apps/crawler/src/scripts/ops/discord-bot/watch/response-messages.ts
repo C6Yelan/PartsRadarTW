@@ -14,16 +14,16 @@ import {
   MAX_TARGET_PRICE,
   PRODUCT_NAME_MAX_LENGTH,
 } from "../constants";
-import { formatDiscordBotText } from "../rest";
-import type { DiscordBotMessage, TargetPriceWatchSortKey, TargetPriceWatchStatusFilter } from "../types";
-import { formatWatchListState } from "./list-state";
 import {
   createProductUrl,
   escapeMarkdownLinkText,
+  formatDiscordBotText,
   formatTaipeiMinute,
   formatTaiwanDollar,
-  formatWatchSummaryFields,
-} from "./message-formatting";
+  toSingleLine,
+} from "../message-text";
+import type { DiscordBotMessage } from "../types";
+import { formatWatchSummaryFields } from "./message-formatting";
 import type { CreateTargetPriceWatchResult, TargetPriceWatchLookupResult } from "./records";
 
 // 將建立 watch 的 domain result 轉成使用者可讀回覆，成功時附上商品、目前價格與目標價。
@@ -36,14 +36,13 @@ export function createTargetPriceWatchResponseMessage({
 }): DiscordBotMessage {
   if (result.status === "invalid_product_reference") {
     return {
-      content:
-        "無法辨識商品。請貼上 PartsRadarTW 商品頁完整網址，或輸入網址 `/products/` 後面的商品 ID。",
+      content: "無法辨識商品。請貼上商品頁網址或網址最後那串ID。",
     };
   }
 
   if (result.status === "invalid_target_price") {
     return {
-      content: `目標價格需為 1-${MAX_TARGET_PRICE.toLocaleString("en-US")} 的新台幣整數，請不要輸入 NT$、逗號或空格。`,
+      content: `目標價格請輸入 1-${MAX_TARGET_PRICE.toLocaleString("en-US")} 範圍內純數字，不要加NT$、逗號或空格。`,
     };
   }
 
@@ -55,15 +54,18 @@ export function createTargetPriceWatchResponseMessage({
 
   if (result.status === "watch_limit_reached") {
     return {
-      content: `你已達到最多 ${result.maxWatches} 個商品追蹤。請先在 /watch 移除不需要的追蹤，再新增商品。`,
+      content: `已追蹤${result.maxWatches}個商品，已達上限。請先在 /watch 移除不需要的追蹤，再新增商品。`,
     };
   }
 
-  const productName = formatDiscordBotText(result.product.name, PRODUCT_NAME_MAX_LENGTH);
+  const productName = formatDiscordBotText(
+    toSingleLine(result.product.name),
+    PRODUCT_NAME_MAX_LENGTH,
+  );
   const targetDelta = result.currentPrice - result.watch.targetPrice;
   const status = result.reached
-    ? "目前價格已低於或等於目標價。"
-    : `尚未達標，距離目標價還差 ${formatTaiwanDollar(targetDelta, result.currency)}。`;
+    ? "目前價格已達標。"
+    : `尚未達標，距離目標價還差 ${formatTaiwanDollar(targetDelta)}。`;
 
   return {
     embeds: [
@@ -77,12 +79,12 @@ export function createTargetPriceWatchResponseMessage({
         fields: [
           {
             name: "目前價格",
-            value: formatTaiwanDollar(result.currentPrice, result.currency),
+            value: formatTaiwanDollar(result.currentPrice),
             inline: true,
           },
           {
             name: "目標價格",
-            value: formatTaiwanDollar(result.watch.targetPrice, result.watch.currency),
+            value: formatTaiwanDollar(result.watch.targetPrice),
             inline: true,
           },
           {
@@ -98,19 +100,15 @@ export function createTargetPriceWatchResponseMessage({
   };
 }
 
-// 建立單筆移除確認訊息，保留目前列表狀態讓取消或確認後能回到原管理面板。
+// 建立單筆移除確認訊息，保留目前頁碼讓取消或確認後能回到原管理面板。
 export function createTargetPriceWatchRemovalConfirmationMessage({
   result,
   publicBaseUrl,
   page,
-  statusFilter = "all",
-  sortKey = "recent",
 }: {
   result: TargetPriceWatchLookupResult;
   publicBaseUrl: string;
   page: number;
-  statusFilter?: TargetPriceWatchStatusFilter;
-  sortKey?: TargetPriceWatchSortKey;
 }): DiscordBotMessage {
   if (result.status === "invalid_reference") {
     return {
@@ -124,8 +122,10 @@ export function createTargetPriceWatchRemovalConfirmationMessage({
     };
   }
 
-  const productName = formatDiscordBotText(result.watch.product.name, PRODUCT_NAME_MAX_LENGTH);
-  const state = formatWatchListState({ page, statusFilter, sortKey });
+  const productName = formatDiscordBotText(
+    toSingleLine(result.watch.product.name),
+    PRODUCT_NAME_MAX_LENGTH,
+  );
 
   return {
     embeds: [
@@ -149,13 +149,13 @@ export function createTargetPriceWatchRemovalConfirmationMessage({
           {
             type: DISCORD_COMPONENT_TYPE_BUTTON,
             style: DISCORD_BUTTON_STYLE_DANGER,
-            custom_id: `${WATCH_REMOVE_CONFIRM_CUSTOM_ID_PREFIX}${result.watch.id}:${state}`,
+            custom_id: `${WATCH_REMOVE_CONFIRM_CUSTOM_ID_PREFIX}${result.watch.id}:${page}`,
             label: "確認移除",
           },
           {
             type: DISCORD_COMPONENT_TYPE_BUTTON,
             style: DISCORD_BUTTON_STYLE_SECONDARY,
-            custom_id: `${WATCH_REMOVE_CANCEL_CUSTOM_ID_PREFIX}${result.watch.id}:${state}`,
+            custom_id: `${WATCH_REMOVE_CANCEL_CUSTOM_ID_PREFIX}${result.watch.id}:${page}`,
             label: "返回設定",
           },
         ],

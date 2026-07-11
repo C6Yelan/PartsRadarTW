@@ -4,9 +4,9 @@
 import { createPriceReportSettingsComponents, type parsePriceReportModalSubmit } from "../commands";
 import {
   DISCORD_EMBED_COLOR,
-  MAX_PRICE_REPORT_ITEMS,
   MAX_PRICE_REPORT_KEYWORD_GROUPS,
   MAX_PRICE_REPORT_KEYWORD_LENGTH,
+  TIME_ZONE,
 } from "../constants";
 import {
   formatPriceReportCategoryFilterLabel,
@@ -21,8 +21,9 @@ import {
   readPriceReportSetting,
   toPriceReportFilters,
 } from "../price-report";
+import { toWindowHours } from "../price-report/schedule";
 import {
-  formatDiscordBotText,
+  formatDiscordDeliveryFailureFieldValue,
   formatDiscordDeliveryFailureForUser,
   formatDiscordRateLimitForUser,
 } from "../rest";
@@ -30,8 +31,7 @@ import type {
   DiscordBotClient,
   DiscordBotEmbed,
   DiscordBotMessage,
-  DiscordBotOptions,
-  PriceReportNowResult,
+  PersonalPriceReportDeliveryResult,
   PriceReportTimeOfDay,
 } from "../types";
 
@@ -40,20 +40,17 @@ interface PriceReportSettingsPanel {
   setting: Awaited<ReturnType<typeof readPriceReportSetting>>;
   categories: PriceReportCategoryOption[];
   latestDelivery: PriceReportDeliveryStatus | null;
-  options: DiscordBotOptions;
   notice?: string;
 }
 
-// 讀取個人 price-report 設定面板資料，包含目前設定、可選分類與最近一次每日報告狀態。
+// 讀取個人 price-report 設定面板資料，包含目前設定、可選分類與最近一次每日私訊價格報告狀態。
 export async function readPriceReportSettingsPanel({
   client,
   discordUserId,
-  options,
   notice,
 }: {
   client: DiscordBotClient;
   discordUserId: string;
-  options: DiscordBotOptions;
   notice?: string;
 }): Promise<PriceReportSettingsPanel> {
   const [setting, categories, latestDelivery] = await Promise.all([
@@ -66,7 +63,6 @@ export async function readPriceReportSettingsPanel({
     setting,
     categories,
     latestDelivery,
-    options,
     notice,
   };
 }
@@ -76,17 +72,14 @@ export function createPriceReportSettingsPanelMessage({
   setting,
   categories,
   latestDelivery,
-  options,
   notice,
 }: PriceReportSettingsPanel): DiscordBotMessage {
   const filters = toPriceReportFilters(setting);
 
   return {
-    embeds: [
-      createPriceReportSettingsEmbed({ setting, categories, latestDelivery, options, notice }),
-    ],
+    embeds: [createPriceReportSettingsEmbed({ setting, categories, latestDelivery, notice })],
     components: createPriceReportSettingsComponents({
-      windowHours: resolveWindowHours(setting?.window),
+      windowHours: toWindowHours(setting?.window),
       categories,
       categoryIgrps: filters.categoryIgrps,
       includePriceDrops: filters.includePriceDrops,
@@ -98,7 +91,9 @@ export function createPriceReportSettingsPanelMessage({
 }
 
 // 將立即預覽 DM 的發送結果轉成設定面板 notice，避免暴露 Discord 原始錯誤細節。
-export function formatPriceReportPreviewDmNotice(result: PriceReportNowResult): string {
+export function formatPriceReportPreviewDmNotice(
+  result: PersonalPriceReportDeliveryResult,
+): string {
   if (result.status === "sent") {
     return `已傳送預覽 DM：列出 ${result.listedCount} 筆，送出 ${result.messageCount} 則訊息。`;
   }
@@ -107,37 +102,7 @@ export function formatPriceReportPreviewDmNotice(result: PriceReportNowResult): 
     return formatDiscordRateLimitForUser();
   }
 
-  return formatDiscordDeliveryFailureForUser(result.message);
-}
-
-// 驗證分類 select 回傳值必須來自目前可見分類；空選或全選都代表不限制分類。
-export function parsePriceReportCategorySelection(
-  values: string[],
-  categories: PriceReportCategoryOption[],
-): number[] | null {
-  const visibleCategories = categories.slice(0, 25);
-  const visibleIgrps = new Set(visibleCategories.map((category) => category.igrp));
-  const selectedIgrps = new Set<number>();
-
-  for (const value of values) {
-    if (!/^[1-9][0-9]*$/.test(value)) {
-      return null;
-    }
-
-    const igrp = Number(value);
-
-    if (!visibleIgrps.has(igrp)) {
-      return null;
-    }
-
-    selectedIgrps.add(igrp);
-  }
-
-  if (selectedIgrps.size === 0 || selectedIgrps.size === visibleIgrps.size) {
-    return [];
-  }
-
-  return [...selectedIgrps].sort((left, right) => left - right);
+  return formatDiscordDeliveryFailureForUser(result);
 }
 
 // 建立個人 price-report modal 驗證錯誤訊息，讓 submit handler 共用同一組使用者回覆。
@@ -148,30 +113,14 @@ export function formatPriceReportModalValidationMessage(
     return formatPriceReportKeywordValidationMessage();
   }
 
-  const messages = [
-    modal.maxItemsInputValid ? null : `最多商品數需為 1-${MAX_PRICE_REPORT_ITEMS} 的整數。`,
-    modal.timeInputValid ? null : "每日發送時間格式需為台北時間 HH:mm，例如 `09:30` 或 `21:00`。",
-  ].filter((message): message is string => message !== null);
-
-  return messages.join("\n");
+  return modal.timeInputValid
+    ? ""
+    : "每日發送時間格式需為台北時間 HH:mm，例如 `09:30` 或 `21:00`。";
 }
 
 // 建立商品關鍵字輸入錯誤訊息，對齊 modal 說明中的長度與分組限制。
 export function formatPriceReportKeywordValidationMessage(): string {
   return `商品關鍵字最多 ${MAX_PRICE_REPORT_KEYWORD_LENGTH} 個字，且最多 ${MAX_PRICE_REPORT_KEYWORD_GROUPS} 組。`;
-}
-
-// 將 persisted window enum 轉回小時數；未知或未設定時回到 24 小時。
-export function resolveWindowHours(window: string | undefined): number {
-  if (window === "HOURS_6") {
-    return 6;
-  }
-
-  if (window === "HOURS_12") {
-    return 12;
-  }
-
-  return 24;
 }
 
 // 將既有 nextSendAt 轉為 modal 可用的台北時間；無法解析時回到 09:00。
@@ -192,7 +141,7 @@ export function formatTaipeiTimeInput(value: Date | null | undefined): string {
   }
 
   const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "Asia/Taipei",
+    timeZone: TIME_ZONE,
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
@@ -208,14 +157,13 @@ function createPriceReportSettingsEmbed({
   setting,
   categories,
   latestDelivery,
-  options,
   notice,
 }: PriceReportSettingsPanel): DiscordBotEmbed {
   const enabled = setting?.enabled ?? false;
   const filters = toPriceReportFilters(setting);
   const description = [
     notice ? `**${notice}**` : null,
-    enabled ? "每日價格提醒已開啟。" : "尚未開啟每日價格提醒。",
+    enabled ? "每日私訊價格報告已開啟。" : "尚未開啟每日私訊價格報告。",
   ]
     .filter((line): line is string => line !== null)
     .join("\n");
@@ -246,11 +194,6 @@ function createPriceReportSettingsEmbed({
         inline: true,
       },
       {
-        name: "每次最多",
-        value: `${setting?.maxItems ?? options.priceReportMaxItems} 筆`,
-        inline: true,
-      },
-      {
         name: "每日時間",
         value: formatTaipeiTimeInput(setting?.nextSendAt),
         inline: true,
@@ -261,7 +204,7 @@ function createPriceReportSettingsEmbed({
         inline: true,
       },
       {
-        name: "最近一次每日報告",
+        name: "最近一次每日私訊價格報告",
         value: formatPriceReportDeliveryStatus(latestDelivery),
       },
     ],
@@ -271,7 +214,7 @@ function createPriceReportSettingsEmbed({
 // 將最近一次每日私訊報告 delivery 狀態轉成設定面板欄位文字。
 function formatPriceReportDeliveryStatus(delivery: PriceReportDeliveryStatus | null): string {
   if (!delivery) {
-    return "尚無每日報告紀錄。";
+    return "尚無每日私訊價格報告紀錄。";
   }
 
   const deliveredAt = formatTaipeiMinute(delivery.deliveredAt ?? delivery.createdAt);
@@ -285,13 +228,8 @@ function formatPriceReportDeliveryStatus(delivery: PriceReportDeliveryStatus | n
   }
 
   if (delivery.status === "FAILED") {
-    return `失敗：${deliveredAt}。${formatPriceReportDeliveryError(delivery.errorMessage)}`;
+    return `失敗：${deliveredAt}。${formatDiscordDeliveryFailureFieldValue(delivery)}`;
   }
 
   return `${delivery.status}：${deliveredAt}，列出 ${delivery.itemCount} 筆。`;
-}
-
-// 將 Discord delivery 錯誤轉成短版使用者訊息，避免 embed 欄位過長。
-export function formatPriceReportDeliveryError(errorMessage: string | null): string {
-  return formatDiscordBotText(formatDiscordDeliveryFailureForUser(errorMessage), 220);
 }

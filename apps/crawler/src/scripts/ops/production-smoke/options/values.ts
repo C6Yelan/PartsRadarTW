@@ -18,14 +18,12 @@ export function normalizeBaseUrl(value: string): string {
   }
 }
 
-// 解析整數型 smoke option，並支援少數舊名稱 alias 以維持過渡相容。
+// 解析整數型 smoke option，統一驗證 CLI / env 值的非負整數範圍。
 export function parseIntegerOption({
   args,
   env,
   argName,
   envName,
-  fallbackArgName,
-  fallbackEnvName,
   fallback,
   min,
   max,
@@ -34,20 +32,12 @@ export function parseIntegerOption({
   env: NodeJS.ProcessEnv;
   argName: string;
   envName: string;
-  fallbackArgName?: string;
-  fallbackEnvName?: string;
   fallback: number;
   min: number;
   max: number;
 }): number {
-  const raw =
-    getStringArg(args, argName) ??
-    (fallbackArgName ? getStringArg(args, fallbackArgName) : undefined) ??
-    env[envName] ??
-    (fallbackEnvName ? env[fallbackEnvName] : undefined) ??
-    String(fallback);
-  const aliases = [argName, envName, fallbackArgName, fallbackEnvName].filter(Boolean).join("/");
-  const message = `${aliases} must be an integer between ${min} and ${max}.`;
+  const raw = getStringArg(args, argName) ?? env[envName] ?? String(fallback);
+  const message = `${argName}/${envName} must be an integer between ${min} and ${max}.`;
 
   if (!/^(0|[1-9][0-9]*)$/.test(raw)) {
     throw new Error(message);

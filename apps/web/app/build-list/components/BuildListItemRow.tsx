@@ -1,13 +1,15 @@
 "use client";
 // apps/web/app/build-list/components/BuildListItemRow.tsx
-// 呈現配單單一品項列，串接商品詳細連結、來源連結、數量控制與移除操作。
+// 呈現 refresh-backed 配單列；missing 或失敗時保留 intent，但不顯示或計入價格。
 
 import Link from "next/link";
-import { formatBuildListDateTime, formatBuildListPrice } from "../formatting";
-import { BUILD_LIST_MAX_QUANTITY, getBuildListLineSubtotal, type BuildListItem } from "../model";
+import { formatTwdPrice } from "../../_shared/formatting";
+import { ExternalLinkIcon } from "../../_shared/icons";
+import { formatTaipeiDateTime } from "../../_shared/time";
+import { BUILD_LIST_MAX_QUANTITY } from "../constants";
+import { type BuildListItem, getBuildListLineSubtotal } from "../model";
 import BuildListItemImage from "./BuildListItemImage";
 
-// 組裝配單品項列，將互動事件交回頁面層維護配單狀態。
 export default function BuildListItemRow({
   item,
   onQuantityChange,
@@ -17,57 +19,71 @@ export default function BuildListItemRow({
   onQuantityChange: (productId: string, quantity: number) => void;
   onRemove: (item: BuildListItem) => void;
 }) {
+  const { intent, product } = item;
   const subtotal = getBuildListLineSubtotal(item);
-  const detailHref = createBuildListProductDetailHref(item.id);
+  const displayName = product?.name ?? intent.productId;
+  const detailHref = createBuildListProductDetailHref(intent.productId);
+  const status = getBuildListItemStatus(item);
 
   return (
-    <article className="build-list-item">
+    <article className={`build-list-item${product ? "" : " is-unconfirmed"}`}>
       <Link
-        aria-label={`查看 ${item.name} 商品詳細`}
+        aria-label={`查看 ${displayName} 商品詳細`}
         className="build-list-item-image-link"
         href={detailHref}
       >
-        <BuildListItemImage item={item} />
+        <BuildListItemImage
+          key={product?.image?.url ?? product?.id ?? intent.productId}
+          product={product}
+        />
       </Link>
       <div className="build-list-item-main">
-        <span className="detail-category-chip">{item.category.displayName}</span>
+        <div className="build-list-item-labels">
+          <span className="detail-category-chip">{product?.category.displayName ?? "商品 ID"}</span>
+          <span className={`row-state ${status.tone}`}>{status.label}</span>
+        </div>
         <h2>
-          <Link className="build-list-item-title-link" href={detailHref} title={item.name}>
-            {item.name}
+          <Link className="build-list-item-title-link" href={detailHref} title={displayName}>
+            {displayName}
           </Link>
         </h2>
         <dl className="build-list-item-facts">
           <div>
             <dt>目前價格</dt>
-            <dd>{formatBuildListPrice(item.price.amount)}</dd>
+            <dd>{product?.price ? formatTwdPrice(product.price.amount) : "暫未計價"}</dd>
           </div>
           <div>
-            <dt>價格更新</dt>
-            <dd>{formatBuildListDateTime(item.price.lastSeenAt)}</dd>
+            <dt>資料更新</dt>
+            <dd>{product ? formatTaipeiDateTime(product.lastSeenAt) : "—"}</dd>
           </div>
           <div>
             <dt>小計</dt>
-            <dd>{formatBuildListPrice(subtotal)}</dd>
+            <dd>{subtotal === null ? "—" : formatTwdPrice(subtotal)}</dd>
           </div>
         </dl>
-        <div className="build-list-links">
-          <a href={item.source.url} rel="noreferrer" target="_blank">
-            原價屋查看／購買
-            <span className="build-list-link-icon" aria-hidden="true">
-              ↗
-            </span>
-          </a>
-        </div>
+        {product ? (
+          <div className="build-list-links">
+            <a
+              aria-label="原價屋查看／購買，開新分頁"
+              href={product.source.url}
+              rel="noreferrer"
+              target="_blank"
+            >
+              原價屋查看／購買
+              <ExternalLinkIcon className="build-list-link-icon" />
+            </a>
+          </div>
+        ) : null}
       </div>
 
       <div className="build-list-item-controls">
         <fieldset className="quantity-stepper">
-          <legend className="sr-only">{item.name} 數量</legend>
+          <legend className="sr-only">{displayName} 數量</legend>
           <button
             aria-label="減少數量"
-            disabled={item.quantity <= 1}
+            disabled={intent.quantity <= 1}
             type="button"
-            onClick={() => onQuantityChange(item.id, item.quantity - 1)}
+            onClick={() => onQuantityChange(intent.productId, intent.quantity - 1)}
           >
             -
           </button>
@@ -77,14 +93,14 @@ export default function BuildListItemRow({
             max={BUILD_LIST_MAX_QUANTITY}
             min={1}
             type="number"
-            value={item.quantity}
-            onChange={(event) => onQuantityChange(item.id, Number(event.target.value))}
+            value={intent.quantity}
+            onChange={(event) => onQuantityChange(intent.productId, Number(event.target.value))}
           />
           <button
             aria-label="增加數量"
-            disabled={item.quantity >= BUILD_LIST_MAX_QUANTITY}
+            disabled={intent.quantity >= BUILD_LIST_MAX_QUANTITY}
             type="button"
-            onClick={() => onQuantityChange(item.id, item.quantity + 1)}
+            onClick={() => onQuantityChange(intent.productId, intent.quantity + 1)}
           >
             +
           </button>
@@ -97,7 +113,21 @@ export default function BuildListItemRow({
   );
 }
 
-// 建立從配單進入商品詳細頁的連結，讓詳細頁返回時能回到配單。
+function getBuildListItemStatus(item: BuildListItem): {
+  label: string;
+  tone: "ok" | "warning";
+} {
+  if (item.product) {
+    return item.product.status.isActive
+      ? { label: "目前上架", tone: "ok" }
+      : { label: "可能已下架", tone: "warning" };
+  }
+
+  return item.availability === "loading"
+    ? { label: "正在取得最新資料", tone: "warning" }
+    : { label: "暫時無法確認", tone: "warning" };
+}
+
 function createBuildListProductDetailHref(productId: string) {
   const params = new URLSearchParams({
     returnTo: "/build-list",

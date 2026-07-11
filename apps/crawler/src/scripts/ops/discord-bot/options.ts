@@ -1,17 +1,15 @@
 // apps/crawler/src/scripts/ops/discord-bot/options.ts
 // 解析 Discord bot CLI/env 設定，包含 token、API 端點、功能旗標與排程參數。
 
-import { normalizePublicBaseUrl } from "../shared/public-base-url";
 import { getStringArg } from "../../shared/script-utils";
+import { normalizePublicBaseUrl } from "../shared/public-base-url";
 import {
   DEFAULT_COMMAND_COOLDOWN_SECONDS,
   DEFAULT_DISCORD_API_BASE_URL,
   DEFAULT_DISCORD_GATEWAY_URL,
-  DEFAULT_PRICE_REPORT_MAX_ITEMS,
   DEFAULT_PRICE_REPORT_SCHEDULE_INTERVAL_SECONDS,
   DEFAULT_PUBLIC_BASE_URL,
   DISCORD_SNOWFLAKE_PATTERN,
-  MAX_PRICE_REPORT_ITEMS,
 } from "./constants";
 import type { DiscordBotOptions } from "./types";
 
@@ -34,20 +32,10 @@ export function parseDiscordBotOptions(
       env.DISCORD_GATEWAY_URL ?? DEFAULT_DISCORD_GATEWAY_URL,
       "DISCORD_GATEWAY_URL",
     ),
-    registerCommands: args.includes("--register-commands"),
     registerCommandsOnStart: readBooleanEnv(env, "DISCORD_BOT_REGISTER_COMMANDS_ON_START", true),
     publicReportsEnabled: readBooleanEnv(env, "DISCORD_FEATURE_PUBLIC_REPORTS_ENABLED", true),
     personalReportsEnabled: readBooleanEnv(env, "DISCORD_FEATURE_PERSONAL_REPORTS_ENABLED", true),
     targetWatchesEnabled: readBooleanEnv(env, "DISCORD_FEATURE_TARGET_WATCHES_ENABLED", true),
-    priceReportMaxItems: parseIntegerOption({
-      args,
-      env,
-      argName: "--price-report-max-items",
-      envName: "DISCORD_PRICE_REPORT_MAX_ITEMS",
-      fallback: DEFAULT_PRICE_REPORT_MAX_ITEMS,
-      min: 1,
-      max: MAX_PRICE_REPORT_ITEMS,
-    }),
     commandCooldownSeconds: parseIntegerOption({
       args,
       env,
@@ -191,22 +179,5 @@ export function printDiscordBotHelp(): void {
 
 Options:
   --register-commands         Register slash commands and exit.
-  --price-report-max-items <n>
-                              Maximum rows in price report messages.
-                              Default: ${DEFAULT_PRICE_REPORT_MAX_ITEMS}, range: 1-${MAX_PRICE_REPORT_ITEMS}
-  --command-cooldown-seconds <sec>
-                              Per-user cooldown for bot commands.
-                              Default: ${DEFAULT_COMMAND_COOLDOWN_SECONDS}, range: 0-3600
-  --price-report-schedule-interval-seconds <sec>
-                              Maximum fallback delay between scheduled price report scans.
-                              Default: ${DEFAULT_PRICE_REPORT_SCHEDULE_INTERVAL_SECONDS}, range: 60-3600
-
-Environment:
-  DISCORD_BOT_TOKEN, DISCORD_APPLICATION_ID, DISCORD_BOT_REGISTER_COMMANDS_ON_START,
-  DISCORD_FEATURE_PUBLIC_REPORTS_ENABLED, DISCORD_FEATURE_PERSONAL_REPORTS_ENABLED,
-  DISCORD_FEATURE_TARGET_WATCHES_ENABLED,
-  DISCORD_PRICE_REPORT_MAX_ITEMS,
-  DISCORD_BOT_COMMAND_COOLDOWN_SECONDS, DISCORD_PRICE_REPORT_SCHEDULE_INTERVAL_SECONDS,
-  PARTSRADAR_PUBLIC_BASE_URL
 `);
 }

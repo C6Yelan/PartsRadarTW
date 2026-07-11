@@ -1,38 +1,52 @@
 "use client";
 // apps/web/app/build-list/BuildListPageClient.tsx
-// 組裝配單頁的 client-side 狀態、品項列表、摘要側欄、Excel 匯出與移除復原流程。
+// 組裝 intent-only 配單、批次 refresh、估算、Excel 與移除復原流程。
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { ArrowLeftIcon, BrandMarkIcon } from "../_shared/icons";
 import DiscordTopbarLink from "../DiscordTopbarLink";
 import SiteDisclaimer from "../site-disclaimer";
 import BuildListEmptyState from "./components/BuildListEmptyState";
 import BuildListItemRow from "./components/BuildListItemRow";
 import BuildListLoadingState from "./components/BuildListLoadingState";
+import BuildListRefreshStatus from "./components/BuildListRefreshStatus";
 import BuildListSummaryPanel from "./components/BuildListSummaryPanel";
 import BuildListUndoToast from "./components/BuildListUndoToast";
 import { downloadBuildListExcel } from "./download";
-import type { BuildListItem } from "./model";
+import {
+  type BuildListIntent,
+  type BuildListItem,
+  resolveBuildListItems,
+  summarizeBuildListItems,
+} from "./model";
 import { useBuildList } from "./use-build-list";
+import { useBuildListRefresh } from "./use-build-list-refresh";
 
 const UNDO_TOAST_DURATION_MS = 7000;
 
 interface RemovedItemNotice {
   id: number;
-  item: BuildListItem;
+  intent: BuildListIntent;
+  label: string;
 }
 
-// 呈現配單頁主要互動區塊，將 localStorage 配單狀態分派給列表、摘要與 undo toast。
 export default function BuildListPageClient() {
   const {
     clearBuildListItems,
+    intents,
     isReady,
-    items,
     removeBuildListItem,
     restoreBuildListItem,
-    summary,
     setBuildListItemQuantity,
   } = useBuildList();
+  const refresh = useBuildListRefresh(intents, isReady);
+  const items = useMemo(
+    () => resolveBuildListItems(intents, refresh.products, refresh.state),
+    [intents, refresh.products, refresh.state],
+  );
+  const summary = useMemo(() => summarizeBuildListItems(items), [items]);
+  const missingItemCount = items.filter((item) => item.availability === "missing").length;
   const [removedItemNotice, setRemovedItemNotice] = useState<RemovedItemNotice | null>(null);
 
   useEffect(() => {
@@ -50,14 +64,15 @@ export default function BuildListPageClient() {
   }, [removedItemNotice]);
 
   function downloadExcel() {
-    downloadBuildListExcel(items);
+    downloadBuildListExcel(items, refresh.lastSuccessfulSyncAt);
   }
 
   function handleRemoveBuildListItem(item: BuildListItem) {
-    removeBuildListItem(item.id);
+    removeBuildListItem(item.intent.productId);
     setRemovedItemNotice({
       id: Date.now(),
-      item,
+      intent: item.intent,
+      label: item.product?.name ?? item.intent.productId,
     });
   }
 
@@ -66,7 +81,7 @@ export default function BuildListPageClient() {
       return;
     }
 
-    restoreBuildListItem(removedItemNotice.item);
+    restoreBuildListItem(removedItemNotice.intent);
     setRemovedItemNotice(null);
   }
 
@@ -84,7 +99,7 @@ export default function BuildListPageClient() {
       <header className="topbar build-list-topbar">
         <div className="topbar-brand-area">
           <Link className="brand-lockup" href="/">
-            <span className="brand-mark" aria-hidden="true" />
+            <BrandMarkIcon />
             <span>
               <span className="brand-name">PartsRadarTW</span>
               <span className="brand-subtitle">原價屋零件查詢</span>
@@ -99,12 +114,23 @@ export default function BuildListPageClient() {
         </div>
 
         <Link className="back-link build-list-back-link" href="/">
+          <ArrowLeftIcon />
           返回查詢
         </Link>
       </header>
 
       <main className="build-list-page" aria-label="配單內容">
         {!isReady ? <BuildListLoadingState /> : null}
+
+        {isReady ? (
+          <BuildListRefreshStatus
+            itemCount={intents.length}
+            lastSuccessfulSyncAt={refresh.lastSuccessfulSyncAt}
+            missingItemCount={missingItemCount}
+            state={refresh.state}
+            onRefresh={() => void refresh.refresh()}
+          />
+        ) : null}
 
         {isReady && items.length === 0 ? <BuildListEmptyState /> : null}
 
@@ -114,7 +140,7 @@ export default function BuildListPageClient() {
               {items.map((item) => (
                 <BuildListItemRow
                   item={item}
-                  key={item.id}
+                  key={item.intent.productId}
                   onQuantityChange={setBuildListItemQuantity}
                   onRemove={handleRemoveBuildListItem}
                 />
@@ -122,6 +148,7 @@ export default function BuildListPageClient() {
             </section>
 
             <BuildListSummaryPanel
+              isDownloadDisabled={refresh.state === "loading"}
               summary={summary}
               onClear={handleClearBuildListItems}
               onDownloadExcel={downloadExcel}
@@ -132,7 +159,7 @@ export default function BuildListPageClient() {
 
       {removedItemNotice ? (
         <BuildListUndoToast
-          item={removedItemNotice.item}
+          itemLabel={removedItemNotice.label}
           onUndo={handleUndoRemoveBuildListItem}
         />
       ) : null}

@@ -1,7 +1,7 @@
 // apps/crawler/tests/coolpc/support/product-write-client.ts
 // 提供 product-write 與 data-flow 測試用的記憶體 fake client、商品 factory 與價格資料列型別。
 
-import type { ParsedCoolpcProduct } from "../../../src/coolpc/parser";
+import type { ParsedCoolpcProduct } from "../../../src/coolpc/parser/types";
 import type { CoolpcProductWriteClient } from "../../../src/coolpc/product-write";
 
 export interface FakeProduct {

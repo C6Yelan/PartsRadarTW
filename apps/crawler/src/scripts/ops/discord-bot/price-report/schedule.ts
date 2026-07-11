@@ -2,13 +2,8 @@
 // 處理個人價格報告的排程時間、報告時間窗與台北時間顯示格式。
 
 import type { DiscordPriceReportSetting } from "@partsradar/db";
-
-import {
-  DAY_MS,
-  HOUR_MS,
-  SCHEDULED_PRICE_REPORT_RETRY_DELAY_MS,
-  TIME_ZONE,
-} from "../constants";
+import { DAY_MS, HOUR_MS, SCHEDULED_PRICE_REPORT_RETRY_DELAY_MS } from "../constants";
+import { formatTaipeiMinute as formatDiscordTaipeiMinute } from "../message-text";
 import type { PriceReportTimeOfDay } from "../types";
 
 const TAIPEI_UTC_OFFSET_MS = 8 * HOUR_MS;
@@ -106,7 +101,7 @@ export function toPriceReportWindow(windowHours: number): DiscordPriceReportSett
 }
 
 // 將 DB report window enum 轉回實際查詢使用的小時數。
-export function toWindowHours(window: DiscordPriceReportSetting["window"]): number {
+export function toWindowHours(window: DiscordPriceReportSetting["window"] | undefined): number {
   if (window === "HOURS_6") {
     return 6;
   }
@@ -129,34 +124,5 @@ export function formatTaipeiMinute(value: Date | null): string {
     return "尚未排程";
   }
 
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: TIME_ZONE,
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    hourCycle: "h23",
-  }).formatToParts(value);
-  const byType = new Map(parts.map((part) => [part.type, part.value]));
-
-  return `${byType.get("month")}/${byType.get("day")} ${byType.get("hour")}:${byType.get("minute")} GMT+8`;
-}
-
-// 格式化每日發送時間，只顯示台北時區的時與分。
-export function formatTaipeiTime(value: Date | null): string {
-  if (!value) {
-    return "尚未排程";
-  }
-
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: TIME_ZONE,
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    hourCycle: "h23",
-  }).formatToParts(value);
-  const byType = new Map(parts.map((part) => [part.type, part.value]));
-
-  return `${byType.get("hour")}:${byType.get("minute")} GMT+8`;
+  return formatDiscordTaipeiMinute(value);
 }
