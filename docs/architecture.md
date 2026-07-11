@@ -22,6 +22,8 @@ flowchart LR
 
 沒有 queue、event bus、多來源 abstraction 或共用 domain framework。排程程序透過 PostgreSQL 與具名 volume 協調。
 
+Filesystem lock 僅協調同一主機上共享本機 filesystem 或 local named volume 的程序。它使用 timed lease，不提供 heartbeat、NFS／multi-host fencing 保證；若 holder 暫停超過 stale timeout，恢復時可能短暫與 replacement 重疊，因此 timeout 必須大於受保護操作的合理最長時間。
+
 ## Workspace 責任
 
 | 區域 | 責任 |
