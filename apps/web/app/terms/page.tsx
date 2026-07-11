@@ -7,6 +7,9 @@ import { ArrowLeftIcon, BrandMarkIcon } from "../_shared/icons";
 import SiteDisclaimer from "../site-disclaimer";
 
 export const metadata: Metadata = {
+  alternates: {
+    canonical: "/terms",
+  },
   title: "使用條款 | PartsRadarTW",
   description: "PartsRadarTW 的資料來源、使用限制與責任範圍。",
 };

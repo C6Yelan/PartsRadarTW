@@ -3,11 +3,18 @@
 
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { resolvePublicSiteUrl } from "./_shared/public-site";
 import "./globals.css";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(resolvePublicSiteUrl()),
   title: "PartsRadarTW",
   description: "原價屋電腦零組件價格查詢工具",
+  openGraph: {
+    type: "website",
+    siteName: "PartsRadarTW",
+    locale: "zh_TW",
+  },
   icons: {
     icon: "/favicon.svg",
   },

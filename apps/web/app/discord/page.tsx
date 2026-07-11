@@ -17,6 +17,9 @@ import {
 } from "./content";
 
 export const metadata: Metadata = {
+  alternates: {
+    canonical: "/discord",
+  },
   title: "Discord 通知 | PartsRadarTW",
   description:
     "邀請 PartsRadarTW Discord bot，設定目標價提醒、即時價格報告、每日私訊價格報告與公開價格報告。",

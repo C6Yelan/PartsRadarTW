@@ -2,6 +2,7 @@
 // 以 Playwright 驗證公開網站主要頁面、配單互動與 public API 的基本可用性。
 
 import { type APIRequestContext, expect, test } from "@playwright/test";
+import { resolvePublicSiteUrl } from "../app/_shared/public-site";
 import { expectImagesLoaded } from "./support/images";
 
 interface ProductListResponse {
@@ -110,6 +111,55 @@ test.describe("public web smoke", () => {
     await expect(
       announcementsFooter.getByRole("link", { name: "使用條款" }),
     ).toBeVisible();
+  });
+
+  test("publishes canonical links and crawler discovery routes", { tag: "@desktop-only" }, async ({
+    page,
+    request,
+  }) => {
+    const publicOrigin = resolvePublicSiteUrl();
+    const publicRoutes = [
+      "/",
+      "/price-report",
+      "/about",
+      "/privacy",
+      "/terms",
+      "/announcements",
+      "/discord",
+    ];
+
+    for (const path of publicRoutes) {
+      await page.goto(path);
+
+      const canonical = page.locator('link[rel="canonical"]');
+      await expect(canonical).toHaveCount(1);
+      const canonicalUrl = new URL((await canonical.getAttribute("href")) ?? "");
+      expect(canonicalUrl.origin).toBe(publicOrigin);
+      expect(canonicalUrl.pathname).toBe(path);
+    }
+
+    await page.goto("/build-list");
+    await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
+
+    const robotsResponse = await request.get("/robots.txt");
+    expect(robotsResponse.status()).toBe(200);
+    expect(robotsResponse.headers()["content-type"]).toContain("text/plain");
+    const robotsText = await robotsResponse.text();
+    expect(robotsText.toLowerCase()).toContain("user-agent: *");
+    expect(robotsText).toContain("Disallow: /api/");
+    expect(robotsText).toContain(`Sitemap: ${publicOrigin}/sitemap.xml`);
+
+    const sitemapResponse = await request.get("/sitemap.xml");
+    expect(sitemapResponse.status()).toBe(200);
+    expect(sitemapResponse.headers()["content-type"]).toContain("xml");
+    const sitemapXml = await sitemapResponse.text();
+
+    for (const path of publicRoutes) {
+      expect(sitemapXml).toContain(`<loc>${new URL(path, `${publicOrigin}/`).toString()}</loc>`);
+    }
+
+    expect(sitemapXml).not.toContain("/api/");
+    expect(sitemapXml).not.toContain("/build-list");
   });
 
   test("replaces a legacy category query with its semantic URL", async ({ page }) => {

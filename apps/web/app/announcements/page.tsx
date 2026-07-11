@@ -8,6 +8,9 @@ import SiteDisclaimer from "../site-disclaimer";
 import { listPublishedAnnouncements, PUBLIC_ANNOUNCEMENTS } from "./data";
 
 export const metadata: Metadata = {
+  alternates: {
+    canonical: "/announcements",
+  },
   title: "網站公告 | PartsRadarTW",
   description: "PartsRadarTW 的服務狀態、功能更新與重要提醒。",
 };

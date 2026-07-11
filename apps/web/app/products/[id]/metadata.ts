@@ -5,11 +5,11 @@ import type { Prisma } from "@partsradar/db";
 import { createPublicProductImagePath } from "@partsradar/shared";
 import type { Metadata } from "next";
 import { formatTwdPrice } from "../../_shared/formatting";
+import { DEFAULT_PUBLIC_SITE_URL, resolvePublicSiteUrl } from "../../_shared/public-site";
 import { formatTaipeiDateTime } from "../../_shared/time";
 import { normalizeProductId } from "../../api/products/[id]/product-id";
 
 const SITE_NAME = "PartsRadarTW";
-const DEFAULT_PUBLIC_SITE_URL = "https://partsradar.net";
 const FALLBACK_TITLE = `商品資訊 | ${SITE_NAME}`;
 const FALLBACK_DESCRIPTION = "原價屋電腦零組件價格查詢工具";
 const TITLE_MAX_LENGTH = 70;
@@ -137,26 +137,6 @@ export function buildProductDetailMetadata(
       images: [imageUrl],
     },
   };
-}
-
-// 決定 metadata 使用的公開站台 origin，無效或非 HTTP(S) 設定會回退正式站網址。
-export function resolvePublicSiteUrl(publicSiteUrl?: string | null) {
-  const candidate =
-    publicSiteUrl?.trim() ||
-    process.env.PARTSRADAR_PUBLIC_BASE_URL?.trim() ||
-    DEFAULT_PUBLIC_SITE_URL;
-
-  try {
-    const url = new URL(candidate);
-
-    if (url.protocol !== "https:" && url.protocol !== "http:") {
-      return DEFAULT_PUBLIC_SITE_URL;
-    }
-
-    return url.origin;
-  } catch {
-    return DEFAULT_PUBLIC_SITE_URL;
-  }
 }
 
 // 建立找不到商品或 metadata 查詢失敗時的安全預設 metadata。

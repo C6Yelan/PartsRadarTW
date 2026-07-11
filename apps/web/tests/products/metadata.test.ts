@@ -8,7 +8,6 @@ import {
   type ProductMetadataFindFirstArgs,
   type ProductMetadataReadClient,
   type ProductMetadataRecord,
-  resolvePublicSiteUrl,
 } from "../../app/products/[id]/metadata";
 
 const PRODUCT_ID = "11111111-1111-1111-1111-111111111111";
@@ -136,14 +135,6 @@ describe("product detail metadata", () => {
     expect(metadata.title).toBe("商品資訊 | PartsRadarTW");
     expect(JSON.stringify(metadata)).not.toContain("DATABASE_URL");
     expect(JSON.stringify(metadata)).not.toContain("iBuyToken");
-  });
-
-  it("uses the public production origin when env input is absent or invalid", () => {
-    expect(resolvePublicSiteUrl(null)).toBe("https://partsradar.net");
-    expect(resolvePublicSiteUrl("ftp://example.com")).toBe("https://partsradar.net");
-    expect(resolvePublicSiteUrl("https://preview.partsradar.net/path?q=1")).toBe(
-      "https://preview.partsradar.net",
-    );
   });
 });
 

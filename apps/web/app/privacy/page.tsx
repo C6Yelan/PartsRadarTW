@@ -7,6 +7,9 @@ import { ArrowLeftIcon, BrandMarkIcon } from "../_shared/icons";
 import SiteDisclaimer from "../site-disclaimer";
 
 export const metadata: Metadata = {
+  alternates: {
+    canonical: "/privacy",
+  },
   title: "隱私權政策 | PartsRadarTW",
   description: "PartsRadarTW 的資料處理與瀏覽器儲存說明。",
 };
