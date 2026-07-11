@@ -206,9 +206,9 @@ Restore drill：
 bash scripts/ops/restore-drill.sh backups/<timestamp>
 ```
 
-腳本會先驗證 `SHA256SUMS`，並拒絕把 drill DB 指向正式或 PostgreSQL system database。Production gate 應在獨立的 disposable Compose project／PostgreSQL cluster 執行，避免 drill 與正式資料庫共享 failure domain。成功標準：Checksum 可驗證、dump 可還原到暫時 DB、`source_categories` 可查詢，drill DB 於完成後刪除。
+腳本會要求 `SHA256SUMS` 以唯一、安全的相對路徑列出 `postgres.dump`，驗證全部 checksum，並拒絕把 drill DB 指向正式或 PostgreSQL system database。Production gate 應在獨立的 disposable Compose project／PostgreSQL cluster 執行，避免 drill 與正式資料庫共享 failure domain。成功標準：Checksum 可驗證、dump 可還原到暫時 DB、`source_categories` 可查詢，drill DB 於完成後刪除。
 
-失敗處理：部署 NO-GO。保留失敗 drill DB可使用 `KEEP_RESTORE_DRILL_DB=1`，但不得覆寫 production DB。
+失敗處理：部署 NO-GO。腳本預設也會在 restore 或 probe 失敗時刪除 drill DB；只有明確設定 `KEEP_RESTORE_DRILL_DB=1` 才會保留。Cleanup 失敗時需手動移除暫存 DB，且不得覆寫 production DB。
 
 ## Cloudflare Tunnel
 
