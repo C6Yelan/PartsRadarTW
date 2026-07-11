@@ -4,6 +4,7 @@ x-database-env: &database-env
 
 services:
   smoke-daemon:
+    image: "${PARTSRADAR_CRAWLER_IMAGE:-partsradar-tw-crawler:local}"
     profiles:
       - ops
     build:
@@ -59,6 +60,7 @@ services:
       ]
 
   discord-bot:
+    image: "${PARTSRADAR_CRAWLER_IMAGE:-partsradar-tw-crawler:local}"
     profiles:
       - discord-bot
     build:

@@ -25,6 +25,7 @@ services:
       start_period: 10s
 
   migrate:
+    image: "${PARTSRADAR_MIGRATE_IMAGE:-partsradar-tw-migrate:local}"
     build:
       context: .
       target: migrate
@@ -36,6 +37,7 @@ services:
         condition: service_healthy
 
   seed:
+    image: "${PARTSRADAR_MIGRATE_IMAGE:-partsradar-tw-migrate:local}"
     build:
       context: .
       target: migrate
@@ -48,6 +50,7 @@ services:
         condition: service_completed_successfully
 
   storage-init:
+    image: "${PARTSRADAR_CRAWLER_IMAGE:-partsradar-tw-crawler:local}"
     build:
       context: .
       target: crawler
@@ -64,6 +67,7 @@ services:
       - product_images:/var/lib/partsradar/product-images
 
   web:
+    image: "${PARTSRADAR_WEB_IMAGE:-partsradar-tw-web:local}"
     build:
       context: .
       target: web
