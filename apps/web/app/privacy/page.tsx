@@ -30,20 +30,29 @@ export default function PrivacyPage() {
         </Link>
       </header>
 
-      <main className="public-info-page">
+      <main className="public-info-page public-legal-page">
         <section className="public-info-hero">
           <strong>本站不提供網站帳號、付款或購物功能。</strong>
           <p>本政策說明網站為了提供功能與維持安全，可能使用哪些必要資料。</p>
         </section>
 
-        <section className="public-info-section">
+        <nav className="public-legal-toc" aria-label="隱私權政策章節">
+          <strong>本頁內容</strong>
+          <a href="#privacy-scope">適用範圍</a>
+          <a href="#privacy-operation">網站運作與安全</a>
+          <a href="#privacy-browser-data">瀏覽器資料</a>
+          <a href="#privacy-analysis">分析與廣告</a>
+          <a href="#privacy-requests">聯絡與權利請求</a>
+        </nav>
+
+        <section className="public-info-section" id="privacy-scope">
           <h2>適用範圍</h2>
           <p>
             本政策適用於 PartsRadarTW。前往原價屋、Discord 或其他外部網站後，應另依該服務的政策處理。
           </p>
         </section>
 
-        <section className="public-info-section">
+        <section className="public-info-section" id="privacy-operation">
           <h2>網站運作與安全</h2>
           <ul className="public-info-section-list">
             <li>網站會限制短時間內的過量請求，避免服務受到濫用。</li>
@@ -52,14 +61,14 @@ export default function PrivacyPage() {
           </ul>
         </section>
 
-        <section className="public-info-section">
+        <section className="public-info-section" id="privacy-browser-data">
           <h2>瀏覽器本機資料</h2>
           <p>
             配單內容儲存在目前使用的瀏覽器，不會自動上傳，也不會跨裝置同步。清除本站的瀏覽器資料即可移除。
           </p>
         </section>
 
-        <section className="public-info-section">
+        <section className="public-info-section" id="privacy-analysis">
           <h2>分析與廣告</h2>
           <p>
             目前網站不使用廣告追蹤或非必要的使用者分析。若未來有所變更，會先更新本政策。

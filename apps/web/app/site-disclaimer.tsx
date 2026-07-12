@@ -8,7 +8,6 @@ export default function SiteDisclaimer() {
     <footer className="site-disclaimer">
       <nav className="site-footer-nav" aria-label="網站資訊">
         <Link href="/about">關於本站</Link>
-        <Link href="/status">資料更新狀態</Link>
         <Link href="/privacy">隱私權政策</Link>
         <Link href="/terms">使用條款</Link>
         <Link href="/about#contact">聯絡與回報</Link>

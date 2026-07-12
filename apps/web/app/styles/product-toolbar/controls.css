@@ -30,6 +30,7 @@
 }
 
 @media (min-width: 761px) {
+  .toolbar-price-filter,
   .toolbar-status-filter {
     grid-column: span 2;
   }
@@ -73,7 +74,6 @@
 }
 
 .filter-drawer {
-  display: none;
   padding-top: 14px;
   border-top: 1px solid var(--border);
 }
@@ -91,10 +91,6 @@
   color: var(--muted);
   font-size: 13px;
   font-weight: 800;
-}
-
-.filter-drawer-backdrop {
-  display: none;
 }
 
 .toolbar-error {

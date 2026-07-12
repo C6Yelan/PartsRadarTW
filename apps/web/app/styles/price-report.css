@@ -392,6 +392,11 @@
   overflow-wrap: anywhere;
 }
 
+.price-report-category {
+  gap: 6px;
+  justify-content: flex-start;
+}
+
 .price-report-cell-label {
   display: none;
 }
@@ -415,33 +420,6 @@
   border-bottom: 1px solid var(--border, #1d3544);
   background: var(--surface-muted, #10232f);
   animation: price-report-loading 1.4s ease-in-out infinite alternate;
-}
-
-.price-report-pagination {
-  display: flex;
-  gap: 14px;
-  align-items: center;
-  justify-content: center;
-  min-height: 70px;
-  padding: 12px 20px;
-  border-top: 1px solid var(--border, #1d3544);
-  color: var(--muted, #8fa8b8);
-  font-size: 13px;
-}
-
-.price-report-pagination button {
-  min-height: 38px;
-  padding: 0 14px;
-  border: 1px solid var(--border-strong, #2b4b5f);
-  border-radius: 7px;
-  background: var(--surface, #091821);
-  color: var(--text, #e5f0f6);
-}
-
-.price-report-pagination button:disabled {
-  color: #577080;
-  cursor: not-allowed;
-  opacity: 0.7;
 }
 
 @keyframes price-report-loading {
@@ -511,6 +489,10 @@
     display: flex;
     gap: 12px;
     justify-content: space-between;
+  }
+
+  .price-report-category {
+    justify-content: flex-start;
   }
 
   .price-report-cell-label {
@@ -620,8 +602,4 @@
     white-space: normal;
   }
 
-  .price-report-pagination {
-    gap: 8px;
-    padding: 12px;
-  }
 }

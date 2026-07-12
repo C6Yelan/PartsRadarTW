@@ -30,13 +30,21 @@ export default function TermsPage() {
         </Link>
       </header>
 
-      <main className="public-info-page">
+      <main className="public-info-page public-legal-page">
         <section className="public-info-hero">
           <strong>使用本站即表示你理解這是一項非官方、非商業的資料整理服務。</strong>
           <p>條款維持簡短，目的在說清楚資料限制與合理使用，不取代來源網站的交易規則。</p>
         </section>
 
-        <section className="public-info-section">
+        <nav className="public-legal-toc" aria-label="使用條款章節">
+          <strong>本頁內容</strong>
+          <a href="#terms-transactions">資料與交易</a>
+          <a href="#terms-availability">正確性與可用性</a>
+          <a href="#terms-use">合理使用</a>
+          <a href="#terms-external">外部連結與服務調整</a>
+        </nav>
+
+        <section className="public-info-section" id="terms-transactions">
           <h2>資料與交易</h2>
           <ul className="public-info-section-list">
             <li>本站整理原價屋公開頁面的必要商品與價格資訊，不代表原價屋或任何品牌。</li>
@@ -45,21 +53,21 @@ export default function TermsPage() {
           </ul>
         </section>
 
-        <section className="public-info-section">
+        <section className="public-info-section" id="terms-availability">
           <h2>正確性與可用性</h2>
           <p>
             資料可能因更新時間、網路狀況、來源版面調整或解析錯誤而延遲、不完整或暫時無法使用。請在做出購買決定前回到來源頁確認。
           </p>
         </section>
 
-        <section className="public-info-section">
+        <section className="public-info-section" id="terms-use">
           <h2>合理使用</h2>
           <p>
             請勿在短時間內大量請求、干擾網站運作、嘗試存取未開放功能，或利用本站散布違法與有害內容。必要時，本站可限制明顯影響服務的使用行為。
           </p>
         </section>
 
-        <section className="public-info-section">
+        <section className="public-info-section" id="terms-external">
           <h2>外部連結與服務調整</h2>
           <p>
             原價屋與 Discord 連結由各自服務管理。網站功能與資料範圍可能因維護或來源變更而調整，重大變更會透過

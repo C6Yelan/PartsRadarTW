@@ -10,6 +10,7 @@ import TopbarBrandNavigation from "../TopbarBrandNavigation";
 import BuildListEmptyState from "./components/BuildListEmptyState";
 import BuildListItemRow from "./components/BuildListItemRow";
 import BuildListLoadingState from "./components/BuildListLoadingState";
+import BuildListRefreshStatus from "./components/BuildListRefreshStatus";
 import BuildListSummaryPanel from "./components/BuildListSummaryPanel";
 import BuildListUndoToast from "./components/BuildListUndoToast";
 import { downloadBuildListExcel } from "./download";
@@ -133,18 +134,22 @@ export default function BuildListPageClient() {
               ))}
             </section>
 
-            <BuildListSummaryPanel
-              exportItemCount={exportItems.length}
-              isDownloadDisabled={refresh.state === "loading" || exportItems.length === 0}
-              itemCount={intents.length}
-              lastSuccessfulSyncAt={refresh.lastSuccessfulSyncAt}
-              missingItemCount={missingItemCount}
-              refreshState={refresh.state}
-              summary={summary}
-              onClear={handleClearBuildListItems}
-              onDownloadExcel={downloadExcel}
-              onRefresh={() => void refresh.refresh()}
-            />
+            <div className="build-list-side-column">
+              <BuildListSummaryPanel
+                exportItemCount={exportItems.length}
+                isDownloadDisabled={refresh.state === "loading" || exportItems.length === 0}
+                summary={summary}
+                onClear={handleClearBuildListItems}
+                onDownloadExcel={downloadExcel}
+              />
+              <BuildListRefreshStatus
+                itemCount={intents.length}
+                lastSuccessfulSyncAt={refresh.lastSuccessfulSyncAt}
+                missingItemCount={missingItemCount}
+                state={refresh.state}
+                onRefresh={() => void refresh.refresh()}
+              />
+            </div>
           </section>
         ) : null}
       </main>

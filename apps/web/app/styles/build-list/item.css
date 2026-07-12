@@ -1,7 +1,7 @@
 /* apps/web/app/styles/build-list/item.css */
 .build-list-item {
   display: grid;
-  grid-template-columns: 84px minmax(0, 1fr) minmax(178px, auto);
+  grid-template-columns: 20px 84px minmax(0, 1fr) minmax(178px, auto);
   gap: 18px;
   align-items: center;
   padding: 18px;
@@ -158,19 +158,16 @@
 }
 
 .build-list-export-toggle {
-  display: inline-flex;
-  gap: 7px;
+  display: grid;
   align-items: center;
-  min-height: 32px;
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 800;
+  justify-items: center;
+  min-height: 44px;
   cursor: pointer;
 }
 
 .build-list-export-toggle input {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   margin: 0;
   accent-color: var(--accent-strong);
 }

@@ -104,12 +104,10 @@ describe("price report response", () => {
     const withImages = attachPriceReportImages(response, [
       {
         id: "drop",
-        primaryImageUrl: "https://www.coolpc.com.tw/example.jpg",
         imageCachedAt: UNTIL,
       },
       {
         id: "rise",
-        primaryImageUrl: "https://www.coolpc.com.tw/not-cached.jpg",
         imageCachedAt: null,
       },
     ]);

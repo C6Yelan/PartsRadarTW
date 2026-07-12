@@ -7,6 +7,17 @@
   padding: 18px;
 }
 
+.build-list-side-column {
+  position: sticky;
+  top: 18px;
+  display: grid;
+  gap: 12px;
+}
+
+.build-list-side-column .build-list-summary {
+  position: static;
+}
+
 .build-list-summary dl {
   display: grid;
   gap: 10px;

@@ -3,7 +3,6 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
 import { formatInteger } from "../../_shared/formatting";
 import {
   DEFAULT_QUERY,
@@ -67,24 +66,6 @@ export function ProductToolbar({
   onToggleVendor,
   onToggleFacet,
 }: ProductToolbarProps) {
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  const selectedFilterCount =
-    query.facets.length +
-    query.vendors.length +
-    Number(Boolean(query.minPrice)) +
-    Number(Boolean(query.maxPrice)) +
-    Number(query.status !== DEFAULT_QUERY.status);
-
-  useEffect(() => {
-    if (!filtersOpen) return;
-
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setFiltersOpen(false);
-    };
-    document.addEventListener("keydown", closeOnEscape);
-    return () => document.removeEventListener("keydown", closeOnEscape);
-  }, [filtersOpen]);
-
   return (
     <div className="results-toolbar">
       <div className="results-heading-row">
@@ -93,14 +74,6 @@ export function ProductToolbar({
           <span>{formatInteger(totalItems)} 筆商品</span>
         </div>
         <div className="results-heading-actions">
-          <button
-            aria-expanded={filtersOpen}
-            className={filtersOpen ? "results-filter-button is-active" : "results-filter-button"}
-            type="button"
-            onClick={() => setFiltersOpen((value) => !value)}
-          >
-            篩選{selectedFilterCount > 0 ? `（${selectedFilterCount}）` : ""}
-          </button>
           <label className="results-compact-select">
             <span>排序</span>
             <select
@@ -133,15 +106,7 @@ export function ProductToolbar({
           </label>
         </div>
       </div>
-      {filtersOpen ? (
-        <button
-          aria-label="關閉篩選"
-          className="filter-drawer-backdrop"
-          type="button"
-          onClick={() => setFiltersOpen(false)}
-        />
-      ) : null}
-      <div className={filtersOpen ? "filter-drawer is-open" : "filter-drawer"}>
+      <div className="filter-drawer is-open">
         <div className="toolbar-controls">
           <div className="toolbar-price-filter">
             <span>價格</span>

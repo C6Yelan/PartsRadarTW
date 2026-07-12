@@ -36,7 +36,7 @@
     grid-template-columns: 1fr;
   }
 
-  .build-list-summary {
+  .build-list-side-column {
     position: static;
     order: -1;
   }
@@ -49,18 +49,26 @@
   }
 
   .build-list-item {
-    grid-template-columns: 64px minmax(0, 1fr);
+    grid-template-columns: 20px 64px minmax(0, 1fr);
     grid-template-areas:
-      "image main"
-      "controls controls";
+      "export image main"
+      "controls controls controls";
     align-items: start;
     gap: 12px 14px;
     padding: 14px;
   }
 
-  .build-list-item-image {
+  .build-list-item-image-link {
     grid-area: image;
+  }
+
+  .build-list-item-image {
     width: 64px;
+  }
+
+  .build-list-export-toggle {
+    grid-area: export;
+    align-self: center;
   }
 
   .build-list-item-main {
@@ -75,12 +83,6 @@
     align-items: center;
     flex-wrap: wrap;
     justify-content: flex-end;
-  }
-
-  .build-list-export-toggle {
-    flex: 1 0 100%;
-    justify-content: flex-end;
-    min-height: 44px;
   }
 
   .quantity-stepper {

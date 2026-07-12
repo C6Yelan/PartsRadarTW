@@ -19,7 +19,6 @@ async function expectPublicFooterLinks(page: Page) {
 
   for (const name of [
     "關於本站",
-    "資料更新狀態",
     "隱私權政策",
     "使用條款",
     "聯絡與回報",
@@ -34,7 +33,7 @@ async function expectPublicFooterLinks(page: Page) {
 async function expectTopbarLinks(page: Page) {
   const topbar = page.getByRole("banner");
 
-  for (const name of ["價格", "公告", "Discord"]) {
+  for (const name of ["價格變動總覽", "公告", "Discord"]) {
     await expect(topbar.getByRole("link", { exact: true, name })).toBeVisible();
   }
 }
@@ -43,9 +42,13 @@ test.describe("public web smoke", () => {
   test("does not expose the removed internal ops route", { tag: "@desktop-only" }, async ({
     request,
   }) => {
-    const response = await request.get("/ops/status");
+    const [opsResponse, publicStatusResponse] = await Promise.all([
+      request.get("/ops/status"),
+      request.get("/status"),
+    ]);
 
-    expect(response.status()).toBe(404);
+    expect(opsResponse.status()).toBe(404);
+    expect(publicStatusResponse.status()).toBe(404);
   });
 
   test("loads the homepage and build list on desktop and mobile", {
@@ -116,12 +119,18 @@ test.describe("public web smoke", () => {
     await expect(page.getByRole("heading", { exact: true, name: "隱私權政策" })).toBeVisible();
     await expect(page.getByText(/配單內容儲存在目前使用的瀏覽器/)).toBeVisible();
     await expect(page.getByText(/SHA-256|PostgreSQL|Cloudflare Tunnel|localStorage/)).toHaveCount(0);
+    await expect(page.getByRole("navigation", { name: "隱私權政策章節" })).toBeVisible();
+    await expect(page.locator(".public-legal-page .public-info-section").first()).toHaveCSS(
+      "background-color",
+      "rgba(0, 0, 0, 0)",
+    );
     await expectTopbarLinks(page);
     await expectPublicFooterLinks(page);
 
     await page.goto("/terms");
     await expect(page.getByRole("heading", { exact: true, name: "使用條款" })).toBeVisible();
     await expect(page.getByText(/非官方、非商業/).first()).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "使用條款章節" })).toBeVisible();
     await expectSingleLine(page.getByText(/使用本站即表示你理解/));
     await expectTopbarLinks(page);
     await expectPublicFooterLinks(page);
@@ -145,11 +154,6 @@ test.describe("public web smoke", () => {
     await expectTopbarLinks(page);
     await expectPublicFooterLinks(page);
 
-    await page.goto("/status");
-    await expect(page.getByRole("heading", { exact: true, name: "資料更新狀態" })).toBeVisible();
-    await expectTopbarLinks(page);
-    await expectPublicFooterLinks(page);
-
     await page.goto("/public-missing-route");
     await expect(page.getByRole("heading", { exact: true, name: "找不到這個頁面" })).toBeVisible();
     await expectTopbarLinks(page);
@@ -164,7 +168,6 @@ test.describe("public web smoke", () => {
     const publicRoutes = [
       "/",
       "/price-report",
-      "/status",
       "/about",
       "/privacy",
       "/terms",
@@ -290,10 +293,28 @@ test.describe("public web smoke", () => {
     await expect(page.getByText("已同步；有 1 個品項暫時查不到。")).toBeVisible();
     await expect(page.getByText("配單只儲存在這個瀏覽器，不會跨裝置同步。")).toBeVisible();
     await expect(item.getByRole("heading", { name: "最新測試顯示卡 RTX" })).toBeVisible();
+    const exportCheckbox = item.getByRole("checkbox", { name: /加入下載配單/ });
+    const [checkboxBox, imageBox] = await Promise.all([
+      exportCheckbox.boundingBox(),
+      item.locator(".build-list-item-image-link").boundingBox(),
+    ]);
+    expect(checkboxBox?.x ?? Number.POSITIVE_INFINITY).toBeLessThan(
+      imageBox?.x ?? Number.NEGATIVE_INFINITY,
+    );
     await expect(item.getByRole("spinbutton", { name: "數量" })).toHaveValue("2");
     await expect(item.getByText("NT$ 14,580")).toBeVisible();
     await expect(missingItem.getByText("暫時無法確認")).toBeVisible();
     await expect(page.getByText("未計價品項")).toBeVisible();
+    const summaryPanel = page.getByLabel("配單總計");
+    const refreshStatus = page.getByLabel("配單同步狀態");
+    const [downloadBox, refreshBox] = await Promise.all([
+      summaryPanel.getByRole("button", { name: "下載 Excel" }).boundingBox(),
+      refreshStatus.boundingBox(),
+    ]);
+    expect(refreshBox?.y ?? Number.NEGATIVE_INFINITY).toBeGreaterThan(
+      downloadBox?.y ?? Number.POSITIVE_INFINITY,
+    );
+    await expect(summaryPanel.getByLabel("配單同步狀態")).toHaveCount(0);
     await expect(page.getByText("下載配單包含 2 個品項。")).toBeVisible();
 
     await missingItem.getByRole("checkbox", { name: "加入下載配單" }).uncheck();

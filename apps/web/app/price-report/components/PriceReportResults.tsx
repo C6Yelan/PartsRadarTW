@@ -1,11 +1,16 @@
 // apps/web/app/price-report/components/PriceReportResults.tsx
 // 顯示價格變動摘要、來源狀態、結果列與分頁控制。
 
+"use client";
+
 import Link from "next/link";
+import { type FormEvent, useState } from "react";
 import { API_RATE_LIMITED_MESSAGE } from "../../_shared/api-client";
 import { formatInteger, formatSignedTwdPrice, formatTwdPrice } from "../../_shared/formatting";
 import { formatTaipeiDateTime } from "../../_shared/time";
 import { ProductImage } from "../../product-explorer/components/ProductImage";
+import { Pagination } from "../../product-explorer/components/Pagination";
+import { getVisiblePages, toDigitsOnly } from "../../product-explorer/query-state";
 import type { PriceReportLoadState, PriceReportResponse, PriceReportResponseItem } from "../types";
 
 interface PriceReportResultsProps {
@@ -27,11 +32,22 @@ export function PriceReportResults({
   state,
   onPageChange,
 }: PriceReportResultsProps) {
+  const [pageJumpValue, setPageJumpValue] = useState("");
   const summary = report?.summary ?? {
     dropCount: 0,
     riseCount: 0,
     newProductCount: 0,
   };
+
+  function submitPageJump(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const page = Number(pageJumpValue);
+
+    if (report && Number.isSafeInteger(page) && page >= 1 && page <= report.pagination.totalPages) {
+      onPageChange(page);
+      setPageJumpValue("");
+    }
+  }
 
   return (
     <>
@@ -103,26 +119,20 @@ export function PriceReportResults({
         ) : null}
 
         {state === "ready" && report && report.pagination.totalPages > 1 ? (
-          <nav className="price-report-pagination" aria-label="價格變動頁碼">
-            <button
-              disabled={report.pagination.page <= 1}
-              type="button"
-              onClick={() => onPageChange(report.pagination.page - 1)}
-            >
-              上一頁
-            </button>
-            <span>
-              第 {formatInteger(report.pagination.page)} /{" "}
-              {formatInteger(report.pagination.totalPages)} 頁
-            </span>
-            <button
-              disabled={report.pagination.page >= report.pagination.totalPages}
-              type="button"
-              onClick={() => onPageChange(report.pagination.page + 1)}
-            >
-              下一頁
-            </button>
-          </nav>
+          <Pagination
+            page={report.pagination.page}
+            pageJumpValue={pageJumpValue}
+            productState={state}
+            shouldShowPageJump={report.pagination.totalPages > 7}
+            totalPages={report.pagination.totalPages}
+            visiblePages={getVisiblePages(
+              report.pagination.page,
+              report.pagination.totalPages,
+            )}
+            onGoToPage={onPageChange}
+            onJumpSubmit={submitPageJump}
+            onPageJumpValueChange={(value) => setPageJumpValue(toDigitsOnly(value))}
+          />
         ) : null}
       </section>
     </>
@@ -158,7 +168,11 @@ function PriceReportRow({ item, returnTo }: { item: PriceReportResponseItem; ret
           </Link>
         </div>
       </div>
-      <ReportValue area="category" label="分類" value={item.category.displayName} />
+      <ReportValue
+        area="category"
+        label="分類"
+        value={formatCategoryLabel(item.category.displayName)}
+      />
       <ReportValue
         area="previous"
         label="前次價格"
@@ -222,4 +236,8 @@ function formatSignedPercent(value: number | null): string {
   }
 
   return `${value > 0 ? "+" : ""}${value.toFixed(2)}%`;
+}
+
+function formatCategoryLabel(value: string): string {
+  return value.replaceAll(/\s*\/\s*/g, "／");
 }

@@ -58,7 +58,6 @@ export interface PriceReportResponseBody {
 
 export interface PriceReportProductImageRecord {
   id: string;
-  primaryImageUrl: string | null;
   imageCachedAt: Date | null;
 }
 
@@ -152,7 +151,7 @@ export function attachPriceReportImages(
   const imagesByProductId = new Map(
     products.map((product) => [
       product.id,
-      product.primaryImageUrl && product.imageCachedAt
+      product.imageCachedAt
         ? {
             url: createPublicProductImagePath(product.id),
             alt: productNames.get(product.id) ?? "商品圖片",

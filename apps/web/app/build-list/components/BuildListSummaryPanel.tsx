@@ -4,30 +4,18 @@
 
 import { formatTwdPrice } from "../../_shared/formatting";
 import type { BuildListSummary } from "../model";
-import type { BuildListRefreshState } from "../model";
-import BuildListRefreshStatus from "./BuildListRefreshStatus";
 
 export default function BuildListSummaryPanel({
   isDownloadDisabled,
   exportItemCount,
-  itemCount,
-  lastSuccessfulSyncAt,
-  missingItemCount,
-  refreshState,
   onClear,
   onDownloadExcel,
-  onRefresh,
   summary,
 }: {
   isDownloadDisabled: boolean;
   exportItemCount: number;
-  itemCount: number;
-  lastSuccessfulSyncAt: string | null;
-  missingItemCount: number;
-  refreshState: BuildListRefreshState;
   onClear: () => void;
   onDownloadExcel: () => void;
-  onRefresh: () => void;
   summary: BuildListSummary;
 }) {
   return (
@@ -60,14 +48,6 @@ export default function BuildListSummaryPanel({
       <p className="build-list-export-count">
         {exportItemCount > 0 ? `下載配單包含 ${exportItemCount} 個品項。` : "尚未選擇下載品項。"}
       </p>
-
-      <BuildListRefreshStatus
-        itemCount={itemCount}
-        lastSuccessfulSyncAt={lastSuccessfulSyncAt}
-        missingItemCount={missingItemCount}
-        state={refreshState}
-        onRefresh={onRefresh}
-      />
 
       <div className="build-list-summary-actions">
         <button

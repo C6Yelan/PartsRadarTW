@@ -163,126 +163,75 @@
   text-align: right;
 }
 
+.public-legal-page {
+  grid-template-columns: minmax(170px, 220px) minmax(0, 1fr);
+  column-gap: clamp(32px, 5vw, 72px);
+  max-width: 1380px;
+}
+
+.public-legal-page .public-info-hero {
+  grid-column: 1 / -1;
+  padding: 28px 0 30px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+}
+
+.public-legal-toc {
+  position: sticky;
+  top: 20px;
+  grid-column: 1;
+  grid-row: 2 / span 10;
+  align-self: start;
+  display: grid;
+  gap: 4px;
+  padding-top: 4px;
+}
+
+.public-legal-toc strong {
+  margin-bottom: 8px;
+  color: var(--text-strong);
+  font-size: 13px;
+}
+
+.public-legal-toc a {
+  padding: 7px 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.public-legal-page .public-info-section,
+.public-legal-page .public-info-updated-at {
+  grid-column: 2;
+}
+
+.public-legal-page .public-info-section {
+  scroll-margin-top: 20px;
+  padding: 4px 0 24px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+}
+
+.public-legal-page .public-info-section h2 {
+  font-size: 22px;
+}
+
+.public-legal-page .public-info-section p,
+.public-legal-page .public-info-section-list {
+  font-size: 15px;
+  line-height: 1.85;
+}
+
 .public-info-launch-warning {
   padding: 12px 14px;
   border: 1px solid #594e27;
   border-radius: 7px;
   background: rgb(122 92 28 / 18%);
   color: #f1d58a;
-}
-
-.status-overview {
-  padding: 24px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface-muted);
-}
-
-.status-overview-heading,
-.status-category-card header {
-  display: flex;
-  gap: 16px;
-  align-items: flex-start;
-  justify-content: space-between;
-}
-
-.status-overview h2,
-.status-category-card h3 {
-  margin: 0;
-  color: var(--text-strong);
-}
-
-.status-overview h2 {
-  font-size: 21px;
-}
-
-.status-overview > p {
-  margin: 14px 0 0;
-  color: var(--muted);
-  font-size: 14px;
-  line-height: 1.75;
-}
-
-.status-badge {
-  display: inline-flex;
-  align-items: center;
-  min-height: 30px;
-  padding: 0 10px;
-  border: 1px solid var(--accent);
-  border-radius: 999px;
-  color: var(--accent-strong);
-  font-size: 12px;
-  font-weight: 800;
-  white-space: nowrap;
-}
-
-.status-badge.is-stale {
-  border-color: var(--warning);
-  color: #f1d58a;
-}
-
-.status-badge.is-unavailable {
-  border-color: var(--danger);
-  color: #f3a6ad;
-}
-
-.status-meta {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px 20px;
-  margin: 18px 0 0;
-}
-
-.status-meta div {
-  min-width: 0;
-}
-
-.status-meta dt {
-  color: var(--faint);
-  font-size: 11px;
-  font-weight: 750;
-}
-
-.status-meta dd {
-  margin: 4px 0 0;
-  color: var(--text);
-  font-size: 13px;
-}
-
-.status-category-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 16px;
-}
-
-.status-category-card {
-  padding: 16px;
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  background: var(--surface);
-}
-
-.status-category-card h3 {
-  font-size: 15px;
-}
-
-.status-category-card header div > span {
-  display: block;
-  margin-top: 3px;
-  color: var(--faint);
-  font-size: 11px;
-}
-
-.status-category-card .status-meta {
-  margin-top: 14px;
-}
-
-.status-loading {
-  min-height: 180px;
-  display: grid;
-  place-items: center;
-  text-align: center;
 }
 
 .public-announcement-list {
@@ -356,6 +305,30 @@
     padding-top: 14px;
   }
 
+  .public-legal-page {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .public-legal-page .public-info-hero,
+  .public-legal-toc,
+  .public-legal-page .public-info-section,
+  .public-legal-page .public-info-updated-at {
+    position: static;
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  .public-legal-toc {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 0 0 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .public-legal-toc strong {
+    grid-column: 1 / -1;
+  }
+
   .public-info-hero,
   .public-info-section,
   .public-announcement-card {
@@ -371,13 +344,4 @@
     text-align: left;
   }
 
-  .status-overview-heading,
-  .status-category-card header {
-    align-items: flex-start;
-  }
-
-  .status-category-grid,
-  .status-meta {
-    grid-template-columns: 1fr;
-  }
 }

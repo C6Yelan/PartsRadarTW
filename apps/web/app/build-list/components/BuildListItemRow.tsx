@@ -29,6 +29,14 @@ export default function BuildListItemRow({
 
   return (
     <article className={`build-list-item${product ? "" : " is-unconfirmed"}`}>
+      <label className="build-list-export-toggle">
+        <input
+          aria-label={`將 ${displayName} 加入下載配單`}
+          checked={intent.includeInExport}
+          type="checkbox"
+          onChange={(event) => onExportSelectionChange(intent.productId, event.target.checked)}
+        />
+      </label>
       <Link
         aria-label={`查看 ${displayName} 商品詳細`}
         className="build-list-item-image-link"
@@ -79,14 +87,6 @@ export default function BuildListItemRow({
       </div>
 
       <div className="build-list-item-controls">
-        <label className="build-list-export-toggle">
-          <input
-            checked={intent.includeInExport}
-            type="checkbox"
-            onChange={(event) => onExportSelectionChange(intent.productId, event.target.checked)}
-          />
-          <span>加入下載配單</span>
-        </label>
         <fieldset className="quantity-stepper">
           <legend className="sr-only">{displayName} 數量</legend>
           <button

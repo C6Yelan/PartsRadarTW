@@ -51,7 +51,6 @@ describe("public site metadata routes", () => {
         "https://partsradar.net/discord",
         "https://partsradar.net/price-report",
         "https://partsradar.net/privacy",
-        "https://partsradar.net/status",
         "https://partsradar.net/terms",
       ]),
     );

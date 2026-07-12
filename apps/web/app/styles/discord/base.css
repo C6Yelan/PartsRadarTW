@@ -59,6 +59,11 @@
   grid-template-columns: minmax(220px, 1fr) minmax(220px, auto) minmax(220px, 1fr);
 }
 
+.discord-topbar > .back-link {
+  justify-self: end;
+  width: auto;
+}
+
 .discord-topbar-title {
   display: grid;
   justify-items: center;

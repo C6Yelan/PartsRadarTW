@@ -23,7 +23,11 @@
 
 @media (max-width: 760px) {
   .discord-topbar {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .discord-topbar > .topbar-brand-area {
+    grid-column: 1 / 3;
   }
 
   .discord-topbar-title {

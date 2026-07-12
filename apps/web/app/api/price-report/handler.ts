@@ -20,7 +20,7 @@ export type PriceReportApiReadClient = PriceReportReaderClient &
     product: {
       findMany(args: {
         where: { id: { in: string[] } };
-        select: { id: true; primaryImageUrl: true; imageCachedAt: true };
+        select: { id: true; imageCachedAt: true };
       }): Promise<PriceReportProductImageRecord[]>;
     };
   };
@@ -63,7 +63,7 @@ export function createGetPriceReportHandler(
           ? []
           : await client.product.findMany({
               where: { id: { in: response.data.map((item) => item.productId) } },
-              select: { id: true, primaryImageUrl: true, imageCachedAt: true },
+              select: { id: true, imageCachedAt: true },
             });
 
       return jsonOk<PriceReportResponseBody>(attachPriceReportImages(response, imageProducts));

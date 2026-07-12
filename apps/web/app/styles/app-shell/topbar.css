@@ -92,19 +92,18 @@
   padding: 0 7px 0 15px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: #0b1720;
+  background: var(--surface);
 }
 
 @media (min-width: 761px) {
   .topbar-search {
-    min-height: 44px;
-    padding-inline: 4px 7px;
-    border-color: transparent;
-    background: transparent;
+    min-height: 48px;
+    padding-inline: 15px 7px;
   }
 
   .topbar-search:focus-within {
-    border-bottom-color: var(--border-strong);
+    border-color: #6ea9c4;
+    box-shadow: 0 0 0 2px rgb(84 148 177 / 20%);
   }
 }
 
@@ -121,6 +120,14 @@
   height: 38px;
   border: 0;
   background: transparent;
+}
+
+.topbar-search .control-button.primary {
+  min-width: 86px;
+  min-height: 42px;
+  border-color: #376a84;
+  background: #204a62;
+  color: #f0f8fc;
 }
 
 .topbar-search input::-webkit-search-cancel-button {
