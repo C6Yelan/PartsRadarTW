@@ -8,10 +8,10 @@
   align-items: center;
   min-height: 58px;
   padding: 12px 16px;
-  border-top: 0;
-  border-bottom: 0;
+  border: 1px solid var(--border-strong);
   border-left: 3px solid var(--accent);
-  background: transparent;
+  border-radius: 8px;
+  background: var(--surface-muted);
 }
 
 .dashboard-shell > .public-announcement {
@@ -128,7 +128,7 @@
 
 .public-info-page {
   display: grid;
-  gap: 0;
+  gap: 18px;
   width: min(960px, calc(100% - 48px));
   margin: 0 auto;
   padding: 20px 0 32px;
@@ -137,14 +137,27 @@
 .public-info-hero,
 .public-info-section,
 .public-announcement-card {
-  padding: 28px 0;
-  border: 0;
-  border-bottom: 1px solid var(--border);
-  background: transparent;
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-muted);
 }
 
 .public-info-hero {
-  padding-top: 16px;
+  position: relative;
+  overflow: hidden;
+  background: var(--surface-muted);
+}
+
+.public-info-hero::after {
+  position: absolute;
+  right: -34px;
+  bottom: -58px;
+  width: 170px;
+  height: 170px;
+  border: 1px solid rgb(143 180 204 / 16%);
+  border-radius: 50%;
+  content: "";
 }
 
 .public-info-kicker {
@@ -229,9 +242,10 @@
   display: inline-flex;
   align-items: center;
   min-height: 40px;
-  padding: 0;
-  border: 0;
-  background: transparent;
+  padding: 0 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+  background: var(--accent-surface);
 }
 
 .public-info-updated-at {
@@ -251,11 +265,11 @@
 }
 
 .status-overview {
-  padding: 24px 0;
-  border: 0;
-  border-bottom: 1px solid var(--border);
+  padding: 24px;
+  border: 1px solid var(--border);
   border-left: 3px solid var(--accent);
-  background: transparent;
+  border-radius: 8px;
+  background: var(--surface-muted);
 }
 
 .status-overview.is-stale,
@@ -342,16 +356,16 @@
 .status-category-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0 24px;
+  gap: 12px;
   margin-top: 16px;
 }
 
 .status-category-card {
-  padding: 18px 0 18px 14px;
-  border: 0;
-  border-bottom: 1px solid var(--border);
+  padding: 16px;
+  border: 1px solid var(--border);
   border-left: 3px solid var(--accent);
-  background: transparent;
+  border-radius: 7px;
+  background: var(--surface);
 }
 
 .status-category-card h3 {
@@ -378,12 +392,11 @@
 
 .public-announcement-list {
   display: grid;
-  gap: 0;
+  gap: 14px;
 }
 
 .public-announcement-card {
   scroll-margin-top: 20px;
-  padding-left: 18px;
   border-left: 3px solid var(--accent);
 }
 
@@ -463,11 +476,7 @@
   .public-info-hero,
   .public-info-section,
   .public-announcement-card {
-    padding: 18px 0;
-  }
-
-  .public-announcement-card {
-    padding-left: 14px;
+    padding: 18px;
   }
 
   .public-info-hero strong {

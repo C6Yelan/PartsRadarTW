@@ -69,9 +69,9 @@
 .price-report-filters,
 .price-report-results {
   overflow: hidden;
-  border-top: 1px solid var(--border, #1d3544);
-  border-bottom: 1px solid var(--border, #1d3544);
-  background: transparent;
+  border: 1px solid var(--border, #1d3544);
+  border-radius: 10px;
+  background: var(--panel, #0c1b24);
 }
 
 .price-report-filters {
@@ -223,9 +223,7 @@
 .price-report-summary {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0;
-  border-top: 1px solid var(--border, #1d3544);
-  border-bottom: 1px solid var(--border, #1d3544);
+  gap: 12px;
 }
 
 .price-report-summary-card {
@@ -233,13 +231,9 @@
   gap: 8px;
   min-height: 104px;
   padding: 17px 18px;
-  border: 0;
-  border-right: 1px solid var(--border, #1d3544);
-  background: transparent;
-}
-
-.price-report-summary-card:last-child {
-  border-right: 0;
+  border: 1px solid var(--border, #1d3544);
+  border-radius: 10px;
+  background: var(--panel, #0c1b24);
 }
 
 .price-report-summary-card span {
@@ -567,14 +561,6 @@
   .price-report-summary-card {
     min-height: 92px;
     padding: 14px;
-  }
-
-  .price-report-summary-card:nth-child(even) {
-    border-right: 0;
-  }
-
-  .price-report-summary-card:nth-child(-n + 2) {
-    border-bottom: 1px solid var(--border, #1d3544);
   }
 
   .price-report-results-heading {

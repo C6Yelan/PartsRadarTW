@@ -8,13 +8,10 @@
 
 .filter-panel,
 .results-panel {
-  border: 0;
-  background: transparent;
-}
-
-.filter-panel summary,
-.results-heading-row {
-  border-bottom: 1px solid var(--border);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-muted);
+  box-shadow: 0 16px 42px var(--shadow);
 }
 
 .filter-panel {
