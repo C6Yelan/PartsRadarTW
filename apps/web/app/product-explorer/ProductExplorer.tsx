@@ -45,13 +45,7 @@ export default function ProductExplorer({
             onToggleOpen={viewModel.filters.actions.syncFiltersOpenFromToggle}
           />
 
-          <ProductExplorerResultsPanel
-            actions={viewModel.results.actions}
-            pagination={viewModel.results.pagination}
-            panel={viewModel.results.panel}
-            table={viewModel.results.table}
-            toolbar={viewModel.results.toolbar}
-          />
+          <ProductExplorerResultsPanel results={viewModel.results} />
         </div>
       </main>
       <FloatingBuildListLink summary={viewModel.buildList.summary} />

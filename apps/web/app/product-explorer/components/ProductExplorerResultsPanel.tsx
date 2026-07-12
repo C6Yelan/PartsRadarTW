@@ -2,79 +2,18 @@
 // apps/web/app/product-explorer/components/ProductExplorerResultsPanel.tsx
 // 組裝商品探索結果區塊，將 toolbar、商品表格與分頁控制接到 view model。
 
-import type { RefObject, SyntheticEvent } from "react";
-import type {
-  LoadState,
-  ProductListItem,
-  ProductSort,
-  ProductStatus,
-  ProductsResponse,
-  ProductVendorOption,
-  QueryState,
-  SelectedFacetChip,
-} from "../types";
+import type { useProductExplorerViewModel } from "../use-product-explorer-view-model";
 import { Pagination } from "./Pagination";
 import { ProductTable } from "./ProductTable";
 import { ProductToolbar } from "./ProductToolbar";
 
+type ProductExplorerResults = ReturnType<typeof useProductExplorerViewModel>["results"];
+
 // 呈現商品列表主區域，負責把分組後的資料與事件傳給子元件。
 export function ProductExplorerResultsPanel({
-  actions,
-  pagination,
-  panel,
-  table,
-  toolbar,
+  results: { actions, pagination, panel, table, toolbar },
 }: {
-  actions: {
-    toolbar: {
-      clearVendors: () => void;
-      draftChange: (draft: QueryState) => void;
-      pageSizeChange: (pageSize: number) => void;
-      removeFacet: (tag: string) => void;
-      resetFilters: () => void;
-      sortChange: (sort: ProductSort) => void;
-      statusChange: (status: ProductStatus) => void;
-      toggleVendor: (vendor: string) => void;
-    };
-    table: {
-      addToBuildList: (product: ProductListItem) => void;
-      decreaseBuildListQuantity: (product: ProductListItem) => void;
-    };
-    pagination: {
-      goToPage: (page: number) => void;
-      jumpSubmit: (event: SyntheticEvent<HTMLFormElement>) => void;
-      pageJumpValueChange: (value: string) => void;
-    };
-  };
-  pagination: {
-    page: number;
-    pageJumpValue: string;
-    productState: LoadState;
-    shouldShowPageJump: boolean;
-    totalPages: number;
-    visiblePages: Array<number | string>;
-  };
-  panel: {
-    ref: RefObject<HTMLElement | null>;
-  };
-  table: {
-    buildListQuantities: Map<string, number>;
-    isProductLimitReached: boolean;
-    productListReturnTo: string;
-    products: ProductsResponse | null;
-    productState: LoadState;
-  };
-  toolbar: {
-    draft: QueryState;
-    formError: string | null;
-    hasActiveFilters: boolean;
-    query: QueryState;
-    selectedCategoryName: string;
-    selectedFacetChips: SelectedFacetChip[];
-    selectedVendorOptions: ProductVendorOption[];
-    totalItems: number;
-    vendorOptions: ProductVendorOption[];
-  };
+  results: ProductExplorerResults;
 }) {
   return (
     <section className="results-panel" ref={panel.ref} aria-label="商品列表">
