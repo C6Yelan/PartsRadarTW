@@ -130,7 +130,9 @@ docker compose -f compose.yml -f compose.ops.yml --profile ops up -d --no-build
 2. 在現有 PostgreSQL 仍可用時建立備份，驗證 checksum 並完成 restore drill。
 3. 進入 maintenance window：停止 public ingress、drain requests，再停止舊 web、crawler、cleanup、smoke 與 Discord writers。
 4. 依前述 migration gate 檢查既有 history；有 checksum 落差就停止。
-5. 執行 `docker compose up -d --no-build`，再依首次部署第 4–7 步以同一組 reference重建並驗證核心服務、writers、Discord 與 public ingress。
+5. 執行 `docker compose up -d --no-build`，再依首次部署第 4 步驗證核心服務。
+6. 若既有商品需要首次建立或依新規則重算 `filter_tags`，依 [Product filter tag backfill](operations.md#product-filter-tag-backfill) 完成 dry-run、審查、confirm-write及第二次 `changed=0` dry-run；失敗或統計異常時停止 rollout且不要恢復 writers。
+7. 依首次部署第 5–7 步以同一組 reference重建並驗證 writers、Discord 與 public ingress。
 
 詳細指令與成功標準見 [operations.md](operations.md)。
 

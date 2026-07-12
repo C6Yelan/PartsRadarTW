@@ -121,6 +121,71 @@ describe("readCrawlRunPriceChangeSummary changes", () => {
 });
 
 describe("readCrawlRunPriceChangeSummary", () => {
+  it("excludes changed and new products from disabled source categories", async () => {
+    const client = createPriceReportReaderClient({
+      snapshots: [
+        snapshot({
+          id: "enabled-changed-old",
+          productId: "enabled-changed",
+          productName: "Enabled Changed GPU",
+          crawlRunId: "old-run",
+          price: 10000,
+          capturedAt: "2026-06-07T01:00:00.000Z",
+        }),
+        snapshot({
+          id: "enabled-changed-new",
+          productId: "enabled-changed",
+          productName: "Enabled Changed GPU",
+          crawlRunId: "target-run",
+          price: 9000,
+          capturedAt: "2026-06-07T02:00:00.000Z",
+        }),
+        snapshot({
+          id: "disabled-changed-old",
+          productId: "disabled-changed",
+          productName: "Disabled Changed GPU",
+          crawlRunId: "old-run",
+          price: 10000,
+          capturedAt: "2026-06-07T01:00:00.000Z",
+          categoryEnabled: false,
+        }),
+        snapshot({
+          id: "disabled-changed-new",
+          productId: "disabled-changed",
+          productName: "Disabled Changed GPU",
+          crawlRunId: "target-run",
+          price: 9000,
+          capturedAt: "2026-06-07T02:01:00.000Z",
+          categoryEnabled: false,
+        }),
+        snapshot({
+          id: "enabled-first-seen",
+          productId: "enabled-new",
+          productName: "Enabled New GPU",
+          crawlRunId: "target-run",
+          price: 5000,
+          capturedAt: "2026-06-07T02:02:00.000Z",
+        }),
+        snapshot({
+          id: "disabled-first-seen",
+          productId: "disabled-new",
+          productName: "Disabled New GPU",
+          crawlRunId: "target-run",
+          price: 4000,
+          capturedAt: "2026-06-07T02:03:00.000Z",
+          categoryEnabled: false,
+        }),
+      ],
+    });
+
+    const result = await readCrawlRunPriceChangeSummary(client, "target-run");
+
+    expect(result.changes.map(({ productId }) => productId)).toEqual(["enabled-changed"]);
+    expect(result.newProducts.map(({ productId }) => productId)).toEqual(["enabled-new"]);
+    expect(result.snapshotCount).toBe(2);
+    expect(result.unmatchedSnapshotCount).toBe(1);
+  });
+
   it("reports current-run snapshots that cannot be matched to previous prices", async () => {
     const client = createPriceReportReaderClient({
       snapshots: [

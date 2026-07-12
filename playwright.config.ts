@@ -41,7 +41,7 @@ export default defineConfig({
   webServer: shouldStartLocalServer
     ? {
         command: localServerCommand,
-        reuseExistingServer: true,
+        reuseExistingServer: false,
         timeout: 120_000,
         url: baseURL,
       }

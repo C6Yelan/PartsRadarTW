@@ -1,11 +1,11 @@
 // packages/db/tests/price-report/reader.integration.test.ts
-// 以隔離 PostgreSQL 驗證停用分類不會進入共用近期價格報告。
+// 以隔離 PostgreSQL 驗證停用分類不會進入共用價格報告 readers。
 
 import { randomUUID } from "node:crypto";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { readRecentPriceReport } from "../../src/price-report";
+import { readCrawlRunPriceChangeSummary, readRecentPriceReport } from "../../src/price-report";
 
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 const describeWithDatabase = testDatabaseUrl ? describe : describe.skip;
@@ -14,7 +14,7 @@ const productIds = [randomUUID(), randomUUID()];
 const crawlRunIds = [randomUUID(), randomUUID()];
 const snapshotIds = [randomUUID(), randomUUID(), randomUUID(), randomUUID()];
 
-describeWithDatabase("readRecentPriceReport PostgreSQL integration", () => {
+describeWithDatabase("price report readers PostgreSQL integration", () => {
   let client: PrismaClient;
 
   beforeAll(() => {
@@ -137,5 +137,11 @@ describeWithDatabase("readRecentPriceReport PostgreSQL integration", () => {
 
     expect(report.priceChanges.map(({ productId }) => productId)).toEqual([productIds[0]]);
     expect(report.newProducts).toEqual([]);
+
+    const crawlRunReport = await readCrawlRunPriceChangeSummary(client, crawlRunIds[1]);
+
+    expect(crawlRunReport.changes.map(({ productId }) => productId)).toEqual([productIds[0]]);
+    expect(crawlRunReport.newProducts).toEqual([]);
+    expect(crawlRunReport.snapshotCount).toBe(1);
   });
 });

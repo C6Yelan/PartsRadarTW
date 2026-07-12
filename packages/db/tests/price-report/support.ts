@@ -1,8 +1,8 @@
 // packages/db/tests/price-report/support.ts
 // 提供 DB owner 的 price-report reader 測試所需最小 snapshot fixture 與 Prisma delegate fake。
 
-import type { PriceReportReaderClient } from "../../src/price-report";
 import { vi } from "vitest";
+import type { PriceReportReaderClient } from "../../src/price-report";
 
 interface TestSnapshot {
   id: string;
@@ -79,7 +79,10 @@ export function createPriceReportReaderClient({ snapshots }: { snapshots: TestSn
 
     if (typeof where.crawlRunId === "string") {
       return snapshots
-        .filter((item) => item.crawlRunId === where.crawlRunId)
+        .filter(
+          (item) =>
+            item.crawlRunId === where.crawlRunId && matchesProductWhere(item, productFilter),
+        )
         .sort(compareCapturedAtAsc)
         .map(toPrismaSnapshotWithProduct);
     }

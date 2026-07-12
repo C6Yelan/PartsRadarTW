@@ -630,8 +630,10 @@ function extractCaseTags(text: string, add: AddTag): void {
   if (/背插/.test(text)) {
     add("back_connect", "yes");
   }
+  const hasNegatedIncludedPsu = /(?:不|未)(?:包)?含[^/]*(?:電源(?!倉)|POWER)/.test(text);
   if (
-    /含.*(?:電源|POWER)|內附[^/]*\d{3,4}\s*W[^/]*(?:電源(?!倉)|POWER)|(?:電源|POWER).*內附/.test(
+    !hasNegatedIncludedPsu &&
+    /含[^/]*(?:電源(?!倉)|POWER)|內附[^/]*\d{3,4}\s*W[^/]*(?:電源(?!倉)|POWER)|(?:電源(?!倉)|POWER)[^/]*內附/.test(
       text,
     )
   ) {

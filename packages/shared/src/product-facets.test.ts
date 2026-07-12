@@ -140,6 +140,27 @@ describe("product facets", () => {
     ).toContain("included_psu:yes");
   });
 
+  it.each([
+    "中塔機殼/含 500W 電源",
+    "中塔機殼/包含 500W 電源",
+    "中塔機殼/不含滑軌/內附400W電源",
+  ])("extracts an explicitly included PSU: %s", (name) => {
+    expect(extractProductFilterTags(14, name)).toContain("included_psu:yes");
+  });
+
+  it.each([
+    "中塔機殼/不含電源",
+    "中塔機殼/未含電源",
+    "中塔機殼/不含 500W 電源",
+    "中塔機殼/不包含電源",
+    "中塔機殼/未包含電源",
+    "中塔機殼/內含風扇/不含電源",
+    "中塔機殼/不含電源/內附3顆風扇",
+    "中塔機殼/未含電源/內附3顆風扇",
+  ])("does not infer an included PSU from a negated description: %s", (name) => {
+    expect(extractProductFilterTags(14, name)).not.toContain("included_psu:yes");
+  });
+
   it("does not infer an included PSU from bundled fans and a power-supply shroud", () => {
     expect(
       extractProductFilterTags(14, "中塔機殼/內附3顆風扇/下置電源倉"),

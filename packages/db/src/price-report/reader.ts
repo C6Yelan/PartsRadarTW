@@ -32,7 +32,14 @@ export async function readCrawlRunPriceChangeSummary(
   crawlRunId: string,
 ): Promise<CrawlRunPriceChangeReadResult> {
   const currentSnapshots = (await client.priceSnapshot.findMany({
-    where: { crawlRunId },
+    where: {
+      crawlRunId,
+      product: {
+        sourceCategory: {
+          enabled: true,
+        },
+      },
+    },
     select: PRICE_SNAPSHOT_WITH_PRODUCT_SELECT,
     orderBy: CURRENT_PRICE_SNAPSHOT_ORDER_BY,
   })) as unknown as CrawlRunPriceSnapshot[];

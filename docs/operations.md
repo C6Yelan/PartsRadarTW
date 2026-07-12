@@ -164,6 +164,28 @@ docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler ru
 
 成功標準：Preview 與 write 的 selected／changed範圍一致；無法分類的商品維持明確 null，不自行猜測品牌。
 
+## Product filter tag backfill
+
+使用時機：首次導入 `filter_tags` 或調整 facet extraction規則後，重算既有商品。Production 必須在 migration完成且 product writers仍停止的 maintenance window執行。
+
+先執行 dry-run：
+
+```bash
+docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler run --rm crawler \
+  pnpm ops:product-filter-tags:backfill -- --dry-run
+```
+
+審查 JSON summary 的 `selected`、`changed`、`unchanged` 與各 category 的 `withoutTags`／`facetHits`；抽查明確否定「不含電源／未含電源」的機殼沒有 `included_psu:yes`。不得把 disposable fixture 的 changed count 當成 production預期值。
+
+確認統計合理後才寫入：
+
+```bash
+docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler run --rm crawler \
+  pnpm ops:product-filter-tags:backfill -- --confirm-write
+```
+
+完成後再次執行相同 dry-run。成功標準：第二次 summary 的 `changed=0`；若失敗或統計異常，停止 rollout且不要恢復 writers。
+
 ## Discord bot
 
 使用時機：設定 token／application ID後註冊 commands並啟動 daemon。
