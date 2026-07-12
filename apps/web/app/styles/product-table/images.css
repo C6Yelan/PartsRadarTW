@@ -16,7 +16,7 @@
   display: grid;
   place-items: center;
   border: 1px solid var(--border);
-  background: linear-gradient(135deg, rgba(143, 180, 204, 0.11), transparent), #0a141c;
+  background: #0a141c;
   color: var(--muted);
   text-align: center;
 }

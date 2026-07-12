@@ -69,9 +69,9 @@
 .price-report-filters,
 .price-report-results {
   overflow: hidden;
-  border: 1px solid var(--border, #1d3544);
-  border-radius: 10px;
-  background: var(--panel, #0c1b24);
+  border-top: 1px solid var(--border, #1d3544);
+  border-bottom: 1px solid var(--border, #1d3544);
+  background: transparent;
 }
 
 .price-report-filters {
@@ -223,7 +223,9 @@
 .price-report-summary {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
+  gap: 0;
+  border-top: 1px solid var(--border, #1d3544);
+  border-bottom: 1px solid var(--border, #1d3544);
 }
 
 .price-report-summary-card {
@@ -231,9 +233,13 @@
   gap: 8px;
   min-height: 104px;
   padding: 17px 18px;
-  border: 1px solid var(--border, #1d3544);
-  border-radius: 10px;
-  background: linear-gradient(145deg, var(--panel, #0c1b24), #102734);
+  border: 0;
+  border-right: 1px solid var(--border, #1d3544);
+  background: transparent;
+}
+
+.price-report-summary-card:last-child {
+  border-right: 0;
 }
 
 .price-report-summary-card span {
@@ -400,9 +406,8 @@
 .price-report-skeleton > span {
   min-height: 86px;
   border-bottom: 1px solid var(--border, #1d3544);
-  background: linear-gradient(90deg, transparent, rgb(88 137 161 / 12%), transparent);
-  background-size: 220% 100%;
-  animation: price-report-loading 1.4s ease-in-out infinite;
+  background: var(--surface-muted, #10232f);
+  animation: price-report-loading 1.4s ease-in-out infinite alternate;
 }
 
 .price-report-pagination {
@@ -434,11 +439,11 @@
 
 @keyframes price-report-loading {
   from {
-    background-position: 100% 0;
+    opacity: 0.45;
   }
 
   to {
-    background-position: -100% 0;
+    opacity: 0.85;
   }
 }
 
@@ -562,6 +567,14 @@
   .price-report-summary-card {
     min-height: 92px;
     padding: 14px;
+  }
+
+  .price-report-summary-card:nth-child(even) {
+    border-right: 0;
+  }
+
+  .price-report-summary-card:nth-child(-n + 2) {
+    border-bottom: 1px solid var(--border, #1d3544);
   }
 
   .price-report-results-heading {

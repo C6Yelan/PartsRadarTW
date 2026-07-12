@@ -9,9 +9,8 @@
   display: block;
   min-height: 16px;
   border-radius: 7px;
-  background: linear-gradient(90deg, #132431, #1b3040, #132431);
-  background-size: 220% 100%;
-  animation: skeleton-shimmer 2.6s ease-in-out infinite;
+  background: #172b39;
+  animation: product-skeleton-pulse 1.4s ease-in-out infinite alternate;
 }
 
 .skeleton-box.image {
@@ -29,4 +28,14 @@
 
 .skeleton-box.short {
   width: min(100%, 96px);
+}
+
+@keyframes product-skeleton-pulse {
+  from {
+    opacity: 0.48;
+  }
+
+  to {
+    opacity: 0.86;
+  }
 }
