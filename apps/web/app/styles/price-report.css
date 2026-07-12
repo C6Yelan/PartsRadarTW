@@ -274,13 +274,23 @@
   font-weight: 750;
 }
 
+.price-report-source-status,
 .price-report-source-warning {
   margin: 0;
   padding: 11px 20px;
+  font-size: 13px;
+}
+
+.price-report-source-status {
+  border-bottom: 1px solid var(--border, #1f3948);
+  background: rgb(43 105 135 / 12%);
+  color: var(--muted, #8fa8b8);
+}
+
+.price-report-source-warning {
   border-bottom: 1px solid #594e27;
   background: rgb(122 92 28 / 20%);
   color: #f1d58a;
-  font-size: 13px;
 }
 
 .price-report-source-warning.is-unavailable {

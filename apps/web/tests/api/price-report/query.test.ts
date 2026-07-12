@@ -13,12 +13,12 @@ import {
 const NOW = new Date("2026-07-10T08:00:00.000Z");
 
 describe("price report query", () => {
-  it("defaults to 24 hours and all public report types", () => {
+  it("defaults to 24 hours with price changes but without new products", () => {
     const query = parsePriceReportQuery(new URLSearchParams());
 
     expect(query).toMatchObject({
       window: "24h",
-      types: ["drop", "rise", "new"],
+      types: ["drop", "rise"],
       categorySlug: null,
       categoryIgrp: null,
       productKeyword: null,
@@ -31,7 +31,7 @@ describe("price report query", () => {
       productKeyword: null,
       includePriceDrops: true,
       includePriceRises: true,
-      includeNewProducts: true,
+      includeNewProducts: false,
     });
     expect(getPriceReportSince(NOW, "24h").toISOString()).toBe(
       "2026-07-09T08:00:00.000Z",

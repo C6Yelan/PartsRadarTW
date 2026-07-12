@@ -37,6 +37,15 @@ describe("price report query state", () => {
     );
   });
 
+  it("keeps the optional new-product type explicit in shared URLs", () => {
+    expect(
+      toPriceReportUrl({
+        ...DEFAULT_PRICE_REPORT_QUERY,
+        types: ["drop", "rise", "new"],
+      }),
+    ).toBe("/price-report?type=drop&type=rise&type=new");
+  });
+
   it("clears unsupported categories and invalid scalar values", () => {
     expect(
       readPriceReportQuery(

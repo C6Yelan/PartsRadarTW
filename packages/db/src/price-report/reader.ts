@@ -256,13 +256,6 @@ export async function readRecentPriceReport(
 
     const delta = current.price - previous.price;
 
-    if (
-      (delta < 0 && !normalizedFilters.includePriceDrops) ||
-      (delta > 0 && !normalizedFilters.includePriceRises)
-    ) {
-      continue;
-    }
-
     latestChangeByProduct.set(current.productId, {
       productId: current.product.id,
       productName: current.product.name,
@@ -277,7 +270,13 @@ export async function readRecentPriceReport(
   }
 
   return {
-    priceChanges: [...latestChangeByProduct.values()].sort(comparePriceChanges),
+    priceChanges: [...latestChangeByProduct.values()]
+      .filter((item) =>
+        item.delta < 0
+          ? normalizedFilters.includePriceDrops
+          : normalizedFilters.includePriceRises,
+      )
+      .sort(comparePriceChanges),
     newProducts: [...newProductByProduct.values()].sort(compareNewProducts),
   };
 }

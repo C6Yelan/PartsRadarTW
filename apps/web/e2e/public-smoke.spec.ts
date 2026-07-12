@@ -275,6 +275,13 @@ test.describe("public API smoke", () => {
     expect(products.headers()["x-ratelimit-remaining"]).toBeTruthy();
     expect(products.headers()["x-ratelimit-reset"]).toBeTruthy();
     await expectJsonShape(products, ["data", "pagination"]);
+
+    const priceReport = await request.get("/api/price-report?pageSize=1");
+    expect(priceReport.status()).toBe(200);
+    expect(priceReport.headers()["x-ratelimit-limit"]).toBeTruthy();
+    expect(priceReport.headers()["x-ratelimit-remaining"]).toBeTruthy();
+    expect(priceReport.headers()["x-ratelimit-reset"]).toBeTruthy();
+    await expectJsonShape(priceReport, ["data", "summary", "pagination", "meta"]);
   });
 
   test("checks product detail, price history, and image API when a product exists", {

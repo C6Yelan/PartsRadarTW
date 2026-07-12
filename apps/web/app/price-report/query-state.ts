@@ -13,7 +13,7 @@ export const PRICE_REPORT_TYPES: readonly PriceReportType[] = ["drop", "rise", "
 
 export const DEFAULT_PRICE_REPORT_QUERY: PriceReportQuery = {
   window: "24h",
-  types: [...PRICE_REPORT_TYPES],
+  types: ["drop", "rise"],
   category: "",
   q: "",
   sort: "changed_desc",
@@ -94,8 +94,8 @@ export function toPriceReportUrl(query: PriceReportQuery): string {
 function hasDefaultTypes(types: PriceReportType[]): boolean {
   const normalized = normalizePriceReportTypes(types);
   return (
-    normalized.length === PRICE_REPORT_TYPES.length &&
-    normalized.every((type, index) => type === PRICE_REPORT_TYPES[index])
+    normalized.length === DEFAULT_PRICE_REPORT_QUERY.types.length &&
+    normalized.every((type, index) => type === DEFAULT_PRICE_REPORT_QUERY.types[index])
   );
 }
 

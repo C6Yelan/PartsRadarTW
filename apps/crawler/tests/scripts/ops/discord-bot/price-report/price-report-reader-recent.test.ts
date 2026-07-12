@@ -70,6 +70,116 @@ describe("readRecentPriceReport price changes", () => {
       },
     ]);
   });
+
+  it("filters direction after selecting each product's latest valid change", async () => {
+    const client = createPriceReportReaderClient({
+      snapshots: [
+        snapshot({
+          id: "baseline",
+          productId: "product-1",
+          productName: "GPU A",
+          crawlRunId: "old-run",
+          price: 100,
+          capturedAt: "2026-06-07T01:00:00.000Z",
+        }),
+        snapshot({
+          id: "drop",
+          productId: "product-1",
+          productName: "GPU A",
+          crawlRunId: "run-1",
+          price: 90,
+          capturedAt: "2026-06-07T03:00:00.000Z",
+        }),
+        snapshot({
+          id: "latest-rise",
+          productId: "product-1",
+          productName: "GPU A",
+          crawlRunId: "run-2",
+          price: 95,
+          capturedAt: "2026-06-07T04:00:00.000Z",
+        }),
+      ],
+    });
+    const range = {
+      since: new Date("2026-06-07T02:00:00.000Z"),
+      until: new Date("2026-06-07T05:00:00.000Z"),
+    };
+
+    const drops = await readRecentPriceReport(client, {
+      ...range,
+      filters: {
+        includePriceDrops: true,
+        includePriceRises: false,
+        includeNewProducts: false,
+      },
+    });
+    expect(drops.priceChanges).toEqual([]);
+
+    const rises = await readRecentPriceReport(client, {
+      ...range,
+      filters: {
+        includePriceDrops: false,
+        includePriceRises: true,
+        includeNewProducts: false,
+      },
+    });
+    expect(rises.priceChanges).toHaveLength(1);
+    expect(rises.priceChanges[0]).toMatchObject({
+      previousPrice: 90,
+      currentPrice: 95,
+      delta: 5,
+      changedAt: new Date("2026-06-07T04:00:00.000Z"),
+    });
+  });
+
+  it("excludes same-price and cross-currency snapshots", async () => {
+    const client = createPriceReportReaderClient({
+      snapshots: [
+        snapshot({
+          id: "same-baseline",
+          productId: "same",
+          productName: "Same Price GPU",
+          crawlRunId: "old-run",
+          price: 100,
+          capturedAt: "2026-06-07T01:00:00.000Z",
+        }),
+        snapshot({
+          id: "same-current",
+          productId: "same",
+          productName: "Same Price GPU",
+          crawlRunId: "new-run",
+          price: 100,
+          capturedAt: "2026-06-07T03:00:00.000Z",
+        }),
+        snapshot({
+          id: "currency-baseline",
+          productId: "currency",
+          productName: "Currency GPU",
+          crawlRunId: "old-run",
+          price: 100,
+          currency: "TWD",
+          capturedAt: "2026-06-07T01:00:00.000Z",
+        }),
+        snapshot({
+          id: "currency-current",
+          productId: "currency",
+          productName: "Currency GPU",
+          crawlRunId: "new-run",
+          price: 90,
+          currency: "USD",
+          capturedAt: "2026-06-07T03:00:00.000Z",
+        }),
+      ],
+    });
+
+    const report = await readRecentPriceReport(client, {
+      since: new Date("2026-06-07T02:00:00.000Z"),
+      until: new Date("2026-06-07T05:00:00.000Z"),
+    });
+
+    expect(report.priceChanges).toEqual([]);
+    expect(report.newProducts).toEqual([]);
+  });
 });
 
 describe("readRecentPriceReport", () => {

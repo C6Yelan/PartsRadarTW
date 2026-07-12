@@ -58,9 +58,15 @@ export function PriceReportResults({
           {report ? <span>{formatInteger(report.pagination.totalItems)} 筆</span> : null}
         </div>
 
+        {report?.meta.sourceStatus === "ok" ? (
+          <p className="price-report-source-status" role="status">
+            資料最後成功更新：
+            {formatTaipeiDateTime(report.meta.lastSuccessAt, "尚無紀錄")}
+          </p>
+        ) : null}
         {report?.meta.sourceStatus === "stale" ? (
           <p className="price-report-source-warning" role="status">
-            資料可能不是最新狀態，最後成功更新：
+            資料可能過期或部分分類尚未成功，最後成功更新：
             {formatTaipeiDateTime(report.meta.lastSuccessAt, "尚無紀錄")}
           </p>
         ) : null}

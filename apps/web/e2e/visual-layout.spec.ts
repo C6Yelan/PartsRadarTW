@@ -11,6 +11,7 @@ const PRODUCT_ID = "11111111-1111-4111-8111-111111111111";
 const READY_ROUTE_SLUG = "visual-ready-product";
 const ERROR_ROUTE_SLUG = "visual-error-product";
 const OBSERVED_AT = "2026-07-10T08:00:00.000Z";
+let releasePriceReportLoading: (() => void) | null = null;
 
 const product = {
   id: PRODUCT_ID,
@@ -40,6 +41,7 @@ const product = {
 
 test.beforeEach(async ({ page }) => {
   test.skip(!isLoopback, "Visual layout tests only run against a loopback web server.");
+  releasePriceReportLoading = null;
 
   await page.route("**/api/**", async (route) => {
     const requestUrl = new URL(route.request().url());
@@ -187,8 +189,16 @@ test.beforeEach(async ({ page }) => {
         return;
       }
 
+      if (requestUrl.searchParams.get("q") === "loading") {
+        await new Promise<void>((resolve) => {
+          releasePriceReportLoading = resolve;
+        });
+        releasePriceReportLoading = null;
+      }
+
       const isEmpty = requestUrl.searchParams.get("q") === "empty";
       const isStale = requestUrl.searchParams.get("q") === "stale";
+      const isUnavailable = requestUrl.searchParams.get("q") === "unavailable";
       const pageNumber = Number(requestUrl.searchParams.get("page") ?? "1");
 
       await fulfillJson(route, {
@@ -236,8 +246,8 @@ test.beforeEach(async ({ page }) => {
           window: "24h",
           since: "2026-07-09T08:00:00.000Z",
           until: OBSERVED_AT,
-          sourceStatus: isStale ? "stale" : "ok",
-          lastSuccessAt: OBSERVED_AT,
+          sourceStatus: isUnavailable ? "unavailable" : isStale ? "stale" : "ok",
+          lastSuccessAt: isUnavailable ? null : OBSERVED_AT,
         },
       });
       return;
@@ -305,6 +315,19 @@ test("captures the main pages without horizontal overflow", async ({ page }, tes
     page.getByRole("heading", { exact: true, name: "價格變動總覽" }),
   ).toBeVisible();
   await expect(page.getByRole("region", { name: "價格變動列表" })).toBeVisible();
+  await expect(page.getByRole("checkbox", { name: "降價" })).toBeChecked();
+  await expect(page.getByRole("checkbox", { name: "漲價" })).toBeChecked();
+  const newProductCheckbox = page.getByRole("checkbox", { name: "新品" });
+  await expect(newProductCheckbox).not.toBeChecked();
+  await newProductCheckbox.focus();
+  await newProductCheckbox.press("Space");
+  await expect
+    .poll(() => new URL(page.url()).searchParams.getAll("type"))
+    .toEqual(["drop", "rise", "new"]);
+  await expect(newProductCheckbox).toBeChecked();
+  await newProductCheckbox.press("Space");
+  await expect.poll(() => new URL(page.url()).searchParams.getAll("type")).toEqual([]);
+  await expect(newProductCheckbox).not.toBeChecked();
   await page.getByRole("combobox", { name: "時間範圍" }).focus();
   await captureLayout(page, testInfo, "price-report");
 
@@ -368,7 +391,38 @@ test("captures the main pages without horizontal overflow", async ({ page }, tes
   await captureLayout(page, testInfo, "discord");
 });
 
-test("keeps error and empty states usable", async ({ page }) => {
+test("keeps error and empty states usable", async ({ page }, testInfo) => {
+  await page.goto("/price-report?q=loading");
+  await expect(page.locator(".price-report-skeleton")).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+  await expect.poll(() => releasePriceReportLoading !== null).toBe(true);
+  releasePriceReportLoading?.();
+  await expect(page.locator(".price-report-skeleton")).toHaveCount(0);
+  await expect(page.getByRole("status").filter({ hasText: "資料最後成功更新" })).toBeVisible();
+
+  await page.goto("/price-report?q=empty");
+  await expect(page.getByText("這個範圍沒有符合條件的價格變動")).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+
+  await page.goto("/price-report?q=stale");
+  await expect(
+    page.getByRole("status").filter({ hasText: "資料可能過期或部分分類尚未成功" }),
+  ).toBeVisible();
+  await page.getByRole("combobox", { name: "時間範圍" }).focus();
+  await captureLayout(page, testInfo, "price-report-stale");
+
+  await page.goto("/price-report?q=unavailable");
+  await expect(
+    page.getByRole("status").filter({ hasText: "目前無法確認來源資料的新鮮度" }),
+  ).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+
+  await page.goto("/price-report?q=error");
+  await expect(
+    page.getByRole("alert").filter({ hasText: "價格變動暫時無法載入" }),
+  ).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+
   await page.goto("/?category=gpu&q=error");
   await expect(page.getByRole("alert").filter({ hasText: "商品資料暫時無法載入" })).toBeVisible();
   await expectNoHorizontalOverflow(page);

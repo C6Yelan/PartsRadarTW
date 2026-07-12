@@ -19,7 +19,7 @@ const PRICE_REPORT_SORTS = [
   "rise_percent_desc",
   "delta_amount_desc",
 ] as const;
-const DEFAULT_PRICE_REPORT_TYPES = PRICE_REPORT_TYPES;
+const DEFAULT_PRICE_REPORT_TYPES = ["drop", "rise"] as const;
 const PRICE_REPORT_SEARCH_MAX_LENGTH = 100;
 const PRICE_REPORT_CATEGORY_MAX_LENGTH = 50;
 

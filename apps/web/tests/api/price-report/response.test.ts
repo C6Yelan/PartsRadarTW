@@ -67,6 +67,20 @@ describe("price report response", () => {
     expect(response.meta.sourceStatus).toBe("stale");
   });
 
+  it.each([
+    ["rise_percent_desc", ["rise", "new", "drop"]],
+    ["delta_amount_desc", ["drop", "rise", "new"]],
+  ] as const)("sorts all items with %s before pagination", (sort, productIds) => {
+    const response = buildPriceReportResponse(REPORT, {
+      query: createQuery({ sort, pageSize: 20 }),
+      since: SINCE,
+      until: UNTIL,
+      sourceStatus: { status: "ok", lastSuccessAt: UNTIL.toISOString() },
+    });
+
+    expect(response.data.map((item) => item.productId)).toEqual(productIds);
+  });
+
   it("clamps an out-of-range page to the last available page", () => {
     const response = buildPriceReportResponse(REPORT, {
       query: createQuery({ page: 99, pageSize: 2 }),
