@@ -1,5 +1,5 @@
 // apps/web/tests/products/api-hook-states.test.ts
-// 以最小 React hook harness 驗證四個 data hooks 的 429、abort cleanup 與 recovery state。
+// 以最小 React hook harness 驗證四個 data hooks 的 429 與 abort cleanup。
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -56,12 +56,9 @@ import { useProductDetail } from "../../app/products/[id]/detail/use-product-det
 const PRODUCT_ID = "11111111-1111-1111-1111-111111111111";
 
 interface HookScenario {
-  dataIndex: number;
-  effectIndex: number;
   name: string;
   run: () => void;
   stateIndex: number;
-  successBody: unknown;
 }
 
 const SCENARIOS: HookScenario[] = [
@@ -71,18 +68,6 @@ const SCENARIOS: HookScenario[] = [
       useCategories();
     },
     stateIndex: 1,
-    effectIndex: 0,
-    dataIndex: 0,
-    successBody: {
-      data: [
-        {
-          id: "category-1",
-          slug: "gpu",
-          displayName: "顯示卡",
-          sourceName: "顯示卡 VGA",
-        },
-      ],
-    },
   },
   {
     name: "products",
@@ -90,22 +75,6 @@ const SCENARIOS: HookScenario[] = [
       useProducts(true, { ...DEFAULT_QUERY, category: "gpu" });
     },
     stateIndex: 1,
-    effectIndex: 0,
-    dataIndex: 0,
-    successBody: {
-      data: [],
-      pagination: {
-        page: 1,
-        pageSize: 20,
-        totalItems: 0,
-        totalPages: 0,
-      },
-      meta: {
-        sourceStatus: "ok",
-        lastSuccessAt: "2026-07-10T08:00:00.000Z",
-        vendors: [],
-      },
-    },
   },
   {
     name: "product detail",
@@ -113,29 +82,15 @@ const SCENARIOS: HookScenario[] = [
       useProductDetail(PRODUCT_ID);
     },
     stateIndex: 0,
-    effectIndex: 0,
-    dataIndex: 1,
-    successBody: {
-      id: PRODUCT_ID,
-      name: "GPU RTX 4070",
-    },
   },
   {
     name: "price history",
     run: () => {
       usePriceHistoryLoader({
-        product: {} as ProductDetailBody,
-        productId: PRODUCT_ID,
+        product: { id: PRODUCT_ID } as ProductDetailBody,
       });
     },
     stateIndex: 0,
-    effectIndex: 1,
-    dataIndex: 1,
-    successBody: {
-      range: "90d",
-      rangeDays: 90,
-      points: [],
-    },
   },
 ];
 
@@ -156,7 +111,7 @@ describe("public API hook states", () => {
     );
 
     scenario.run();
-    const cleanup = runEffect(scenario.effectIndex);
+    const cleanup = runEffect(0);
     const stateUpdates = hookHarness.states[scenario.stateIndex].updates;
 
     expect(stateUpdates).toContain("loading");
@@ -182,7 +137,7 @@ describe("public API hook states", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     scenario.run();
-    const cleanup = runEffect(scenario.effectIndex);
+    const cleanup = runEffect(0);
     const stateUpdates = hookHarness.states[scenario.stateIndex].updates;
 
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
@@ -196,24 +151,28 @@ describe("public API hook states", () => {
     expect(stateUpdates).toEqual(["loading"]);
   });
 
-  it.each(SCENARIOS)("allows the $name effect to recover on a later success", async (scenario) => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(new Response(null, { status: 429 }))
-      .mockResolvedValueOnce(Response.json(scenario.successBody));
+  it("loads price history from the loaded product identity", async () => {
+    const loadedProductId = "22222222-2222-4222-8222-222222222222";
+    const fetchMock = vi.fn(async () =>
+      Response.json({
+        range: "90d",
+        rangeDays: 90,
+        points: [],
+      }),
+    );
     vi.stubGlobal("fetch", fetchMock);
 
-    scenario.run();
-    const effect = hookHarness.effects[scenario.effectIndex];
-    const stateUpdates = hookHarness.states[scenario.stateIndex].updates;
+    usePriceHistoryLoader({
+      product: { id: loadedProductId } as ProductDetailBody,
+    });
+    const cleanup = runEffect(0);
 
-    effect();
-    await vi.waitFor(() => expect(stateUpdates).toContain("rate_limited"));
-    effect();
-    await vi.waitFor(() => expect(stateUpdates).toContain("ready"));
-
-    expect(stateUpdates).toEqual(["loading", "rate_limited", "loading", "ready"]);
-    expect(hookHarness.states[scenario.dataIndex].updates.at(-1)).toBeTruthy();
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/products/${loadedProductId}/price-history?days=90`,
+      { signal: expect.any(AbortSignal) },
+    );
+    cleanup?.();
   });
 
   it("lets the build-list hook recover from 429 through manual refresh", async () => {

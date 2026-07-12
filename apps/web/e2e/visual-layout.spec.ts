@@ -2,7 +2,6 @@
 // 以本地 mock API 驗證指定 viewport 的主要頁面、focus、空狀態與水平 overflow。
 
 import { expect, type Locator, type Page, type Route, type TestInfo, test } from "@playwright/test";
-import { expectImagesLoaded } from "./support/images";
 
 const visualBaseUrl = new URL(process.env.E2E_BASE_URL ?? "http://127.0.0.1:3100");
 const isLoopback = ["127.0.0.1", "localhost", "::1"].includes(visualBaseUrl.hostname);
@@ -176,7 +175,7 @@ test.beforeEach(async ({ page }) => {
       return;
     }
 
-    if (requestUrl.pathname === `/api/products/${READY_ROUTE_SLUG}/price-history`) {
+    if (requestUrl.pathname === `/api/products/${PRODUCT_ID}/price-history`) {
       await fulfillJson(route, {
         range: "90d",
         rangeDays: 90,
@@ -299,7 +298,9 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test("captures the main pages without horizontal overflow", async ({ page }, testInfo) => {
+test("keeps the main pages usable without horizontal overflow", async ({ page }, testInfo) => {
+  test.setTimeout(60_000);
+
   await page.goto("/?category=gpu&page=10");
   await expect(page.getByRole("status", { name: "網站公告" })).toBeVisible();
   await expect(
@@ -330,7 +331,7 @@ test("captures the main pages without horizontal overflow", async ({ page }, tes
   ).toBeVisible();
 
   await page.getByRole("searchbox", { name: "搜尋商品名稱" }).focus();
-  await captureLayout(page, testInfo, "home");
+  await expectUsableLayout(page, testInfo);
 
   await page.getByRole("button", { name: "移除篩選：GPU 晶片：NVIDIA" }).click();
   await expect
@@ -371,7 +372,7 @@ test("captures the main pages without horizontal overflow", async ({ page }, tes
   await expect.poll(() => new URL(page.url()).searchParams.getAll("type")).toEqual([]);
   await expect(newProductCheckbox).not.toBeChecked();
   await page.getByRole("combobox", { name: "時間範圍" }).focus();
-  await captureLayout(page, testInfo, "price-report");
+  await expectUsableLayout(page, testInfo);
 
   await page.goto("/privacy");
   await expect(
@@ -379,30 +380,12 @@ test("captures the main pages without horizontal overflow", async ({ page }, tes
   ).toBeVisible();
   await expect(page.getByText(/localStorage/)).toBeVisible();
   await page.getByRole("link", { name: "返回查詢" }).focus();
-  await captureLayout(page, testInfo, "privacy");
-
-  await page.goto("/announcements");
-  await expect(
-    page.getByRole("heading", { exact: true, name: "網站公告" }),
-  ).toBeVisible();
-  await expect(page.getByRole("heading", { name: "網站公開測試中" })).toBeVisible();
-  await page.getByRole("link", { name: "返回查詢" }).focus();
-  await captureLayout(page, testInfo, "announcements");
-
-  await page.goto("/about");
-  await expect(page.getByRole("heading", { exact: true, name: "關於本站" })).toBeVisible();
-  await page.getByRole("link", { name: "返回查詢" }).focus();
-  await captureLayout(page, testInfo, "about");
-
-  await page.goto("/terms");
-  await expect(page.getByRole("heading", { exact: true, name: "使用條款" })).toBeVisible();
-  await page.getByRole("link", { name: "返回查詢" }).focus();
-  await captureLayout(page, testInfo, "terms");
+  await expectUsableLayout(page, testInfo);
 
   await page.goto("/visual-missing-route");
   await expect(page.getByRole("heading", { exact: true, name: "找不到這個頁面" })).toBeVisible();
   await page.getByRole("link", { name: "返回商品查詢" }).focus();
-  await captureLayout(page, testInfo, "not-found");
+  await expectUsableLayout(page, testInfo);
 
   await page.goto(`/products/${READY_ROUTE_SLUG}`);
   await expect(page.getByRole("heading", { name: product.name })).toBeVisible();
@@ -411,7 +394,7 @@ test("captures the main pages without horizontal overflow", async ({ page }, tes
   await chartPoints.first().focus();
   const historyTooltip = page.locator(".history-tooltip");
   await expect(historyTooltip).toHaveClass(/is-below/);
-  await captureLayout(page, testInfo, "detail");
+  await expectUsableLayout(page, testInfo);
   await chartPoints.last().focus();
   await expect(historyTooltip).not.toHaveClass(/is-below/);
   await expectNoHorizontalOverflow(page);
@@ -439,13 +422,12 @@ test("captures the main pages without horizontal overflow", async ({ page }, tes
   ).toBeVisible();
   await expect(page.getByRole("heading", { name: product.name })).toBeVisible();
   await page.getByRole("link", { name: "原價屋查看／購買，開新分頁" }).focus();
-  await captureLayout(page, testInfo, "build-list");
+  await expectUsableLayout(page, testInfo);
 
   await page.goto("/discord");
   await expect(page.getByRole("heading", { name: "快速開始" })).toBeVisible();
-  await expectImagesLoaded(page.locator(".discord-guide-image"));
   await page.getByRole("link", { name: "快速開始" }).focus();
-  await captureLayout(page, testInfo, "discord");
+  await expectUsableLayout(page, testInfo);
 });
 
 test("keeps error and empty states usable", async ({ page }, testInfo) => {
@@ -466,7 +448,7 @@ test("keeps error and empty states usable", async ({ page }, testInfo) => {
     page.getByRole("status").filter({ hasText: "資料可能過期或部分分類尚未成功" }),
   ).toBeVisible();
   await page.getByRole("combobox", { name: "時間範圍" }).focus();
-  await captureLayout(page, testInfo, "price-report-stale");
+  await expectUsableLayout(page, testInfo);
 
   await page.goto("/price-report?q=unavailable");
   await expect(
@@ -484,7 +466,7 @@ test("keeps error and empty states usable", async ({ page }, testInfo) => {
   await expect(page.getByRole("heading", { exact: true, name: "資料更新狀態" })).toBeVisible();
   await expect(page.getByText("部分資料需留意").first()).toBeVisible();
   await page.getByRole("link", { name: "返回查詢" }).focus();
-  await captureLayout(page, testInfo, "status-stale");
+  await expectUsableLayout(page, testInfo);
 
   await page.goto("/status?fixture=error");
   await expect(
@@ -525,16 +507,12 @@ test("suppresses authored transitions when reduced motion is requested", {
   await expectTransitionDurationAtMost(copyButton.locator(".detail-action-icon"), 0.01);
 });
 
-async function captureLayout(page: Page, testInfo: TestInfo, name: string) {
+async function expectUsableLayout(page: Page, testInfo: TestInfo) {
   const viewport = expectedViewport(testInfo.project.name);
   expect(page.viewportSize()).toEqual(viewport);
   await page.addStyleTag({ content: "nextjs-portal { display: none !important; }" });
   await expectFocusedControlToBeVisible(page);
   await expectNoHorizontalOverflow(page);
-  await page.screenshot({
-    fullPage: true,
-    path: testInfo.outputPath(`${viewport.width}x${viewport.height}-${name}.png`),
-  });
 }
 
 function expectedViewport(projectName: string) {

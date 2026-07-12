@@ -39,7 +39,9 @@ test.describe("public web smoke", () => {
     expect(response.status()).toBe(404);
   });
 
-  test("loads the homepage and build list on desktop and mobile", async ({ page }) => {
+  test("loads the homepage and build list on desktop and mobile", {
+    tag: "@desktop-mobile-only",
+  }, async ({ page }) => {
     await page.goto("/");
     await expect(page.getByText("PartsRadarTW").first()).toBeVisible();
     await expect(page.getByRole("searchbox", { name: "搜尋商品名稱" })).toBeVisible();
@@ -88,7 +90,7 @@ test.describe("public web smoke", () => {
     await expectPublicFooterLinks(page);
   });
 
-  test("loads the public information pages", async ({ page }) => {
+  test("loads the public information pages", { tag: "@desktop-only" }, async ({ page }) => {
     await page.goto("/about");
     await expect(
       page.getByRole("heading", { exact: true, name: "關於本站" }),
@@ -184,14 +186,20 @@ test.describe("public web smoke", () => {
     expect(sitemapXml).not.toContain("/build-list");
   });
 
-  test("replaces a legacy category query with its semantic URL", async ({ page }) => {
-    await page.goto("/?igrp=12");
+  test(
+    "replaces a legacy category query with its semantic URL",
+    { tag: "@desktop-only" },
+    async ({ page }) => {
+      await page.goto("/?igrp=12");
 
-    await expect.poll(() => new URL(page.url()).searchParams.get("category")).toBe("gpu");
-    expect(new URL(page.url()).searchParams.has("igrp")).toBe(false);
-  });
+      await expect.poll(() => new URL(page.url()).searchParams.get("category")).toBe("gpu");
+      expect(new URL(page.url()).searchParams.has("igrp")).toBe(false);
+    },
+  );
 
-  test("refreshes v2 build-list intents while preserving quantity and undo", async ({ page }) => {
+  test("refreshes v2 build-list intents while preserving quantity and undo", {
+    tag: "@desktop-mobile-only",
+  }, async ({ page }) => {
     const productId = "11111111-1111-1111-1111-111111111111";
     const missingProductId = "22222222-2222-2222-2222-222222222222";
 

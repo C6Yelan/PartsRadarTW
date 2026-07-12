@@ -2,7 +2,7 @@
 // apps/web/app/products/[id]/detail/use-product-detail-view-model.ts
 // 組裝商品詳細頁所需的商品資料、價格歷史、配單、圖片、返回連結與分享狀態。
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { BUILD_LIST_MAX_QUANTITY } from "../../../build-list/constants";
 import { useBuildList } from "../../../build-list/use-build-list";
 import type { ProductShareStatus } from "../product-share";
@@ -21,7 +21,6 @@ export function useProductDetailViewModel({
   const { product, state } = useProductDetail(productId);
   const { historyRange, historyState, priceHistory, setHistoryRange } = usePriceHistoryLoader({
     product,
-    productId,
   });
   const [imageError, setImageError] = useState(false);
   const [shareStatus, setShareStatus] = useState<ProductShareStatus>(null);
@@ -40,15 +39,6 @@ export function useProductDetailViewModel({
       ? currentBuildListQuantity < BUILD_LIST_MAX_QUANTITY
       : !isProductLimitReached;
   const returnLabel = returnHref.startsWith("/build-list") ? "返回配單" : "返回查詢";
-
-  useEffect(() => {
-    if (product) {
-      return;
-    }
-
-    setImageError(false);
-    setShareStatus(null);
-  }, [product]);
 
   function addCurrentProductToBuildList() {
     if (!product) {

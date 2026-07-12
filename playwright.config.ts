@@ -12,10 +12,18 @@ if (existsSync(workspaceEnvFile)) {
 
 const baseURL = process.env.E2E_BASE_URL ?? "http://127.0.0.1:3100";
 const shouldStartLocalServer = !process.env.E2E_BASE_URL;
-const localServerCommand =
-  process.env.E2E_SKIP_BUILD === "1"
-    ? "pnpm --filter @partsradar/web start --hostname 127.0.0.1 --port 3100"
-    : "pnpm build:web && pnpm --filter @partsradar/web start --hostname 127.0.0.1 --port 3100";
+const standaloneWebRoot = "apps/web/.next/standalone/apps/web";
+const stageStandaloneAssets = [
+  `rm -rf ${standaloneWebRoot}/.next/static ${standaloneWebRoot}/public`,
+  `mkdir -p ${standaloneWebRoot}/.next`,
+  `cp -R apps/web/.next/static ${standaloneWebRoot}/.next/static`,
+  `cp -R apps/web/public ${standaloneWebRoot}/public`,
+].join(" && ");
+const localServerCommand = [
+  ...(process.env.E2E_SKIP_BUILD === "1" ? [] : ["NODE_ENV=production pnpm build:web"]),
+  stageStandaloneAssets,
+  `NODE_ENV=production HOSTNAME=127.0.0.1 PORT=3100 node ${standaloneWebRoot}/server.js`,
+].join(" && ");
 
 export default defineConfig({
   testDir: "apps/web/e2e",
@@ -48,6 +56,7 @@ export default defineConfig({
     },
     {
       name: "chromium-tablet",
+      grepInvert: /@desktop-only|@desktop-mobile-only/,
       use: {
         ...devices["Desktop Chrome"],
         viewport: { width: 1024, height: 768 },

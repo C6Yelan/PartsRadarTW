@@ -11,39 +11,28 @@ import type {
 import type { ProductDetailBody } from "./types";
 
 // 在商品詳細資料可用後載入價格歷史，並讓價格走勢面板切換 7/30/90 天或全部範圍。
-export function usePriceHistoryLoader({
-  product,
-  productId,
-}: {
-  product: ProductDetailBody | null;
-  productId: string;
-}) {
+export function usePriceHistoryLoader({ product }: { product: ProductDetailBody | null }) {
   const [historyState, setHistoryState] = useState<PriceHistoryLoadState>("idle");
   const [priceHistory, setPriceHistory] = useState<ProductPriceHistoryBody | null>(null);
   const [historyRange, setHistoryRange] = useState<PriceHistoryRange>(90);
+  const loadedProductId = product?.id ?? null;
 
   useEffect(() => {
-    if (product) {
+    if (!loadedProductId) {
+      setHistoryState("idle");
+      setPriceHistory(null);
+      setHistoryRange(90);
       return;
     }
 
-    setHistoryState("idle");
-    setPriceHistory(null);
-    setHistoryRange(90);
-  }, [product]);
-
-  useEffect(() => {
-    if (!product) {
-      return;
-    }
-
+    const requestedProductId = loadedProductId;
     const controller = new AbortController();
     setHistoryState("loading");
 
     async function loadPriceHistory() {
       try {
         const nextPriceHistory = await fetchPriceHistory(
-          productId,
+          requestedProductId,
           historyRange,
           controller.signal,
         );
@@ -67,7 +56,7 @@ export function usePriceHistoryLoader({
     void loadPriceHistory();
 
     return () => controller.abort();
-  }, [product, productId, historyRange]);
+  }, [loadedProductId, historyRange]);
 
   return {
     historyRange,
