@@ -1,6 +1,6 @@
 // 定義 web/API boundary 使用的 public category slug 與 CoolPC IGrp 對照。
 
-const CATEGORY_MAPPINGS = [
+export const CATEGORY_MAPPINGS = [
   { igrp: 4, slug: "cpu" },
   { igrp: 5, slug: "motherboard" },
   { igrp: 6, slug: "memory" },

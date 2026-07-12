@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { getCategoryIgrp, getCategorySlug } from "../../app/category-slugs";
+import { CATEGORY_MAPPINGS, getCategoryIgrp, getCategorySlug } from "../../app/category-slugs";
 
 const EXPECTED_CATEGORY_MAPPINGS = [
   [4, "cpu"],
@@ -19,12 +19,19 @@ const EXPECTED_CATEGORY_MAPPINGS = [
 ] as const;
 
 describe("category slug mapping", () => {
+  it("keeps the public contract aligned to the exact 11 CoolPC categories", () => {
+    expect(CATEGORY_MAPPINGS.map(({ igrp, slug }) => [igrp, slug])).toEqual(
+      EXPECTED_CATEGORY_MAPPINGS,
+    );
+  });
+
   it.each(EXPECTED_CATEGORY_MAPPINGS)("maps IGrp %i to %s in both directions", (igrp, slug) => {
     expect(getCategorySlug(igrp)).toBe(slug);
     expect(getCategoryIgrp(slug)).toBe(igrp);
   });
 
   it("does not resolve unknown public or source categories", () => {
+    expect(getCategorySlug(9)).toBeNull();
     expect(getCategorySlug(99)).toBeNull();
     expect(getCategoryIgrp("unknown")).toBeNull();
   });
