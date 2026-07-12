@@ -4,15 +4,15 @@
 import { relative } from "node:path";
 import type { Prisma, PrismaClient } from "@partsradar/db";
 import { createPublicProductImagePath } from "@partsradar/shared";
-import { assertSeededCategories, runCoolpcCategoryCrawl } from "../../coolpc/live-crawl";
 import { CRAWL_TRIGGER_TYPES, type RunCoolpcCrawlOnceResult } from "../../coolpc/crawl-run";
+import { assertSeededCategories, runCoolpcCategoryCrawl } from "../../coolpc/live-crawl";
+import { tryAcquireExternalFetchLock } from "../ops/external-fetch-lock";
 import {
   loadWorkspaceEnv,
   resolveWorkspaceRoot,
   toSafeCliErrorMessage,
 } from "../shared/script-utils";
-import { tryAcquireExternalFetchLock } from "../ops/external-fetch-lock";
-import { parseOptions, type CrawlOptions } from "./crawl-coolpc-once/options";
+import { type CrawlOptions, parseOptions } from "./crawl-coolpc-once/options";
 
 // 取樣輸出的商品筆數上限（僅供 smoke summary 顯示）。
 const DEFAULT_PAGE_SIZE = 5;
@@ -122,11 +122,17 @@ async function main() {
 }
 
 // 根據 options 呼叫一次性爬取流程，回傳 manual run 的執行結果。
-async function runManualCrawl(
+export async function runManualCrawl(
   client: PrismaClient,
   options: CrawlOptions,
+  dependencies: {
+    acquireLock?: typeof tryAcquireExternalFetchLock;
+    crawlCategories?: typeof runCoolpcCategoryCrawl;
+  } = {},
 ): Promise<RunCoolpcCrawlOnceResult> {
-  const externalFetchLock = await tryAcquireExternalFetchLock({
+  const acquireLock = dependencies.acquireLock ?? tryAcquireExternalFetchLock;
+  const crawlCategories = dependencies.crawlCategories ?? runCoolpcCategoryCrawl;
+  const externalFetchLock = await acquireLock({
     lockDir: options.externalFetchLockDir,
     owner: "manual-crawler",
     staleSeconds: options.externalFetchLockStaleSeconds,
@@ -137,7 +143,7 @@ async function runManualCrawl(
   }
 
   try {
-    return await runCoolpcCategoryCrawl({
+    return await crawlCategories({
       client,
       workspaceRoot: options.workspaceRoot,
       storageDir: options.storageDir,

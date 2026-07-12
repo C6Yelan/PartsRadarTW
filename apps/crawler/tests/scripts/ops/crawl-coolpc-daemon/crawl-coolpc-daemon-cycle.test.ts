@@ -82,6 +82,31 @@ describe("CoolPC scheduled crawler daemon cycle", () => {
     expect(calls).toEqual([]);
   });
 
+  it("backs off and releases the external lock when crawl reconciliation fails", async () => {
+    const calls: string[] = [];
+    const fakeLock = {
+      lockDir: "/tmp/external-fetch.lock",
+      owner: "crawler-daemon",
+      async release() {
+        calls.push("release-lock");
+      },
+    };
+
+    const result = await runScheduledCycle({} as never, createDaemonOptions(), {
+      acquireLock: async () => fakeLock,
+      crawlCategories: async () => {
+        calls.push("crawl-categories");
+        throw new Error("crawl-run reconciliation failed");
+      },
+      backfillNewProductImages: async () => {
+        calls.push("backfill-new-product-images");
+      },
+    });
+
+    expect(result).toEqual({ shouldBackoff: true });
+    expect(calls).toEqual(["crawl-categories", "release-lock"]);
+  });
+
   it("skips new product image backfill when the crawl result should back off", async () => {
     const calls: string[] = [];
     const fakeLock = {

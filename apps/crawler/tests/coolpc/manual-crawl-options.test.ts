@@ -1,11 +1,15 @@
 // apps/crawler/tests/coolpc/manual-crawl-options.test.ts
-// 驗證 manual live crawl 的確認旗標、raw snapshot storage allowlist 與安全 default。
+// 驗證 manual live crawl 的確認旗標、storage allowlist 與執行失敗傳播。
 
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
-import { parseOptions } from "../../src/scripts/manual/crawl-coolpc-once/options";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { runManualCrawl } from "../../src/scripts/manual/crawl-coolpc-once";
+import {
+  type CrawlOptions,
+  parseOptions,
+} from "../../src/scripts/manual/crawl-coolpc-once/options";
 
 const tempRoots: string[] = [];
 
@@ -66,6 +70,30 @@ describe("manual CoolPC crawl snapshot storage options", () => {
   });
 });
 
+describe("manual CoolPC crawl execution", () => {
+  it("releases the external lock and propagates reconciliation failure", async () => {
+    const reconciliationError = new Error("crawl-run reconciliation failed");
+    const release = vi.fn(async () => {});
+    const acquireLock = vi.fn(async () => ({
+      lockDir: "/tmp/external-fetch",
+      owner: "manual-crawler",
+      release,
+    }));
+    const crawlCategories = vi.fn(async () => {
+      throw reconciliationError;
+    });
+
+    const result = runManualCrawl({} as never, manualCrawlOptions(), {
+      acquireLock,
+      crawlCategories,
+    });
+
+    await expect(result).rejects.toBe(reconciliationError);
+    expect(crawlCategories).toHaveBeenCalledOnce();
+    expect(release).toHaveBeenCalledOnce();
+  });
+});
+
 async function createWorkspace(): Promise<{ workspaceRoot: string; crawlerCwd: string }> {
   const workspaceRoot = await mkdtemp(join(tmpdir(), "partsradar-manual-crawl-options-"));
   const crawlerCwd = join(workspaceRoot, "apps", "crawler");
@@ -73,4 +101,14 @@ async function createWorkspace(): Promise<{ workspaceRoot: string; crawlerCwd: s
   await writeFile(join(workspaceRoot, "pnpm-workspace.yaml"), "packages: []\n");
   await mkdir(crawlerCwd, { recursive: true });
   return { workspaceRoot, crawlerCwd };
+}
+
+function manualCrawlOptions(): CrawlOptions {
+  return {
+    workspaceRoot: "/repo",
+    storageDir: "/repo/storage/snapshots",
+    delayMs: 8000,
+    externalFetchLockDir: "/repo/storage/snapshots/.locks/external-fetch",
+    externalFetchLockStaleSeconds: 43200,
+  };
 }

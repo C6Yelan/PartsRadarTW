@@ -5,11 +5,11 @@ import {
   CRAWL_RUN_CATEGORY_RESULT_STATUSES,
   CRAWL_RUN_STATUSES,
   CRAWL_TRIGGER_TYPES,
-  isSuccessStatus,
-  resolveCrawlRunStatus,
   type CrawlRunCategoryResultStatusValue,
   type CrawlRunStatusValue,
   type CrawlTriggerTypeValue,
+  isSuccessStatus,
+  resolveCrawlRunStatus,
 } from "./crawl-run/status";
 
 // crawl-run 的狀態語彙由此公開入口統一提供，raw snapshot 與商品價格寫入維持各自模組。
@@ -21,6 +21,9 @@ export {
   type CrawlRunStatusValue,
   type CrawlTriggerTypeValue,
 } from "./crawl-run/status";
+
+export const CRAWL_RUN_LIFECYCLE_FAILURE_MARKER = "crawl_run_lifecycle_failure";
+export const CRAWL_RUN_INTERRUPTED_RECONCILED_MARKER = "crawl_run_interrupted_reconciled";
 
 export interface CrawlRunSourceCategory {
   id: string;
@@ -60,6 +63,18 @@ export interface CrawlRunWriteClient {
         errorMessage?: string | null;
       };
     }): Promise<{ id: string; status: CrawlRunStatusValue }>;
+    updateMany(args: {
+      where: {
+        id: string;
+        status: typeof CRAWL_RUN_STATUSES.RUNNING;
+        finishedAt: null;
+      };
+      data: {
+        status: typeof CRAWL_RUN_STATUSES.FETCH_FAILED;
+        finishedAt: Date;
+        errorMessage: typeof CRAWL_RUN_LIFECYCLE_FAILURE_MARKER;
+      };
+    }): Promise<{ count: number }>;
   };
   crawlRunCategoryResult: {
     create(args: {
@@ -93,6 +108,27 @@ export interface RunCoolpcCrawlOnceOptions {
   now?: () => Date;
 }
 
+export interface InterruptedCrawlRunReconciliationClient {
+  crawlRun: {
+    updateMany(args: {
+      where: {
+        status: typeof CRAWL_RUN_STATUSES.RUNNING;
+        finishedAt: null;
+      };
+      data: {
+        status: typeof CRAWL_RUN_STATUSES.FETCH_FAILED;
+        finishedAt: Date;
+        errorMessage: typeof CRAWL_RUN_INTERRUPTED_RECONCILED_MARKER;
+      };
+    }): Promise<{ count: number }>;
+  };
+}
+
+export interface ReconcileInterruptedCrawlRunsOptions {
+  client: InterruptedCrawlRunReconciliationClient;
+  now?: () => Date;
+}
+
 export interface RecordedCrawlRunCategoryResult {
   sourceCategoryId: string;
   igrp: number;
@@ -120,6 +156,26 @@ export interface RunCoolpcCrawlOnceResult {
   categoryResults: RecordedCrawlRunCategoryResult[];
 }
 
+// 在新一輪 crawl 開始前，以單一 atomic update 收斂上次中斷的 RUNNING rows。
+export async function reconcileInterruptedCrawlRuns({
+  client,
+  now = () => new Date(),
+}: ReconcileInterruptedCrawlRunsOptions): Promise<number> {
+  const result = await client.crawlRun.updateMany({
+    where: {
+      status: CRAWL_RUN_STATUSES.RUNNING,
+      finishedAt: null,
+    },
+    data: {
+      status: CRAWL_RUN_STATUSES.FETCH_FAILED,
+      finishedAt: now(),
+      errorMessage: CRAWL_RUN_INTERRUPTED_RECONCILED_MARKER,
+    },
+  });
+
+  return result.count;
+}
+
 export async function runCoolpcCrawlOnce({
   client,
   triggerType = CRAWL_TRIGGER_TYPES.MANUAL,
@@ -134,67 +190,88 @@ export async function runCoolpcCrawlOnce({
       triggerType,
     },
   });
-  const categories = await client.sourceCategory.findMany({
-    where: { enabled: true },
-    orderBy: { igrp: "asc" },
-  });
-  const categoryResults: RecordedCrawlRunCategoryResult[] = [];
-  let stoppedBySuspectedBlock = false;
-
-  for (const category of categories) {
-    const result = await processCategorySafely({
-      crawlRunId: crawlRun.id,
-      category,
-      processCategory,
+  try {
+    const categories = await client.sourceCategory.findMany({
+      where: { enabled: true },
+      orderBy: { igrp: "asc" },
     });
+    const categoryResults: RecordedCrawlRunCategoryResult[] = [];
+    let stoppedBySuspectedBlock = false;
 
-    await client.crawlRunCategoryResult.create({
-      data: {
+    for (const category of categories) {
+      const result = await processCategorySafely({
         crawlRunId: crawlRun.id,
+        category,
+        processCategory,
+      });
+
+      await client.crawlRunCategoryResult.create({
+        data: {
+          crawlRunId: crawlRun.id,
+          sourceCategoryId: category.id,
+          status: result.status,
+          rawSnapshotId: result.rawSnapshotId,
+          errorMessage: result.errorMessage,
+        },
+      });
+      await updateSourceCategoryCheckTimestamps({
+        client,
         sourceCategoryId: category.id,
         status: result.status,
-        rawSnapshotId: result.rawSnapshotId,
-        errorMessage: result.errorMessage,
+        checkedAt: now(),
+      });
+
+      categoryResults.push({
+        sourceCategoryId: category.id,
+        igrp: category.igrp,
+        status: result.status,
+        rawSnapshotId: result.rawSnapshotId ?? null,
+        errorMessage: result.errorMessage ?? null,
+        productWriteSummary: result.productWriteSummary ?? null,
+      });
+
+      // 只要該分類判定疑似封鎖，先停止後續循環，避免繼續抓取時誤判正常分類而寫入混淆資料。
+      if (result.status === CRAWL_RUN_CATEGORY_RESULT_STATUSES.SUSPECTED_BLOCK) {
+        stoppedBySuspectedBlock = true;
+        break;
+      }
+    }
+
+    const status = resolveCrawlRunStatus(categoryResults);
+    await client.crawlRun.update({
+      where: { id: crawlRun.id },
+      data: {
+        status,
+        finishedAt: now(),
       },
     });
-    await updateSourceCategoryCheckTimestamps({
-      client,
-      sourceCategoryId: category.id,
-      status: result.status,
-      checkedAt: now(),
-    });
 
-    categoryResults.push({
-      sourceCategoryId: category.id,
-      igrp: category.igrp,
-      status: result.status,
-      rawSnapshotId: result.rawSnapshotId ?? null,
-      errorMessage: result.errorMessage ?? null,
-      productWriteSummary: result.productWriteSummary ?? null,
-    });
-
-    // 只要該分類判定疑似封鎖，先停止後續循環，避免繼續抓取時誤判正常分類而寫入混淆資料。
-    if (result.status === CRAWL_RUN_CATEGORY_RESULT_STATUSES.SUSPECTED_BLOCK) {
-      stoppedBySuspectedBlock = true;
-      break;
-    }
-  }
-
-  const status = resolveCrawlRunStatus(categoryResults);
-  await client.crawlRun.update({
-    where: { id: crawlRun.id },
-    data: {
+    return {
+      crawlRunId: crawlRun.id,
       status,
-      finishedAt: now(),
-    },
-  });
+      stoppedBySuspectedBlock,
+      categoryResults,
+    };
+  } catch (error) {
+    try {
+      await client.crawlRun.updateMany({
+        where: {
+          id: crawlRun.id,
+          status: CRAWL_RUN_STATUSES.RUNNING,
+          finishedAt: null,
+        },
+        data: {
+          status: CRAWL_RUN_STATUSES.FETCH_FAILED,
+          finishedAt: now(),
+          errorMessage: CRAWL_RUN_LIFECYCLE_FAILURE_MARKER,
+        },
+      });
+    } catch {
+      // Finalization 僅是 best-effort，不得取代 caller 應收到的原始 lifecycle error。
+    }
 
-  return {
-    crawlRunId: crawlRun.id,
-    status,
-    stoppedBySuspectedBlock,
-    categoryResults,
-  };
+    throw error;
+  }
 }
 
 async function updateSourceCategoryCheckTimestamps({

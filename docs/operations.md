@@ -69,6 +69,8 @@ docker compose -f compose.yml -f compose.crawler.yml logs --tail=100 crawler-dae
 
 失敗處理：遇到 suspected block、來源錯誤或 external fetch lock 衝突時先停止 crawler-daemon，保存 snapshot 與 log，再用 offline raw replay分析。不要提高並行或移除 request delay硬試。
 
+Crawl lifecycle 維運 marker：建立 run 後若有未吸收的 lifecycle failure，可完成 best-effort finalization 時會寫入 `crawl_run_lifecycle_failure`。下一次成功取得 raw snapshot mutation lock 的 live crawl，會先將未完成的 `RUNNING` run 收斂為 `FETCH_FAILED` 並寫入 `crawl_run_interrupted_reconciled`；只有實際收斂時才記錄 sanitized count。這兩個 marker 都代表需要檢查 crawler 與 DB 維運 log，不是成功狀態。
+
 停止 writers：
 
 ```bash

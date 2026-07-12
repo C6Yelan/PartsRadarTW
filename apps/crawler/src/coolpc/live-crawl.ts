@@ -7,6 +7,7 @@ import {
   CRAWL_TRIGGER_TYPES,
   type CrawlTriggerTypeValue,
   type RunCoolpcCrawlOnceResult,
+  reconcileInterruptedCrawlRuns,
   runCoolpcCrawlOnce,
 } from "./crawl-run";
 import { fetchLiveCategorySnapshot } from "./live-crawl/fetch";
@@ -42,6 +43,7 @@ interface CrawlTimingOptions {
 
 interface RunCoolpcCategoryCrawlDependencies {
   acquireMutationLock?: typeof tryAcquireRawSnapshotMutationLock;
+  reconcileRuns?: typeof reconcileInterruptedCrawlRuns;
   runCrawl?: typeof runCoolpcCrawlOnce;
 }
 
@@ -73,6 +75,7 @@ export async function runCoolpcCategoryCrawl(
   });
 
   const acquireMutationLock = dependencies.acquireMutationLock ?? tryAcquireRawSnapshotMutationLock;
+  const reconcileRuns = dependencies.reconcileRuns ?? reconcileInterruptedCrawlRuns;
   const runCrawl = dependencies.runCrawl ?? runCoolpcCrawlOnce;
   const mutationLock = await acquireMutationLock({
     mutationRoot: storageLocation.mutationRoot,
@@ -86,6 +89,11 @@ export async function runCoolpcCategoryCrawl(
   }
 
   try {
+    const reconciledRunCount = await reconcileRuns({ client });
+    if (reconciledRunCount > 0) {
+      log?.(`Reconciled interrupted CoolPC crawl runs. count=${reconciledRunCount}`);
+    }
+
     return await runCrawl({
       client,
       triggerType,

@@ -4,13 +4,17 @@
 import { describe, expect, it } from "vitest";
 import {
   CRAWL_RUN_CATEGORY_RESULT_STATUSES,
+  CRAWL_RUN_INTERRUPTED_RECONCILED_MARKER,
+  CRAWL_RUN_LIFECYCLE_FAILURE_MARKER,
   CRAWL_RUN_STATUSES,
   CRAWL_TRIGGER_TYPES,
-  runCoolpcCrawlOnce,
   type CrawlRunCategoryResultStatusValue,
   type CrawlRunSourceCategory,
   type CrawlRunStatusValue,
   type CrawlRunWriteClient,
+  type InterruptedCrawlRunReconciliationClient,
+  reconcileInterruptedCrawlRuns,
+  runCoolpcCrawlOnce,
 } from "../../src/coolpc/crawl-run";
 
 describe("CoolPC crawl run writer", () => {
@@ -170,6 +174,167 @@ describe("CoolPC crawl run writer", () => {
       }),
     ]);
   });
+
+  it("finalizes the crawl run when category-result persistence fails", async () => {
+    const client = new FakeCrawlRunWriteClient([
+      category({ id: "category-4", igrp: 4, displayName: "CPU" }),
+    ]);
+    const lifecycleError = new Error("provider response and database details must stay private");
+    client.crawlRunCategoryResult.create = async () => {
+      throw lifecycleError;
+    };
+
+    const result = runCoolpcCrawlOnce({
+      client,
+      now: fixedClock(),
+      processCategory: async () => ({
+        status: CRAWL_RUN_CATEGORY_RESULT_STATUSES.SUCCESS_UNCHANGED,
+      }),
+    });
+
+    await expect(result).rejects.toBe(lifecycleError);
+    expect(client.crawlRuns[0]).toMatchObject({
+      status: CRAWL_RUN_STATUSES.FETCH_FAILED,
+      finishedAt: fixedDate(),
+      errorMessage: CRAWL_RUN_LIFECYCLE_FAILURE_MARKER,
+    });
+    expect(client.crawlRuns[0]?.errorMessage).not.toContain(lifecycleError.message);
+  });
+
+  it("preserves the lifecycle error when failure finalization also fails", async () => {
+    const client = new FakeCrawlRunWriteClient([
+      category({ id: "category-4", igrp: 4, displayName: "CPU" }),
+    ]);
+    const lifecycleError = new Error("category-result persistence failed");
+    const finalizationError = new Error("crawl-run finalization failed");
+    let finalizationAttempted = false;
+    client.crawlRunCategoryResult.create = async () => {
+      throw lifecycleError;
+    };
+    client.crawlRun.updateMany = async () => {
+      finalizationAttempted = true;
+      throw finalizationError;
+    };
+
+    const result = runCoolpcCrawlOnce({
+      client,
+      now: fixedClock(),
+      processCategory: async () => ({
+        status: CRAWL_RUN_CATEGORY_RESULT_STATUSES.SUCCESS_UNCHANGED,
+      }),
+    });
+
+    await expect(result).rejects.toBe(lifecycleError);
+    expect(finalizationAttempted).toBe(true);
+  });
+
+  it("does not overwrite a terminal status when the terminal update response is lost", async () => {
+    const client = new FakeCrawlRunWriteClient([
+      category({ id: "category-4", igrp: 4, displayName: "CPU" }),
+    ]);
+    const terminalUpdateError = new Error("terminal update response was lost");
+    const applyTerminalUpdate = client.crawlRun.update;
+    client.crawlRun.update = async (args) => {
+      await applyTerminalUpdate(args);
+      throw terminalUpdateError;
+    };
+
+    const result = runCoolpcCrawlOnce({
+      client,
+      now: fixedClock(),
+      processCategory: async () => ({
+        status: CRAWL_RUN_CATEGORY_RESULT_STATUSES.SUCCESS_UNCHANGED,
+      }),
+    });
+
+    await expect(result).rejects.toBe(terminalUpdateError);
+    expect(client.crawlRuns[0]).toMatchObject({
+      status: CRAWL_RUN_STATUSES.SUCCESS_UNCHANGED,
+      finishedAt: fixedDate(),
+      errorMessage: null,
+    });
+  });
+});
+
+describe("interrupted CoolPC crawl run reconciliation", () => {
+  it("atomically reconciles only unfinished running rows and returns the updated count", async () => {
+    const reconciliationTime = fixedDate();
+    const previouslyFinishedAt = new Date("2026-05-27T09:30:00.000Z");
+    const rows: ReconciliationRow[] = [
+      {
+        status: CRAWL_RUN_STATUSES.RUNNING,
+        finishedAt: null,
+        errorMessage: null,
+      },
+      {
+        status: CRAWL_RUN_STATUSES.RUNNING,
+        finishedAt: previouslyFinishedAt,
+        errorMessage: null,
+      },
+      {
+        status: CRAWL_RUN_STATUSES.SUCCESS_CHANGED,
+        finishedAt: null,
+        errorMessage: null,
+      },
+    ];
+    let updateManyArgs: ReconciliationUpdateManyArgs | null = null;
+    const client: InterruptedCrawlRunReconciliationClient = {
+      crawlRun: {
+        updateMany: async (args) => {
+          updateManyArgs = args;
+          let count = 0;
+
+          for (const row of rows) {
+            if (row.status !== args.where.status || row.finishedAt !== args.where.finishedAt) {
+              continue;
+            }
+
+            row.status = args.data.status;
+            row.finishedAt = args.data.finishedAt;
+            row.errorMessage = args.data.errorMessage;
+            count += 1;
+          }
+
+          return { count };
+        },
+      },
+    };
+
+    const count = await reconcileInterruptedCrawlRuns({
+      client,
+      now: () => reconciliationTime,
+    });
+
+    expect(count).toBe(1);
+    expect(updateManyArgs).toEqual({
+      where: {
+        status: CRAWL_RUN_STATUSES.RUNNING,
+        finishedAt: null,
+      },
+      data: {
+        status: CRAWL_RUN_STATUSES.FETCH_FAILED,
+        finishedAt: reconciliationTime,
+        errorMessage: CRAWL_RUN_INTERRUPTED_RECONCILED_MARKER,
+      },
+    });
+    expect(rows).toEqual([
+      {
+        status: CRAWL_RUN_STATUSES.FETCH_FAILED,
+        finishedAt: reconciliationTime,
+        errorMessage: CRAWL_RUN_INTERRUPTED_RECONCILED_MARKER,
+      },
+      {
+        status: CRAWL_RUN_STATUSES.RUNNING,
+        finishedAt: previouslyFinishedAt,
+        errorMessage: null,
+      },
+      {
+        status: CRAWL_RUN_STATUSES.SUCCESS_CHANGED,
+        finishedAt: null,
+        errorMessage: null,
+      },
+    ]);
+  });
 });
 
 interface FakeCrawlRun {
@@ -178,7 +343,18 @@ interface FakeCrawlRun {
   startedAt: Date;
   finishedAt: Date | null;
   triggerType: string;
+  errorMessage: string | null;
 }
+
+interface ReconciliationRow {
+  status: CrawlRunStatusValue;
+  finishedAt: Date | null;
+  errorMessage: string | null;
+}
+
+type ReconciliationUpdateManyArgs = Parameters<
+  InterruptedCrawlRunReconciliationClient["crawlRun"]["updateMany"]
+>[0];
 
 interface FakeCategoryResult {
   id: string;
@@ -231,6 +407,7 @@ class FakeCrawlRunWriteClient implements CrawlRunWriteClient {
         startedAt: data.startedAt,
         finishedAt: null,
         triggerType: data.triggerType,
+        errorMessage: null,
       };
       this.crawlRuns.push(crawlRun);
 
@@ -245,8 +422,31 @@ class FakeCrawlRunWriteClient implements CrawlRunWriteClient {
 
       crawlRun.status = data.status;
       crawlRun.finishedAt = data.finishedAt;
+      if ("errorMessage" in data) {
+        crawlRun.errorMessage = data.errorMessage ?? null;
+      }
 
       return { id: crawlRun.id, status: crawlRun.status };
+    },
+    updateMany: async ({
+      where,
+      data,
+    }: Parameters<CrawlRunWriteClient["crawlRun"]["updateMany"]>[0]) => {
+      const crawlRun = this.crawlRuns.find(
+        (candidate) =>
+          candidate.id === where.id &&
+          candidate.status === where.status &&
+          candidate.finishedAt === where.finishedAt,
+      );
+
+      if (!crawlRun) {
+        return { count: 0 };
+      }
+
+      crawlRun.status = data.status;
+      crawlRun.finishedAt = data.finishedAt;
+      crawlRun.errorMessage = data.errorMessage;
+      return { count: 1 };
     },
   };
 

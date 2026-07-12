@@ -64,6 +64,25 @@ export class FakeCrawlerWriteClient
 
       return { id: crawlRun.id, status: crawlRun.status };
     },
+    updateMany: async ({
+      where,
+      data,
+    }: Parameters<CrawlRunWriteClient["crawlRun"]["updateMany"]>[0]) => {
+      const crawlRun = this.crawlRuns.find(
+        (candidate) =>
+          candidate.id === where.id &&
+          candidate.status === where.status &&
+          candidate.finishedAt === where.finishedAt,
+      );
+
+      if (!crawlRun) {
+        return { count: 0 };
+      }
+
+      crawlRun.status = data.status;
+      crawlRun.finishedAt = data.finishedAt;
+      return { count: 1 };
+    },
   };
 
   crawlRunCategoryResult = {

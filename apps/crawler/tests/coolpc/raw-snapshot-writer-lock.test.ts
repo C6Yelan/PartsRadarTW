@@ -29,13 +29,22 @@ describe("raw snapshot writer mutation lock", () => {
   ])("holds and releases the shared lock for $name", async (testCase) => {
     const { workspaceRoot, storageRoot } = await createWorkspace();
     const calls: string[] = [];
-    const acquireMutationLock = vi.fn(async () => ({
-      lockDir: join(storageRoot, ".locks", "raw-snapshot-mutation"),
-      owner: testCase.expectedOwner,
-      async release() {
-        calls.push("release");
-      },
-    }));
+    const client = {} as never;
+    const log = vi.fn();
+    const acquireMutationLock = vi.fn(async () => {
+      calls.push("acquire");
+      return {
+        lockDir: join(storageRoot, ".locks", "raw-snapshot-mutation"),
+        owner: testCase.expectedOwner,
+        async release() {
+          calls.push("release");
+        },
+      };
+    });
+    const reconcileRuns = vi.fn(async () => {
+      calls.push("reconcile");
+      return 2;
+    });
     const runCrawl = vi.fn(async () => {
       calls.push("run");
       return {} as never;
@@ -43,16 +52,18 @@ describe("raw snapshot writer mutation lock", () => {
 
     await runCoolpcCategoryCrawl(
       {
-        client: {} as never,
+        client,
         workspaceRoot,
         storageDir: join(storageRoot, "controlled-child"),
         configuredStorageDir: null,
         additionalAllowedStorageRootsForTesting: [storageRoot],
         triggerType: testCase.triggerType,
         fetchUserAgent: "test-agent",
+        log,
       },
       {
         acquireMutationLock: acquireMutationLock as never,
+        reconcileRuns: reconcileRuns as never,
         runCrawl: runCrawl as never,
       },
     );
@@ -61,7 +72,10 @@ describe("raw snapshot writer mutation lock", () => {
       mutationRoot: storageRoot,
       owner: testCase.expectedOwner,
     });
-    expect(calls).toEqual(["run", "release"]);
+    expect(reconcileRuns).toHaveBeenCalledWith({ client });
+    expect(calls).toEqual(["acquire", "reconcile", "run", "release"]);
+    expect(log).toHaveBeenCalledOnce();
+    expect(log).toHaveBeenCalledWith("Reconciled interrupted CoolPC crawl runs. count=2");
   });
 
   it("releases the lock when the crawl fails", async () => {
@@ -84,6 +98,7 @@ describe("raw snapshot writer mutation lock", () => {
             owner: "manual-crawler",
             release,
           })) as never,
+          reconcileRuns: (async () => 0) as never,
           runCrawl: (async () => {
             throw new Error("crawl failed");
           }) as never,
@@ -95,6 +110,7 @@ describe("raw snapshot writer mutation lock", () => {
 
   it("does not start a crawl when the shared lock is busy", async () => {
     const { workspaceRoot, storageRoot } = await createWorkspace();
+    const reconcileRuns = vi.fn(async () => 0);
     const runCrawl = vi.fn(async () => ({}) as never);
 
     await expect(
@@ -109,11 +125,74 @@ describe("raw snapshot writer mutation lock", () => {
         },
         {
           acquireMutationLock: (async () => null) as never,
+          reconcileRuns: reconcileRuns as never,
           runCrawl: runCrawl as never,
         },
       ),
     ).rejects.toThrow("another crawler or cleanup process holds the mutation lock");
+    expect(reconcileRuns).not.toHaveBeenCalled();
     expect(runCrawl).not.toHaveBeenCalled();
+  });
+
+  it("does not log when reconciliation updates no crawl runs", async () => {
+    const { workspaceRoot, storageRoot } = await createWorkspace();
+    const log = vi.fn();
+
+    await runCoolpcCategoryCrawl(
+      {
+        client: {} as never,
+        workspaceRoot,
+        storageDir: storageRoot,
+        configuredStorageDir: null,
+        additionalAllowedStorageRootsForTesting: [storageRoot],
+        fetchUserAgent: "test-agent",
+        log,
+      },
+      {
+        acquireMutationLock: (async () => ({
+          lockDir: join(storageRoot, ".locks", "raw-snapshot-mutation"),
+          owner: "manual-crawler",
+          release: async () => {},
+        })) as never,
+        reconcileRuns: (async () => 0) as never,
+        runCrawl: (async () => ({}) as never) as never,
+      },
+    );
+
+    expect(log).not.toHaveBeenCalled();
+  });
+
+  it("releases the lock and does not crawl when reconciliation fails", async () => {
+    const { workspaceRoot, storageRoot } = await createWorkspace();
+    const reconciliationError = new Error("crawl-run reconciliation failed");
+    const release = vi.fn(async () => {});
+    const runCrawl = vi.fn(async () => ({}) as never);
+
+    const result = runCoolpcCategoryCrawl(
+      {
+        client: {} as never,
+        workspaceRoot,
+        storageDir: storageRoot,
+        configuredStorageDir: null,
+        additionalAllowedStorageRootsForTesting: [storageRoot],
+        fetchUserAgent: "test-agent",
+      },
+      {
+        acquireMutationLock: (async () => ({
+          lockDir: join(storageRoot, ".locks", "raw-snapshot-mutation"),
+          owner: "manual-crawler",
+          release,
+        })) as never,
+        reconcileRuns: (async () => {
+          throw reconciliationError;
+        }) as never,
+        runCrawl: runCrawl as never,
+      },
+    );
+
+    await expect(result).rejects.toBe(reconciliationError);
+    expect(runCrawl).not.toHaveBeenCalled();
+    expect(release).toHaveBeenCalledOnce();
   });
 });
 
