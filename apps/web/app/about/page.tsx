@@ -3,8 +3,9 @@
 
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowLeftIcon, BrandMarkIcon } from "../_shared/icons";
+import { ArrowLeftIcon } from "../_shared/icons";
 import SiteDisclaimer from "../site-disclaimer";
+import TopbarBrandNavigation from "../TopbarBrandNavigation";
 
 export const metadata: Metadata = {
   alternates: {
@@ -18,13 +19,7 @@ export default function AboutPage() {
   return (
     <div className="app-shell public-info-shell">
       <header className="topbar public-info-topbar">
-        <Link className="brand-lockup" href="/">
-          <BrandMarkIcon />
-          <span>
-            <span className="brand-name">PartsRadarTW</span>
-            <span className="brand-subtitle">原價屋零件查詢</span>
-          </span>
-        </Link>
+        <TopbarBrandNavigation />
         <div className="public-info-topbar-title">
           <h1>關於本站</h1>
           <span>用途、資料來源與功能邊界</span>
@@ -38,9 +33,7 @@ export default function AboutPage() {
       <main className="public-info-page">
         <section className="public-info-hero">
           <strong>讓原價屋公開商品資料更容易搜尋、比較與整理。</strong>
-          <p>
-            PartsRadarTW 是非官方、非商業的個人專案，不販售商品，也不代表原價屋或任何硬體品牌。
-          </p>
+          <p>PartsRadarTW 是非官方、非商業的個人專案，不販售商品，也不代表原價屋或任何硬體品牌。</p>
         </section>
 
         <section className="public-info-section">

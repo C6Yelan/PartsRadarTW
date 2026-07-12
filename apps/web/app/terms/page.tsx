@@ -3,8 +3,9 @@
 
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowLeftIcon, BrandMarkIcon } from "../_shared/icons";
+import { ArrowLeftIcon } from "../_shared/icons";
 import SiteDisclaimer from "../site-disclaimer";
+import TopbarBrandNavigation from "../TopbarBrandNavigation";
 
 export const metadata: Metadata = {
   alternates: {
@@ -18,13 +19,7 @@ export default function TermsPage() {
   return (
     <div className="app-shell public-info-shell">
       <header className="topbar public-info-topbar">
-        <Link className="brand-lockup" href="/">
-          <BrandMarkIcon />
-          <span>
-            <span className="brand-name">PartsRadarTW</span>
-            <span className="brand-subtitle">原價屋零件查詢</span>
-          </span>
-        </Link>
+        <TopbarBrandNavigation />
         <div className="public-info-topbar-title">
           <h1>使用條款</h1>
           <span>資料限制與合理使用規則</span>
@@ -60,14 +55,16 @@ export default function TermsPage() {
         <section className="public-info-section">
           <h2>合理使用</h2>
           <p>
-            請勿繞過 rate limit、大量自動化請求、干擾服務、探測非公開介面，或利用本站散布違法與有害內容。必要時可限制濫用流量。
+            請勿繞過 rate
+            limit、大量自動化請求、干擾服務、探測非公開介面，或利用本站散布違法與有害內容。必要時可限制濫用流量。
           </p>
         </section>
 
         <section className="public-info-section">
           <h2>外部連結與服務調整</h2>
           <p>
-            本站提供的原價屋與 Discord 連結由各自服務管理。網站功能、資料範圍與可用性可能因維護或來源變更而調整，重大變更會盡量透過
+            本站提供的原價屋與 Discord
+            連結由各自服務管理。網站功能、資料範圍與可用性可能因維護或來源變更而調整，重大變更會盡量透過
             <Link href="/announcements">網站公告</Link>說明。
           </p>
         </section>

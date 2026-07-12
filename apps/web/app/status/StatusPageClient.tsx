@@ -11,9 +11,10 @@ import {
   toApiRequestError,
 } from "../_shared/api-client";
 import { formatTaipeiDateTime } from "../_shared/time";
-import { ArrowLeftIcon, BrandMarkIcon } from "../_shared/icons";
+import { ArrowLeftIcon } from "../_shared/icons";
 import type { SourceStatusResponseBody } from "../api/source-status/response";
 import SiteDisclaimer from "../site-disclaimer";
+import TopbarBrandNavigation from "../TopbarBrandNavigation";
 
 type StatusLoadState = "loading" | "ready" | "error" | "rate_limited";
 type SourceStatus = SourceStatusResponseBody["status"];
@@ -70,13 +71,7 @@ export default function StatusPageClient() {
   return (
     <div className="app-shell public-info-shell">
       <header className="topbar public-info-topbar">
-        <Link className="brand-lockup" href="/">
-          <BrandMarkIcon />
-          <span>
-            <span className="brand-name">PartsRadarTW</span>
-            <span className="brand-subtitle">原價屋零件查詢</span>
-          </span>
-        </Link>
+        <TopbarBrandNavigation />
         <div className="public-info-topbar-title">
           <h1>資料更新狀態</h1>
           <span>來源檢查與分類新鮮度</span>

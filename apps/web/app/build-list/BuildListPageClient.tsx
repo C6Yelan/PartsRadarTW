@@ -4,11 +4,9 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeftIcon, BrandMarkIcon } from "../_shared/icons";
-import DiscordTopbarLink from "../DiscordTopbarLink";
-import PriceReportTopbarLink from "../PriceReportTopbarLink";
-import AnnouncementTopbarLink from "../AnnouncementTopbarLink";
+import { ArrowLeftIcon } from "../_shared/icons";
 import SiteDisclaimer from "../site-disclaimer";
+import TopbarBrandNavigation from "../TopbarBrandNavigation";
 import BuildListEmptyState from "./components/BuildListEmptyState";
 import BuildListItemRow from "./components/BuildListItemRow";
 import BuildListLoadingState from "./components/BuildListLoadingState";
@@ -99,18 +97,7 @@ export default function BuildListPageClient() {
   return (
     <div className="app-shell build-list-shell">
       <header className="topbar build-list-topbar">
-        <div className="topbar-brand-area">
-          <Link className="brand-lockup" href="/">
-            <BrandMarkIcon />
-            <span>
-              <span className="brand-name">PartsRadarTW</span>
-              <span className="brand-subtitle">原價屋零件查詢</span>
-            </span>
-          </Link>
-          <PriceReportTopbarLink />
-          <AnnouncementTopbarLink />
-          <DiscordTopbarLink />
-        </div>
+        <TopbarBrandNavigation />
 
         <div className="build-list-title">
           <h1>配單</h1>

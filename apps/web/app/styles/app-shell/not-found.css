@@ -1,20 +1,14 @@
 /* apps/web/app/styles/app-shell/not-found.css */
 .not-found-shell {
-  display: grid;
-  align-content: start;
   min-height: 100svh;
-  gap: clamp(56px, 12vw, 110px);
-  width: min(1680px, calc(100% - 48px));
-  margin: 0 auto;
-  padding: clamp(24px, 5vw, 48px) 0;
 }
 
 .not-found-content {
-  display: contents;
-}
-
-.not-found-brand {
-  align-self: start;
+  display: grid;
+  gap: clamp(56px, 12vw, 110px);
+  width: min(1680px, calc(100% - 48px));
+  margin: 0 auto;
+  padding: clamp(48px, 8vw, 96px) 0;
 }
 
 .not-found-panel {

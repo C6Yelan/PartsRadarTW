@@ -30,6 +30,14 @@ async function expectPublicFooterLinks(page: Page) {
   }
 }
 
+async function expectTopbarLinks(page: Page) {
+  const topbar = page.getByRole("banner");
+
+  for (const name of ["價格", "公告", "Discord"]) {
+    await expect(topbar.getByRole("link", { exact: true, name })).toBeVisible();
+  }
+}
+
 test.describe("public web smoke", () => {
   test("does not expose the removed internal ops route", { tag: "@desktop-only" }, async ({
     request,
@@ -48,6 +56,7 @@ test.describe("public web smoke", () => {
     await expect(page.getByRole("link", { name: "Discord" })).toBeVisible();
     await expect(page.getByRole("region", { name: "商品列表" })).toBeVisible();
     await expect(page.getByRole("status", { name: "網站公告" })).toHaveCount(0);
+    await expectTopbarLinks(page);
 
     await expectPublicFooterLinks(page);
 
@@ -55,6 +64,7 @@ test.describe("public web smoke", () => {
     await expect(page.getByRole("heading", { exact: true, name: "配單" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Discord" })).toBeVisible();
     await expect(page.getByText("配單目前沒有品項")).toBeVisible();
+    await expectTopbarLinks(page);
     await expectPublicFooterLinks(page);
 
     await page.goto("/discord");
@@ -87,6 +97,7 @@ test.describe("public web smoke", () => {
     await expect(page.getByRole("img", { name: "公開價格報告管理面板截圖" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "常見問題" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "一般成員能用哪些指令？" })).toBeVisible();
+    await expectTopbarLinks(page);
     await expectPublicFooterLinks(page);
   });
 
@@ -97,34 +108,41 @@ test.describe("public web smoke", () => {
       page.locator("main").getByText(/商品名稱、分類、價格與來源連結整理自原價屋公開頁面/),
     ).toBeVisible();
     await expect(page.getByText(/尚未符合正式公開上線條件/)).toBeVisible();
+    await expectTopbarLinks(page);
     await expectPublicFooterLinks(page);
 
     await page.goto("/privacy");
     await expect(page.getByRole("heading", { exact: true, name: "隱私權政策" })).toBeVisible();
     await expect(page.getByText(/localStorage/)).toBeVisible();
     await expect(page.getByText(/不應視為已符合正式公開上線條件/)).toBeVisible();
+    await expectTopbarLinks(page);
     await expectPublicFooterLinks(page);
 
     await page.goto("/terms");
     await expect(page.getByRole("heading", { exact: true, name: "使用條款" })).toBeVisible();
     await expect(page.getByText(/非官方、非商業/).first()).toBeVisible();
+    await expectTopbarLinks(page);
     await expectPublicFooterLinks(page);
 
     await page.goto("/announcements");
     await expect(page.getByRole("heading", { exact: true, name: "網站公告" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "網站公開測試中" })).toBeVisible();
+    await expectTopbarLinks(page);
     await expectPublicFooterLinks(page);
 
     await page.goto("/price-report");
     await expect(page.getByRole("heading", { exact: true, name: "價格變動總覽" })).toBeVisible();
+    await expectTopbarLinks(page);
     await expectPublicFooterLinks(page);
 
     await page.goto("/status");
     await expect(page.getByRole("heading", { exact: true, name: "資料更新狀態" })).toBeVisible();
+    await expectTopbarLinks(page);
     await expectPublicFooterLinks(page);
 
     await page.goto("/public-missing-route");
     await expect(page.getByRole("heading", { exact: true, name: "找不到這個頁面" })).toBeVisible();
+    await expectTopbarLinks(page);
     await expectPublicFooterLinks(page);
   });
 

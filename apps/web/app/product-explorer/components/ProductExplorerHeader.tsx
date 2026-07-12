@@ -2,13 +2,10 @@
 // apps/web/app/product-explorer/components/ProductExplorerHeader.tsx
 // 呈現商品探索頁頂部品牌區、Discord 入口、全域搜尋與資料更新時間。
 
-import Link from "next/link";
 import type { MouseEvent, SyntheticEvent } from "react";
-import { BrandMarkIcon, ClearIcon, SearchIcon } from "../../_shared/icons";
+import { ClearIcon, SearchIcon } from "../../_shared/icons";
 import { formatTaipeiDateTime } from "../../_shared/time";
-import DiscordTopbarLink from "../../DiscordTopbarLink";
-import PriceReportTopbarLink from "../../PriceReportTopbarLink";
-import AnnouncementTopbarLink from "../../AnnouncementTopbarLink";
+import TopbarBrandNavigation from "../../TopbarBrandNavigation";
 import type { ProductsResponse, QueryState } from "../types";
 
 // 組裝首頁頂部列，將搜尋 draft 與提交 / 清除 / 返回首頁事件交給上層控制。
@@ -29,18 +26,7 @@ export function ProductExplorerHeader({
 }) {
   return (
     <header className="topbar">
-      <div className="topbar-brand-area">
-        <Link className="brand-lockup" href="/" onClick={onReturnHome}>
-          <BrandMarkIcon />
-          <span>
-            <span className="brand-name">PartsRadarTW</span>
-            <span className="brand-subtitle">原價屋零件查詢</span>
-          </span>
-        </Link>
-        <PriceReportTopbarLink />
-        <AnnouncementTopbarLink />
-        <DiscordTopbarLink />
-      </div>
+      <TopbarBrandNavigation onHomeClick={onReturnHome} />
 
       <form className="topbar-search" onSubmit={onTextFiltersSubmit}>
         <label className="sr-only" htmlFor="global-search">

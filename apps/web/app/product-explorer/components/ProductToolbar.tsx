@@ -3,7 +3,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { formatInteger } from "../../_shared/formatting";
 import {
   DEFAULT_QUERY,
@@ -75,6 +75,16 @@ export function ProductToolbar({
     Number(Boolean(query.maxPrice)) +
     Number(query.status !== DEFAULT_QUERY.status);
 
+  useEffect(() => {
+    if (!filtersOpen) return;
+
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setFiltersOpen(false);
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [filtersOpen]);
+
   return (
     <div className="results-toolbar">
       <div className="results-heading-row">
@@ -132,23 +142,6 @@ export function ProductToolbar({
         />
       ) : null}
       <div className={filtersOpen ? "filter-drawer is-open" : "filter-drawer"}>
-        <div className="filter-drawer-heading">
-          <strong>篩選條件</strong>
-          <div>
-            {hasActiveFilters ? (
-              <button className="results-reset-button" type="button" onClick={onResetFilters}>
-                重設
-              </button>
-            ) : null}
-            <button
-              className="filter-drawer-close"
-              type="button"
-              onClick={() => setFiltersOpen(false)}
-            >
-              完成
-            </button>
-          </div>
-        </div>
         <div className="toolbar-controls">
           <div className="toolbar-price-filter">
             <span>價格</span>
@@ -206,6 +199,11 @@ export function ProductToolbar({
             selectedFacets={query.facets}
             onToggle={onToggleFacet}
           />
+          {hasActiveFilters ? (
+            <button className="filter-reset-item" type="button" onClick={onResetFilters}>
+              重設所有篩選
+            </button>
+          ) : null}
         </div>
       </div>
       {selectedFacetChips.length > 0 ? (

@@ -32,14 +32,13 @@ export function ProductFilters({
       <details open={filtersOpen} onToggle={(event) => onToggleOpen(event.currentTarget.open)}>
         {/* biome-ignore lint/a11y/noStaticElementInteractions: summary is the native details control; the click handler only disables desktop collapse. */}
         <summary onClick={onKeepDesktopOpen}>
-          <span>商品分類</span>
+          <span>分類</span>
           <span className="filter-summary-meta">
             <ChevronDownIcon className="filter-chevron" />
           </span>
         </summary>
         <div className="filter-stack">
           <div>
-            <span className="filter-title">分類</span>
             <div className="category-list" role="radiogroup" aria-label="分類">
               {categories.map((category) => (
                 <CategoryOption

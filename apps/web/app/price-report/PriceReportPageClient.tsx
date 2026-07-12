@@ -7,10 +7,9 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { isRateLimitedApiError } from "../_shared/api-client";
-import { ArrowLeftIcon, BrandMarkIcon } from "../_shared/icons";
-import DiscordTopbarLink from "../DiscordTopbarLink";
-import AnnouncementTopbarLink from "../AnnouncementTopbarLink";
+import { ArrowLeftIcon } from "../_shared/icons";
 import SiteDisclaimer from "../site-disclaimer";
+import TopbarBrandNavigation from "../TopbarBrandNavigation";
 import { fetchPriceReport, fetchPriceReportCategories } from "./api";
 import { PriceReportFilters } from "./components/PriceReportFilters";
 import { PriceReportResults } from "./components/PriceReportResults";
@@ -121,17 +120,7 @@ export default function PriceReportPageClient() {
   return (
     <div className="app-shell price-report-shell">
       <header className="topbar price-report-topbar">
-        <div className="topbar-brand-area">
-          <Link className="brand-lockup" href="/">
-            <BrandMarkIcon />
-            <span>
-              <span className="brand-name">PartsRadarTW</span>
-              <span className="brand-subtitle">原價屋零件查詢</span>
-            </span>
-          </Link>
-          <AnnouncementTopbarLink />
-          <DiscordTopbarLink />
-        </div>
+        <TopbarBrandNavigation />
 
         <div className="price-report-topbar-title">
           <h1>價格變動總覽</h1>

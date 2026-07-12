@@ -248,8 +248,7 @@ test.beforeEach(async ({ page }) => {
           : [
               {
                 productId: PRODUCT_ID,
-                productName:
-                  "視覺驗證超長商品名稱 NVIDIA GeForce RTX 顯示卡 OC Edition",
+                productName: "視覺驗證超長商品名稱 NVIDIA GeForce RTX 顯示卡 OC Edition",
                 category: { igrp: 12, slug: "gpu", displayName: "顯示卡" },
                 previousPrice: 19_990,
                 currentPrice: 18_990,
@@ -303,15 +302,20 @@ test("keeps the main pages usable without horizontal overflow", async ({ page },
 
   await page.goto("/?category=gpu&page=10");
   await expect(page.getByRole("status", { name: "網站公告" })).toHaveCount(0);
-  await expect(
-    page.locator(".topbar").getByRole("link", { name: "價格" }),
-  ).toBeVisible();
+  await expect(page.locator(".topbar").getByRole("link", { name: "價格" })).toBeVisible();
   await expect(page.locator(".topbar").getByRole("link", { name: "公告" })).toBeVisible();
   await expect(page.getByRole("region", { name: "商品列表" })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "頁碼" })).toBeVisible();
 
   const gpuChipFilter = page.locator(".facet-filter").filter({ hasText: "GPU 晶片" });
   const vramFilter = page.locator(".facet-filter").filter({ hasText: "顯示記憶體" });
+  const closeFilters = async () => {
+    if ((page.viewportSize()?.width ?? 0) <= 760) {
+      await page.getByRole("button", { name: "關閉篩選" }).click({ position: { x: 8, y: 8 } });
+      return;
+    }
+    await page.getByRole("button", { name: /^篩選/ }).click();
+  };
 
   await page.getByRole("button", { name: /^篩選/ }).click();
   await gpuChipFilter.getByRole("button", { name: "全部" }).click();
@@ -336,22 +340,20 @@ test("keeps the main pages usable without horizontal overflow", async ({ page },
   await expectUsableLayout(page, testInfo);
 
   await vramFilter.getByRole("button", { name: "16 GB" }).click();
-  await page.getByRole("button", { name: "完成" }).click();
+  await closeFilters();
   await page.getByRole("button", { name: "移除篩選：GPU 晶片：NVIDIA" }).click();
-  await expect
-    .poll(() => new URL(page.url()).searchParams.getAll("facet"))
-    .toEqual(["vram_gb:16"]);
+  await expect.poll(() => new URL(page.url()).searchParams.getAll("facet")).toEqual(["vram_gb:16"]);
   await page.getByRole("button", { name: /^篩選/ }).click();
   await gpuChipFilter.getByRole("button", { name: "全部" }).click();
   await expect(page.getByRole("checkbox", { name: "NVIDIA" })).not.toBeChecked();
   await gpuChipFilter.getByRole("button", { name: "全部" }).click();
 
-  await page.getByRole("button", { name: "重設" }).click();
+  await page.getByRole("button", { name: "重設所有篩選" }).click();
   await expect.poll(() => new URL(page.url()).searchParams.getAll("facet")).toEqual([]);
   await vramFilter.getByRole("button", { name: "全部" }).click();
   await expect(page.getByRole("checkbox", { name: "16 GB" })).not.toBeChecked();
   await vramFilter.getByRole("button", { name: "全部" }).click();
-  await page.getByRole("button", { name: "完成" }).click();
+  await closeFilters();
   await expect(page.getByRole("button", { name: /^篩選/ })).toHaveAttribute(
     "aria-expanded",
     "false",
@@ -360,18 +362,13 @@ test("keeps the main pages usable without horizontal overflow", async ({ page },
     await page.locator(".filter-panel summary").click();
     await expect(page.locator(".filter-panel details")).toHaveAttribute("open", "");
   }
-  await page
-    .getByRole("radiogroup", { name: "分類" })
-    .getByText("CPU", { exact: true })
-    .click();
+  await page.getByRole("radiogroup", { name: "分類" }).getByText("CPU", { exact: true }).click();
   await expect.poll(() => new URL(page.url()).searchParams.get("category")).toBe("cpu");
   await expect.poll(() => new URL(page.url()).searchParams.getAll("facet")).toEqual([]);
   await expect(page.getByRole("group", { name: "已選進階篩選" })).toHaveCount(0);
 
   await page.goto("/price-report");
-  await expect(
-    page.getByRole("heading", { exact: true, name: "價格變動總覽" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { exact: true, name: "價格變動總覽" })).toBeVisible();
   await expect(page.getByRole("region", { name: "價格變動列表" })).toBeVisible();
   await expect(page.getByRole("checkbox", { name: "降價" })).toBeChecked();
   await expect(page.getByRole("checkbox", { name: "漲價" })).toBeChecked();
@@ -390,9 +387,7 @@ test("keeps the main pages usable without horizontal overflow", async ({ page },
   await expectUsableLayout(page, testInfo);
 
   await page.goto("/privacy");
-  await expect(
-    page.getByRole("heading", { exact: true, name: "隱私權政策" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { exact: true, name: "隱私權政策" })).toBeVisible();
   await expect(page.getByText(/localStorage/)).toBeVisible();
   await page.getByRole("link", { name: "返回查詢" }).focus();
   await expectUsableLayout(page, testInfo);
@@ -432,9 +427,7 @@ test("keeps the main pages usable without horizontal overflow", async ({ page },
     { productId: PRODUCT_ID, observedAt: OBSERVED_AT },
   );
   await page.goto("/build-list");
-  await expect(
-    page.locator(".topbar").getByRole("link", { name: "價格" }),
-  ).toBeVisible();
+  await expect(page.locator(".topbar").getByRole("link", { name: "價格" })).toBeVisible();
   await expect(page.getByRole("heading", { name: product.name })).toBeVisible();
   await page.getByRole("link", { name: "原價屋查看／購買，開新分頁" }).focus();
   await expectUsableLayout(page, testInfo);
@@ -472,9 +465,7 @@ test("keeps error and empty states usable", async ({ page }, testInfo) => {
   await expectNoHorizontalOverflow(page);
 
   await page.goto("/price-report?q=error");
-  await expect(
-    page.getByRole("alert").filter({ hasText: "價格變動暫時無法載入" }),
-  ).toBeVisible();
+  await expect(page.getByRole("alert").filter({ hasText: "價格變動暫時無法載入" })).toBeVisible();
   await expectNoHorizontalOverflow(page);
 
   await page.goto("/status?fixture=stale");

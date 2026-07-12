@@ -4,12 +4,10 @@
 
 import Link from "next/link";
 import { API_RATE_LIMITED_MESSAGE } from "../../_shared/api-client";
-import { ArrowLeftIcon, BrandMarkIcon } from "../../_shared/icons";
-import AnnouncementTopbarLink from "../../AnnouncementTopbarLink";
-import DiscordTopbarLink from "../../DiscordTopbarLink";
-import PriceReportTopbarLink from "../../PriceReportTopbarLink";
+import { ArrowLeftIcon } from "../../_shared/icons";
 import FloatingBuildListLink from "../../build-list/FloatingBuildListLink";
 import SiteDisclaimer from "../../site-disclaimer";
+import TopbarBrandNavigation from "../../TopbarBrandNavigation";
 import ProductDetailActions from "./detail/ProductDetailActions";
 import ProductDetailFacts from "./detail/ProductDetailFacts";
 import ProductDetailMedia from "./detail/ProductDetailMedia";
@@ -34,18 +32,7 @@ export default function ProductDetail({
   return (
     <div className="app-shell">
       <header className="topbar public-info-topbar">
-        <div className="topbar-brand-area">
-          <Link className="brand-lockup" href="/">
-            <BrandMarkIcon />
-            <span>
-              <span className="brand-name">PartsRadarTW</span>
-              <span className="brand-subtitle">原價屋零件查詢</span>
-            </span>
-          </Link>
-          <PriceReportTopbarLink />
-          <AnnouncementTopbarLink />
-          <DiscordTopbarLink />
-        </div>
+        <TopbarBrandNavigation />
         <div className="public-info-topbar-title">
           <h1>商品資訊</h1>
         </div>

@@ -3,8 +3,9 @@
 
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowLeftIcon, BrandMarkIcon } from "../_shared/icons";
+import { ArrowLeftIcon } from "../_shared/icons";
 import SiteDisclaimer from "../site-disclaimer";
+import TopbarBrandNavigation from "../TopbarBrandNavigation";
 import { listPublishedAnnouncements, PUBLIC_ANNOUNCEMENTS } from "./data";
 
 export const metadata: Metadata = {
@@ -23,13 +24,7 @@ export default function AnnouncementsPage() {
   return (
     <div className="app-shell public-info-shell">
       <header className="topbar public-info-topbar">
-        <Link className="brand-lockup" href="/">
-          <BrandMarkIcon />
-          <span>
-            <span className="brand-name">PartsRadarTW</span>
-            <span className="brand-subtitle">原價屋零件查詢</span>
-          </span>
-        </Link>
+        <TopbarBrandNavigation />
         <div className="public-info-topbar-title">
           <h1>網站公告</h1>
           <span>服務提醒與功能更新</span>
