@@ -125,6 +125,17 @@ describe("product facets", () => {
     ]);
   });
 
+  it.each([
+    [399, "under-400"],
+    [400, "400-599"],
+    [599, "400-599"],
+    [600, "600-799"],
+  ])("keeps %iW on the documented wattage boundary", (wattage, range) => {
+    expect(extractProductFilterTags(15, `${wattage}W 電源供應器`)).toContain(
+      `wattage_range:${range}`,
+    );
+  });
+
   it("extracts fan product type, size, and ARGB without a duplicate RGB tag", () => {
     expect(extractProductFilterTags(16, "120mm ARGB 機殼風扇 三入")).toEqual([
       "fan_product_type:fan",

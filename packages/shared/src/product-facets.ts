@@ -260,7 +260,7 @@ const PRODUCT_FACETS_BY_IGRP: Readonly<Record<number, readonly ProductFacetDefin
   ],
   15: [
     facet("wattage_range", "瓦數", [
-      option("under-400", "400W 以下"),
+      option("under-400", "399W 以下"),
       option("400-599", "400～599W"),
       option("600-799", "600～799W"),
       option("800-999", "800～999W"),
