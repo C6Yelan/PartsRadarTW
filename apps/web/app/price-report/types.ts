@@ -30,6 +30,10 @@ export interface PriceReportCategory {
 export interface PriceReportResponseItem {
   productId: string;
   productName: string;
+  image: {
+    url: string;
+    alt: string;
+  } | null;
   category: {
     igrp: number;
     slug: CategorySlug | null;

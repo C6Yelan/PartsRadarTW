@@ -124,7 +124,7 @@ export default function PriceReportPageClient() {
 
         <div className="price-report-topbar-title">
           <h1>價格變動總覽</h1>
-          <span>近期零組件漲跌與新品</span>
+          <span>近期零件漲跌與新品</span>
         </div>
 
         <Link className="back-link price-report-back-link" href="/">

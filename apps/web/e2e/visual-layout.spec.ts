@@ -249,6 +249,10 @@ test.beforeEach(async ({ page }) => {
               {
                 productId: PRODUCT_ID,
                 productName: "視覺驗證超長商品名稱 NVIDIA GeForce RTX 顯示卡 OC Edition",
+                image: {
+                  url: "/favicon.svg",
+                  alt: "視覺驗證超長商品名稱 NVIDIA GeForce RTX 顯示卡 OC Edition",
+                },
                 category: { igrp: 12, slug: "gpu", displayName: "顯示卡" },
                 previousPrice: 19_990,
                 currentPrice: 18_990,
@@ -261,6 +265,7 @@ test.beforeEach(async ({ page }) => {
               {
                 productId: "22222222-2222-4222-8222-222222222222",
                 productName: "視覺驗證漲價商品",
+                image: null,
                 category: { igrp: 4, slug: "cpu", displayName: "CPU" },
                 previousPrice: 10_000,
                 currentPrice: 10_500,
@@ -370,6 +375,13 @@ test("keeps the main pages usable without horizontal overflow", async ({ page },
   await page.goto("/price-report");
   await expect(page.getByRole("heading", { exact: true, name: "價格變動總覽" })).toBeVisible();
   await expect(page.getByRole("region", { name: "價格變動列表" })).toBeVisible();
+  await expect(
+    page.getByRole("img", {
+      name: "視覺驗證超長商品名稱 NVIDIA GeForce RTX 顯示卡 OC Edition",
+    }),
+  ).toBeVisible();
+  await expect(page.getByText("符合項目", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("40 筆", { exact: true })).toHaveCount(1);
   await expect(page.getByRole("checkbox", { name: "降價" })).toBeChecked();
   await expect(page.getByRole("checkbox", { name: "漲價" })).toBeChecked();
   const newProductCheckbox = page.getByRole("checkbox", { name: "新品" });

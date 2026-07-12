@@ -6,7 +6,7 @@ import BuildListPageClient from "./BuildListPageClient";
 
 export const metadata: Metadata = {
   title: "配單 | PartsRadarTW",
-  description: "在瀏覽器中整理電腦零組件配單與價格估算。",
+  description: "在瀏覽器中整理電腦零件配單與價格估算。",
   alternates: {
     canonical: "/build-list",
   },

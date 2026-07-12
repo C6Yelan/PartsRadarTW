@@ -47,7 +47,7 @@ export default function AboutPage() {
         <section className="public-info-section">
           <h2>目前提供的功能</h2>
           <ul className="public-info-section-list">
-            <li>依商品名稱、分類、廠商與類別專屬條件搜尋零組件。</li>
+            <li>依商品名稱、分類、廠商與類別專屬條件搜尋零件。</li>
             <li>
               在<Link href="/price-report">價格變動總覽</Link>查看近期降價、漲價與新品。
             </li>

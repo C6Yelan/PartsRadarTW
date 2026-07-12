@@ -8,7 +8,7 @@ import ProductExplorer from "./product-explorer/ProductExplorer";
 
 export const metadata: Metadata = {
   title: "PartsRadarTW",
-  description: "原價屋電腦零組件價格查詢工具",
+  description: "原價屋電腦零件價格查詢工具",
   alternates: {
     canonical: "/",
   },

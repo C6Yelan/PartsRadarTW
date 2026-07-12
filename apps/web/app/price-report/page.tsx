@@ -10,7 +10,7 @@ export const metadata: Metadata = {
     canonical: "/price-report",
   },
   title: "價格變動總覽 | PartsRadarTW",
-  description: "查看原價屋電腦零組件近期漲價、降價與新增商品。",
+  description: "查看原價屋電腦零件近期漲價、降價與新增商品。",
 };
 
 export default function PriceReportPage() {

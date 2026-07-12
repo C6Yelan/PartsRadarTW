@@ -2,6 +2,7 @@
 // 將共用 reader 結果轉為穩定、可分頁且不暴露 crawler 欄位的公開 JSON。
 
 import type { RecentPriceReport } from "@partsradar/db/price-report";
+import { createPublicProductImagePath } from "@partsradar/shared";
 
 import { getCategorySlug, type CategorySlug } from "../../category-slugs";
 import type { SourceStatusResponseBody } from "../source-status/response";
@@ -15,6 +16,10 @@ import type {
 export interface PriceReportResponseItem {
   productId: string;
   productName: string;
+  image: {
+    url: string;
+    alt: string;
+  } | null;
   category: {
     igrp: number;
     slug: CategorySlug | null;
@@ -51,6 +56,12 @@ export interface PriceReportResponseBody {
   };
 }
 
+export interface PriceReportProductImageRecord {
+  id: string;
+  primaryImageUrl: string | null;
+  imageCachedAt: Date | null;
+}
+
 interface BuildPriceReportResponseOptions {
   query: PriceReportQuery;
   since: Date;
@@ -63,38 +74,44 @@ export function buildPriceReportResponse(
   options: BuildPriceReportResponseOptions,
 ): PriceReportResponseBody {
   const items = [
-    ...report.priceChanges.map((item): PriceReportResponseItem => ({
-      productId: item.productId,
-      productName: item.productName,
-      category: {
-        igrp: item.category.igrp,
-        slug: getCategorySlug(item.category.igrp),
-        displayName: item.category.displayName,
-      },
-      kind: item.delta < 0 ? "drop" : "rise",
-      previousPrice: item.previousPrice,
-      currentPrice: item.currentPrice,
-      currency: item.currency,
-      deltaAmount: item.delta,
-      deltaPercent: getDeltaPercent(item.delta, item.previousPrice),
-      changedAt: item.changedAt.toISOString(),
-    })),
-    ...report.newProducts.map((item): PriceReportResponseItem => ({
-      productId: item.productId,
-      productName: item.productName,
-      category: {
-        igrp: item.category.igrp,
-        slug: getCategorySlug(item.category.igrp),
-        displayName: item.category.displayName,
-      },
-      kind: "new",
-      previousPrice: null,
-      currentPrice: item.currentPrice,
-      currency: item.currency,
-      deltaAmount: null,
-      deltaPercent: null,
-      changedAt: item.firstSeenAt.toISOString(),
-    })),
+    ...report.priceChanges.map(
+      (item): PriceReportResponseItem => ({
+        productId: item.productId,
+        productName: item.productName,
+        image: null,
+        category: {
+          igrp: item.category.igrp,
+          slug: getCategorySlug(item.category.igrp),
+          displayName: item.category.displayName,
+        },
+        kind: item.delta < 0 ? "drop" : "rise",
+        previousPrice: item.previousPrice,
+        currentPrice: item.currentPrice,
+        currency: item.currency,
+        deltaAmount: item.delta,
+        deltaPercent: getDeltaPercent(item.delta, item.previousPrice),
+        changedAt: item.changedAt.toISOString(),
+      }),
+    ),
+    ...report.newProducts.map(
+      (item): PriceReportResponseItem => ({
+        productId: item.productId,
+        productName: item.productName,
+        image: null,
+        category: {
+          igrp: item.category.igrp,
+          slug: getCategorySlug(item.category.igrp),
+          displayName: item.category.displayName,
+        },
+        kind: "new",
+        previousPrice: null,
+        currentPrice: item.currentPrice,
+        currency: item.currency,
+        deltaAmount: null,
+        deltaPercent: null,
+        changedAt: item.firstSeenAt.toISOString(),
+      }),
+    ),
   ];
 
   items.sort((left, right) => compareItems(left, right, options.query.sort));
@@ -124,6 +141,32 @@ export function buildPriceReportResponse(
       sourceStatus: options.sourceStatus.status,
       lastSuccessAt: options.sourceStatus.lastSuccessAt,
     },
+  };
+}
+
+export function attachPriceReportImages(
+  response: PriceReportResponseBody,
+  products: readonly PriceReportProductImageRecord[],
+): PriceReportResponseBody {
+  const productNames = new Map(response.data.map((item) => [item.productId, item.productName]));
+  const imagesByProductId = new Map(
+    products.map((product) => [
+      product.id,
+      product.primaryImageUrl && product.imageCachedAt
+        ? {
+            url: createPublicProductImagePath(product.id),
+            alt: productNames.get(product.id) ?? "商品圖片",
+          }
+        : null,
+    ]),
+  );
+
+  return {
+    ...response,
+    data: response.data.map((item) => ({
+      ...item,
+      image: imagesByProductId.get(item.productId) ?? null,
+    })),
   };
 }
 

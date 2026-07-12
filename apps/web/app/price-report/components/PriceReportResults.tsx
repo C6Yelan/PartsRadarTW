@@ -3,17 +3,10 @@
 
 import Link from "next/link";
 import { API_RATE_LIMITED_MESSAGE } from "../../_shared/api-client";
-import {
-  formatInteger,
-  formatSignedTwdPrice,
-  formatTwdPrice,
-} from "../../_shared/formatting";
+import { formatInteger, formatSignedTwdPrice, formatTwdPrice } from "../../_shared/formatting";
 import { formatTaipeiDateTime } from "../../_shared/time";
-import type {
-  PriceReportLoadState,
-  PriceReportResponse,
-  PriceReportResponseItem,
-} from "../types";
+import { ProductImage } from "../../product-explorer/components/ProductImage";
+import type { PriceReportLoadState, PriceReportResponse, PriceReportResponseItem } from "../types";
 
 interface PriceReportResultsProps {
   report: PriceReportResponse | null;
@@ -43,7 +36,6 @@ export function PriceReportResults({
   return (
     <>
       <section className="price-report-summary" aria-label="價格變動摘要">
-        <SummaryCard label="符合項目" value={report?.pagination.totalItems ?? 0} />
         <SummaryCard className="is-drop" label="降價" value={summary.dropCount} />
         <SummaryCard className="is-rise" label="漲價" value={summary.riseCount} />
         <SummaryCard className="is-new" label="新品" value={summary.newProductCount} />
@@ -51,10 +43,7 @@ export function PriceReportResults({
 
       <section className="price-report-results" aria-label="價格變動列表">
         <div className="price-report-results-heading">
-          <div>
-            <p className="price-report-eyebrow">查詢結果</p>
-            <h2>每項商品在範圍內的最近一次變動</h2>
-          </div>
+          <h2>每項商品在範圍內的最近一次變動</h2>
           {report ? <span>{formatInteger(report.pagination.totalItems)} 筆</span> : null}
         </div>
 
@@ -103,7 +92,11 @@ export function PriceReportResults({
             </div>
             <div className="price-report-rows">
               {report.data.map((item) => (
-                <PriceReportRow item={item} key={`${item.kind}:${item.productId}`} returnTo={returnTo} />
+                <PriceReportRow
+                  item={item}
+                  key={`${item.kind}:${item.productId}`}
+                  returnTo={returnTo}
+                />
               ))}
             </div>
           </>
@@ -119,7 +112,8 @@ export function PriceReportResults({
               上一頁
             </button>
             <span>
-              第 {formatInteger(report.pagination.page)} / {formatInteger(report.pagination.totalPages)} 頁
+              第 {formatInteger(report.pagination.page)} /{" "}
+              {formatInteger(report.pagination.totalPages)} 頁
             </span>
             <button
               disabled={report.pagination.page >= report.pagination.totalPages}
@@ -156,10 +150,13 @@ function PriceReportRow({ item, returnTo }: { item: PriceReportResponseItem; ret
   return (
     <article className={`price-report-row is-${item.kind}`}>
       <div className="price-report-product">
-        <span className={`price-report-kind is-${item.kind}`}>{KIND_LABELS[item.kind]}</span>
-        <Link href={`/products/${item.productId}?returnTo=${encodeURIComponent(returnTo)}`}>
-          {item.productName}
-        </Link>
+        <ProductImage fallbackLabel={item.category.displayName} image={item.image} />
+        <div className="price-report-product-copy">
+          <span className={`price-report-kind is-${item.kind}`}>{KIND_LABELS[item.kind]}</span>
+          <Link href={`/products/${item.productId}?returnTo=${encodeURIComponent(returnTo)}`}>
+            {item.productName}
+          </Link>
+        </div>
       </div>
       <ReportValue area="category" label="分類" value={item.category.displayName} />
       <ReportValue

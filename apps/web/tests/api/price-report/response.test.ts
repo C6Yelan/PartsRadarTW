@@ -5,7 +5,10 @@ import type { RecentPriceReport } from "@partsradar/db/price-report";
 import { describe, expect, it } from "vitest";
 
 import type { PriceReportQuery } from "../../../app/api/price-report/query";
-import { buildPriceReportResponse } from "../../../app/api/price-report/response";
+import {
+  attachPriceReportImages,
+  buildPriceReportResponse,
+} from "../../../app/api/price-report/response";
 
 const SINCE = new Date("2026-07-09T08:00:00.000Z");
 const UNTIL = new Date("2026-07-10T08:00:00.000Z");
@@ -39,9 +42,7 @@ describe("price report response", () => {
       deltaPercent: 5,
       changedAt: "2026-07-10T06:00:00.000Z",
     });
-    expect(JSON.stringify(response)).not.toMatch(
-      /snapshot|crawlRun|vendor|subcategory|discord/i,
-    );
+    expect(JSON.stringify(response)).not.toMatch(/snapshot|crawlRun|vendor|subcategory|discord/i);
   });
 
   it("sorts drops by percentage and keeps nullable new-product movement fields", () => {
@@ -91,6 +92,34 @@ describe("price report response", () => {
 
     expect(response.pagination.page).toBe(2);
     expect(response.data.map((item) => item.productId)).toEqual(["drop"]);
+  });
+
+  it("only exposes product images after the local cache is confirmed", () => {
+    const response = buildPriceReportResponse(REPORT, {
+      query: createQuery({ pageSize: 20 }),
+      since: SINCE,
+      until: UNTIL,
+      sourceStatus: { status: "ok", lastSuccessAt: UNTIL.toISOString() },
+    });
+    const withImages = attachPriceReportImages(response, [
+      {
+        id: "drop",
+        primaryImageUrl: "https://www.coolpc.com.tw/example.jpg",
+        imageCachedAt: UNTIL,
+      },
+      {
+        id: "rise",
+        primaryImageUrl: "https://www.coolpc.com.tw/not-cached.jpg",
+        imageCachedAt: null,
+      },
+    ]);
+
+    expect(withImages.data.find((item) => item.productId === "drop")?.image).toEqual({
+      url: "/api/product-images/drop.webp",
+      alt: "降價顯示卡",
+    });
+    expect(withImages.data.find((item) => item.productId === "rise")?.image).toBeNull();
+    expect(withImages.data.find((item) => item.productId === "new")?.image).toBeNull();
   });
 });
 

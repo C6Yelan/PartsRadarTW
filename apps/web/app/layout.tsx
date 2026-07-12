@@ -9,7 +9,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   metadataBase: new URL(resolvePublicSiteUrl()),
   title: "PartsRadarTW",
-  description: "原價屋電腦零組件價格查詢工具",
+  description: "原價屋電腦零件價格查詢工具",
   openGraph: {
     type: "website",
     siteName: "PartsRadarTW",

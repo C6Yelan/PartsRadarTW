@@ -11,7 +11,7 @@ import { normalizeProductId } from "../../api/products/[id]/product-id";
 
 const SITE_NAME = "PartsRadarTW";
 const FALLBACK_TITLE = `商品資訊 | ${SITE_NAME}`;
-const FALLBACK_DESCRIPTION = "原價屋電腦零組件價格查詢工具";
+const FALLBACK_DESCRIPTION = "原價屋電腦零件價格查詢工具";
 const TITLE_MAX_LENGTH = 70;
 
 const PRODUCT_METADATA_SELECT = {

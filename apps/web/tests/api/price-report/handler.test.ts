@@ -42,6 +42,7 @@ describe("GET /api/price-report handler", () => {
     });
     expect(fake.priceReadCount()).toBeGreaterThan(0);
     expect(fake.categoryReadCount()).toBe(1);
+    expect(fake.productReadCount()).toBe(0);
   });
 
   it("rejects invalid values before any database read", async () => {
@@ -53,6 +54,7 @@ describe("GET /api/price-report handler", () => {
     expect(response.status).toBe(400);
     expect(fake.priceReadCount()).toBe(0);
     expect(fake.categoryReadCount()).toBe(0);
+    expect(fake.productReadCount()).toBe(0);
   });
 
   it("returns a generic error without leaking database details", async () => {
@@ -74,6 +76,7 @@ describe("GET /api/price-report handler", () => {
 function createFakeClient(priceError?: Error) {
   let priceReads = 0;
   let categoryReads = 0;
+  let productReads = 0;
   const client = {
     priceSnapshot: {
       findMany: async () => {
@@ -83,6 +86,12 @@ function createFakeClient(priceError?: Error) {
           throw priceError;
         }
 
+        return [];
+      },
+    },
+    product: {
+      findMany: async () => {
+        productReads += 1;
         return [];
       },
     },
@@ -98,5 +107,6 @@ function createFakeClient(priceError?: Error) {
     client,
     priceReadCount: () => priceReads,
     categoryReadCount: () => categoryReads,
+    productReadCount: () => productReads,
   };
 }

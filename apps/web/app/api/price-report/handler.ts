@@ -1,30 +1,29 @@
 // apps/web/app/api/price-report/handler.ts
 // 處理公開價格報告 query、共用 reader、來源狀態與安全 JSON response。
 
-import {
-  readRecentPriceReport,
-  type PriceReportReaderClient,
-} from "@partsradar/db/price-report";
+import { readRecentPriceReport, type PriceReportReaderClient } from "@partsradar/db/price-report";
 
 import { InvalidQueryError } from "../_shared/query";
-import {
-  internalErrorResponse,
-  invalidQueryResponse,
-  jsonOk,
-} from "../_shared/responses";
-import {
-  SOURCE_STATUS_CATEGORY_QUERY,
-  type SourceStatusReadClient,
-} from "../source-status/data";
+import { internalErrorResponse, invalidQueryResponse, jsonOk } from "../_shared/responses";
+import { SOURCE_STATUS_CATEGORY_QUERY, type SourceStatusReadClient } from "../source-status/data";
 import { buildSourceStatusResponse } from "../source-status/response";
+import { getPriceReportSince, parsePriceReportQuery, toRecentPriceReportFilters } from "./query";
 import {
-  getPriceReportSince,
-  parsePriceReportQuery,
-  toRecentPriceReportFilters,
-} from "./query";
-import { buildPriceReportResponse, type PriceReportResponseBody } from "./response";
+  attachPriceReportImages,
+  buildPriceReportResponse,
+  type PriceReportProductImageRecord,
+  type PriceReportResponseBody,
+} from "./response";
 
-export type PriceReportApiReadClient = PriceReportReaderClient & SourceStatusReadClient;
+export type PriceReportApiReadClient = PriceReportReaderClient &
+  SourceStatusReadClient & {
+    product: {
+      findMany(args: {
+        where: { id: { in: string[] } };
+        select: { id: true; primaryImageUrl: true; imageCachedAt: true };
+      }): Promise<PriceReportProductImageRecord[]>;
+    };
+  };
 
 interface GetPriceReportHandlerOptions {
   now?: () => Date;
@@ -53,14 +52,21 @@ export function createGetPriceReportHandler(
           : sourceCategories.filter((category) => category.igrp === query.categoryIgrp);
       const sourceStatus = buildSourceStatusResponse(relevantCategories, until);
 
-      return jsonOk<PriceReportResponseBody>(
-        buildPriceReportResponse(report, {
-          query,
-          since,
-          until,
-          sourceStatus,
-        }),
-      );
+      const response = buildPriceReportResponse(report, {
+        query,
+        since,
+        until,
+        sourceStatus,
+      });
+      const imageProducts =
+        response.data.length === 0
+          ? []
+          : await client.product.findMany({
+              where: { id: { in: response.data.map((item) => item.productId) } },
+              select: { id: true, primaryImageUrl: true, imageCachedAt: true },
+            });
+
+      return jsonOk<PriceReportResponseBody>(attachPriceReportImages(response, imageProducts));
     } catch (error) {
       if (error instanceof InvalidQueryError) {
         return invalidQueryResponse();
