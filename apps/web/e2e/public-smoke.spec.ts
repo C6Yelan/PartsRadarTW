@@ -92,9 +92,7 @@ test.describe("public web smoke", () => {
 
   test("loads the public information pages", { tag: "@desktop-only" }, async ({ page }) => {
     await page.goto("/about");
-    await expect(
-      page.getByRole("heading", { exact: true, name: "關於本站" }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { exact: true, name: "關於本站" })).toBeVisible();
     await expect(
       page.locator("main").getByText(/商品名稱、分類、價格與來源連結整理自原價屋公開頁面/),
     ).toBeVisible();
@@ -102,24 +100,18 @@ test.describe("public web smoke", () => {
     await expectPublicFooterLinks(page);
 
     await page.goto("/privacy");
-    await expect(
-      page.getByRole("heading", { exact: true, name: "隱私權政策" }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { exact: true, name: "隱私權政策" })).toBeVisible();
     await expect(page.getByText(/localStorage/)).toBeVisible();
     await expect(page.getByText(/不應視為已符合正式公開上線條件/)).toBeVisible();
     await expectPublicFooterLinks(page);
 
     await page.goto("/terms");
-    await expect(
-      page.getByRole("heading", { exact: true, name: "使用條款" }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { exact: true, name: "使用條款" })).toBeVisible();
     await expect(page.getByText(/非官方、非商業/).first()).toBeVisible();
     await expectPublicFooterLinks(page);
 
     await page.goto("/announcements");
-    await expect(
-      page.getByRole("heading", { exact: true, name: "網站公告" }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { exact: true, name: "網站公告" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "網站公開測試中" })).toBeVisible();
     await expectPublicFooterLinks(page);
 
@@ -186,16 +178,14 @@ test.describe("public web smoke", () => {
     expect(sitemapXml).not.toContain("/build-list");
   });
 
-  test(
-    "replaces a legacy category query with its semantic URL",
-    { tag: "@desktop-only" },
-    async ({ page }) => {
-      await page.goto("/?igrp=12");
+  test("removes the unsupported legacy category query", { tag: "@desktop-only" }, async ({
+    page,
+  }) => {
+    await page.goto("/?igrp=12");
 
-      await expect.poll(() => new URL(page.url()).searchParams.get("category")).toBe("gpu");
-      expect(new URL(page.url()).searchParams.has("igrp")).toBe(false);
-    },
-  );
+    await expect.poll(() => new URL(page.url()).searchParams.has("igrp")).toBe(false);
+    expect(new URL(page.url()).searchParams.has("category")).toBe(false);
+  });
 
   test("refreshes v2 build-list intents while preserving quantity and undo", {
     tag: "@desktop-mobile-only",

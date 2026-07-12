@@ -2,12 +2,9 @@
 // 定義商品列表 API 的 public query contract，集中驗證篩選、排序、品牌與分頁語意。
 
 import type { Prisma } from "@partsradar/db";
-import {
-  isProductFilterTagSupported,
-  parseProductFilterTag,
-} from "@partsradar/shared";
+import { isProductFilterTagSupported, parseProductFilterTag } from "@partsradar/shared";
 
-import { getCategoryIgrp, getCategorySlug } from "../../category-slugs";
+import { getCategoryIgrp } from "../../category-slugs";
 import {
   InvalidQueryError,
   parseEnumQuery,
@@ -335,25 +332,20 @@ function buildFacetWhere(facetTags: string[]): Prisma.ProductWhereInput[] {
 }
 
 function parseCategoryIgrp(params: URLSearchParams): number | undefined {
+  if (params.has("igrp")) {
+    throw new InvalidQueryError("igrp", "is not supported; use category");
+  }
+
   const category = parseOptionalTextQuery(params, "category", {
     maxLength: PRODUCT_CATEGORY_MAX_LENGTH,
   });
-  const legacyIgrp = parseOptionalIntegerQuery(params, "igrp", { min: 1 });
   const categoryIgrp = category ? getCategoryIgrp(category) : null;
 
   if (category && categoryIgrp === null) {
     throw new InvalidQueryError("category", "must be one of the supported category slugs");
   }
 
-  if (legacyIgrp !== undefined && getCategorySlug(legacyIgrp) === null) {
-    throw new InvalidQueryError("igrp", "must map to a supported category");
-  }
-
-  if (categoryIgrp !== null && legacyIgrp !== undefined && categoryIgrp !== legacyIgrp) {
-    throw new InvalidQueryError("category", "must match igrp when both are provided");
-  }
-
-  return categoryIgrp ?? legacyIgrp;
+  return categoryIgrp ?? undefined;
 }
 
 function buildVendorWhere(query: ProductListQuery): Prisma.ProductWhereInput | null {

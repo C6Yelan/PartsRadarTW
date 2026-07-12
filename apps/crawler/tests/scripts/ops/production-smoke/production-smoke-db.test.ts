@@ -69,7 +69,7 @@ describe("production smoke DB-backed checks", () => {
         expect.objectContaining({
           name: "categories api",
           status: "OK",
-          message: "categories=11",
+          message: "categories=11 advancedFilters=motherboard,memory",
         }),
         expect.objectContaining({
           name: "product image api",

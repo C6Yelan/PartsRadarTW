@@ -188,13 +188,28 @@ export function isSmokeProductsResponse(value: unknown): value is SmokeProductsR
   );
 }
 
-// 驗證分類 API 的最小 response shape，確認分類資料可供前端選單使用。
+// 驗證分類 API 的最小 response shape，包含前端進階篩選使用的 facets。
 export function isSmokeCategoriesResponse(value: unknown): value is SmokeCategoriesResponse {
   return (
     isRecord(value) &&
     Array.isArray(value.data) &&
     value.data.every(
-      (category) => isRecord(category) && typeof category.slug === "string" && category.slug !== "",
+      (category) =>
+        isRecord(category) &&
+        typeof category.slug === "string" &&
+        category.slug !== "" &&
+        Array.isArray(category.facets) &&
+        category.facets.every(
+          (facet) =>
+            isRecord(facet) &&
+            typeof facet.key === "string" &&
+            facet.key !== "" &&
+            Array.isArray(facet.options) &&
+            facet.options.every(
+              (option) =>
+                isRecord(option) && typeof option.value === "string" && option.value !== "",
+            ),
+        ),
     )
   );
 }

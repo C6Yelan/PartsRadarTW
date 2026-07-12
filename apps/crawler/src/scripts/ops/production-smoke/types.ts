@@ -69,6 +69,10 @@ export interface SmokeProductsResponse {
 export interface SmokeCategoriesResponse {
   data: Array<{
     slug: string;
+    facets: Array<{
+      key: string;
+      options: Array<{ value: string }>;
+    }>;
   }>;
 }
 

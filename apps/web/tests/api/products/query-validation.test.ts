@@ -114,9 +114,7 @@ describe("GET /api/products query validation", () => {
         ],
       },
     });
-    expect(client.lastProductCountArgs?.where).toEqual(
-      client.lastProductFindProductsArgs?.where,
-    );
+    expect(client.lastProductCountArgs?.where).toEqual(client.lastProductFindProductsArgs?.where);
   });
 
   it("keeps a valid selected vendor removable when other filters have no results", async () => {
@@ -220,9 +218,7 @@ describe("GET /api/products query validation", () => {
         ],
       },
     });
-    expect(client.lastProductCountArgs?.where).toEqual(
-      client.lastProductFindProductsArgs?.where,
-    );
+    expect(client.lastProductCountArgs?.where).toEqual(client.lastProductFindProductsArgs?.where);
   });
 
   it.each([
@@ -233,57 +229,30 @@ describe("GET /api/products query validation", () => {
     `category=cpu&${Array.from({ length: 51 }, () => "facet=socket:am5").join("&")}`,
     `category=cpu&facet=${"x".repeat(101)}`,
     "category=cpu&facet=%20",
-  ])(
-    "rejects invalid or category-incompatible facets before reading data: %s",
-    async (query) => {
-      const client = fakeProductsClient({
-        products: [],
-        totalItems: 0,
-        sourceCategories: [],
-      });
-
-      const response = await createGetProductsHandler(client)(
-        new Request(`https://parts.example/api/products?${query}`),
-      );
-
-      expect(response.status).toBe(400);
-      expect(client.productFindProductsCallCount).toBe(0);
-      expect(client.productFindVendorOptionsCallCount).toBe(0);
-      expect(client.productCountCallCount).toBe(0);
-      expect(client.sourceCategoryFindManyCallCount).toBe(0);
-    },
-  );
-
-  it.each([
-    "igrp=12",
-    "category=gpu&igrp=12",
-    "igrp=12&facet=gpu_chip:nvidia",
-  ])("accepts the temporary legacy category alias: %s", async (categoryQuery) => {
+  ])("rejects invalid or category-incompatible facets before reading data: %s", async (query) => {
     const client = fakeProductsClient({
       products: [],
       totalItems: 0,
       sourceCategories: [],
     });
 
-    const response = await createGetProductsHandler(client, { now: () => NOW })(
-      new Request(`https://parts.example/api/products?${categoryQuery}`),
+    const response = await createGetProductsHandler(client)(
+      new Request(`https://parts.example/api/products?${query}`),
     );
 
-    expect(response.status).toBe(200);
-    expect(client.lastProductFindProductsArgs).toMatchObject({
-      where: {
-        sourceCategory: {
-          enabled: true,
-          igrp: 12,
-        },
-      },
-    });
+    expect(response.status).toBe(400);
+    expect(client.productFindProductsCallCount).toBe(0);
+    expect(client.productFindVendorOptionsCallCount).toBe(0);
+    expect(client.productCountCallCount).toBe(0);
+    expect(client.sourceCategoryFindManyCallCount).toBe(0);
   });
 
   it.each([
     "category=unknown",
+    "igrp=12",
     "igrp=99",
     "category=cpu&igrp=12",
+    "igrp=12&facet=gpu_chip:nvidia",
   ])("rejects an unknown or conflicting category before reading data: %s", async (categoryQuery) => {
     const client = fakeProductsClient({
       products: [],

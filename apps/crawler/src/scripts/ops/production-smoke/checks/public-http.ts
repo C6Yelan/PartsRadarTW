@@ -124,13 +124,24 @@ function checkCategoriesApi(
     return fail("categories api", "response shape is invalid");
   }
 
-  const categoryCount = categoriesResult.body.data.length;
+  const categories = categoriesResult.body.data;
+  const categoryCount = categories.length;
 
   if (categoryCount === 0) {
     return fail("categories api", "response has no category");
   }
 
-  return ok("categories api", `categories=${categoryCount}`);
+  const requiredFacetSlugs = ["motherboard", "memory"];
+  const missingFacetSlugs = requiredFacetSlugs.filter((slug) => {
+    const category = categories.find((item) => item.slug === slug);
+    return !category || category.facets.length === 0;
+  });
+
+  if (missingFacetSlugs.length > 0) {
+    return fail("categories api", `advanced filters missing for ${missingFacetSlugs.join(",")}`);
+  }
+
+  return ok("categories api", `categories=${categoryCount} advancedFilters=motherboard,memory`);
 }
 
 // 抽樣商品列表中的公開圖片 URL，確認 image route 可回應 image content type。

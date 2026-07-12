@@ -13,15 +13,13 @@ describe("product detail return href", () => {
     expect(normalizeReturnHref(["/?status=inactive", "/?q=ignored"])).toBe("/?status=inactive");
     expect(normalizeReturnHref("/build-list")).toBe("/build-list");
     expect(
-      normalizeReturnHref(
-        "/price-report?window=7d&type=drop&type=rise&category=gpu&page=2",
-      ),
+      normalizeReturnHref("/price-report?window=7d&type=drop&type=rise&category=gpu&page=2"),
     ).toBe("/price-report?window=7d&type=drop&type=rise&category=gpu&page=2");
   });
 
-  it("canonicalizes the legacy category alias and rejects conflicting category queries", () => {
-    expect(normalizeReturnHref("/?igrp=7")).toBe("/?category=storage");
-    expect(normalizeReturnHref("/?category=storage&igrp=7")).toBe("/?category=storage");
+  it("rejects the removed legacy category query and invalid semantic categories", () => {
+    expect(normalizeReturnHref("/?igrp=7")).toBe("/");
+    expect(normalizeReturnHref("/?category=storage&igrp=7")).toBe("/");
     expect(normalizeReturnHref("/?category=cpu&igrp=7")).toBe("/");
     expect(normalizeReturnHref("/?category=unknown")).toBe("/");
   });

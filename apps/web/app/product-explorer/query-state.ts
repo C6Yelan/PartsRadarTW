@@ -1,11 +1,8 @@
 // apps/web/app/product-explorer/query-state.ts
 // 集中商品探索頁的 URL query、API search params、篩選選項與分頁狀態轉換規則。
 
-import {
-  getProductFacetDefinitions,
-  isProductFilterTagSupported,
-} from "@partsradar/shared";
-import { getCategoryIgrp, getCategorySlug } from "../category-slugs";
+import { getProductFacetDefinitions, isProductFilterTagSupported } from "@partsradar/shared";
+import { getCategoryIgrp } from "../category-slugs";
 import type { CategoryItem, ProductSort, ProductStatus, QueryState } from "./types";
 
 // 商品探索頁的初始查詢狀態；URL 產生時會省略與預設值相同的欄位。
@@ -47,9 +44,9 @@ export function readQueryFromLocation(): QueryState {
   return readQueryFromSearchParams(new URLSearchParams(window.location.search));
 }
 
-// 將 browser search params 轉成 canonical slug state；legacy IGrp 只在沒有 category 時讀取。
+// 將 browser search params 轉成 canonical slug state；分類只接受公開 semantic slug。
 export function readQueryFromSearchParams(params: URLSearchParams): QueryState {
-  const category = parseCategoryParam(params.get("category"), params.get("igrp"));
+  const category = parseCategoryParam(params.get("category"));
 
   return {
     q: (params.get("q") ?? "").trim().slice(0, 100),
@@ -194,9 +191,7 @@ export function normalizeFacetValues(
   }
 
   const selectedFacets = new Set(
-    facets
-      .map((facet) => facet.trim())
-      .filter((facet) => isProductFilterTagSupported(igrp, facet)),
+    facets.map((facet) => facet.trim()).filter((facet) => isProductFilterTagSupported(igrp, facet)),
   );
 
   return getProductFacetDefinitions(igrp).flatMap((definition) =>
@@ -270,29 +265,10 @@ function parsePriceParam(value: string | null) {
   return normalizedValue ? normalizedValue.slice(0, MAX_PRICE_DIGITS) : null;
 }
 
-function parseCategoryParam(categoryValue: string | null, legacyIgrpValue: string | null) {
+function parseCategoryParam(categoryValue: string | null) {
   const category = categoryValue?.trim() ?? "";
 
-  if (category) {
-    const categoryIgrp = getCategoryIgrp(category);
-
-    if (categoryIgrp === null) {
-      return "";
-    }
-
-    if (legacyIgrpValue !== null) {
-      const legacyIgrp = parseNonNegativeIntegerParam(legacyIgrpValue);
-
-      if (!legacyIgrp || Number(legacyIgrp) !== categoryIgrp) {
-        return "";
-      }
-    }
-
-    return category;
-  }
-
-  const legacyIgrp = parseNonNegativeIntegerParam(legacyIgrpValue);
-  return legacyIgrp ? (getCategorySlug(Number(legacyIgrp)) ?? "") : "";
+  return category && getCategoryIgrp(category) !== null ? category : "";
 }
 
 function parseVendorsParam(value: string | null) {

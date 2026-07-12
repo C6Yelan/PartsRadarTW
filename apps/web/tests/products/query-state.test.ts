@@ -1,9 +1,8 @@
-// 驗證商品探索頁只產生 semantic category URL，並 canonicalize legacy IGrp query。
+// 驗證商品探索頁只接受 semantic category URL，並清除已移除的 IGrp query。
 
 import { describe, expect, it } from "vitest";
 
 import {
-  createProductDetailHref,
   DEFAULT_QUERY,
   getFallbackCategorySlug,
   readQueryFromSearchParams,
@@ -14,9 +13,7 @@ import {
 describe("product explorer category query state", () => {
   it("reads a semantic category and emits it to the browser and API", () => {
     const query = readQueryFromSearchParams(
-      new URLSearchParams(
-        "category=gpu&vendors=asus&q=RTX&facet=gpu_chip:nvidia&facet=vram_gb:16",
-      ),
+      new URLSearchParams("category=gpu&vendors=asus&q=RTX&facet=gpu_chip:nvidia&facet=vram_gb:16"),
     );
 
     expect(query).toMatchObject({
@@ -44,39 +41,29 @@ describe("product explorer category query state", () => {
     );
 
     expect(query.facets).toEqual(["socket:am5", "cpu_family:ryzen-7"]);
-    expect(toUrl(query)).toBe(
-      "/?category=cpu&facet=socket%3Aam5&facet=cpu_family%3Aryzen-7",
-    );
+    expect(toUrl(query)).toBe("/?category=cpu&facet=socket%3Aam5&facet=cpu_family%3Aryzen-7");
   });
 
   it("clears facets without a compatible category", () => {
-    expect(readQueryFromSearchParams(new URLSearchParams("facet=socket:am5")).facets).toEqual(
-      [],
-    );
+    expect(readQueryFromSearchParams(new URLSearchParams("facet=socket:am5")).facets).toEqual([]);
     expect(
-      readQueryFromSearchParams(
-        new URLSearchParams("category=gpu&facet=socket:am5"),
-      ).facets,
+      readQueryFromSearchParams(new URLSearchParams("category=gpu&facet=socket:am5")).facets,
     ).toEqual([]);
   });
 
   it.each([
     "igrp=12",
     "category=gpu&igrp=12",
-  ])("canonicalizes a compatible legacy query: %s", (search) => {
+  ])("ignores the removed legacy query without affecting semantic categories: %s", (search) => {
     const query = readQueryFromSearchParams(new URLSearchParams(search));
 
-    expect(query.category).toBe("gpu");
-    expect(toUrl(query)).toBe("/?category=gpu");
-    expect(createProductDetailHref("product-1", toUrl(query))).toBe(
-      "/products/product-1?returnTo=%2F%3Fcategory%3Dgpu",
-    );
+    expect(query.category).toBe(search.startsWith("category=gpu") ? "gpu" : "");
+    expect(toUrl(query)).toBe(search.startsWith("category=gpu") ? "/?category=gpu" : "/");
   });
 
   it.each([
     "category=unknown",
     "igrp=99",
-    "category=cpu&igrp=12",
   ])("clears an unknown or conflicting category query: %s", (search) => {
     const query = readQueryFromSearchParams(
       new URLSearchParams(`${search}&vendors=asus&facet=gpu_chip:nvidia`),

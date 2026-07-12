@@ -26,9 +26,9 @@ describe("API query helpers", () => {
   });
 
   it("parses bounded integers", () => {
-    const params = new URLSearchParams("igrp=4&minPrice=0&maxPrice=999999");
+    const params = new URLSearchParams("count=4&minPrice=0&maxPrice=999999");
 
-    expect(parseOptionalIntegerQuery(params, "igrp", { min: 1 })).toBe(4);
+    expect(parseOptionalIntegerQuery(params, "count", { min: 1 })).toBe(4);
     expect(parseOptionalIntegerQuery(params, "minPrice", { min: 0 })).toBe(0);
     expect(parseOptionalIntegerQuery(new URLSearchParams(), "page", { defaultValue: 1 })).toBe(1);
     expect(parseOptionalIntegerQuery(params, "maxPrice", { min: 0, max: 1_000_000 })).toBe(999999);

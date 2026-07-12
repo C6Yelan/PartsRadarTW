@@ -38,7 +38,7 @@ describe("production smoke public checks", () => {
         expect.objectContaining({
           name: "categories api",
           status: "OK",
-          message: "categories=11",
+          message: "categories=11 advancedFilters=motherboard,memory",
         }),
         expect.objectContaining({
           name: "product image api",
@@ -113,6 +113,23 @@ describe("production smoke public checks", () => {
           name: "categories api",
           status: "FAIL",
           message: "response has no category",
+        }),
+      ]),
+    );
+  });
+
+  it("fails when the deployed categories API omits advanced filter facets", async () => {
+    const { crawlerCwd } = await createWorkspace();
+    stubHealthyPublicApi({ includeCategoryFacets: false });
+    const options = parseProductionSmokeOptions(["--public-only"], {}, crawlerCwd);
+    const summary = await runProductionPublicSmoke(options, new Date("2026-06-02T12:00:00.000Z"));
+
+    expect(summary.checks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "categories api",
+          status: "FAIL",
+          message: "response shape is invalid",
         }),
       ]),
     );

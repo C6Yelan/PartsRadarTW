@@ -45,6 +45,7 @@ export function stubHealthyPublicApi({
     "power-supply",
     "fan-accessory",
   ],
+  includeCategoryFacets = true,
   imageStatus = 200,
   imageStatusByProductId = new Map<string, number>(),
   nullImageProductIds = new Set<string>(),
@@ -53,6 +54,7 @@ export function stubHealthyPublicApi({
 }: {
   buildListStatus?: number;
   categorySlugs?: string[];
+  includeCategoryFacets?: boolean;
   imageStatus?: number;
   imageStatusByProductId?: Map<string, number>;
   nullImageProductIds?: Set<string>;
@@ -81,7 +83,12 @@ export function stubHealthyPublicApi({
 
       if (url.pathname === "/api/categories") {
         return Response.json({
-          data: categorySlugs.map((slug) => ({ slug })),
+          data: categorySlugs.map((slug) => ({
+            slug,
+            ...(includeCategoryFacets
+              ? { facets: [{ key: "example", options: [{ value: "yes" }] }] }
+              : {}),
+          })),
         });
       }
 
