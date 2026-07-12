@@ -31,6 +31,13 @@
   white-space: nowrap;
 }
 
+.topbar-nav-link,
+.price-report-topbar-link,
+.discord-topbar-link {
+  font-size: 13px;
+  font-weight: 800;
+}
+
 .brand-mark {
   display: block;
   flex: 0 0 auto;
@@ -86,6 +93,19 @@
   border: 1px solid var(--border);
   border-radius: 8px;
   background: #0b1720;
+}
+
+@media (min-width: 761px) {
+  .topbar-search {
+    min-height: 44px;
+    padding-inline: 4px 7px;
+    border-color: transparent;
+    background: transparent;
+  }
+
+  .topbar-search:focus-within {
+    border-bottom-color: var(--border-strong);
+  }
 }
 
 .search-glyph {

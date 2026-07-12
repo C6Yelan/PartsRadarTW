@@ -109,6 +109,15 @@ describe("build list Excel export", () => {
     expect(download.blob.size).toBeGreaterThan(0);
     await expect(download.blob.arrayBuffer()).resolves.toBeInstanceOf(ArrayBuffer);
   });
+
+  it("exports only items selected for the downloaded build list", () => {
+    const selectedItems = items().filter((item) => item.intent.includeInExport);
+    const rows = createBuildListWorksheetRows(selectedItems, SYNCED_AT);
+
+    expect(rows).toHaveLength(4);
+    expect(rows.flat()).not.toContain("GPU RTX 4060");
+    expect(rows.at(-1)).toEqual(["總價", "", "", "", 5, "", 13_980, "", "", "", ""]);
+  });
 });
 
 describe("build list export formatting", () => {
@@ -134,7 +143,7 @@ function items(): BuildListItem[] {
         },
         status: { isActive: false },
       }),
-      { order: 1 },
+      { order: 1, includeInExport: false },
     ),
     item(PRODUCT_ID_3, null, { quantity: 3, order: 2 }, "missing"),
   ];
@@ -150,6 +159,7 @@ function item(
     intent: {
       productId,
       quantity: 1,
+      includeInExport: true,
       order: 0,
       addedAt: "2026-06-03T10:00:00.000Z",
       updatedAt: "2026-06-03T10:00:00.000Z",

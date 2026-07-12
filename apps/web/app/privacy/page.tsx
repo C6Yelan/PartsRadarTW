@@ -50,7 +50,7 @@ export default function PrivacyPage() {
         >
           <h2 id="launch-readiness-title">上線準備狀態</h2>
           <p>
-            本站尚未確認正式對外部署環境的存取日誌欄位、保存期間、存取權限與刪除流程，也尚未提供一般使用者可提交隱私權請求、安全問題或錯誤回報的公開管道。
+            本站尚未確認正式對外部署環境的存取日誌欄位、保存期間、存取權限與刪除流程；隱私權請求、安全問題或錯誤回報可透過本政策下方的聯絡信箱提出。
           </p>
           <p>完成上述確認前，本政策不應視為已符合正式公開上線條件。</p>
         </section>
@@ -101,8 +101,9 @@ export default function PrivacyPage() {
         <section className="public-info-section" id="privacy-requests">
           <h2>聯絡、權利請求與政策更新</h2>
           <p>
-            使用者應可提出資料處理查詢、更正、停止利用、刪除、安全問題與網站錯誤回報；但本站目前尚未提供可受理上述請求的專用
-            email 或公開表單。
+            使用者可透過
+            <a href="mailto:partsradartw@gmail.com">partsradartw@gmail.com</a>
+            提出資料處理查詢、更正、停止利用、刪除、安全問題與網站錯誤回報。請勿在信件中附上密碼、token、私鑰或其他敏感資訊。
           </p>
           <p>
             <a href="https://github.com/C6Yelan/PartsRadarTW" rel="noreferrer" target="_blank">

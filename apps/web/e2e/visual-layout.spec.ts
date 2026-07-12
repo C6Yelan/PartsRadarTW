@@ -424,11 +424,12 @@ test("keeps the main pages usable without horizontal overflow", async ({ page },
   await page.evaluate(
     ({ productId, observedAt }) => {
       window.localStorage.setItem(
-        "partsradartw:build-list:v2",
+        "partsradartw:build-list:v3",
         JSON.stringify([
           {
             productId,
             quantity: 2,
+            includeInExport: true,
             order: 0,
             addedAt: observedAt,
             updatedAt: observedAt,
@@ -500,7 +501,7 @@ test("keeps error and empty states usable", async ({ page }, testInfo) => {
   await expect(page.getByRole("alert").filter({ hasText: "商品資料暫時無法載入" })).toBeVisible();
   await expectNoHorizontalOverflow(page);
 
-  await page.evaluate(() => window.localStorage.removeItem("partsradartw:build-list:v2"));
+  await page.evaluate(() => window.localStorage.removeItem("partsradartw:build-list:v3"));
   await page.goto("/build-list");
   await expect(page.getByText("配單目前沒有品項")).toBeVisible();
   await expect(page.getByRole("link", { name: "回到查詢" })).toBeVisible();

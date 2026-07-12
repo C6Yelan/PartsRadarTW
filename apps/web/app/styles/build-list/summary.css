@@ -46,6 +46,11 @@
   line-height: 1.7;
 }
 
+.build-list-summary .build-list-export-count {
+  color: var(--text);
+  font-weight: 760;
+}
+
 .build-list-summary-actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

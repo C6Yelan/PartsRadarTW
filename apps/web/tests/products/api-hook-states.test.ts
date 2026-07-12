@@ -257,6 +257,7 @@ function buildListIntent(): BuildListIntent {
   return {
     productId: PRODUCT_ID,
     quantity: 1,
+    includeInExport: true,
     order: 0,
     addedAt: "2026-07-10T08:00:00.000Z",
     updatedAt: "2026-07-10T08:00:00.000Z",

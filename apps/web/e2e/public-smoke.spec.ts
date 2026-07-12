@@ -205,7 +205,7 @@ test.describe("public web smoke", () => {
     expect(new URL(page.url()).searchParams.has("category")).toBe(false);
   });
 
-  test("refreshes v2 build-list intents while preserving quantity and undo", {
+  test("refreshes v3 build-list intents while preserving export choice, quantity, and undo", {
     tag: "@desktop-mobile-only",
   }, async ({ page }) => {
     const productId = "11111111-1111-1111-1111-111111111111";
@@ -248,11 +248,12 @@ test.describe("public web smoke", () => {
     await page.addInitScript(
       ({ id, missingId }) => {
         window.localStorage.setItem(
-          "partsradartw:build-list:v2",
+          "partsradartw:build-list:v3",
           JSON.stringify([
             {
               productId: id,
               quantity: 2,
+              includeInExport: true,
               order: 0,
               addedAt: "2026-05-28T12:00:00.000Z",
               updatedAt: "2026-05-28T12:00:00.000Z",
@@ -260,6 +261,7 @@ test.describe("public web smoke", () => {
             {
               productId: missingId,
               quantity: 1,
+              includeInExport: true,
               order: 1,
               addedAt: "2026-05-28T12:01:00.000Z",
               updatedAt: "2026-05-28T12:01:00.000Z",
@@ -282,6 +284,19 @@ test.describe("public web smoke", () => {
     await expect(item.getByText("NT$ 14,580")).toBeVisible();
     await expect(missingItem.getByText("暫時無法確認")).toBeVisible();
     await expect(page.getByText("未計價品項")).toBeVisible();
+    await expect(page.getByText("下載配單包含 2 個品項。")).toBeVisible();
+
+    await missingItem.getByRole("checkbox", { name: "加入下載配單" }).uncheck();
+    await expect(page.getByText("下載配單包含 1 個品項。")).toBeVisible();
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          JSON.parse(window.localStorage.getItem("partsradartw:build-list:v3") ?? "[]").find(
+            (intent: { productId: string }) => intent.productId === "22222222-2222-2222-2222-222222222222",
+          )?.includeInExport,
+        ),
+      )
+      .toBe(false);
 
     await item.getByRole("button", { name: "增加數量" }).click();
     await expect(page.getByText("4 件商品")).toBeVisible();

@@ -1,5 +1,5 @@
 // apps/web/tests/build-list/model-storage.test.ts
-// 驗證配單 v2 intent 純函式、50 筆限制、refresh join 與 localStorage 邊界。
+// 驗證配單 v3 intent 純函式、50 筆限制、refresh join 與 localStorage 邊界。
 
 import { describe, expect, it } from "vitest";
 
@@ -16,6 +16,7 @@ import {
   summarizeBuildListIntents,
   summarizeBuildListItems,
   updateBuildListItemQuantity,
+  updateBuildListItemExportSelection,
 } from "../../app/build-list/model";
 import {
   BUILD_LIST_STORAGE_KEY,
@@ -42,6 +43,7 @@ describe("build list v2 model", () => {
       {
         productId: PRODUCT_ID_1,
         quantity: 2,
+        includeInExport: true,
         order: 0,
         addedAt: "2026-06-03T10:00:00.000Z",
         updatedAt: "2026-06-03T10:05:00.000Z",
@@ -87,6 +89,9 @@ describe("build list v2 model", () => {
       updatedAt: "2026-06-03T10:10:00.000Z",
     });
     expect(clampBuildListQuantity(Number.NaN)).toBe(1);
+    expect(
+      updateBuildListItemExportSelection(updated, PRODUCT_ID_3, false)[2].includeInExport,
+    ).toBe(false);
   });
 
   it("restores a removed final item ahead of a newly added order collision", () => {
@@ -178,14 +183,17 @@ describe("build list v2 model", () => {
   });
 });
 
-describe("build list v2 storage", () => {
-  it("reads only v2 intents and ignores the v1 snapshot key", () => {
+describe("build list v3 storage", () => {
+  it("reads only v3 intents and ignores older storage keys", () => {
     const storage = fakeStorage();
     storage.setItem(
       "partsradartw:build-list:v1",
       JSON.stringify([{ id: PRODUCT_ID_1, name: "legacy snapshot", quantity: 1 }]),
     );
 
+    expect(readBuildListIntents(storage)).toEqual([]);
+
+    storage.setItem("partsradartw:build-list:v2", JSON.stringify([intent(PRODUCT_ID_1)]));
     expect(readBuildListIntents(storage)).toEqual([]);
 
     storage.setItem(BUILD_LIST_STORAGE_KEY, JSON.stringify([intent(PRODUCT_ID_1)]));
@@ -229,6 +237,7 @@ function intent(productIdValue: string, overrides: Partial<BuildListIntent> = {}
   return {
     productId: productIdValue,
     quantity: 1,
+    includeInExport: true,
     order: 0,
     addedAt: "2026-06-03T10:00:00.000Z",
     updatedAt: "2026-06-03T10:00:00.000Z",

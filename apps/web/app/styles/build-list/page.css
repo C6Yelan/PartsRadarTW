@@ -40,14 +40,10 @@
 }
 
 .build-list-refresh-status {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  padding: 14px 16px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: rgba(18, 34, 47, 0.58);
+  display: grid;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
 }
 
 .build-list-refresh-status > div {
@@ -67,8 +63,8 @@
 }
 
 .build-list-refresh-status .control-button {
-  flex: 0 0 auto;
-  min-height: 38px;
+  width: 100%;
+  min-height: 36px;
   padding-inline: 14px;
 }
 

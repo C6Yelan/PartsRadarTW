@@ -89,6 +89,12 @@
     grid-template-columns: 1fr;
   }
 
+  .vendor-menu-trigger,
+  .vendor-filter-disabled,
+  .facet-menu-trigger {
+    min-height: 44px;
+  }
+
   .filter-drawer.is-open {
     position: fixed;
     right: 0;

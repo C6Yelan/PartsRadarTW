@@ -1,9 +1,9 @@
 // apps/web/app/build-list/storage.ts
-// 封裝配單 v2 intent 的 localStorage 讀寫、資料正規化與同頁同步事件。
+// 封裝配單 v3 intent 的 localStorage 讀寫、資料正規化與同頁同步事件。
 
 import { type BuildListIntent, normalizeBuildListIntents } from "./model";
 
-export const BUILD_LIST_STORAGE_KEY = "partsradartw:build-list:v2";
+export const BUILD_LIST_STORAGE_KEY = "partsradartw:build-list:v3";
 export const BUILD_LIST_UPDATED_EVENT = "partsradartw:build-list-updated";
 
 // 配單 storage 的最小介面，讓測試可注入 fake storage，不直接依賴瀏覽器物件。

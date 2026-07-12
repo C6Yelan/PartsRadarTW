@@ -11,6 +11,7 @@ import {
   restoreBuildListItem as restoreBuildListItemToCollection,
   summarizeBuildListIntents,
   updateBuildListItemQuantity as updateBuildListItemQuantityInCollection,
+  updateBuildListItemExportSelection,
 } from "./model";
 import {
   BUILD_LIST_STORAGE_KEY,
@@ -81,6 +82,15 @@ export function useBuildList() {
     [commitIntents],
   );
 
+  const setBuildListItemExportSelection = useCallback(
+    (productId: string, includeInExport: boolean) => {
+      commitIntents((currentIntents) =>
+        updateBuildListItemExportSelection(currentIntents, productId, includeInExport),
+      );
+    },
+    [commitIntents],
+  );
+
   const restoreBuildListItem = useCallback(
     (intent: BuildListIntent) => {
       commitIntents((currentIntents) => restoreBuildListItemToCollection(currentIntents, intent));
@@ -106,6 +116,7 @@ export function useBuildList() {
     summary,
     addBuildListProduct,
     setBuildListItemQuantity,
+    setBuildListItemExportSelection,
     removeBuildListItem,
     restoreBuildListItem,
     clearBuildListItems,

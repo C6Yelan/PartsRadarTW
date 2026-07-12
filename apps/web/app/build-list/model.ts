@@ -8,6 +8,7 @@ import { normalizeBuildListProductId } from "./product-id";
 export interface BuildListIntent {
   productId: string;
   quantity: number;
+  includeInExport: boolean;
   order: number;
   addedAt: string;
   updatedAt: string;
@@ -92,6 +93,7 @@ export function addProductToBuildList(
     {
       productId: normalizedProductId,
       quantity: 1,
+      includeInExport: true,
       order: nextOrder,
       addedAt: updatedAt,
       updatedAt,
@@ -120,6 +122,23 @@ export function updateBuildListItemQuantity(
           quantity: clampBuildListQuantity(quantity),
           updatedAt,
         }
+      : intent,
+  );
+}
+
+export function updateBuildListItemExportSelection(
+  intents: BuildListIntent[],
+  productId: string,
+  includeInExport: boolean,
+  now = new Date(),
+): BuildListIntent[] {
+  const normalizedProductId = normalizeBuildListProductId(productId);
+
+  if (!normalizedProductId) return intents;
+
+  return intents.map((intent) =>
+    intent.productId === normalizedProductId
+      ? { ...intent, includeInExport, updatedAt: now.toISOString() }
       : intent,
   );
 }
@@ -261,6 +280,7 @@ function normalizeBuildListIntent(value: unknown): BuildListIntent | null {
   const updatedAt = normalizeIsoDate(value.updatedAt);
   const order = value.order;
   const quantity = value.quantity;
+  const includeInExport = value.includeInExport;
 
   if (
     !productId ||
@@ -270,7 +290,8 @@ function normalizeBuildListIntent(value: unknown): BuildListIntent | null {
     !Number.isSafeInteger(order) ||
     order < 0 ||
     typeof quantity !== "number" ||
-    !Number.isFinite(quantity)
+    !Number.isFinite(quantity) ||
+    typeof includeInExport !== "boolean"
   ) {
     return null;
   }
@@ -278,6 +299,7 @@ function normalizeBuildListIntent(value: unknown): BuildListIntent | null {
   return {
     productId,
     quantity: clampBuildListQuantity(quantity),
+    includeInExport,
     order,
     addedAt,
     updatedAt,

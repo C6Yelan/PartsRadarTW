@@ -10,7 +10,6 @@ import TopbarBrandNavigation from "../TopbarBrandNavigation";
 import BuildListEmptyState from "./components/BuildListEmptyState";
 import BuildListItemRow from "./components/BuildListItemRow";
 import BuildListLoadingState from "./components/BuildListLoadingState";
-import BuildListRefreshStatus from "./components/BuildListRefreshStatus";
 import BuildListSummaryPanel from "./components/BuildListSummaryPanel";
 import BuildListUndoToast from "./components/BuildListUndoToast";
 import { downloadBuildListExcel } from "./download";
@@ -39,6 +38,7 @@ export default function BuildListPageClient() {
     removeBuildListItem,
     restoreBuildListItem,
     setBuildListItemQuantity,
+    setBuildListItemExportSelection,
   } = useBuildList();
   const refresh = useBuildListRefresh(intents, isReady);
   const items = useMemo(
@@ -46,6 +46,10 @@ export default function BuildListPageClient() {
     [intents, refresh.products, refresh.state],
   );
   const summary = useMemo(() => summarizeBuildListItems(items), [items]);
+  const exportItems = useMemo(
+    () => items.filter((item) => item.intent.includeInExport),
+    [items],
+  );
   const missingItemCount = items.filter((item) => item.availability === "missing").length;
   const [removedItemNotice, setRemovedItemNotice] = useState<RemovedItemNotice | null>(null);
 
@@ -64,7 +68,7 @@ export default function BuildListPageClient() {
   }, [removedItemNotice]);
 
   function downloadExcel() {
-    downloadBuildListExcel(items, refresh.lastSuccessfulSyncAt);
+    downloadBuildListExcel(exportItems, refresh.lastSuccessfulSyncAt);
   }
 
   function handleRemoveBuildListItem(item: BuildListItem) {
@@ -113,16 +117,6 @@ export default function BuildListPageClient() {
       <main className="build-list-page" aria-label="配單內容">
         {!isReady ? <BuildListLoadingState /> : null}
 
-        {isReady ? (
-          <BuildListRefreshStatus
-            itemCount={intents.length}
-            lastSuccessfulSyncAt={refresh.lastSuccessfulSyncAt}
-            missingItemCount={missingItemCount}
-            state={refresh.state}
-            onRefresh={() => void refresh.refresh()}
-          />
-        ) : null}
-
         {isReady && items.length === 0 ? <BuildListEmptyState /> : null}
 
         {isReady && items.length > 0 ? (
@@ -132,6 +126,7 @@ export default function BuildListPageClient() {
                 <BuildListItemRow
                   item={item}
                   key={item.intent.productId}
+                  onExportSelectionChange={setBuildListItemExportSelection}
                   onQuantityChange={setBuildListItemQuantity}
                   onRemove={handleRemoveBuildListItem}
                 />
@@ -139,10 +134,16 @@ export default function BuildListPageClient() {
             </section>
 
             <BuildListSummaryPanel
-              isDownloadDisabled={refresh.state === "loading"}
+              exportItemCount={exportItems.length}
+              isDownloadDisabled={refresh.state === "loading" || exportItems.length === 0}
+              itemCount={intents.length}
+              lastSuccessfulSyncAt={refresh.lastSuccessfulSyncAt}
+              missingItemCount={missingItemCount}
+              refreshState={refresh.state}
               summary={summary}
               onClear={handleClearBuildListItems}
               onDownloadExcel={downloadExcel}
+              onRefresh={() => void refresh.refresh()}
             />
           </section>
         ) : null}

@@ -4,16 +4,30 @@
 
 import { formatTwdPrice } from "../../_shared/formatting";
 import type { BuildListSummary } from "../model";
+import type { BuildListRefreshState } from "../model";
+import BuildListRefreshStatus from "./BuildListRefreshStatus";
 
 export default function BuildListSummaryPanel({
   isDownloadDisabled,
+  exportItemCount,
+  itemCount,
+  lastSuccessfulSyncAt,
+  missingItemCount,
+  refreshState,
   onClear,
   onDownloadExcel,
+  onRefresh,
   summary,
 }: {
   isDownloadDisabled: boolean;
+  exportItemCount: number;
+  itemCount: number;
+  lastSuccessfulSyncAt: string | null;
+  missingItemCount: number;
+  refreshState: BuildListRefreshState;
   onClear: () => void;
   onDownloadExcel: () => void;
+  onRefresh: () => void;
   summary: BuildListSummary;
 }) {
   return (
@@ -42,6 +56,18 @@ export default function BuildListSummaryPanel({
           ? `配單總價僅計入目前有價格的品項；另有 ${summary.unpricedItemCount} 個品項暫未計價。`
           : "配單總價為目前已確認價格的估算。"}
       </p>
+
+      <p className="build-list-export-count">
+        {exportItemCount > 0 ? `下載配單包含 ${exportItemCount} 個品項。` : "尚未選擇下載品項。"}
+      </p>
+
+      <BuildListRefreshStatus
+        itemCount={itemCount}
+        lastSuccessfulSyncAt={lastSuccessfulSyncAt}
+        missingItemCount={missingItemCount}
+        state={refreshState}
+        onRefresh={onRefresh}
+      />
 
       <div className="build-list-summary-actions">
         <button

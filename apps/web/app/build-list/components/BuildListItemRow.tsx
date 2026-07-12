@@ -13,10 +13,12 @@ import BuildListItemImage from "./BuildListItemImage";
 export default function BuildListItemRow({
   item,
   onQuantityChange,
+  onExportSelectionChange,
   onRemove,
 }: {
   item: BuildListItem;
   onQuantityChange: (productId: string, quantity: number) => void;
+  onExportSelectionChange: (productId: string, includeInExport: boolean) => void;
   onRemove: (item: BuildListItem) => void;
 }) {
   const { intent, product } = item;
@@ -77,6 +79,14 @@ export default function BuildListItemRow({
       </div>
 
       <div className="build-list-item-controls">
+        <label className="build-list-export-toggle">
+          <input
+            checked={intent.includeInExport}
+            type="checkbox"
+            onChange={(event) => onExportSelectionChange(intent.productId, event.target.checked)}
+          />
+          <span>加入下載配單</span>
+        </label>
         <fieldset className="quantity-stepper">
           <legend className="sr-only">{displayName} 數量</legend>
           <button

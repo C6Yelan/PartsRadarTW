@@ -68,11 +68,12 @@ export default function AboutPage() {
             公開瀏覽，但目前 Issues 限制建立新 issue，不能作為一般使用者的正式回報管道。
           </p>
           <p>
-            本站尚未提供專用 email 或公開表單。請勿透過原價屋客服回報本站問題，也不要在公開內容附上
+            網站問題與一般回報可寄至
+            <a href="mailto:partsradartw@gmail.com">partsradartw@gmail.com</a>。請勿透過原價屋客服回報本站問題，也不要在信件中附上
             token、連線字串、私鑰或其他敏感資訊。
           </p>
           <p className="public-info-launch-warning" role="note">
-            在可用聯絡管道與正式部署日誌政策確認前，本站尚未符合正式公開上線條件。
+            回報信箱不應用於傳送密碼、付款資料或其他敏感資訊。
           </p>
         </section>
 

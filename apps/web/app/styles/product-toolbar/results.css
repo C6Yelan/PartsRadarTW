@@ -6,9 +6,9 @@
 
 .results-toolbar {
   display: grid;
-  gap: 16px;
+  gap: 12px;
   align-items: start;
-  padding: 18px 22px;
+  padding: 13px 18px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -35,7 +35,7 @@
 }
 
 .results-filter-button {
-  min-height: 40px;
+  min-height: 36px;
   padding: 0 14px;
   border: 1px solid var(--border-strong);
   border-radius: 7px;
@@ -52,7 +52,7 @@
 
 .results-compact-select {
   display: grid;
-  grid-template-columns: auto minmax(120px, 190px);
+  grid-template-columns: auto minmax(108px, 160px);
   gap: 7px;
   align-items: center;
   color: var(--muted);
