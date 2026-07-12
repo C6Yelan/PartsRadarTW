@@ -323,6 +323,12 @@ test("keeps the main pages usable without horizontal overflow", async ({ page },
   };
 
   await page.getByRole("button", { name: /^篩選/ }).click();
+  if ((page.viewportSize()?.width ?? 0) > 760) {
+    const statusFilterWidth = await page.locator(".toolbar-status-filter").evaluate(
+      (element) => element.getBoundingClientRect().width,
+    );
+    expect(statusFilterWidth).toBeGreaterThan(320);
+  }
   await gpuChipFilter.getByRole("button", { name: "全部" }).click();
   await page.getByRole("checkbox", { name: "NVIDIA" }).check();
   await vramFilter.getByRole("button", { name: "全部" }).click();
@@ -400,7 +406,7 @@ test("keeps the main pages usable without horizontal overflow", async ({ page },
 
   await page.goto("/privacy");
   await expect(page.getByRole("heading", { exact: true, name: "隱私權政策" })).toBeVisible();
-  await expect(page.getByText(/localStorage/)).toBeVisible();
+  await expect(page.getByText(/配單內容儲存在目前使用的瀏覽器/)).toBeVisible();
   await page.getByRole("link", { name: "返回查詢" }).focus();
   await expectUsableLayout(page, testInfo);
 

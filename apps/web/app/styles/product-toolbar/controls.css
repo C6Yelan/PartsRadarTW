@@ -29,6 +29,12 @@
   font-size: 13px;
 }
 
+@media (min-width: 761px) {
+  .toolbar-status-filter {
+    grid-column: span 2;
+  }
+}
+
 .toolbar-price-grid {
   gap: 8px;
   min-width: 0;

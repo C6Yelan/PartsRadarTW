@@ -38,7 +38,6 @@ export default function AnnouncementsPage() {
       <main className="public-info-page">
         <section className="public-info-hero">
           <strong>服務提醒、資料狀態與功能更新會集中記錄在這裡。</strong>
-          <p>目前公告與歷史公告都會保留於本頁，方便集中查閱。</p>
         </section>
 
         <div className="public-announcement-list">

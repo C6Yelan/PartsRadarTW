@@ -8,9 +8,7 @@ export default function SiteDisclaimer() {
     <footer className="site-disclaimer">
       <nav className="site-footer-nav" aria-label="網站資訊">
         <Link href="/about">關於本站</Link>
-        <Link href="/price-report">價格變動總覽</Link>
         <Link href="/status">資料更新狀態</Link>
-        <Link href="/announcements">公告</Link>
         <Link href="/privacy">隱私權政策</Link>
         <Link href="/terms">使用條款</Link>
         <Link href="/about#contact">聯絡與回報</Link>
@@ -18,11 +16,7 @@ export default function SiteDisclaimer() {
 
       <div className="site-footer-copy">
         <p>
-          PartsRadarTW
-          是非官方、非商業的商品搜尋與價格整理工具。資料來源為原價屋公開頁面；實際商品資訊、價格、庫存、購買與售後服務以原價屋來源頁為準。
-        </p>
-        <p>
-          本站僅整理必要的商品查詢資訊，不複製完整商品文案、完整頁面內容或原站排版。
+          PartsRadarTW 是非官方的商品搜尋與價格整理工具；實際商品資訊、價格、庫存、購買與售後服務以原價屋來源頁為準。
         </p>
       </div>
     </footer>

@@ -25,8 +25,7 @@
 }
 
 .site-footer-copy {
-  display: grid;
-  gap: 6px;
+  display: block;
 }
 
 .site-footer-copy p {
@@ -90,7 +89,7 @@
   position: relative;
   z-index: 1;
   display: block;
-  max-width: 760px;
+  max-width: 100%;
   color: var(--text-strong);
   font-size: clamp(22px, 3vw, 34px);
   line-height: 1.3;
@@ -99,18 +98,24 @@
 .public-info-hero > p:last-child {
   position: relative;
   z-index: 1;
-  max-width: 760px;
+  max-width: 920px;
   margin: 14px 0 0;
   color: var(--muted);
   line-height: 1.75;
 }
 
-.public-info-section h2,
-.public-announcement-card h2 {
+.public-info-section h2 {
   margin: 0 0 12px;
   color: var(--text-strong);
   font-size: 18px;
   line-height: 1.4;
+}
+
+.public-announcement-card h2 {
+  margin: 0 0 10px;
+  color: var(--text-strong);
+  font-size: 22px;
+  line-height: 1.35;
 }
 
 .public-info-section p,
@@ -123,7 +128,7 @@
 
 .public-info-section p + p,
 .public-announcement-card p + p {
-  margin-top: 10px;
+  margin-top: 8px;
 }
 
 .public-info-section a,
@@ -299,6 +304,12 @@
   font-size: 12px;
 }
 
+@media (min-width: 1000px) {
+  .public-info-hero strong {
+    white-space: nowrap;
+  }
+}
+
 .public-announcement-card-meta span {
   color: var(--accent-strong);
   font-weight: 800;
@@ -353,6 +364,7 @@
 
   .public-info-hero strong {
     font-size: 23px;
+    white-space: normal;
   }
 
   .public-info-updated-at {

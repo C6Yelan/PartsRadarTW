@@ -55,16 +55,14 @@ export default function TermsPage() {
         <section className="public-info-section">
           <h2>合理使用</h2>
           <p>
-            請勿繞過 rate
-            limit、大量自動化請求、干擾服務、探測非公開介面，或利用本站散布違法與有害內容。必要時可限制濫用流量。
+            請勿在短時間內大量請求、干擾網站運作、嘗試存取未開放功能，或利用本站散布違法與有害內容。必要時，本站可限制明顯影響服務的使用行為。
           </p>
         </section>
 
         <section className="public-info-section">
           <h2>外部連結與服務調整</h2>
           <p>
-            本站提供的原價屋與 Discord
-            連結由各自服務管理。網站功能、資料範圍與可用性可能因維護或來源變更而調整，重大變更會盡量透過
+            原價屋與 Discord 連結由各自服務管理。網站功能與資料範圍可能因維護或來源變更而調整，重大變更會透過
             <Link href="/announcements">網站公告</Link>說明。
           </p>
         </section>

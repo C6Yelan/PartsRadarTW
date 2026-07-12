@@ -1,7 +1,7 @@
 // apps/web/e2e/public-smoke.spec.ts
 // 以 Playwright 驗證公開網站主要頁面、配單互動與 public API 的基本可用性。
 
-import { type APIRequestContext, expect, type Page, test } from "@playwright/test";
+import { type APIRequestContext, expect, type Locator, type Page, test } from "@playwright/test";
 import { resolvePublicSiteUrl } from "../app/_shared/public-site";
 import { expectImagesLoaded } from "./support/images";
 
@@ -19,15 +19,16 @@ async function expectPublicFooterLinks(page: Page) {
 
   for (const name of [
     "關於本站",
-    "價格變動總覽",
     "資料更新狀態",
-    "公告",
     "隱私權政策",
     "使用條款",
     "聯絡與回報",
   ]) {
     await expect(footer.getByRole("link", { name })).toBeVisible();
   }
+
+  await expect(footer.getByRole("link", { name: "價格變動總覽" })).toHaveCount(0);
+  await expect(footer.getByRole("link", { name: "公告", exact: true })).toHaveCount(0);
 }
 
 async function expectTopbarLinks(page: Page) {
@@ -107,26 +108,35 @@ test.describe("public web smoke", () => {
     await expect(
       page.locator("main").getByText(/商品名稱、分類、價格與來源連結整理自原價屋公開頁面/),
     ).toBeVisible();
-    await expect(page.getByText(/尚未符合正式公開上線條件/)).toBeVisible();
+    await expect(page.getByText("partsradartw@gmail.com")).toBeVisible();
     await expectTopbarLinks(page);
     await expectPublicFooterLinks(page);
 
     await page.goto("/privacy");
     await expect(page.getByRole("heading", { exact: true, name: "隱私權政策" })).toBeVisible();
-    await expect(page.getByText(/localStorage/)).toBeVisible();
-    await expect(page.getByText(/不應視為已符合正式公開上線條件/)).toBeVisible();
+    await expect(page.getByText(/配單內容儲存在目前使用的瀏覽器/)).toBeVisible();
+    await expect(page.getByText(/SHA-256|PostgreSQL|Cloudflare Tunnel|localStorage/)).toHaveCount(0);
     await expectTopbarLinks(page);
     await expectPublicFooterLinks(page);
 
     await page.goto("/terms");
     await expect(page.getByRole("heading", { exact: true, name: "使用條款" })).toBeVisible();
     await expect(page.getByText(/非官方、非商業/).first()).toBeVisible();
+    await expectSingleLine(page.getByText(/使用本站即表示你理解/));
     await expectTopbarLinks(page);
     await expectPublicFooterLinks(page);
 
     await page.goto("/announcements");
     await expect(page.getByRole("heading", { exact: true, name: "網站公告" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "網站公開測試中" })).toBeVisible();
+    await expectSingleLine(page.getByText(/服務提醒、資料狀態與功能更新/));
+    const announcementTitle = page.getByRole("heading", { name: "網站公開測試中" });
+    const announcementSummary = page.getByText(/商品與價格資訊可能因來源更新時間而有延遲/);
+    const [titleSize, summarySize] = await Promise.all([
+      announcementTitle.evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize)),
+      announcementSummary.evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize)),
+    ]);
+    expect(titleSize).toBeGreaterThan(summarySize);
     await expectTopbarLinks(page);
     await expectPublicFooterLinks(page);
 
@@ -309,6 +319,18 @@ test.describe("public web smoke", () => {
     await expect(page.getByRole("article").filter({ hasText: "最新測試顯示卡 RTX" })).toBeVisible();
   });
 });
+
+async function expectSingleLine(locator: Locator) {
+  const metrics = await locator.evaluate((element) => {
+    const styles = getComputedStyle(element);
+    return {
+      height: element.getBoundingClientRect().height,
+      lineHeight: Number.parseFloat(styles.lineHeight),
+    };
+  });
+
+  expect(metrics.height).toBeLessThan(metrics.lineHeight * 1.5);
+}
 
 test.describe("public API smoke", () => {
   test("checks public data and rate-limit headers", { tag: "@desktop-only" }, async ({

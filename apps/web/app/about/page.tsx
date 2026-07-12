@@ -39,9 +39,8 @@ export default function AboutPage() {
         <section className="public-info-section">
           <h2>資料從哪裡來</h2>
           <p>
-            商品名稱、分類、價格與來源連結整理自原價屋公開頁面。網站依排程更新資料，但來源頁更新、網路狀況與解析流程都可能造成延遲。
+            商品名稱、分類、價格與來源連結整理自原價屋公開頁面。資料更新可能有延遲，購買前請回到來源頁確認。
           </p>
-          <p>實際規格、價格、庫存、購買與售後服務，一律以原價屋來源頁面當下資訊為準。</p>
         </section>
 
         <section className="public-info-section">
@@ -53,7 +52,7 @@ export default function AboutPage() {
             </li>
             <li>使用瀏覽器本機配單整理數量與預估總價，不需註冊帳號。</li>
             <li>
-              透過<Link href="/discord">Discord 通知</Link>頁查看公開 bot 的使用方式。
+              透過<Link href="/discord">Discord 通知</Link>頁查看提醒功能的使用方式。
             </li>
           </ul>
         </section>
@@ -61,19 +60,15 @@ export default function AboutPage() {
         <section className="public-info-section" id="contact">
           <h2>聯絡與回報</h2>
           <p>
-            專案原始碼可在
+            專案內容可在
             <a href="https://github.com/C6Yelan/PartsRadarTW" rel="noreferrer" target="_blank">
-              GitHub repository
+              GitHub
             </a>
-            公開瀏覽，但目前 Issues 限制建立新 issue，不能作為一般使用者的正式回報管道。
+            公開瀏覽；網站問題與一般回報請使用下方信箱。
           </p>
           <p>
             網站問題與一般回報可寄至
-            <a href="mailto:partsradartw@gmail.com">partsradartw@gmail.com</a>。請勿透過原價屋客服回報本站問題，也不要在信件中附上
-            token、連線字串、私鑰或其他敏感資訊。
-          </p>
-          <p className="public-info-launch-warning" role="note">
-            回報信箱不應用於傳送密碼、付款資料或其他敏感資訊。
+            <a href="mailto:partsradartw@gmail.com">partsradartw@gmail.com</a>。請勿透過原價屋客服回報本站問題，也不要在信件中附上密碼、付款資料或其他私人資訊。
           </p>
         </section>
 
