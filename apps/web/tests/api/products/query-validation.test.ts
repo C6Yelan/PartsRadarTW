@@ -21,7 +21,7 @@ describe("GET /api/products query validation", () => {
 
     const response = await createGetProductsHandler(client, { now: () => NOW })(
       new Request(
-        "https://parts.example/api/products?category=gpu&vendors=asus,msi&facet=gpu_chip:nvidia&facet=vram_gb:12",
+        "https://parts.example/api/products?category=gpu&q=rtx&minPrice=10000&maxPrice=20000&status=inactive&vendors=asus,msi&facet=gpu_chip:nvidia&facet=vram_gb:12",
       ),
     );
 
@@ -37,6 +37,43 @@ describe("GET /api/products query validation", () => {
         },
         vendorSlug: { not: null },
         vendorName: { not: null },
+        OR: [
+          {
+            sourceCategory: {
+              enabled: true,
+              igrp: 12,
+            },
+            currentPrice: {
+              is: {
+                priceSnapshot: {
+                  price: {
+                    gte: 10000,
+                    lte: 20000,
+                  },
+                },
+              },
+            },
+            isActive: false,
+            AND: [
+              searchTokenWhere("rtx"),
+              {
+                filterTags: {
+                  hasSome: ["gpu_chip:nvidia"],
+                },
+              },
+              {
+                filterTags: {
+                  hasSome: ["vram_gb:12"],
+                },
+              },
+            ],
+          },
+          {
+            vendorSlug: {
+              in: ["asus", "msi"],
+            },
+          },
+        ],
       },
       distinct: ["vendorSlug"],
     });
@@ -46,7 +83,19 @@ describe("GET /api/products query validation", () => {
           enabled: true,
           igrp: 12,
         },
+        currentPrice: {
+          is: {
+            priceSnapshot: {
+              price: {
+                gte: 10000,
+                lte: 20000,
+              },
+            },
+          },
+        },
+        isActive: false,
         AND: [
+          searchTokenWhere("rtx"),
           {
             filterTags: {
               hasSome: ["gpu_chip:nvidia"],
@@ -68,6 +117,73 @@ describe("GET /api/products query validation", () => {
     expect(client.lastProductCountArgs?.where).toEqual(
       client.lastProductFindProductsArgs?.where,
     );
+  });
+
+  it("keeps a valid selected vendor removable when other filters have no results", async () => {
+    const client = fakeProductsClient({
+      products: [],
+      vendorOptions: [vendorOption({ vendorSlug: "asus", vendorName: "華碩" })],
+      totalItems: 0,
+      sourceCategories: [],
+    });
+
+    const response = await createGetProductsHandler(client, { now: () => NOW })(
+      new Request(
+        "https://parts.example/api/products?category=gpu&vendors=asus&facet=gpu_chip:amd",
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(client.lastProductVendorOptionsArgs?.where).toMatchObject({
+      OR: [
+        {
+          AND: [
+            {
+              filterTags: {
+                hasSome: ["gpu_chip:amd"],
+              },
+            },
+          ],
+        },
+        {
+          vendorSlug: {
+            in: ["asus"],
+          },
+        },
+      ],
+    });
+    expect(client.lastProductFindProductsArgs?.where).toMatchObject({
+      AND: [
+        {
+          filterTags: {
+            hasSome: ["gpu_chip:amd"],
+          },
+        },
+        {
+          vendorSlug: {
+            in: ["asus"],
+          },
+        },
+      ],
+    });
+  });
+
+  it("rejects a selected vendor that is unavailable in the selected category", async () => {
+    const client = fakeProductsClient({
+      products: [],
+      vendorOptions: [vendorOption({ vendorSlug: "msi", vendorName: "微星" })],
+      totalItems: 0,
+      sourceCategories: [],
+    });
+
+    const response = await createGetProductsHandler(client, { now: () => NOW })(
+      new Request("https://parts.example/api/products?category=gpu&vendors=asus"),
+    );
+
+    expect(response.status).toBe(400);
+    expect(client.productFindVendorOptionsCallCount).toBe(1);
+    expect(client.productFindProductsCallCount).toBe(0);
+    expect(client.productCountCallCount).toBe(0);
   });
 
   it("groups same-key facets as OR and different facet keys as AND", async () => {
@@ -114,6 +230,9 @@ describe("GET /api/products query validation", () => {
     "category=cpu&facet=chipset:b850",
     "category=cpu&facet=socket",
     "category=cpu&facet=socket:am5&facet=socket:am5",
+    `category=cpu&${Array.from({ length: 51 }, () => "facet=socket:am5").join("&")}`,
+    `category=cpu&facet=${"x".repeat(101)}`,
+    "category=cpu&facet=%20",
   ])(
     "rejects invalid or category-incompatible facets before reading data: %s",
     async (query) => {

@@ -71,6 +71,19 @@ test.beforeEach(async ({ page }) => {
               },
             ],
           },
+          {
+            id: "44444444-4444-4444-8444-444444444444",
+            slug: "cpu",
+            displayName: "CPU",
+            sourceName: "處理器 CPU",
+            facets: [
+              {
+                key: "socket",
+                label: "腳位",
+                options: [{ value: "am5", label: "AM5" }],
+              },
+            ],
+          },
         ],
       });
       return;
@@ -266,6 +279,26 @@ test("captures the main pages without horizontal overflow", async ({ page }, tes
 
   await page.getByRole("searchbox", { name: "搜尋商品名稱" }).focus();
   await captureLayout(page, testInfo, "home");
+
+  await page.getByRole("button", { name: "移除篩選：GPU 晶片：NVIDIA" }).click();
+  await expect
+    .poll(() => new URL(page.url()).searchParams.getAll("facet"))
+    .toEqual(["vram_gb:16"]);
+  await expect(page.getByRole("checkbox", { name: "NVIDIA" })).not.toBeChecked();
+
+  await page.getByRole("button", { name: "重設" }).click();
+  await expect.poll(() => new URL(page.url()).searchParams.getAll("facet")).toEqual([]);
+  await expect(page.getByRole("checkbox", { name: "16 GB" })).not.toBeChecked();
+
+  await page.getByRole("checkbox", { name: "NVIDIA" }).check();
+  await page.getByRole("checkbox", { name: "16 GB" }).check();
+  await page
+    .getByRole("radiogroup", { name: "分類" })
+    .getByText("CPU", { exact: true })
+    .click();
+  await expect.poll(() => new URL(page.url()).searchParams.get("category")).toBe("cpu");
+  await expect.poll(() => new URL(page.url()).searchParams.getAll("facet")).toEqual([]);
+  await expect(page.getByRole("group", { name: "已選進階篩選" })).toHaveCount(0);
 
   await page.goto("/price-report");
   await expect(

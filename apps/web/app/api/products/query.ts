@@ -120,18 +120,36 @@ export function buildProductWhere(
   return where;
 }
 
-// 建立指定分類可用品牌清單的查詢條件；品牌篩選只在分類語境下提供。
-export function buildProductVendorOptionsWhere(igrp: number): Prisma.ProductWhereInput {
+// 建立套用非品牌條件的選項查詢，並保留目前分類中已選品牌供使用者移除。
+export function buildProductVendorOptionsWhere(query: ProductListQuery): Prisma.ProductWhereInput {
+  const availableVendorWhere: Prisma.ProductWhereInput = {
+    ...buildProductWhere(query, { includeVendors: false }),
+    vendorSlug: { not: null },
+    vendorName: { not: null },
+  };
+
+  if (query.igrp === undefined || query.vendors.length === 0) {
+    return availableVendorWhere;
+  }
+
   return {
     sourceCategory: {
       enabled: true,
-      igrp,
+      igrp: query.igrp,
     },
     currentPrice: {
       isNot: null,
     },
     vendorSlug: { not: null },
     vendorName: { not: null },
+    OR: [
+      availableVendorWhere,
+      {
+        vendorSlug: {
+          in: query.vendors,
+        },
+      },
+    ],
   };
 }
 

@@ -40,7 +40,7 @@ export function createGetProductsHandler(
         query.igrp === undefined
           ? Promise.resolve([])
           : client.product.findVendorOptions({
-              where: buildProductVendorOptionsWhere(query.igrp),
+              where: buildProductVendorOptionsWhere(query),
               orderBy: [{ vendorName: "asc" }, { vendorSlug: "asc" }],
               distinct: ["vendorSlug"],
               select: PRODUCT_VENDOR_SELECT,
