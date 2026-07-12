@@ -45,15 +45,15 @@ test.describe("public web smoke", () => {
     await page.goto("/");
     await expect(page.getByText("PartsRadarTW").first()).toBeVisible();
     await expect(page.getByRole("searchbox", { name: "搜尋商品名稱" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Discord 通知" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Discord" })).toBeVisible();
     await expect(page.getByRole("region", { name: "商品列表" })).toBeVisible();
-    await expect(page.getByRole("status", { name: "網站公告" })).toBeVisible();
+    await expect(page.getByRole("status", { name: "網站公告" })).toHaveCount(0);
 
     await expectPublicFooterLinks(page);
 
     await page.goto("/build-list");
     await expect(page.getByRole("heading", { exact: true, name: "配單" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Discord 通知" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Discord" })).toBeVisible();
     await expect(page.getByText("配單目前沒有品項")).toBeVisible();
     await expectPublicFooterLinks(page);
 

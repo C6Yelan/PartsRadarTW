@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ArrowLeftIcon, BrandMarkIcon } from "../_shared/icons";
 import DiscordTopbarLink from "../DiscordTopbarLink";
 import PriceReportTopbarLink from "../PriceReportTopbarLink";
+import AnnouncementTopbarLink from "../AnnouncementTopbarLink";
 import SiteDisclaimer from "../site-disclaimer";
 import BuildListEmptyState from "./components/BuildListEmptyState";
 import BuildListItemRow from "./components/BuildListItemRow";
@@ -107,6 +108,7 @@ export default function BuildListPageClient() {
             </span>
           </Link>
           <PriceReportTopbarLink />
+          <AnnouncementTopbarLink />
           <DiscordTopbarLink />
         </div>
 

@@ -89,7 +89,6 @@ export default function StatusPageClient() {
 
       <main className="public-info-page status-page">
         <section className="public-info-hero">
-          <p className="public-info-kicker">DATA STATUS</p>
           <strong>直接查看各商品分類最近一次成功更新狀態。</strong>
           <p>狀態來自既有資料庫紀錄，不會額外向原價屋或其他網站發出查詢。</p>
         </section>
@@ -125,7 +124,6 @@ function StatusReport({ report }: { report: SourceStatusResponseBody }) {
       <section className={`status-overview is-${report.status}`} aria-labelledby="status-title">
         <div className="status-overview-heading">
           <div>
-            <p className="public-info-kicker">COOLPC SOURCE</p>
             <h2 id="status-title">原價屋資料來源</h2>
           </div>
           <span className={`status-badge is-${report.status}`}>{copy.label}</span>

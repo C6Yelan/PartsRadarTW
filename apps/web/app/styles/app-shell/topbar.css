@@ -1,7 +1,7 @@
 /* apps/web/app/styles/app-shell/topbar.css */
 .topbar {
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) minmax(360px, 640px) minmax(220px, 1fr);
+  grid-template-columns: minmax(460px, auto) minmax(320px, 1fr) minmax(180px, auto);
   gap: 22px;
   align-items: center;
   min-height: 78px;
@@ -15,6 +15,20 @@
   align-items: center;
   gap: 12px;
   width: fit-content;
+}
+
+.topbar-nav-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--accent-surface);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
 }
 
 .brand-mark {

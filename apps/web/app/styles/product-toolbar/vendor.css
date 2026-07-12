@@ -1,5 +1,6 @@
 /* apps/web/app/styles/product-toolbar/vendor.css */
-.vendor-filter {
+.vendor-filter,
+.advanced-filter {
   position: relative;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -10,13 +11,16 @@
   font-size: 13px;
 }
 
-.vendor-menu {
+.vendor-menu,
+.advanced-menu {
   position: relative;
   min-width: 0;
 }
 
 .vendor-menu-trigger,
-.vendor-filter-disabled {
+.vendor-filter-disabled,
+.advanced-menu-trigger,
+.advanced-filter-disabled {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -36,6 +40,14 @@
   margin-left: 12px;
 }
 
+.advanced-menu .filter-chevron {
+  margin-left: 12px;
+}
+
+.advanced-menu.is-open .filter-chevron {
+  transform: rotate(180deg);
+}
+
 .vendor-menu.is-open .filter-chevron {
   transform: rotate(180deg);
 }
@@ -45,7 +57,8 @@
   cursor: default;
 }
 
-.vendor-menu-popover {
+.vendor-menu-popover,
+.advanced-menu-popover {
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
@@ -58,7 +71,21 @@
   box-shadow: 0 18px 44px rgba(0, 0, 0, 0.34);
 }
 
-.vendor-menu-header {
+.advanced-menu-popover {
+  right: auto;
+  left: 0;
+  width: min(760px, calc(100vw - 48px));
+}
+
+@media (max-width: 1400px) {
+  .advanced-menu-popover {
+    right: 0;
+    left: auto;
+  }
+}
+
+.vendor-menu-header,
+.advanced-menu-header {
   display: flex;
   gap: 12px;
   align-items: center;
@@ -69,7 +96,8 @@
   font-weight: 700;
 }
 
-.vendor-menu-header button {
+.vendor-menu-header button,
+.advanced-menu-header button {
   min-height: 28px;
   padding: 0 9px;
   border: 1px solid var(--border);
@@ -78,6 +106,59 @@
   color: var(--muted);
   font-size: 12px;
   font-weight: 700;
+}
+
+.advanced-group-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px 24px;
+  max-height: min(520px, 60vh);
+  overflow-y: auto;
+}
+
+.advanced-group {
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
+
+.advanced-group legend {
+  padding: 0;
+  margin-bottom: 8px;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.advanced-option-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.advanced-option {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.advanced-option:hover,
+.advanced-option.is-active {
+  border-color: var(--border-strong);
+  background: var(--accent-surface);
+  color: var(--text);
+}
+
+.advanced-option input {
+  position: absolute;
+  opacity: 0;
 }
 
 .vendor-option-list {

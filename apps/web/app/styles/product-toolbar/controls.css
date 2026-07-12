@@ -1,9 +1,7 @@
 /* apps/web/app/styles/product-toolbar/controls.css */
 .toolbar-controls {
   display: grid;
-  grid-template-columns:
-    minmax(230px, 1.35fr) minmax(285px, 1.45fr) minmax(150px, 1fr)
-    minmax(150px, 1fr) minmax(108px, 0.65fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
   align-items: center;
   justify-content: stretch;

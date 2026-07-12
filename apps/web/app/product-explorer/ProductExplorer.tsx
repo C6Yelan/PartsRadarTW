@@ -2,8 +2,6 @@
 // apps/web/app/product-explorer/ProductExplorer.tsx
 // 提供首頁商品探索頁的 client-side 組裝入口，串接搜尋、分類、結果、配單入口與聲明區塊。
 
-import PublicAnnouncementBanner from "../announcements/PublicAnnouncementBanner";
-import type { PublicAnnouncement } from "../announcements/data";
 import FloatingBuildListLink from "../build-list/FloatingBuildListLink";
 import SiteDisclaimer from "../site-disclaimer";
 import { ProductExplorerHeader } from "./components/ProductExplorerHeader";
@@ -12,11 +10,7 @@ import { ProductFilters } from "./components/ProductFilters";
 import { useProductExplorerViewModel } from "./use-product-explorer-view-model";
 
 // 組裝商品探索頁主畫面，將 view model 切分給 header、filter、results 與配單浮動入口。
-export default function ProductExplorer({
-  announcement,
-}: {
-  announcement: PublicAnnouncement | null;
-}) {
+export default function ProductExplorer() {
   const viewModel = useProductExplorerViewModel();
 
   return (
@@ -31,17 +25,14 @@ export default function ProductExplorer({
       />
 
       <main className="dashboard-shell">
-        <PublicAnnouncementBanner announcement={announcement} />
         <div className="workspace-grid">
           <ProductFilters
             categories={viewModel.filters.categories}
             categoryState={viewModel.filters.categoryState}
             filtersOpen={viewModel.filters.filtersOpen}
             selectedCategory={viewModel.filters.selectedCategory}
-            selectedFacets={viewModel.filters.selectedFacets}
             onCategoryChange={viewModel.filters.actions.updateCategoryFilter}
             onKeepDesktopOpen={viewModel.filters.actions.keepDesktopFiltersOpen}
-            onToggleFacet={viewModel.filters.actions.toggleFacetFilter}
             onToggleOpen={viewModel.filters.actions.syncFiltersOpenFromToggle}
           />
 

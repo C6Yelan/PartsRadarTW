@@ -10,10 +10,6 @@
     display: flex;
   }
 
-  .facet-groups {
-    grid-template-columns: 1fr;
-  }
-
   .results-toolbar {
     align-items: stretch;
     flex-direction: column;
@@ -38,6 +34,24 @@
   }
 
   .vendor-filter {
+    grid-template-columns: 1fr;
+  }
+
+  .advanced-filter {
+    grid-template-columns: 1fr;
+  }
+
+  .advanced-menu-popover {
+    position: fixed;
+    top: auto;
+    right: 14px;
+    bottom: 14px;
+    left: 14px;
+    width: auto;
+    max-height: 72vh;
+  }
+
+  .advanced-group-list {
     grid-template-columns: 1fr;
   }
 

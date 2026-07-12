@@ -37,7 +37,6 @@ export default function TermsPage() {
 
       <main className="public-info-page">
         <section className="public-info-hero">
-          <p className="public-info-kicker">TERMS</p>
           <strong>使用本站即表示你理解這是一項非官方、非商業的資料整理服務。</strong>
           <p>條款維持簡短，目的在說清楚資料限制與合理使用，不取代來源網站的交易規則。</p>
         </section>

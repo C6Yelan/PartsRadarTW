@@ -1,69 +1,6 @@
 /* apps/web/app/styles/public-pages.css */
 /* 公開公告、網站資訊 footer 與靜態說明頁的共用版面。 */
 
-.public-announcement {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 14px;
-  align-items: center;
-  min-height: 58px;
-  padding: 12px 16px;
-  border: 1px solid var(--border-strong);
-  border-left: 3px solid var(--accent);
-  border-radius: 8px;
-  background: var(--surface-muted);
-}
-
-.dashboard-shell > .public-announcement {
-  width: min(1680px, calc(100% - 32px));
-  margin: 16px auto 0;
-}
-
-.public-announcement.is-maintenance {
-  border-left-color: var(--warning);
-}
-
-.public-announcement.is-warning {
-  border-left-color: var(--danger);
-}
-
-.public-announcement-label,
-.public-info-kicker {
-  color: var(--accent-strong);
-  font-size: 12px;
-  font-weight: 850;
-  letter-spacing: 0.08em;
-}
-
-.public-announcement-copy {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-
-.public-announcement-copy strong {
-  color: var(--text-strong);
-  font-size: 14px;
-}
-
-.public-announcement-copy p {
-  margin: 0;
-  color: var(--muted);
-  font-size: 13px;
-  line-height: 1.55;
-}
-
-.public-announcement-link {
-  display: inline-flex;
-  align-items: center;
-  min-height: 34px;
-  color: var(--accent-strong);
-  font-size: 13px;
-  font-weight: 800;
-  white-space: nowrap;
-}
-
-.public-announcement-link:hover,
 .site-footer-nav a:hover,
 .public-info-page a:hover {
   color: var(--text-strong);
@@ -129,7 +66,7 @@
 .public-info-page {
   display: grid;
   gap: 18px;
-  width: min(960px, calc(100% - 48px));
+  width: min(1680px, calc(100% - 48px));
   margin: 0 auto;
   padding: 20px 0 32px;
 }
@@ -147,23 +84,6 @@
   position: relative;
   overflow: hidden;
   background: var(--surface-muted);
-}
-
-.public-info-hero::after {
-  position: absolute;
-  right: -34px;
-  bottom: -58px;
-  width: 170px;
-  height: 170px;
-  border: 1px solid rgb(143 180 204 / 16%);
-  border-radius: 50%;
-  content: "";
-}
-
-.public-info-kicker {
-  position: relative;
-  z-index: 1;
-  margin: 0 0 10px;
 }
 
 .public-info-hero strong {
@@ -231,23 +151,6 @@
   line-height: 1.75;
 }
 
-.public-info-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 16px;
-  margin-top: 16px;
-}
-
-.public-info-actions a {
-  display: inline-flex;
-  align-items: center;
-  min-height: 40px;
-  padding: 0 12px;
-  border: 1px solid var(--border-strong);
-  border-radius: 7px;
-  background: var(--accent-surface);
-}
-
 .public-info-updated-at {
   margin: 0;
   color: var(--faint);
@@ -258,7 +161,6 @@
 .public-info-launch-warning {
   padding: 12px 14px;
   border: 1px solid #594e27;
-  border-left: 3px solid var(--warning);
   border-radius: 7px;
   background: rgb(122 92 28 / 18%);
   color: #f1d58a;
@@ -267,19 +169,8 @@
 .status-overview {
   padding: 24px;
   border: 1px solid var(--border);
-  border-left: 3px solid var(--accent);
   border-radius: 8px;
   background: var(--surface-muted);
-}
-
-.status-overview.is-stale,
-.status-category-card.is-stale {
-  border-left-color: var(--warning);
-}
-
-.status-overview.is-unavailable,
-.status-category-card.is-unavailable {
-  border-left-color: var(--danger);
 }
 
 .status-overview-heading,
@@ -363,7 +254,6 @@
 .status-category-card {
   padding: 16px;
   border: 1px solid var(--border);
-  border-left: 3px solid var(--accent);
   border-radius: 7px;
   background: var(--surface);
 }
@@ -397,15 +287,6 @@
 
 .public-announcement-card {
   scroll-margin-top: 20px;
-  border-left: 3px solid var(--accent);
-}
-
-.public-announcement-card.is-maintenance {
-  border-left-color: var(--warning);
-}
-
-.public-announcement-card.is-warning {
-  border-left-color: var(--danger);
 }
 
 .public-announcement-card-meta {
@@ -429,21 +310,6 @@
 }
 
 @media (max-width: 760px) {
-  .public-announcement {
-    grid-template-columns: 1fr;
-    gap: 7px;
-    padding: 14px;
-  }
-
-  .dashboard-shell > .public-announcement {
-    width: min(100% - 28px, 1680px);
-  }
-
-  .public-announcement-link {
-    width: fit-content;
-    min-height: 44px;
-  }
-
   .site-footer-nav {
     gap: 2px 14px;
   }
@@ -469,7 +335,7 @@
   }
 
   .public-info-page {
-    width: min(100% - 28px, 960px);
+    width: calc(100% - 24px);
     padding-top: 14px;
   }
 

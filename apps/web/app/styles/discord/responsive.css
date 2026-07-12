@@ -32,7 +32,7 @@
   }
 
   .discord-page {
-    width: min(100% - 28px, 1120px);
+    width: calc(100% - 24px);
     padding-top: 14px;
   }
 

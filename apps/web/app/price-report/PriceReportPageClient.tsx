@@ -9,6 +9,7 @@ import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { isRateLimitedApiError } from "../_shared/api-client";
 import { ArrowLeftIcon, BrandMarkIcon } from "../_shared/icons";
 import DiscordTopbarLink from "../DiscordTopbarLink";
+import AnnouncementTopbarLink from "../AnnouncementTopbarLink";
 import SiteDisclaimer from "../site-disclaimer";
 import { fetchPriceReport, fetchPriceReportCategories } from "./api";
 import { PriceReportFilters } from "./components/PriceReportFilters";
@@ -71,10 +72,9 @@ export default function PriceReportPageClient() {
         setState("ready");
 
         if (nextReport.pagination.page !== query.page) {
-          router.replace(
-            toPriceReportUrl({ ...query, page: nextReport.pagination.page }),
-            { scroll: false },
-          );
+          router.replace(toPriceReportUrl({ ...query, page: nextReport.pagination.page }), {
+            scroll: false,
+          });
         }
       })
       .catch((error: unknown) => {
@@ -129,6 +129,7 @@ export default function PriceReportPageClient() {
               <span className="brand-subtitle">原價屋零件查詢</span>
             </span>
           </Link>
+          <AnnouncementTopbarLink />
           <DiscordTopbarLink />
         </div>
 

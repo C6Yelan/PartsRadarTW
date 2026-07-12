@@ -28,6 +28,14 @@
     padding: 14px;
   }
 
+  .topbar-brand-area {
+    flex-wrap: wrap;
+  }
+
+  .topbar-brand-area .brand-lockup {
+    flex-basis: 100%;
+  }
+
   .topbar-search {
     grid-template-areas:
       "icon input clear"

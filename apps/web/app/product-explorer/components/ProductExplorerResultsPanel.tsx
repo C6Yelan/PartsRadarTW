@@ -18,6 +18,7 @@ export function ProductExplorerResultsPanel({
   return (
     <section className="results-panel" ref={panel.ref} aria-label="商品列表">
       <ProductToolbar
+        categories={toolbar.categories}
         draft={toolbar.draft}
         formError={toolbar.formError}
         hasActiveFilters={toolbar.hasActiveFilters}
@@ -28,6 +29,7 @@ export function ProductExplorerResultsPanel({
         totalItems={toolbar.totalItems}
         vendorOptions={toolbar.vendorOptions}
         onClearVendors={actions.toolbar.clearVendors}
+        onClearFacets={actions.toolbar.clearFacets}
         onDraftChange={actions.toolbar.draftChange}
         onPageSizeChange={actions.toolbar.pageSizeChange}
         onRemoveFacet={actions.toolbar.removeFacet}
@@ -35,6 +37,7 @@ export function ProductExplorerResultsPanel({
         onSortChange={actions.toolbar.sortChange}
         onStatusChange={actions.toolbar.statusChange}
         onToggleVendor={actions.toolbar.toggleVendor}
+        onToggleFacet={actions.toolbar.toggleFacet}
       />
 
       <ProductTable

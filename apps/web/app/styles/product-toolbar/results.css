@@ -1,7 +1,7 @@
 /* apps/web/app/styles/product-toolbar/results.css */
 .results-panel {
   min-width: 0;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .results-toolbar {

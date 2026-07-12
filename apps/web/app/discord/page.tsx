@@ -49,19 +49,15 @@ export default function DiscordPage() {
           <h1>Discord 通知</h1>
           <span>指令教學與公開價格報告</span>
         </div>
+        <Link className="back-link" href="/">
+          <ArrowLeftIcon />
+          返回查詢
+        </Link>
       </header>
 
       <main className="discord-page">
-        <div className="discord-page-nav">
-          <Link className="back-link" href="/">
-            <ArrowLeftIcon />
-            返回查詢
-          </Link>
-        </div>
-
         <section className="discord-hero" aria-labelledby="discord-title">
           <div className="discord-hero-copy">
-            <span className="eyebrow">PartsRadarTW Discord bot</span>
             <h2 id="discord-title">Discord 價格通知</h2>
             <p>用 Discord 管理目標價提醒、即時價格報告、每日私訊價格報告與公開價格報告。</p>
             <div className="discord-actions">
@@ -107,7 +103,6 @@ export default function DiscordPage() {
 
         <section className="discord-section" id="quick-start" aria-labelledby="quick-start-title">
           <div className="discord-section-heading">
-            <span className="eyebrow">Quick start</span>
             <h2 id="quick-start-title">快速開始</h2>
             <p>先完成邀請，再依需求選擇目標價提醒、即時或每日報告，以及公開價格報告。</p>
           </div>
@@ -128,7 +123,6 @@ export default function DiscordPage() {
 
         <section className="discord-section" id="discord-commands" aria-labelledby="commands-title">
           <div className="discord-section-heading">
-            <span className="eyebrow">Commands</span>
             <h2 id="commands-title">指令說明</h2>
             <p>
               /watch 管理目標價提醒；/price-report 提供即時與每日私訊價格報告；/public-report
@@ -233,7 +227,6 @@ export default function DiscordPage() {
 
         <section className="discord-section" aria-labelledby="discord-faq-title">
           <div className="discord-section-heading">
-            <span className="eyebrow">FAQ</span>
             <h2 id="discord-faq-title">常見問題</h2>
             <p>遇到指令權限或私訊問題時，先從這裡確認使用範圍與必要設定。</p>
           </div>

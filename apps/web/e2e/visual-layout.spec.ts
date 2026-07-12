@@ -302,18 +302,15 @@ test("keeps the main pages usable without horizontal overflow", async ({ page },
   test.setTimeout(60_000);
 
   await page.goto("/?category=gpu&page=10");
-  await expect(page.getByRole("status", { name: "網站公告" })).toBeVisible();
+  await expect(page.getByRole("status", { name: "網站公告" })).toHaveCount(0);
   await expect(
-    page.locator(".topbar").getByRole("link", { name: "價格變動總覽" }),
+    page.locator(".topbar").getByRole("link", { name: "價格" }),
   ).toBeVisible();
+  await expect(page.locator(".topbar").getByRole("link", { name: "公告" })).toBeVisible();
   await expect(page.getByRole("region", { name: "商品列表" })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "頁碼" })).toBeVisible();
 
-  if ((page.viewportSize()?.width ?? 0) <= 760) {
-    await page.locator(".filter-panel summary").click();
-    await expect(page.locator(".filter-panel details")).toHaveAttribute("open", "");
-  }
-
+  await page.getByRole("button", { name: "選擇條件" }).click();
   await page.getByRole("checkbox", { name: "NVIDIA" }).check();
   await page.getByRole("checkbox", { name: "16 GB" }).check();
   await expect
@@ -333,18 +330,26 @@ test("keeps the main pages usable without horizontal overflow", async ({ page },
   await page.getByRole("searchbox", { name: "搜尋商品名稱" }).focus();
   await expectUsableLayout(page, testInfo);
 
+  await page.getByRole("button", { name: "已選 2 項" }).click();
   await page.getByRole("button", { name: "移除篩選：GPU 晶片：NVIDIA" }).click();
   await expect
     .poll(() => new URL(page.url()).searchParams.getAll("facet"))
     .toEqual(["vram_gb:16"]);
+  await page.getByRole("button", { name: "已選 1 項" }).click();
   await expect(page.getByRole("checkbox", { name: "NVIDIA" })).not.toBeChecked();
 
   await page.getByRole("button", { name: "重設" }).click();
   await expect.poll(() => new URL(page.url()).searchParams.getAll("facet")).toEqual([]);
+  await page.getByRole("button", { name: "選擇條件" }).click();
   await expect(page.getByRole("checkbox", { name: "16 GB" })).not.toBeChecked();
 
   await page.getByRole("checkbox", { name: "NVIDIA" }).check();
   await page.getByRole("checkbox", { name: "16 GB" }).check();
+  await page.getByRole("button", { name: "已選 2 項" }).click();
+  if ((page.viewportSize()?.width ?? 0) <= 760) {
+    await page.locator(".filter-panel summary").click();
+    await expect(page.locator(".filter-panel details")).toHaveAttribute("open", "");
+  }
   await page
     .getByRole("radiogroup", { name: "分類" })
     .getByText("CPU", { exact: true })
@@ -418,7 +423,7 @@ test("keeps the main pages usable without horizontal overflow", async ({ page },
   );
   await page.goto("/build-list");
   await expect(
-    page.locator(".topbar").getByRole("link", { name: "價格變動總覽" }),
+    page.locator(".topbar").getByRole("link", { name: "價格" }),
   ).toBeVisible();
   await expect(page.getByRole("heading", { name: product.name })).toBeVisible();
   await page.getByRole("link", { name: "原價屋查看／購買，開新分頁" }).focus();

@@ -37,7 +37,6 @@ export default function AboutPage() {
 
       <main className="public-info-page">
         <section className="public-info-hero">
-          <p className="public-info-kicker">ABOUT PARTSRADARTW</p>
           <strong>讓原價屋公開商品資料更容易搜尋、比較與整理。</strong>
           <p>
             PartsRadarTW 是非官方、非商業的個人專案，不販售商品，也不代表原價屋或任何硬體品牌。
@@ -82,11 +81,6 @@ export default function AboutPage() {
           <p className="public-info-launch-warning" role="note">
             在可用聯絡管道與正式部署日誌政策確認前，本站尚未符合正式公開上線條件。
           </p>
-          <div className="public-info-actions">
-            <Link href="/announcements">查看網站公告</Link>
-            <Link href="/status">查看資料更新狀態</Link>
-            <Link href="/privacy">閱讀隱私權政策</Link>
-          </div>
         </section>
 
         <p className="public-info-updated-at">

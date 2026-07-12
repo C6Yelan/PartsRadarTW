@@ -10,6 +10,7 @@ import {
   toPriceDigits,
 } from "../query-state";
 import type {
+  CategoryItem,
   ProductSort,
   ProductStatus,
   ProductVendorOption,
@@ -17,8 +18,10 @@ import type {
   SelectedFacetChip,
 } from "../types";
 import { VendorFilter } from "./VendorFilter";
+import { AdvancedFilter } from "./AdvancedFilter";
 
 interface ProductToolbarProps {
+  categories: CategoryItem[];
   draft: QueryState;
   formError: string | null;
   hasActiveFilters: boolean;
@@ -29,6 +32,7 @@ interface ProductToolbarProps {
   totalItems: number;
   vendorOptions: ProductVendorOption[];
   onClearVendors: () => void;
+  onClearFacets: () => void;
   onDraftChange: (draft: QueryState) => void;
   onResetFilters: () => void;
   onSortChange: (sort: ProductSort) => void;
@@ -36,10 +40,12 @@ interface ProductToolbarProps {
   onPageSizeChange: (pageSize: number) => void;
   onRemoveFacet: (tag: string) => void;
   onToggleVendor: (vendor: string) => void;
+  onToggleFacet: (tag: string) => void;
 }
 
 // 組裝結果工具列的可互動控制，將 query / draft 變更交由上層 actions 套用。
 export function ProductToolbar({
+  categories,
   draft,
   formError,
   hasActiveFilters,
@@ -50,6 +56,7 @@ export function ProductToolbar({
   totalItems,
   vendorOptions,
   onClearVendors,
+  onClearFacets,
   onDraftChange,
   onResetFilters,
   onSortChange,
@@ -57,6 +64,7 @@ export function ProductToolbar({
   onPageSizeChange,
   onRemoveFacet,
   onToggleVendor,
+  onToggleFacet,
 }: ProductToolbarProps) {
   return (
     <div className="results-toolbar">
@@ -121,6 +129,13 @@ export function ProductToolbar({
           selectedValues={query.vendors}
           onClear={onClearVendors}
           onToggle={onToggleVendor}
+        />
+        <AdvancedFilter
+          categories={categories}
+          selectedCategory={query.category}
+          selectedFacets={query.facets}
+          onClear={onClearFacets}
+          onToggle={onToggleFacet}
         />
         <label>
           <span>排序</span>

@@ -4,7 +4,10 @@
 
 import Link from "next/link";
 import { API_RATE_LIMITED_MESSAGE } from "../../_shared/api-client";
-import { ArrowLeftIcon } from "../../_shared/icons";
+import { ArrowLeftIcon, BrandMarkIcon } from "../../_shared/icons";
+import AnnouncementTopbarLink from "../../AnnouncementTopbarLink";
+import DiscordTopbarLink from "../../DiscordTopbarLink";
+import PriceReportTopbarLink from "../../PriceReportTopbarLink";
 import FloatingBuildListLink from "../../build-list/FloatingBuildListLink";
 import SiteDisclaimer from "../../site-disclaimer";
 import ProductDetailActions from "./detail/ProductDetailActions";
@@ -29,71 +32,84 @@ export default function ProductDetail({
   const { product, state } = viewModel.productLoad;
 
   return (
-    <main className="detail-shell">
-      <div className="detail-topbar">
-        <Link className="back-link" href={viewModel.navigation.returnHref}>
+    <div className="app-shell">
+      <header className="topbar public-info-topbar">
+        <div className="topbar-brand-area">
+          <Link className="brand-lockup" href="/">
+            <BrandMarkIcon />
+            <span>
+              <span className="brand-name">PartsRadarTW</span>
+              <span className="brand-subtitle">原價屋零件查詢</span>
+            </span>
+          </Link>
+          <PriceReportTopbarLink />
+          <AnnouncementTopbarLink />
+          <DiscordTopbarLink />
+        </div>
+        <div className="public-info-topbar-title">
+          <h1>商品資訊</h1>
+        </div>
+        <Link className="back-link public-info-back-link" href={viewModel.navigation.returnHref}>
           <ArrowLeftIcon />
           {viewModel.navigation.returnLabel}
         </Link>
-        {state === "ready" && product ? (
-          <span className="detail-category-chip">{product.category.displayName}</span>
+      </header>
+      <main className="detail-shell">
+        {state === "loading" || state === "idle" ? (
+          <section className="detail-loading" aria-label="商品載入中">
+            <span className="skeleton-box detail-image" />
+            <span className="skeleton-box detail-title" />
+            <span className="skeleton-box detail-line" />
+          </section>
         ) : null}
-      </div>
 
-      {state === "loading" || state === "idle" ? (
-        <section className="detail-loading" aria-label="商品載入中">
-          <span className="skeleton-box detail-image" />
-          <span className="skeleton-box detail-title" />
-          <span className="skeleton-box detail-line" />
-        </section>
-      ) : null}
+        {state === "not-found" ? <ProductDetailNotFoundState /> : null}
 
-      {state === "not-found" ? <ProductDetailNotFoundState /> : null}
+        {state === "error" || state === "rate_limited" ? (
+          <ProductDetailErrorState state={state} />
+        ) : null}
 
-      {state === "error" || state === "rate_limited" ? (
-        <ProductDetailErrorState state={state} />
-      ) : null}
-
-      {state === "ready" && product ? (
-        <section className="detail-layout">
-          <ProductDetailMedia
-            imageError={viewModel.media.imageError}
-            product={product}
-            onImageError={viewModel.media.onImageError}
-          />
-
-          <div className="detail-content">
-            <h1>{product.name}</h1>
-
-            <ProductDetailFacts product={product} />
-            <ProductDetailActions
-              canIncreaseBuildListQuantity={viewModel.buildList.canIncreaseBuildListQuantity}
-              currentBuildListQuantity={viewModel.buildList.currentBuildListQuantity}
-              isProductLimitReached={viewModel.buildList.isProductLimitReached}
-              productName={product.name}
-              purchaseUrl={product.source.url}
-              shareStatusMessage={viewModel.share.statusMessage}
-              onAddToBuildList={viewModel.buildList.addCurrentProductToBuildList}
-              onDecreaseBuildListQuantity={
-                viewModel.buildList.decreaseCurrentProductBuildListQuantity
-              }
-              onCopyLink={viewModel.share.copyCurrentProductLink}
+        {state === "ready" && product ? (
+          <section className="detail-layout">
+            <ProductDetailMedia
+              imageError={viewModel.media.imageError}
+              product={product}
+              onImageError={viewModel.media.onImageError}
             />
-          </div>
-        </section>
-      ) : null}
 
-      {state === "ready" && product ? (
-        <PriceHistoryPanel
-          history={viewModel.priceHistory.history}
-          selectedRange={viewModel.priceHistory.selectedRange}
-          state={viewModel.priceHistory.state}
-          onRangeChange={viewModel.priceHistory.onRangeChange}
-        />
-      ) : null}
-      <FloatingBuildListLink summary={viewModel.buildList.summary} />
-      <SiteDisclaimer />
-    </main>
+            <div className="detail-content">
+              <h1>{product.name}</h1>
+
+              <ProductDetailFacts product={product} />
+              <ProductDetailActions
+                canIncreaseBuildListQuantity={viewModel.buildList.canIncreaseBuildListQuantity}
+                currentBuildListQuantity={viewModel.buildList.currentBuildListQuantity}
+                isProductLimitReached={viewModel.buildList.isProductLimitReached}
+                productName={product.name}
+                purchaseUrl={product.source.url}
+                shareStatusMessage={viewModel.share.statusMessage}
+                onAddToBuildList={viewModel.buildList.addCurrentProductToBuildList}
+                onDecreaseBuildListQuantity={
+                  viewModel.buildList.decreaseCurrentProductBuildListQuantity
+                }
+                onCopyLink={viewModel.share.copyCurrentProductLink}
+              />
+            </div>
+          </section>
+        ) : null}
+
+        {state === "ready" && product ? (
+          <PriceHistoryPanel
+            history={viewModel.priceHistory.history}
+            selectedRange={viewModel.priceHistory.selectedRange}
+            state={viewModel.priceHistory.state}
+            onRangeChange={viewModel.priceHistory.onRangeChange}
+          />
+        ) : null}
+        <FloatingBuildListLink summary={viewModel.buildList.summary} />
+        <SiteDisclaimer />
+      </main>
+    </div>
   );
 }
 

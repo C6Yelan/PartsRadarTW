@@ -58,12 +58,10 @@ describe("product facets", () => {
     ]);
   });
 
-  it("extracts SSD details inside the existing combined storage category", () => {
+  it("extracts decision-useful SSD details inside the combined storage category", () => {
     expect(extractProductFilterTags(7, "Samsung 990 PRO 2TB M.2 PCIe 4.0 NVMe SSD")).toEqual([
       "storage_type:ssd",
       "form_factor:m2",
-      "interface:pcie",
-      "interface:nvme",
       "pcie_generation:gen4",
       "capacity_gb:2000",
     ]);
@@ -77,19 +75,17 @@ describe("product facets", () => {
     ]);
   });
 
-  it("extracts air cooler shape, fan size, and explicit socket", () => {
+  it("extracts air cooler shape and fan size", () => {
     expect(extractProductFilterTags(10, "雙塔 CPU 散熱器 120mm 支援 AM5")).toEqual([
       "cooler_type:air-tower",
       "fan_size_mm:120",
-      "socket:am5",
     ]);
   });
 
-  it("extracts liquid cooling type, radiator size, and explicit socket", () => {
+  it("extracts liquid cooling type and radiator size", () => {
     expect(extractProductFilterTags(11, "360mm 一體式水冷 支援 LGA1700")).toEqual([
       "liquid_type:aio",
       "radiator_size_mm:360",
-      "socket:lga1700",
     ]);
   });
 
@@ -181,14 +177,13 @@ describe("product facets", () => {
     }
   });
 
-  it("extracts power supply wattage, efficiency, standards, and modularity", () => {
+  it("extracts distinct power supply wattage, efficiency, standards, and modularity", () => {
     expect(
       extractProductFilterTags(15, "850W ATX 3.1 PCIe 5.1 12V-2x6 80PLUS 金牌 全模組"),
     ).toEqual([
       "wattage_range:800-999",
       "efficiency:gold",
       "psu_standard:atx-3",
-      "psu_standard:pcie-5",
       "psu_standard:12v-2x6",
       "modularity:full",
     ]);

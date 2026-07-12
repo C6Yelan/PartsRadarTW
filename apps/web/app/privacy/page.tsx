@@ -37,7 +37,6 @@ export default function PrivacyPage() {
 
       <main className="public-info-page">
         <section className="public-info-hero">
-          <p className="public-info-kicker">PRIVACY</p>
           <strong>本站不提供 Web 帳號、付款或購物功能。</strong>
           <p>
             本政策說明瀏覽網站與使用公開 API 時，為維持服務安全與功能所需的最少技術資訊。

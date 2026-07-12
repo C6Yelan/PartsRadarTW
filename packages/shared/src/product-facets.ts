@@ -151,11 +151,6 @@ const PRODUCT_FACETS_BY_IGRP: Readonly<Record<number, readonly ProductFacetDefin
       option("2-5-inch", "2.5 吋"),
       option("3-5-inch", "3.5 吋"),
     ]),
-    facet("interface", "介面", [
-      option("sata", "SATA"),
-      option("pcie", "PCIe"),
-      option("nvme", "NVMe"),
-    ]),
     facet("pcie_generation", "PCIe 世代", [
       option("gen3", "PCIe 3.0"),
       option("gen4", "PCIe 4.0"),
@@ -198,7 +193,6 @@ const PRODUCT_FACETS_BY_IGRP: Readonly<Record<number, readonly ProductFacetDefin
       option("120", "120 mm"),
       option("140", "140 mm"),
     ]),
-    facet("socket", "明示相容腳位", SOCKET_OPTIONS),
   ],
   11: [
     facet("liquid_type", "水冷類型", [
@@ -213,7 +207,6 @@ const PRODUCT_FACETS_BY_IGRP: Readonly<Record<number, readonly ProductFacetDefin
       option("360", "360 mm"),
       option("420", "420 mm"),
     ]),
-    facet("socket", "明示相容腳位", SOCKET_OPTIONS),
   ],
   12: [
     facet("gpu_chip", "GPU 晶片", [
@@ -275,7 +268,6 @@ const PRODUCT_FACETS_BY_IGRP: Readonly<Record<number, readonly ProductFacetDefin
     ]),
     facet("psu_standard", "電源標準", [
       option("atx-3", "ATX 3.x"),
-      option("pcie-5", "PCIe 5.x"),
       option("12v-2x6", "12V-2x6"),
     ]),
     facet("modularity", "模組化", [

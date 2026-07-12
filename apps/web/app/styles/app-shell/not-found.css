@@ -4,7 +4,7 @@
   align-content: start;
   min-height: 100svh;
   gap: clamp(56px, 12vw, 110px);
-  width: min(960px, calc(100% - 48px));
+  width: min(1680px, calc(100% - 48px));
   margin: 0 auto;
   padding: clamp(24px, 5vw, 48px) 0;
 }

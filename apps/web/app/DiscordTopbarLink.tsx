@@ -8,7 +8,7 @@ export default function DiscordTopbarLink() {
   return (
     <Link className="discord-topbar-link" href="/discord" title="Discord 通知">
       <DiscordLogoIcon />
-      <span className="sr-only">Discord 通知</span>
+      <span>Discord</span>
     </Link>
   );
 }

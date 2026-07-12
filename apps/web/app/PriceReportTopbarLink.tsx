@@ -8,7 +8,7 @@ export default function PriceReportTopbarLink() {
   return (
     <Link className="price-report-topbar-link" href="/price-report" title="價格變動總覽">
       <TrendIcon className="price-report-topbar-icon" />
-      <span className="sr-only">價格變動總覽</span>
+      <span>價格</span>
     </Link>
   );
 }

@@ -116,10 +116,8 @@ export function useProductExplorerViewModel() {
       categoryState,
       filtersOpen,
       selectedCategory: query.category,
-      selectedFacets: query.facets,
       actions: {
         updateCategoryFilter: actions.updateCategoryFilter,
-        toggleFacetFilter: actions.toggleFacetFilter,
         keepDesktopFiltersOpen,
         syncFiltersOpenFromToggle,
       },
@@ -129,6 +127,7 @@ export function useProductExplorerViewModel() {
         ref: resultsPanelRef,
       },
       toolbar: {
+        categories,
         draft,
         formError,
         hasActiveFilters,
@@ -157,6 +156,7 @@ export function useProductExplorerViewModel() {
       actions: {
         toolbar: {
           clearVendors: () => actions.updateQuery({ vendors: DEFAULT_QUERY.vendors }),
+          clearFacets: () => actions.updateQuery({ facets: DEFAULT_QUERY.facets }),
           draftChange: setDraft,
           pageSizeChange: (pageSize: number) => actions.updateQuery({ pageSize }),
           removeFacet: actions.toggleFacetFilter,
@@ -164,6 +164,7 @@ export function useProductExplorerViewModel() {
           sortChange: (sort: typeof query.sort) => actions.updateQuery({ sort }),
           statusChange: (status: typeof query.status) => actions.updateQuery({ status }),
           toggleVendor: actions.toggleVendorFilter,
+          toggleFacet: actions.toggleFacetFilter,
         },
         table: {
           addToBuildList: buildList.addProductToBuildList,
