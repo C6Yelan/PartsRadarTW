@@ -1,6 +1,9 @@
 // apps/web/app/product-explorer/components/ProductToolbar.tsx
 // 呈現商品探索結果上方的篩選、排序、每頁數量與重設控制列。
 
+"use client";
+
+import { useState } from "react";
 import { formatInteger } from "../../_shared/formatting";
 import {
   DEFAULT_QUERY,
@@ -32,7 +35,6 @@ interface ProductToolbarProps {
   totalItems: number;
   vendorOptions: ProductVendorOption[];
   onClearVendors: () => void;
-  onClearFacets: () => void;
   onDraftChange: (draft: QueryState) => void;
   onResetFilters: () => void;
   onSortChange: (sort: ProductSort) => void;
@@ -56,7 +58,6 @@ export function ProductToolbar({
   totalItems,
   vendorOptions,
   onClearVendors,
-  onClearFacets,
   onDraftChange,
   onResetFilters,
   onSortChange,
@@ -66,6 +67,14 @@ export function ProductToolbar({
   onToggleVendor,
   onToggleFacet,
 }: ProductToolbarProps) {
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const selectedFilterCount =
+    query.facets.length +
+    query.vendors.length +
+    Number(Boolean(query.minPrice)) +
+    Number(Boolean(query.maxPrice)) +
+    Number(query.status !== DEFAULT_QUERY.status);
+
   return (
     <div className="results-toolbar">
       <div className="results-heading-row">
@@ -73,100 +82,131 @@ export function ProductToolbar({
           <h1>搜尋結果</h1>
           <span>{formatInteger(totalItems)} 筆商品</span>
         </div>
-        {hasActiveFilters ? (
-          <button className="results-reset-button" type="button" onClick={onResetFilters}>
-            重設
+        <div className="results-heading-actions">
+          <button
+            aria-expanded={filtersOpen}
+            className={filtersOpen ? "results-filter-button is-active" : "results-filter-button"}
+            type="button"
+            onClick={() => setFiltersOpen((value) => !value)}
+          >
+            篩選{selectedFilterCount > 0 ? `（${selectedFilterCount}）` : ""}
           </button>
-        ) : null}
+          <label className="results-compact-select">
+            <span>排序</span>
+            <select
+              aria-label="排序"
+              value={query.sort}
+              onChange={(event) => onSortChange(event.target.value as ProductSort)}
+            >
+              {SORT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="results-compact-select is-page-size">
+            <span>每頁</span>
+            <select
+              aria-label="每頁顯示"
+              value={query.pageSize}
+              onChange={(event) =>
+                onPageSizeChange(Number(event.target.value) || DEFAULT_QUERY.pageSize)
+              }
+            >
+              {PAGE_SIZE_OPTIONS.map((pageSize) => (
+                <option key={pageSize} value={pageSize}>
+                  {pageSize}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
       </div>
-      <div className="toolbar-controls">
-        <div className="toolbar-price-filter">
-          <span>價格</span>
-          <div className="price-grid toolbar-price-grid">
-            <input
-              aria-label="最低價格"
-              inputMode="numeric"
-              placeholder="最低價格"
-              type="text"
-              value={draft.minPrice}
-              onChange={(event) =>
-                onDraftChange({ ...draft, minPrice: toPriceDigits(event.target.value) })
-              }
-            />
-            <input
-              aria-label="最高價格"
-              inputMode="numeric"
-              placeholder="最高價格"
-              type="text"
-              value={draft.maxPrice}
-              onChange={(event) =>
-                onDraftChange({ ...draft, maxPrice: toPriceDigits(event.target.value) })
-              }
-            />
-          </div>
-        </div>
-        <div className="toolbar-status-filter">
-          <span>狀態</span>
-          <div className="segmented-control toolbar-segmented-control">
-            {STATUS_OPTIONS.map((option) => (
-              <button
-                aria-pressed={query.status === option.value}
-                className={query.status === option.value ? "is-active" : ""}
-                key={option.value}
-                type="button"
-                onClick={() => onStatusChange(option.value)}
-              >
-                {option.label}
+      {filtersOpen ? (
+        <button
+          aria-label="關閉篩選"
+          className="filter-drawer-backdrop"
+          type="button"
+          onClick={() => setFiltersOpen(false)}
+        />
+      ) : null}
+      <div className={filtersOpen ? "filter-drawer is-open" : "filter-drawer"}>
+        <div className="filter-drawer-heading">
+          <strong>篩選條件</strong>
+          <div>
+            {hasActiveFilters ? (
+              <button className="results-reset-button" type="button" onClick={onResetFilters}>
+                重設
               </button>
-            ))}
+            ) : null}
+            <button
+              className="filter-drawer-close"
+              type="button"
+              onClick={() => setFiltersOpen(false)}
+            >
+              完成
+            </button>
           </div>
         </div>
-        <VendorFilter
-          options={vendorOptions}
-          disabledLabel={query.category ? "無廠商資料" : "先選分類"}
-          selectedCategoryName={selectedCategoryName}
-          selectedOptions={selectedVendorOptions}
-          selectedValues={query.vendors}
-          onClear={onClearVendors}
-          onToggle={onToggleVendor}
-        />
-        <AdvancedFilter
-          categories={categories}
-          selectedCategory={query.category}
-          selectedFacets={query.facets}
-          onClear={onClearFacets}
-          onToggle={onToggleFacet}
-        />
-        <label>
-          <span>排序</span>
-          <select
-            aria-label="排序"
-            value={query.sort}
-            onChange={(event) => onSortChange(event.target.value as ProductSort)}
-          >
-            {SORT_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          <span>每頁</span>
-          <select
-            aria-label="每頁顯示"
-            value={query.pageSize}
-            onChange={(event) =>
-              onPageSizeChange(Number(event.target.value) || DEFAULT_QUERY.pageSize)
-            }
-          >
-            {PAGE_SIZE_OPTIONS.map((pageSize) => (
-              <option key={pageSize} value={pageSize}>
-                {pageSize}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="toolbar-controls">
+          <div className="toolbar-price-filter">
+            <span>價格</span>
+            <div className="price-grid toolbar-price-grid">
+              <input
+                aria-label="最低價格"
+                inputMode="numeric"
+                placeholder="最低價格"
+                type="text"
+                value={draft.minPrice}
+                onChange={(event) =>
+                  onDraftChange({ ...draft, minPrice: toPriceDigits(event.target.value) })
+                }
+              />
+              <input
+                aria-label="最高價格"
+                inputMode="numeric"
+                placeholder="最高價格"
+                type="text"
+                value={draft.maxPrice}
+                onChange={(event) =>
+                  onDraftChange({ ...draft, maxPrice: toPriceDigits(event.target.value) })
+                }
+              />
+            </div>
+          </div>
+          <div className="toolbar-status-filter">
+            <span>狀態</span>
+            <div className="segmented-control toolbar-segmented-control">
+              {STATUS_OPTIONS.map((option) => (
+                <button
+                  aria-pressed={query.status === option.value}
+                  className={query.status === option.value ? "is-active" : ""}
+                  key={option.value}
+                  type="button"
+                  onClick={() => onStatusChange(option.value)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <VendorFilter
+            options={vendorOptions}
+            disabledLabel={query.category ? "無廠商資料" : "先選分類"}
+            selectedCategoryName={selectedCategoryName}
+            selectedOptions={selectedVendorOptions}
+            selectedValues={query.vendors}
+            onClear={onClearVendors}
+            onToggle={onToggleVendor}
+          />
+          <AdvancedFilter
+            categories={categories}
+            selectedCategory={query.category}
+            selectedFacets={query.facets}
+            onToggle={onToggleFacet}
+          />
+        </div>
       </div>
       {selectedFacetChips.length > 0 ? (
         <fieldset className="active-filter-chips" aria-label="已選進階篩選">

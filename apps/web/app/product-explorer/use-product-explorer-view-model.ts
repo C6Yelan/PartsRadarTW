@@ -156,7 +156,6 @@ export function useProductExplorerViewModel() {
       actions: {
         toolbar: {
           clearVendors: () => actions.updateQuery({ vendors: DEFAULT_QUERY.vendors }),
-          clearFacets: () => actions.updateQuery({ facets: DEFAULT_QUERY.facets }),
           draftChange: setDraft,
           pageSizeChange: (pageSize: number) => actions.updateQuery({ pageSize }),
           removeFacet: actions.toggleFacetFilter,

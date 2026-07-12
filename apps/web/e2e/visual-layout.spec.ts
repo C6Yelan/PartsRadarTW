@@ -310,8 +310,13 @@ test("keeps the main pages usable without horizontal overflow", async ({ page },
   await expect(page.getByRole("region", { name: "商品列表" })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "頁碼" })).toBeVisible();
 
-  await page.getByRole("button", { name: "選擇條件" }).click();
+  const gpuChipFilter = page.locator(".facet-filter").filter({ hasText: "GPU 晶片" });
+  const vramFilter = page.locator(".facet-filter").filter({ hasText: "顯示記憶體" });
+
+  await page.getByRole("button", { name: /^篩選/ }).click();
+  await gpuChipFilter.getByRole("button", { name: "全部" }).click();
   await page.getByRole("checkbox", { name: "NVIDIA" }).check();
+  await vramFilter.getByRole("button", { name: "全部" }).click();
   await page.getByRole("checkbox", { name: "16 GB" }).check();
   await expect
     .poll(() => new URL(page.url()).searchParams.getAll("facet"))
@@ -330,22 +335,27 @@ test("keeps the main pages usable without horizontal overflow", async ({ page },
   await page.getByRole("searchbox", { name: "搜尋商品名稱" }).focus();
   await expectUsableLayout(page, testInfo);
 
-  await page.getByRole("button", { name: "已選 2 項" }).click();
+  await vramFilter.getByRole("button", { name: "16 GB" }).click();
+  await page.getByRole("button", { name: "完成" }).click();
   await page.getByRole("button", { name: "移除篩選：GPU 晶片：NVIDIA" }).click();
   await expect
     .poll(() => new URL(page.url()).searchParams.getAll("facet"))
     .toEqual(["vram_gb:16"]);
-  await page.getByRole("button", { name: "已選 1 項" }).click();
+  await page.getByRole("button", { name: /^篩選/ }).click();
+  await gpuChipFilter.getByRole("button", { name: "全部" }).click();
   await expect(page.getByRole("checkbox", { name: "NVIDIA" })).not.toBeChecked();
+  await gpuChipFilter.getByRole("button", { name: "全部" }).click();
 
   await page.getByRole("button", { name: "重設" }).click();
   await expect.poll(() => new URL(page.url()).searchParams.getAll("facet")).toEqual([]);
-  await page.getByRole("button", { name: "選擇條件" }).click();
+  await vramFilter.getByRole("button", { name: "全部" }).click();
   await expect(page.getByRole("checkbox", { name: "16 GB" })).not.toBeChecked();
-
-  await page.getByRole("checkbox", { name: "NVIDIA" }).check();
-  await page.getByRole("checkbox", { name: "16 GB" }).check();
-  await page.getByRole("button", { name: "已選 2 項" }).click();
+  await vramFilter.getByRole("button", { name: "全部" }).click();
+  await page.getByRole("button", { name: "完成" }).click();
+  await expect(page.getByRole("button", { name: /^篩選/ })).toHaveAttribute(
+    "aria-expanded",
+    "false",
+  );
   if ((page.viewportSize()?.width ?? 0) <= 760) {
     await page.locator(".filter-panel summary").click();
     await expect(page.locator(".filter-panel details")).toHaveAttribute("open", "");

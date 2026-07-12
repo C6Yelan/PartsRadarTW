@@ -29,7 +29,6 @@ export function ProductExplorerResultsPanel({
         totalItems={toolbar.totalItems}
         vendorOptions={toolbar.vendorOptions}
         onClearVendors={actions.toolbar.clearVendors}
-        onClearFacets={actions.toolbar.clearFacets}
         onDraftChange={actions.toolbar.draftChange}
         onPageSizeChange={actions.toolbar.pageSizeChange}
         onRemoveFacet={actions.toolbar.removeFacet}

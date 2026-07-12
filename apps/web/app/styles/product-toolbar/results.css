@@ -22,8 +22,45 @@
 .results-heading-row {
   display: flex;
   gap: 12px;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
+}
+
+.results-heading-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.results-filter-button {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text);
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.results-filter-button.is-active {
+  background: var(--accent-surface);
+  color: var(--text-strong);
+}
+
+.results-compact-select {
+  display: grid;
+  grid-template-columns: auto minmax(120px, 190px);
+  gap: 7px;
+  align-items: center;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.results-compact-select.is-page-size {
+  grid-template-columns: auto 72px;
 }
 
 .results-title {
