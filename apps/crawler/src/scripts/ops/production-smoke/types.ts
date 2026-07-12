@@ -13,6 +13,7 @@ export interface ProductionSmokeOptions {
   timeoutMs: number;
   productImageStorageDir: string;
   productImageSampleSize: number;
+  imageInactiveRetentionDays: number;
   sourceWarnAfterMinutes: number;
   sourceFailAfterMinutes: number;
   crawlerWarnAfterMinutes: number;

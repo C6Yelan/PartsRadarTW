@@ -18,6 +18,7 @@ const DEFAULT_MIN_DELAY_MS = 5000;
 const DEFAULT_MAX_DELAY_MS = 12000;
 const DEFAULT_TIMEOUT_MS = 15000;
 const DEFAULT_MAX_SOURCE_BYTES = 5 * 1024 * 1024;
+export const DEFAULT_INACTIVE_IMAGE_RETENTION_DAYS = 30;
 
 // 手動補圖流程傳給候選查詢、圖片下載與寫檔 processor 的設定契約。
 export interface ImageBackfillOptions {
@@ -26,6 +27,7 @@ export interface ImageBackfillOptions {
   limit: number | null;
   productId: string | null;
   igrp: number | null;
+  inactiveRetentionDays: number;
   minDelayMs: number;
   maxDelayMs: number;
   timeoutMs: number;
@@ -88,6 +90,11 @@ export function parseOptions(
     limit: getPositiveNumberArg(args, "--limit"),
     productId: getStringArg(args, "--product-id") ?? null,
     igrp: getPositiveNumberArg(args, "--igrp"),
+    inactiveRetentionDays: getNumberArg(
+      args,
+      "--inactive-retention-days",
+      getInactiveRetentionDays(env.IMAGE_CACHE_INACTIVE_RETENTION_DAYS),
+    ),
     minDelayMs,
     maxDelayMs,
     timeoutMs: getNumberArg(args, "--timeout-ms", DEFAULT_TIMEOUT_MS),
@@ -131,6 +138,9 @@ Options:
   --limit <count>            Limit selected products.
   --product-id <uuid>        Backfill a single product.
   --igrp <number>            Backfill one enabled CoolPC category.
+  --inactive-retention-days <days>
+                             Fetch missing inactive product images only when referenced by a price snapshot within this many days.
+                             Default: ${DEFAULT_INACTIVE_IMAGE_RETENTION_DAYS}
   --overwrite                Regenerate existing cached thumbnails.
   --min-delay-ms <ms>        Minimum randomized delay between source image requests.
                              Default: ${DEFAULT_MIN_DELAY_MS}
@@ -144,6 +154,19 @@ Options:
                              Default: PRODUCT_IMAGE_STORAGE_DIR, then ${DEFAULT_STORAGE_DIR}
 
 Environment:
-  EXTERNAL_FETCH_LOCK_DIR, EXTERNAL_FETCH_LOCK_STALE_SECONDS, SNAPSHOT_STORAGE_DIR
+  IMAGE_CACHE_INACTIVE_RETENTION_DAYS, EXTERNAL_FETCH_LOCK_DIR,
+  EXTERNAL_FETCH_LOCK_STALE_SECONDS, SNAPSHOT_STORAGE_DIR
 `);
+}
+
+function getInactiveRetentionDays(raw: string | undefined): number {
+  if (raw === undefined) {
+    return DEFAULT_INACTIVE_IMAGE_RETENTION_DAYS;
+  }
+
+  if (!/^\d+$/.test(raw) || !Number.isSafeInteger(Number(raw))) {
+    throw new Error("IMAGE_CACHE_INACTIVE_RETENTION_DAYS must be a non-negative integer.");
+  }
+
+  return Number(raw);
 }

@@ -20,6 +20,8 @@ Options:
   --timeout-ms <ms>                        HTTP request timeout. Default: ${DEFAULT_TIMEOUT_MS}
   --product-image-storage-dir <path>       Product image cache directory.
                                            Default: PRODUCT_IMAGE_STORAGE_DIR, then ${DEFAULT_PRODUCT_IMAGE_STORAGE_DIR}
+  --image-inactive-retention-days <days>   Historical product image retention used by metadata checks.
+                                           Default: IMAGE_CACHE_INACTIVE_RETENTION_DAYS, then 30
   --source-warn-after-minutes <minutes>    Warn when source success is older than this.
   --source-fail-after-minutes <minutes>    Fail when source success is older than this.
   --crawler-warn-after-minutes <minutes>   Warn when latest successful crawler run is older than this.

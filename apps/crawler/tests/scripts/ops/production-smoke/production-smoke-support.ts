@@ -152,6 +152,7 @@ export function createSmokeClient({
   discordDeliveryRecords,
   publicDiscordDeliveryCounts = {},
   publicDiscordDeliveryRecords,
+  historicalImageProducts = [],
 }: {
   invalidImageErrorCount: number;
   trueParseErrorCount: number;
@@ -178,6 +179,7 @@ export function createSmokeClient({
     createdAt: Date;
     updatedAt: Date;
   }>;
+  historicalImageProducts?: Array<{ id: string }>;
 }) {
   return {
     crawlRun: {
@@ -226,7 +228,8 @@ export function createSmokeClient({
     },
     product: {
       count: async () => 1,
-      findMany: async () => [{ id: "product-1" }],
+      findMany: async ({ where }: { where?: { isActive?: boolean } } = {}) =>
+        where?.isActive === false ? historicalImageProducts : [{ id: "product-1" }],
     },
     rawSnapshot: {
       count: async () => 0,

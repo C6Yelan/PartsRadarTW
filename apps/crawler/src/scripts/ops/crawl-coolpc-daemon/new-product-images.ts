@@ -3,7 +3,11 @@
 
 import type { PrismaClient } from "@partsradar/db";
 import { toSafeCliErrorMessage } from "../../shared/script-utils";
-import type { BackfillSummary, ImageBackfillOptions } from "../image-cache-backfill/options";
+import {
+  DEFAULT_INACTIVE_IMAGE_RETENTION_DAYS,
+  type BackfillSummary,
+  type ImageBackfillOptions,
+} from "../image-cache-backfill/options";
 import {
   backfillImages,
   readImageRecoveryCandidates,
@@ -86,6 +90,7 @@ function createImageBackfillOptions(options: NewProductImageBackfillOptions): Im
     limit: null,
     productId: null,
     igrp: null,
+    inactiveRetentionDays: DEFAULT_INACTIVE_IMAGE_RETENTION_DAYS,
     minDelayMs: options.minDelayMs,
     maxDelayMs: options.maxDelayMs,
     timeoutMs: options.timeoutMs,

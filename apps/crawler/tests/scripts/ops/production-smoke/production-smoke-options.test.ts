@@ -25,6 +25,7 @@ describe("production smoke options", () => {
       publicOnly: false,
       timeoutMs: 5000,
       productImageSampleSize: 5,
+      imageInactiveRetentionDays: 30,
       sourceWarnAfterMinutes: 60,
       sourceFailAfterMinutes: 120,
       crawlerWarnAfterMinutes: 90,
@@ -57,6 +58,8 @@ describe("production smoke options", () => {
         "1500",
         "--missing-image-warn-count",
         "10",
+        "--image-inactive-retention-days",
+        "45",
       ],
       {
         SMOKE_TIMEOUT_MS: "9000",
@@ -75,6 +78,7 @@ describe("production smoke options", () => {
     expect(options.sourceWarnAfterMinutes).toBe(45);
     expect(options.crawlerFailAfterMinutes).toBe(240);
     expect(options.missingImageWarnCount).toBe(10);
+    expect(options.imageInactiveRetentionDays).toBe(45);
     expect(options.invalidImageUrlWarnCount).toBe(1500);
     expect(options.productImageStorageDir).toBe(join(workspaceRoot, "custom-images"));
   });

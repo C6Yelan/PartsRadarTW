@@ -17,8 +17,28 @@ describe("image cache backfill options", () => {
   it("defaults bare and compatibility alias invocations to dry-run", async () => {
     const crawlerCwd = await createWorkspace();
 
-    expect(parseOptions([], crawlerCwd, {}).dryRun).toBe(true);
+    expect(parseOptions([], crawlerCwd, {})).toMatchObject({
+      dryRun: true,
+      inactiveRetentionDays: 30,
+    });
     expect(parseOptions(["--dry-run"], crawlerCwd, {}).dryRun).toBe(true);
+  });
+
+  it("accepts CLI and environment overrides for inactive retention", async () => {
+    const crawlerCwd = await createWorkspace();
+
+    expect(
+      parseOptions(["--inactive-retention-days", "45"], crawlerCwd, {
+        IMAGE_CACHE_INACTIVE_RETENTION_DAYS: "60",
+      }).inactiveRetentionDays,
+    ).toBe(45);
+    expect(
+      parseOptions([], crawlerCwd, { IMAGE_CACHE_INACTIVE_RETENTION_DAYS: "60" })
+        .inactiveRetentionDays,
+    ).toBe(60);
+    expect(() =>
+      parseOptions([], crawlerCwd, { IMAGE_CACHE_INACTIVE_RETENTION_DAYS: "invalid" }),
+    ).toThrow("IMAGE_CACHE_INACTIVE_RETENTION_DAYS must be a non-negative integer");
   });
 
   it("enables live requests only with explicit confirmation", async () => {

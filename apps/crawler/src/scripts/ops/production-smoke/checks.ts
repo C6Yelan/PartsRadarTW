@@ -13,7 +13,11 @@ import {
 import { checkCrawlerFreshness, checkRecentSuspectedBlocks } from "./checks/crawler-runs";
 import { checkDiscordBotDeliveries } from "./checks/discord-deliveries";
 import { checkRecentParseErrors, checkSourceImageAnomalies } from "./checks/parse-errors";
-import { checkActiveProductCount, checkMissingProductImages } from "./checks/product-health";
+import {
+  checkActiveProductCount,
+  checkHistoricalImageCacheMetadata,
+  checkMissingProductImages,
+} from "./checks/product-health";
 import { checkPublicEndpoints } from "./checks/public-http";
 import { checkRawSnapshotRetention } from "./checks/raw-snapshot-retention";
 import type {
@@ -40,6 +44,7 @@ export async function runProductionSmoke(
   checks.push(await checkSourceImageAnomalies(client, options, now));
   checks.push(await checkActiveProductCount(client, options));
   checks.push(await checkMissingProductImages(client, options));
+  checks.push(await checkHistoricalImageCacheMetadata(client, options, now));
   checks.push(await checkRawSnapshotRetention(client, options, now));
   checks.push(await checkDiscordBotDeliveries(client, options, now));
 

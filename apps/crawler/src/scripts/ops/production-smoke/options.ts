@@ -32,6 +32,7 @@ import {
   HELP_FLAG,
   PUBLIC_ONLY_FLAG,
 } from "./constants";
+import { DEFAULT_INACTIVE_IMAGE_RETENTION_DAYS } from "../image-cache-backfill/options";
 import { printProductionSmokeHelp } from "./options/help";
 import { normalizeBaseUrl, parseIntegerOption } from "./options/values";
 import type { ProductionSmokeOptions } from "./types";
@@ -81,6 +82,15 @@ export function parseProductionSmokeOptions(
       fallback: DEFAULT_PRODUCT_IMAGE_SAMPLE_SIZE,
       min: 1,
       max: 50,
+    }),
+    imageInactiveRetentionDays: parseIntegerOption({
+      args,
+      env,
+      argName: "--image-inactive-retention-days",
+      envName: "IMAGE_CACHE_INACTIVE_RETENTION_DAYS",
+      fallback: DEFAULT_INACTIVE_IMAGE_RETENTION_DAYS,
+      min: 0,
+      max: 3650,
     }),
     sourceWarnAfterMinutes: parseIntegerOption({
       args,

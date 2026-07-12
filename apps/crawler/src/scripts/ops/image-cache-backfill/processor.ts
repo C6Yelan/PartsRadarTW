@@ -28,6 +28,7 @@ import type { BackfillSummary, ImageBackfillOptions } from "./options";
 export interface ProductImageCandidate {
   id: string;
   name: string;
+  isActive: boolean;
   primaryImageUrl: string | null;
   primaryImageCheckedAt: Date | null;
   imageCachedAt: Date | null;
@@ -36,6 +37,7 @@ export interface ProductImageCandidate {
   imageCacheNextRetryAt: Date | null;
   firstSeenAt: Date;
   lastSeenAt: Date;
+  priceSnapshots: Array<{ capturedAt: Date }>;
   sourceCategory: {
     igrp: number;
     displayName: string;
@@ -61,13 +63,28 @@ type ImageCacheStateClient = Pick<PrismaClient, "product">;
 export async function readCandidates(
   client: PrismaClient,
   options: ImageBackfillOptions,
+  now = new Date(),
 ): Promise<ProductImageCandidate[]> {
-  return client.product.findMany({
-    where: createProductImageCandidateWhere(options),
+  const candidates = await client.product.findMany({
+    where: createProductImageCandidateWhere(options, now),
     select: createProductImageCandidateSelect(),
     orderBy: PRODUCT_IMAGE_CANDIDATE_ORDER_BY,
-    take: options.limit ?? undefined,
   });
+  const selected: ProductImageCandidate[] = [];
+
+  for (const candidate of candidates) {
+    const webpExists = await pathExists(join(options.storageDir, `${candidate.id}.webp`));
+
+    if (webpExists || isMissingImageEligible(candidate, options, now)) {
+      selected.push(candidate);
+    }
+
+    if (options.limit !== null && selected.length >= options.limit) {
+      break;
+    }
+  }
+
+  return selected;
 }
 
 // scheduled crawler 只針對本輪新增商品補圖，因此以 product id 清單收斂查詢範圍。
@@ -118,12 +135,30 @@ export async function readImageRecoveryCandidates(
   for (const candidate of candidates) {
     if (await pathExists(join(options.storageDir, `${candidate.id}.webp`))) {
       await markImageCacheReady(client, candidate.id, now);
+    } else if (!isMissingImageEligible(candidate, options, now)) {
+      await markImageCacheChecked(client, candidate.id, now);
     } else if (!candidate.imageCacheNextRetryAt || candidate.imageCacheNextRetryAt <= now) {
       missingCandidates.push(candidate);
     }
   }
 
   return missingCandidates;
+}
+
+function isMissingImageEligible(
+  candidate: ProductImageCandidate,
+  options: ImageBackfillOptions,
+  now: Date,
+): boolean {
+  if (options.productId === candidate.id || candidate.isActive) {
+    return true;
+  }
+
+  const retentionCutoff = now.getTime() - options.inactiveRetentionDays * 24 * 60 * 60 * 1000;
+
+  return candidate.priceSnapshots.some(
+    (snapshot) => snapshot.capturedAt.getTime() >= retentionCutoff,
+  );
 }
 
 // 逐筆處理圖片候選並彙整摘要；逐筆失敗會記入 failed，不中斷整批補圖。
@@ -197,6 +232,24 @@ async function processCandidate(
   let didRequestSource = false;
 
   try {
+    if (!options.overwrite && (await pathExists(outputPath))) {
+      const normalizedExistingSourceUrl = candidate.primaryImageUrl
+        ? normalizeCoolpcProductImageUrl(candidate.primaryImageUrl, candidate.sourceCategory.igrp)
+        : null;
+
+      if (
+        normalizedExistingSourceUrl &&
+        !reusableImagePathsBySourceUrl.has(normalizedExistingSourceUrl)
+      ) {
+        reusableImagePathsBySourceUrl.set(normalizedExistingSourceUrl, outputPath);
+      }
+
+      debugLog(
+        `[skipped] ${candidate.id} | existing ${relative(options.workspaceRoot, outputPath)} | ${candidate.name}`,
+      );
+      return { status: "skipped", didRequestSource };
+    }
+
     const sourceImageUrl = candidate.primaryImageUrl;
 
     if (!sourceImageUrl) {
@@ -212,17 +265,6 @@ async function processCandidate(
     if (!normalizedImageUrl) {
       log(`[invalid] ${candidate.id} | invalid source image URL | ${sourceImageUrl}`);
       return { status: "invalid", didRequestSource, errorMessage: "invalid source image URL" };
-    }
-
-    if (!options.overwrite && (await pathExists(outputPath))) {
-      if (!reusableImagePathsBySourceUrl.has(normalizedImageUrl)) {
-        reusableImagePathsBySourceUrl.set(normalizedImageUrl, outputPath);
-      }
-
-      debugLog(
-        `[skipped] ${candidate.id} | existing ${relative(options.workspaceRoot, outputPath)} | ${candidate.name}`,
-      );
-      return { status: "skipped", didRequestSource };
     }
 
     // 相同來源圖片只下載一次，後續商品直接複製已產生的本地縮圖。
@@ -301,6 +343,17 @@ async function markImageCacheReady(
       imageCacheLastError: null,
       imageCacheNextRetryAt: null,
     },
+  });
+}
+
+async function markImageCacheChecked(
+  client: ImageCacheStateClient,
+  productId: string,
+  checkedAt: Date,
+): Promise<void> {
+  await client.product.update({
+    where: { id: productId },
+    data: { imageCacheCheckedAt: checkedAt },
   });
 }
 

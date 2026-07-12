@@ -1,13 +1,14 @@
 // apps/crawler/tests/scripts/ops/image-cache-backfill/image-cache-backfill-processor.test.ts
 // 驗證圖片快取補圖的 dry-run log、錯誤計數、重用與摘要行為。
 
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ImageBackfillOptions } from "../../../../src/scripts/ops/image-cache-backfill/options";
 import {
   backfillImages,
+  readCandidates,
   readImageRecoveryCandidates,
   type ProductImageCandidate,
 } from "../../../../src/scripts/ops/image-cache-backfill/processor";
@@ -132,6 +133,160 @@ describe("image cache backfill live request accounting", () => {
     expect(updates).toEqual([]);
   });
 
+  it("marks an inactive historical product cache-ready when its WebP already exists", async () => {
+    const storageDir = await createTempRoot();
+    const candidate = {
+      ...createCandidate("historical-existing", "2026-05-01T08:05:00.000Z"),
+      isActive: false,
+      priceSnapshots: [{ capturedAt: new Date("2026-05-01T08:05:00.000Z") }],
+    };
+    const updates: unknown[] = [];
+    await writeFile(join(storageDir, `${candidate.id}.webp`), "webp");
+    const client = {
+      product: {
+        findMany: async () => [candidate],
+        update: async (args: unknown) => {
+          updates.push(args);
+          return candidate;
+        },
+      },
+    } as never;
+
+    const selected = await readImageRecoveryCandidates(
+      client,
+      createOptions({ storageDir, inactiveRetentionDays: 30 }),
+      25,
+      new Date("2026-06-09T08:05:00.000Z"),
+    );
+
+    expect(selected).toEqual([]);
+    expect(updates).toEqual([
+      expect.objectContaining({
+        where: { id: candidate.id },
+        data: expect.objectContaining({
+          imageCachedAt: new Date("2026-06-09T08:05:00.000Z"),
+          imageCacheFailureCount: 0,
+          imageCacheNextRetryAt: null,
+        }),
+      }),
+    ]);
+  });
+
+  it("does not reconcile existing WebP metadata during dry-run", async () => {
+    const storageDir = await createTempRoot();
+    const candidate = createCandidate("dry-run-existing", "2026-06-01T08:05:00.000Z");
+    const update = vi.fn();
+    await writeFile(join(storageDir, `${candidate.id}.webp`), "webp");
+
+    const summary = await backfillImages(
+      [candidate],
+      createOptions({ storageDir, dryRun: true }),
+      { log: () => {}, debugLog: () => {} },
+      { product: { update } } as never,
+    );
+
+    expect(summary).toMatchObject({ selected: 1, skipped: 1, liveFetches: 0 });
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it("reconciles an existing WebP without depending on a still-valid source URL", async () => {
+    const storageDir = await createTempRoot();
+    const candidate = {
+      ...createCandidate("existing-invalid-source", "2026-05-01T08:05:00.000Z"),
+      primaryImageUrl: "https://invalid.example/image.jpg",
+    };
+    const update = vi.fn(async () => candidate);
+    await writeFile(join(storageDir, `${candidate.id}.webp`), "webp");
+
+    const summary = await backfillImages(
+      [candidate],
+      createOptions({ storageDir }),
+      { log: () => {}, debugLog: () => {} },
+      { product: { update } } as never,
+    );
+
+    expect(summary).toMatchObject({ selected: 1, skipped: 1, invalid: 0, liveFetches: 0 });
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: candidate.id },
+        data: expect.objectContaining({ imageCacheFailureCount: 0, imageCacheNextRetryAt: null }),
+      }),
+    );
+  });
+
+  it("only selects missing inactive products inside retention unless explicitly requested", async () => {
+    const storageDir = await createTempRoot();
+    const recent = {
+      ...createCandidate("recent-inactive", "2026-05-20T08:05:00.000Z"),
+      isActive: false,
+      priceSnapshots: [{ capturedAt: new Date("2026-06-01T08:05:00.000Z") }],
+    };
+    const expired = {
+      ...createCandidate("expired-inactive", "2026-04-01T08:05:00.000Z"),
+      isActive: false,
+      priceSnapshots: [{ capturedAt: new Date("2026-04-01T08:05:00.000Z") }],
+    };
+    const client = {
+      product: {
+        findMany: async ({ where }: { where: { id?: string } }) =>
+          where.id
+            ? [expired, recent].filter((candidate) => candidate.id === where.id)
+            : [expired, recent],
+      },
+    } as never;
+    const now = new Date("2026-06-09T08:05:00.000Z");
+
+    await expect(
+      readCandidates(client, createOptions({ storageDir, inactiveRetentionDays: 30 }), now),
+    ).resolves.toEqual([recent]);
+    await expect(
+      readCandidates(
+        client,
+        createOptions({
+          storageDir,
+          inactiveRetentionDays: 30,
+          productId: expired.id,
+        }),
+        now,
+      ),
+    ).resolves.toEqual([expired]);
+  });
+
+  it("rotates expired inactive recovery rows without fetching or marking them ready", async () => {
+    const storageDir = await createTempRoot();
+    const candidate = {
+      ...createCandidate("expired-recovery", "2026-04-01T08:05:00.000Z"),
+      isActive: false,
+      priceSnapshots: [{ capturedAt: new Date("2026-04-01T08:05:00.000Z") }],
+    };
+    const updates: unknown[] = [];
+    const client = {
+      product: {
+        findMany: async () => [candidate],
+        update: async (args: unknown) => {
+          updates.push(args);
+          return candidate;
+        },
+      },
+    } as never;
+    const now = new Date("2026-06-09T08:05:00.000Z");
+
+    await expect(
+      readImageRecoveryCandidates(
+        client,
+        createOptions({ storageDir, inactiveRetentionDays: 30 }),
+        25,
+        now,
+      ),
+    ).resolves.toEqual([]);
+    expect(updates).toEqual([
+      {
+        where: { id: candidate.id },
+        data: { imageCacheCheckedAt: now },
+      },
+    ]);
+  });
+
   it("does not count a shared-lock deferral as a source request", async () => {
     const storageDir = await createTempRoot();
     const options = createOptions({ storageDir });
@@ -222,6 +377,7 @@ function createCandidate(id: string, seenAt: string): ProductImageCandidate {
   return {
     id,
     name: id,
+    isActive: true,
     primaryImageUrl: `https://www.coolpc.com.tw/eval/4/${id}.jpg`,
     primaryImageCheckedAt: date,
     imageCachedAt: null,
@@ -230,6 +386,7 @@ function createCandidate(id: string, seenAt: string): ProductImageCandidate {
     imageCacheNextRetryAt: null,
     firstSeenAt: date,
     lastSeenAt: date,
+    priceSnapshots: [{ capturedAt: date }],
     sourceCategory: {
       igrp: 4,
       displayName: "CPU",
@@ -246,6 +403,7 @@ function createOptions(overrides: Partial<ImageBackfillOptions> = {}): ImageBack
     limit: null,
     productId: null,
     igrp: null,
+    inactiveRetentionDays: 30,
     minDelayMs: 3000,
     maxDelayMs: 8000,
     timeoutMs: 15000,

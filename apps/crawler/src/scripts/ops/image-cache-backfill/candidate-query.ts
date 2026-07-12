@@ -4,13 +4,26 @@
 import type { Prisma } from "@partsradar/db";
 import type { ImageBackfillOptions } from "./options";
 
-// 建立一般補圖候選查詢條件，只選啟用分類、active 商品與有來源圖片 URL 的商品。
+// 建立一般補圖候選查詢條件，納入 active、近期價格引用與 cache metadata 待校正商品。
 export function createProductImageCandidateWhere(
   options: ImageBackfillOptions,
+  now = new Date(),
 ): Prisma.ProductWhereInput {
+  const retentionCutoff = new Date(
+    now.getTime() - options.inactiveRetentionDays * 24 * 60 * 60 * 1000,
+  );
+
   return {
     ...(options.productId ? { id: options.productId } : {}),
-    isActive: true,
+    ...(options.productId
+      ? {}
+      : {
+          OR: [
+            { isActive: true },
+            { imageCachedAt: null },
+            { priceSnapshots: { some: { capturedAt: { gte: retentionCutoff } } } },
+          ],
+        }),
     primaryImageUrl: { not: null },
     sourceCategory: {
       ...(options.igrp === null ? {} : { igrp: options.igrp }),
@@ -38,6 +51,7 @@ export function createProductImageCandidateSelect() {
   return {
     id: true,
     name: true,
+    isActive: true,
     primaryImageUrl: true,
     primaryImageCheckedAt: true,
     imageCachedAt: true,
@@ -46,6 +60,11 @@ export function createProductImageCandidateSelect() {
     imageCacheNextRetryAt: true,
     firstSeenAt: true,
     lastSeenAt: true,
+    priceSnapshots: {
+      select: { capturedAt: true },
+      orderBy: { capturedAt: "desc" },
+      take: 1,
+    },
     sourceCategory: {
       select: {
         igrp: true,
