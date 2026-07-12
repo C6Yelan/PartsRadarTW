@@ -7,6 +7,7 @@ import { resolvePublicSiteUrl } from "./_shared/public-site";
 const PUBLIC_SITEMAP_PATHS = [
   "/",
   "/price-report",
+  "/status",
   "/discord",
   "/about",
   "/announcements",

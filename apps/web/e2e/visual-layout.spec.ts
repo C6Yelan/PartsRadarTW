@@ -91,6 +91,48 @@ test.beforeEach(async ({ page }) => {
       return;
     }
 
+    if (requestUrl.pathname === "/api/source-status") {
+      const fixture = new URL(page.url()).searchParams.get("fixture");
+      if (fixture === "error") {
+        await route.fulfill({ status: 503, body: "" });
+        return;
+      }
+
+      await fulfillJson(route, {
+        source: "coolpc",
+        status: fixture === "stale" ? "stale" : "ok",
+        lastCheckedAt: OBSERVED_AT,
+        lastSuccessAt: "2026-07-10T07:30:00.000Z",
+        categories: [
+          {
+            igrp: 4,
+            displayName: "CPU",
+            sourceName: "處理器 CPU",
+            status: "ok",
+            lastCheckedAt: OBSERVED_AT,
+            lastSuccessAt: "2026-07-10T07:50:00.000Z",
+          },
+          {
+            igrp: 12,
+            displayName: "顯示卡",
+            sourceName: "顯示卡 VGA",
+            status: fixture === "stale" ? "stale" : "ok",
+            lastCheckedAt: OBSERVED_AT,
+            lastSuccessAt: "2026-07-10T06:00:00.000Z",
+          },
+          {
+            igrp: 7,
+            displayName: "SSD／HDD",
+            sourceName: "儲存裝置",
+            status: fixture === "stale" ? "unavailable" : "ok",
+            lastCheckedAt: OBSERVED_AT,
+            lastSuccessAt: fixture === "stale" ? null : "2026-07-10T07:40:00.000Z",
+          },
+        ],
+      });
+      return;
+    }
+
     if (requestUrl.pathname === "/api/products" && requestUrl.searchParams.get("q") === "error") {
       await route.fulfill({ status: 503, body: "" });
       return;
@@ -347,6 +389,21 @@ test("captures the main pages without horizontal overflow", async ({ page }, tes
   await page.getByRole("link", { name: "返回查詢" }).focus();
   await captureLayout(page, testInfo, "announcements");
 
+  await page.goto("/about");
+  await expect(page.getByRole("heading", { exact: true, name: "關於本站" })).toBeVisible();
+  await page.getByRole("link", { name: "返回查詢" }).focus();
+  await captureLayout(page, testInfo, "about");
+
+  await page.goto("/terms");
+  await expect(page.getByRole("heading", { exact: true, name: "使用條款" })).toBeVisible();
+  await page.getByRole("link", { name: "返回查詢" }).focus();
+  await captureLayout(page, testInfo, "terms");
+
+  await page.goto("/visual-missing-route");
+  await expect(page.getByRole("heading", { exact: true, name: "找不到這個頁面" })).toBeVisible();
+  await page.getByRole("link", { name: "返回商品查詢" }).focus();
+  await captureLayout(page, testInfo, "not-found");
+
   await page.goto(`/products/${READY_ROUTE_SLUG}`);
   await expect(page.getByRole("heading", { name: product.name })).toBeVisible();
   await expect(page.getByRole("heading", { name: "價格走勢" })).toBeVisible();
@@ -420,6 +477,18 @@ test("keeps error and empty states usable", async ({ page }, testInfo) => {
   await page.goto("/price-report?q=error");
   await expect(
     page.getByRole("alert").filter({ hasText: "價格變動暫時無法載入" }),
+  ).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+
+  await page.goto("/status?fixture=stale");
+  await expect(page.getByRole("heading", { exact: true, name: "資料更新狀態" })).toBeVisible();
+  await expect(page.getByText("部分資料需留意").first()).toBeVisible();
+  await page.getByRole("link", { name: "返回查詢" }).focus();
+  await captureLayout(page, testInfo, "status-stale");
+
+  await page.goto("/status?fixture=error");
+  await expect(
+    page.getByRole("alert").filter({ hasText: "資料更新狀態暫時無法載入" }),
   ).toBeVisible();
   await expectNoHorizontalOverflow(page);
 

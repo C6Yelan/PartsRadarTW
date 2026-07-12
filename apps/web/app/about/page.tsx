@@ -69,13 +69,22 @@ export default function AboutPage() {
         <section className="public-info-section" id="contact">
           <h2>聯絡與回報</h2>
           <p>
-            本站尚未公布專用聯絡信箱或固定公開回報網址；確認可公開的聯絡管道後會在此更新。
+            專案原始碼可在
+            <a href="https://github.com/C6Yelan/PartsRadarTW" rel="noreferrer" target="_blank">
+              GitHub repository
+            </a>
+            公開瀏覽，但目前 Issues 限制建立新 issue，不能作為一般使用者的正式回報管道。
           </p>
           <p>
-            請勿透過原價屋客服回報本站問題，也不要在公開內容附上 token、連線字串、私鑰或其他敏感資訊。
+            本站尚未提供專用 email 或公開表單。請勿透過原價屋客服回報本站問題，也不要在公開內容附上
+            token、連線字串、私鑰或其他敏感資訊。
+          </p>
+          <p className="public-info-launch-warning" role="note">
+            在可用聯絡管道與正式部署日誌政策確認前，本站尚未符合正式公開上線條件。
           </p>
           <div className="public-info-actions">
             <Link href="/announcements">查看網站公告</Link>
+            <Link href="/status">查看資料更新狀態</Link>
             <Link href="/privacy">閱讀隱私權政策</Link>
           </div>
         </section>

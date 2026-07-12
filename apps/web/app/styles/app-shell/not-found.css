@@ -9,6 +9,10 @@
   padding: clamp(24px, 5vw, 48px) 0;
 }
 
+.not-found-content {
+  display: contents;
+}
+
 .not-found-brand {
   align-self: start;
 }
