@@ -9,6 +9,7 @@ export const PRODUCT_DETAIL_SELECT = {
   ibuyToken: true,
   name: true,
   primaryImageUrl: true,
+  imageCachedAt: true,
   isActive: true,
   lastSeenAt: true,
   currentPrice: {

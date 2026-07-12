@@ -221,4 +221,18 @@ describe("GET /api/products response", () => {
       },
     });
   });
+
+  it("does not advertise an image until the local cache is confirmed", async () => {
+    const client = fakeProductsClient({
+      products: [product({ imageCachedAt: null })],
+      totalItems: 1,
+      sourceCategories: [],
+    });
+
+    const response = await createGetProductsHandler(client, { now: () => NOW })(
+      new Request("https://parts.example/api/products"),
+    );
+
+    expect((await response.json()).data[0].image).toBeNull();
+  });
 });

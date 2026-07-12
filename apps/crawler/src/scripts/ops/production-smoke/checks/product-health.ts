@@ -3,7 +3,7 @@
 
 import { access } from "node:fs/promises";
 import { join } from "node:path";
-import { fail, ok, thresholdCheck } from "../results";
+import { countStatus, fail, ok, worseStatus } from "../results";
 import type { ProductionSmokeClient, ProductionSmokeOptions, SmokeCheckResult } from "../types";
 
 // 確認 production DB 仍有可展示的 active 商品，避免 crawler 或資料寫入異常造成商品清空。
@@ -40,15 +40,23 @@ export async function checkMissingProductImages(
     }
   }
 
-  const message = `${missingCount}/${products.length} display-ready product image(s) missing`;
-
-  return thresholdCheck(
-    "missing product images",
+  const missingPercent = products.length === 0 ? 0 : (missingCount / products.length) * 100;
+  const countBasedStatus = countStatus(
     missingCount,
     options.missingImageWarnCount,
     options.missingImageFailCount,
-    message,
   );
+  const percentBasedStatus = countStatus(
+    missingPercent,
+    options.missingImageWarnPercent,
+    options.missingImageFailPercent,
+  );
+
+  return {
+    name: "missing product images",
+    status: worseStatus(countBasedStatus, percentBasedStatus),
+    message: `${missingCount}/${products.length} (${missingPercent.toFixed(2)}%) display-ready product image(s) missing`,
+  };
 }
 
 // 定義 production smoke 中「可展示商品」的共用條件，供商品數與圖片快取檢查一致使用。

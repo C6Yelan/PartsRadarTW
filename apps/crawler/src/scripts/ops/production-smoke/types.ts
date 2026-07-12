@@ -24,6 +24,8 @@ export interface ProductionSmokeOptions {
   minActiveProducts: number;
   missingImageWarnCount: number;
   missingImageFailCount: number;
+  missingImageWarnPercent: number;
+  missingImageFailPercent: number;
   rawSnapshotNormalRetentionDays: number;
   rawSnapshotAbnormalRetentionDays: number;
   rawSnapshotRetentionGraceDays: number;

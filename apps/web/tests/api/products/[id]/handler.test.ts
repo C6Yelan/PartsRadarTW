@@ -90,6 +90,15 @@ describe("GET /api/products/{id} handler", () => {
     });
   });
 
+  it("does not advertise a missing local image cache", async () => {
+    const response = await createGetProductHandler(
+      fakeProductDetailClient(product({ imageCachedAt: null })),
+    )(PRODUCT_ID);
+
+    expect(response.status).toBe(200);
+    expect((await response.json()).image).toBeNull();
+  });
+
   it("returns inactive product details when the product still has a current price", async () => {
     const response = await createGetProductHandler(
       fakeProductDetailClient(
@@ -189,6 +198,7 @@ function product(overrides: Partial<NonNullable<ProductRecord>> = {}): NonNullab
     ibuyToken: "GPU-RTX-4070",
     name: "GPU RTX 4070",
     primaryImageUrl: "https://www.coolpc.com.tw/eval/12/gpu-rtx-4070.jpg",
+    imageCachedAt: new Date("2026-05-28T11:50:00.000Z"),
     isActive: true,
     lastSeenAt: new Date("2026-05-28T11:55:00.000Z"),
     currentPrice: {

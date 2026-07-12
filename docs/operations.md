@@ -124,6 +124,8 @@ docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler ru
 
 使用時機：新主機、重建 product image volume、缺圖修復。必須使用專用 `image-cache-backfill` service；`crawler` 不掛載此 volume。
 
+日常缺圖由既有 `crawler-daemon` 每輪限量輪替檢查並自動補回；失敗會記錄於商品圖片快取狀態，經退避後重試。此手動指令只用於首次部署、volume 重建或加速大量歷史缺檔修復。
+
 Dry-run：
 
 ```bash

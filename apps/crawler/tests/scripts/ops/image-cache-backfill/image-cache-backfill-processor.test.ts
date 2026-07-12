@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ImageBackfillOptions } from "../../../../src/scripts/ops/image-cache-backfill/options";
 import {
   backfillImages,
+  readImageRecoveryCandidates,
   type ProductImageCandidate,
 } from "../../../../src/scripts/ops/image-cache-backfill/processor";
 import { tryAcquireExternalFetchLock } from "../../../../src/scripts/ops/external-fetch-lock";
@@ -70,6 +71,67 @@ describe("image cache backfill log levels", () => {
 });
 
 describe("image cache backfill live request accounting", () => {
+  it("persists a bounded retry after a source failure", async () => {
+    const storageDir = await createTempRoot();
+    const updates: unknown[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new Error("source unavailable");
+      }),
+    );
+    const candidate = createCandidate("retry-state", "2026-06-08T08:05:00.000Z");
+
+    await backfillImages(
+      [candidate],
+      createOptions({ storageDir }),
+      { log: () => {}, debugLog: () => {} },
+      {
+        product: {
+          update: async (args: unknown) => {
+            updates.push(args);
+            return candidate;
+          },
+        },
+      } as never,
+    );
+
+    expect(updates).toHaveLength(1);
+    expect(updates[0]).toMatchObject({
+      where: { id: "retry-state" },
+      data: {
+        imageCachedAt: null,
+        imageCacheFailureCount: 1,
+        imageCacheLastError: "source unavailable",
+      },
+    });
+  });
+
+  it("selects an existing product when its WebP is missing", async () => {
+    const storageDir = await createTempRoot();
+    const candidate = createCandidate("existing-missing", "2026-06-08T08:05:00.000Z");
+    const updates: unknown[] = [];
+    const client = {
+      product: {
+        findMany: async () => [candidate],
+        update: async (args: unknown) => {
+          updates.push(args);
+          return candidate;
+        },
+      },
+    } as never;
+
+    const selected = await readImageRecoveryCandidates(
+      client,
+      createOptions({ storageDir }),
+      25,
+      new Date("2026-06-09T08:05:00.000Z"),
+    );
+
+    expect(selected.map(({ id }) => id)).toEqual(["existing-missing"]);
+    expect(updates).toEqual([]);
+  });
+
   it("does not count a shared-lock deferral as a source request", async () => {
     const storageDir = await createTempRoot();
     const options = createOptions({ storageDir });
@@ -162,6 +224,10 @@ function createCandidate(id: string, seenAt: string): ProductImageCandidate {
     name: id,
     primaryImageUrl: `https://www.coolpc.com.tw/eval/4/${id}.jpg`,
     primaryImageCheckedAt: date,
+    imageCachedAt: null,
+    imageCacheCheckedAt: null,
+    imageCacheFailureCount: 0,
+    imageCacheNextRetryAt: null,
     firstSeenAt: date,
     lastSeenAt: date,
     sourceCategory: {

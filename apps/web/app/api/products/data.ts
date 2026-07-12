@@ -11,6 +11,7 @@ export const PRODUCT_SELECT = {
   ibuyToken: true,
   name: true,
   primaryImageUrl: true,
+  imageCachedAt: true,
   isActive: true,
   currentPrice: {
     select: {

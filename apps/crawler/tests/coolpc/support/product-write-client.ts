@@ -80,6 +80,7 @@ export class FakeCoolpcProductWriteClient implements CoolpcProductWriteClient {
 
       return {
         id: product.id,
+        primaryImageUrl: product.primaryImageUrl,
         currentPrice:
           currentPrice && priceSnapshot
             ? {

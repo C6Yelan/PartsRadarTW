@@ -143,6 +143,7 @@ export function product(overrides: Partial<ProductRecord> = {}): ProductRecord {
     ibuyToken: "GPU-RTX-4070",
     name: "GPU RTX 4070",
     primaryImageUrl: "https://www.coolpc.com.tw/eval/12/gpu-rtx-4070.jpg",
+    imageCachedAt: new Date("2026-05-28T11:50:00.000Z"),
     isActive: true,
     currentPrice: {
       lastSeenAt: new Date("2026-05-28T11:55:00.000Z"),

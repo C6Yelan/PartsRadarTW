@@ -118,7 +118,7 @@ export function toProductResponseItemWithMovement(
 
 // 將商品圖片欄位轉成列表用的公開圖片資訊。
 function toProductListImage(product: ProductRecord): ProductListResponseItem["image"] {
-  if (!product.primaryImageUrl) {
+  if (!product.primaryImageUrl || !product.imageCachedAt) {
     return null;
   }
 

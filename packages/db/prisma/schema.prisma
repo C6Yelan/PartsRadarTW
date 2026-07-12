@@ -132,29 +132,34 @@ model SourceCategory {
 }
 
 model Product {
-  id                    String                        @id @default(uuid()) @db.Uuid
-  sourceCategoryId      String                        @map("source_category_id") @db.Uuid
-  sourceCategory        SourceCategory                @relation(fields: [sourceCategoryId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  ibuyToken             String                        @map("ibuy_token")
-  name                  String                        @db.Text
-  normalizedName        String                        @map("normalized_name") @db.Text
-  vendorSlug            String?                       @map("vendor_slug") @db.Text
-  vendorName            String?                       @map("vendor_name") @db.Text
-  filterTags            String[]                      @default([]) @map("filter_tags")
-  primaryImageUrl       String?                       @map("primary_image_url") @db.Text
-  primaryImageCheckedAt DateTime?                     @map("primary_image_checked_at") @db.Timestamptz(6)
-  sourceUrl             String                        @map("source_url") @db.Text
-  isActive              Boolean                       @default(true) @map("is_active")
-  missingSince          DateTime?                     @map("missing_since") @db.Timestamptz(6)
-  missingSeenCount      Int                           @default(0) @map("missing_seen_count")
-  firstSeenAt           DateTime                      @map("first_seen_at") @db.Timestamptz(6)
-  lastSeenAt            DateTime                      @map("last_seen_at") @db.Timestamptz(6)
-  createdAt             DateTime                      @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt             DateTime                      @updatedAt @map("updated_at") @db.Timestamptz(6)
-  currentPrice          CurrentPrice?
-  priceSnapshots        PriceSnapshot[]
-  discordTargetWatches  DiscordTargetPriceWatch[]
-  discordDeliveries     DiscordNotificationDelivery[]
+  id                     String                        @id @default(uuid()) @db.Uuid
+  sourceCategoryId       String                        @map("source_category_id") @db.Uuid
+  sourceCategory         SourceCategory                @relation(fields: [sourceCategoryId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  ibuyToken              String                        @map("ibuy_token")
+  name                   String                        @db.Text
+  normalizedName         String                        @map("normalized_name") @db.Text
+  vendorSlug             String?                       @map("vendor_slug") @db.Text
+  vendorName             String?                       @map("vendor_name") @db.Text
+  filterTags             String[]                      @default([]) @map("filter_tags")
+  primaryImageUrl        String?                       @map("primary_image_url") @db.Text
+  primaryImageCheckedAt  DateTime?                     @map("primary_image_checked_at") @db.Timestamptz(6)
+  imageCachedAt          DateTime?                     @map("image_cached_at") @db.Timestamptz(6)
+  imageCacheCheckedAt    DateTime?                     @map("image_cache_checked_at") @db.Timestamptz(6)
+  imageCacheFailureCount Int                           @default(0) @map("image_cache_failure_count")
+  imageCacheLastError    String?                       @map("image_cache_last_error") @db.Text
+  imageCacheNextRetryAt  DateTime?                     @map("image_cache_next_retry_at") @db.Timestamptz(6)
+  sourceUrl              String                        @map("source_url") @db.Text
+  isActive               Boolean                       @default(true) @map("is_active")
+  missingSince           DateTime?                     @map("missing_since") @db.Timestamptz(6)
+  missingSeenCount       Int                           @default(0) @map("missing_seen_count")
+  firstSeenAt            DateTime                      @map("first_seen_at") @db.Timestamptz(6)
+  lastSeenAt             DateTime                      @map("last_seen_at") @db.Timestamptz(6)
+  createdAt              DateTime                      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime                      @updatedAt @map("updated_at") @db.Timestamptz(6)
+  currentPrice           CurrentPrice?
+  priceSnapshots         PriceSnapshot[]
+  discordTargetWatches   DiscordTargetPriceWatch[]
+  discordDeliveries      DiscordNotificationDelivery[]
 
   @@unique([sourceCategoryId, ibuyToken], map: "products_source_category_id_ibuy_token_key")
   @@index([sourceCategoryId], map: "products_source_category_id_idx")
@@ -163,6 +168,8 @@ model Product {
   @@index([isActive], map: "products_is_active_idx")
   @@index([lastSeenAt], map: "products_last_seen_at_idx")
   @@index([primaryImageCheckedAt], map: "products_primary_image_checked_at_idx")
+  @@index([imageCacheCheckedAt], map: "products_image_cache_checked_at_idx")
+  @@index([imageCacheNextRetryAt], map: "products_image_cache_next_retry_at_idx")
   @@map("products")
 }
 

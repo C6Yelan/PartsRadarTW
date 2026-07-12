@@ -40,6 +40,10 @@ export function createProductImageCandidateSelect() {
     name: true,
     primaryImageUrl: true,
     primaryImageCheckedAt: true,
+    imageCachedAt: true,
+    imageCacheCheckedAt: true,
+    imageCacheFailureCount: true,
+    imageCacheNextRetryAt: true,
     firstSeenAt: true,
     lastSeenAt: true,
     sourceCategory: {

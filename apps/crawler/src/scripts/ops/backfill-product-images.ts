@@ -30,10 +30,15 @@ async function main() {
     client = db.prisma;
 
     const candidates = await readCandidates(client, options);
-    const summary = await backfillImages(candidates, options, {
-      log: (message) => logger.info(message),
-      debugLog: (message) => logger.debug(message),
-    });
+    const summary = await backfillImages(
+      candidates,
+      options,
+      {
+        log: (message) => logger.info(message),
+        debugLog: (message) => logger.debug(message),
+      },
+      client,
+    );
 
     printSummary(summary, options);
   } finally {

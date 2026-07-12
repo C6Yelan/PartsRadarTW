@@ -49,6 +49,7 @@ export function createDaemonOptions(
       maxDelayMs: 12000,
       timeoutMs: 15000,
       maxSourceBytes: 5 * 1024 * 1024,
+      recoveryScanLimit: 25,
       externalFetchLockDir: "/workspace/storage/snapshots/.locks/external-fetch",
       externalFetchLockStaleSeconds: 43200,
     },

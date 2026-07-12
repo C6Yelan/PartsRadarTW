@@ -51,7 +51,7 @@ export async function writeObservedProduct({
     };
   }
 
-  await updateProductSeenData(client, existingProduct.id, parsedProduct);
+  await updateProductSeenData(client, existingProduct, parsedProduct);
 
   if (hasPriceChanged(existingProduct.currentPrice?.priceSnapshot ?? null, parsedProduct)) {
     const priceSnapshot = await createPriceSnapshot({
@@ -160,19 +160,22 @@ async function createProductWithCurrentPrice({
 
 function updateProductSeenData(
   client: CoolpcProductWriteDelegates,
-  productId: string,
+  existingProduct: ExistingProductForPriceWrite,
   parsedProduct: ParsedCoolpcProduct,
 ): Promise<{ id: string }> {
   // 商品重新被解析到，更新最後看到時間、名稱、網址等欄位並恢復啟用，
   // 不重建商品資料，保留既有價格歷史。
   return client.product.update({
-    where: { id: productId },
-    data: buildProductSeenUpdateData(parsedProduct),
+    where: { id: existingProduct.id },
+    data: buildProductSeenUpdateData(existingProduct, parsedProduct),
     select: { id: true },
   });
 }
 
-function buildProductSeenUpdateData(parsedProduct: ParsedCoolpcProduct): ProductSeenUpdateData {
+function buildProductSeenUpdateData(
+  existingProduct: ExistingProductForPriceWrite,
+  parsedProduct: ParsedCoolpcProduct,
+): ProductSeenUpdateData {
   // 組裝「再次看到」時的更新欄位；若缺少圖片時不清空既有 primaryImageUrl。
   return {
     name: parsedProduct.name,
@@ -184,6 +187,15 @@ function buildProductSeenUpdateData(parsedProduct: ParsedCoolpcProduct): Product
       ? {
           primaryImageUrl: parsedProduct.primaryImageUrl,
           primaryImageCheckedAt: parsedProduct.fetchedAt,
+          ...(parsedProduct.primaryImageUrl !== existingProduct.primaryImageUrl
+            ? {
+                imageCachedAt: null,
+                imageCacheCheckedAt: null,
+                imageCacheFailureCount: 0 as const,
+                imageCacheLastError: null,
+                imageCacheNextRetryAt: null,
+              }
+            : {}),
         }
       : {}),
     sourceUrl: parsedProduct.sourceUrl,

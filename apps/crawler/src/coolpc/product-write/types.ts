@@ -90,6 +90,7 @@ export interface ProductIdentity {
 
 export interface ExistingProductForPriceWrite {
   id: string;
+  primaryImageUrl: string | null;
   currentPrice: {
     productId: string;
     priceSnapshotId: string;
@@ -143,6 +144,11 @@ export interface ProductSeenUpdateData {
   filterTags: string[];
   primaryImageUrl?: string;
   primaryImageCheckedAt?: Date;
+  imageCachedAt?: null;
+  imageCacheCheckedAt?: null;
+  imageCacheFailureCount?: 0;
+  imageCacheLastError?: null;
+  imageCacheNextRetryAt?: null;
   sourceUrl: string;
   isActive: true;
   missingSince: null;

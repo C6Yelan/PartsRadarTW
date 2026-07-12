@@ -1,11 +1,12 @@
 // apps/crawler/src/scripts/ops/crawl-coolpc-daemon/new-product-images.ts
-// 在 scheduled crawler 成功寫入新商品後，針對本輪新增商品補齊本地商品圖片快取。
+// 在 scheduled crawler 成功後補新商品圖片，並輪替修復既有商品缺少的本地快取。
 
 import type { PrismaClient } from "@partsradar/db";
 import { toSafeCliErrorMessage } from "../../shared/script-utils";
 import type { BackfillSummary, ImageBackfillOptions } from "../image-cache-backfill/options";
 import {
   backfillImages,
+  readImageRecoveryCandidates,
   readMissingImageCandidatesByProductIds,
 } from "../image-cache-backfill/processor";
 import { createOpsLogger } from "../shared/logger";
@@ -32,34 +33,48 @@ export async function handleNewProductImageBackfill({
 }): Promise<void> {
   const uniqueProductIds = [...new Set(productIds)];
 
-  if (uniqueProductIds.length === 0) {
-    return;
-  }
-
   const imageOptions = createImageBackfillOptions(options);
 
   try {
-    const candidates = await readMissingImageCandidatesByProductIds(
+    const newProductCandidates = await readMissingImageCandidatesByProductIds(
       client,
       imageOptions,
       uniqueProductIds,
     );
+    const recoveryCandidates = await readImageRecoveryCandidates(
+      client,
+      imageOptions,
+      options.recoveryScanLimit,
+    );
+    const candidates = [
+      ...new Map(
+        [...newProductCandidates, ...recoveryCandidates].map((candidate) => [
+          candidate.id,
+          candidate,
+        ]),
+      ).values(),
+    ];
 
     if (candidates.length === 0) {
-      log(`New product image backfill skipped. createdProducts=${uniqueProductIds.length}`);
+      log(`Product image recovery skipped. createdProducts=${uniqueProductIds.length}`);
       return;
     }
 
     log(
-      `Starting new product image backfill. createdProducts=${uniqueProductIds.length} candidates=${candidates.length}`,
+      `Starting product image recovery. createdProducts=${uniqueProductIds.length} candidates=${candidates.length}`,
     );
-    const summary = await backfillImages(candidates, imageOptions, {
-      log: (message) => logger.info(message),
-      debugLog: (message) => logger.debug(message),
-    });
+    const summary = await backfillImages(
+      candidates,
+      imageOptions,
+      {
+        log: (message) => logger.info(message),
+        debugLog: (message) => logger.debug(message),
+      },
+      client,
+    );
     logNewProductImageBackfillSummary(summary, uniqueProductIds.length);
   } catch (error) {
-    log(`New product image backfill failed: ${toSafeCliErrorMessage(error)}`);
+    log(`Product image recovery failed: ${toSafeCliErrorMessage(error)}`);
   }
 }
 
@@ -88,7 +103,7 @@ function logNewProductImageBackfillSummary(
   createdProductCount: number,
 ): void {
   log(
-    `New product image backfill finished. createdProducts=${createdProductCount} selected=${summary.selected} cached=${summary.cached} reused=${summary.reused} skipped=${summary.skipped} invalid=${summary.invalid} failed=${summary.failed} liveFetches=${summary.liveFetches}`,
+    `Product image recovery finished. createdProducts=${createdProductCount} selected=${summary.selected} cached=${summary.cached} reused=${summary.reused} skipped=${summary.skipped} invalid=${summary.invalid} failed=${summary.failed} liveFetches=${summary.liveFetches}`,
   );
 }
 

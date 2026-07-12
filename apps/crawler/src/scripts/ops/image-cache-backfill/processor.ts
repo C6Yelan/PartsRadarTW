@@ -30,6 +30,10 @@ export interface ProductImageCandidate {
   name: string;
   primaryImageUrl: string | null;
   primaryImageCheckedAt: Date | null;
+  imageCachedAt: Date | null;
+  imageCacheCheckedAt: Date | null;
+  imageCacheFailureCount: number;
+  imageCacheNextRetryAt: Date | null;
   firstSeenAt: Date;
   lastSeenAt: Date;
   sourceCategory: {
@@ -43,12 +47,15 @@ type ProcessStatus = "cached" | "dry-run" | "failed" | "invalid" | "reused" | "s
 interface ProcessResult {
   status: ProcessStatus;
   didRequestSource: boolean;
+  errorMessage?: string;
 }
 
 interface BackfillLoggers {
   log?: (message: string) => void;
   debugLog?: (message: string) => void;
 }
+
+type ImageCacheStateClient = Pick<PrismaClient, "product">;
 
 // 讀取手動補圖候選；保留 limit 直接套用於 DB 查詢，避免全量維運時一次取出過多資料。
 export async function readCandidates(
@@ -93,11 +100,38 @@ export async function readMissingImageCandidatesByProductIds(
   return missingCandidates;
 }
 
+// 輪替檢查既有商品快取；有檔案者刷新狀態，缺檔且已到重試時間者交給補圖流程。
+export async function readImageRecoveryCandidates(
+  client: PrismaClient,
+  options: ImageBackfillOptions,
+  limit: number,
+  now = new Date(),
+): Promise<ProductImageCandidate[]> {
+  const candidates = await client.product.findMany({
+    where: createProductImageCandidateWhere(options),
+    select: createProductImageCandidateSelect(),
+    orderBy: [{ imageCacheCheckedAt: "asc" }, ...PRODUCT_IMAGE_CANDIDATE_ORDER_BY],
+    take: limit,
+  });
+  const missingCandidates: ProductImageCandidate[] = [];
+
+  for (const candidate of candidates) {
+    if (await pathExists(join(options.storageDir, `${candidate.id}.webp`))) {
+      await markImageCacheReady(client, candidate.id, now);
+    } else if (!candidate.imageCacheNextRetryAt || candidate.imageCacheNextRetryAt <= now) {
+      missingCandidates.push(candidate);
+    }
+  }
+
+  return missingCandidates;
+}
+
 // 逐筆處理圖片候選並彙整摘要；逐筆失敗會記入 failed，不中斷整批補圖。
 export async function backfillImages(
   candidates: ProductImageCandidate[],
   options: ImageBackfillOptions,
   loggers: BackfillLoggers = {},
+  stateClient?: ImageCacheStateClient,
 ): Promise<BackfillSummary> {
   const summary: BackfillSummary = {
     selected: candidates.length,
@@ -137,6 +171,14 @@ export async function backfillImages(
     if (result.didRequestSource) {
       summary.liveFetches += 1;
     }
+
+    if (stateClient && !options.dryRun) {
+      if (["cached", "reused", "skipped"].includes(result.status)) {
+        await markImageCacheReady(stateClient, candidate.id, new Date());
+      } else if (result.status === "failed" || result.status === "invalid") {
+        await markImageCacheFailure(stateClient, candidate, result.errorMessage ?? result.status);
+      }
+    }
   }
 
   return summary;
@@ -159,7 +201,7 @@ async function processCandidate(
 
     if (!sourceImageUrl) {
       log(`[invalid] ${candidate.id} | missing image URL | ${candidate.name}`);
-      return { status: "invalid", didRequestSource };
+      return { status: "invalid", didRequestSource, errorMessage: "missing image URL" };
     }
 
     const normalizedImageUrl = normalizeCoolpcProductImageUrl(
@@ -169,7 +211,7 @@ async function processCandidate(
 
     if (!normalizedImageUrl) {
       log(`[invalid] ${candidate.id} | invalid source image URL | ${sourceImageUrl}`);
-      return { status: "invalid", didRequestSource };
+      return { status: "invalid", didRequestSource, errorMessage: "invalid source image URL" };
     }
 
     if (!options.overwrite && (await pathExists(outputPath))) {
@@ -235,7 +277,56 @@ async function processCandidate(
 
     return { status: "cached", didRequestSource };
   } catch (error) {
-    log(`[failed] ${candidate.id} | ${toSafeCliErrorMessage(error)} | ${candidate.name}`);
-    return { status: "failed", didRequestSource };
+    const errorMessage = toSafeCliErrorMessage(error);
+    log(`[failed] ${candidate.id} | ${errorMessage} | ${candidate.name}`);
+    return { status: "failed", didRequestSource, errorMessage };
   }
+}
+
+const MAX_CONSECUTIVE_IMAGE_FAILURES = 5;
+const IMAGE_RETRY_BASE_MS = 60 * 60 * 1000;
+const IMAGE_RETRY_LONG_COOLDOWN_MS = 7 * 24 * IMAGE_RETRY_BASE_MS;
+
+async function markImageCacheReady(
+  client: ImageCacheStateClient,
+  productId: string,
+  checkedAt: Date,
+): Promise<void> {
+  await client.product.update({
+    where: { id: productId },
+    data: {
+      imageCachedAt: checkedAt,
+      imageCacheCheckedAt: checkedAt,
+      imageCacheFailureCount: 0,
+      imageCacheLastError: null,
+      imageCacheNextRetryAt: null,
+    },
+  });
+}
+
+async function markImageCacheFailure(
+  client: ImageCacheStateClient,
+  candidate: ProductImageCandidate,
+  errorMessage: string,
+): Promise<void> {
+  const attemptedAt = new Date();
+  const failureCount = Math.min(
+    candidate.imageCacheFailureCount + 1,
+    MAX_CONSECUTIVE_IMAGE_FAILURES,
+  );
+  const retryDelayMs =
+    failureCount >= MAX_CONSECUTIVE_IMAGE_FAILURES
+      ? IMAGE_RETRY_LONG_COOLDOWN_MS
+      : IMAGE_RETRY_BASE_MS * 2 ** (failureCount - 1);
+
+  await client.product.update({
+    where: { id: candidate.id },
+    data: {
+      imageCachedAt: null,
+      imageCacheCheckedAt: attemptedAt,
+      imageCacheFailureCount: failureCount,
+      imageCacheLastError: errorMessage.slice(0, 1000),
+      imageCacheNextRetryAt: new Date(attemptedAt.getTime() + retryDelayMs),
+    },
+  });
 }

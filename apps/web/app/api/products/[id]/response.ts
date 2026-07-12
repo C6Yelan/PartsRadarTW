@@ -77,7 +77,7 @@ export function toProductDetailResponse(product: ProductDetailRecord): ProductDe
 
 // 有來源圖片資料時提供站內快取圖片路徑，不回傳來源站 raw image URL。
 function toProductDetailImage(product: ProductDetailRecord): ProductDetailResponseBody["image"] {
-  if (!product.primaryImageUrl) {
+  if (!product.primaryImageUrl || !product.imageCachedAt) {
     return null;
   }
 

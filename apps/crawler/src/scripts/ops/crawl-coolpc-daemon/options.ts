@@ -23,6 +23,7 @@ export const DEFAULT_NEW_PRODUCT_IMAGE_MIN_DELAY_MS = 5000;
 export const DEFAULT_NEW_PRODUCT_IMAGE_MAX_DELAY_MS = 12000;
 export const DEFAULT_NEW_PRODUCT_IMAGE_TIMEOUT_MS = 15000;
 export const DEFAULT_NEW_PRODUCT_IMAGE_MAX_SOURCE_BYTES = 5 * 1024 * 1024;
+export const DEFAULT_IMAGE_RECOVERY_SCAN_LIMIT = 25;
 export const MIN_INTERVAL_SECONDS = 60;
 export const MIN_BACKOFF_SECONDS = 60;
 export const MIN_LOCK_RETRY_SECONDS = 30;
@@ -45,6 +46,7 @@ const ENV_ONLY_DAEMON_OPTIONS = {
   "--new-product-image-max-delay-ms": "CRAWLER_NEW_PRODUCT_IMAGE_MAX_DELAY_MS",
   "--new-product-image-timeout-ms": "CRAWLER_NEW_PRODUCT_IMAGE_TIMEOUT_MS",
   "--new-product-image-max-source-bytes": "CRAWLER_NEW_PRODUCT_IMAGE_MAX_SOURCE_BYTES",
+  "--image-recovery-scan-limit": "CRAWLER_IMAGE_RECOVERY_SCAN_LIMIT",
   "--product-image-storage-dir": "PRODUCT_IMAGE_STORAGE_DIR",
   "--lock-dir": "EXTERNAL_FETCH_LOCK_DIR",
   "--lock-stale-seconds": "EXTERNAL_FETCH_LOCK_STALE_SECONDS",
@@ -58,6 +60,7 @@ export interface NewProductImageBackfillOptions {
   maxDelayMs: number;
   timeoutMs: number;
   maxSourceBytes: number;
+  recoveryScanLimit: number;
   externalFetchLockDir: string;
   externalFetchLockStaleSeconds: number;
 }
@@ -216,6 +219,13 @@ function parseNewProductImageBackfillOptions(
       fallback: DEFAULT_NEW_PRODUCT_IMAGE_MAX_SOURCE_BYTES,
       min: MIN_NEW_PRODUCT_IMAGE_SOURCE_BYTES,
       max: MAX_NEW_PRODUCT_IMAGE_SOURCE_BYTES,
+    }),
+    recoveryScanLimit: parseIntegerEnvironmentValue({
+      env,
+      envName: "CRAWLER_IMAGE_RECOVERY_SCAN_LIMIT",
+      fallback: DEFAULT_IMAGE_RECOVERY_SCAN_LIMIT,
+      min: 1,
+      max: 1000,
     }),
     externalFetchLockDir,
     externalFetchLockStaleSeconds,
