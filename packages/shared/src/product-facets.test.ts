@@ -101,6 +101,25 @@ describe("product facets", () => {
     ]);
   });
 
+  it.each([
+    "AMD Ryzen TR 9960X盒【24核/48緒】",
+    "AMD Ryzen TR PRO 9995WX盒【96核/192緒】",
+  ])("recognizes current Ryzen TR naming as Threadripper: %s", (name) => {
+    expect(extractProductFilterTags(4, name)).toEqual(["socket:str5", "cpu_family:threadripper"]);
+  });
+
+  it.each([
+    ["Acer Nitro Intel ARC B570 OC 10GB(2690MHz/27cm/雙風扇/註三年)", "10"],
+    ["Acer Nitro ARC B580 OC 12GB(2740MHz/28cm/三風扇/註三年)", "12"],
+    ["華擎 ARC PRO B70 Creator 32G(2540MHz/27cm/鼓風扇/註冊五年保)", "32"],
+  ])("extracts parenthesized Intel Arc VRAM: %s", (name, vramGb) => {
+    expect(extractProductFilterTags(12, name)).toEqual([
+      "gpu_chip:intel",
+      "gpu_series:arc",
+      `vram_gb:${vramGb}`,
+    ]);
+  });
+
   it("extracts multiple explicitly supported case form factors", () => {
     const tags = extractProductFilterTags(14, "中塔機殼 支援 E-ATX/M-ATX/背插");
     expect(tags).toEqual([
@@ -110,6 +129,35 @@ describe("product facets", () => {
       "case_size:mid-tower",
     ]);
     expect(tags).not.toContain("motherboard_support:atx");
+  });
+
+  it("extracts an included PSU when the wattage appears between 內附 and 電源", () => {
+    expect(
+      extractProductFilterTags(
+        14,
+        "Mavoly Strawberry M16(黑) 顯卡長20/CPU高7/內附400W電源(1年)/ITX",
+      ),
+    ).toContain("included_psu:yes");
+  });
+
+  it("does not infer an included PSU from bundled fans and a power-supply shroud", () => {
+    expect(
+      extractProductFilterTags(14, "中塔機殼/內附3顆風扇/下置電源倉"),
+    ).not.toContain("included_psu:yes");
+  });
+
+  it.each([
+    ["伺服器機殼/EEB(不含滑軌)", "motherboard_support:eeb"],
+    ["全塔機殼/E-ATX(不含滑軌)", "motherboard_support:e-atx"],
+    ["中塔機殼/ATX(ATX-01)", "motherboard_support:atx"],
+    ["小型機殼/M-ATX(XT325M_WT01)", "motherboard_support:m-atx"],
+  ])("accepts an opening parenthesis after a case form factor: %s", (name, expectedTag) => {
+    const tags = extractProductFilterTags(14, name);
+
+    expect(tags).toContain(expectedTag);
+    if (expectedTag !== "motherboard_support:atx") {
+      expect(tags).not.toContain("motherboard_support:atx");
+    }
   });
 
   it("extracts power supply wattage, efficiency, standards, and modularity", () => {

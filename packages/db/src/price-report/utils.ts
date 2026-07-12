@@ -34,15 +34,16 @@ export function createRecentPriceReportProductFilter(
     : {};
 
   return {
-    ...(filters.categoryIgrps.length > 0
-      ? {
-          sourceCategory: {
+    sourceCategory: {
+      enabled: true,
+      ...(filters.categoryIgrps.length > 0
+        ? {
             igrp: {
               in: filters.categoryIgrps,
             },
-          },
-        }
-      : {}),
+          }
+        : {}),
+    },
     ...keywordFilter,
   };
 }

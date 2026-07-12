@@ -1,6 +1,11 @@
 // apps/crawler/src/scripts/ops/discord-bot/price-report/messages.ts
 // 將個人與公開價格報告資料組裝成可送往 Discord 的多則 embed 訊息。
 
+import type {
+  PriceReportNewProductItem,
+  PriceReportPriceChangeItem,
+  RecentPriceReport,
+} from "@partsradar/db/price-report";
 import { DISCORD_EMBED_COLOR, MAX_PRICE_REPORT_ITEMS } from "../constants";
 import type { DiscordBotEmbed, DiscordBotMessage } from "../types";
 import { createReportMessages, createReportSectionEmbeds } from "./message-layout";
@@ -15,11 +20,6 @@ import {
   formatPublicPriceReportSummary,
   type PriceChangeMovementCounts,
 } from "./message-lines";
-import type {
-  PriceReportNewProductItem,
-  PriceReportPriceChangeItem,
-  RecentPriceReport,
-} from "./reader-types";
 
 // 建立公開頻道價格報告訊息，依項目上限列出價格變動與新增商品。
 export function createPublicPriceReportMessages(

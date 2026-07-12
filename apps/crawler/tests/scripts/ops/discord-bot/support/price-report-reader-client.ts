@@ -1,7 +1,7 @@
 // apps/crawler/tests/scripts/ops/discord-bot/support/price-report-reader-client.ts
 // 模擬個人價格報告 reader 需要的 product、priceSnapshot 與 sourceCategory delegate。
 import { vi } from "vitest";
-import type { PriceReportReaderClient } from "../../../../../src/scripts/ops/discord-bot/price-report/reader-types";
+import type { PriceReportReaderClient } from "@partsradar/db/price-report";
 import {
   compareCapturedAtAsc,
   comparePreviousSnapshotOrder,

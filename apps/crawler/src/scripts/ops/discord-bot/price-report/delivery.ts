@@ -2,6 +2,7 @@
 // 產生個人價格報告訊息並記錄 Discord DM 發送結果。
 
 import type { Prisma } from "@partsradar/db";
+import { readRecentPriceReport } from "@partsradar/db/price-report";
 import { HOUR_MS, MAX_PRICE_REPORT_ITEMS } from "../constants";
 import { toDiscordDeliveryErrorFields } from "../delivery-error-fields";
 import type {
@@ -17,7 +18,6 @@ import {
   type PriceReportFilters,
 } from "./filters";
 import { createPersonalPriceReportEmbedMessages } from "./messages";
-import { readRecentPriceReport } from "./reader";
 
 const PRICE_REPORT_DELIVERY_STATUS_SELECT = {
   status: true,

@@ -1,5 +1,5 @@
 // apps/crawler/tests/scripts/ops/discord-bot/price-report/price-report-filters.test.ts
-// 驗證個人價格報告會依分類、內容類型與商品關鍵字篩選查詢與輸出結果。
+// 驗證個人價格報告會依分類、內容類型與商品關鍵字篩選輸出結果。
 
 import { describe, expect, it, vi } from "vitest";
 import { sendPriceReportNow } from "../../../../../src/scripts/ops/discord-bot/price-report";
@@ -99,19 +99,6 @@ describe("sendPriceReportNow filters", () => {
     expect(JSON.stringify(reportMessage)).toContain("GPU A");
     expect(JSON.stringify(reportMessage)).not.toContain("Board A");
     expect(JSON.stringify(reportMessage)).not.toContain("SSD B");
-    expect(client.priceSnapshot.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          product: {
-            sourceCategory: {
-              igrp: {
-                in: [12],
-              },
-            },
-          },
-        }),
-      }),
-    );
   });
 
   it("filters price reports by product keyword", async () => {
@@ -195,22 +182,5 @@ describe("sendPriceReportNow filters", () => {
     expect(JSON.stringify(reportMessage)).toContain("ROG-RTX5090-O32G");
     expect(JSON.stringify(reportMessage)).toContain("DDR5 6400");
     expect(JSON.stringify(reportMessage)).not.toContain("PRIME-RX9070XT-O16G");
-    expect(client.priceSnapshot.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          product: expect.objectContaining({
-            OR: [
-              {
-                AND: [
-                  { name: { contains: "RTX", mode: "insensitive" } },
-                  { name: { contains: "5090", mode: "insensitive" } },
-                ],
-              },
-              { name: { contains: "DDR5", mode: "insensitive" } },
-            ],
-          }),
-        }),
-      }),
-    );
   });
 });

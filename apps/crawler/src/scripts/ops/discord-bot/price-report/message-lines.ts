@@ -1,6 +1,13 @@
 // apps/crawler/src/scripts/ops/discord-bot/price-report/message-lines.ts
 // 組裝價格報告 embed 內的分類標題、價格變動摘要與商品連結行文字。
 
+import type {
+  PriceReportNewProductItem,
+  PriceReportPriceChangeItem,
+  PriceReportProductCategory,
+  PriceReportProductSubcategory,
+  RecentPriceReport,
+} from "@partsradar/db/price-report";
 import { PRODUCT_NAME_MAX_LENGTH } from "../constants";
 import {
   createProductUrl,
@@ -10,13 +17,6 @@ import {
   toSingleLine,
 } from "../message-text";
 import { escapeMarkdownText, formatSignedTaiwanDollar } from "./message-text";
-import type {
-  PriceReportNewProductItem,
-  PriceReportPriceChangeItem,
-  PriceReportProductCategory,
-  PriceReportProductSubcategory,
-  RecentPriceReport,
-} from "./reader-types";
 
 // 報告行分組所需的商品分類資訊與已格式化行文字。
 export interface GroupedReportLineItem {

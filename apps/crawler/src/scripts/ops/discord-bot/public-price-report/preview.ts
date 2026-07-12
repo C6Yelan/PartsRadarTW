@@ -1,9 +1,9 @@
 // apps/crawler/src/scripts/ops/discord-bot/public-price-report/preview.ts
 // 產生並發送公開價格報告測試訊息，供伺服器管理員驗證頻道與篩選設定。
 
+import { readRecentPriceReport } from "@partsradar/db/price-report";
 import { HOUR_MS, MAX_PRICE_REPORT_ITEMS } from "../constants";
 import { createPublicPriceReportMessages } from "../price-report/messages";
-import { readRecentPriceReport } from "../price-report/reader";
 import type {
   DiscordBotClient,
   DiscordBotMessage,

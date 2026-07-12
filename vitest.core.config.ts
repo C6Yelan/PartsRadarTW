@@ -13,6 +13,7 @@ export default defineConfig({
       "apps/web/tests/announcements/**/*.{test,spec}.{ts,tsx}",
       "apps/web/tests/build-list/**/*.{test,spec}.{ts,tsx}",
       "apps/web/tests/products/**/*.{test,spec}.{ts,tsx}",
+      "apps/web/tests/price-report/**/*.{test,spec}.{ts,tsx}",
       "apps/web/tests/seo/**/*.{test,spec}.{ts,tsx}",
       "packages/**/*.{test,spec}.{ts,tsx}",
     ],

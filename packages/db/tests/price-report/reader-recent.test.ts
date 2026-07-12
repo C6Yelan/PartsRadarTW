@@ -1,10 +1,9 @@
-// apps/crawler/tests/scripts/ops/discord-bot/price-report/price-report-reader-recent.test.ts
+// packages/db/tests/price-report/reader-recent.test.ts
 // 驗證近期時間窗價格報告 reader 會彙整最新變價、新商品與商品關鍵字篩選結果。
 
 import { describe, expect, it } from "vitest";
-import { readRecentPriceReport } from "../../../../../src/scripts/ops/discord-bot/price-report/reader";
-import { snapshot } from "../support";
-import { createPriceReportReaderClient } from "../support/price-report-reader-client";
+import { readRecentPriceReport } from "../../src/price-report";
+import { createPriceReportReaderClient, snapshot } from "./support";
 
 describe("readRecentPriceReport price changes", () => {
   it("returns each product's latest price change inside the requested window", async () => {

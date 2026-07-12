@@ -2,7 +2,7 @@
 // 定義 Discord bot runtime 共用的設定、資料存取 client 與關閉控制 contract。
 
 import type { PrismaClient } from "@partsradar/db";
-import type { PriceReportReaderClient } from "../price-report/reader-types";
+import type { PriceReportReaderClient } from "@partsradar/db/price-report";
 
 // Discord bot 啟動後傳遞給 gateway、互動 handler、排程與註冊流程的完整設定。
 export interface DiscordBotOptions {

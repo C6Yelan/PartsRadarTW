@@ -10,6 +10,7 @@ PartsRadarTW 的公開 API 主要服務官方 web UI。它沒有版本化、SLA 
 | --- | --- | --- |
 | `GET` | `/api/categories` | 目前啟用的公開分類。 |
 | `GET` | `/api/products` | 商品搜尋、篩選、排序與分頁。 |
+| `GET` | `/api/price-report` | 唯讀價格變動總覽。 |
 | `GET` | `/api/products/{id}` | 單一商品與目前價格。 |
 | `GET` | `/api/products/{id}/price-history` | 商品價格歷史觀測點。 |
 | `GET` | `/api/product-images/{id}.webp` | 站內 WebP 商品圖片。 |
@@ -26,6 +27,7 @@ PartsRadarTW 的公開 API 主要服務官方 web UI。它沒有版本化、SLA 
 | `category` | 公開 category slug。 |
 | `igrp` | 舊版 read-only alias；只接受已支援分類。新 client 應使用 `category`。 |
 | `vendors` | 逗號分隔且不可重複；必須同時提供 category。 |
+| `facet` | 可重複的 `key:value`；必須同時提供 `category` 或相容用的 `igrp` alias，最多 50 筆。單筆 trim 後須為 1–100 字、不可重複，且必須是該分類支援的值。 |
 | `minPrice`, `maxPrice` | 非負整數，且 min 不得大於 max。 |
 | `status` | `active`、`inactive` 或 `all`；預設 `active`。 |
 | `sort` | `price_asc`、`price_desc`、`price_drop_desc`、`price_rise_desc`、`name_asc`。 |
@@ -39,6 +41,9 @@ cpu, motherboard, memory, storage, external-storage, cooler,
 liquid-cooling, gpu, case, power-supply, fan-accessory
 ```
 
+同一 facet key 的多個值使用 OR，不同 key 之間使用 AND。可用 key、label 與 value 由
+`GET /api/categories` 回應的 `facets` 提供。
+
 列表回應包含：
 
 - `data`：商品 ID、名稱、分類、站內圖片、目前價格、原價屋連結、active 狀態與近 30 天價格變動。
@@ -46,6 +51,35 @@ liquid-cooling, gpu, case, power-supply, fan-accessory
 - `meta`：來源狀態、最近成功時間與目前分類可用品牌選項。
 
 API 不公開 standalone `ibuyToken`；原價屋連結在 response 組裝時重建。
+
+## 公開分類
+
+`GET /api/categories` 只回傳目前啟用的分類。每筆分類包含 `id`、`slug`、`displayName`、
+`sourceName` 與 `facets`；沒有高效益進階條件的分類可回傳空的 `facets`。
+
+每個 facet 定義包含穩定 key、顯示 label 與允許的 options，供商品列表組裝合法的 repeatable
+`facet=key:value` query。Client 不應自行猜測未出現在分類回應中的 tag。
+
+## 價格變動總覽
+
+`GET /api/price-report` 只讀取既有價格快照，不會建立通知、訂閱或 delivery 紀錄。
+
+| Parameter | 規則 |
+| --- | --- |
+| `window` | `24h`、`7d` 或 `30d`；預設 `24h`。 |
+| `type` | 可重複且不可重複值；`drop`、`rise`、`new`。預設為 `drop` 與 `rise`。 |
+| `category` | 可選的公開 category slug。 |
+| `q` | 可選商品關鍵字，最多 100 字。 |
+| `sort` | `changed_desc`、`drop_percent_desc`、`rise_percent_desc` 或 `delta_amount_desc`；預設 `changed_desc`。 |
+| `page` | 從 1 開始；預設 1。 |
+| `pageSize` | 預設 20，最大 100。 |
+
+回應包含：
+
+- `data`：`productId`、`productName`、`category`、`kind`、`previousPrice`、`currentPrice`、`currency`、`deltaAmount`、`deltaPercent` 與 `changedAt`。
+- `summary`：篩選後、分頁前的漲價、降價與新增商品統計。
+- `pagination`：目前頁、page size、總筆數與總頁數。
+- `meta`：`window`、`since`、`until`、`sourceStatus` 與 `lastSuccessAt`。
 
 ## 商品詳細與價格歷史
 

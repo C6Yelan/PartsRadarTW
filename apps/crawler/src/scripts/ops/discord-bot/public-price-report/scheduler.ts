@@ -1,6 +1,7 @@
 // apps/crawler/src/scripts/ops/discord-bot/public-price-report/scheduler.ts
 // 掃描已完成的 scheduled crawl run，對啟用的公開報告頻道發送尚未送出的價格報告。
 
+import { readCrawlRunPriceChangeSummary } from "@partsradar/db/price-report";
 import { CRAWL_RUN_STATUSES } from "../../../../coolpc/crawl-run";
 import {
   MAX_DUE_PUBLIC_PRICE_REPORT_SETTINGS_PER_CYCLE,
@@ -10,7 +11,6 @@ import {
 import { NO_DISCORD_DELIVERY_ERROR, toDiscordDeliveryErrorFields } from "../delivery-error-fields";
 import { filterNewProductsForReport, filterPriceChangesForReport } from "../price-report/filters";
 import { createPublicPriceReportMessages } from "../price-report/messages";
-import { readCrawlRunPriceChangeSummary } from "../price-report/reader";
 import type {
   DiscordBotClient,
   DiscordBotMessage,

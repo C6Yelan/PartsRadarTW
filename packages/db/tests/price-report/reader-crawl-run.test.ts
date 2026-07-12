@@ -1,10 +1,9 @@
-// apps/crawler/tests/scripts/ops/discord-bot/price-report/price-report-reader-crawl-run.test.ts
+// packages/db/tests/price-report/reader-crawl-run.test.ts
 // 驗證指定 crawl run 的價格報告 reader 會區分變價、新商品、未變價並排序變動幅度。
 
 import { describe, expect, it } from "vitest";
-import { readCrawlRunPriceChangeSummary } from "../../../../../src/scripts/ops/discord-bot/price-report/reader";
-import { snapshot } from "../support";
-import { createPriceReportReaderClient } from "../support/price-report-reader-client";
+import { readCrawlRunPriceChangeSummary } from "../../src/price-report";
+import { createPriceReportReaderClient, snapshot } from "./support";
 
 describe("readCrawlRunPriceChangeSummary changes", () => {
   it("returns changed existing products and skips first-seen or unchanged snapshots", async () => {

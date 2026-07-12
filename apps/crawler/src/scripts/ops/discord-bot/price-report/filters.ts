@@ -2,7 +2,10 @@
 // 定義 price-report 篩選條件，並提供分類、內容類型與商品關鍵字的正規化、套用與顯示文字。
 
 import { MAX_PRICE_REPORT_KEYWORD_GROUPS, MAX_PRICE_REPORT_KEYWORD_LENGTH } from "../constants";
-import type { PriceReportNewProductItem, PriceReportPriceChangeItem } from "./reader-types";
+import type {
+  PriceReportNewProductItem,
+  PriceReportPriceChangeItem,
+} from "@partsradar/db/price-report";
 
 // Discord 設定面板使用的來源分類選項，對應 CoolPC sourceCategory 的 IGrp 與顯示名稱。
 export interface PriceReportCategoryOption {

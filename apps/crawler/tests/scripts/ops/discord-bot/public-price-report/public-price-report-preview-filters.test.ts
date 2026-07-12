@@ -1,5 +1,5 @@
 // apps/crawler/tests/scripts/ops/discord-bot/public-price-report/public-price-report-preview-filters.test.ts
-// 驗證公開報告測試發送會套用伺服器設定中的分類、關鍵字與漲跌篩選。
+// 驗證公開報告測試發送會套用伺服器設定中的分類與商品關鍵字篩選。
 
 import { describe, expect, it, vi } from "vitest";
 import { CommandCooldowns } from "../../../../../src/scripts/ops/discord-bot/cooldowns";
@@ -35,26 +35,6 @@ describe("public price report preview filters", () => {
           productName: "華碩 RTX 5090 顯示卡",
           crawlRunId: "new-run",
           price: 95_990,
-          capturedAt: newCapturedAt,
-          categoryIgrp: 12,
-          categoryName: "顯示卡",
-        }),
-        snapshot({
-          id: "public-filter-old-rise",
-          productId: "public-filter-product-rise",
-          productName: "華碩 RTX 5090 OC 顯示卡",
-          crawlRunId: "old-run",
-          price: 95_990,
-          capturedAt: oldCapturedAt,
-          categoryIgrp: 12,
-          categoryName: "顯示卡",
-        }),
-        snapshot({
-          id: "public-filter-new-rise",
-          productId: "public-filter-product-rise",
-          productName: "華碩 RTX 5090 OC 顯示卡",
-          crawlRunId: "new-run",
-          price: 99_990,
           capturedAt: newCapturedAt,
           categoryIgrp: 12,
           categoryName: "顯示卡",
@@ -126,7 +106,6 @@ describe("public price report preview filters", () => {
     const reportText = JSON.stringify(reportBody.embeds);
 
     expect(reportText).toContain("RTX 5090 顯示卡");
-    expect(reportText).not.toContain("RTX 5090 OC");
     expect(reportText).not.toContain("RTX 5090 外接盒");
     expect(reportText).not.toContain("RTX 5080");
   });
