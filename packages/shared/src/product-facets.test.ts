@@ -92,6 +92,43 @@ describe("product facets", () => {
     ]);
   });
 
+  it.each([
+    [
+      "三星 2024 EVO Plus 64G micro SDXC / R:160 / 附轉卡",
+      ["external_type:memory-card", "capacity_gb:64"],
+    ],
+    [
+      "Lexar High-Performance 633x 64Gmicro SDXC / R:100",
+      ["external_type:memory-card", "capacity_gb:64"],
+    ],
+    [
+      "GIGASTONE 256G 格紋碟 / Type-A / USB3.2 G1",
+      ["external_type:usb-flash", "connector:type-a", "capacity_gb:256"],
+    ],
+    [
+      "Toshiba 1TB Canvio Advance V10 / Type-A",
+      ["external_type:external-hdd", "connector:type-a", "capacity_gb:1000"],
+    ],
+    [
+      "Seagate OneTouch 5T極夜黑 / Type-A / 硬體加密",
+      ["external_type:external-hdd", "connector:type-a", "capacity_gb:5000"],
+    ],
+    [
+      "創見 4TB 25M3 / Type-A / 軍規",
+      ["external_type:external-hdd", "connector:type-a", "capacity_gb:4000"],
+    ],
+    [
+      "Micron Crucial X10 SSD碟 6TB Type-C",
+      ["external_type:external-ssd", "connector:type-c", "capacity_gb:6000"],
+    ],
+    [
+      "威剛 SD820 SSD碟 1TB 藍/讀取2000MB/s/支援iPhone15",
+      ["external_type:external-ssd", "connector:type-c", "capacity_gb:1000"],
+    ],
+  ])("extracts current external-storage naming: %s", (name, expectedTags) => {
+    expect(extractProductFilterTags(9, name)).toEqual(expectedTags);
+  });
+
   it("extracts air cooler shape and fan size", () => {
     expect(extractProductFilterTags(10, "雙塔 CPU 散熱器 120mm 支援 AM5")).toEqual([
       "cooler_type:air-tower",

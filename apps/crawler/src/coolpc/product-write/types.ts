@@ -10,6 +10,7 @@ export interface WriteCoolpcCategoryProductObservationOptions {
   sourceCategoryId: string;
   fetchedAt: Date;
   parsedProducts: ParsedCoolpcProduct[];
+  excludedIbuyTokens?: readonly string[];
 }
 
 // 單次分類寫入的結果摘要，供上游彙總與排程監控顯示。

@@ -11,6 +11,7 @@ interface FilesystemLockMetadata {
   token: string;
   pid: number;
   acquiredAt: string;
+  heartbeatAt?: string;
 }
 
 interface StateGuardMetadata {
@@ -51,6 +52,8 @@ const STATE_GUARD_STALE_MS = 30_000;
 const RETIRED_STATE_GUARD_GRACE_MS = STATE_GUARD_STALE_MS * 2;
 const STATE_GUARD_RETRY_COUNT = 31_000;
 const STATE_GUARD_RETRY_DELAY_MS = 1;
+const MAX_HEARTBEAT_INTERVAL_MS = 30_000;
+const MIN_HEARTBEAT_INTERVAL_MS = 10;
 const lastRetiredStateGuardPruneAt = new Map<string, number>();
 
 // 以 mkdir 的原子性取得鎖；fresh lock contention 回傳 null，stale lock 最多清除後重試一次。
@@ -110,6 +113,7 @@ export async function tryAcquireFilesystemLock({
       token,
       pid: process.pid,
       acquiredAt: acquiredAt.toISOString(),
+      heartbeatAt: acquiredAt.toISOString(),
     };
 
     try {
@@ -128,10 +132,45 @@ export async function tryAcquireFilesystemLock({
     await stateGuard.release();
   }
 
+  let heartbeatStopped = false;
+  let heartbeatTimer: NodeJS.Timeout | null = null;
+  let heartbeatPromise = Promise.resolve();
+  const heartbeatIntervalMs = Math.max(
+    MIN_HEARTBEAT_INTERVAL_MS,
+    Math.min(MAX_HEARTBEAT_INTERVAL_MS, Math.floor((staleSeconds * 1000) / 3)),
+  );
+
+  const scheduleHeartbeat = () => {
+    if (heartbeatStopped) {
+      return;
+    }
+
+    heartbeatTimer = setTimeout(() => {
+      heartbeatPromise = heartbeatPromise
+        .then(() => refreshLockHeartbeat(lockDir, token, now))
+        .catch(() => undefined)
+        .then((stillOwned) => {
+          if (stillOwned === false) {
+            heartbeatStopped = true;
+          }
+        })
+        .finally(scheduleHeartbeat);
+    }, heartbeatIntervalMs);
+    heartbeatTimer.unref();
+  };
+
+  scheduleHeartbeat();
+
   return {
     lockDir,
     owner,
     async release() {
+      heartbeatStopped = true;
+      if (heartbeatTimer) {
+        clearTimeout(heartbeatTimer);
+      }
+      await heartbeatPromise;
+
       const releaseGuard = await acquireStateGuard(lockDir);
 
       if (releaseGuard === null) {
@@ -152,6 +191,37 @@ export async function tryAcquireFilesystemLock({
       }
     },
   };
+}
+
+// 定期更新持有中的 lease；token 不符表示鎖已由 replacement 接手，舊 holder 不再續租。
+async function refreshLockHeartbeat(
+  lockDir: string,
+  token: string,
+  now: () => Date,
+): Promise<boolean> {
+  const heartbeatGuard = await acquireStateGuard(lockDir);
+
+  if (heartbeatGuard === null) {
+    return false;
+  }
+
+  try {
+    const metadata = await readLockMetadata(lockDir);
+
+    if (metadata?.token !== token) {
+      return false;
+    }
+
+    await heartbeatGuard.assertOwned();
+    await writeFile(
+      getMetadataPath(lockDir),
+      `${JSON.stringify({ ...metadata, heartbeatAt: now().toISOString() }, null, 2)}\n`,
+      "utf8",
+    );
+    return true;
+  } finally {
+    await heartbeatGuard.release();
+  }
 }
 
 // stale reclaim 與 token-safe release 都先取得短生命週期 guard，避免 check/remove/recreate 互相穿插。
@@ -466,7 +536,7 @@ async function readExistingLock(
   const metadata = await readLockMetadata(lockDir);
 
   return {
-    acquiredAt: metadata?.acquiredAt ?? stats.mtime.toISOString(),
+    acquiredAt: metadata?.heartbeatAt ?? metadata?.acquiredAt ?? stats.mtime.toISOString(),
     hasMetadata: metadata !== null,
   };
 }
@@ -502,7 +572,9 @@ async function readLockMetadata(lockDir: string): Promise<FilesystemLockMetadata
       typeof parsed.token === "string" &&
       typeof parsed.pid === "number" &&
       typeof parsed.acquiredAt === "string" &&
-      Number.isFinite(Date.parse(parsed.acquiredAt))
+      Number.isFinite(Date.parse(parsed.acquiredAt)) &&
+      (parsed.heartbeatAt === undefined ||
+        (typeof parsed.heartbeatAt === "string" && Number.isFinite(Date.parse(parsed.heartbeatAt))))
     ) {
       return parsed as FilesystemLockMetadata;
     }

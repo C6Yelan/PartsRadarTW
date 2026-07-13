@@ -2,15 +2,18 @@
 // 驗證外部來源抓取鎖的互斥取得與釋放流程。
 
 import { createHash } from "node:crypto";
-import { lstat, mkdir, rename, rm, utimes, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readFile, rename, rm, utimes, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { tryAcquireExternalFetchLock } from "../../../src/scripts/ops/external-fetch-lock";
 import { createDaemonTestEnvironment } from "./crawl-coolpc-daemon/crawl-coolpc-daemon-support";
 
 const testEnv = createDaemonTestEnvironment();
 
-afterEach(testEnv.cleanup);
+afterEach(async () => {
+  vi.useRealTimers();
+  await testEnv.cleanup();
+});
 
 describe("external fetch lock", () => {
   it("allows only one holder and can be released", async () => {
@@ -26,6 +29,80 @@ describe("external fetch lock", () => {
 
     expect(secondLock).not.toBeNull();
     await secondLock?.release();
+  });
+
+  it("uses the latest heartbeat when deciding whether a lock is stale", async () => {
+    const { workspaceRoot } = await testEnv.createWorkspace();
+    const lockDir = join(workspaceRoot, "external-fetch.lock");
+    await mkdir(lockDir);
+    await writeFile(
+      join(lockDir, "lock.json"),
+      `${JSON.stringify({
+        owner: "active-holder",
+        token: "active-token",
+        pid: 123,
+        acquiredAt: "2026-07-13T00:00:00.000Z",
+        heartbeatAt: "2026-07-13T01:59:30.000Z",
+      })}\n`,
+      "utf8",
+    );
+
+    await expect(
+      tryAcquireExternalFetchLock({
+        lockDir,
+        owner: "contender",
+        staleSeconds: 60,
+        now: () => new Date("2026-07-13T02:00:00.000Z"),
+      }),
+    ).resolves.toBeNull();
+  });
+
+  it("renews the heartbeat while the holder remains active", async () => {
+    const { workspaceRoot } = await testEnv.createWorkspace();
+    const lockDir = join(workspaceRoot, "external-fetch.lock");
+    let currentTime = new Date("2026-07-13T02:00:00.000Z");
+    const lock = await tryAcquireExternalFetchLock({
+      lockDir,
+      owner: "active-holder",
+      staleSeconds: 0.03,
+      now: () => currentTime,
+    });
+
+    currentTime = new Date("2026-07-13T02:00:00.020Z");
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    const metadata = JSON.parse(await readFile(join(lockDir, "lock.json"), "utf8")) as {
+      heartbeatAt: string;
+    };
+
+    expect(metadata.heartbeatAt).toBe("2026-07-13T02:00:00.020Z");
+    await lock?.release();
+  });
+
+  it("reclaims a lock after its heartbeat lease expires", async () => {
+    const { workspaceRoot } = await testEnv.createWorkspace();
+    const lockDir = join(workspaceRoot, "external-fetch.lock");
+    await mkdir(lockDir);
+    await writeFile(
+      join(lockDir, "lock.json"),
+      `${JSON.stringify({
+        owner: "orphaned-holder",
+        token: "orphaned-token",
+        pid: 123,
+        acquiredAt: "2026-07-13T00:00:00.000Z",
+        heartbeatAt: "2026-07-13T01:58:00.000Z",
+      })}\n`,
+      "utf8",
+    );
+
+    const replacement = await tryAcquireExternalFetchLock({
+      lockDir,
+      owner: "replacement",
+      staleSeconds: 60,
+      now: () => new Date("2026-07-13T02:00:00.000Z"),
+    });
+
+    expect(replacement).not.toBeNull();
+    await replacement?.release();
   });
 
   it("recovers an orphaned state guard without allowing multiple holders", async () => {

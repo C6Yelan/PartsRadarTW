@@ -23,6 +23,9 @@ export interface ProductionSmokeOptions {
   parseErrorWarnCount: number;
   parseErrorFailCount: number;
   invalidImageUrlWarnCount: number;
+  invalidImageUrlWarnUrlCount: number;
+  invalidImageUrlWarnPercent: number;
+  invalidImageUrlWarnHours: number;
   minActiveProducts: number;
   missingImageWarnCount: number;
   missingImageFailCount: number;
@@ -107,6 +110,7 @@ export interface SourceImageAnomalyRecord {
   rawToken: string | null;
   rawName: string | null;
   rawImageUrl: string | null;
+  createdAt: Date;
 }
 
 // production smoke 只依賴檢查所需的 Prisma delegates，不綁定其他資料存取能力。

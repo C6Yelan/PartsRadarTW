@@ -104,7 +104,7 @@ describe("CoolPC scheduled crawler daemon options", () => {
         maxDelayMs: 9000,
         timeoutMs: 18000,
         maxSourceBytes: 4194304,
-        recoveryScanLimit: 25,
+        batchLimit: 25,
         externalFetchLockDir: join(
           workspaceRoot,
           "storage",
@@ -171,10 +171,10 @@ describe("CoolPC scheduled crawler daemon options", () => {
     expect(() =>
       parseDaemonOptions(
         ["--confirm-live-fetch"],
-        { EXTERNAL_FETCH_LOCK_STALE_SECONDS: "1799" },
+        { EXTERNAL_FETCH_LOCK_STALE_SECONDS: "59" },
         crawlerCwd,
       ),
-    ).toThrow("EXTERNAL_FETCH_LOCK_STALE_SECONDS must be at least 1800");
+    ).toThrow("EXTERNAL_FETCH_LOCK_STALE_SECONDS must be at least 60");
 
     expect(() =>
       parseDaemonOptions(

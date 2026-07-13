@@ -3,8 +3,8 @@
 
 import { type FilesystemLockHandle, tryAcquireFilesystemLock } from "../../shared/filesystem-lock";
 
-export const DEFAULT_EXTERNAL_FETCH_LOCK_STALE_SECONDS = 12 * 60 * 60;
-const MIN_EXTERNAL_FETCH_LOCK_STALE_SECONDS = 1800;
+export const DEFAULT_EXTERNAL_FETCH_LOCK_STALE_SECONDS = 5 * 60;
+const MIN_EXTERNAL_FETCH_LOCK_STALE_SECONDS = 60;
 const MAX_EXTERNAL_FETCH_LOCK_STALE_SECONDS = 7 * 24 * 60 * 60;
 
 export type ExternalFetchLockHandle = FilesystemLockHandle;

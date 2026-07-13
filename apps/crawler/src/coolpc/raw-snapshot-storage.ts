@@ -6,7 +6,7 @@ import { basename, dirname, isAbsolute, join, parse, relative, resolve } from "n
 import { type FilesystemLockHandle, tryAcquireFilesystemLock } from "../shared/filesystem-lock";
 
 export const DEFAULT_RAW_SNAPSHOT_STORAGE_DIR = "temp/coolpc-daemon/snapshots";
-export const DEFAULT_RAW_SNAPSHOT_MUTATION_LOCK_STALE_SECONDS = 12 * 60 * 60;
+export const DEFAULT_RAW_SNAPSHOT_MUTATION_LOCK_STALE_SECONDS = 5 * 60;
 
 export interface RawSnapshotStorageLocation {
   storageDir: string;

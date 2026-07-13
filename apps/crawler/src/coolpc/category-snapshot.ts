@@ -103,6 +103,7 @@ export type WriteCoolpcCategoryProductObservation = (options: {
   sourceCategoryId: string;
   fetchedAt: Date;
   parsedProducts: ParsedCoolpcProduct[];
+  excludedIbuyTokens?: readonly string[];
 }) => Promise<WriteCoolpcCategoryProductObservationResult>;
 
 /**
@@ -210,6 +211,7 @@ export async function processCoolpcCategorySnapshot(
     sourceCategoryId: category.id,
     fetchedAt: snapshot.fetchedAt,
     parsedProducts: parseResult.items,
+    excludedIbuyTokens: parseResult.excludedIbuyTokens,
   });
 
   return {

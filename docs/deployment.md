@@ -44,6 +44,14 @@ docker compose -f compose.yml -f compose.ops.yml --profile ops --profile discord
 docker compose -f compose.yml -f compose.tunnel.yml --profile public-tunnel config --quiet
 ```
 
+正式完整 topology 統一透過 `scripts/ops/compose-production.sh` 載入上述四個 Compose files 與 scheduled crawler、ops、Discord、public tunnel profiles。例如：
+
+```bash
+scripts/ops/compose-production.sh up -d --no-build
+```
+
+此入口會先執行 `config --quiet`，但不取代備份、migration、Discord command 註冊或 public cutover gate。
+
 任何 placeholder、缺少的必要值或意外 public bind 都必須先修正。若需人工檢視展開後的 config，不要保存或貼出含真實 secret 的輸出。
 
 ## Release image references
@@ -114,15 +122,13 @@ docker compose logs --tail=100 migrate seed web
 curl --fail http://127.0.0.1:3000/api/source-status
 ```
 
-5. 必要時先以 dry-run 檢查圖片補圖，再啟動排程服務：
+5. 必要時先以 dry-run 檢查圖片補圖，再以正式 topology 入口啟動所有背景服務與 ingress：
 
 ```bash
-docker compose -f compose.yml -f compose.crawler.yml --profile scheduled-crawler up -d --no-build
-docker compose -f compose.yml -f compose.ops.yml --profile ops up -d --no-build
+scripts/ops/compose-production.sh up -d --no-build
 ```
 
-6. 完成 Discord command 註冊與功能檢查後，以 `docker compose -f compose.yml -f compose.ops.yml --profile discord-bot up -d --no-build` 啟動 Discord profile。
-7. 最後才啟用 public ingress，執行 public-only smoke 與瀏覽器關鍵流程。
+6. 啟動前必須已完成 Discord command 註冊與功能檢查；啟動後再執行 public-only smoke 與瀏覽器關鍵流程。
 
 ## 既有部署升級
 

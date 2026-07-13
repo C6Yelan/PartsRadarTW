@@ -121,6 +121,7 @@ describe("CoolPC category parser", () => {
     expect(result.items.map((item) => item.name)).not.toContain(
       "[搭CPU現省500] 技嘉 B860M GAMING X WIFI6E(M-ATX)",
     );
+    expect(result.excludedIbuyTokens).toEqual(["CPU-BUNDLE-BOARD"]);
     expect(result.items).toHaveLength(2);
   });
 

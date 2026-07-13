@@ -34,7 +34,10 @@ describe("production smoke options", () => {
       recentWindowHours: 24,
       parseErrorWarnCount: 20,
       parseErrorFailCount: 100,
-      invalidImageUrlWarnCount: 2000,
+      invalidImageUrlWarnCount: 50,
+      invalidImageUrlWarnUrlCount: 10,
+      invalidImageUrlWarnPercent: 5,
+      invalidImageUrlWarnHours: 12,
       minActiveProducts: 1,
       missingImageWarnCount: 200,
       missingImageFailCount: 500,
@@ -57,6 +60,12 @@ describe("production smoke options", () => {
         "45",
         "--invalid-image-url-warn-count",
         "1500",
+        "--invalid-image-url-warn-url-count",
+        "25",
+        "--invalid-image-url-warn-percent",
+        "7",
+        "--invalid-image-url-warn-hours",
+        "18",
         "--missing-image-warn-count",
         "10",
         "--image-inactive-retention-days",
@@ -83,6 +92,9 @@ describe("production smoke options", () => {
     expect(options.missingImageWarnCount).toBe(10);
     expect(options.imageInactiveRetentionDays).toBe(45);
     expect(options.invalidImageUrlWarnCount).toBe(1500);
+    expect(options.invalidImageUrlWarnUrlCount).toBe(25);
+    expect(options.invalidImageUrlWarnPercent).toBe(7);
+    expect(options.invalidImageUrlWarnHours).toBe(18);
     expect(options.productImageStorageDir).toBe(join(workspaceRoot, "custom-images"));
     expect(options.filterSyncStateFilePath).toBe(
       join(workspaceRoot, "storage", "filter-sync.json"),

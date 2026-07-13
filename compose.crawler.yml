@@ -10,7 +10,7 @@ x-product-image-storage-env: &product-image-storage-env
 
 x-external-fetch-lock-env: &external-fetch-lock-env
   EXTERNAL_FETCH_LOCK_DIR: "/var/lib/partsradar/snapshots/.locks/external-fetch"
-  EXTERNAL_FETCH_LOCK_STALE_SECONDS: "${EXTERNAL_FETCH_LOCK_STALE_SECONDS:-43200}"
+  EXTERNAL_FETCH_LOCK_STALE_SECONDS: "${EXTERNAL_FETCH_LOCK_STALE_SECONDS:-300}"
 
 services:
   crawler:
@@ -75,6 +75,7 @@ services:
       context: .
       target: crawler
     restart: unless-stopped
+    stop_grace_period: 15m
     environment:
       <<: [*database-env, *snapshot-storage-env, *product-image-storage-env, *external-fetch-lock-env]
       LOG_LEVEL: "${LOG_LEVEL:-info}"
@@ -118,6 +119,7 @@ services:
       context: .
       target: crawler
     restart: unless-stopped
+    stop_grace_period: 15m
     environment:
       <<: [*database-env, *snapshot-storage-env]
       LOG_LEVEL: "${LOG_LEVEL:-info}"

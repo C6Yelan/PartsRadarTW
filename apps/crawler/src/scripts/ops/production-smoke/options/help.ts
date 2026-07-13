@@ -28,8 +28,11 @@ Options:
   --crawler-warn-after-minutes <minutes>   Warn when latest successful crawler run is older than this.
   --crawler-fail-after-minutes <minutes>   Fail when latest successful crawler run is older than this.
   --recent-window-hours <hours>            Window for suspected block and parse error checks.
-  --invalid-image-url-warn-count <count>   Warn only when source image URL anomalies exceed this.
+  --invalid-image-url-warn-count <count>   Warn when distinct affected products exceed this.
                                            Default: ${DEFAULT_INVALID_IMAGE_URL_WARN_COUNT}
+  --invalid-image-url-warn-url-count <n>   Warn when distinct invalid source URLs exceed this.
+  --invalid-image-url-warn-percent <n>     Warn when affected active-product percentage exceeds this.
+  --invalid-image-url-warn-hours <hours>   Warn when the same product anomaly persists this long.
   --help                                   Show this help message.
 `);
 }

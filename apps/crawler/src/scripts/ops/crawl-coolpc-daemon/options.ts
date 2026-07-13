@@ -64,7 +64,7 @@ export interface NewProductImageBackfillOptions {
   maxDelayMs: number;
   timeoutMs: number;
   maxSourceBytes: number;
-  recoveryScanLimit: number;
+  batchLimit: number;
   externalFetchLockDir: string;
   externalFetchLockStaleSeconds: number;
 }
@@ -234,7 +234,7 @@ function parseNewProductImageBackfillOptions(
       min: MIN_NEW_PRODUCT_IMAGE_SOURCE_BYTES,
       max: MAX_NEW_PRODUCT_IMAGE_SOURCE_BYTES,
     }),
-    recoveryScanLimit: parseIntegerEnvironmentValue({
+    batchLimit: parseIntegerEnvironmentValue({
       env,
       envName: "CRAWLER_IMAGE_RECOVERY_SCAN_LIMIT",
       fallback: DEFAULT_IMAGE_RECOVERY_SCAN_LIMIT,

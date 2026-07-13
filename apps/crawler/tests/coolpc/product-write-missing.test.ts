@@ -6,6 +6,38 @@ import { writeCoolpcCategoryProductObservation } from "../../src/coolpc/product-
 import { FakeCoolpcProductWriteClient, productItem } from "./support/product-write-client";
 
 describe("CoolPC category product observation writer missing lifecycle", () => {
+  it("immediately hides an explicitly excluded existing product", async () => {
+    const client = new FakeCoolpcProductWriteClient();
+    const fetchedAt = new Date("2026-05-27T11:00:00.000Z");
+    client.seedProductWithCurrentPrice(
+      productItem({
+        ibuyToken: "CPU-BUNDLE-BOARD",
+        name: "[搭CPU現省500] 技嘉 B860M GAMING X WIFI6E(M-ATX)",
+        price: 4990,
+      }),
+    );
+
+    const result = await writeCoolpcCategoryProductObservation({
+      client,
+      crawlRunId: "crawl-run-2",
+      rawSnapshotId: "raw-snapshot-2",
+      sourceCategoryId: "category-4",
+      fetchedAt,
+      parsedProducts: [],
+      excludedIbuyTokens: ["CPU-BUNDLE-BOARD"],
+    });
+
+    expect(result).toMatchObject({
+      missingProductUpdatedCount: 1,
+      markedInactiveProductCount: 1,
+    });
+    expect(client.products[0]).toMatchObject({
+      isActive: false,
+      missingSince: fetchedAt,
+      missingSeenCount: 6,
+    });
+  });
+
   it("marks existing products missing when they are absent from a successful category parse", async () => {
     const client = new FakeCoolpcProductWriteClient();
     const previousSeenAt = new Date("2026-05-27T10:00:00.000Z");

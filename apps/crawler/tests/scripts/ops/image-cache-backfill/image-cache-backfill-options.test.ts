@@ -56,7 +56,7 @@ describe("image cache backfill options", () => {
         ".locks",
         "external-fetch",
       ),
-      externalFetchLockStaleSeconds: 43200,
+      externalFetchLockStaleSeconds: 300,
     });
   });
 

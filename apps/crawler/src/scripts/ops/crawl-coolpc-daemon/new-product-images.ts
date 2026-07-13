@@ -48,16 +48,13 @@ export async function handleNewProductImageBackfill({
     const recoveryCandidates = await readImageRecoveryCandidates(
       client,
       imageOptions,
-      options.recoveryScanLimit,
+      options.batchLimit,
     );
-    const candidates = [
-      ...new Map(
-        [...newProductCandidates, ...recoveryCandidates].map((candidate) => [
-          candidate.id,
-          candidate,
-        ]),
-      ).values(),
-    ];
+    const { candidates, deferredCount } = createBoundedImageCandidateBatch(
+      newProductCandidates,
+      recoveryCandidates,
+      options.batchLimit,
+    );
 
     if (candidates.length === 0) {
       log(`Product image recovery skipped. createdProducts=${uniqueProductIds.length}`);
@@ -65,7 +62,7 @@ export async function handleNewProductImageBackfill({
     }
 
     log(
-      `Starting product image recovery. createdProducts=${uniqueProductIds.length} candidates=${candidates.length}`,
+      `Starting product image recovery. createdProducts=${uniqueProductIds.length} candidates=${candidates.length} deferred=${deferredCount}`,
     );
     const summary = await backfillImages(
       candidates,
@@ -80,6 +77,26 @@ export async function handleNewProductImageBackfill({
   } catch (error) {
     log(`Product image recovery failed: ${toSafeCliErrorMessage(error)}`);
   }
+}
+
+export function createBoundedImageCandidateBatch<T extends { id: string }>(
+  newProductCandidates: readonly T[],
+  recoveryCandidates: readonly T[],
+  batchLimit: number,
+): { candidates: T[]; deferredCount: number } {
+  const candidatePool = [
+    ...new Map(
+      [...newProductCandidates, ...recoveryCandidates].map((candidate) => [
+        candidate.id,
+        candidate,
+      ]),
+    ).values(),
+  ];
+
+  return {
+    candidates: candidatePool.slice(0, batchLimit),
+    deferredCount: Math.max(0, candidatePool.length - batchLimit),
+  };
 }
 
 // 將 scheduled crawler 的新商品補圖設定轉成共用 image backfill processor 需要的完整選項。

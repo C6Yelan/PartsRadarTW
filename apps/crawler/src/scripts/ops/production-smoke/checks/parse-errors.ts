@@ -56,12 +56,21 @@ export async function checkSourceImageAnomalies(
       rawToken: true,
       rawName: true,
       rawImageUrl: true,
+      createdAt: true,
     },
   });
   const summary = summarizeSourceImageAnomalies(records);
-  const message = `${summary.rows} rows / ${summary.distinctProducts} distinct products / ${summary.distinctRawImageUrls} distinct raw image urls in ${options.recentWindowHours}h, warnAfter=${options.invalidImageUrlWarnCount}`;
+  const activeProductCount = await client.product.count({ where: { isActive: true } });
+  const failurePercent =
+    activeProductCount === 0 ? 0 : (summary.distinctProducts / activeProductCount) * 100;
+  const message = `${summary.rows} rows / ${summary.distinctProducts} distinct products / ${summary.distinctRawImageUrls} distinct raw image urls / ${failurePercent.toFixed(2)}% of ${activeProductCount} active products / longest ${summary.longestPersistenceHours.toFixed(2)}h in ${options.recentWindowHours}h`;
+  const shouldWarn =
+    summary.distinctProducts > options.invalidImageUrlWarnCount ||
+    summary.distinctRawImageUrls > options.invalidImageUrlWarnUrlCount ||
+    failurePercent > options.invalidImageUrlWarnPercent ||
+    summary.longestPersistenceHours >= options.invalidImageUrlWarnHours;
 
-  return summary.rows > options.invalidImageUrlWarnCount
+  return shouldWarn
     ? warn("source image anomalies", message)
     : ok("source image anomalies", message);
 }
@@ -70,6 +79,7 @@ export async function checkSourceImageAnomalies(
 function summarizeSourceImageAnomalies(records: SourceImageAnomalyRecord[]) {
   const productKeys = new Set<string>();
   const rawImageUrls = new Set<string>();
+  const productTimes = new Map<string, { first: number; last: number }>();
 
   for (const record of records) {
     const productKey = toSourceImageAnomalyProductKey(record);
@@ -77,6 +87,12 @@ function summarizeSourceImageAnomalies(records: SourceImageAnomalyRecord[]) {
 
     if (productKey) {
       productKeys.add(productKey);
+      const createdAt = record.createdAt.getTime();
+      const times = productTimes.get(productKey);
+      productTimes.set(productKey, {
+        first: times ? Math.min(times.first, createdAt) : createdAt,
+        last: times ? Math.max(times.last, createdAt) : createdAt,
+      });
     }
 
     if (rawImageUrl) {
@@ -88,6 +104,12 @@ function summarizeSourceImageAnomalies(records: SourceImageAnomalyRecord[]) {
     rows: records.length,
     distinctProducts: productKeys.size,
     distinctRawImageUrls: rawImageUrls.size,
+    longestPersistenceHours: Math.max(
+      0,
+      ...[...productTimes.values()].map(
+        ({ first, last }) => (last - first) / MILLISECONDS_PER_HOUR,
+      ),
+    ),
   };
 }
 

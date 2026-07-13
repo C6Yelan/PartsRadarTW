@@ -55,6 +55,7 @@ export function parseCoolpcCategoryPage(
     return {
       validation,
       items: [],
+      excludedIbuyTokens: [],
       issues: [
         {
           type: "content_validation_failed",
@@ -69,6 +70,7 @@ export function parseCoolpcCategoryPage(
   const $ = load(html);
   const candidates = extractCoolpcProductCandidates($);
   const items: ParsedCoolpcProduct[] = [];
+  const excludedIbuyTokens: string[] = [];
   const issues: CoolpcParseIssue[] = [];
   const seenItemsBySourceKey = new Map<string, ParsedCoolpcProduct>();
   let deduplicatedItemCount = 0;
@@ -107,6 +109,7 @@ export function parseCoolpcCategoryPage(
     }
 
     if (isMisclassifiedCategoryProduct(context.igrp, name)) {
+      excludedIbuyTokens.push(ibuyToken);
       continue;
     }
 
@@ -189,6 +192,7 @@ export function parseCoolpcCategoryPage(
   return {
     validation,
     items,
+    excludedIbuyTokens,
     issues,
     deduplicatedItemCount,
     canImport: items.length > 0 && !hasFatalIssue,

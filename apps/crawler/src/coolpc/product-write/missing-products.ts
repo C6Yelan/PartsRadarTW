@@ -13,11 +13,13 @@ export async function markMissingProducts({
   sourceCategoryId,
   fetchedAt,
   presentIbuyTokens,
+  excludedIbuyTokens = new Set(),
 }: {
   client: CoolpcProductWriteDelegates;
   sourceCategoryId: string;
   fetchedAt: Date;
   presentIbuyTokens: ReadonlySet<string>;
+  excludedIbuyTokens?: ReadonlySet<string>;
 }): Promise<
   Pick<
     WriteCoolpcCategoryProductObservationResult,
@@ -44,6 +46,33 @@ export async function markMissingProducts({
   for (const product of products) {
     // 若本次已抓到該 ibuyToken，視為仍存活，跳過缺漏邏輯。
     if (presentIbuyTokens.has(product.ibuyToken)) {
+      continue;
+    }
+
+    if (excludedIbuyTokens.has(product.ibuyToken)) {
+      if (
+        !product.isActive &&
+        product.missingSeenCount >= MISSING_SUCCESSFUL_CRAWLS_BEFORE_INACTIVE
+      ) {
+        continue;
+      }
+
+      await client.product.update({
+        where: { id: product.id },
+        data: {
+          isActive: false,
+          missingSince: product.missingSince ?? fetchedAt,
+          missingSeenCount: Math.max(
+            product.missingSeenCount,
+            MISSING_SUCCESSFUL_CRAWLS_BEFORE_INACTIVE,
+          ),
+        },
+        select: { id: true },
+      });
+      result.missingProductUpdatedCount += 1;
+      if (product.isActive) {
+        result.markedInactiveProductCount += 1;
+      }
       continue;
     }
 

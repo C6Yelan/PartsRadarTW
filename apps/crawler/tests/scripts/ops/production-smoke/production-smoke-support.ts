@@ -154,6 +154,10 @@ export function createSmokeClient({
   publicDiscordDeliveryCounts = {},
   publicDiscordDeliveryRecords,
   historicalImageProducts = [],
+  invalidImageDistinctProductCount = 16,
+  invalidImageDistinctUrlCount = 5,
+  invalidImagePersistenceHours = 0,
+  activeProductCount = 1000,
 }: {
   invalidImageErrorCount: number;
   trueParseErrorCount: number;
@@ -181,6 +185,10 @@ export function createSmokeClient({
     updatedAt: Date;
   }>;
   historicalImageProducts?: Array<{ id: string }>;
+  invalidImageDistinctProductCount?: number;
+  invalidImageDistinctUrlCount?: number;
+  invalidImagePersistenceHours?: number;
+  activeProductCount?: number;
 }) {
   return {
     crawlRun: {
@@ -221,14 +229,23 @@ export function createSmokeClient({
         }
 
         return Array.from({ length: invalidImageErrorCount }, (_, index) => ({
-          rawToken: `TOKEN-${(index % 16) + 1}`,
-          rawName: `Invalid image product ${(index % 16) + 1}`,
-          rawImageUrl: `/eval/${(index % 5) + 1}/`,
+          rawToken: `TOKEN-${(index % invalidImageDistinctProductCount) + 1}`,
+          rawName: `Invalid image product ${(index % invalidImageDistinctProductCount) + 1}`,
+          rawImageUrl: `/eval/${(index % invalidImageDistinctUrlCount) + 1}/`,
+          createdAt: new Date(
+            Date.parse("2026-06-02T12:00:00.000Z") -
+              (index < invalidImageDistinctProductCount
+                ? invalidImagePersistenceHours * 60 * 60 * 1000
+                : 0),
+          ),
         }));
       },
     },
     product: {
-      count: async () => 1,
+      count: async ({ where }: { where?: Record<string, unknown> } = {}) =>
+        where && Object.keys(where).length === 1 && where.isActive === true
+          ? activeProductCount
+          : 1,
       findMany: async ({ where }: { where?: { isActive?: boolean } } = {}) =>
         where?.isActive === false ? historicalImageProducts : [{ id: "product-1" }],
     },

@@ -83,6 +83,7 @@ export interface ContentValidationResult {
 export interface CoolpcParseResult {
   validation: ContentValidationResult;
   items: ParsedCoolpcProduct[];
+  excludedIbuyTokens: string[];
   issues: CoolpcParseIssue[];
   deduplicatedItemCount: number;
   canImport: boolean;

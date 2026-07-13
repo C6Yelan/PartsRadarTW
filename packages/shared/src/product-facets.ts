@@ -33,6 +33,8 @@ const CAPACITY_OPTIONS = [
   option("1000", "1 TB"),
   option("2000", "2 TB"),
   option("4000", "4 TB"),
+  option("5000", "5 TB"),
+  option("6000", "6 TB"),
   option("8000", "8 TB"),
   option("10000", "10 TB"),
   option("12000", "12 TB"),
@@ -597,19 +599,23 @@ function extractStorageTags(text: string, add: AddTag): void {
 }
 
 function extractExternalStorageTags(text: string, add: AddTag): void {
-  if (/記憶卡|\b(?:SD|MICROSD)\b/.test(text)) {
+  if (/記憶卡|\b(?:SD(?:HC|XC)?|MICRO\s*SD(?:HC|XC)?)\b/.test(text)) {
     add("external_type", "memory-card");
-  } else if (/隨身碟/.test(text) && !/SSD/.test(text)) {
+  } else if (/隨身碟|格紋碟/.test(text) && !/SSD/.test(text)) {
     add("external_type", "usb-flash");
   } else if (/SSD/.test(text)) {
     add("external_type", "external-ssd");
-  } else if (/HDD|外接硬碟|隨身硬碟/.test(text)) {
+  } else if (
+    /HDD|外接硬碟|隨身硬碟|\bCANVIO\b|\b(?:EXPANSION|ONETOUCH)\b|\b25(?:A3|M3|H3)\b/.test(
+      text,
+    )
+  ) {
     add("external_type", "external-hdd");
   }
 
   addAllMatches(add, "connector", text, [
     ["type-a", /TYPE[ -]?A/],
-    ["type-c", /TYPE[ -]?C|USB[ -]?C/],
+    ["type-c", /TYPE[ -]?C|USB[ -]?C|\bSD820\b/],
   ]);
   extractStorageCapacity(text, add);
 }
@@ -785,7 +791,9 @@ function extractFanSize(text: string, add: AddTag): void {
 }
 
 function extractStorageCapacity(text: string, add: AddTag): void {
-  const terabyteMatch = text.match(/(?:^|[^\d])(1|2|4|8|10|12|14|16|18|20|22|24)\s*T(?:B)?\b/);
+  const terabyteMatch = text.match(
+    /(?:^|[^\d])(1|2|4|5|6|8|10|12|14|16|18|20|22|24)\s*T(?:B)?\b/,
+  );
   if (terabyteMatch?.[1]) {
     add("capacity_gb", String(Number(terabyteMatch[1]) * 1000));
     return;
@@ -795,7 +803,7 @@ function extractStorageCapacity(text: string, add: AddTag): void {
     add,
     "capacity_gb",
     text,
-    /(?:^|[^\d])(32|64|128|256|480|500|512)\s*G(?:B)?\b/,
+    /(?:^|[^\d])(32|64|128|256|480|500|512)\s*G(?:B)?(?=$|[^A-Z0-9]|MICRO\s*SD)/,
   );
 }
 

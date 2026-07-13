@@ -46,7 +46,7 @@ describe("manual CoolPC crawl snapshot storage options", () => {
         ".locks",
         "external-fetch",
       ),
-      externalFetchLockStaleSeconds: 43200,
+      externalFetchLockStaleSeconds: 300,
     });
   });
 
@@ -109,6 +109,6 @@ function manualCrawlOptions(): CrawlOptions {
     storageDir: "/repo/storage/snapshots",
     delayMs: 8000,
     externalFetchLockDir: "/repo/storage/snapshots/.locks/external-fetch",
-    externalFetchLockStaleSeconds: 43200,
+    externalFetchLockStaleSeconds: 300,
   };
 }

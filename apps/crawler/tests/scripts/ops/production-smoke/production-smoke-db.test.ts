@@ -89,7 +89,7 @@ describe("production smoke DB-backed checks", () => {
           name: "source image anomalies",
           status: "OK",
           message:
-            "624 rows / 16 distinct products / 5 distinct raw image urls in 24h, warnAfter=2000",
+            "624 rows / 16 distinct products / 5 distinct raw image urls / 1.60% of 1000 active products / longest 0.00h in 24h",
         }),
         expect.objectContaining({
           name: "rate limit headers",
@@ -115,14 +115,14 @@ describe("production smoke DB-backed checks", () => {
     );
   });
 
-  it("warns when invalid image URL issues exceed the anomaly threshold", async () => {
+  it("warns when distinct products exceed the anomaly threshold", async () => {
     const { crawlerCwd, workspaceRoot } = await createWorkspace();
     const imageDir = join(workspaceRoot, "product-images");
     await mkdir(imageDir);
     await writeFile(join(imageDir, "product-1.webp"), "webp");
     stubHealthyPublicApi();
     const options = parseProductionSmokeOptions(
-      ["--invalid-image-url-warn-count", "2000"],
+      ["--invalid-image-url-warn-count", "15"],
       {
         PRODUCT_IMAGE_STORAGE_DIR: imageDir,
       },
@@ -149,7 +149,49 @@ describe("production smoke DB-backed checks", () => {
           name: "source image anomalies",
           status: "WARN",
           message:
-            "2001 rows / 16 distinct products / 5 distinct raw image urls in 24h, warnAfter=2000",
+            "2001 rows / 16 distinct products / 5 distinct raw image urls / 1.60% of 1000 active products / longest 0.00h in 24h",
+        }),
+      ]),
+    );
+  });
+
+  it("warns when the same source image anomaly persists", async () => {
+    const { crawlerCwd, workspaceRoot } = await createWorkspace();
+    const imageDir = join(workspaceRoot, "product-images");
+    await mkdir(imageDir);
+    await writeFile(join(imageDir, "product-1.webp"), "webp");
+    stubHealthyPublicApi();
+    const options = parseProductionSmokeOptions(
+      [
+        "--invalid-image-url-warn-count",
+        "100",
+        "--invalid-image-url-warn-url-count",
+        "100",
+        "--invalid-image-url-warn-percent",
+        "100",
+        "--invalid-image-url-warn-hours",
+        "12",
+      ],
+      { PRODUCT_IMAGE_STORAGE_DIR: imageDir },
+      crawlerCwd,
+    );
+    const summary = await runProductionSmoke(
+      createSmokeClient({
+        invalidImageErrorCount: 32,
+        trueParseErrorCount: 0,
+        invalidImagePersistenceHours: 18,
+      }),
+      options,
+      new Date("2026-06-02T12:00:00.000Z"),
+    );
+
+    expect(summary.checks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "source image anomalies",
+          status: "WARN",
+          message:
+            "32 rows / 16 distinct products / 5 distinct raw image urls / 1.60% of 1000 active products / longest 18.00h in 24h",
         }),
       ]),
     );
@@ -236,7 +278,7 @@ describe("production smoke DB-backed checks", () => {
           name: "source image anomalies",
           status: "OK",
           message:
-            "0 rows / 0 distinct products / 0 distinct raw image urls in 24h, warnAfter=2000",
+            "0 rows / 0 distinct products / 0 distinct raw image urls / 0.00% of 1000 active products / longest 0.00h in 24h",
         }),
       ]),
     );
