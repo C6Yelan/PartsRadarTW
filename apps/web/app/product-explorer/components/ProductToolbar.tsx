@@ -19,8 +19,8 @@ import type {
   QueryState,
   SelectedFacetChip,
 } from "../types";
-import { VendorFilter } from "./VendorFilter";
 import { AdvancedFilter } from "./AdvancedFilter";
+import { VendorFilter } from "./VendorFilter";
 
 interface ProductToolbarProps {
   categories: CategoryItem[];
@@ -165,9 +165,11 @@ export function ProductToolbar({
             onToggle={onToggleFacet}
           />
           {hasActiveFilters ? (
-            <button className="filter-reset-item" type="button" onClick={onResetFilters}>
-              重設所有篩選
-            </button>
+            <div className="filter-reset-row">
+              <button className="filter-reset-item" type="button" onClick={onResetFilters}>
+                重設
+              </button>
+            </div>
           ) : null}
         </div>
       </div>

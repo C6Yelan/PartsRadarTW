@@ -100,11 +100,11 @@
     min-height: 48px;
     padding-inline: 15px 7px;
   }
+}
 
-  .topbar-search:focus-within {
-    border-color: #6ea9c4;
-    box-shadow: 0 0 0 2px rgb(84 148 177 / 20%);
-  }
+.topbar-search:focus-within {
+  border-color: #6ea9c4;
+  box-shadow: 0 0 0 2px rgb(84 148 177 / 20%);
 }
 
 .search-glyph {
@@ -120,6 +120,10 @@
   height: 38px;
   border: 0;
   background: transparent;
+}
+
+.topbar-search input:focus {
+  outline: none;
 }
 
 .topbar-search .control-button.primary {

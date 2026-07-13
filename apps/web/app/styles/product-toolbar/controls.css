@@ -2,7 +2,7 @@
 .toolbar-controls {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 10px;
+  gap: 10px 8px;
   align-items: center;
   justify-content: stretch;
 }
@@ -11,7 +11,7 @@
 .facet-filter {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  gap: 8px;
+  gap: 5px;
   align-items: center;
   min-width: 0;
   color: var(--muted);
@@ -22,7 +22,7 @@
 .toolbar-status-filter {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  gap: 8px;
+  gap: 5px;
   align-items: center;
   min-width: 0;
   color: var(--muted);
@@ -33,6 +33,13 @@
   .toolbar-price-filter,
   .toolbar-status-filter {
     grid-column: span 2;
+  }
+
+  .vendor-filter,
+  .facet-filter {
+    grid-template-columns: max-content minmax(112px, 160px);
+    gap: 5px;
+    justify-content: start;
   }
 }
 
@@ -73,6 +80,12 @@
     5px 5px;
 }
 
+.toolbar-price-grid input:focus,
+.results-compact-select select:focus {
+  border-color: #6ea9c4;
+  outline: none;
+}
+
 .filter-drawer {
   padding-top: 14px;
   border-top: 1px solid var(--border);
@@ -91,6 +104,12 @@
   color: var(--muted);
   font-size: 13px;
   font-weight: 800;
+}
+
+.filter-reset-row {
+  display: flex;
+  grid-column: 1 / -1;
+  justify-content: flex-end;
 }
 
 .toolbar-error {

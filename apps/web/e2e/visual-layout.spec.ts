@@ -379,7 +379,21 @@ test("keeps the main pages usable without horizontal overflow", async ({ page },
     );
     expect(statusFilterWidth).toBeGreaterThan(320);
   }
+  const sortSelect = page.getByRole("combobox", { name: "排序" });
+  const pageSizeSelect = page.getByRole("combobox", { name: "每頁顯示" });
+  const minimumPriceInput = page.getByRole("textbox", { name: "最低價格" });
+  for (const control of [sortSelect, pageSizeSelect, minimumPriceInput]) {
+    await control.click();
+    await expect(control).toHaveCSS("outline-style", "none");
+    await control.press("Escape");
+  }
   await gpuChipFilter.getByRole("button", { name: "全部" }).click();
+  if (!isMobile) {
+    const facetTriggerWidth = await gpuChipFilter
+      .getByRole("button", { name: "全部" })
+      .evaluate((element) => element.getBoundingClientRect().width);
+    expect(facetTriggerWidth).toBeLessThanOrEqual(160);
+  }
   await page.getByRole("checkbox", { name: "NVIDIA" }).check();
   await expect.poll(() => new URL(page.url()).searchParams.getAll("facet")).toEqual([
     "gpu_chip:nvidia",
@@ -404,7 +418,27 @@ test("keeps the main pages usable without horizontal overflow", async ({ page },
     ).toBeVisible();
   }
 
+  const resetButton = page.getByRole("button", { name: "重設", exact: true });
+  await expect(resetButton).toBeVisible();
+  const resetAlignment = await resetButton.evaluate((button) => {
+    const buttonRect = button.getBoundingClientRect();
+    const controlsRect = button.closest(".toolbar-controls")?.getBoundingClientRect();
+    return controlsRect
+      ? {
+          bottomOffset: controlsRect.bottom - buttonRect.bottom,
+          rightOffset: controlsRect.right - buttonRect.right,
+        }
+      : null;
+  });
+  expect(resetAlignment).not.toBeNull();
+  expect(resetAlignment?.bottomOffset).toBeLessThanOrEqual(1);
+  expect(resetAlignment?.rightOffset).toBeLessThanOrEqual(1);
+
   await page.getByRole("searchbox", { name: "搜尋商品名稱" }).focus();
+  await expect(page.getByRole("searchbox", { name: "搜尋商品名稱" })).toHaveCSS(
+    "outline-style",
+    "none",
+  );
   await expectUsableLayout(page, testInfo);
 
   if (isMobile) {
@@ -418,7 +452,7 @@ test("keeps the main pages usable without horizontal overflow", async ({ page },
     await gpuChipFilter.getByRole("button", { name: "全部" }).click();
     await expect(page.getByRole("checkbox", { name: "NVIDIA" })).not.toBeChecked();
     await gpuChipFilter.getByRole("button", { name: "全部" }).click();
-    await page.getByRole("button", { name: "重設所有篩選" }).click();
+    await resetButton.click();
     await expect.poll(() => new URL(page.url()).searchParams.getAll("facet")).toEqual([]);
     await vramFilter.getByRole("button", { name: "全部" }).click();
     await expect(page.getByRole("checkbox", { name: "16 GB" })).not.toBeChecked();
@@ -613,8 +647,16 @@ async function expectFocusedControlToBeVisible(page: Page) {
       return false;
     }
 
-    const styles = window.getComputedStyle(focusedElement);
-    return styles.outlineStyle !== "none" || styles.boxShadow !== "none";
+    let element: HTMLElement | null = focusedElement;
+    while (element) {
+      const styles = window.getComputedStyle(element);
+      if (styles.outlineStyle !== "none" || styles.boxShadow !== "none") {
+        return true;
+      }
+      element = element.parentElement;
+    }
+
+    return false;
   });
 
   expect(hasVisibleFocusIndicator).toBe(true);
