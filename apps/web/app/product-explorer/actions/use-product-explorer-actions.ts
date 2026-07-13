@@ -1,17 +1,25 @@
 // apps/web/app/product-explorer/actions/use-product-explorer-actions.ts
 // 集中商品探索頁的查詢、篩選、分頁與返回首頁互動處理。
 
-import { type MouseEvent, type SyntheticEvent, useState } from "react";
+import { type MouseEvent, type SyntheticEvent, useEffect, useRef, useState } from "react";
 import {
   DEFAULT_QUERY,
   getFallbackCategorySlug,
   isNonNegativeInteger,
   normalizeFacetValues,
+  normalizeVendorValues,
   validatePriceRange,
 } from "../query-state";
 import type { CategoryItem, ProductVendorOption, QueryState } from "../types";
 
 const TOUCH_INPUT_MEDIA_QUERY = "(pointer: coarse)";
+
+interface CategoryScopedFilters {
+  vendors: string[];
+  facets: string[];
+}
+
+type CategoryFilterMemory = Map<string, CategoryScopedFilters>;
 
 // 建立商品探索頁 UI 事件 handler，負責把使用者操作轉成 query / draft 更新。
 export function useProductExplorerActions({
@@ -39,6 +47,16 @@ export function useProductExplorerActions({
   vendorOptions: ProductVendorOption[];
 }) {
   const [pageJumpValue, setPageJumpValue] = useState("");
+  const categoryFilterMemoryRef = useRef<CategoryFilterMemory>(new Map());
+
+  useEffect(() => {
+    rememberCategoryFilters(
+      categoryFilterMemoryRef.current,
+      query.category,
+      query.vendors,
+      query.facets,
+    );
+  }, [query.category, query.facets, query.vendors]);
 
   function updateQuery(partial: Partial<QueryState>) {
     commitQuery({
@@ -99,6 +117,13 @@ export function useProductExplorerActions({
   }
 
   function resetFilters() {
+    rememberCategoryFilters(
+      categoryFilterMemoryRef.current,
+      query.category,
+      DEFAULT_QUERY.vendors,
+      DEFAULT_QUERY.facets,
+    );
+
     commitQuery({
       ...query,
       q: DEFAULT_QUERY.q,
@@ -155,10 +180,24 @@ export function useProductExplorerActions({
   }
 
   function updateCategoryFilter(category: string) {
-    updateQuery({
+    if (category === query.category) {
+      return;
+    }
+
+    rememberCategoryFilters(
+      categoryFilterMemoryRef.current,
+      query.category,
+      query.vendors,
+      query.facets,
+    );
+    const rememberedFilters = categoryFilterMemoryRef.current.get(category);
+
+    commitQuery({
+      ...query,
       category,
-      vendors: DEFAULT_QUERY.vendors,
-      facets: DEFAULT_QUERY.facets,
+      vendors: normalizeVendorValues([...(rememberedFilters?.vendors ?? [])], category),
+      facets: normalizeFacetValues([...(rememberedFilters?.facets ?? [])], category),
+      page: 1,
     });
   }
 
@@ -215,6 +254,22 @@ export function useProductExplorerActions({
     updateQuery,
     updateSearchDraft,
   };
+}
+
+function rememberCategoryFilters(
+  memory: CategoryFilterMemory,
+  category: string,
+  vendors: string[],
+  facets: string[],
+) {
+  if (!category) {
+    return;
+  }
+
+  memory.set(category, {
+    vendors: [...vendors],
+    facets: [...facets],
+  });
 }
 
 // 觸控裝置提交搜尋或清除搜尋後收起鍵盤，避免結果區被虛擬鍵盤遮住。

@@ -109,6 +109,30 @@ test.beforeEach(async ({ page }) => {
           },
           {
             id: "88888888-8888-4888-8888-888888888888",
+            slug: "motherboard",
+            displayName: "主機板",
+            sourceName: "主機板 MB",
+            facets: [
+              {
+                key: "socket",
+                label: "腳位",
+                options: [
+                  { value: "lga1700", label: "LGA 1700" },
+                  { value: "am5", label: "AM5" },
+                ],
+              },
+              {
+                key: "chipset",
+                label: "晶片組",
+                options: [
+                  { value: "b650", label: "B650" },
+                  { value: "b760", label: "B760" },
+                ],
+              },
+            ],
+          },
+          {
+            id: "99999999-9999-4999-8999-999999999999",
             slug: "memory",
             displayName: "記憶體",
             sourceName: "記憶體 RAM",
@@ -224,6 +248,21 @@ test.beforeEach(async ({ page }) => {
 
     if (requestUrl.pathname === "/api/products") {
       const pageNumber = Number(requestUrl.searchParams.get("page") ?? "1");
+      const vendorsByCategory = {
+        cpu: [
+          { slug: "intel", name: "Intel" },
+          { slug: "amd", name: "AMD" },
+        ],
+        motherboard: [
+          { slug: "asus", name: "ASUS" },
+          { slug: "msi", name: "MSI" },
+        ],
+        gpu: [
+          { slug: "gigabyte", name: "GIGABYTE" },
+          { slug: "sapphire", name: "SAPPHIRE" },
+        ],
+      };
+      const category = requestUrl.searchParams.get("category") ?? "";
       await fulfillJson(route, {
         data: [
           {
@@ -244,10 +283,7 @@ test.beforeEach(async ({ page }) => {
         meta: {
           sourceStatus: "ok",
           lastSuccessAt: OBSERVED_AT,
-          vendors: [
-            { slug: "intel", name: "Intel" },
-            { slug: "amd", name: "AMD" },
-          ],
+          vendors: vendorsByCategory[category as keyof typeof vendorsByCategory] ?? [],
         },
       });
       return;
@@ -931,6 +967,233 @@ test("resets vendor, grouped facets, status, and page together @desktop-only", a
   await expect(summaryRow.getByRole("button", { name: "重設", exact: true })).toBeVisible();
 });
 
+test("remembers vendor and facet filters independently per category @desktop-only", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1760, height: 900 });
+  await page.goto("/?category=cpu");
+
+  await page.getByRole("searchbox", { name: "搜尋商品名稱" }).fill("遊戲主機");
+  await page.getByRole("button", { name: "搜尋", exact: true }).click();
+  await page.getByRole("textbox", { name: "最低價格" }).fill("1000");
+  await page.getByRole("textbox", { name: "最高價格" }).fill("20000");
+  await expect
+    .poll(() => {
+      const url = new URL(page.url());
+      return {
+        maxPrice: url.searchParams.get("maxPrice"),
+        minPrice: url.searchParams.get("minPrice"),
+      };
+    })
+    .toEqual({ maxPrice: "20000", minPrice: "1000" });
+  await page.getByRole("button", { name: "全部商品" }).click();
+  await page.getByRole("combobox", { name: "排序" }).selectOption("price_desc");
+  await page.getByRole("combobox", { name: "每頁顯示" }).selectOption("50");
+  await selectVendor(page, "Intel");
+  await selectFacetOptions(page, "腳位", ["LGA 1700"]);
+  await selectFacetOptions(page, "產品系列", ["Intel Core i5"]);
+
+  await expectQueryFilters(page, {
+    category: "cpu",
+    facets: ["socket:lga1700", "cpu_family:core-i5"],
+    vendors: "intel",
+  });
+  await expect
+    .poll(() => {
+      const url = new URL(page.url());
+      return {
+        maxPrice: url.searchParams.get("maxPrice"),
+        minPrice: url.searchParams.get("minPrice"),
+        pageSize: url.searchParams.get("pageSize"),
+        q: url.searchParams.get("q"),
+        sort: url.searchParams.get("sort"),
+        status: url.searchParams.get("status"),
+      };
+    })
+    .toEqual({
+      maxPrice: "20000",
+      minPrice: "1000",
+      pageSize: "50",
+      q: "遊戲主機",
+      sort: "price_desc",
+      status: "all",
+    });
+
+  await page.getByRole("textbox", { name: "跳至" }).fill("10");
+  await page.getByRole("button", { name: "前往" }).click();
+  await expect.poll(() => new URL(page.url()).searchParams.get("page")).toBe("10");
+
+  await switchCategory(page, "主機板", "motherboard");
+  await expectQueryFilters(page, { category: "motherboard", facets: [], vendors: null });
+  await expect.poll(() => new URL(page.url()).searchParams.get("page")).toBeNull();
+  await expect
+    .poll(() => {
+      const url = new URL(page.url());
+      return {
+        maxPrice: url.searchParams.get("maxPrice"),
+        minPrice: url.searchParams.get("minPrice"),
+        pageSize: url.searchParams.get("pageSize"),
+        q: url.searchParams.get("q"),
+        sort: url.searchParams.get("sort"),
+        status: url.searchParams.get("status"),
+      };
+    })
+    .toEqual({
+      maxPrice: "20000",
+      minPrice: "1000",
+      pageSize: "50",
+      q: "遊戲主機",
+      sort: "price_desc",
+      status: "all",
+    });
+
+  await selectVendor(page, "ASUS");
+  await selectFacetOptions(page, "腳位", ["AM5"]);
+  await selectFacetOptions(page, "晶片組", ["B650"]);
+  await expectQueryFilters(page, {
+    category: "motherboard",
+    facets: ["socket:am5", "chipset:b650"],
+    vendors: "asus",
+  });
+
+  await switchCategory(page, "CPU", "cpu");
+  await expectQueryFilters(page, {
+    category: "cpu",
+    facets: ["socket:lga1700", "cpu_family:core-i5"],
+    vendors: "intel",
+  });
+  await expect(page.getByRole("button", { name: "移除篩選：廠商：Intel" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "移除篩選：腳位：LGA 1700" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "移除篩選：產品系列：Intel Core i5" }),
+  ).toBeVisible();
+  await expect(page.locator(".active-filter-chips")).not.toContainText(/ASUS|AM5|B650/);
+  await assertVendorCheckboxStates(page, { checked: ["Intel"], absent: ["ASUS"] });
+  await assertFacetCheckboxStates(page, "腳位", { checked: ["LGA 1700"], unchecked: ["AM5"] });
+  await assertFacetCheckboxStates(page, "產品系列", { checked: ["Intel Core i5"] });
+
+  await switchCategory(page, "主機板", "motherboard");
+  await expectQueryFilters(page, {
+    category: "motherboard",
+    facets: ["socket:am5", "chipset:b650"],
+    vendors: "asus",
+  });
+  await expect(page.getByRole("button", { name: "移除篩選：廠商：ASUS" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "移除篩選：腳位：AM5" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "移除篩選：晶片組：B650" })).toBeVisible();
+  await expect(page.locator(".active-filter-chips")).not.toContainText(/Intel|LGA 1700|Core i5/);
+  await assertVendorCheckboxStates(page, { checked: ["ASUS"], absent: ["Intel"] });
+  await assertFacetCheckboxStates(page, "腳位", { checked: ["AM5"], unchecked: ["LGA 1700"] });
+  await assertFacetCheckboxStates(page, "晶片組", { checked: ["B650"] });
+});
+
+test("reset clears only the current category memory @desktop-only", async ({ page }) => {
+  await page.setViewportSize({ width: 1760, height: 900 });
+  await page.goto("/?category=cpu");
+
+  await selectVendor(page, "Intel");
+  await selectFacetOptions(page, "腳位", ["LGA 1700"]);
+  await switchCategory(page, "主機板", "motherboard");
+  await selectVendor(page, "ASUS");
+  await selectFacetOptions(page, "晶片組", ["B650"]);
+  await page.getByRole("button", { name: "可能已下架" }).click();
+
+  await page.getByRole("button", { name: "重設", exact: true }).click();
+  await expectQueryFilters(page, { category: "motherboard", facets: [], vendors: null });
+  await expect.poll(() => new URL(page.url()).searchParams.get("status")).toBeNull();
+  await expect(page.locator(".active-filter-summary-row")).toHaveCount(0);
+  await assertVendorCheckboxStates(page, { unchecked: ["ASUS", "MSI"] });
+  await assertFacetCheckboxStates(page, "晶片組", { unchecked: ["B650"] });
+
+  await switchCategory(page, "CPU", "cpu");
+  await expectQueryFilters(page, {
+    category: "cpu",
+    facets: ["socket:lga1700"],
+    vendors: "intel",
+  });
+  await expect(page.getByRole("button", { name: "移除篩選：廠商：Intel" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "移除篩選：腳位：LGA 1700" })).toBeVisible();
+
+  await switchCategory(page, "主機板", "motherboard");
+  await expectQueryFilters(page, { category: "motherboard", facets: [], vendors: null });
+  await expect(page.locator(".active-filter-summary-row")).toHaveCount(0);
+  await assertVendorCheckboxStates(page, { unchecked: ["ASUS", "MSI"] });
+  await assertFacetCheckboxStates(page, "晶片組", { unchecked: ["B650"] });
+});
+
+test("keeps URL and popstate filters ahead of category memory @desktop-only", async ({ page }) => {
+  await page.setViewportSize({ width: 1760, height: 900 });
+  await page.goto("/?category=cpu");
+
+  await selectVendor(page, "Intel");
+  await selectFacetOptions(page, "腳位", ["LGA 1700"]);
+  await switchCategory(page, "主機板", "motherboard");
+
+  await page.evaluate(() => {
+    window.history.pushState(null, "", "/?category=cpu&facet=socket%3Aam5&vendors=amd");
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  });
+  await expectQueryFilters(page, {
+    category: "cpu",
+    facets: ["socket:am5"],
+    vendors: "amd",
+  });
+  await expect(page.getByRole("button", { name: "移除篩選：廠商：AMD" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "移除篩選：腳位：AM5" })).toBeVisible();
+  await expect(page.locator(".active-filter-chips")).not.toContainText(/Intel|LGA 1700/);
+  await assertVendorCheckboxStates(page, { checked: ["AMD"], unchecked: ["Intel"] });
+  await assertFacetCheckboxStates(page, "腳位", { checked: ["AM5"], unchecked: ["LGA 1700"] });
+
+  await switchCategory(page, "主機板", "motherboard");
+  await switchCategory(page, "CPU", "cpu");
+  await expectQueryFilters(page, {
+    category: "cpu",
+    facets: ["socket:am5"],
+    vendors: "amd",
+  });
+  await expect(page.getByRole("button", { name: "移除篩選：廠商：AMD" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "移除篩選：腳位：AM5" })).toBeVisible();
+});
+
+test("uses the initial URL and drops other category memory after reload @desktop-only", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1760, height: 900 });
+  await page.goto("/?category=cpu&facet=socket%3Alga1700&vendors=intel");
+
+  await expectQueryFilters(page, {
+    category: "cpu",
+    facets: ["socket:lga1700"],
+    vendors: "intel",
+  });
+  await expect(page.getByRole("button", { name: "移除篩選：廠商：Intel" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "移除篩選：腳位：LGA 1700" })).toBeVisible();
+
+  await switchCategory(page, "主機板", "motherboard");
+  await selectVendor(page, "ASUS");
+  await selectFacetOptions(page, "晶片組", ["B650"]);
+  await switchCategory(page, "CPU", "cpu");
+  await expectQueryFilters(page, {
+    category: "cpu",
+    facets: ["socket:lga1700"],
+    vendors: "intel",
+  });
+
+  await page.reload();
+  await expectQueryFilters(page, {
+    category: "cpu",
+    facets: ["socket:lga1700"],
+    vendors: "intel",
+  });
+  await expect(page.getByRole("button", { name: "移除篩選：廠商：Intel" })).toBeVisible();
+
+  await switchCategory(page, "主機板", "motherboard");
+  await expectQueryFilters(page, { category: "motherboard", facets: [], vendors: null });
+  await expect(page.locator(".active-filter-summary-row")).toHaveCount(0);
+  await assertVendorCheckboxStates(page, { unchecked: ["ASUS", "MSI"] });
+  await assertFacetCheckboxStates(page, "晶片組", { unchecked: ["B650"] });
+});
+
 test("keeps the main pages usable without horizontal overflow", async ({ page }, testInfo) => {
   test.setTimeout(60_000);
 
@@ -1205,6 +1468,65 @@ async function assertFacetOptionsUnchecked(page: Page, facetLabel: string, optio
   for (const optionLabel of optionLabels) {
     await expect(facetFilter.getByRole("checkbox", { name: optionLabel })).not.toBeChecked();
   }
+}
+
+async function switchCategory(page: Page, categoryLabel: string, categorySlug: string) {
+  await page
+    .getByRole("radiogroup", { name: "分類" })
+    .getByText(categoryLabel, { exact: true })
+    .click();
+  await expect.poll(() => new URL(page.url()).searchParams.get("category")).toBe(categorySlug);
+  await expect(page.getByRole("region", { name: "商品列表" })).toBeVisible();
+}
+
+async function expectQueryFilters(
+  page: Page,
+  expected: { category: string; facets: string[]; vendors: string | null },
+) {
+  await expect
+    .poll(() => {
+      const url = new URL(page.url());
+      return {
+        category: url.searchParams.get("category"),
+        facets: url.searchParams.getAll("facet"),
+        vendors: url.searchParams.get("vendors"),
+      };
+    })
+    .toEqual(expected);
+}
+
+async function assertVendorCheckboxStates(
+  page: Page,
+  expected: { checked?: string[]; unchecked?: string[]; absent?: string[] },
+) {
+  const vendorFilter = page.locator(".vendor-filter");
+  await vendorFilter.locator(".vendor-menu-trigger").click();
+  for (const vendor of expected.checked ?? []) {
+    await expect(vendorFilter.getByRole("checkbox", { name: vendor })).toBeChecked();
+  }
+  for (const vendor of expected.unchecked ?? []) {
+    await expect(vendorFilter.getByRole("checkbox", { name: vendor })).not.toBeChecked();
+  }
+  for (const vendor of expected.absent ?? []) {
+    await expect(vendorFilter.getByRole("checkbox", { name: vendor })).toHaveCount(0);
+  }
+  await vendorFilter.locator(".vendor-menu-trigger").click();
+}
+
+async function assertFacetCheckboxStates(
+  page: Page,
+  facetLabel: string,
+  expected: { checked?: string[]; unchecked?: string[] },
+) {
+  const facetFilter = page.locator(".facet-filter").filter({ hasText: facetLabel });
+  await facetFilter.locator(".facet-menu-trigger").click();
+  for (const option of expected.checked ?? []) {
+    await expect(facetFilter.getByRole("checkbox", { name: option })).toBeChecked();
+  }
+  for (const option of expected.unchecked ?? []) {
+    await expect(facetFilter.getByRole("checkbox", { name: option })).not.toBeChecked();
+  }
+  await facetFilter.locator(".facet-menu-trigger").click();
 }
 
 async function expectUsableLayout(page: Page, testInfo: TestInfo) {
