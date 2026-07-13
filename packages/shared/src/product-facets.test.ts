@@ -240,6 +240,15 @@ describe("product facets", () => {
     );
   });
 
+  it("recognizes the confirmed ATX support of a GT502 Horizon fan bundle", () => {
+    expect(
+      extractProductFilterTags(
+        14,
+        "華碩 TUF Gaming GT502 Horizon(白色)+Prime MR120 ARGB(白)反向扇(三入)+正向(單顆)",
+      ),
+    ).toEqual(["motherboard_support:atx"]);
+  });
+
   it.each([
     ["伺服器機殼/EEB(不含滑軌)", "motherboard_support:eeb"],
     ["全塔機殼/E-ATX(不含滑軌)", "motherboard_support:e-atx"],

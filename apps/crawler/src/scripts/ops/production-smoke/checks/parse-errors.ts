@@ -48,7 +48,7 @@ export async function checkSourceImageAnomalies(
   const records = await client.parseError.findMany({
     where: {
       errorType: "INVALID_IMAGE_URL",
-      createdAt: {
+      lastSeenAt: {
         gte: since,
       },
     },

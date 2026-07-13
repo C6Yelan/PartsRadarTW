@@ -739,6 +739,9 @@ function extractGpuTags(text: string, add: AddTag): void {
 
 function extractCaseTags(text: string, add: AddTag): void {
   extractFormFactors(text, add, "motherboard_support");
+  if (/\bGT502\s+HORIZON\b/.test(text)) {
+    add("motherboard_support", "atx");
+  }
   if (/背插/.test(text)) {
     add("back_connect", "yes");
   }

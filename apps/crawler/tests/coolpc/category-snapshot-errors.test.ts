@@ -85,14 +85,6 @@ describe("CoolPC category snapshot error handling", () => {
         rawSnapshotId: "raw-snapshot-1",
         sourceCategoryId: "category-4",
         errorType: "INVALID_IMAGE_URL",
-        rawToken: "CPU-TOKEN-002",
-        rawImageUrl: "/eval/4/",
-      }),
-      expect.objectContaining({
-        crawlRunId: "crawl-run-1",
-        rawSnapshotId: "raw-snapshot-1",
-        sourceCategoryId: "category-4",
-        errorType: "INVALID_IMAGE_URL",
         rawToken: "CPU-TOKEN-003",
         rawImageUrl: "https://example.com/product.jpg",
       }),
@@ -122,8 +114,8 @@ describe("CoolPC category snapshot error handling", () => {
       writeProducts: productWriter.writeProducts,
     });
 
-    expect(client.parseErrors).toHaveLength(2);
-    expect(client.parseErrors.map(({ occurrenceCount }) => occurrenceCount)).toEqual([2, 2]);
+    expect(client.parseErrors).toHaveLength(1);
+    expect(client.parseErrors[0]?.occurrenceCount).toBe(2);
   });
 
   it("records non-product content as suspected block", async () => {

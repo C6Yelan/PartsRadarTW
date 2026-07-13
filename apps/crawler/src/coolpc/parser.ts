@@ -26,6 +26,7 @@ import {
   createCoolpcSourceProductKey,
   normalizeCoolpcProductImageUrl,
   sanitizeCoolpcSourceCategoryUrl,
+  shouldReportInvalidCoolpcProductImageUrl,
 } from "./parser/urls";
 import { classifyProductVendor } from "./vendor-classification";
 import { normalizeFilterSyncProductName } from "./filter-sync/parser";
@@ -124,7 +125,10 @@ export function parseCoolpcCategoryPage(
       continue;
     }
 
-    if (primaryImageUrl === null) {
+    if (
+      primaryImageUrl === null &&
+      shouldReportInvalidCoolpcProductImageUrl(candidate.rawImageUrl)
+    ) {
       issues.push({
         type: "invalid_image_url",
         message: "Product candidate image URL is missing or not allowed.",

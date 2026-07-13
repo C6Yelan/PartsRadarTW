@@ -56,6 +56,27 @@ export function normalizeCoolpcProductImageUrl(
   return `${COOLPC_OFFICIAL_BASE_URL}${url.pathname}`;
 }
 
+// 只有看起來確實是圖片的 URL 才值得記錄異常；來源缺圖 placeholder 與功能連結直接略過。
+export function shouldReportInvalidCoolpcProductImageUrl(
+  rawImageUrl: string,
+  baseUrl = COOLPC_OFFICIAL_BASE_URL,
+): boolean {
+  const trimmedImageUrl = rawImageUrl.trim();
+  if (trimmedImageUrl.length === 0) {
+    return false;
+  }
+
+  try {
+    const url = new URL(trimmedImageUrl, baseUrl);
+    return (
+      ["http:", "https:"].includes(url.protocol) &&
+      /\.(?:jpg|jpeg|png|gif|webp)$/i.test(url.pathname)
+    );
+  } catch {
+    return false;
+  }
+}
+
 // 移除來源分類 URL 中的 session 參數，保留可追蹤但不帶 request state 的穩定網址。
 export function sanitizeCoolpcSourceCategoryUrl(sourceCategoryUrl: string): string {
   const url = new URL(sourceCategoryUrl);

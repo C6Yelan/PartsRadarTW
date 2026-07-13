@@ -178,11 +178,6 @@ describe("CoolPC category parser", () => {
     expect(result.issues).toEqual([
       expect.objectContaining({
         type: "invalid_image_url",
-        rawToken: "CPU-TOKEN-002",
-        rawImageUrl: "/eval/4/",
-      }),
-      expect.objectContaining({
-        type: "invalid_image_url",
         rawToken: "CPU-TOKEN-003",
         rawImageUrl: "https://example.com/product.jpg",
       }),
@@ -211,13 +206,7 @@ describe("CoolPC category parser", () => {
         primaryImageUrl: null,
         price: 4190,
       });
-      expect(result.issues).toEqual([
-        expect.objectContaining({
-          type: "invalid_image_url",
-          rawImageUrl,
-          rawToken: `TOKEN-${igrp}`,
-        }),
-      ]);
+      expect(result.issues).toEqual([]);
     }
   });
 

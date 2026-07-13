@@ -4,7 +4,10 @@
 import { describe, expect, it } from "vitest";
 import { COOLPC_TARGET_CATEGORIES } from "../../src/coolpc/categories";
 import { parsePriceText } from "../../src/coolpc/parser/normalization";
-import { normalizeCoolpcProductImageUrl } from "../../src/coolpc/parser/urls";
+import {
+  normalizeCoolpcProductImageUrl,
+  shouldReportInvalidCoolpcProductImageUrl,
+} from "../../src/coolpc/parser/urls";
 
 describe("CoolPC parser helpers", () => {
   it("keeps the current target categories in code", () => {
@@ -46,5 +49,13 @@ describe("CoolPC parser helpers", () => {
     expect(normalizeCoolpcProductImageUrl("/eval/4/amd7500f.jpg", 4)).toBe(
       "https://www.coolpc.com.tw/eval/4/amd7500f.jpg",
     );
+  });
+
+  it("reports only image-like invalid source references", () => {
+    expect(shouldReportInvalidCoolpcProductImageUrl("/eval/14/")).toBe(false);
+    expect(shouldReportInvalidCoolpcProductImageUrl("/eval/15/revolutioniiiwjpg")).toBe(false);
+    expect(shouldReportInvalidCoolpcProductImageUrl("javascript:showImage()")).toBe(false);
+    expect(shouldReportInvalidCoolpcProductImageUrl("https://example.com/product.jpg")).toBe(true);
+    expect(shouldReportInvalidCoolpcProductImageUrl("/eval/5/wrong-category.png")).toBe(true);
   });
 });
