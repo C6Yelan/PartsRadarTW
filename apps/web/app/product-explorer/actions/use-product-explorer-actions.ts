@@ -172,6 +172,17 @@ export function useProductExplorerActions({
     });
   }
 
+  function removeFacetGroup(tags: readonly string[]) {
+    const removedTags = new Set(tags);
+
+    updateQuery({
+      facets: normalizeFacetValues(
+        query.facets.filter((tag) => !removedTags.has(tag)),
+        query.category,
+      ),
+    });
+  }
+
   function toggleVendorFilter(vendor: string) {
     const selectedVendors = new Set(query.vendors);
 
@@ -194,6 +205,7 @@ export function useProductExplorerActions({
     goToPage,
     jumpToPage,
     pageJumpValue,
+    removeFacetGroup,
     resetFilters,
     returnHome,
     setPageJumpValue,

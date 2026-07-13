@@ -60,14 +60,21 @@ export function useProductExplorerViewModel() {
       categories.find((category) => category.slug === query.category)?.facets ?? [];
     const selectedFacets = new Set(query.facets);
 
-    return definitions.flatMap((definition) =>
-      definition.options
-        .map((option) => ({
-          tag: `${definition.key}:${option.value}`,
-          label: `${definition.label}：${option.label}`,
-        }))
-        .filter((chip) => selectedFacets.has(chip.tag)),
-    );
+    return definitions.flatMap((definition) => {
+      const selectedOptions = definition.options.filter((option) =>
+        selectedFacets.has(`${definition.key}:${option.value}`),
+      );
+
+      return selectedOptions.length > 0
+        ? [
+            {
+              key: definition.key,
+              label: `${definition.label}：${selectedOptions.map((option) => option.label).join("、")}`,
+              tags: selectedOptions.map((option) => `${definition.key}:${option.value}`),
+            },
+          ]
+        : [];
+    });
   }, [categories, query.category, query.facets]);
 
   const totalItems = products?.pagination.totalItems ?? 0;
@@ -158,7 +165,7 @@ export function useProductExplorerViewModel() {
           clearVendors: () => actions.updateQuery({ vendors: DEFAULT_QUERY.vendors }),
           draftChange: setDraft,
           pageSizeChange: (pageSize: number) => actions.updateQuery({ pageSize }),
-          removeFacet: actions.toggleFacetFilter,
+          removeFacetGroup: actions.removeFacetGroup,
           resetFilters: actions.resetFilters,
           sortChange: (sort: typeof query.sort) => actions.updateQuery({ sort }),
           statusChange: (status: typeof query.status) => actions.updateQuery({ status }),

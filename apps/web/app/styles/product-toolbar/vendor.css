@@ -35,6 +35,14 @@
   cursor: pointer;
 }
 
+.vendor-menu-trigger > span,
+.facet-menu-trigger > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .vendor-menu .filter-chevron {
   margin-left: 12px;
 }

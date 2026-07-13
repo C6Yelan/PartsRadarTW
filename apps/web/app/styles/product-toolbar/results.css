@@ -93,10 +93,23 @@
   border: 0;
 }
 
+.active-filter-summary-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: start;
+}
+
+.active-filter-summary-row > .filter-reset-item {
+  grid-column: 2;
+}
+
 .active-filter-chip {
   display: inline-flex;
   gap: 7px;
   align-items: center;
+  min-width: 0;
+  max-width: 100%;
   min-height: 32px;
   padding: 0 10px;
   border: 1px solid var(--border-strong);
@@ -111,7 +124,15 @@
   background: var(--surface-hover);
 }
 
+.active-filter-chip span:first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-align: left;
+  white-space: normal;
+}
+
 .active-filter-chip span:last-child {
+  flex: 0 0 auto;
   color: var(--accent-strong);
   font-size: 15px;
   line-height: 1;

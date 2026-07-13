@@ -81,7 +81,53 @@ test.beforeEach(async ({ page }) => {
               {
                 key: "socket",
                 label: "腳位",
-                options: [{ value: "am5", label: "AM5" }],
+                options: [
+                  { value: "lga1851", label: "LGA 1851" },
+                  { value: "lga1700", label: "LGA 1700" },
+                  { value: "am5", label: "AM5" },
+                  { value: "am4", label: "AM4" },
+                  { value: "str5", label: "sTR5 / Threadripper" },
+                ],
+              },
+              {
+                key: "cpu_family",
+                label: "產品系列",
+                options: [
+                  { value: "core-i3", label: "Intel Core i3" },
+                  { value: "core-i5", label: "Intel Core i5" },
+                ],
+              },
+              {
+                key: "integrated_graphics",
+                label: "內建顯示",
+                options: [
+                  { value: "yes", label: "有內顯" },
+                  { value: "no", label: "無內顯" },
+                ],
+              },
+            ],
+          },
+          {
+            id: "88888888-8888-4888-8888-888888888888",
+            slug: "memory",
+            displayName: "記憶體",
+            sourceName: "記憶體 RAM",
+            facets: [
+              {
+                key: "module_type",
+                label: "使用類型",
+                options: [
+                  { value: "desktop", label: "桌上型" },
+                  { value: "laptop", label: "筆記型" },
+                ],
+              },
+              {
+                key: "memory_type",
+                label: "記憶體規格",
+                options: [
+                  { value: "ddr4", label: "DDR4" },
+                  { value: "ddr5", label: "DDR5" },
+                ],
               },
             ],
           },
@@ -198,7 +244,10 @@ test.beforeEach(async ({ page }) => {
         meta: {
           sourceStatus: "ok",
           lastSuccessAt: OBSERVED_AT,
-          vendors: [{ slug: "visual-vendor", name: "Visual Vendor" }],
+          vendors: [
+            { slug: "intel", name: "Intel" },
+            { slug: "amd", name: "AMD" },
+          ],
         },
       });
       return;
@@ -387,7 +436,7 @@ test("keeps the product toolbar compact and readable across its layout boundary 
 
   for (const viewport of viewports) {
     await page.setViewportSize(viewport);
-    await page.goto("/?category=gpu");
+    await page.goto("/?category=cpu");
     await expect(page.getByRole("region", { name: "商品列表" })).toBeVisible();
 
     const priceInputs = page.locator(".toolbar-price-grid input");
@@ -445,7 +494,7 @@ test("keeps the product toolbar compact and readable across its layout boundary 
       }),
     );
     expect(controlsBox).not.toBeNull();
-    expect(groupBoxes.length).toBe(5);
+    expect(groupBoxes.length).toBe(6);
 
     if (viewport.width > 760) {
       const toolbarGap = await controls.evaluate((element) => {
@@ -454,9 +503,13 @@ test("keeps the product toolbar compact and readable across its layout boundary 
       });
       expect(toolbarGap).toEqual({ columnGap: "8px", rowGap: "8px" });
       for (const input of await priceInputs.all()) {
-        expect((await input.boundingBox())?.width).toBeCloseTo(104, 0);
+        expect((await input.boundingBox())?.width).toBeCloseTo(92, 0);
       }
       expect((await page.locator(".toolbar-status-filter").boundingBox())?.width).toBeLessThan(300);
+      expect((await page.locator(".vendor-menu-trigger").boundingBox())?.width).toBeCloseTo(112, 0);
+      for (const trigger of await page.locator(".facet-menu-trigger").all()) {
+        expect((await trigger.boundingBox())?.width).toBeCloseTo(112, 0);
+      }
     }
 
     if (viewport.width === 1760) {
@@ -590,7 +643,7 @@ test("keeps the product toolbar compact and readable across its layout boundary 
   console.log("toolbar/table viewport dimensions", viewportDimensions);
 
   await page.setViewportSize({ width: 1760, height: 900 });
-  await page.goto("/?category=gpu");
+  await page.goto("/?category=cpu");
   await page.getByRole("button", { name: "全部商品" }).click();
   await expect.poll(() => new URL(page.url()).searchParams.get("status")).toBe("all");
   await page.getByRole("textbox", { name: "最低價格" }).fill("1000");
@@ -598,16 +651,284 @@ test("keeps the product toolbar compact and readable across its layout boundary 
   await expect(page.getByRole("textbox", { name: "最低價格" })).toHaveValue("1000");
   await expect(page.getByRole("textbox", { name: "最高價格" })).toHaveValue("2000");
   await page.getByRole("button", { name: "全部廠商" }).click();
-  const vendorCheckbox = page.getByRole("checkbox", { name: "Visual Vendor" });
+  const vendorCheckbox = page.getByRole("checkbox", { name: "Intel" });
   await expect(vendorCheckbox).not.toBeChecked();
-  await page.locator(".vendor-option").filter({ hasText: "Visual Vendor" }).click();
-  await expect.poll(() => new URL(page.url()).searchParams.get("vendors")).toBe("visual-vendor");
-  const gpuChipFilter = page.locator(".facet-filter").filter({ hasText: "GPU 晶片" });
-  await gpuChipFilter.getByRole("button", { name: "全部" }).click();
-  await page.getByRole("checkbox", { name: "NVIDIA" }).check();
+  await page.locator(".vendor-option").filter({ hasText: "Intel" }).click();
+  await expect.poll(() => new URL(page.url()).searchParams.get("vendors")).toBe("intel");
+  const socketFilter = page.locator(".facet-filter").filter({ hasText: "腳位" });
+  await socketFilter.getByRole("button", { name: "全部" }).click();
+  await page.getByRole("checkbox", { name: "LGA 1851" }).check();
   await expect
     .poll(() => new URL(page.url()).searchParams.getAll("facet"))
-    .toEqual(["gpu_chip:nvidia"]);
+    .toEqual(["socket:lga1851"]);
+});
+
+test("groups selected CPU facets and keeps the vendor chip first @desktop-only", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1760, height: 900 });
+  await page.goto("/?category=cpu");
+
+  await selectVendor(page, "Intel");
+  await selectFacetOptions(page, "腳位", ["LGA 1851", "LGA 1700"]);
+  await expect.poll(() => new URL(page.url()).searchParams.get("vendors")).toBe("intel");
+  await expect
+    .poll(() => new URL(page.url()).searchParams.getAll("facet"))
+    .toEqual(["socket:lga1851", "socket:lga1700"]);
+
+  const summaryRow = page.locator(".active-filter-summary-row");
+  const chips = summaryRow.locator(".active-filter-chip");
+  await expect(chips).toHaveCount(2);
+  await expect(chips).toHaveText(["廠商：Intel×", "腳位：LGA 1851、LGA 1700×"]);
+  await expect(
+    page.getByRole("button", { exact: true, name: "移除篩選：腳位：LGA 1851" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { exact: true, name: "移除篩選：腳位：LGA 1700" }),
+  ).toHaveCount(0);
+  await expect(summaryRow.getByRole("group", { name: "已選篩選條件" })).toBeVisible();
+  const resetButton = summaryRow.getByRole("button", { name: "重設", exact: true });
+  await expect(resetButton).toBeVisible();
+
+  const [firstChipBox, resetBox] = await Promise.all([
+    chips.first().boundingBox(),
+    resetButton.boundingBox(),
+  ]);
+  expect(Math.abs((firstChipBox?.y ?? 0) - (resetBox?.y ?? 0))).toBeLessThanOrEqual(1);
+
+  const pageTenUrl = new URL(page.url());
+  pageTenUrl.searchParams.set("page", "10");
+  await page.goto(`${pageTenUrl.pathname}${pageTenUrl.search}`);
+  await expect.poll(() => new URL(page.url()).searchParams.get("page")).toBe("10");
+
+  await page.getByRole("button", { name: "移除篩選：腳位：LGA 1851、LGA 1700" }).click();
+  await expect.poll(() => new URL(page.url()).searchParams.getAll("facet")).toEqual([]);
+  await expect.poll(() => new URL(page.url()).searchParams.get("vendors")).toBe("intel");
+  await expect.poll(() => new URL(page.url()).searchParams.get("page")).toBeNull();
+
+  await selectFacetOptions(page, "產品系列", ["Intel Core i3"]);
+  await page.getByRole("button", { name: "移除篩選：廠商：Intel" }).click();
+  await expect.poll(() => new URL(page.url()).searchParams.get("vendors")).toBeNull();
+  await expect
+    .poll(() => new URL(page.url()).searchParams.getAll("facet"))
+    .toEqual(["cpu_family:core-i3"]);
+});
+
+test("orders and clears multiple vendors without changing other filters @desktop-only", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1760, height: 900 });
+  await page.goto("/?category=cpu");
+
+  await selectVendor(page, "AMD");
+  await selectVendor(page, "Intel");
+  await selectFacetOptions(page, "內建顯示", ["有內顯"]);
+  await page.getByRole("button", { name: "全部商品" }).click();
+
+  const pageTenUrl = new URL(page.url());
+  pageTenUrl.searchParams.set("page", "10");
+  await page.goto(`${pageTenUrl.pathname}${pageTenUrl.search}`);
+
+  await expect.poll(() => new URL(page.url()).searchParams.get("vendors")).toBe("intel,amd");
+  await expect(page.getByRole("button", { name: "移除篩選：廠商：Intel、AMD" })).toBeVisible();
+  await page.getByRole("button", { name: "移除篩選：廠商：Intel、AMD" }).click();
+
+  await expect.poll(() => new URL(page.url()).searchParams.get("vendors")).toBeNull();
+  await expect
+    .poll(() => new URL(page.url()).searchParams.getAll("facet"))
+    .toEqual(["integrated_graphics:yes"]);
+  await expect.poll(() => new URL(page.url()).searchParams.get("status")).toBe("all");
+  await expect.poll(() => new URL(page.url()).searchParams.get("page")).toBeNull();
+  await expect(page.getByRole("button", { name: "移除篩選：內建顯示：有內顯" })).toBeVisible();
+
+  await page.getByRole("button", { name: "全部廠商" }).click();
+  await expect(page.getByRole("checkbox", { name: "Intel" })).not.toBeChecked();
+  await expect(page.getByRole("checkbox", { name: "AMD" })).not.toBeChecked();
+});
+
+test("groups non-CPU facets without clearing other definitions @desktop-only", async ({ page }) => {
+  await page.setViewportSize({ width: 1760, height: 900 });
+  await page.goto("/?category=gpu");
+
+  await selectFacetOptions(page, "GPU 晶片", ["NVIDIA", "AMD"]);
+  await selectFacetOptions(page, "顯示記憶體", ["16 GB"]);
+  await expect
+    .poll(() => new URL(page.url()).searchParams.getAll("facet"))
+    .toEqual(["gpu_chip:nvidia", "gpu_chip:amd", "vram_gb:16"]);
+  await expect(page.locator(".active-filter-chip")).toHaveCount(2);
+  await expect(page.getByRole("button", { name: "移除篩選：GPU 晶片：NVIDIA、AMD" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "移除篩選：顯示記憶體：16 GB" })).toBeVisible();
+
+  await page.getByRole("button", { name: "移除篩選：GPU 晶片：NVIDIA、AMD" }).click();
+  await expect.poll(() => new URL(page.url()).searchParams.getAll("facet")).toEqual(["vram_gb:16"]);
+  await expect(page.getByRole("button", { name: "移除篩選：顯示記憶體：16 GB" })).toBeVisible();
+});
+
+test("uses the active category definitions for memory chips @desktop-only", async ({ page }) => {
+  await page.setViewportSize({ width: 1760, height: 900 });
+  await page.goto("/?category=memory");
+
+  await selectFacetOptions(page, "使用類型", ["桌上型", "筆記型"]);
+  await selectFacetOptions(page, "記憶體規格", ["DDR5"]);
+  await expect
+    .poll(() => new URL(page.url()).searchParams.getAll("facet"))
+    .toEqual(["module_type:desktop", "module_type:laptop", "memory_type:ddr5"]);
+  await expect(
+    page.getByRole("button", { name: "移除篩選：使用類型：桌上型、筆記型" }),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "移除篩選：記憶體規格：DDR5" })).toBeVisible();
+  await expect(page.locator(".active-filter-chips")).not.toContainText("腳位");
+});
+
+test("keeps shared trigger widths and chevrons usable across categories @desktop-only", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1760, height: 900 });
+
+  for (const category of ["cpu", "gpu", "memory", "external-storage"]) {
+    await page.goto(`/?category=${category}`);
+    const triggers = page.locator(".vendor-menu-trigger, .facet-menu-trigger");
+    for (const trigger of await triggers.all()) {
+      const layout = await trigger.evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+        const textRect = element.querySelector("span")?.getBoundingClientRect();
+        const chevronRect = element.querySelector(".filter-chevron")?.getBoundingClientRect();
+        return { chevronRect, rect, textRect };
+      });
+      expect(layout.rect.width).toBeCloseTo(112, 0);
+      expect(layout.textRect?.right ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(
+        layout.chevronRect?.left ?? 0,
+      );
+      expect(layout.chevronRect?.right ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(
+        layout.rect.right,
+      );
+    }
+    await expectNoHorizontalOverflow(page);
+  }
+
+  await page.goto("/?category=cpu");
+  await selectFacetOptions(page, "腳位", ["sTR5 / Threadripper"]);
+  const longSummaryTrigger = page
+    .locator(".facet-filter")
+    .filter({ hasText: "腳位" })
+    .getByRole("button", { name: "sTR5 / Threadripper" });
+  const longSummaryLayout = await longSummaryTrigger.evaluate((element) => {
+    const text = element.querySelector("span");
+    const chevron = element.querySelector(".filter-chevron");
+    if (!(text instanceof HTMLElement) || !(chevron instanceof SVGElement)) return null;
+    const textStyles = window.getComputedStyle(text);
+    return {
+      accessibleText: element.textContent?.trim(),
+      chevronLeft: chevron.getBoundingClientRect().left,
+      scrollWidth: text.scrollWidth,
+      textOverflow: textStyles.textOverflow,
+      textRight: text.getBoundingClientRect().right,
+      textWidth: text.clientWidth,
+    };
+  });
+  expect(longSummaryLayout).not.toBeNull();
+  expect(longSummaryLayout?.accessibleText).toContain("sTR5 / Threadripper");
+  expect(longSummaryLayout?.textOverflow).toBe("ellipsis");
+  expect(longSummaryLayout?.scrollWidth ?? 0).toBeGreaterThan(longSummaryLayout?.textWidth ?? 0);
+  expect(longSummaryLayout?.textRight ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(
+    longSummaryLayout?.chevronLeft ?? 0,
+  );
+  await expectNoHorizontalOverflow(page);
+});
+
+test("wraps a complete grouped CPU socket chip on mobile @desktop-only", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/?category=cpu");
+
+  await selectFacetOptions(page, "腳位", [
+    "LGA 1851",
+    "LGA 1700",
+    "AM5",
+    "AM4",
+    "sTR5 / Threadripper",
+  ]);
+  const expectedTags = [
+    "socket:lga1851",
+    "socket:lga1700",
+    "socket:am5",
+    "socket:am4",
+    "socket:str5",
+  ];
+  await expect.poll(() => new URL(page.url()).searchParams.getAll("facet")).toEqual(expectedTags);
+  const socketFilter = page.locator(".facet-filter").filter({ hasText: "腳位" });
+  await expect(socketFilter.locator(".facet-menu")).toHaveClass(/is-open/);
+  await socketFilter.locator(".facet-menu-trigger").click();
+  await expect(socketFilter.locator(".facet-menu")).not.toHaveClass(/is-open/);
+
+  const chip = page.getByRole("button", {
+    name: "移除篩選：腳位：LGA 1851、LGA 1700、AM5、AM4、sTR5 / Threadripper",
+  });
+  await expect(page.locator(".active-filter-chip")).toHaveCount(1);
+  await expect(chip).toBeVisible();
+  await expect(chip.getByText("×")).toBeVisible();
+  await expect(page.getByRole("button", { name: "重設", exact: true })).toBeVisible();
+  const chipTextLayout = await chip
+    .locator("span")
+    .first()
+    .evaluate((element) => {
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      return {
+        lineCount: new Set([...range.getClientRects()].map((rect) => Math.round(rect.top))).size,
+        scrollHeight: element.scrollHeight,
+      };
+    });
+  expect(chipTextLayout.lineCount).toBeGreaterThan(1);
+  expect(chipTextLayout.scrollHeight).toBeGreaterThan(16);
+  await expectNoHorizontalOverflow(page);
+
+  await chip.getByText("×").click();
+  await expect.poll(() => new URL(page.url()).searchParams.getAll("facet")).toEqual([]);
+  await expect(page.locator(".active-filter-summary-row")).toHaveCount(0);
+});
+
+test("resets vendor, grouped facets, status, and page together @desktop-only", async ({ page }) => {
+  await page.setViewportSize({ width: 1760, height: 900 });
+  await page.goto("/?category=cpu");
+
+  await selectVendor(page, "AMD");
+  await selectFacetOptions(page, "腳位", ["LGA 1851", "LGA 1700"]);
+  await selectFacetOptions(page, "產品系列", ["Intel Core i5"]);
+  await page.getByRole("button", { name: "可能已下架" }).click();
+  const selectedUrl = new URL(page.url());
+  selectedUrl.searchParams.set("page", "10");
+  await page.goto(`${selectedUrl.pathname}${selectedUrl.search}`);
+
+  await expect.poll(() => new URL(page.url()).searchParams.get("page")).toBe("10");
+  await expect(page.locator(".active-filter-chip")).toHaveCount(3);
+  await page.getByRole("button", { name: "重設", exact: true }).click();
+
+  await expect.poll(() => new URL(page.url()).searchParams.get("vendors")).toBeNull();
+  await expect.poll(() => new URL(page.url()).searchParams.getAll("facet")).toEqual([]);
+  await expect.poll(() => new URL(page.url()).searchParams.get("status")).toBeNull();
+  await expect.poll(() => new URL(page.url()).searchParams.get("page")).toBeNull();
+  await expect(page.locator(".active-filter-summary-row")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "目前上架" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(page.getByRole("button", { name: "可能已下架" })).toHaveAttribute(
+    "aria-pressed",
+    "false",
+  );
+
+  await page.getByRole("button", { name: "全部廠商" }).click();
+  await expect(page.getByRole("checkbox", { name: "Intel" })).not.toBeChecked();
+  await expect(page.getByRole("checkbox", { name: "AMD" })).not.toBeChecked();
+  await page.getByRole("button", { name: "全部廠商" }).click();
+  await assertFacetOptionsUnchecked(page, "腳位", ["LGA 1851", "LGA 1700"]);
+  await assertFacetOptionsUnchecked(page, "產品系列", ["Intel Core i5"]);
+
+  await page.getByRole("button", { name: "全部商品" }).click();
+  const summaryRow = page.locator(".active-filter-summary-row");
+  await expect(summaryRow).toBeVisible();
+  await expect(summaryRow.getByRole("group", { name: "已選篩選條件" })).toHaveCount(0);
+  await expect(summaryRow.getByRole("button", { name: "重設", exact: true })).toBeVisible();
 });
 
 test("keeps the main pages usable without horizontal overflow", async ({ page }, testInfo) => {
@@ -615,9 +936,7 @@ test("keeps the main pages usable without horizontal overflow", async ({ page },
 
   await page.goto("/?category=gpu&page=10");
   await expect(page.getByRole("status", { name: "網站公告" })).toHaveCount(0);
-  await expect(
-    page.locator(".topbar").getByRole("link", { name: "價格變動總覽" }),
-  ).toBeVisible();
+  await expect(page.locator(".topbar").getByRole("link", { name: "價格變動總覽" })).toBeVisible();
   await expect(page.locator(".topbar").getByRole("link", { name: "公告" })).toBeVisible();
   await expect(page.getByRole("region", { name: "商品列表" })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "頁碼" })).toBeVisible();
@@ -639,12 +958,12 @@ test("keeps the main pages usable without horizontal overflow", async ({ page },
     const facetTriggerWidth = await gpuChipFilter
       .getByRole("button", { name: "全部" })
       .evaluate((element) => element.getBoundingClientRect().width);
-    expect(facetTriggerWidth).toBeLessThanOrEqual(160);
+    expect(facetTriggerWidth).toBeCloseTo(112, 0);
   }
   await page.getByRole("checkbox", { name: "NVIDIA" }).check();
-  await expect.poll(() => new URL(page.url()).searchParams.getAll("facet")).toEqual([
-    "gpu_chip:nvidia",
-  ]);
+  await expect
+    .poll(() => new URL(page.url()).searchParams.getAll("facet"))
+    .toEqual(["gpu_chip:nvidia"]);
   if (!isMobile) {
     await vramFilter.getByRole("button", { name: "全部" }).click();
     await page.getByRole("checkbox", { name: "16 GB" }).check();
@@ -669,17 +988,21 @@ test("keeps the main pages usable without horizontal overflow", async ({ page },
   await expect(resetButton).toBeVisible();
   const resetAlignment = await resetButton.evaluate((button) => {
     const buttonRect = button.getBoundingClientRect();
-    const controlsRect = button.closest(".toolbar-controls")?.getBoundingClientRect();
-    return controlsRect
+    const summaryRect = button.closest(".active-filter-summary-row")?.getBoundingClientRect();
+    const firstChipRect = button
+      .closest(".active-filter-summary-row")
+      ?.querySelector(".active-filter-chip")
+      ?.getBoundingClientRect();
+    return summaryRect && firstChipRect
       ? {
-          bottomOffset: controlsRect.bottom - buttonRect.bottom,
-          rightOffset: controlsRect.right - buttonRect.right,
+          rightOffset: summaryRect.right - buttonRect.right,
+          topOffset: Math.abs(firstChipRect.top - buttonRect.top),
         }
       : null;
   });
   expect(resetAlignment).not.toBeNull();
-  expect(resetAlignment?.bottomOffset).toBeLessThanOrEqual(1);
   expect(resetAlignment?.rightOffset).toBeLessThanOrEqual(1);
+  expect(resetAlignment?.topOffset).toBeLessThanOrEqual(1);
 
   await page.getByRole("searchbox", { name: "搜尋商品名稱" }).focus();
   await expect(page.getByRole("searchbox", { name: "搜尋商品名稱" })).toHaveCSS(
@@ -693,9 +1016,9 @@ test("keeps the main pages usable without horizontal overflow", async ({ page },
   } else {
     await vramFilter.getByRole("button", { name: "16 GB" }).click();
     await page.getByRole("button", { name: "移除篩選：GPU 晶片：NVIDIA" }).click();
-    await expect.poll(() => new URL(page.url()).searchParams.getAll("facet")).toEqual([
-      "vram_gb:16",
-    ]);
+    await expect
+      .poll(() => new URL(page.url()).searchParams.getAll("facet"))
+      .toEqual(["vram_gb:16"]);
     await gpuChipFilter.getByRole("button", { name: "全部" }).click();
     await expect(page.getByRole("checkbox", { name: "NVIDIA" })).not.toBeChecked();
     await gpuChipFilter.getByRole("button", { name: "全部" }).click();
@@ -708,7 +1031,7 @@ test("keeps the main pages usable without horizontal overflow", async ({ page },
   }
   await expect.poll(() => new URL(page.url()).searchParams.get("category")).toBe("cpu");
   await expect.poll(() => new URL(page.url()).searchParams.getAll("facet")).toEqual([]);
-  await expect(page.getByRole("group", { name: "已選進階篩選" })).toHaveCount(0);
+  await expect(page.getByRole("group", { name: "已選篩選條件" })).toHaveCount(0);
 
   await page.goto("/price-report");
   await expect(page.getByRole("heading", { exact: true, name: "價格變動總覽" })).toBeVisible();
@@ -783,9 +1106,7 @@ test("keeps the main pages usable without horizontal overflow", async ({ page },
     { productId: PRODUCT_ID, observedAt: OBSERVED_AT },
   );
   await page.goto("/build-list");
-  await expect(
-    page.locator(".topbar").getByRole("link", { name: "價格變動總覽" }),
-  ).toBeVisible();
+  await expect(page.locator(".topbar").getByRole("link", { name: "價格變動總覽" })).toBeVisible();
   await expect(page.getByRole("heading", { name: product.name })).toBeVisible();
   await page.getByRole("link", { name: "原價屋查看／購買，開新分頁" }).focus();
   await expectUsableLayout(page, testInfo);
@@ -862,6 +1183,29 @@ test("suppresses authored transitions when reduced motion is requested", {
   await expectTransitionDurationAtMost(copyButton, 0.01);
   await expectTransitionDurationAtMost(copyButton.locator(".detail-action-icon"), 0.01);
 });
+
+async function selectVendor(page: Page, vendorName: string) {
+  const vendorFilter = page.locator(".vendor-filter");
+  await vendorFilter.locator(".vendor-menu-trigger").click();
+  await expect(vendorFilter.getByRole("checkbox", { name: vendorName })).not.toBeChecked();
+  await vendorFilter.locator(".vendor-option").filter({ hasText: vendorName }).click();
+}
+
+async function selectFacetOptions(page: Page, facetLabel: string, optionLabels: string[]) {
+  const facetFilter = page.locator(".facet-filter").filter({ hasText: facetLabel });
+  await facetFilter.locator(".facet-menu-trigger").click();
+  for (const optionLabel of optionLabels) {
+    await facetFilter.getByRole("checkbox", { name: optionLabel }).check();
+  }
+}
+
+async function assertFacetOptionsUnchecked(page: Page, facetLabel: string, optionLabels: string[]) {
+  const facetFilter = page.locator(".facet-filter").filter({ hasText: facetLabel });
+  await facetFilter.locator(".facet-menu-trigger").click();
+  for (const optionLabel of optionLabels) {
+    await expect(facetFilter.getByRole("checkbox", { name: optionLabel })).not.toBeChecked();
+  }
+}
 
 async function expectUsableLayout(page: Page, testInfo: TestInfo) {
   const viewport = expectedViewport(testInfo.project.name);

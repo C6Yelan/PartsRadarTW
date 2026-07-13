@@ -31,7 +31,7 @@ export function ProductExplorerResultsPanel({
         onClearVendors={actions.toolbar.clearVendors}
         onDraftChange={actions.toolbar.draftChange}
         onPageSizeChange={actions.toolbar.pageSizeChange}
-        onRemoveFacet={actions.toolbar.removeFacet}
+        onRemoveFacetGroup={actions.toolbar.removeFacetGroup}
         onResetFilters={actions.toolbar.resetFilters}
         onSortChange={actions.toolbar.sortChange}
         onStatusChange={actions.toolbar.statusChange}

@@ -32,8 +32,9 @@ export type ProductListItem = ProductsResponseBody["data"][number];
 export type ProductVendorOption = ProductsResponseBody["meta"]["vendors"][number];
 
 export interface SelectedFacetChip {
-  tag: string;
+  key: string;
   label: string;
+  tags: string[];
 }
 
 export type ProductsResponse = ProductsResponseBody;

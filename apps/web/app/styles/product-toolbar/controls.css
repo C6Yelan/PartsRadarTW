@@ -92,12 +92,6 @@
   font-weight: 800;
 }
 
-.filter-reset-row {
-  display: flex;
-  grid-column: 1 / -1;
-  justify-content: flex-end;
-}
-
 .toolbar-error {
   margin: -4px 0 0;
   color: var(--danger);
@@ -125,7 +119,7 @@
   }
 
   .toolbar-price-grid {
-    grid-template-columns: repeat(2, 104px);
+    grid-template-columns: repeat(2, 92px);
   }
 
   .toolbar-segmented-control {
@@ -139,10 +133,6 @@
 
   .toolbar-controls .vendor-filter,
   .toolbar-controls .facet-filter {
-    grid-template-columns: max-content minmax(112px, 160px);
-  }
-
-  .filter-reset-row {
-    flex: 0 0 100%;
+    grid-template-columns: max-content 112px;
   }
 }

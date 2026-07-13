@@ -39,7 +39,7 @@ interface ProductToolbarProps {
   onSortChange: (sort: ProductSort) => void;
   onStatusChange: (status: ProductStatus) => void;
   onPageSizeChange: (pageSize: number) => void;
-  onRemoveFacet: (tag: string) => void;
+  onRemoveFacetGroup: (tags: readonly string[]) => void;
   onToggleVendor: (vendor: string) => void;
   onToggleFacet: (tag: string) => void;
 }
@@ -62,10 +62,16 @@ export function ProductToolbar({
   onSortChange,
   onStatusChange,
   onPageSizeChange,
-  onRemoveFacet,
+  onRemoveFacetGroup,
   onToggleVendor,
   onToggleFacet,
 }: ProductToolbarProps) {
+  const resolvedVendorSlugs = new Set(selectedVendorOptions.map((option) => option.slug));
+  const selectedVendorLabel = [
+    ...selectedVendorOptions.map((option) => option.name),
+    ...query.vendors.filter((vendor) => !resolvedVendorSlugs.has(vendor)),
+  ].join("、");
+
   return (
     <div className="results-toolbar">
       <div className="results-heading-row">
@@ -164,30 +170,41 @@ export function ProductToolbar({
             selectedFacets={query.facets}
             onToggle={onToggleFacet}
           />
-          {hasActiveFilters ? (
-            <div className="filter-reset-row">
-              <button className="filter-reset-item" type="button" onClick={onResetFilters}>
-                重設
-              </button>
-            </div>
-          ) : null}
         </div>
       </div>
-      {selectedFacetChips.length > 0 ? (
-        <fieldset className="active-filter-chips" aria-label="已選進階篩選">
-          {selectedFacetChips.map((chip) => (
-            <button
-              aria-label={`移除篩選：${chip.label}`}
-              className="active-filter-chip"
-              key={chip.tag}
-              type="button"
-              onClick={() => onRemoveFacet(chip.tag)}
-            >
-              <span>{chip.label}</span>
-              <span aria-hidden="true">×</span>
-            </button>
-          ))}
-        </fieldset>
+      {hasActiveFilters ? (
+        <div className="active-filter-summary-row">
+          {query.vendors.length > 0 || selectedFacetChips.length > 0 ? (
+            <fieldset className="active-filter-chips" aria-label="已選篩選條件">
+              {query.vendors.length > 0 ? (
+                <button
+                  aria-label={`移除篩選：廠商：${selectedVendorLabel}`}
+                  className="active-filter-chip"
+                  type="button"
+                  onClick={onClearVendors}
+                >
+                  <span>廠商：{selectedVendorLabel}</span>
+                  <span aria-hidden="true">×</span>
+                </button>
+              ) : null}
+              {selectedFacetChips.map((chip) => (
+                <button
+                  aria-label={`移除篩選：${chip.label}`}
+                  className="active-filter-chip"
+                  key={chip.key}
+                  type="button"
+                  onClick={() => onRemoveFacetGroup(chip.tags)}
+                >
+                  <span>{chip.label}</span>
+                  <span aria-hidden="true">×</span>
+                </button>
+              ))}
+            </fieldset>
+          ) : null}
+          <button className="filter-reset-item" type="button" onClick={onResetFilters}>
+            重設
+          </button>
+        </div>
       ) : null}
       {formError ? (
         <p className="toolbar-error" role="alert">
