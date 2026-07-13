@@ -84,4 +84,20 @@ describe("product vendor classification", () => {
       name: "保銳",
     });
   });
+
+  it.each([
+    ["金士頓 DT Exodia M 64G 推蓋式 / Type-A / USB3.2 G1", { slug: "kingston", name: "金士頓" }],
+    ["GIGASTONE 64G 格紋碟 / Type-A / USB3.2 G1", { slug: "gigastone", name: "GIGASTONE" }],
+    ["威剛 UC310 64G 白 / Type-A / USB3.2 G1", { slug: "adata", name: "威剛" }],
+    [
+      "【台中公益門市限定】GIGASTONE 64G 格紋碟 / Type-A / USB3.2 G1",
+      { slug: "gigastone", name: "GIGASTONE" },
+    ],
+  ])("classifies external-storage vendors: %s", (productName, expectedVendor) => {
+    expect(classifyProductVendor(9, productName)).toEqual(expectedVendor);
+  });
+
+  it("keeps an unknown external-storage vendor unclassified", () => {
+    expect(classifyProductVendor(9, "未知品牌 64G 隨身碟 / Type-A")).toBeNull();
+  });
 });

@@ -65,6 +65,35 @@ describe("GET /api/categories handler", () => {
     });
   });
 
+  it("returns optional facet option groups without changing existing option fields", async () => {
+    const response = await createGetCategoriesHandler(
+      fakeCategoriesClient([
+        category({
+          id: "category-5",
+          igrp: 5,
+          displayName: "主機板",
+          sourceName: "主機板 MB",
+        }),
+      ]),
+    )();
+    const body = await response.json();
+    const facets = body.data[0].facets;
+    const socketOption = facets
+      .find((facet: { key: string }) => facet.key === "socket")
+      .options.find((option: { value: string }) => option.value === "lga1700");
+    const chipsetOption = facets
+      .find((facet: { key: string }) => facet.key === "chipset")
+      .options.find((option: { value: string }) => option.value === "b760");
+
+    expect(socketOption).toEqual({ value: "lga1700", label: "LGA 1700" });
+    expect(socketOption).not.toHaveProperty("group");
+    expect(chipsetOption).toEqual({
+      value: "b760",
+      label: "B760",
+      group: "Intel LGA 1700",
+    });
+  });
+
   it("returns a generic 500 response when an enabled category has no public slug", async () => {
     const response = await createGetCategoriesHandler(
       fakeCategoriesClient([category({ igrp: 99 })]),

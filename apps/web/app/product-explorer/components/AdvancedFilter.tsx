@@ -3,7 +3,7 @@
 
 "use client";
 
-import type { ProductFacetDefinition } from "@partsradar/shared";
+import type { ProductFacetDefinition, ProductFacetOption } from "@partsradar/shared";
 import { useEffect, useRef, useState } from "react";
 import { ChevronDownIcon } from "../../_shared/icons";
 import type { CategoryItem } from "../types";
@@ -52,6 +52,7 @@ function FacetFilter({
       : selectedOptions.length <= 2
         ? selectedOptions.map((option) => option.label).join("、")
         : `已選 ${selectedOptions.length} 項`;
+  const optionGroups = groupFacetOptions(definition.options);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -87,21 +88,80 @@ function FacetFilter({
         </button>
         {isOpen ? (
           <div className="facet-menu-popover">
-            <div className="facet-option-list">
-              {definition.options.map((option) => {
-                const tag = `${definition.key}:${option.value}`;
-                const checked = selectedFacets.includes(tag);
-                return (
-                  <label className={checked ? "facet-option is-active" : "facet-option"} key={tag}>
-                    <input checked={checked} type="checkbox" onChange={() => onToggle(tag)} />
-                    <span>{option.label}</span>
-                  </label>
-                );
-              })}
+            <div className={optionGroups ? "facet-option-list is-grouped" : "facet-option-list"}>
+              {optionGroups
+                ? optionGroups.map((group) => (
+                    <fieldset
+                      aria-label={group.label}
+                      className="facet-option-group"
+                      key={`${group.label}:${group.options[0]?.value}`}
+                    >
+                      {group.options.map((option) => (
+                        <FacetOption
+                          definitionKey={definition.key}
+                          key={option.value}
+                          option={option}
+                          selectedFacets={selectedFacets}
+                          onToggle={onToggle}
+                        />
+                      ))}
+                    </fieldset>
+                  ))
+                : definition.options.map((option) => (
+                    <FacetOption
+                      definitionKey={definition.key}
+                      key={option.value}
+                      option={option}
+                      selectedFacets={selectedFacets}
+                      onToggle={onToggle}
+                    />
+                  ))}
             </div>
           </div>
         ) : null}
       </div>
     </div>
   );
+}
+
+function FacetOption({
+  definitionKey,
+  option,
+  selectedFacets,
+  onToggle,
+}: {
+  definitionKey: string;
+  option: ProductFacetOption;
+  selectedFacets: string[];
+  onToggle: (tag: string) => void;
+}) {
+  const tag = `${definitionKey}:${option.value}`;
+  const checked = selectedFacets.includes(tag);
+
+  return (
+    <label className={checked ? "facet-option is-active" : "facet-option"}>
+      <input checked={checked} type="checkbox" onChange={() => onToggle(tag)} />
+      <span>{option.label}</span>
+    </label>
+  );
+}
+
+function groupFacetOptions(options: readonly ProductFacetOption[]) {
+  if (!options.some((option) => option.group)) {
+    return null;
+  }
+
+  const groups: Array<{ label: string; options: ProductFacetOption[] }> = [];
+
+  for (const option of options) {
+    const label = option.group ?? "其他";
+    const lastGroup = groups.at(-1);
+    if (lastGroup?.label === label) {
+      lastGroup.options.push(option);
+    } else {
+      groups.push({ label, options: [option] });
+    }
+  }
+
+  return groups;
 }

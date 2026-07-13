@@ -1,6 +1,7 @@
 // apps/web/e2e/visual-layout.spec.ts
 // 以本地 mock API 驗證指定 viewport 的主要頁面、focus、空狀態與水平 overflow。
 
+import { getProductFacetDefinitions } from "@partsradar/shared";
 import { expect, type Locator, type Page, type Route, type TestInfo, test } from "@playwright/test";
 
 const visualBaseUrl = new URL(process.env.E2E_BASE_URL ?? "http://127.0.0.1:3100");
@@ -112,24 +113,7 @@ test.beforeEach(async ({ page }) => {
             slug: "motherboard",
             displayName: "主機板",
             sourceName: "主機板 MB",
-            facets: [
-              {
-                key: "socket",
-                label: "腳位",
-                options: [
-                  { value: "lga1700", label: "LGA 1700" },
-                  { value: "am5", label: "AM5" },
-                ],
-              },
-              {
-                key: "chipset",
-                label: "晶片組",
-                options: [
-                  { value: "b650", label: "B650" },
-                  { value: "b760", label: "B760" },
-                ],
-              },
-            ],
+            facets: getProductFacetDefinitions(5),
           },
           {
             id: "99999999-9999-4999-8999-999999999999",
@@ -160,39 +144,21 @@ test.beforeEach(async ({ page }) => {
             slug: "storage",
             displayName: "SSD",
             sourceName: "固態 SSD",
-            facets: [
-              {
-                key: "pcie_generation",
-                label: "PCIe 世代",
-                options: [{ value: "gen4", label: "PCIe 4.0" }],
-              },
-            ],
+            facets: getProductFacetDefinitions(7),
           },
           {
             id: "66666666-6666-4666-8666-666666666666",
             slug: "hard-drive",
             displayName: "HDD",
             sourceName: "內接硬碟 HDD",
-            facets: [
-              {
-                key: "storage_usage",
-                label: "硬碟用途",
-                options: [{ value: "nas", label: "NAS" }],
-              },
-            ],
+            facets: getProductFacetDefinitions(8),
           },
           {
             id: "77777777-7777-4777-8777-777777777777",
             slug: "external-storage",
             displayName: "外接儲存",
             sourceName: "USB週邊 / 硬碟座 / 讀卡機",
-            facets: [
-              {
-                key: "external_type",
-                label: "商品類型",
-                options: [{ value: "usb-flash", label: "隨身碟" }],
-              },
-            ],
+            facets: getProductFacetDefinitions(9),
           },
         ],
       });
@@ -260,6 +226,11 @@ test.beforeEach(async ({ page }) => {
         gpu: [
           { slug: "gigabyte", name: "GIGABYTE" },
           { slug: "sapphire", name: "SAPPHIRE" },
+        ],
+        "external-storage": [
+          { slug: "kingston", name: "金士頓" },
+          { slug: "gigastone", name: "GIGASTONE" },
+          { slug: "adata", name: "威剛" },
         ],
       };
       const category = requestUrl.searchParams.get("category") ?? "";
@@ -872,6 +843,194 @@ test("keeps shared trigger widths and chevrons usable across categories @desktop
   await expectNoHorizontalOverflow(page);
 });
 
+test("sizes short facet popovers and separates semantic option groups @desktop-only", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1760, height: 900 });
+  await page.goto("/?category=cpu");
+
+  const socketFilter = page.locator(".facet-filter").filter({ hasText: "腳位" });
+  await socketFilter.locator(".facet-menu-trigger").click();
+  const socketPopover = socketFilter.locator(".facet-menu-popover");
+  const socketLayout = await socketPopover.evaluate((popover) => {
+    const option = [...popover.querySelectorAll(".facet-option")].find((candidate) =>
+      candidate.textContent?.includes("sTR5 / Threadripper"),
+    );
+    const optionRect = option?.getBoundingClientRect();
+    const textRect = option?.querySelector("span")?.getBoundingClientRect();
+    const popoverRect = popover.getBoundingClientRect();
+    return {
+      clientWidth: popover.clientWidth,
+      optionLeft: optionRect?.left,
+      popoverRight: popoverRect.right,
+      scrollWidth: popover.scrollWidth,
+      textLeft: textRect?.left,
+      textRight: textRect?.right,
+      width: popoverRect.width,
+    };
+  });
+  console.log("facet popover desktop layout", socketLayout);
+  expect(socketLayout.width).toBeLessThanOrEqual(260);
+  expect(socketLayout.width).toBeLessThan(300);
+  expect(socketLayout.width).toBeGreaterThanOrEqual(200);
+  expect(socketLayout.scrollWidth).toBeLessThanOrEqual(socketLayout.clientWidth);
+  expect((socketLayout.textLeft ?? 0) - (socketLayout.optionLeft ?? 0)).toBeGreaterThanOrEqual(30);
+  expect(socketLayout.textRight ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(
+    socketLayout.popoverRight - 10,
+  );
+  await expectNoHorizontalOverflow(page);
+  await socketFilter.locator(".facet-menu-trigger").click();
+
+  await switchCategory(page, "主機板", "motherboard");
+  const chipsetFilter = page.locator(".facet-filter").filter({ hasText: "晶片組" });
+  await chipsetFilter.locator(".facet-menu-trigger").click();
+  const groups = chipsetFilter.locator(".facet-option-group");
+  await expect(groups).toHaveCount(6);
+  await expect(chipsetFilter.getByRole("group")).toHaveCount(6);
+  await expect(groups).toHaveText([
+    "H610B760Z790",
+    "H810B860Z890",
+    "H81H110H310H510W680W790W880W890",
+    "A520B550",
+    "A620B650B650EB840B850X670X670EX870X870E",
+    "TRX50WRX90",
+  ]);
+  await expect(chipsetFilter.locator(".facet-option span")).toHaveText([
+    "H610",
+    "B760",
+    "Z790",
+    "H810",
+    "B860",
+    "Z890",
+    "H81",
+    "H110",
+    "H310",
+    "H510",
+    "W680",
+    "W790",
+    "W880",
+    "W890",
+    "A520",
+    "B550",
+    "A620",
+    "B650",
+    "B650E",
+    "B840",
+    "B850",
+    "X670",
+    "X670E",
+    "X870",
+    "X870E",
+    "TRX50",
+    "WRX90",
+  ]);
+  const groupBorders = await groups.evaluateAll((elements) =>
+    elements.map((element) => window.getComputedStyle(element).borderTopWidth),
+  );
+  expect(groupBorders).toEqual(["0px", "1px", "1px", "1px", "1px", "1px"]);
+  const optionListScroll = await chipsetFilter
+    .locator(".facet-option-list")
+    .evaluate((element) => ({
+      clientHeight: element.clientHeight,
+      scrollHeight: element.scrollHeight,
+    }));
+  expect(optionListScroll.scrollHeight).toBeGreaterThan(optionListScroll.clientHeight);
+
+  await chipsetFilter.getByRole("checkbox", { name: "H610" }).check();
+  await chipsetFilter.getByRole("checkbox", { name: "W680" }).check();
+  await chipsetFilter.getByRole("checkbox", { name: "WRX90" }).check();
+  await expect
+    .poll(() => new URL(page.url()).searchParams.getAll("facet"))
+    .toEqual(["chipset:h610", "chipset:w680", "chipset:wrx90"]);
+  await expectNoHorizontalOverflow(page);
+});
+
+test("keeps capacity options category-specific and memory-safe @desktop-only", async ({ page }) => {
+  await page.setViewportSize({ width: 1760, height: 900 });
+  await page.goto("/?category=storage");
+
+  await assertFacetOptionAvailability(page, "容量", {
+    absent: ["32 GB", "64 GB", "3 TB", "10 TB", "30 TB"],
+    present: ["128 GB", "1 TB", "2 TB", "4 TB", "8 TB"],
+  });
+  await selectFacetOptions(page, "容量", ["128 GB"]);
+  await expect
+    .poll(() => new URL(page.url()).searchParams.getAll("facet"))
+    .toEqual(["capacity_gb:128"]);
+
+  await switchCategory(page, "HDD", "hard-drive");
+  await assertFacetOptionAvailability(page, "容量", {
+    absent: ["32 GB", "64 GB", "128 GB", "256 GB", "480 GB", "512 GB"],
+    present: ["500 GB", "1 TB", "5 TB", "30 TB"],
+  });
+  await expect.poll(() => new URL(page.url()).searchParams.getAll("facet")).toEqual([]);
+
+  await switchCategory(page, "外接儲存", "external-storage");
+  await assertFacetOptionAvailability(page, "容量", {
+    present: ["480 GB", "3 TB", "10 TB", "26 TB", "28 TB", "30 TB"],
+  });
+  await selectFacetOptions(page, "容量", ["3 TB"]);
+  await expect
+    .poll(() => new URL(page.url()).searchParams.getAll("facet"))
+    .toEqual(["capacity_gb:3000"]);
+
+  await switchCategory(page, "SSD", "storage");
+  await expect
+    .poll(() => new URL(page.url()).searchParams.getAll("facet"))
+    .toEqual(["capacity_gb:128"]);
+  await expect(page.getByRole("button", { name: "移除篩選：容量：128 GB" })).toBeVisible();
+  await expect(page.locator(".active-filter-chips")).not.toContainText("3 TB");
+
+  await switchCategory(page, "外接儲存", "external-storage");
+  await expect
+    .poll(() => new URL(page.url()).searchParams.getAll("facet"))
+    .toEqual(["capacity_gb:3000"]);
+  await expect(page.getByRole("button", { name: "移除篩選：容量：3 TB" })).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+});
+
+test("keeps grouped facet popovers full-width and category memory usable on mobile @desktop-only", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/?category=motherboard");
+
+  await selectVendor(page, "ASUS");
+  const chipsetFilter = page.locator(".facet-filter").filter({ hasText: "晶片組" });
+  await chipsetFilter.locator(".facet-menu-trigger").click();
+  const [popoverBox, menuBox] = await Promise.all([
+    chipsetFilter.locator(".facet-menu-popover").boundingBox(),
+    chipsetFilter.locator(".facet-menu").boundingBox(),
+  ]);
+  expect(popoverBox?.width).toBeCloseTo(menuBox?.width ?? 0, 0);
+  await expect(chipsetFilter.locator(".facet-option-group")).toHaveCount(6);
+  const groupBorders = await chipsetFilter
+    .locator(".facet-option-group")
+    .evaluateAll((elements) =>
+      elements.map((element) => window.getComputedStyle(element).borderTopWidth),
+    );
+  expect(groupBorders).toEqual(["0px", "1px", "1px", "1px", "1px", "1px"]);
+  await chipsetFilter.getByRole("checkbox", { name: "B760" }).check();
+  await expect
+    .poll(() => new URL(page.url()).searchParams.getAll("facet"))
+    .toEqual(["chipset:b760"]);
+  await expectNoHorizontalOverflow(page);
+
+  await chipsetFilter.locator(".facet-menu-trigger").click();
+  const categoryPanel = page.locator(".filter-panel details");
+  await categoryPanel.locator("summary").click();
+  await switchCategory(page, "CPU", "cpu");
+  await switchCategory(page, "主機板", "motherboard");
+  await expectQueryFilters(page, {
+    category: "motherboard",
+    facets: ["chipset:b760"],
+    vendors: "asus",
+  });
+  await expect(page.getByRole("button", { name: "移除篩選：廠商：ASUS" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "移除篩選：晶片組：B760" })).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+});
+
 test("wraps a complete grouped CPU socket chip on mobile @desktop-only", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/?category=cpu");
@@ -1450,7 +1609,9 @@ test("suppresses authored transitions when reduced motion is requested", {
 async function selectVendor(page: Page, vendorName: string) {
   const vendorFilter = page.locator(".vendor-filter");
   await vendorFilter.locator(".vendor-menu-trigger").click();
-  await expect(vendorFilter.getByRole("checkbox", { name: vendorName })).not.toBeChecked();
+  await expect(
+    vendorFilter.getByRole("checkbox", { exact: true, name: vendorName }),
+  ).not.toBeChecked();
   await vendorFilter.locator(".vendor-option").filter({ hasText: vendorName }).click();
 }
 
@@ -1458,7 +1619,7 @@ async function selectFacetOptions(page: Page, facetLabel: string, optionLabels: 
   const facetFilter = page.locator(".facet-filter").filter({ hasText: facetLabel });
   await facetFilter.locator(".facet-menu-trigger").click();
   for (const optionLabel of optionLabels) {
-    await facetFilter.getByRole("checkbox", { name: optionLabel }).check();
+    await facetFilter.getByRole("checkbox", { exact: true, name: optionLabel }).check();
   }
 }
 
@@ -1466,7 +1627,9 @@ async function assertFacetOptionsUnchecked(page: Page, facetLabel: string, optio
   const facetFilter = page.locator(".facet-filter").filter({ hasText: facetLabel });
   await facetFilter.locator(".facet-menu-trigger").click();
   for (const optionLabel of optionLabels) {
-    await expect(facetFilter.getByRole("checkbox", { name: optionLabel })).not.toBeChecked();
+    await expect(
+      facetFilter.getByRole("checkbox", { exact: true, name: optionLabel }),
+    ).not.toBeChecked();
   }
 }
 
@@ -1502,13 +1665,15 @@ async function assertVendorCheckboxStates(
   const vendorFilter = page.locator(".vendor-filter");
   await vendorFilter.locator(".vendor-menu-trigger").click();
   for (const vendor of expected.checked ?? []) {
-    await expect(vendorFilter.getByRole("checkbox", { name: vendor })).toBeChecked();
+    await expect(vendorFilter.getByRole("checkbox", { exact: true, name: vendor })).toBeChecked();
   }
   for (const vendor of expected.unchecked ?? []) {
-    await expect(vendorFilter.getByRole("checkbox", { name: vendor })).not.toBeChecked();
+    await expect(
+      vendorFilter.getByRole("checkbox", { exact: true, name: vendor }),
+    ).not.toBeChecked();
   }
   for (const vendor of expected.absent ?? []) {
-    await expect(vendorFilter.getByRole("checkbox", { name: vendor })).toHaveCount(0);
+    await expect(vendorFilter.getByRole("checkbox", { exact: true, name: vendor })).toHaveCount(0);
   }
   await vendorFilter.locator(".vendor-menu-trigger").click();
 }
@@ -1521,12 +1686,31 @@ async function assertFacetCheckboxStates(
   const facetFilter = page.locator(".facet-filter").filter({ hasText: facetLabel });
   await facetFilter.locator(".facet-menu-trigger").click();
   for (const option of expected.checked ?? []) {
-    await expect(facetFilter.getByRole("checkbox", { name: option })).toBeChecked();
+    await expect(facetFilter.getByRole("checkbox", { exact: true, name: option })).toBeChecked();
   }
   for (const option of expected.unchecked ?? []) {
-    await expect(facetFilter.getByRole("checkbox", { name: option })).not.toBeChecked();
+    await expect(
+      facetFilter.getByRole("checkbox", { exact: true, name: option }),
+    ).not.toBeChecked();
   }
   await facetFilter.locator(".facet-menu-trigger").click();
+}
+
+async function assertFacetOptionAvailability(
+  page: Page,
+  facetLabel: string,
+  expected: { present?: string[]; absent?: string[] },
+) {
+  const facetFilter = page.locator(".facet-filter").filter({ hasText: facetLabel });
+  await facetFilter.locator(".facet-menu-trigger").click();
+  for (const option of expected.present ?? []) {
+    await expect(facetFilter.getByRole("checkbox", { exact: true, name: option })).toBeVisible();
+  }
+  for (const option of expected.absent ?? []) {
+    await expect(facetFilter.getByRole("checkbox", { exact: true, name: option })).toHaveCount(0);
+  }
+  await facetFilter.locator(".facet-menu-trigger").click();
+  await expectNoHorizontalOverflow(page);
 }
 
 async function expectUsableLayout(page: Page, testInfo: TestInfo) {

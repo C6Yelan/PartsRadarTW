@@ -6,6 +6,7 @@ import {
   extractProductFilterTags,
   getProductFacetDefinitions,
   isProductFilterTagSupported,
+  mergeProductFilterTags,
   PRODUCT_FACET_IGRPS,
 } from "./product-facets";
 
@@ -321,6 +322,84 @@ describe("product facets", () => {
     ]);
   });
 
+  it("keeps storage capacities scoped to each category without mutating the shared registry", () => {
+    const ssdCapacities = getFacetOptions(7, "capacity_gb").map((option) => option.value);
+    const hddCapacities = getFacetOptions(8, "capacity_gb").map((option) => option.value);
+    const externalCapacities = getFacetOptions(9, "capacity_gb").map((option) => option.value);
+
+    expect(ssdCapacities).toEqual([
+      "128",
+      "256",
+      "480",
+      "500",
+      "512",
+      "1000",
+      "2000",
+      "4000",
+      "8000",
+    ]);
+    expect(ssdCapacities).not.toEqual(expect.arrayContaining(["32", "64", "3000", "10000"]));
+    expect(hddCapacities).not.toEqual(
+      expect.arrayContaining(["32", "64", "128", "256", "480", "512"]),
+    );
+    expect(hddCapacities).toEqual(expect.arrayContaining(["500", "5000", "30000"]));
+    expect(externalCapacities).toEqual(
+      expect.arrayContaining(["480", "3000", "10000", "26000", "28000", "30000"]),
+    );
+    expect(externalCapacities).toHaveLength(25);
+  });
+
+  it("rejects excluded capacity tags and parser matches only in the affected categories", () => {
+    expect(isProductFilterTagSupported(7, "capacity_gb:32")).toBe(false);
+    expect(isProductFilterTagSupported(7, "capacity_gb:3000")).toBe(false);
+    expect(isProductFilterTagSupported(8, "capacity_gb:480")).toBe(false);
+    expect(isProductFilterTagSupported(9, "capacity_gb:480")).toBe(true);
+    expect(isProductFilterTagSupported(9, "capacity_gb:3000")).toBe(true);
+
+    expect(extractProductFilterTags(7, "SSD 3TB")).not.toContain("capacity_gb:3000");
+    expect(extractProductFilterTags(8, "HDD 480GB")).not.toContain("capacity_gb:480");
+    expect(extractProductFilterTags(9, "外接 SSD 480GB Type-C")).toContain("capacity_gb:480");
+    expect(extractProductFilterTags(9, "外接 HDD 3TB Type-A")).toContain("capacity_gb:3000");
+    expect(extractProductFilterTags(8, "Seagate 5TB 3.5吋")).toContain("capacity_gb:5000");
+    expect(mergeProductFilterTags(7, [], ["capacity_gb:3000"])).toEqual([]);
+    expect(mergeProductFilterTags(8, [], ["capacity_gb:480"])).toEqual([]);
+    expect(mergeProductFilterTags(9, [], ["capacity_gb:3000"])).toEqual(["capacity_gb:3000"]);
+  });
+
+  it("keeps semantic option groups contiguous and stable", () => {
+    expect(readGroups(5, "chipset")).toEqual([
+      ["Intel LGA 1700", ["h610", "b760", "z790"]],
+      ["Intel LGA 1851", ["h810", "b860", "z890"]],
+      ["Intel 舊平台／工作站", ["h81", "h110", "h310", "h510", "w680", "w790", "w880", "w890"]],
+      ["AMD AM4", ["a520", "b550"]],
+      ["AMD AM5", ["a620", "b650", "b650e", "b840", "b850", "x670", "x670e", "x870", "x870e"]],
+      ["Threadripper", ["trx50", "wrx90"]],
+    ]);
+    expect(readGroups(6, "speed_mhz")).toEqual([
+      ["1600～4000 MHz", ["1600", "2400", "2666", "3200", "3600", "4000"]],
+      [
+        "4800 MHz 以上",
+        ["4800", "5200", "5600", "6000", "6200", "6400", "6800", "7200", "8000", "8400"],
+      ],
+    ]);
+    expect(readGroups(12, "gpu_series").map(([group]) => group)).toEqual([
+      "GeForce",
+      "Radeon",
+      "Intel／專業繪圖",
+    ]);
+    expect(readGroups(12, "vram_gb").map(([group]) => group)).toEqual([
+      "1～6 GB",
+      "8～16 GB",
+      "20 GB 以上",
+    ]);
+    expect(readGroups(9, "capacity_gb").map(([group]) => group)).toEqual([
+      "GB 容量",
+      "1～8 TB",
+      "10 TB 以上",
+    ]);
+    expect(getFacetOptions(4, "socket").every((option) => option.group === undefined)).toBe(true);
+  });
+
   it("uses total kit capacity before per-module capacity", () => {
     expect(extractProductFilterTags(6, 'Biwin 192G("雙通"四根48G*4)D5 6000 CL28')).toEqual([
       "module_type:desktop",
@@ -337,3 +416,25 @@ describe("product facets", () => {
     expect(isProductFilterTagSupported(4, "socket")).toBe(false);
   });
 });
+
+function getFacetOptions(igrp: number, facetKey: string) {
+  const definition = getProductFacetDefinitions(igrp).find((facet) => facet.key === facetKey);
+  expect(definition).toBeDefined();
+  return definition?.options ?? [];
+}
+
+function readGroups(igrp: number, facetKey: string): Array<[string, string[]]> {
+  const groups: Array<[string, string[]]> = [];
+
+  for (const option of getFacetOptions(igrp, facetKey)) {
+    const group = option.group ?? "";
+    const previous = groups.at(-1);
+    if (previous?.[0] === group) {
+      previous[1].push(option.value);
+    } else {
+      groups.push([group, [option.value]]);
+    }
+  }
+
+  return groups;
+}
