@@ -29,20 +29,6 @@
   font-size: 13px;
 }
 
-@media (min-width: 761px) {
-  .toolbar-price-filter,
-  .toolbar-status-filter {
-    grid-column: span 2;
-  }
-
-  .vendor-filter,
-  .facet-filter {
-    grid-template-columns: max-content minmax(112px, 160px);
-    gap: 5px;
-    justify-content: start;
-  }
-}
-
 .toolbar-price-grid {
   gap: 8px;
   min-width: 0;
@@ -118,4 +104,45 @@
   font-size: 13px;
   font-weight: 700;
   line-height: 1.5;
+}
+
+@media (min-width: 761px) {
+  .toolbar-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-start;
+  }
+
+  .toolbar-price-filter,
+  .toolbar-status-filter,
+  .toolbar-controls .vendor-filter,
+  .toolbar-controls .facet-filter {
+    flex: 0 0 auto;
+    grid-template-columns: max-content max-content;
+    gap: 5px;
+    justify-content: start;
+  }
+
+  .toolbar-price-grid {
+    grid-template-columns: repeat(2, 104px);
+  }
+
+  .toolbar-segmented-control {
+    grid-template-columns: repeat(3, max-content);
+    width: fit-content;
+  }
+
+  .toolbar-segmented-control button {
+    padding: 0 12px;
+  }
+
+  .toolbar-controls .vendor-filter,
+  .toolbar-controls .facet-filter {
+    grid-template-columns: max-content minmax(112px, 160px);
+  }
+
+  .filter-reset-row {
+    flex: 0 0 100%;
+  }
 }

@@ -1,5 +1,5 @@
 /* apps/web/app/styles/responsive/mobile-table.css */
-@media (max-width: 760px) {
+@media (max-width: 1309px) {
   .table-header {
     display: none;
   }
@@ -124,7 +124,9 @@
   .skeleton-row .skeleton-box:nth-child(n + 5) {
     display: none;
   }
+}
 
+@media (max-width: 760px) {
   .pagination-bar {
     display: grid;
     grid-template-areas:
