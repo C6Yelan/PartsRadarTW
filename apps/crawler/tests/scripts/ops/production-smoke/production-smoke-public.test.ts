@@ -150,7 +150,6 @@ describe("production smoke public checks", () => {
     );
     const summary = await runProductionSmoke(
       createSmokeClient({
-        invalidImageErrorCount: 0,
         trueParseErrorCount: 0,
       }),
       options,
@@ -188,7 +187,6 @@ describe("production smoke public checks", () => {
     );
     const summary = await runProductionSmoke(
       createSmokeClient({
-        invalidImageErrorCount: 0,
         trueParseErrorCount: 0,
       }),
       options,

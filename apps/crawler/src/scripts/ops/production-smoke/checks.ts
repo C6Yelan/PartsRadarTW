@@ -13,7 +13,7 @@ import {
 import { checkCrawlerFreshness, checkRecentSuspectedBlocks } from "./checks/crawler-runs";
 import { checkDiscordBotDeliveries } from "./checks/discord-deliveries";
 import { checkCoolpcFilterSync } from "./checks/filter-sync";
-import { checkRecentParseErrors, checkSourceImageAnomalies } from "./checks/parse-errors";
+import { checkRecentParseErrors } from "./checks/parse-errors";
 import {
   checkActiveProductCount,
   checkHistoricalImageCacheMetadata,
@@ -47,7 +47,6 @@ export async function runProductionSmoke(
   }
   checks.push(await checkRecentSuspectedBlocks(client, options, now));
   checks.push(await checkRecentParseErrors(client, options, now));
-  checks.push(await checkSourceImageAnomalies(client, options, now));
   checks.push(await checkSourceImageFetchFailures(client, options, now));
   checks.push(await checkActiveProductCount(client, options));
   checks.push(await checkProductFilterQuality(client));

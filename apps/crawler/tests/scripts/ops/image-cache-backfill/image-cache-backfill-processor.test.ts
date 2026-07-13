@@ -221,6 +221,9 @@ describe("image cache backfill live request accounting", () => {
     const candidate = {
       ...createCandidate("existing-invalid-source", "2026-05-01T08:05:00.000Z"),
       primaryImageUrl: "https://invalid.example/image.jpg",
+      imageCacheFailureCount: 3,
+      imageCacheFailureSince: new Date("2026-05-01T08:05:00.000Z"),
+      imageCacheNextRetryAt: new Date("2026-05-02T08:05:00.000Z"),
     };
     const update = vi.fn(async () => candidate);
     await writeFile(join(storageDir, `${candidate.id}.webp`), "webp");

@@ -34,7 +34,6 @@ describe("production smoke DB-backed checks", () => {
     );
     const summary = await runProductionSmoke(
       createSmokeClient({
-        invalidImageErrorCount: 0,
         trueParseErrorCount: 0,
         historicalImageProducts: [{ id: "historical-product" }],
       }),
@@ -55,7 +54,7 @@ describe("production smoke DB-backed checks", () => {
     expect(summary.status).toBe("WARN");
   });
 
-  it("keeps invalid image URL issues informational below the anomaly threshold", async () => {
+  it("does not emit the removed source image occurrence check", async () => {
     const { crawlerCwd, workspaceRoot } = await createWorkspace();
     const imageDir = join(workspaceRoot, "product-images");
     await mkdir(imageDir);
@@ -70,7 +69,6 @@ describe("production smoke DB-backed checks", () => {
     );
     const summary = await runProductionSmoke(
       createSmokeClient({
-        invalidImageErrorCount: 624,
         trueParseErrorCount: 0,
       }),
       options,
@@ -84,13 +82,6 @@ describe("production smoke DB-backed checks", () => {
           name: "recent parse errors",
           status: "OK",
           message: "0 parse error(s) in 24h",
-        }),
-        expect.objectContaining({
-          name: "source image anomalies",
-          status: "OK",
-          message: expect.stringContaining(
-            "624 occurrence(s) / 16 distinct products / 5 distinct raw image urls / 1.60% of 1000 active products / longest 0.00h in 24h; id=product-1",
-          ),
         }),
         expect.objectContaining({
           name: "rate limit headers",
@@ -114,90 +105,7 @@ describe("production smoke DB-backed checks", () => {
         }),
       ]),
     );
-  });
-
-  it("warns when distinct products exceed the anomaly threshold", async () => {
-    const { crawlerCwd, workspaceRoot } = await createWorkspace();
-    const imageDir = join(workspaceRoot, "product-images");
-    await mkdir(imageDir);
-    await writeFile(join(imageDir, "product-1.webp"), "webp");
-    stubHealthyPublicApi();
-    const options = parseProductionSmokeOptions(
-      ["--invalid-image-url-warn-count", "15"],
-      {
-        PRODUCT_IMAGE_STORAGE_DIR: imageDir,
-      },
-      crawlerCwd,
-    );
-    const summary = await runProductionSmoke(
-      createSmokeClient({
-        invalidImageErrorCount: 2001,
-        trueParseErrorCount: 0,
-      }),
-      options,
-      new Date("2026-06-02T12:00:00.000Z"),
-    );
-
-    expect(summary.status).toBe("WARN");
-    expect(summary.checks).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          name: "recent parse errors",
-          status: "OK",
-          message: "0 parse error(s) in 24h",
-        }),
-        expect.objectContaining({
-          name: "source image anomalies",
-          status: "WARN",
-          message: expect.stringContaining(
-            "2001 occurrence(s) / 16 distinct products / 5 distinct raw image urls / 1.60% of 1000 active products / longest 0.00h in 24h; id=product-1",
-          ),
-        }),
-      ]),
-    );
-  });
-
-  it("warns when the same source image anomaly persists", async () => {
-    const { crawlerCwd, workspaceRoot } = await createWorkspace();
-    const imageDir = join(workspaceRoot, "product-images");
-    await mkdir(imageDir);
-    await writeFile(join(imageDir, "product-1.webp"), "webp");
-    stubHealthyPublicApi();
-    const options = parseProductionSmokeOptions(
-      [
-        "--invalid-image-url-warn-count",
-        "100",
-        "--invalid-image-url-warn-url-count",
-        "100",
-        "--invalid-image-url-warn-percent",
-        "100",
-        "--invalid-image-url-warn-hours",
-        "12",
-      ],
-      { PRODUCT_IMAGE_STORAGE_DIR: imageDir },
-      crawlerCwd,
-    );
-    const summary = await runProductionSmoke(
-      createSmokeClient({
-        invalidImageErrorCount: 32,
-        trueParseErrorCount: 0,
-        invalidImagePersistenceHours: 18,
-      }),
-      options,
-      new Date("2026-06-02T12:00:00.000Z"),
-    );
-
-    expect(summary.checks).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          name: "source image anomalies",
-          status: "WARN",
-          message: expect.stringContaining(
-            "32 occurrence(s) / 16 distinct products / 5 distinct raw image urls / 1.60% of 1000 active products / longest 18.00h in 24h; id=product-1",
-          ),
-        }),
-      ]),
-    );
+    expect(summary.checks.map((check) => check.name)).not.toContain("source image anomalies");
   });
 
   it("warns when recent personal or public Discord deliveries failed or were rate limited", async () => {
@@ -215,7 +123,6 @@ describe("production smoke DB-backed checks", () => {
     );
     const summary = await runProductionSmoke(
       createSmokeClient({
-        invalidImageErrorCount: 0,
         trueParseErrorCount: 0,
         discordDeliveryCounts: {
           failed: 1,
@@ -262,7 +169,6 @@ describe("production smoke DB-backed checks", () => {
     );
     const summary = await runProductionSmoke(
       createSmokeClient({
-        invalidImageErrorCount: 0,
         trueParseErrorCount: 2,
       }),
       options,
@@ -276,12 +182,6 @@ describe("production smoke DB-backed checks", () => {
           name: "recent parse errors",
           status: "FAIL",
           message: "2 parse error(s) in 24h",
-        }),
-        expect.objectContaining({
-          name: "source image anomalies",
-          status: "OK",
-          message:
-            "0 occurrence(s) / 0 distinct products / 0 distinct raw image urls / 0.00% of 1000 active products / longest 0.00h in 24h",
         }),
       ]),
     );
@@ -302,7 +202,6 @@ describe("production smoke DB-backed checks", () => {
     );
     const summary = await runProductionSmoke(
       createSmokeClient({
-        invalidImageErrorCount: 0,
         trueParseErrorCount: 0,
         discordDeliveryRecords: [
           {
@@ -364,7 +263,6 @@ describe("production smoke DB-backed checks", () => {
       crawlerCwd,
     );
     const client = createSmokeClient({
-      invalidImageErrorCount: 0,
       trueParseErrorCount: 0,
       publicDiscordDeliveryRecords: [
         {

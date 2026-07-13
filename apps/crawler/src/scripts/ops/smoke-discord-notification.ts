@@ -15,7 +15,8 @@ import {
 } from "./smoke-discord-notification/state";
 
 const DEFAULT_STATE_FILE = "storage/ops/smoke-discord-state.json";
-const DEFAULT_COOLDOWN_SECONDS = 6 * 60 * 60;
+const DEFAULT_COOLDOWN_SECONDS = 12 * 60 * 60;
+const MIN_COOLDOWN_SECONDS = DEFAULT_COOLDOWN_SECONDS;
 const MAX_COOLDOWN_SECONDS = 7 * 24 * 60 * 60;
 
 export {
@@ -75,7 +76,7 @@ export function parseSmokeDiscordNotificationOptions(
       argName: "--smoke-discord-cooldown-seconds",
       envName: "SMOKE_DISCORD_COOLDOWN_SECONDS",
       fallback: DEFAULT_COOLDOWN_SECONDS,
-      min: 0,
+      min: MIN_COOLDOWN_SECONDS,
       max: MAX_COOLDOWN_SECONDS,
     }),
   };
@@ -128,7 +129,6 @@ export function createSmokeDiscordNotificationDecision({
 
   const notificationKey = createAbnormalNotificationKey(summary);
   const shouldSend = shouldSendAbnormalNotification({
-    notificationKey,
     previousState,
     summary,
     cooldownSeconds: options.cooldownSeconds,
@@ -215,15 +215,13 @@ function createNextState({
   };
 }
 
-// 判斷同一組異常是否已在 cooldown 內通知過，避免 Discord admin webhook 被重複洗版。
+// 僅在狀態轉換或未恢復滿 cooldown 時通知，避免異常細節變動造成重複洗版。
 function shouldSendAbnormalNotification({
-  notificationKey,
   previousState,
   summary,
   cooldownSeconds,
   now,
 }: {
-  notificationKey: string;
   previousState: SmokeDiscordNotificationState | null;
   summary: ProductionSmokeSummary;
   cooldownSeconds: number;
@@ -234,10 +232,6 @@ function shouldSendAbnormalNotification({
   }
 
   if (previousState.lastObservedStatus !== summary.status) {
-    return true;
-  }
-
-  if (previousState.lastNotificationKey !== notificationKey) {
     return true;
   }
 

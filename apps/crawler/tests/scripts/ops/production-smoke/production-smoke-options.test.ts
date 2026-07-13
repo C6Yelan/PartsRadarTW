@@ -34,13 +34,12 @@ describe("production smoke options", () => {
       recentWindowHours: 24,
       parseErrorWarnCount: 20,
       parseErrorFailCount: 100,
-      invalidImageUrlWarnCount: 50,
-      invalidImageUrlWarnUrlCount: 10,
-      invalidImageUrlWarnPercent: 5,
-      invalidImageUrlWarnHours: 12,
+      sourceImageFailureMinConsecutive: 3,
+      sourceImageFailureWarnCount: 100,
+      sourceImageFailureFailCount: 300,
       minActiveProducts: 1,
-      missingImageWarnCount: 200,
-      missingImageFailCount: 500,
+      missingImageWarnCount: 30,
+      missingImageFailCount: 100,
     });
     expect(options.productImageStorageDir).toBe(join(workspaceRoot, "storage", "product-images"));
   });
@@ -58,14 +57,12 @@ describe("production smoke options", () => {
         "--public-only",
         "--source-warn-after-minutes",
         "45",
-        "--invalid-image-url-warn-count",
+        "--source-image-failure-min-consecutive",
+        "4",
+        "--source-image-failure-warn-count",
         "1500",
-        "--invalid-image-url-warn-url-count",
-        "25",
-        "--invalid-image-url-warn-percent",
-        "7",
-        "--invalid-image-url-warn-hours",
-        "18",
+        "--source-image-failure-fail-count",
+        "2500",
         "--missing-image-warn-count",
         "10",
         "--image-inactive-retention-days",
@@ -78,7 +75,7 @@ describe("production smoke options", () => {
         SMOKE_PRODUCT_IMAGE_STORAGE_DIR: "ignored",
         PRODUCT_IMAGE_STORAGE_DIR: "custom-images",
         SMOKE_CRAWLER_FAIL_AFTER_MINUTES: "240",
-        SMOKE_INVALID_IMAGE_URL_WARN_COUNT: "3000",
+        SMOKE_SOURCE_IMAGE_FAILURE_WARN_COUNT: "3000",
       },
       crawlerCwd,
     );
@@ -91,10 +88,9 @@ describe("production smoke options", () => {
     expect(options.crawlerFailAfterMinutes).toBe(240);
     expect(options.missingImageWarnCount).toBe(10);
     expect(options.imageInactiveRetentionDays).toBe(45);
-    expect(options.invalidImageUrlWarnCount).toBe(1500);
-    expect(options.invalidImageUrlWarnUrlCount).toBe(25);
-    expect(options.invalidImageUrlWarnPercent).toBe(7);
-    expect(options.invalidImageUrlWarnHours).toBe(18);
+    expect(options.sourceImageFailureMinConsecutive).toBe(4);
+    expect(options.sourceImageFailureWarnCount).toBe(1500);
+    expect(options.sourceImageFailureFailCount).toBe(2500);
     expect(options.productImageStorageDir).toBe(join(workspaceRoot, "custom-images"));
     expect(options.filterSyncStateFilePath).toBe(
       join(workspaceRoot, "storage", "filter-sync.json"),

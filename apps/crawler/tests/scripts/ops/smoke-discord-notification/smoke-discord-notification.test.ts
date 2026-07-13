@@ -1,5 +1,5 @@
 // apps/crawler/tests/scripts/ops/smoke-discord-notification/smoke-discord-notification.test.ts
-// 驗證 production smoke Discord 告警 options、通知決策、cooldown、fingerprint 與恢復通知。
+// 驗證 production smoke Discord 告警 options、狀態轉換、12 小時提醒與恢復通知。
 
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -23,7 +23,7 @@ describe("smoke Discord notification options", () => {
     expect(options).toEqual({
       adminWebhookUrl: null,
       stateFilePath: join(workspaceRoot, "storage", "ops", "smoke-discord-state.json"),
-      cooldownSeconds: 21600,
+      cooldownSeconds: 43200,
     });
   });
 
@@ -34,7 +34,7 @@ describe("smoke Discord notification options", () => {
         "--smoke-discord-state-file",
         "custom/smoke-state.json",
         "--smoke-discord-cooldown-seconds",
-        "120",
+        "43200",
       ],
       {
         DISCORD_ADMIN_WEBHOOK_URL: WEBHOOK_URL,
@@ -47,8 +47,20 @@ describe("smoke Discord notification options", () => {
     expect(options).toEqual({
       adminWebhookUrl: WEBHOOK_URL,
       stateFilePath: join(workspaceRoot, "custom", "smoke-state.json"),
-      cooldownSeconds: 120,
+      cooldownSeconds: 43200,
     });
+  });
+
+  it("rejects reminder cooldowns shorter than twelve hours", async () => {
+    const workspaceRoot = await createWorkspace();
+
+    expect(() =>
+      parseSmokeDiscordNotificationOptions(
+        ["--smoke-discord-cooldown-seconds", "43199"],
+        {},
+        workspaceRoot,
+      ),
+    ).toThrow("--smoke-discord-cooldown-seconds/SMOKE_DISCORD_COOLDOWN_SECONDS must be an integer");
   });
 });
 
@@ -58,7 +70,7 @@ describe("createSmokeDiscordNotificationDecision", () => {
     const decision = createSmokeDiscordNotificationDecision({
       summary: summary({ status: "FAIL" }),
       previousState,
-      options: { adminWebhookUrl: null, cooldownSeconds: 21600 },
+      options: { adminWebhookUrl: null, cooldownSeconds: 43200 },
       now: new Date("2026-06-06T12:00:00.000Z"),
     });
 
@@ -74,7 +86,7 @@ describe("createSmokeDiscordNotificationDecision", () => {
     const decision = createSmokeDiscordNotificationDecision({
       summary: summary({ status: "OK", checkedAt }),
       previousState: null,
-      options: { adminWebhookUrl: WEBHOOK_URL, cooldownSeconds: 21600 },
+      options: { adminWebhookUrl: WEBHOOK_URL, cooldownSeconds: 43200 },
     });
 
     expect(decision).toEqual({
@@ -103,7 +115,7 @@ describe("createSmokeDiscordNotificationDecision", () => {
         ],
       }),
       previousState: state({ status: "OK" }),
-      options: { adminWebhookUrl: WEBHOOK_URL, cooldownSeconds: 21600 },
+      options: { adminWebhookUrl: WEBHOOK_URL, cooldownSeconds: 43200 },
     });
 
     expect(decision).toMatchObject({
@@ -141,7 +153,7 @@ describe("createSmokeDiscordNotificationDecision", () => {
     expect(decision.message.embeds?.[0]?.description).not.toContain("Runbook:");
   });
 
-  it("skips repeated unchanged WARN within the six-hour cooldown", () => {
+  it("skips repeated unchanged WARN within the twelve-hour cooldown", () => {
     const decision = createSmokeDiscordNotificationDecision({
       summary: summary({ status: "WARN" }),
       previousState: state({
@@ -149,7 +161,7 @@ describe("createSmokeDiscordNotificationDecision", () => {
         lastNotificationKey: "WARN:WARN:source freshness",
         lastNotificationAt: "2026-06-06T06:00:01.000Z",
       }),
-      options: { adminWebhookUrl: WEBHOOK_URL, cooldownSeconds: 21600 },
+      options: { adminWebhookUrl: WEBHOOK_URL, cooldownSeconds: 43200 },
       now: new Date("2026-06-06T12:00:00.000Z"),
     });
 
@@ -164,16 +176,16 @@ describe("createSmokeDiscordNotificationDecision", () => {
     });
   });
 
-  it("sends repeated unchanged WARN at the six-hour cooldown boundary", () => {
+  it("sends repeated unchanged WARN at the twelve-hour cooldown boundary", () => {
     const checkedAt = new Date("2026-06-06T12:00:00.000Z");
     const decision = createSmokeDiscordNotificationDecision({
       summary: summary({ status: "WARN", checkedAt }),
       previousState: state({
         status: "WARN",
         lastNotificationKey: "WARN:WARN:source freshness",
-        lastNotificationAt: "2026-06-06T06:00:00.000Z",
+        lastNotificationAt: "2026-06-06T00:00:00.000Z",
       }),
-      options: { adminWebhookUrl: WEBHOOK_URL, cooldownSeconds: 21600 },
+      options: { adminWebhookUrl: WEBHOOK_URL, cooldownSeconds: 43200 },
       now: checkedAt,
     });
 
@@ -186,7 +198,7 @@ describe("createSmokeDiscordNotificationDecision", () => {
     });
   });
 
-  it("sends when WARN issue fingerprint changes inside cooldown", () => {
+  it("skips when WARN issue details change inside cooldown", () => {
     const decision = createSmokeDiscordNotificationDecision({
       summary: summary({
         status: "WARN",
@@ -197,14 +209,13 @@ describe("createSmokeDiscordNotificationDecision", () => {
         lastNotificationKey: "WARN:WARN:source freshness",
         lastNotificationAt: "2026-06-06T11:55:00.000Z",
       }),
-      options: { adminWebhookUrl: WEBHOOK_URL, cooldownSeconds: 21600 },
+      options: { adminWebhookUrl: WEBHOOK_URL, cooldownSeconds: 43200 },
       now: new Date("2026-06-06T12:00:00.000Z"),
     });
 
     expect(decision).toMatchObject({
-      action: "send",
-      kind: "WARN",
-      notificationKey: "WARN:WARN:missing product images",
+      action: "skip",
+      reason: "unchanged_within_cooldown",
     });
   });
 
@@ -222,7 +233,7 @@ describe("createSmokeDiscordNotificationDecision", () => {
         lastNotificationKey: "WARN:WARN:source freshness",
         lastNotificationAt: "2026-06-06T11:59:00.000Z",
       }),
-      options: { adminWebhookUrl: WEBHOOK_URL, cooldownSeconds: 21600 },
+      options: { adminWebhookUrl: WEBHOOK_URL, cooldownSeconds: 43200 },
       now: new Date("2026-06-06T12:00:00.000Z"),
     });
 
@@ -246,7 +257,7 @@ describe("createSmokeDiscordNotificationDecision", () => {
         lastNotificationKey: "FAIL:FAIL:crawler freshness",
         lastNotificationAt: "2026-06-06T11:00:00.000Z",
       }),
-      options: { adminWebhookUrl: WEBHOOK_URL, cooldownSeconds: 21600 },
+      options: { adminWebhookUrl: WEBHOOK_URL, cooldownSeconds: 43200 },
       now: checkedAt,
     });
 
@@ -290,7 +301,7 @@ describe("createSmokeDiscordNotificationDecision", () => {
         lastNotificationKey: "RECOVERED:FAIL->OK",
         lastNotificationAt: "2026-06-06T11:00:00.000Z",
       }),
-      options: { adminWebhookUrl: WEBHOOK_URL, cooldownSeconds: 21600 },
+      options: { adminWebhookUrl: WEBHOOK_URL, cooldownSeconds: 43200 },
       now: new Date("2026-06-06T12:00:00.000Z"),
     });
 
@@ -317,7 +328,7 @@ describe("createSmokeDiscordNotificationDecision", () => {
         ],
       }),
       previousState: state({ status: "OK" }),
-      options: { adminWebhookUrl: WEBHOOK_URL, cooldownSeconds: 21600 },
+      options: { adminWebhookUrl: WEBHOOK_URL, cooldownSeconds: 43200 },
     });
 
     if (decision.action !== "send") {

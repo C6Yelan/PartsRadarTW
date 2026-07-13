@@ -22,15 +22,12 @@ export interface ProductionSmokeOptions {
   recentWindowHours: number;
   parseErrorWarnCount: number;
   parseErrorFailCount: number;
-  invalidImageUrlWarnCount: number;
-  invalidImageUrlWarnUrlCount: number;
-  invalidImageUrlWarnPercent: number;
-  invalidImageUrlWarnHours: number;
+  sourceImageFailureMinConsecutive: number;
+  sourceImageFailureWarnCount: number;
+  sourceImageFailureFailCount: number;
   minActiveProducts: number;
   missingImageWarnCount: number;
   missingImageFailCount: number;
-  missingImageWarnPercent: number;
-  missingImageFailPercent: number;
   rawSnapshotNormalRetentionDays: number;
   rawSnapshotAbnormalRetentionDays: number;
   rawSnapshotRetentionGraceDays: number;
@@ -103,18 +100,6 @@ export interface RateLimitHeaderSnapshot {
   limit: number;
   remaining: number;
   reset: number;
-}
-
-// 來源圖片異常診斷使用的 parse error 欄位投影。
-export interface SourceImageAnomalyRecord {
-  sourceCategoryId: string;
-  rawToken: string | null;
-  rawName: string | null;
-  rawImageUrl: string | null;
-  message: string;
-  occurrenceCount: number;
-  createdAt: Date;
-  lastSeenAt: Date;
 }
 
 // production smoke 只依賴檢查所需的 Prisma delegates，不綁定其他資料存取能力。

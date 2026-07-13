@@ -3,7 +3,7 @@
 
 import { access } from "node:fs/promises";
 import { join } from "node:path";
-import { countStatus, fail, ok, warn, worseStatus } from "../results";
+import { countStatus, fail, ok, warn } from "../results";
 import type { ProductionSmokeClient, ProductionSmokeOptions, SmokeCheckResult } from "../types";
 
 // 確認 production DB 仍有可展示的 active 商品，避免 crawler 或資料寫入異常造成商品清空。
@@ -41,20 +41,15 @@ export async function checkMissingProductImages(
   }
 
   const missingPercent = products.length === 0 ? 0 : (missingCount / products.length) * 100;
-  const countBasedStatus = countStatus(
+  const status = countStatus(
     missingCount,
     options.missingImageWarnCount,
     options.missingImageFailCount,
   );
-  const percentBasedStatus = countStatus(
-    missingPercent,
-    options.missingImageWarnPercent,
-    options.missingImageFailPercent,
-  );
 
   return {
     name: "missing product images",
-    status: worseStatus(countBasedStatus, percentBasedStatus),
+    status,
     message: `${missingCount}/${products.length} (${missingPercent.toFixed(2)}%) display-ready product image(s) missing`,
   };
 }
@@ -99,7 +94,7 @@ export async function checkSourceImageFetchFailures(
   const products = await client.product.findMany({
     where: {
       isActive: true,
-      imageCacheFailureSince: { not: null },
+      imageCacheFailureCount: { gte: options.sourceImageFailureMinConsecutive },
     },
     select: {
       id: true,
@@ -107,6 +102,7 @@ export async function checkSourceImageFetchFailures(
       imageCacheLastError: true,
       imageCacheLastErrorKind: true,
       imageCacheLastHttpStatus: true,
+      imageCacheFailureCount: true,
       imageCacheFailureSince: true,
     },
     orderBy: { imageCacheFailureSince: "asc" },
@@ -129,17 +125,18 @@ export async function checkSourceImageFetchFailures(
     ]
       .filter(Boolean)
       .join("/");
-    return `id=${product.id} url=${product.primaryImageUrl ?? "missing"} reason=${reason}`;
+    return `id=${product.id} failures=${product.imageCacheFailureCount} url=${product.primaryImageUrl ?? "missing"} reason=${reason}`;
   });
   const message = `${products.length} product(s) / ${distinctUrls} distinct URL(s) / longest ${longestHours.toFixed(2)}h${samples.length > 0 ? `; ${samples.join("; ")}` : ""}`;
-  const shouldWarn =
-    products.length >= options.invalidImageUrlWarnCount ||
-    distinctUrls >= options.invalidImageUrlWarnUrlCount ||
-    longestHours >= options.invalidImageUrlWarnHours;
-
-  return shouldWarn
-    ? warn("source image fetch failures", message)
-    : ok("source image fetch failures", message);
+  return {
+    name: "source image fetch failures",
+    status: countStatus(
+      products.length,
+      options.sourceImageFailureWarnCount,
+      options.sourceImageFailureFailCount,
+    ),
+    message,
+  };
 }
 
 // 定義 production smoke 中「可展示商品」的共用條件，供商品數與圖片快取檢查一致使用。

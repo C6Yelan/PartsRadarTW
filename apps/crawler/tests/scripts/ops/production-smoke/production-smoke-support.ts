@@ -147,19 +147,14 @@ export function stubHealthyPublicApi({
 
 // 建立 production smoke fake client，集中控制 DB-backed checks 需要的統計資料。
 export function createSmokeClient({
-  invalidImageErrorCount,
   trueParseErrorCount,
   discordDeliveryCounts = {},
   discordDeliveryRecords,
   publicDiscordDeliveryCounts = {},
   publicDiscordDeliveryRecords,
   historicalImageProducts = [],
-  invalidImageDistinctProductCount = 16,
-  invalidImageDistinctUrlCount = 5,
-  invalidImagePersistenceHours = 0,
   activeProductCount = 1000,
 }: {
-  invalidImageErrorCount: number;
   trueParseErrorCount: number;
   discordDeliveryCounts?: {
     failed?: number;
@@ -185,9 +180,6 @@ export function createSmokeClient({
     updatedAt: Date;
   }>;
   historicalImageProducts?: Array<{ id: string }>;
-  invalidImageDistinctProductCount?: number;
-  invalidImageDistinctUrlCount?: number;
-  invalidImagePersistenceHours?: number;
   activeProductCount?: number;
 }) {
   return {
@@ -208,45 +200,7 @@ export function createSmokeClient({
       count: async () => 0,
     },
     parseError: {
-      count: async ({
-        where,
-      }: {
-        where: { errorType?: "INVALID_IMAGE_URL" | { not: "INVALID_IMAGE_URL" } };
-      }) => {
-        if (where.errorType === "INVALID_IMAGE_URL") {
-          return invalidImageErrorCount;
-        }
-
-        return trueParseErrorCount;
-      },
-      findMany: async ({
-        where,
-      }: {
-        where: { errorType?: "INVALID_IMAGE_URL" | { not: "INVALID_IMAGE_URL" } };
-      }) => {
-        if (where.errorType !== "INVALID_IMAGE_URL") {
-          return [];
-        }
-
-        return Array.from(
-          { length: invalidImageErrorCount === 0 ? 0 : invalidImageDistinctProductCount },
-          (_, index) => ({
-            sourceCategoryId: "category-4",
-            rawToken: `TOKEN-${index + 1}`,
-            rawName: `Invalid image product ${index + 1}`,
-            rawImageUrl: `/eval/${(index % invalidImageDistinctUrlCount) + 1}/`,
-            message: "invalid source image url",
-            occurrenceCount:
-              Math.floor(invalidImageErrorCount / invalidImageDistinctProductCount) +
-              (index < invalidImageErrorCount % invalidImageDistinctProductCount ? 1 : 0),
-            createdAt: new Date(
-              Date.parse("2026-06-02T12:00:00.000Z") -
-                invalidImagePersistenceHours * 60 * 60 * 1000,
-            ),
-            lastSeenAt: new Date("2026-06-02T12:00:00.000Z"),
-          }),
-        );
-      },
+      count: async () => trueParseErrorCount,
     },
     product: {
       count: async ({ where }: { where?: Record<string, unknown> } = {}) =>
@@ -258,20 +212,17 @@ export function createSmokeClient({
       }: {
         where?: {
           isActive?: boolean;
-          imageCacheFailureSince?: unknown;
+          imageCacheFailureCount?: unknown;
           sourceCategory?: unknown;
-          OR?: Array<{ sourceCategoryId: string; ibuyToken: string }>;
         };
       } = {}) =>
         where?.isActive === false
           ? historicalImageProducts
-          : where?.imageCacheFailureSince
+          : where?.imageCacheFailureCount
             ? []
             : where?.sourceCategory
               ? []
-              : where?.OR
-                ? where.OR.map((ref, index) => ({ id: `product-${index + 1}`, ...ref }))
-                : [{ id: "product-1" }],
+              : [{ id: "product-1" }],
     },
     rawSnapshot: {
       count: async () => 0,

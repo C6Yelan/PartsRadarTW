@@ -32,7 +32,7 @@ describe("production smoke daemon options", () => {
     expect(options.intervalSeconds).toBe(900);
     expect(options.initialDelaySeconds).toBe(60);
     expect(options.runOnce).toBe(false);
-    expect(options.smokeDiscordNotification.cooldownSeconds).toBe(21600);
+    expect(options.smokeDiscordNotification.cooldownSeconds).toBe(43200);
   });
 
   it("adds daemon interval and run-once options", async () => {
@@ -56,7 +56,7 @@ describe("production smoke daemon options", () => {
         "--smoke-discord-state-file",
         "custom/smoke-state.json",
         "--smoke-discord-cooldown-seconds",
-        "120",
+        "43200",
       ],
       {
         DISCORD_ADMIN_WEBHOOK_URL,
@@ -69,7 +69,7 @@ describe("production smoke daemon options", () => {
     expect(options.smokeDiscordNotification).toEqual({
       adminWebhookUrl: DISCORD_ADMIN_WEBHOOK_URL,
       stateFilePath: join(workspaceRoot, "custom", "smoke-state.json"),
-      cooldownSeconds: 120,
+      cooldownSeconds: 43200,
     });
   });
 });
@@ -123,7 +123,6 @@ describe("production smoke daemon Discord notifications", () => {
 
     await runProductionSmokeDaemon({
       client: createSmokeClient({
-        invalidImageErrorCount: 0,
         trueParseErrorCount: 0,
       }) as unknown as Parameters<typeof runProductionSmokeDaemon>[0]["client"],
       options,
@@ -192,7 +191,6 @@ describe("production smoke daemon Discord notifications", () => {
 
     await runProductionSmokeDaemon({
       client: createSmokeClient({
-        invalidImageErrorCount: 0,
         trueParseErrorCount: 0,
         discordDeliveryCounts: {
           failed: 2,
@@ -246,7 +244,6 @@ describe("production smoke daemon Discord notifications", () => {
 
     await runProductionSmokeDaemon({
       client: createSmokeClient({
-        invalidImageErrorCount: 0,
         trueParseErrorCount: 0,
       }) as unknown as Parameters<typeof runProductionSmokeDaemon>[0]["client"],
       options,
@@ -289,7 +286,6 @@ describe("production smoke daemon Discord notifications", () => {
 
     await runProductionSmokeDaemon({
       client: createSmokeClient({
-        invalidImageErrorCount: 0,
         trueParseErrorCount: 0,
       }) as unknown as Parameters<typeof runProductionSmokeDaemon>[0]["client"],
       options,
