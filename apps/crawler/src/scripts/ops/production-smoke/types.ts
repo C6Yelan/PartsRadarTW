@@ -107,10 +107,14 @@ export interface RateLimitHeaderSnapshot {
 
 // 來源圖片異常診斷使用的 parse error 欄位投影。
 export interface SourceImageAnomalyRecord {
+  sourceCategoryId: string;
   rawToken: string | null;
   rawName: string | null;
   rawImageUrl: string | null;
+  message: string;
+  occurrenceCount: number;
   createdAt: Date;
+  lastSeenAt: Date;
 }
 
 // production smoke 只依賴檢查所需的 Prisma delegates，不綁定其他資料存取能力。

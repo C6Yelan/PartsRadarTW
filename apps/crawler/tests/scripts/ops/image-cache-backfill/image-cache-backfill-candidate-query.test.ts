@@ -1,11 +1,8 @@
 // apps/crawler/tests/scripts/ops/image-cache-backfill/image-cache-backfill-candidate-query.test.ts
-// 驗證手動補圖涵蓋 inactive 歷史商品，而 scheduled id 查詢仍維持 active-only。
+// 驗證補圖候選涵蓋 active、metadata drift 與近期仍被價格歷史引用的商品。
 
 import { describe, expect, it } from "vitest";
-import {
-  createProductImageCandidateByIdsWhere,
-  createProductImageCandidateWhere,
-} from "../../../../src/scripts/ops/image-cache-backfill/candidate-query";
+import { createProductImageCandidateWhere } from "../../../../src/scripts/ops/image-cache-backfill/candidate-query";
 import type { ImageBackfillOptions } from "../../../../src/scripts/ops/image-cache-backfill/options";
 
 describe("image cache backfill candidate query", () => {
@@ -26,13 +23,6 @@ describe("image cache backfill candidate query", () => {
       sourceCategory: { enabled: true },
     });
   });
-
-  it("keeps scheduled new-product recovery active-only", () => {
-    expect(createProductImageCandidateByIdsWhere(["product-1"])).toMatchObject({
-      id: { in: ["product-1"] },
-      isActive: true,
-    });
-  });
 });
 
 function createOptions(): ImageBackfillOptions {
@@ -47,8 +37,8 @@ function createOptions(): ImageBackfillOptions {
     maxDelayMs: 0,
     timeoutMs: 15000,
     maxSourceBytes: 5 * 1024 * 1024,
-    externalFetchLockDir: "/workspace/locks",
-    externalFetchLockStaleSeconds: 43200,
+    sourceImageFetchLockDir: "/workspace/locks",
+    sourceImageFetchLockStaleSeconds: 43200,
     dryRun: true,
     overwrite: false,
   };

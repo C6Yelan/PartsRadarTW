@@ -32,8 +32,8 @@ export interface ImageBackfillOptions {
   maxDelayMs: number;
   timeoutMs: number;
   maxSourceBytes: number;
-  externalFetchLockDir: string;
-  externalFetchLockStaleSeconds: number;
+  sourceImageFetchLockDir: string;
+  sourceImageFetchLockStaleSeconds: number;
   dryRun: boolean;
   overwrite: boolean;
 }
@@ -99,12 +99,12 @@ export function parseOptions(
     maxDelayMs,
     timeoutMs: getNumberArg(args, "--timeout-ms", DEFAULT_TIMEOUT_MS),
     maxSourceBytes: getNumberArg(args, "--max-source-bytes", DEFAULT_MAX_SOURCE_BYTES),
-    externalFetchLockDir: resolveWorkspacePathArgument(
+    sourceImageFetchLockDir: resolveWorkspacePathArgument(
       workspaceRoot,
-      env.EXTERNAL_FETCH_LOCK_DIR ?? `${snapshotStorageDir}/.locks/external-fetch`,
+      env.SOURCE_IMAGE_FETCH_LOCK_DIR ?? `${snapshotStorageDir}/.locks/source-image-fetch`,
     ),
-    externalFetchLockStaleSeconds: parseExternalFetchLockStaleSeconds(
-      env.EXTERNAL_FETCH_LOCK_STALE_SECONDS,
+    sourceImageFetchLockStaleSeconds: parseExternalFetchLockStaleSeconds(
+      env.SOURCE_IMAGE_FETCH_LOCK_STALE_SECONDS,
     ),
     dryRun,
     overwrite: args.includes("--overwrite"),
@@ -154,8 +154,8 @@ Options:
                              Default: PRODUCT_IMAGE_STORAGE_DIR, then ${DEFAULT_STORAGE_DIR}
 
 Environment:
-  IMAGE_CACHE_INACTIVE_RETENTION_DAYS, EXTERNAL_FETCH_LOCK_DIR,
-  EXTERNAL_FETCH_LOCK_STALE_SECONDS, SNAPSHOT_STORAGE_DIR
+  IMAGE_CACHE_INACTIVE_RETENTION_DAYS, SOURCE_IMAGE_FETCH_LOCK_DIR,
+  SOURCE_IMAGE_FETCH_LOCK_STALE_SECONDS, SNAPSHOT_STORAGE_DIR
 `);
 }
 

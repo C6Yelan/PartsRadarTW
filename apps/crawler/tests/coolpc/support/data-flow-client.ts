@@ -203,10 +203,45 @@ export class FakeCoolpcDataFlowClient
         rawPriceText: item.rawPriceText,
         rawToken: item.rawToken,
         rawImageUrl: item.rawImageUrl,
+        fingerprint: null,
+        occurrenceCount: 1,
+        lastSeenAt: new Date(),
       }));
       this.parseErrors.push(...parseErrors);
 
       return { count: parseErrors.length };
+    },
+    upsert: async ({
+      where,
+      create,
+      update,
+    }: Parameters<CoolpcCategorySnapshotWriteClient["parseError"]["upsert"]>[0]) => {
+      const existing = this.parseErrors.find((row) => row.fingerprint === where.fingerprint);
+      if (existing) {
+        existing.occurrenceCount += update.occurrenceCount.increment;
+        existing.lastSeenAt = update.lastSeenAt;
+        existing.crawlRunId = update.crawlRunId;
+        existing.rawSnapshotId = update.rawSnapshotId;
+        existing.message = update.message;
+        return { id: existing.id };
+      }
+      const row: FakeParseError = {
+        id: `parse-error-${this.parseErrors.length + 1}`,
+        crawlRunId: create.crawlRunId,
+        rawSnapshotId: create.rawSnapshotId,
+        sourceCategoryId: create.sourceCategoryId,
+        errorType: create.errorType,
+        message: create.message,
+        rawName: create.rawName,
+        rawPriceText: create.rawPriceText,
+        rawToken: create.rawToken,
+        rawImageUrl: create.rawImageUrl,
+        fingerprint: create.fingerprint,
+        occurrenceCount: create.occurrenceCount,
+        lastSeenAt: create.lastSeenAt,
+      };
+      this.parseErrors.push(row);
+      return { id: row.id };
     },
   };
 }

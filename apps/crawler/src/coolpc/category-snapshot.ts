@@ -60,6 +60,21 @@ export type ProcessCoolpcCategorySnapshotOptions =
 export interface CoolpcCategorySnapshotWriteClient extends RawSnapshotWriteClient {
   parseError: {
     createMany(args: { data: ParseErrorCreateManyData[] }): Promise<{ count: number }>;
+    upsert(args: {
+      where: { fingerprint: string };
+      create: ParseErrorCreateManyData & {
+        fingerprint: string;
+        occurrenceCount: number;
+        lastSeenAt: Date;
+      };
+      update: {
+        crawlRunId: string;
+        rawSnapshotId: string | null;
+        message: string;
+        occurrenceCount: { increment: number };
+        lastSeenAt: Date;
+      };
+    }): Promise<{ id: string }>;
   };
   rawSnapshot: RawSnapshotWriteClient["rawSnapshot"] & {
     findMany(args: {

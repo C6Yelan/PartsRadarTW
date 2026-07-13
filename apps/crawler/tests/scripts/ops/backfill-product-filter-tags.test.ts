@@ -136,6 +136,7 @@ describe("product filter tag backfill safety", () => {
         selected: 1,
         withoutTags: 0,
         facetHits: {
+          "gpu_product_type:graphics-card": 1,
           "gpu_chip:nvidia": 1,
           "gpu_series:rtx-50": 1,
           "vram_gb:16": 1,

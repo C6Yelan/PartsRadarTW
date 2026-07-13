@@ -22,7 +22,7 @@ export async function checkRecentParseErrors(
       errorType: {
         not: "INVALID_IMAGE_URL",
       },
-      createdAt: {
+      lastSeenAt: {
         gte: since,
       },
     },
@@ -53,17 +53,49 @@ export async function checkSourceImageAnomalies(
       },
     },
     select: {
+      sourceCategoryId: true,
       rawToken: true,
       rawName: true,
       rawImageUrl: true,
+      message: true,
+      occurrenceCount: true,
       createdAt: true,
+      lastSeenAt: true,
     },
   });
   const summary = summarizeSourceImageAnomalies(records);
+  const productRefs = records.flatMap((record) =>
+    record.rawToken
+      ? [{ sourceCategoryId: record.sourceCategoryId, ibuyToken: record.rawToken }]
+      : [],
+  );
+  const products = productRefs.length
+    ? await client.product.findMany({
+        where: { OR: productRefs },
+        select: { id: true, sourceCategoryId: true, ibuyToken: true },
+      })
+    : [];
+  const productIds = new Map(
+    products.map((product) => [
+      `${product.sourceCategoryId}\u0000${product.ibuyToken}`,
+      product.id,
+    ]),
+  );
   const activeProductCount = await client.product.count({ where: { isActive: true } });
   const failurePercent =
     activeProductCount === 0 ? 0 : (summary.distinctProducts / activeProductCount) * 100;
-  const message = `${summary.rows} rows / ${summary.distinctProducts} distinct products / ${summary.distinctRawImageUrls} distinct raw image urls / ${failurePercent.toFixed(2)}% of ${activeProductCount} active products / longest ${summary.longestPersistenceHours.toFixed(2)}h in ${options.recentWindowHours}h`;
+  const details = records
+    .slice(0, 5)
+    .map((record) => {
+      const productId = record.rawToken
+        ? productIds.get(`${record.sourceCategoryId}\u0000${record.rawToken}`)
+        : undefined;
+      const durationHours =
+        (record.lastSeenAt.getTime() - record.createdAt.getTime()) / MILLISECONDS_PER_HOUR;
+      return `id=${productId ?? "unknown"} url=${record.rawImageUrl ?? "missing"} reason=${record.message} duration=${durationHours.toFixed(2)}h`;
+    })
+    .join(" | ");
+  const message = `${summary.occurrences} occurrence(s) / ${summary.distinctProducts} distinct products / ${summary.distinctRawImageUrls} distinct raw image urls / ${failurePercent.toFixed(2)}% of ${activeProductCount} active products / longest ${summary.longestPersistenceHours.toFixed(2)}h in ${options.recentWindowHours}h${details ? `; ${details}` : ""}`;
   const shouldWarn =
     summary.distinctProducts > options.invalidImageUrlWarnCount ||
     summary.distinctRawImageUrls > options.invalidImageUrlWarnUrlCount ||
@@ -80,18 +112,21 @@ function summarizeSourceImageAnomalies(records: SourceImageAnomalyRecord[]) {
   const productKeys = new Set<string>();
   const rawImageUrls = new Set<string>();
   const productTimes = new Map<string, { first: number; last: number }>();
+  let occurrences = 0;
 
   for (const record of records) {
+    occurrences += record.occurrenceCount;
     const productKey = toSourceImageAnomalyProductKey(record);
     const rawImageUrl = normalizeNullableText(record.rawImageUrl);
 
     if (productKey) {
       productKeys.add(productKey);
       const createdAt = record.createdAt.getTime();
+      const lastSeenAt = record.lastSeenAt.getTime();
       const times = productTimes.get(productKey);
       productTimes.set(productKey, {
         first: times ? Math.min(times.first, createdAt) : createdAt,
-        last: times ? Math.max(times.last, createdAt) : createdAt,
+        last: times ? Math.max(times.last, lastSeenAt) : lastSeenAt,
       });
     }
 
@@ -101,7 +136,7 @@ function summarizeSourceImageAnomalies(records: SourceImageAnomalyRecord[]) {
   }
 
   return {
-    rows: records.length,
+    occurrences,
     distinctProducts: productKeys.size,
     distinctRawImageUrls: rawImageUrls.size,
     longestPersistenceHours: Math.max(

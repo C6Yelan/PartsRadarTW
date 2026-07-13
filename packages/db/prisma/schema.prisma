@@ -132,34 +132,38 @@ model SourceCategory {
 }
 
 model Product {
-  id                     String                        @id @default(uuid()) @db.Uuid
-  sourceCategoryId       String                        @map("source_category_id") @db.Uuid
-  sourceCategory         SourceCategory                @relation(fields: [sourceCategoryId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  ibuyToken              String                        @map("ibuy_token")
-  name                   String                        @db.Text
-  normalizedName         String                        @map("normalized_name") @db.Text
-  vendorSlug             String?                       @map("vendor_slug") @db.Text
-  vendorName             String?                       @map("vendor_name") @db.Text
-  filterTags             String[]                      @default([]) @map("filter_tags")
-  primaryImageUrl        String?                       @map("primary_image_url") @db.Text
-  primaryImageCheckedAt  DateTime?                     @map("primary_image_checked_at") @db.Timestamptz(6)
-  imageCachedAt          DateTime?                     @map("image_cached_at") @db.Timestamptz(6)
-  imageCacheCheckedAt    DateTime?                     @map("image_cache_checked_at") @db.Timestamptz(6)
-  imageCacheFailureCount Int                           @default(0) @map("image_cache_failure_count")
-  imageCacheLastError    String?                       @map("image_cache_last_error") @db.Text
-  imageCacheNextRetryAt  DateTime?                     @map("image_cache_next_retry_at") @db.Timestamptz(6)
-  sourceUrl              String                        @map("source_url") @db.Text
-  isActive               Boolean                       @default(true) @map("is_active")
-  missingSince           DateTime?                     @map("missing_since") @db.Timestamptz(6)
-  missingSeenCount       Int                           @default(0) @map("missing_seen_count")
-  firstSeenAt            DateTime                      @map("first_seen_at") @db.Timestamptz(6)
-  lastSeenAt             DateTime                      @map("last_seen_at") @db.Timestamptz(6)
-  createdAt              DateTime                      @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt              DateTime                      @updatedAt @map("updated_at") @db.Timestamptz(6)
-  currentPrice           CurrentPrice?
-  priceSnapshots         PriceSnapshot[]
-  discordTargetWatches   DiscordTargetPriceWatch[]
-  discordDeliveries      DiscordNotificationDelivery[]
+  id                       String                        @id @default(uuid()) @db.Uuid
+  sourceCategoryId         String                        @map("source_category_id") @db.Uuid
+  sourceCategory           SourceCategory                @relation(fields: [sourceCategoryId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  ibuyToken                String                        @map("ibuy_token")
+  name                     String                        @db.Text
+  normalizedName           String                        @map("normalized_name") @db.Text
+  vendorSlug               String?                       @map("vendor_slug") @db.Text
+  vendorName               String?                       @map("vendor_name") @db.Text
+  filterTags               String[]                      @default([]) @map("filter_tags")
+  primaryImageUrl          String?                       @map("primary_image_url") @db.Text
+  primaryImageCheckedAt    DateTime?                     @map("primary_image_checked_at") @db.Timestamptz(6)
+  imageCachedAt            DateTime?                     @map("image_cached_at") @db.Timestamptz(6)
+  imageCacheCheckedAt      DateTime?                     @map("image_cache_checked_at") @db.Timestamptz(6)
+  imageCacheFailureCount   Int                           @default(0) @map("image_cache_failure_count")
+  imageCacheLastError      String?                       @map("image_cache_last_error") @db.Text
+  imageCacheLastErrorKind  String?                       @map("image_cache_last_error_kind") @db.Text
+  imageCacheLastHttpStatus Int?                          @map("image_cache_last_http_status")
+  imageCacheFailureSince   DateTime?                     @map("image_cache_failure_since") @db.Timestamptz(6)
+  imageCacheLastSuccessAt  DateTime?                     @map("image_cache_last_success_at") @db.Timestamptz(6)
+  imageCacheNextRetryAt    DateTime?                     @map("image_cache_next_retry_at") @db.Timestamptz(6)
+  sourceUrl                String                        @map("source_url") @db.Text
+  isActive                 Boolean                       @default(true) @map("is_active")
+  missingSince             DateTime?                     @map("missing_since") @db.Timestamptz(6)
+  missingSeenCount         Int                           @default(0) @map("missing_seen_count")
+  firstSeenAt              DateTime                      @map("first_seen_at") @db.Timestamptz(6)
+  lastSeenAt               DateTime                      @map("last_seen_at") @db.Timestamptz(6)
+  createdAt                DateTime                      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                DateTime                      @updatedAt @map("updated_at") @db.Timestamptz(6)
+  currentPrice             CurrentPrice?
+  priceSnapshots           PriceSnapshot[]
+  discordTargetWatches     DiscordTargetPriceWatch[]
+  discordDeliveries        DiscordNotificationDelivery[]
 
   @@unique([sourceCategoryId, ibuyToken], map: "products_source_category_id_ibuy_token_key")
   @@index([sourceCategoryId], map: "products_source_category_id_idx")
@@ -406,11 +410,15 @@ model ParseError {
   rawPriceText     String?        @map("raw_price_text")
   rawToken         String?        @map("raw_token")
   rawImageUrl      String?        @map("raw_image_url") @db.Text
+  fingerprint      String?        @unique(map: "parse_errors_fingerprint_key") @db.VarChar(64)
+  occurrenceCount  Int            @default(1) @map("occurrence_count")
+  lastSeenAt       DateTime       @default(now()) @map("last_seen_at") @db.Timestamptz(6)
   createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@index([crawlRunId], map: "parse_errors_crawl_run_id_idx")
   @@index([rawSnapshotId], map: "parse_errors_raw_snapshot_id_idx")
   @@index([sourceCategoryId, createdAt], map: "parse_errors_source_category_id_created_at_idx")
   @@index([errorType], map: "parse_errors_error_type_idx")
+  @@index([errorType, lastSeenAt], map: "parse_errors_error_type_last_seen_at_idx")
   @@map("parse_errors")
 }

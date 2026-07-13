@@ -18,7 +18,9 @@ import {
   checkActiveProductCount,
   checkHistoricalImageCacheMetadata,
   checkMissingProductImages,
+  checkSourceImageFetchFailures,
 } from "./checks/product-health";
+import { checkProductFilterQuality } from "./checks/product-filter-quality";
 import { checkPublicEndpoints } from "./checks/public-http";
 import { checkRawSnapshotRetention } from "./checks/raw-snapshot-retention";
 import type {
@@ -46,7 +48,9 @@ export async function runProductionSmoke(
   checks.push(await checkRecentSuspectedBlocks(client, options, now));
   checks.push(await checkRecentParseErrors(client, options, now));
   checks.push(await checkSourceImageAnomalies(client, options, now));
+  checks.push(await checkSourceImageFetchFailures(client, options, now));
   checks.push(await checkActiveProductCount(client, options));
+  checks.push(await checkProductFilterQuality(client));
   checks.push(await checkMissingProductImages(client, options));
   checks.push(await checkHistoricalImageCacheMetadata(client, options, now));
   checks.push(await checkRawSnapshotRetention(client, options, now));

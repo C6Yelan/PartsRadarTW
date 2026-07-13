@@ -7,6 +7,7 @@
     "ops:crawl-coolpc-daemon": "tsx src/scripts/ops/crawl-coolpc-daemon.ts",
     "ops:discord-bot": "tsx src/scripts/ops/discord-bot.ts",
     "ops:image-cache:backfill": "tsx src/scripts/ops/backfill-product-images.ts",
+    "ops:image-cache:recovery-daemon": "tsx src/scripts/ops/image-cache-recovery-daemon.ts",
     "ops:production-smoke": "tsx src/scripts/ops/production-smoke.ts",
     "ops:production-smoke-daemon": "tsx src/scripts/ops/production-smoke-daemon.ts",
     "ops:product-vendors:backfill": "tsx src/scripts/ops/backfill-product-vendors.ts",

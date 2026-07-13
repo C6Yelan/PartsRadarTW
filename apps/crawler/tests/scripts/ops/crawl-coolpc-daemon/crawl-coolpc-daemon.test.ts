@@ -42,11 +42,6 @@ describe("CoolPC scheduled crawler daemon options", () => {
     ["--backoff-seconds", "CRAWLER_BACKOFF_SECONDS"],
     ["--category-delay-ms", "CRAWLER_CATEGORY_DELAY_MS"],
     ["--lock-retry-seconds", "CRAWLER_LOCK_RETRY_SECONDS"],
-    ["--new-product-image-min-delay-ms", "CRAWLER_NEW_PRODUCT_IMAGE_MIN_DELAY_MS"],
-    ["--new-product-image-max-delay-ms", "CRAWLER_NEW_PRODUCT_IMAGE_MAX_DELAY_MS"],
-    ["--new-product-image-timeout-ms", "CRAWLER_NEW_PRODUCT_IMAGE_TIMEOUT_MS"],
-    ["--new-product-image-max-source-bytes", "CRAWLER_NEW_PRODUCT_IMAGE_MAX_SOURCE_BYTES"],
-    ["--product-image-storage-dir", "PRODUCT_IMAGE_STORAGE_DIR"],
     ["--lock-dir", "EXTERNAL_FETCH_LOCK_DIR"],
     ["--lock-stale-seconds", "EXTERNAL_FETCH_LOCK_STALE_SECONDS"],
     ["--filter-sync-interval-seconds", "CRAWLER_FILTER_SYNC_INTERVAL_SECONDS"],
@@ -68,10 +63,6 @@ describe("CoolPC scheduled crawler daemon options", () => {
         CRAWLER_LOCK_RETRY_SECONDS: "90",
         CRAWLER_CATEGORY_DELAY_MS: "5000",
         CRAWLER_FILTER_SYNC_INTERVAL_SECONDS: "86400",
-        CRAWLER_NEW_PRODUCT_IMAGE_MIN_DELAY_MS: "6000",
-        CRAWLER_NEW_PRODUCT_IMAGE_MAX_DELAY_MS: "9000",
-        CRAWLER_NEW_PRODUCT_IMAGE_TIMEOUT_MS: "18000",
-        CRAWLER_NEW_PRODUCT_IMAGE_MAX_SOURCE_BYTES: "4194304",
         SNAPSHOT_STORAGE_DIR: "storage/snapshots",
         PRODUCT_IMAGE_STORAGE_DIR: "storage/product-images",
         EXTERNAL_FETCH_LOCK_STALE_SECONDS: "21600",
@@ -97,23 +88,6 @@ describe("CoolPC scheduled crawler daemon options", () => {
         "ops",
         "coolpc-filter-sync-state.json",
       ),
-      newProductImageBackfill: {
-        workspaceRoot,
-        storageDir: join(workspaceRoot, "storage", "product-images"),
-        minDelayMs: 6000,
-        maxDelayMs: 9000,
-        timeoutMs: 18000,
-        maxSourceBytes: 4194304,
-        batchLimit: 25,
-        externalFetchLockDir: join(
-          workspaceRoot,
-          "storage",
-          "snapshots",
-          ".locks",
-          "external-fetch",
-        ),
-        externalFetchLockStaleSeconds: 21600,
-      },
     });
   });
 
@@ -175,16 +149,5 @@ describe("CoolPC scheduled crawler daemon options", () => {
         crawlerCwd,
       ),
     ).toThrow("EXTERNAL_FETCH_LOCK_STALE_SECONDS must be at least 60");
-
-    expect(() =>
-      parseDaemonOptions(
-        ["--confirm-live-fetch"],
-        {
-          CRAWLER_NEW_PRODUCT_IMAGE_MIN_DELAY_MS: "12000",
-          CRAWLER_NEW_PRODUCT_IMAGE_MAX_DELAY_MS: "5000",
-        },
-        crawlerCwd,
-      ),
-    ).toThrow("CRAWLER_NEW_PRODUCT_IMAGE_MIN_DELAY_MS must be less than or equal to");
   });
 });

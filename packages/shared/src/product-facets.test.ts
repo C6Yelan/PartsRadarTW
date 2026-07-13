@@ -37,10 +37,7 @@ describe("product facets", () => {
   });
 
   it("extracts motherboard chipset without confusing ATX and M-ATX", () => {
-    const tags = extractProductFilterTags(
-      5,
-      "華碩 TUF GAMING B850M-PLUS WIFI(M-ATX/DDR5/無線)",
-    );
+    const tags = extractProductFilterTags(5, "華碩 TUF GAMING B850M-PLUS WIFI(M-ATX/DDR5/無線)");
     expect(tags).toEqual([
       "socket:am5",
       "chipset:b850",
@@ -58,9 +55,7 @@ describe("product facets", () => {
   });
 
   it("extracts memory type, capacity, and speed", () => {
-    expect(
-      extractProductFilterTags(6, "桌上型 32GB(雙通16GB*2) DDR5 6000/CL30"),
-    ).toEqual([
+    expect(extractProductFilterTags(6, "桌上型 32GB(雙通16GB*2) DDR5 6000/CL30")).toEqual([
       "module_type:desktop",
       "memory_type:ddr5",
       "capacity_gb:32",
@@ -129,10 +124,15 @@ describe("product facets", () => {
     expect(extractProductFilterTags(9, name)).toEqual(expectedTags);
   });
 
-  it("extracts air cooler shape and fan size", () => {
+  it("extracts air cooler shape without exposing the unsupported fan-size facet", () => {
     expect(extractProductFilterTags(10, "雙塔 CPU 散熱器 120mm 支援 AM5")).toEqual([
       "cooler_type:air-tower",
-      "fan_size_mm:120",
+    ]);
+  });
+
+  it("keeps SSD heatsinks separate from CPU air coolers", () => {
+    expect(extractProductFilterTags(10, "M.2 2280 SSD 固態硬碟散熱片/鋁合金")).toEqual([
+      "cooler_type:ssd-heatsink",
     ]);
   });
 
@@ -163,6 +163,7 @@ describe("product facets", () => {
 
   it("extracts GPU chip, series, and VRAM", () => {
     expect(extractProductFilterTags(12, "NVIDIA GeForce RTX 5070 Ti 16GB")).toEqual([
+      "gpu_product_type:graphics-card",
       "gpu_chip:nvidia",
       "gpu_series:rtx-50",
       "vram_gb:16",
@@ -186,6 +187,7 @@ describe("product facets", () => {
     ["華擎 ARC PRO B70 Creator 32G(2540MHz/27cm/鼓風扇/註冊五年保)", "32"],
   ])("extracts parenthesized Intel Arc VRAM: %s", (name, vramGb) => {
     expect(extractProductFilterTags(12, name)).toEqual([
+      "gpu_product_type:graphics-card",
       "gpu_chip:intel",
       "gpu_series:arc",
       `vram_gb:${vramGb}`,
@@ -198,7 +200,6 @@ describe("product facets", () => {
       "motherboard_support:e-atx",
       "motherboard_support:m-atx",
       "back_connect:yes",
-      "case_size:mid-tower",
     ]);
     expect(tags).not.toContain("motherboard_support:atx");
   });
@@ -234,9 +235,9 @@ describe("product facets", () => {
   });
 
   it("does not infer an included PSU from bundled fans and a power-supply shroud", () => {
-    expect(
-      extractProductFilterTags(14, "中塔機殼/內附3顆風扇/下置電源倉"),
-    ).not.toContain("included_psu:yes");
+    expect(extractProductFilterTags(14, "中塔機殼/內附3顆風扇/下置電源倉")).not.toContain(
+      "included_psu:yes",
+    );
   });
 
   it.each([
@@ -281,6 +282,42 @@ describe("product facets", () => {
       "fan_product_type:fan",
       "fan_size_mm:120",
       "lighting:argb",
+    ]);
+  });
+
+  it("does not give an unknown fan accessory a catch-all type", () => {
+    expect(extractProductFilterTags(16, "機殼專用磁吸飾板")).toEqual([]);
+  });
+
+  it("classifies an explicitly named lighting kit as an accessory", () => {
+    expect(extractProductFilterTags(16, "機殼專用 ARGB 燈效套件")).toEqual([
+      "fan_product_type:accessory",
+      "lighting:argb",
+    ]);
+  });
+
+  it("keeps GPU accessories out of chip, series, and VRAM facets", () => {
+    expect(extractProductFilterTags(12, "ROG Herculx 顯示卡支撐架 ARGB")).toEqual([
+      "gpu_product_type:accessory",
+    ]);
+  });
+
+  it("extracts current HDD capacities and only explicit consumer series usage", () => {
+    expect(extractProductFilterTags(8, "Seagate 30TB【EXOS企業碟】")).toContain(
+      "capacity_gb:30000",
+    );
+    expect(extractProductFilterTags(8, "WD 3TB【藍標】")).toEqual([
+      "capacity_gb:3000",
+      "storage_usage:desktop",
+    ]);
+  });
+
+  it("uses total kit capacity before per-module capacity", () => {
+    expect(extractProductFilterTags(6, 'Biwin 192G("雙通"四根48G*4)D5 6000 CL28')).toEqual([
+      "module_type:desktop",
+      "memory_type:ddr5",
+      "capacity_gb:192",
+      "speed_mhz:6000",
     ]);
   });
 

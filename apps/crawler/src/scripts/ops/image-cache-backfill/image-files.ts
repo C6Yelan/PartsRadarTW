@@ -10,6 +10,26 @@ import type { ImageBackfillOptions } from "./options";
 const THUMBNAIL_MAX_SIZE = 512;
 const WEBP_QUALITY = 74;
 
+export type SourceImageFailureKind =
+  | "content_type"
+  | "decode"
+  | "http"
+  | "lock_busy"
+  | "network"
+  | "too_large"
+  | "timeout";
+
+export class SourceImageFetchError extends Error {
+  constructor(
+    message: string,
+    readonly kind: SourceImageFailureKind,
+    readonly httpStatus: number | null = null,
+  ) {
+    super(message);
+    this.name = "SourceImageFetchError";
+  }
+}
+
 // 檢查本地圖片檔是否存在；只有 ENOENT 視為不存在，其餘檔案系統錯誤向外拋出。
 export async function pathExists(path: string): Promise<boolean> {
   try {
@@ -39,15 +59,16 @@ export async function fetchSourceImageBytes(
   options: ImageBackfillOptions,
   onRequestStarted: () => void = () => {},
 ): Promise<Buffer> {
-  const externalFetchLock = await tryAcquireExternalFetchLock({
-    lockDir: options.externalFetchLockDir,
+  const sourceImageFetchLock = await tryAcquireExternalFetchLock({
+    lockDir: options.sourceImageFetchLockDir,
     owner: "image-backfill",
-    staleSeconds: options.externalFetchLockStaleSeconds,
+    staleSeconds: options.sourceImageFetchLockStaleSeconds,
   });
 
-  if (!externalFetchLock) {
-    throw new Error(
+  if (!sourceImageFetchLock) {
+    throw new SourceImageFetchError(
       "Source image request deferred because another live source fetch holds the lock.",
+      "lock_busy",
     );
   }
 
@@ -56,47 +77,83 @@ export async function fetchSourceImageBytes(
 
   try {
     onRequestStarted();
-    const response = await fetch(url, {
-      headers: {
-        accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
-        "accept-language": "zh-TW,zh;q=0.9,en;q=0.8",
-        "user-agent":
-          "PartsRadarTW manual image cache backfill (+https://github.com/C6Yelan/PartsRadarTW)",
-      },
-      redirect: "manual",
-      signal: controller.signal,
-    });
+    let response: Response;
+
+    try {
+      response = await fetch(url, {
+        headers: {
+          accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+          "accept-language": "zh-TW,zh;q=0.9,en;q=0.8",
+          "user-agent":
+            "PartsRadarTW image cache recovery (+https://github.com/C6Yelan/PartsRadarTW)",
+        },
+        redirect: "manual",
+        signal: controller.signal,
+      });
+    } catch (error) {
+      if (controller.signal.aborted) {
+        throw new SourceImageFetchError(
+          `Source image request timed out after ${options.timeoutMs}ms`,
+          "timeout",
+        );
+      }
+
+      throw new SourceImageFetchError(
+        error instanceof Error ? error.message : "Source image request failed",
+        "network",
+      );
+    }
 
     if (response.status >= 300 && response.status < 400) {
-      throw new Error(`Unexpected image redirect: HTTP ${response.status}`);
+      throw new SourceImageFetchError(
+        `Unexpected image redirect: HTTP ${response.status}`,
+        "http",
+        response.status,
+      );
     }
 
     if (!response.ok) {
-      throw new Error(`Image request failed: HTTP ${response.status}`);
+      throw new SourceImageFetchError(
+        `Image request failed: HTTP ${response.status}`,
+        "http",
+        response.status,
+      );
     }
 
     const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
 
     if (!contentType.startsWith("image/")) {
-      throw new Error(`Unexpected image content type: ${contentType || "missing"}`);
+      throw new SourceImageFetchError(
+        `Unexpected image content type: ${contentType || "missing"}`,
+        "content_type",
+        response.status,
+      );
     }
 
     const contentLength = parseContentLength(response.headers.get("content-length"));
 
     if (contentLength !== null && contentLength > options.maxSourceBytes) {
-      throw new Error(`Source image is too large: ${formatBytes(contentLength)}`);
+      throw new SourceImageFetchError(
+        `Source image is too large: ${formatBytes(contentLength)}`,
+        "too_large",
+        response.status,
+      );
     }
 
     const bytes = Buffer.from(await response.arrayBuffer());
 
     if (bytes.byteLength > options.maxSourceBytes) {
-      throw new Error(`Source image is too large: ${formatBytes(bytes.byteLength)}`);
+      throw new SourceImageFetchError(
+        `Source image is too large: ${formatBytes(bytes.byteLength)}`,
+        "too_large",
+        response.status,
+      );
     }
 
     return bytes;
   } finally {
     clearTimeout(timeoutId);
-    await externalFetchLock.release();
+    await sourceImageFetchLock.release();
   }
 }
 

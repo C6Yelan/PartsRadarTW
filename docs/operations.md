@@ -52,7 +52,7 @@ docker compose -f compose.yml -f compose.ops.yml --profile ops run --rm smoke-da
   pnpm ops:production-smoke -- --base-url http://web:3000
 ```
 
-Full smoke 另檢查 crawler run、CoolPC 篩選同步、parse errors、active products、缺圖、snapshot retention 與近期 Discord delivery。只有 FAIL 使用 non-zero exit；WARN 不會自動阻止 shell pipeline，因此部署流程必須解析摘要。
+Full smoke 另檢查 crawler run、CoolPC 篩選同步、parse errors、來源圖片異常、商品篩選品質、active products、缺圖、snapshot retention 與近期 Discord delivery。只有 FAIL 使用 non-zero exit；WARN 不會自動阻止 shell pipeline，因此部署流程必須解析摘要。
 
 預設門檻只是起始值。應依 production baseline 調整 env，不能把「沒有 FAIL」誤寫成門檻已校準。
 
@@ -62,10 +62,10 @@ Full smoke 另檢查 crawler run、CoolPC 篩選同步、parse errors、active p
 
 ```bash
 docker compose -f compose.yml -f compose.crawler.yml --profile scheduled-crawler up -d
-docker compose -f compose.yml -f compose.crawler.yml logs --tail=100 crawler-daemon raw-snapshot-cleanup-daemon
+docker compose -f compose.yml -f compose.crawler.yml logs --tail=100 crawler-daemon image-cache-recovery-daemon raw-snapshot-cleanup-daemon
 ```
 
-成功標準：Crawler 完成分類週期，沒有疑似阻擋或無限 backoff；cleanup daemon 能取得正確 snapshot path。
+成功標準：Crawler 完成分類週期，沒有疑似阻擋或無限 backoff；圖片修復不占用價格 crawler 的 external-fetch lock；cleanup daemon 能取得正確 snapshot path。
 
 失敗處理：遇到 suspected block、來源錯誤或 external fetch lock 衝突時先停止 crawler-daemon，保存 snapshot 與 log，再用 offline raw replay分析。不要提高並行或移除 request delay硬試。
 
@@ -76,7 +76,7 @@ Crawl lifecycle 維運 marker：建立 run 後若有未吸收的 lifecycle failu
 停止 writers：
 
 ```bash
-docker compose -f compose.yml -f compose.crawler.yml stop crawler-daemon raw-snapshot-cleanup-daemon
+docker compose -f compose.yml -f compose.crawler.yml stop crawler-daemon image-cache-recovery-daemon raw-snapshot-cleanup-daemon
 ```
 
 ## 手動 crawl
@@ -126,7 +126,7 @@ docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler ru
 
 使用時機：新主機、重建 product image volume、缺圖修復。必須使用專用 `image-cache-backfill` service；`crawler` 不掛載此 volume。
 
-日常缺圖由既有 `crawler-daemon` 每輪限量輪替檢查並自動補回；失敗會記錄於商品圖片快取狀態，經退避後重試。此手動指令只用於首次部署、volume 重建或加速大量歷史缺檔修復。
+日常缺圖由 `image-cache-recovery-daemon` 限量輪替檢查並自動補回；失敗會記錄 HTTP 狀態或錯誤類型，並以來源 URL 共用 cooldown 與指數退避重試。價格 `crawler-daemon` 不等待圖片下載。此手動指令只用於首次部署、volume 重建或加速大量歷史缺檔修復。
 
 Dry-run：
 
@@ -137,7 +137,7 @@ docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler ru
 
 確認後 live fetch：
 
-每次圖片 HTTP request 都會使用與分類抓取相同的 external-fetch lock；request 間 delay、轉檔與寫檔留在鎖外。大量補圖前仍建議先停止 `crawler-daemon`，避免價格 crawl 與補圖互相延後。
+圖片 HTTP request 使用獨立的 source-image-fetch lock；request 間 delay、轉檔與寫檔留在鎖外，不會阻塞價格分類抓取。大量手動補圖前應先停止 `image-cache-recovery-daemon`，避免兩個圖片工作互相等待。
 
 ```bash
 docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler run --rm image-cache-backfill \

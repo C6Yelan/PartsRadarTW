@@ -11,10 +11,6 @@ import {
   toSafeCliErrorMessage,
 } from "../shared/script-utils";
 import { printHelp } from "./crawl-coolpc-daemon/help";
-import {
-  handleNewProductImageBackfill,
-  type NewProductImageBackfillHandler,
-} from "./crawl-coolpc-daemon/new-product-images";
 import { type CoolpcDaemonOptions, parseDaemonOptions } from "./crawl-coolpc-daemon/options";
 import {
   type ProductWriteSummaryTotals,
@@ -62,7 +58,7 @@ async function main(): Promise<void> {
 
     await assertSeededCategories(client);
     log(
-      `CoolPC scheduled crawler started. interval=${options.intervalSeconds}s backoff=${options.backoffSeconds}s categoryDelay=${options.categoryDelayMs}ms filterSyncInterval=${options.filterSyncIntervalSeconds}s newProductImageDelay=${options.newProductImageBackfill.minDelayMs}-${options.newProductImageBackfill.maxDelayMs}ms runOnce=${options.runOnce ? "yes" : "no"}`,
+      `CoolPC scheduled crawler started. interval=${options.intervalSeconds}s backoff=${options.backoffSeconds}s categoryDelay=${options.categoryDelayMs}ms filterSyncInterval=${options.filterSyncIntervalSeconds}s runOnce=${options.runOnce ? "yes" : "no"}`,
     );
 
     do {
@@ -95,14 +91,11 @@ export async function runScheduledCycle(
     acquireLock?: typeof tryAcquireExternalFetchLock;
     crawlCategories?: typeof runCoolpcCategoryCrawl;
     refreshFilterSync?: typeof refreshCoolpcFilterSync;
-    backfillNewProductImages?: NewProductImageBackfillHandler;
   } = {},
 ): Promise<ScheduledCycleResult> {
   const acquireLock = dependencies.acquireLock ?? tryAcquireExternalFetchLock;
   const crawlCategories = dependencies.crawlCategories ?? runCoolpcCategoryCrawl;
   const refreshFilterSync = dependencies.refreshFilterSync ?? refreshCoolpcFilterSync;
-  const backfillNewProductImages =
-    dependencies.backfillNewProductImages ?? handleNewProductImageBackfill;
   const lock = await acquireLock({
     lockDir: options.lockDir,
     owner: "crawler-daemon",
@@ -181,20 +174,6 @@ export async function runScheduledCycle(
     log(
       `All CoolPC categories failed during fetch. Retrying in ${retryAfterSeconds}s before using the regular ${options.backoffSeconds}s backoff.`,
     );
-  }
-
-  if (shouldBackoff) {
-    if (productWriteSummary.createdProductIds.length > 0) {
-      log(
-        `New product image backfill skipped. reason=crawl_not_clean status=${result.status} stoppedBySuspectedBlock=${result.stoppedBySuspectedBlock ? "yes" : "no"} createdProducts=${productWriteSummary.createdProductIds.length}`,
-      );
-    }
-  } else {
-    await backfillNewProductImages({
-      client,
-      productIds: productWriteSummary.createdProductIds,
-      options: options.newProductImageBackfill,
-    });
   }
 
   return retryAfterSeconds === undefined

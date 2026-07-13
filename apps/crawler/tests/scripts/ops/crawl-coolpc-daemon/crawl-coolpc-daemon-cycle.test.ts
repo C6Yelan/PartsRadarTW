@@ -1,5 +1,5 @@
 // apps/crawler/tests/scripts/ops/crawl-coolpc-daemon/crawl-coolpc-daemon-cycle.test.ts
-// 驗證 scheduled CoolPC crawler 單輪執行的 external fetch lock、retry、backoff 與新商品圖片補圖協調。
+// 驗證 scheduled CoolPC crawler 單輪執行的 external fetch lock、retry 與 backoff。
 
 import { describe, expect, it } from "vitest";
 import {
@@ -10,7 +10,7 @@ import { runScheduledCycle } from "../../../../src/scripts/ops/crawl-coolpc-daem
 import { createDaemonOptions, skipFilterSync } from "./crawl-coolpc-daemon-support";
 
 describe("CoolPC scheduled crawler daemon cycle", () => {
-  it("releases the external fetch lock before non-crawl follow-up work", async () => {
+  it("releases the external fetch lock after the crawl", async () => {
     const calls: string[] = [];
     const synchronizedTags = { "4": { "amd test cpu": ["socket:am5"] } };
     const fakeLock = {
@@ -72,10 +72,6 @@ describe("CoolPC scheduled crawler daemon cycle", () => {
           ],
         };
       },
-      backfillNewProductImages: async ({ productIds }) => {
-        expect(productIds).toEqual(["product-1"]);
-        calls.push("backfill-new-product-images");
-      },
     });
 
     expect(result).toEqual({ shouldBackoff: false });
@@ -84,7 +80,6 @@ describe("CoolPC scheduled crawler daemon cycle", () => {
       "refresh-filter-sync",
       "crawl-categories",
       "release-lock",
-      "backfill-new-product-images",
     ]);
   });
 
@@ -120,16 +115,13 @@ describe("CoolPC scheduled crawler daemon cycle", () => {
         calls.push("crawl-categories");
         throw new Error("crawl-run reconciliation failed");
       },
-      backfillNewProductImages: async () => {
-        calls.push("backfill-new-product-images");
-      },
     });
 
     expect(result).toEqual({ shouldBackoff: true });
     expect(calls).toEqual(["crawl-categories", "release-lock"]);
   });
 
-  it("skips new product image backfill when the crawl result should back off", async () => {
+  it("backs off after a suspected block", async () => {
     const calls: string[] = [];
     const fakeLock = {
       lockDir: "/tmp/external-fetch.lock",
@@ -166,9 +158,6 @@ describe("CoolPC scheduled crawler daemon cycle", () => {
           },
         ],
       }),
-      backfillNewProductImages: async () => {
-        calls.push("backfill-new-product-images");
-      },
     });
 
     expect(result).toEqual({ shouldBackoff: true });
@@ -218,9 +207,6 @@ describe("CoolPC scheduled crawler daemon cycle", () => {
             },
           ],
         }),
-        backfillNewProductImages: async () => {
-          calls.push("backfill-new-product-images");
-        },
       },
     );
 

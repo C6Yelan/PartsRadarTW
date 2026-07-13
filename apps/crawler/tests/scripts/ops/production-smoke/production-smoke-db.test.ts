@@ -88,8 +88,9 @@ describe("production smoke DB-backed checks", () => {
         expect.objectContaining({
           name: "source image anomalies",
           status: "OK",
-          message:
-            "624 rows / 16 distinct products / 5 distinct raw image urls / 1.60% of 1000 active products / longest 0.00h in 24h",
+          message: expect.stringContaining(
+            "624 occurrence(s) / 16 distinct products / 5 distinct raw image urls / 1.60% of 1000 active products / longest 0.00h in 24h; id=product-1",
+          ),
         }),
         expect.objectContaining({
           name: "rate limit headers",
@@ -148,8 +149,9 @@ describe("production smoke DB-backed checks", () => {
         expect.objectContaining({
           name: "source image anomalies",
           status: "WARN",
-          message:
-            "2001 rows / 16 distinct products / 5 distinct raw image urls / 1.60% of 1000 active products / longest 0.00h in 24h",
+          message: expect.stringContaining(
+            "2001 occurrence(s) / 16 distinct products / 5 distinct raw image urls / 1.60% of 1000 active products / longest 0.00h in 24h; id=product-1",
+          ),
         }),
       ]),
     );
@@ -190,8 +192,9 @@ describe("production smoke DB-backed checks", () => {
         expect.objectContaining({
           name: "source image anomalies",
           status: "WARN",
-          message:
-            "32 rows / 16 distinct products / 5 distinct raw image urls / 1.60% of 1000 active products / longest 18.00h in 24h",
+          message: expect.stringContaining(
+            "32 occurrence(s) / 16 distinct products / 5 distinct raw image urls / 1.60% of 1000 active products / longest 18.00h in 24h; id=product-1",
+          ),
         }),
       ]),
     );
@@ -278,7 +281,7 @@ describe("production smoke DB-backed checks", () => {
           name: "source image anomalies",
           status: "OK",
           message:
-            "0 rows / 0 distinct products / 0 distinct raw image urls / 0.00% of 1000 active products / longest 0.00h in 24h",
+            "0 occurrence(s) / 0 distinct products / 0 distinct raw image urls / 0.00% of 1000 active products / longest 0.00h in 24h",
         }),
       ]),
     );

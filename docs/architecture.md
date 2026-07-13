@@ -72,7 +72,7 @@ Fetch、validation 或 parse 失敗不得覆寫最後一份有效商品與價格
 | --- | --- | --- |
 | 無 profile | `postgres`, `storage-init`, `migrate`, `seed`, `web` | 核心服務。 |
 | `manual-crawler` | `crawler`, `image-cache-backfill` | 手動 crawl、cleanup 與圖片／vendor backfill。 |
-| `scheduled-crawler` | `crawler-daemon`, `raw-snapshot-cleanup-daemon` | 排程抓取與 snapshot 保留。 |
+| `scheduled-crawler` | `crawler-daemon`, `image-cache-recovery-daemon`, `raw-snapshot-cleanup-daemon` | 排程抓取、獨立圖片修復與 snapshot 保留。 |
 | `ops` | `smoke-daemon` | Web、DB、crawler 與 delivery 健康檢查。 |
 | `discord-bot` | `discord-bot` | Slash commands 與通知排程。 |
 | `public-tunnel` | `cloudflared` | 選用 public ingress。 |

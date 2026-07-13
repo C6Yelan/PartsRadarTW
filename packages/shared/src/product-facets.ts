@@ -32,6 +32,7 @@ const CAPACITY_OPTIONS = [
   option("512", "512 GB"),
   option("1000", "1 TB"),
   option("2000", "2 TB"),
+  option("3000", "3 TB"),
   option("4000", "4 TB"),
   option("5000", "5 TB"),
   option("6000", "6 TB"),
@@ -44,6 +45,9 @@ const CAPACITY_OPTIONS = [
   option("20000", "20 TB"),
   option("22000", "22 TB"),
   option("24000", "24 TB"),
+  option("26000", "26 TB"),
+  option("28000", "28 TB"),
+  option("30000", "30 TB"),
 ] as const;
 
 const SOCKET_OPTIONS = [
@@ -69,13 +73,10 @@ const PRODUCT_FACETS_BY_IGRP: Readonly<Record<number, readonly ProductFacetDefin
       option("ryzen-9", "AMD Ryzen 9"),
       option("threadripper", "AMD Threadripper"),
     ]),
-    facet("integrated_graphics", "內建顯示", [
-      option("yes", "有內顯"),
-      option("no", "無內顯"),
-    ]),
+    facet("integrated_graphics", "內建顯示", [option("yes", "有內顯"), option("no", "無內顯")]),
   ],
   5: [
-    facet("socket", "腳位", SOCKET_OPTIONS),
+    facet("socket", "腳位", [...SOCKET_OPTIONS, option("other", "其他腳位")]),
     facet("chipset", "晶片組", [
       option("h610", "H610"),
       option("b760", "B760"),
@@ -83,7 +84,16 @@ const PRODUCT_FACETS_BY_IGRP: Readonly<Record<number, readonly ProductFacetDefin
       option("h810", "H810"),
       option("b860", "B860"),
       option("z890", "Z890"),
+      option("h81", "H81"),
+      option("h110", "H110"),
+      option("h310", "H310"),
+      option("h510", "H510"),
+      option("w680", "W680"),
+      option("w790", "W790"),
+      option("w880", "W880"),
+      option("w890", "W890"),
       option("a520", "A520"),
+      option("a620", "A620"),
       option("b550", "B550"),
       option("b650", "B650"),
       option("b650e", "B650E"),
@@ -103,10 +113,7 @@ const PRODUCT_FACETS_BY_IGRP: Readonly<Record<number, readonly ProductFacetDefin
       option("mini-itx", "Mini-ITX"),
       option("eeb", "EEB"),
     ]),
-    facet("memory_type", "記憶體規格", [
-      option("ddr4", "DDR4"),
-      option("ddr5", "DDR5"),
-    ]),
+    facet("memory_type", "記憶體規格", [option("ddr4", "DDR4"), option("ddr5", "DDR5")]),
     facet("wifi", "無線網路", [option("yes", "含 Wi-Fi")]),
   ],
   6: [
@@ -129,9 +136,16 @@ const PRODUCT_FACETS_BY_IGRP: Readonly<Record<number, readonly ProductFacetDefin
       option("64", "64 GB"),
       option("96", "96 GB"),
       option("128", "128 GB"),
+      option("192", "192 GB"),
+      option("256", "256 GB"),
     ]),
     facet("speed_mhz", "頻率", [
+      option("1600", "1600 MHz"),
+      option("2400", "2400 MHz"),
+      option("2666", "2666 MHz"),
       option("3200", "3200 MHz"),
+      option("3600", "3600 MHz"),
+      option("4000", "4000 MHz"),
       option("4800", "4800 MHz"),
       option("5200", "5200 MHz"),
       option("5600", "5600 MHz"),
@@ -141,13 +155,11 @@ const PRODUCT_FACETS_BY_IGRP: Readonly<Record<number, readonly ProductFacetDefin
       option("6800", "6800 MHz"),
       option("7200", "7200 MHz"),
       option("8000", "8000 MHz"),
+      option("8400", "8400 MHz"),
     ]),
   ],
   7: [
-    facet("form_factor", "尺寸", [
-      option("m2", "M.2"),
-      option("2-5-inch", "2.5 吋"),
-    ]),
+    facet("form_factor", "尺寸", [option("m2", "M.2"), option("2-5-inch", "2.5 吋")]),
     facet("pcie_generation", "PCIe 世代", [
       option("gen3", "PCIe 3.0"),
       option("gen4", "PCIe 4.0"),
@@ -156,10 +168,7 @@ const PRODUCT_FACETS_BY_IGRP: Readonly<Record<number, readonly ProductFacetDefin
     facet("capacity_gb", "容量", CAPACITY_OPTIONS),
   ],
   8: [
-    facet("form_factor", "尺寸", [
-      option("2-5-inch", "2.5 吋"),
-      option("3-5-inch", "3.5 吋"),
-    ]),
+    facet("form_factor", "尺寸", [option("2-5-inch", "2.5 吋"), option("3-5-inch", "3.5 吋")]),
     facet("capacity_gb", "容量", CAPACITY_OPTIONS),
     facet("storage_usage", "硬碟用途", [
       option("desktop", "一般桌機"),
@@ -175,10 +184,7 @@ const PRODUCT_FACETS_BY_IGRP: Readonly<Record<number, readonly ProductFacetDefin
       option("external-ssd", "外接 SSD"),
       option("external-hdd", "外接 HDD"),
     ]),
-    facet("connector", "接頭", [
-      option("type-a", "Type-A"),
-      option("type-c", "Type-C"),
-    ]),
+    facet("connector", "接頭", [option("type-a", "Type-A"), option("type-c", "Type-C")]),
     facet("capacity_gb", "容量", CAPACITY_OPTIONS),
   ],
   10: [
@@ -187,15 +193,10 @@ const PRODUCT_FACETS_BY_IGRP: Readonly<Record<number, readonly ProductFacetDefin
       option("top-down", "下吹式散熱器"),
       option("thermal-paste", "散熱膏"),
       option("thermal-pad", "散熱墊"),
+      option("ssd-heatsink", "SSD 散熱"),
+      option("mounting-kit", "安裝扣具"),
       option("laptop-cooler", "筆電散熱"),
       option("other-air", "其他氣冷"),
-    ]),
-    facet("fan_size_mm", "風扇尺寸", [
-      option("80", "80 mm"),
-      option("90", "90 mm"),
-      option("92", "92 mm"),
-      option("120", "120 mm"),
-      option("140", "140 mm"),
     ]),
   ],
   11: [
@@ -213,6 +214,10 @@ const PRODUCT_FACETS_BY_IGRP: Readonly<Record<number, readonly ProductFacetDefin
     ]),
   ],
   12: [
+    facet("gpu_product_type", "商品類型", [
+      option("graphics-card", "顯示卡"),
+      option("accessory", "顯卡配件"),
+    ]),
     facet("gpu_chip", "GPU 晶片", [
       option("nvidia", "NVIDIA"),
       option("amd", "AMD"),
@@ -222,12 +227,17 @@ const PRODUCT_FACETS_BY_IGRP: Readonly<Record<number, readonly ProductFacetDefin
       option("rtx-50", "GeForce RTX 50"),
       option("rtx-40", "GeForce RTX 40"),
       option("rtx-30", "GeForce RTX 30"),
+      option("geforce-gt", "GeForce GT"),
       option("rx-9000", "Radeon RX 9000"),
       option("rx-7000", "Radeon RX 7000"),
       option("rx-6000", "Radeon RX 6000"),
       option("arc", "Intel Arc"),
+      option("professional", "專業繪圖卡"),
+      option("legacy-radeon", "舊款 Radeon"),
     ]),
     facet("vram_gb", "顯示記憶體", [
+      option("1", "1 GB"),
+      option("2", "2 GB"),
       option("4", "4 GB"),
       option("6", "6 GB"),
       option("8", "8 GB"),
@@ -237,6 +247,9 @@ const PRODUCT_FACETS_BY_IGRP: Readonly<Record<number, readonly ProductFacetDefin
       option("20", "20 GB"),
       option("24", "24 GB"),
       option("32", "32 GB"),
+      option("48", "48 GB"),
+      option("72", "72 GB"),
+      option("96", "96 GB"),
     ]),
   ],
   14: [
@@ -249,11 +262,6 @@ const PRODUCT_FACETS_BY_IGRP: Readonly<Record<number, readonly ProductFacetDefin
     ]),
     facet("back_connect", "背插支援", [option("yes", "支援背插")]),
     facet("included_psu", "隨附電源", [option("yes", "含電源")]),
-    facet("case_size", "機殼類型", [
-      option("full-tower", "全塔"),
-      option("mid-tower", "中塔"),
-      option("mini-tower", "小型機殼"),
-    ]),
   ],
   15: [
     facet("wattage_range", "瓦數", [
@@ -270,14 +278,8 @@ const PRODUCT_FACETS_BY_IGRP: Readonly<Record<number, readonly ProductFacetDefin
       option("platinum", "白金"),
       option("titanium", "鈦金"),
     ]),
-    facet("psu_standard", "電源標準", [
-      option("atx-3", "ATX 3.x"),
-      option("12v-2x6", "12V-2x6"),
-    ]),
-    facet("modularity", "模組化", [
-      option("full", "全模組"),
-      option("semi", "半模組"),
-    ]),
+    facet("psu_standard", "電源標準", [option("atx-3", "ATX 3.x"), option("12v-2x6", "12V-2x6")]),
+    facet("modularity", "模組化", [option("full", "全模組"), option("semi", "半模組")]),
   ],
   16: [
     facet("fan_product_type", "商品類型", [
@@ -295,10 +297,7 @@ const PRODUCT_FACETS_BY_IGRP: Readonly<Record<number, readonly ProductFacetDefin
       option("140", "140 mm"),
       option("200", "200 mm"),
     ]),
-    facet("lighting", "燈效", [
-      option("argb", "ARGB"),
-      option("rgb", "RGB"),
-    ]),
+    facet("lighting", "燈效", [option("argb", "ARGB"), option("rgb", "RGB")]),
   ],
 };
 
@@ -498,41 +497,61 @@ function extractMotherboardTags(text: string, add: AddTag): void {
     ["b760", /\bB760(?:M|I)?\b/],
     ["z790", /\bZ790(?:M|I)?\b/],
     ["h810", /\bH810(?:M|I)?\b/],
-    ["b860", /\bB860(?:M|I)?\b/],
+    ["b860", /\bB860/],
     ["z890", /\bZ890(?:M|I)?\b/],
+    ["h81", /\bH81/],
+    ["h110", /\bH110/],
+    ["h310", /\bH310/],
+    ["h510", /\bH510/],
+    ["w680", /\bW680/],
+    ["w790", /\bW790/],
+    ["w880", /\bW880/],
+    ["w890", /\bW890/],
     ["a520", /\bA520(?:M|I)?\b/],
+    ["a620", /\bA620/],
     ["b550", /\bB550(?:M|I)?\b/],
     ["b650", /\bB650(?:M|I)?\b/],
     ["b840", /\bB840(?:M|I)?\b/],
-    ["b850", /\bB850(?:M|I)?\b/],
+    ["b850", /\bB850/],
     ["x670", /\bX670\b/],
-    ["x870", /\bX870\b/],
+    ["x870", /\bX870(?!E)/],
     ["trx50", /\bTRX50\b/],
     ["wrx90", /\bWRX90\b/],
   ];
   addFirstMatch(add, "chipset", text, chipsetRules);
 
-  if (/\b(?:H610|B760|Z790)(?:M|I)?\b/.test(text)) {
+  if (/\b(?:H610|B760|Z790)/.test(text)) {
     add("socket", "lga1700");
-  } else if (/\b(?:H810|B860|Z890)(?:M|I)?\b/.test(text)) {
+  } else if (/\b(?:H810|B860|Z890)/.test(text)) {
     add("socket", "lga1851");
   } else if (/\b(?:A520|B550)(?:M|I)?\b/.test(text)) {
     add("socket", "am4");
-  } else if (
-    /\b(?:A620(?:M|I)?|B650(?:M|I)?|B650E|B840(?:M|I)?|B850(?:M|I)?|X670E?|X870E?)\b/.test(
-      text,
-    )
-  ) {
+  } else if (/\b(?:A620|B650|B840|B850|X670|X870)/.test(text)) {
     add("socket", "am5");
   } else if (/\b(?:TRX50|WRX90)\b/.test(text)) {
     add("socket", "str5");
+  } else if (/\b(?:H81|H110|H310|H510|W680|W790|W880|W890)/.test(text)) {
+    add("socket", "other");
   }
 
   extractFormFactors(text, add, "form_factor");
   addAllMatches(add, "memory_type", text, [
-    ["ddr4", /\bDDR4\b|(?:^|[/\s])D4(?=$|[/\s)])/],
-    ["ddr5", /\bDDR5\b|(?:^|[/\s])D5(?=$|[/\s)])/],
+    ["ddr4", /\bDDR4\b|(?:^|[^A-Z0-9])D4(?=$|[^A-Z0-9])/],
+    ["ddr5", /\bDDR5\b|(?:^|[^A-Z0-9])D5(?=$|[^A-Z0-9])/],
   ]);
+  if (/\b(?:A520|B550)/.test(text)) {
+    add("memory_type", "ddr4");
+  } else if (
+    /\b(?:A620|B650|B840|B850|X670|X870|H810|B860|Z890|W790|W880|W890|TRX50|WRX90)/.test(text)
+  ) {
+    add("memory_type", "ddr5");
+  } else if (/\b(?:H110|H310|H510|WRX80)/.test(text)) {
+    add("memory_type", "ddr4");
+  } else if (/\bPRO\s+WS\s+W680/.test(text)) {
+    add("memory_type", "ddr5");
+  } else if (/\b(?:B760|Z790)/.test(text) && !/\bD4\b|COMBO/.test(text)) {
+    add("memory_type", "ddr5");
+  }
   if (/\bWI-?FI\b|無線/.test(text)) {
     add("wifi", "yes");
   }
@@ -543,26 +562,32 @@ function extractMemoryTags(text: string, add: AddTag): void {
     add("module_type", "server");
   } else if (/筆記型|\bNOTE\b|\bNB\b|\bSO-?DIMM\b/.test(text)) {
     add("module_type", "laptop");
-  } else if (/桌上型|\bU-?DIMM\b/.test(text)) {
+  } else if (/桌上型|\bU-?DIMM\b|單條|雙通|\bCL\d+\b/.test(text)) {
     add("module_type", "desktop");
   }
 
   addAllMatches(add, "memory_type", text, [
-    ["ddr3", /\bDDR3\b/],
-    ["ddr4", /\bDDR4\b/],
-    ["ddr5", /\bDDR5\b/],
+    ["ddr3", /\b(?:DDR3|D3)\b/],
+    ["ddr4", /\b(?:DDR4|D4)\b/],
+    ["ddr5", /\b(?:DDR5|D5)\b/],
   ]);
   addFirstNumberMatch(
     add,
     "capacity_gb",
     text,
-    /(?:^|[^\d])(8|16|24|32|48|64|96|128)\s*G(?:B)?(?=\s|[(/×*]|$)/,
+    /(?:^|[^\d])(8|16|24|32|48|64|96|128|192|256)\s*G(?:B)?(?=\s|[(/×*"“]|$)/,
   );
   addFirstNumberMatch(
     add,
     "speed_mhz",
     text,
-    /(?:DDR[345][ -]?|D[45]-)(3200|4800|5200|5600|6000|6200|6400|6800|7200|8000)\b/,
+    /(?:DDR[345]L?|D[45])[ -]?(1600|2400|2666|3200|3600|4000|4800|5200|5600|6000|6200|6400|6800|7200|8000|8400)\b/,
+  );
+  addFirstNumberMatch(
+    add,
+    "speed_mhz",
+    text,
+    /(?:^|[^\d])(1600|2400|2666|3200|3600|4000|4800|5200|5600|6000|6200|6400|6800|7200|8000|8400)\s*(?:MHZ|MT\/S)/,
   );
 }
 
@@ -591,11 +616,14 @@ function extractStorageTags(text: string, add: AddTag): void {
   ]);
   extractStorageCapacity(text, add);
   addAllMatches(add, "storage_usage", text, [
-    ["nas", /\bNAS\b|NAS碟/],
-    ["surveillance", /監控/],
-    ["enterprise", /企業/],
-    ["desktop", /桌機|桌上型|一般碟/],
+    ["nas", /\bNAS\b|NAS碟|那嘶狼|【紅標(?:PLUS|PRO)?】/],
+    ["surveillance", /監控|【紫標(?:PRO)?】/],
+    ["enterprise", /企業|ULTRASTAR|【金標】/],
+    ["desktop", /桌機|桌上型|一般碟|【[PX]300系列】/],
   ]);
+  if (/【(?:藍標|新梭魚)】/.test(text)) {
+    add("storage_usage", "desktop");
+  }
 }
 
 function extractExternalStorageTags(text: string, add: AddTag): void {
@@ -606,9 +634,7 @@ function extractExternalStorageTags(text: string, add: AddTag): void {
   } else if (/SSD/.test(text)) {
     add("external_type", "external-ssd");
   } else if (
-    /HDD|外接硬碟|隨身硬碟|\bCANVIO\b|\b(?:EXPANSION|ONETOUCH)\b|\b25(?:A3|M3|H3)\b/.test(
-      text,
-    )
+    /HDD|外接硬碟|隨身硬碟|\bCANVIO\b|\b(?:EXPANSION|ONETOUCH)\b|\b25(?:A3|M3|H3)\b/.test(text)
   ) {
     add("external_type", "external-hdd");
   }
@@ -621,21 +647,24 @@ function extractExternalStorageTags(text: string, add: AddTag): void {
 }
 
 function extractCoolerTags(text: string, add: AddTag): void {
-  if (/散熱膏/.test(text)) {
+  if (/(?:M\.?2|SSD).*散熱|散熱.*(?:M\.?2|SSD)/.test(text)) {
+    add("cooler_type", "ssd-heatsink");
+  } else if (/扣具/.test(text)) {
+    add("cooler_type", "mounting-kit");
+  } else if (/散熱膏|金屬膏|道康膏|涼膏/.test(text)) {
     add("cooler_type", "thermal-paste");
-  } else if (/散熱墊|導熱墊/.test(text)) {
+  } else if (/散熱墊|導熱墊|導熱片|THERMAL\s+PAD/.test(text)) {
     add("cooler_type", "thermal-pad");
-  } else if (/筆電.*散熱|散熱.*筆電/.test(text)) {
+  } else if (/筆電.*散熱|散熱.*筆電|NOTEPAL|風扇.*筆電支架/.test(text)) {
     add("cooler_type", "laptop-cooler");
   } else if (/下吹/.test(text)) {
     add("cooler_type", "top-down");
-  } else if (/塔散|塔式|單塔|雙塔/.test(text)) {
+  } else if (/塔散|塔式|單塔|雙塔|(?:\d+導管.*(?:TDP|高|高度|風扇))|FROZN\s+A\d+/.test(text)) {
     add("cooler_type", "air-tower");
-  } else if (/散熱器|CPU.*風扇/.test(text)) {
+  } else if (/散熱器|CPU.*風扇|網通設備.*散熱架/.test(text)) {
     add("cooler_type", "other-air");
   }
 
-  extractFanSize(text, add);
   extractExplicitSockets(text, add);
 }
 
@@ -644,23 +673,28 @@ function extractLiquidCoolingTags(text: string, add: AddTag): void {
     add("liquid_type", "custom");
   } else if (/水冷(?:頭|泵|排|箱|接頭|管|液)|水泵|冷排|水箱|止水栓|流量計/.test(text)) {
     add("liquid_type", "component");
-  } else if (/一體式|AIO|封閉式|水冷/.test(text)) {
+  } else if (
+    /一體式|AIO|封閉式|水冷|\b(?:PANORAMA|HYPERFLOW|NANCOOL|TUF\s+GAMING\s+LC|ROG\s+(?:STRIX\s+(?:LC|SLC(?:\s+IV)?)|SLC(?:\s+IV)?|RYUO)|LC\s+III|CORELIQUID|AQUAFUSION|FROZEN\s+WARFRAME|GRAND\s+VISION|HYDROSHIFT|WATERFORCE)\b|ASETEK/.test(
+      text,
+    )
+  ) {
     add("liquid_type", "aio");
   }
 
-  addFirstNumberMatch(
-    add,
-    "radiator_size_mm",
-    text,
-    /(?:^|[^\d])(120|240|280|360|420)(?=[^\d]|$)/,
-  );
+  addFirstNumberMatch(add, "radiator_size_mm", text, /(?:^|[^\d])(120|240|280|360|420)(?=[^\d]|$)/);
   extractExplicitSockets(text, add);
 }
 
 function extractGpuTags(text: string, add: AddTag): void {
-  if (/\b(?:RTX|GTX)\s*\d|NVIDIA/.test(text)) {
+  if (/支撐架|顯卡支架|VGA\s+HOLDER/.test(text)) {
+    add("gpu_product_type", "accessory");
+    return;
+  }
+  add("gpu_product_type", "graphics-card");
+
+  if (/\b(?:RTX|GTX|GT)\s*\d|NVIDIA|\bN(?:210|710|730)/.test(text)) {
     add("gpu_chip", "nvidia");
-  } else if (/\bRX\s*\d|RADEON/.test(text)) {
+  } else if (/\bRX\s*\d|RADEON|(?:\bR7|AXR7)\s*240\b|AI\s+PRO\s+R\d/.test(text)) {
     add("gpu_chip", "amd");
   } else if (/\bARC\s*(?:PRO\s+)?[AB]?\d|INTEL\s+ARC/.test(text)) {
     add("gpu_chip", "intel");
@@ -670,17 +704,37 @@ function extractGpuTags(text: string, add: AddTag): void {
     ["rtx-50", /\bRTX\s*50\d{2}/],
     ["rtx-40", /\bRTX\s*40\d{2}/],
     ["rtx-30", /\bRTX\s*30\d{2}/],
+    ["geforce-gt", /\b(?:GT\s*(?:710|730|1030)|N(?:210|710|730))\b/],
     ["rx-9000", /\bRX\s*9\d{3}/],
     ["rx-7000", /\bRX\s*7\d{3}/],
     ["rx-6000", /\bRX\s*6\d{3}/],
     ["arc", /\bARC\s*(?:PRO\s+)?[AB]?\d|INTEL\s+ARC/],
+    ["professional", /\b(?:NVIDIA\s+RTX\s+(?:A\d|\d{4}\s+ADA)|RTX\s+PRO|AI\s+PRO\s+R\d)/],
+    ["legacy-radeon", /\bR7\s*240\b/],
   ]);
   addFirstNumberMatch(
     add,
     "vram_gb",
     text,
-    /(?:^|[/\s])(4|6|8|10|12|16|20|24|32)\s*G(?:B)?(?=$|[/\s(),])/,
+    /(?:^|[/\s(-])(?:O)?(1|2|4|6|8|10|12|16|20|24|32|48|72|96)\s*G(?:B|D[34567])?(?=$|[-/\s(),])/,
   );
+  if (/\bRTX\s*5050\b|\bRTX\s*5060(?!\s*TI)\b/.test(text)) {
+    add("vram_gb", "8");
+  } else if (/\bRTX\s*5070\s*TI\b|\bRTX\s*5080\b/.test(text)) {
+    add("vram_gb", "16");
+  } else if (/\bRTX\s*5070(?!\s*TI)\b|\bRX\s*9070\s*GRE\b/.test(text)) {
+    add("vram_gb", "12");
+  } else if (/\bRTX\s*5090\b/.test(text)) {
+    add("vram_gb", "32");
+  } else if (/\bRX\s*(?:7650\s*GRE)\b/.test(text)) {
+    add("vram_gb", "8");
+  } else if (/\bRX\s*9070(?:\s*XT)?\b/.test(text)) {
+    add("vram_gb", "16");
+  } else if (/\bGT\s*1030\b|\bR7\s*240\b/.test(text)) {
+    add("vram_gb", "2");
+  } else if (/\bN210\b/.test(text)) {
+    add("vram_gb", "1");
+  }
 }
 
 function extractCaseTags(text: string, add: AddTag): void {
@@ -697,11 +751,6 @@ function extractCaseTags(text: string, add: AddTag): void {
   ) {
     add("included_psu", "yes");
   }
-  addFirstMatch(add, "case_size", text, [
-    ["full-tower", /全塔/],
-    ["mid-tower", /中塔/],
-    ["mini-tower", /小型機殼|迷你機殼|MINI\s*TOWER/],
-  ]);
 }
 
 function extractPowerSupplyTags(text: string, add: AddTag): void {
@@ -735,7 +784,7 @@ function extractPowerSupplyTags(text: string, add: AddTag): void {
     ["12v-2x6", /12V-?2X6/],
   ]);
   addFirstMatch(add, "modularity", text, [
-    ["full", /全模組|FULLY\s+MODULAR/],
+    ["full", /全模(?:組)?|FULLY\s+MODULAR/],
     ["semi", /半模組|SEMI[- ]MODULAR/],
   ]);
 }
@@ -743,18 +792,20 @@ function extractPowerSupplyTags(text: string, add: AddTag): void {
 function extractFanAccessoryTags(text: string, add: AddTag): void {
   if (/控制器|HUB/.test(text)) {
     add("fan_product_type", "controller");
-  } else if (/線材|延長線|轉接線|CABLE/.test(text)) {
+  } else if (/線材|電源線|訊號線|連接線|啟動線|延長線|轉接線|CABLE/.test(text)) {
     add("fan_product_type", "cable");
-  } else if (/支架|BRACKET/.test(text)) {
+  } else if (/支架|支撐架|轉接架|直立套件|BRACKET/.test(text)) {
     add("fan_product_type", "bracket");
-  } else if (/風扇|\bFAN\b/.test(text)) {
+  } else if (
+    /風扇|效能扇|反向扇|雙向扇|磁軌扇|薄扇|靜音扇|\bFAN\b|\bNF-[A-Z0-9]|\bPWM\b/.test(text)
+  ) {
     add("fan_product_type", "fan");
-  } else {
+  } else if (/燈效套件|擴充USB模組|LCD|螢幕|燈條/.test(text)) {
     add("fan_product_type", "accessory");
   }
 
   extractFanSize(text, add);
-  if (/\bARGB\b/.test(text)) {
+  if (/\bA\.?RGB\b/.test(text)) {
     add("lighting", "argb");
   } else if (/\bRGB\b/.test(text)) {
     add("lighting", "rgb");
@@ -763,11 +814,11 @@ function extractFanAccessoryTags(text: string, add: AddTag): void {
 
 function extractFormFactors(text: string, add: AddTag, key: string): void {
   addAllMatches(add, key, text, [
-    ["e-atx", /(?:^|[(/,\s])E-?ATX(?=$|[/(),\s])/],
-    ["atx", /(?:^|[(/,\s])ATX(?=$|[/(),\s])/],
-    ["m-atx", /(?:^|[(/,\s])(?:M-?ATX|MICRO\s*ATX)(?=$|[/(),\s])/],
+    ["e-atx", /(?:^|[(/,\s])E-?ATX(?=$|[^A-Z0-9-])/],
+    ["atx", /(?:^|[(/,\s])ATX(?=$|[^A-Z0-9-])/],
+    ["m-atx", /(?:^|[(/,\s])(?:M-?ATX|MICRO\s*ATX)(?=$|[^A-Z0-9-])/],
     ["mini-itx", /MINI-?ITX|(?:^|[(/,\s])ITX(?=$|[/(),\s])/],
-    ["eeb", /(?:^|[(/,\s])EEB(?=$|[/(),\s])/],
+    ["eeb", /(?:^|[(/,\s])EEB(?=$|[^A-Z0-9-])/],
   ]);
 }
 
@@ -792,7 +843,7 @@ function extractFanSize(text: string, add: AddTag): void {
 
 function extractStorageCapacity(text: string, add: AddTag): void {
   const terabyteMatch = text.match(
-    /(?:^|[^\d])(1|2|4|5|6|8|10|12|14|16|18|20|22|24)\s*T(?:B)?\b/,
+    /(?:^|[^\d])(1|2|3|4|5|6|8|10|12|14|16|18|20|22|24|26|28|30)\s*T(?:B)?\b/,
   );
   if (terabyteMatch?.[1]) {
     add("capacity_gb", String(Number(terabyteMatch[1]) * 1000));
@@ -807,12 +858,7 @@ function extractStorageCapacity(text: string, add: AddTag): void {
   );
 }
 
-function addAllMatches(
-  add: AddTag,
-  key: string,
-  text: string,
-  rules: readonly MatchRule[],
-): void {
+function addAllMatches(add: AddTag, key: string, text: string, rules: readonly MatchRule[]): void {
   for (const [value, pattern] of rules) {
     if (pattern.test(text)) {
       add(key, value);
@@ -824,12 +870,7 @@ function readFacetKey(tag: string): string {
   return tag.slice(0, tag.indexOf(":"));
 }
 
-function addFirstMatch(
-  add: AddTag,
-  key: string,
-  text: string,
-  rules: readonly MatchRule[],
-): void {
+function addFirstMatch(add: AddTag, key: string, text: string, rules: readonly MatchRule[]): void {
   for (const [value, pattern] of rules) {
     if (pattern.test(text)) {
       add(key, value);

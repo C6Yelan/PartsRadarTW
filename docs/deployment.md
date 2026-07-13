@@ -30,7 +30,7 @@ Compose 會在 container 內依前三個值建立 `DATABASE_URL`；host-side Pri
 | --- | --- | --- |
 | `compose.yml` | 無 | PostgreSQL、storage init、migration、seed、web。 |
 | `compose.crawler.yml` | `manual-crawler` | 手動 crawler、image cache backfill。 |
-| `compose.crawler.yml` | `scheduled-crawler` | Crawler daemon、raw snapshot cleanup daemon。 |
+| `compose.crawler.yml` | `scheduled-crawler` | Crawler daemon、image cache recovery daemon、raw snapshot cleanup daemon。 |
 | `compose.ops.yml` | `ops` | Production smoke daemon。 |
 | `compose.ops.yml` | `discord-bot` | Discord bot daemon。 |
 | `compose.tunnel.yml` | `public-tunnel` | Cloudflare Tunnel。 |
@@ -181,7 +181,7 @@ Smoke threshold 是部署預設，不等於已依 production baseline 校準。W
 
 ```bash
 docker compose up -d --no-build --force-recreate web
-docker compose -f compose.yml -f compose.crawler.yml --profile scheduled-crawler up -d --no-build --force-recreate crawler-daemon raw-snapshot-cleanup-daemon
+docker compose -f compose.yml -f compose.crawler.yml --profile scheduled-crawler up -d --no-build --force-recreate crawler-daemon image-cache-recovery-daemon raw-snapshot-cleanup-daemon
 docker compose -f compose.yml -f compose.ops.yml --profile ops --profile discord-bot up -d --no-build --force-recreate smoke-daemon discord-bot
 ```
 

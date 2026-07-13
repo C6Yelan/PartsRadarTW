@@ -50,4 +50,7 @@ export interface FakeParseError {
   rawPriceText: string | null;
   rawToken: string | null;
   rawImageUrl: string | null;
+  fingerprint: string | null;
+  occurrenceCount: number;
+  lastSeenAt: Date;
 }

@@ -46,7 +46,7 @@ describe("image cache backfill options", () => {
 
     expect(parseOptions(["--confirm-live-fetch"], crawlerCwd, {})).toMatchObject({
       dryRun: false,
-      externalFetchLockDir: join(
+      sourceImageFetchLockDir: join(
         crawlerCwd,
         "..",
         "..",
@@ -54,9 +54,9 @@ describe("image cache backfill options", () => {
         "coolpc-daemon",
         "snapshots",
         ".locks",
-        "external-fetch",
+        "source-image-fetch",
       ),
-      externalFetchLockStaleSeconds: 300,
+      sourceImageFetchLockStaleSeconds: 300,
     });
   });
 

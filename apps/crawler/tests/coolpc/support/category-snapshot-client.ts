@@ -175,10 +175,49 @@ export class FakeCrawlerWriteClient
         rawPriceText: item.rawPriceText,
         rawToken: item.rawToken,
         rawImageUrl: item.rawImageUrl,
+        fingerprint: null,
+        occurrenceCount: 1,
+        lastSeenAt: new Date("2026-05-27T11:00:00.000Z"),
       }));
       this.parseErrors.push(...parseErrors);
 
       return { count: parseErrors.length };
+    },
+    upsert: async ({
+      where,
+      create,
+      update,
+    }: Parameters<CoolpcCategorySnapshotWriteClient["parseError"]["upsert"]>[0]) => {
+      const existing = this.parseErrors.find(
+        (parseError) => parseError.fingerprint === where.fingerprint,
+      );
+
+      if (existing) {
+        existing.crawlRunId = update.crawlRunId;
+        existing.rawSnapshotId = update.rawSnapshotId;
+        existing.message = update.message;
+        existing.occurrenceCount += update.occurrenceCount.increment;
+        existing.lastSeenAt = update.lastSeenAt;
+        return { id: existing.id };
+      }
+
+      const parseError: FakeParseError = {
+        id: `parse-error-${this.parseErrors.length + 1}`,
+        crawlRunId: create.crawlRunId,
+        rawSnapshotId: create.rawSnapshotId,
+        sourceCategoryId: create.sourceCategoryId,
+        errorType: create.errorType,
+        message: create.message,
+        rawName: create.rawName,
+        rawPriceText: create.rawPriceText,
+        rawToken: create.rawToken,
+        rawImageUrl: create.rawImageUrl,
+        fingerprint: create.fingerprint,
+        occurrenceCount: create.occurrenceCount,
+        lastSeenAt: create.lastSeenAt,
+      };
+      this.parseErrors.push(parseError);
+      return { id: parseError.id };
     },
   };
 

@@ -91,6 +91,57 @@ export async function checkHistoricalImageCacheMetadata(
     : warn("historical image cache metadata", message);
 }
 
+export async function checkSourceImageFetchFailures(
+  client: ProductionSmokeClient,
+  options: ProductionSmokeOptions,
+  now: Date,
+): Promise<SmokeCheckResult> {
+  const products = await client.product.findMany({
+    where: {
+      isActive: true,
+      imageCacheFailureSince: { not: null },
+    },
+    select: {
+      id: true,
+      primaryImageUrl: true,
+      imageCacheLastError: true,
+      imageCacheLastErrorKind: true,
+      imageCacheLastHttpStatus: true,
+      imageCacheFailureSince: true,
+    },
+    orderBy: { imageCacheFailureSince: "asc" },
+  });
+  const distinctUrls = new Set(products.flatMap((product) => product.primaryImageUrl ?? [])).size;
+  const longestHours = products.reduce((longest, product) => {
+    if (!product.imageCacheFailureSince) {
+      return longest;
+    }
+    return Math.max(
+      longest,
+      (now.getTime() - product.imageCacheFailureSince.getTime()) / 3_600_000,
+    );
+  }, 0);
+  const samples = products.slice(0, 3).map((product) => {
+    const reason = [
+      product.imageCacheLastErrorKind ?? "unknown",
+      product.imageCacheLastHttpStatus ? `HTTP ${product.imageCacheLastHttpStatus}` : null,
+      product.imageCacheLastError,
+    ]
+      .filter(Boolean)
+      .join("/");
+    return `id=${product.id} url=${product.primaryImageUrl ?? "missing"} reason=${reason}`;
+  });
+  const message = `${products.length} product(s) / ${distinctUrls} distinct URL(s) / longest ${longestHours.toFixed(2)}h${samples.length > 0 ? `; ${samples.join("; ")}` : ""}`;
+  const shouldWarn =
+    products.length >= options.invalidImageUrlWarnCount ||
+    distinctUrls >= options.invalidImageUrlWarnUrlCount ||
+    longestHours >= options.invalidImageUrlWarnHours;
+
+  return shouldWarn
+    ? warn("source image fetch failures", message)
+    : ok("source image fetch failures", message);
+}
+
 // 定義 production smoke 中「可展示商品」的共用條件，供商品數與圖片快取檢查一致使用。
 function displayReadyProductWhere() {
   return {

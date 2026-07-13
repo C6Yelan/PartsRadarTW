@@ -93,19 +93,46 @@ describe("image cache backfill live request accounting", () => {
             updates.push(args);
             return candidate;
           },
+          updateMany: async (args: unknown) => {
+            updates.push(args);
+            return { count: 1 };
+          },
         },
       } as never,
     );
 
     expect(updates).toHaveLength(1);
     expect(updates[0]).toMatchObject({
-      where: { id: "retry-state" },
+      where: { primaryImageUrl: candidate.primaryImageUrl },
       data: {
         imageCachedAt: null,
         imageCacheFailureCount: 1,
         imageCacheLastError: "source unavailable",
+        imageCacheLastErrorKind: "network",
       },
     });
+  });
+
+  it("requests a shared failing source URL only once per batch", async () => {
+    const storageDir = await createTempRoot();
+    const fetchMock = vi.fn(async () => {
+      throw new Error("source unavailable");
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const first = createCandidate("shared-first", "2026-06-08T08:05:00.000Z");
+    const second = {
+      ...createCandidate("shared-second", "2026-06-08T08:05:00.000Z"),
+      primaryImageUrl: first.primaryImageUrl,
+    };
+
+    const summary = await backfillImages(
+      [first, second],
+      createOptions({ storageDir, minDelayMs: 0, maxDelayMs: 0 }),
+      { log: () => {}, debugLog: () => {} },
+    );
+
+    expect(summary).toMatchObject({ failed: 2, liveFetches: 1 });
+    expect(fetchMock).toHaveBeenCalledOnce();
   });
 
   it("selects an existing product when its WebP is missing", async () => {
@@ -292,7 +319,7 @@ describe("image cache backfill live request accounting", () => {
     const options = createOptions({ storageDir });
     const fetchMock = vi.fn();
     const existingLock = await tryAcquireExternalFetchLock({
-      lockDir: options.externalFetchLockDir,
+      lockDir: options.sourceImageFetchLockDir,
       owner: "scheduled-crawler",
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -383,6 +410,7 @@ function createCandidate(id: string, seenAt: string): ProductImageCandidate {
     imageCachedAt: null,
     imageCacheCheckedAt: null,
     imageCacheFailureCount: 0,
+    imageCacheFailureSince: null,
     imageCacheNextRetryAt: null,
     firstSeenAt: date,
     lastSeenAt: date,
@@ -408,8 +436,8 @@ function createOptions(overrides: Partial<ImageBackfillOptions> = {}): ImageBack
     maxDelayMs: 8000,
     timeoutMs: 15000,
     maxSourceBytes: 5 * 1024 * 1024,
-    externalFetchLockDir: join(storageDir, ".locks", "external-fetch"),
-    externalFetchLockStaleSeconds: 43200,
+    sourceImageFetchLockDir: join(storageDir, ".locks", "source-image-fetch"),
+    sourceImageFetchLockStaleSeconds: 43200,
     dryRun: false,
     overwrite: false,
     ...overrides,

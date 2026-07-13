@@ -24,6 +24,7 @@
     "ops:crawl-coolpc-daemon": "pnpm --filter @partsradar/crawler ops:crawl-coolpc-daemon",
     "ops:discord-bot": "pnpm --filter @partsradar/crawler ops:discord-bot",
     "ops:image-cache:backfill": "pnpm --filter @partsradar/crawler ops:image-cache:backfill",
+    "ops:image-cache:recovery-daemon": "pnpm --filter @partsradar/crawler ops:image-cache:recovery-daemon",
     "ops:production-smoke": "pnpm --filter @partsradar/crawler ops:production-smoke",
     "ops:production-smoke-daemon": "pnpm --filter @partsradar/crawler ops:production-smoke-daemon",
     "ops:product-vendors:backfill": "pnpm --filter @partsradar/crawler ops:product-vendors:backfill",

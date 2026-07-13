@@ -2,6 +2,7 @@
 // 負責 category-snapshot 解析結果的輔助邏輯。
 // 包含 context 組裝、驗證狀態轉換、hash 比對與 parse issue 的持久化。
 
+import { createHash } from "node:crypto";
 import type { ParseErrorType as PrismaParseErrorType } from "@partsradar/db";
 import { COOLPC_TARGET_CATEGORIES, type CoolpcTargetCategory } from "../categories";
 import { CRAWL_RUN_CATEGORY_RESULT_STATUSES, type CrawlRunSourceCategory } from "../crawl-run";
@@ -142,19 +143,54 @@ export async function recordParseIssues({
     return;
   }
 
-  await client.parseError.createMany({
-    data: issues.map((issue) => ({
-      crawlRunId,
-      rawSnapshotId,
-      sourceCategoryId,
-      errorType: PRISMA_PARSE_ERROR_TYPES[issue.type],
-      message: issue.message,
-      rawName: issue.rawName ?? null,
-      rawPriceText: issue.rawPriceText ?? null,
-      rawToken: issue.rawToken ?? null,
-      rawImageUrl: issue.type === "invalid_image_url" ? (issue.rawImageUrl ?? null) : null,
-    })),
-  });
+  const observedAt = new Date();
+  const rows = issues.map((issue) => ({
+    crawlRunId,
+    rawSnapshotId,
+    sourceCategoryId,
+    errorType: PRISMA_PARSE_ERROR_TYPES[issue.type],
+    message: issue.message,
+    rawName: issue.rawName ?? null,
+    rawPriceText: issue.rawPriceText ?? null,
+    rawToken: issue.rawToken ?? null,
+    rawImageUrl: issue.type === "invalid_image_url" ? (issue.rawImageUrl ?? null) : null,
+  }));
+  const repeatedImageIssues = rows.filter((row) => row.errorType === "INVALID_IMAGE_URL");
+  const eventIssues = rows.filter((row) => row.errorType !== "INVALID_IMAGE_URL");
+
+  if (eventIssues.length > 0) {
+    await client.parseError.createMany({ data: eventIssues });
+  }
+
+  for (const row of repeatedImageIssues) {
+    const fingerprint = createHash("sha256")
+      .update(
+        [
+          row.sourceCategoryId,
+          row.errorType,
+          row.rawToken ?? row.rawName ?? "unknown-product",
+          row.rawImageUrl ?? "missing-url",
+        ].join("\u0000"),
+      )
+      .digest("hex");
+
+    await client.parseError.upsert({
+      where: { fingerprint },
+      create: {
+        ...row,
+        fingerprint,
+        occurrenceCount: 1,
+        lastSeenAt: observedAt,
+      },
+      update: {
+        crawlRunId,
+        rawSnapshotId,
+        message: row.message,
+        occurrenceCount: { increment: 1 },
+        lastSeenAt: observedAt,
+      },
+    });
+  }
 }
 
 /**

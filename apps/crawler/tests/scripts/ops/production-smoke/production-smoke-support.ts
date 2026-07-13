@@ -228,17 +228,24 @@ export function createSmokeClient({
           return [];
         }
 
-        return Array.from({ length: invalidImageErrorCount }, (_, index) => ({
-          rawToken: `TOKEN-${(index % invalidImageDistinctProductCount) + 1}`,
-          rawName: `Invalid image product ${(index % invalidImageDistinctProductCount) + 1}`,
-          rawImageUrl: `/eval/${(index % invalidImageDistinctUrlCount) + 1}/`,
-          createdAt: new Date(
-            Date.parse("2026-06-02T12:00:00.000Z") -
-              (index < invalidImageDistinctProductCount
-                ? invalidImagePersistenceHours * 60 * 60 * 1000
-                : 0),
-          ),
-        }));
+        return Array.from(
+          { length: invalidImageErrorCount === 0 ? 0 : invalidImageDistinctProductCount },
+          (_, index) => ({
+            sourceCategoryId: "category-4",
+            rawToken: `TOKEN-${index + 1}`,
+            rawName: `Invalid image product ${index + 1}`,
+            rawImageUrl: `/eval/${(index % invalidImageDistinctUrlCount) + 1}/`,
+            message: "invalid source image url",
+            occurrenceCount:
+              Math.floor(invalidImageErrorCount / invalidImageDistinctProductCount) +
+              (index < invalidImageErrorCount % invalidImageDistinctProductCount ? 1 : 0),
+            createdAt: new Date(
+              Date.parse("2026-06-02T12:00:00.000Z") -
+                invalidImagePersistenceHours * 60 * 60 * 1000,
+            ),
+            lastSeenAt: new Date("2026-06-02T12:00:00.000Z"),
+          }),
+        );
       },
     },
     product: {
@@ -246,8 +253,25 @@ export function createSmokeClient({
         where && Object.keys(where).length === 1 && where.isActive === true
           ? activeProductCount
           : 1,
-      findMany: async ({ where }: { where?: { isActive?: boolean } } = {}) =>
-        where?.isActive === false ? historicalImageProducts : [{ id: "product-1" }],
+      findMany: async ({
+        where,
+      }: {
+        where?: {
+          isActive?: boolean;
+          imageCacheFailureSince?: unknown;
+          sourceCategory?: unknown;
+          OR?: Array<{ sourceCategoryId: string; ibuyToken: string }>;
+        };
+      } = {}) =>
+        where?.isActive === false
+          ? historicalImageProducts
+          : where?.imageCacheFailureSince
+            ? []
+            : where?.sourceCategory
+              ? []
+              : where?.OR
+                ? where.OR.map((ref, index) => ({ id: `product-${index + 1}`, ...ref }))
+                : [{ id: "product-1" }],
     },
     rawSnapshot: {
       count: async () => 0,

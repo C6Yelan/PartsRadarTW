@@ -109,6 +109,21 @@ describe("CoolPC category snapshot error handling", () => {
         ],
       }),
     ]);
+
+    await processCoolpcCategorySnapshot({
+      client,
+      storageDir,
+      crawlRunId: "crawl-run-2",
+      category: category({ id: "category-4", igrp: 4 }),
+      snapshot: snapshot({
+        rawHtml: await testEnv.fixture("cpu-category.invalid-image.html"),
+        fetchedAt: new Date("2026-05-27T11:30:00.000Z"),
+      }),
+      writeProducts: productWriter.writeProducts,
+    });
+
+    expect(client.parseErrors).toHaveLength(2);
+    expect(client.parseErrors.map(({ occurrenceCount }) => occurrenceCount)).toEqual([2, 2]);
   });
 
   it("records non-product content as suspected block", async () => {
