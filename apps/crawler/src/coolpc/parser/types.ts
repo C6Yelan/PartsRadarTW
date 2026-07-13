@@ -25,6 +25,7 @@ export interface SourceCategoryContext {
   fetchedAt: Date;
   sourceCategoryUrl?: string;
   expectedTitleKeywords?: string[];
+  sourceFilterTagsByProductName?: Readonly<Record<string, readonly string[]>>;
 }
 
 // parser 抽取出的原始候選欄位，供後續正規化與驗證。
@@ -47,6 +48,7 @@ export interface ParsedCoolpcProduct {
   normalizedName: string;
   vendorSlug: string | null;
   vendorName: string | null;
+  filterTags: string[];
   primaryImageUrl: string | null;
   price: number;
   currency: Currency;

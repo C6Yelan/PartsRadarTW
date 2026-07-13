@@ -11,6 +11,7 @@ export interface ProductionSmokeOptions {
   baseUrl: string;
   publicOnly: boolean;
   timeoutMs: number;
+  filterSyncStateFilePath: string | null;
   productImageStorageDir: string;
   productImageSampleSize: number;
   imageInactiveRetentionDays: number;

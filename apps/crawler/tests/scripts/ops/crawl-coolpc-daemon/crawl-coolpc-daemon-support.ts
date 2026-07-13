@@ -6,6 +6,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { CoolpcDaemonOptions } from "../../../../src/scripts/ops/crawl-coolpc-daemon/options";
 
+export async function skipFilterSync() {
+  return { outcome: "skipped" as const, state: null };
+}
+
 // 建立隔離 workspace，讓 daemon option 測試可模擬 crawler package 工作目錄。
 export function createDaemonTestEnvironment() {
   const tempRoots: string[] = [];
@@ -42,6 +46,8 @@ export function createDaemonOptions(
     lockStaleSeconds: 43200,
     lockRetrySeconds: 120,
     runOnce: false,
+    filterSyncIntervalSeconds: 604800,
+    filterSyncStateFilePath: "/workspace/storage/snapshots/ops/coolpc-filter-sync-state.json",
     newProductImageBackfill: {
       workspaceRoot: "/workspace",
       storageDir: "/workspace/storage/product-images",

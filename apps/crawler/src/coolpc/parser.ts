@@ -2,7 +2,11 @@
 // CoolPC parser 入口，負責把分類頁 HTML 轉成 parsed products 與 issues 清單；
 // 同時重用 parser helpers 做頁面驗證、候選擷取、欄位正規化與 vendor 分類判斷。
 
-import { createCoolpcCategoryUrl } from "@partsradar/shared";
+import {
+  createCoolpcCategoryUrl,
+  extractProductFilterTags,
+  getProductFacetDefinitions,
+} from "@partsradar/shared";
 import { load } from "cheerio";
 import { decode } from "iconv-lite";
 import { extractCoolpcProductCandidates } from "./parser/candidates";
@@ -24,6 +28,7 @@ import {
   sanitizeCoolpcSourceCategoryUrl,
 } from "./parser/urls";
 import { classifyProductVendor } from "./vendor-classification";
+import { normalizeFilterSyncProductName } from "./filter-sync/parser";
 
 export type {
   ContentValidationStatus,
@@ -147,6 +152,11 @@ export function parseCoolpcCategoryPage(
     }
 
     const vendor = classifyProductVendor(context.igrp, name);
+    const filterTags = mergeFilterTags(
+      context.igrp,
+      extractProductFilterTags(context.igrp, name),
+      context.sourceFilterTagsByProductName?.[normalizeFilterSyncProductName(name)] ?? [],
+    );
     const item: ParsedCoolpcProduct = {
       sourceCategoryId: context.sourceCategoryId,
       igrp: context.igrp,
@@ -158,6 +168,7 @@ export function parseCoolpcCategoryPage(
       normalizedName: name.toLocaleLowerCase("zh-TW"),
       vendorSlug: vendor?.slug ?? null,
       vendorName: vendor?.name ?? null,
+      filterTags,
       primaryImageUrl,
       price,
       currency: "TWD",
@@ -178,4 +189,25 @@ export function parseCoolpcCategoryPage(
     deduplicatedItemCount,
     canImport: items.length > 0 && !hasFatalIssue,
   };
+}
+
+function mergeFilterTags(
+  igrp: number,
+  localTags: readonly string[],
+  sourceTags: readonly string[],
+): string[] {
+  const sourceFacetKeys = new Set(sourceTags.map(readFacetKey));
+  const selected = new Set([
+    ...localTags.filter((tag) => !sourceFacetKeys.has(readFacetKey(tag))),
+    ...sourceTags,
+  ]);
+  return getProductFacetDefinitions(igrp).flatMap((definition) =>
+    definition.options
+      .map((option) => `${definition.key}:${option.value}`)
+      .filter((tag) => selected.has(tag)),
+  );
+}
+
+function readFacetKey(tag: string): string {
+  return tag.slice(0, tag.indexOf(":"));
 }

@@ -17,6 +17,7 @@ Options:
   --base-url <url>                         Website base URL to check.
                                            Default: SMOKE_PUBLIC_BASE_URL, then ${DEFAULT_BASE_URL}
   --public-only                            Check public HTTP routes/APIs only; does not require DB access.
+  --filter-sync-state-file <path>          Check the optional CoolPC filter sync state file.
   --timeout-ms <ms>                        HTTP request timeout. Default: ${DEFAULT_TIMEOUT_MS}
   --product-image-storage-dir <path>       Product image cache directory.
                                            Default: PRODUCT_IMAGE_STORAGE_DIR, then ${DEFAULT_PRODUCT_IMAGE_STORAGE_DIR}

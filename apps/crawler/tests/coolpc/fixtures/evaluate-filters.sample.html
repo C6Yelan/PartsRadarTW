@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+  <body>
+    <select name="n4"><optgroup label="AMD AM5 9000系列"><option value="1">AMD Ryzen 測試處理器, $9999</option></optgroup></select>
+    <div>
+      <input type="checkbox" name="cpuT">Intel<input type="checkbox" name="cpuT" alt="1">AMD
+      <input type="checkbox" name="cpuT" value="4677">xeon<input type="checkbox" name="cpuT">1700<input type="checkbox" name="cpuT">1851<input type="checkbox" name="cpuT">Threadripper<input type="checkbox" name="cpuT">AM4<input type="checkbox" name="cpuT" alt="1">AM5
+    </div>
+
+    <select name="n5"><optgroup label="AMD B850 / AM5腳位"><option value="1">測試 B850 主機板 M-ATX, $5999</option></optgroup></select>
+    <div>
+      <input type="checkbox" name="mbT">Intel<input type="checkbox" name="mbT" alt="1">AMD
+      <input type="checkbox" name="mbT">1150<input type="checkbox" name="mbT">1151<input type="checkbox" name="mbT">1200<input type="checkbox" name="mbT">1700<input type="checkbox" name="mbT">1851<input type="checkbox" name="mbT">AM4<input type="checkbox" name="mbT">AM5<input type="checkbox" name="mbT" value="trx50|wrx80|wrx90|Threadripper" alt="1">Threadripper
+      <input type="checkbox" name="mbT">E-ATX<input type="checkbox" name="mbT" value="\/ATX|\(ATX">ATX<input type="checkbox" name="mbT" value="M-ATX|micro ATX">Micro ATX<input type="checkbox" name="mbT" value="ITX" alt="2">mini-ITX
+      <input type="checkbox" name="mbT" alt="2">測試廠商
+    </div>
+
+    <select name="n6"><optgroup label="桌上型 DDR5"><option value="1">測試桌上型 DDR5 記憶體, $1999</option></optgroup></select>
+    <div>
+      <input type="checkbox" name="ramT">桌上型<input type="checkbox" name="ramT" value="NOTE|筆記型">筆記型<input type="checkbox" name="ramT" alt="1">伺服器專用
+      <input type="checkbox" name="ramT">DDR3<input type="checkbox" name="ramT">DDR4<input type="checkbox" name="ramT" alt="1">DDR5
+      <input type="checkbox" name="ramT" alt="2">測試廠商
+    </div>
+
+    <select name="n7"><optgroup label="M.2 PCIe 4.0"><option value="1">測試 M.2 PCIe 4.0 SSD, $2999</option></optgroup></select>
+    <div>
+      <input type="checkbox" name="ssdT" value="2\.5">2.5吋<input type="checkbox" name="ssdT" value="M\.2 PCIe 3">M.2 PCIe 3.0<input type="checkbox" name="ssdT" value="M\.2 PCIe 4">M.2 PCIe 4.0<input type="checkbox" name="ssdT" value="M\.2 PCIe 5" alt="1">M.2 PCIe 5.0
+      <input type="checkbox" name="ssdT" alt="2">測試廠商
+    </div>
+
+    <select name="n8"><optgroup label="NAS碟 3.5吋"><option value="1">測試 NAS 3.5吋 HDD, $3999</option></optgroup></select>
+    <div>
+      <input type="checkbox" name="hdT" value="2\.5">2.5吋<input type="checkbox" name="hdT" value="3\.5" alt="1">3.5吋
+      <input type="checkbox" name="hdT">傳統碟<input type="checkbox" name="hdT">企業碟<input type="checkbox" name="hdT">監控碟<input type="checkbox" name="hdT" alt="1">NAS碟
+      <input type="checkbox" name="hdT" alt="2">測試廠商
+    </div>
+
+    <select name="n9"><optgroup label="隨身SSD碟"><option value="1">測試外接 SSD Type-C, $1599</option></optgroup></select>
+    <div>
+      <input type="checkbox" name="usbT">記憶卡<input type="checkbox" name="usbT">隨身碟<input type="checkbox" name="usbT" value="ssd">隨身SSD碟<input type="checkbox" name="usbT" value="2\.5">隨身2.5硬碟<input type="checkbox" name="usbT" value="3\.5" alt="1">外接3.5硬碟
+      <input type="checkbox" name="usbT">Type-A<input type="checkbox" name="usbT" alt="2">Type-C
+    </div>
+
+    <select name="n12"><optgroup label="AMD Radeon"><option value="1">AMD Radeon 測試顯示卡, $12999</option></optgroup></select>
+    <div>
+      <input type="checkbox" name="vgaT">AMD<input type="checkbox" name="vgaT" value="NV" alt="1">NVIDIA
+      <input type="checkbox" name="vgaT" alt="2">測試廠商
+    </div>
+
+    <select name="n14"><optgroup label="機殼"><option value="1">測試 E-ATX 背插機殼 含電源, $2999</option></optgroup></select>
+    <div>
+      <input type="checkbox" name="caseT" value="m-atx">m-atx<input type="checkbox" name="caseT" value="m-atx" title="m-atx除外">no-atx<input type="checkbox" name="caseT" value="電源">含Power<input type="checkbox" name="caseT" value="電源" title="Case不含Power" alt="2">無Power
+      <input type="checkbox" name="caseT" value="atx">ATX<input type="checkbox" name="caseT" value="e-atx">E-ATX<input type="checkbox" name="caseT">EEB<input type="checkbox" name="caseT">ITX<input type="checkbox" name="caseT" value="m-atx">M-ATX<input type="checkbox" name="caseT" value="背插" alt="2">支援背插式
+      <input type="checkbox" name="caseT" alt="1">測試廠商
+    </div>
+
+    <select name="n15"><optgroup label="電源"><option value="1">測試 850W ATX 3.1 銅牌電源, $3999</option></optgroup></select>
+    <div>
+      <input type="checkbox" name="psuT" value="[^0-9][^4-9][0-9]{2}W">400W以下<input type="checkbox" name="psuT" value="[^0-9][4-5][0-9]{2}W">400~599W<input type="checkbox" name="psuT" value="[^0-9][6-7][0-9]{2}W">600~799W<input type="checkbox" name="psuT" value="[^0-9][8-9][0-9]{2}W">800~999W<input type="checkbox" name="psuT" value="[0-9]{4,}W" alt="2">1000W以上
+      <input type="checkbox" name="psuT" value="ATX3|ATX 3">ATX 3.X<input type="checkbox" name="psuT" value="PCIe5|PCIe 5">PCIe 5.0<input type="checkbox" name="psuT">銅牌<input type="checkbox" name="psuT" value="銀牌|金牌">銀牌、金牌<input type="checkbox" name="psuT" value="白金|鈦金" alt="2">白金、鈦金
+      <input type="checkbox" name="psuT" alt="1">測試廠商
+    </div>
+  </body>
+</html>

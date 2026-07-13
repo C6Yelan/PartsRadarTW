@@ -2,6 +2,8 @@
 // 解析 scheduled CoolPC crawler daemon 的 CLI/env 設定，集中管理排程、外部抓取鎖與新商品圖片補圖參數。
 
 import { DEFAULT_COOLPC_CATEGORY_DELAY_MS } from "../../../coolpc/live-crawl";
+import { DEFAULT_FILTER_SYNC_INTERVAL_SECONDS } from "../../../coolpc/filter-sync";
+import { join } from "node:path";
 import {
   DEFAULT_RAW_SNAPSHOT_STORAGE_DIR,
   resolveAllowlistedRawSnapshotStorage,
@@ -36,6 +38,7 @@ export const MIN_NEW_PRODUCT_IMAGE_TIMEOUT_MS = 1000;
 export const MAX_NEW_PRODUCT_IMAGE_TIMEOUT_MS = 120000;
 export const MIN_NEW_PRODUCT_IMAGE_SOURCE_BYTES = 64 * 1024;
 export const MAX_NEW_PRODUCT_IMAGE_SOURCE_BYTES = 20 * 1024 * 1024;
+export const MIN_FILTER_SYNC_INTERVAL_SECONDS = 60 * 60;
 
 const ENV_ONLY_DAEMON_OPTIONS = {
   "--interval-seconds": "CRAWLER_INTERVAL_SECONDS",
@@ -50,6 +53,7 @@ const ENV_ONLY_DAEMON_OPTIONS = {
   "--product-image-storage-dir": "PRODUCT_IMAGE_STORAGE_DIR",
   "--lock-dir": "EXTERNAL_FETCH_LOCK_DIR",
   "--lock-stale-seconds": "EXTERNAL_FETCH_LOCK_STALE_SECONDS",
+  "--filter-sync-interval-seconds": "CRAWLER_FILTER_SYNC_INTERVAL_SECONDS",
 } as const;
 
 // scheduled crawler 每輪成功後針對本輪新增商品執行圖片補圖所需的設定。
@@ -76,6 +80,8 @@ export interface CoolpcDaemonOptions {
   lockStaleSeconds: number;
   lockRetrySeconds: number;
   runOnce: boolean;
+  filterSyncIntervalSeconds: number;
+  filterSyncStateFilePath: string;
   newProductImageBackfill: NewProductImageBackfillOptions;
 }
 
@@ -166,6 +172,14 @@ export function parseDaemonOptions(
       max: MAX_LOCK_RETRY_SECONDS,
     }),
     runOnce: args.includes("--run-once"),
+    filterSyncIntervalSeconds: parseIntegerEnvironmentValue({
+      env,
+      envName: "CRAWLER_FILTER_SYNC_INTERVAL_SECONDS",
+      fallback: DEFAULT_FILTER_SYNC_INTERVAL_SECONDS,
+      min: MIN_FILTER_SYNC_INTERVAL_SECONDS,
+      max: 30 * 24 * 60 * 60,
+    }),
+    filterSyncStateFilePath: join(storageDir, "ops", "coolpc-filter-sync-state.json"),
     newProductImageBackfill,
   };
 }

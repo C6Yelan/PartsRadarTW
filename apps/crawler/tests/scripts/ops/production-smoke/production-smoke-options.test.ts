@@ -23,6 +23,7 @@ describe("production smoke options", () => {
       workspaceRoot,
       baseUrl: "http://127.0.0.1:3000/",
       publicOnly: false,
+      filterSyncStateFilePath: null,
       timeoutMs: 5000,
       productImageSampleSize: 5,
       imageInactiveRetentionDays: 30,
@@ -60,6 +61,8 @@ describe("production smoke options", () => {
         "10",
         "--image-inactive-retention-days",
         "45",
+        "--filter-sync-state-file",
+        "storage/filter-sync.json",
       ],
       {
         SMOKE_TIMEOUT_MS: "9000",
@@ -81,6 +84,9 @@ describe("production smoke options", () => {
     expect(options.imageInactiveRetentionDays).toBe(45);
     expect(options.invalidImageUrlWarnCount).toBe(1500);
     expect(options.productImageStorageDir).toBe(join(workspaceRoot, "custom-images"));
+    expect(options.filterSyncStateFilePath).toBe(
+      join(workspaceRoot, "storage", "filter-sync.json"),
+    );
   });
 
   it("rejects invalid URLs and invalid integer ranges", async () => {

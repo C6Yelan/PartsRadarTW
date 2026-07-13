@@ -37,6 +37,7 @@ export function createCategoryContext(
   category: CrawlRunSourceCategory,
   fetchedAt: Date,
   sourceCategoryUrl: string,
+  sourceFilterTagsByProductName?: Readonly<Record<string, readonly string[]>>,
 ): SourceCategoryContext {
   const targetCategory: CoolpcTargetCategory | undefined = COOLPC_TARGET_CATEGORIES.find(
     (candidate) => candidate.igrp === category.igrp,
@@ -52,6 +53,7 @@ export function createCategoryContext(
     expectedTitleKeywords: targetCategory?.expectedTitleKeywords
       ? [...targetCategory.expectedTitleKeywords]
       : undefined,
+    sourceFilterTagsByProductName,
   };
 }
 
@@ -79,6 +81,7 @@ export function createStableParsedResultHash(items: ParsedCoolpcProduct[]): stri
       sourceItemKey: item.sourceItemKey,
       name: item.name,
       normalizedName: item.normalizedName,
+      filterTags: item.filterTags,
       primaryImageUrl: item.primaryImageUrl,
       price: item.price,
       currency: item.currency,

@@ -54,11 +54,16 @@ export function parseProductionSmokeOptions(
   const baseUrl = normalizeBaseUrl(
     getStringArg(args, "--base-url") ?? env.SMOKE_PUBLIC_BASE_URL ?? DEFAULT_BASE_URL,
   );
+  const filterSyncStateFile =
+    getStringArg(args, "--filter-sync-state-file") ?? env.SMOKE_FILTER_SYNC_STATE_FILE;
 
   return {
     workspaceRoot,
     baseUrl,
     publicOnly: args.includes(PUBLIC_ONLY_FLAG),
+    filterSyncStateFilePath: filterSyncStateFile
+      ? resolveWorkspacePathArgument(workspaceRoot, filterSyncStateFile)
+      : null,
     timeoutMs: parseIntegerOption({
       args,
       env,

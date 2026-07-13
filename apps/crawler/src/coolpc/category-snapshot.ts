@@ -43,6 +43,7 @@ interface ProcessCoolpcCategorySnapshotBaseOptions {
   crawlRunId: string;
   category: CrawlRunSourceCategory;
   snapshot: CoolpcCategorySnapshotInput;
+  sourceFilterTagsByProductName?: Readonly<Record<string, readonly string[]>>;
 }
 
 export type ProcessCoolpcCategorySnapshotOptions =
@@ -139,7 +140,12 @@ export async function processCoolpcCategorySnapshot(
     };
   }
 
-  const context = createCategoryContext(category, snapshot.fetchedAt, url);
+  const context = createCategoryContext(
+    category,
+    snapshot.fetchedAt,
+    url,
+    options.sourceFilterTagsByProductName,
+  );
   const parseResult = parseCoolpcCategoryPage(snapshot.rawHtml, context);
   const parsedResultHash =
     parseResult.validation.status === "valid"

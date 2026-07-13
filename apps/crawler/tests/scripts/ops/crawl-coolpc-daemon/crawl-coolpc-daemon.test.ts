@@ -49,6 +49,7 @@ describe("CoolPC scheduled crawler daemon options", () => {
     ["--product-image-storage-dir", "PRODUCT_IMAGE_STORAGE_DIR"],
     ["--lock-dir", "EXTERNAL_FETCH_LOCK_DIR"],
     ["--lock-stale-seconds", "EXTERNAL_FETCH_LOCK_STALE_SECONDS"],
+    ["--filter-sync-interval-seconds", "CRAWLER_FILTER_SYNC_INTERVAL_SECONDS"],
   ])("rejects env-only daemon option %s", async (flag, envName) => {
     const { crawlerCwd } = await testEnv.createWorkspace();
 
@@ -66,6 +67,7 @@ describe("CoolPC scheduled crawler daemon options", () => {
         CRAWLER_BACKOFF_SECONDS: "7200",
         CRAWLER_LOCK_RETRY_SECONDS: "90",
         CRAWLER_CATEGORY_DELAY_MS: "5000",
+        CRAWLER_FILTER_SYNC_INTERVAL_SECONDS: "86400",
         CRAWLER_NEW_PRODUCT_IMAGE_MIN_DELAY_MS: "6000",
         CRAWLER_NEW_PRODUCT_IMAGE_MAX_DELAY_MS: "9000",
         CRAWLER_NEW_PRODUCT_IMAGE_TIMEOUT_MS: "18000",
@@ -87,6 +89,14 @@ describe("CoolPC scheduled crawler daemon options", () => {
       lockStaleSeconds: 21600,
       lockRetrySeconds: 90,
       runOnce: false,
+      filterSyncIntervalSeconds: 86400,
+      filterSyncStateFilePath: join(
+        workspaceRoot,
+        "storage",
+        "snapshots",
+        "ops",
+        "coolpc-filter-sync-state.json",
+      ),
       newProductImageBackfill: {
         workspaceRoot,
         storageDir: join(workspaceRoot, "storage", "product-images"),
@@ -94,6 +104,7 @@ describe("CoolPC scheduled crawler daemon options", () => {
         maxDelayMs: 9000,
         timeoutMs: 18000,
         maxSourceBytes: 4194304,
+        recoveryScanLimit: 25,
         externalFetchLockDir: join(
           workspaceRoot,
           "storage",

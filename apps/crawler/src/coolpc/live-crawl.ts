@@ -34,6 +34,7 @@ export interface RunCoolpcCategoryCrawlOptions {
   fetchTimeoutMs?: number;
   fetchUserAgent: string;
   log?: (message: string) => void;
+  sourceFilterTagsByIgrp?: Readonly<Record<string, Readonly<Record<string, readonly string[]>>>>;
 }
 
 interface CrawlTimingOptions {
@@ -62,6 +63,7 @@ export async function runCoolpcCategoryCrawl(
     fetchTimeoutMs = DEFAULT_COOLPC_FETCH_TIMEOUT_MS,
     fetchUserAgent,
     log,
+    sourceFilterTagsByIgrp = {},
   }: RunCoolpcCategoryCrawlOptions,
   dependencies: RunCoolpcCategoryCrawlDependencies = {},
 ): Promise<RunCoolpcCrawlOnceResult> {
@@ -122,6 +124,7 @@ export async function runCoolpcCategoryCrawl(
           crawlRunId,
           category,
           snapshot,
+          sourceFilterTagsByProductName: sourceFilterTagsByIgrp[String(category.igrp)],
         });
       },
     });

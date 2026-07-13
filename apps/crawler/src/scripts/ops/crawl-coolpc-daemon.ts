@@ -4,6 +4,7 @@
 import type { PrismaClient } from "@partsradar/db";
 import { CRAWL_TRIGGER_TYPES, type RunCoolpcCrawlOnceResult } from "../../coolpc/crawl-run";
 import { assertSeededCategories, runCoolpcCategoryCrawl } from "../../coolpc/live-crawl";
+import { refreshCoolpcFilterSync } from "../../coolpc/filter-sync";
 import {
   loadWorkspaceEnv,
   resolveWorkspaceRoot,
@@ -61,7 +62,7 @@ async function main(): Promise<void> {
 
     await assertSeededCategories(client);
     log(
-      `CoolPC scheduled crawler started. interval=${options.intervalSeconds}s backoff=${options.backoffSeconds}s categoryDelay=${options.categoryDelayMs}ms newProductImageDelay=${options.newProductImageBackfill.minDelayMs}-${options.newProductImageBackfill.maxDelayMs}ms runOnce=${options.runOnce ? "yes" : "no"}`,
+      `CoolPC scheduled crawler started. interval=${options.intervalSeconds}s backoff=${options.backoffSeconds}s categoryDelay=${options.categoryDelayMs}ms filterSyncInterval=${options.filterSyncIntervalSeconds}s newProductImageDelay=${options.newProductImageBackfill.minDelayMs}-${options.newProductImageBackfill.maxDelayMs}ms runOnce=${options.runOnce ? "yes" : "no"}`,
     );
 
     do {
@@ -93,11 +94,13 @@ export async function runScheduledCycle(
   dependencies: {
     acquireLock?: typeof tryAcquireExternalFetchLock;
     crawlCategories?: typeof runCoolpcCategoryCrawl;
+    refreshFilterSync?: typeof refreshCoolpcFilterSync;
     backfillNewProductImages?: NewProductImageBackfillHandler;
   } = {},
 ): Promise<ScheduledCycleResult> {
   const acquireLock = dependencies.acquireLock ?? tryAcquireExternalFetchLock;
   const crawlCategories = dependencies.crawlCategories ?? runCoolpcCategoryCrawl;
+  const refreshFilterSync = dependencies.refreshFilterSync ?? refreshCoolpcFilterSync;
   const backfillNewProductImages =
     dependencies.backfillNewProductImages ?? handleNewProductImageBackfill;
   const lock = await acquireLock({
@@ -122,8 +125,32 @@ export async function runScheduledCycle(
   let result: RunCoolpcCrawlOnceResult;
   let productWriteSummary: ProductWriteSummaryTotals;
   let shouldBackoff: boolean;
+  let sourceFilterTagsByIgrp = {};
 
   try {
+    try {
+      const filterSync = await refreshFilterSync({
+        stateFilePath: options.filterSyncStateFilePath,
+        intervalSeconds: options.filterSyncIntervalSeconds,
+        timeoutMs: 30_000,
+        userAgent: SCHEDULED_CRAWL_USER_AGENT,
+      });
+      sourceFilterTagsByIgrp = filterSync.state?.tagsByIgrp ?? {};
+      if (filterSync.outcome === "published") {
+        log(
+          `CoolPC filter sync published. conditions=${filterSync.state?.conditionCount ?? 0} products=${filterSync.state?.productCount ?? 0} tagged=${filterSync.state?.taggedProductCount ?? 0} ambiguous=${filterSync.state?.ambiguousProductCount ?? 0}`,
+        );
+      } else if (filterSync.outcome === "failed") {
+        log(
+          `CoolPC filter sync failed; using last known good state. error=${toSafeCliErrorMessage(filterSync.state?.lastError ?? "unknown")}`,
+        );
+      }
+    } catch (error) {
+      log(
+        `CoolPC filter sync failed before state was available; continuing with built-in rules. error=${toSafeCliErrorMessage(error)}`,
+      );
+    }
+
     result = await crawlCategories({
       client,
       workspaceRoot: options.workspaceRoot,
@@ -132,6 +159,7 @@ export async function runScheduledCycle(
       delayMs: options.categoryDelayMs,
       fetchUserAgent: SCHEDULED_CRAWL_USER_AGENT,
       log,
+      sourceFilterTagsByIgrp,
     });
 
     productWriteSummary = summarizeProductWrites(result);

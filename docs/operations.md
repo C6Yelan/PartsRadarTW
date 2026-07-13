@@ -52,7 +52,7 @@ docker compose -f compose.yml -f compose.ops.yml --profile ops run --rm smoke-da
   pnpm ops:production-smoke -- --base-url http://web:3000
 ```
 
-Full smoke 另檢查 crawler run、parse errors、active products、缺圖、snapshot retention 與近期 Discord delivery。只有 FAIL 使用 non-zero exit；WARN 不會自動阻止 shell pipeline，因此部署流程必須解析摘要。
+Full smoke 另檢查 crawler run、CoolPC 篩選同步、parse errors、active products、缺圖、snapshot retention 與近期 Discord delivery。只有 FAIL 使用 non-zero exit；WARN 不會自動阻止 shell pipeline，因此部署流程必須解析摘要。
 
 預設門檻只是起始值。應依 production baseline 調整 env，不能把「沒有 FAIL」誤寫成門檻已校準。
 
@@ -68,6 +68,8 @@ docker compose -f compose.yml -f compose.crawler.yml logs --tail=100 crawler-dae
 成功標準：Crawler 完成分類週期，沒有疑似阻擋或無限 backoff；cleanup daemon 能取得正確 snapshot path。
 
 失敗處理：遇到 suspected block、來源錯誤或 external fetch lock 衝突時先停止 crawler-daemon，保存 snapshot 與 log，再用 offline raw replay分析。不要提高並行或移除 request delay硬試。
+
+`crawler-daemon` 預設每 7 天讀取一次 CoolPC 估價頁的既有篩選條件，只有已知群組與本站既有標籤映射全部通過驗證才發布。新條件、來源結構變動或抓取失敗會保留上一版可用狀態，並由 full smoke／Discord 管理告警回報；不會阻止一般價格 crawl。狀態預設保存在 snapshot volume 的 `ops/coolpc-filter-sync-state.json`，週期可用 `CRAWLER_FILTER_SYNC_INTERVAL_SECONDS` 調整。
 
 Crawl lifecycle 維運 marker：建立 run 後若有未吸收的 lifecycle failure，可完成 best-effort finalization 時會寫入 `crawl_run_lifecycle_failure`。下一次成功取得 raw snapshot mutation lock 的 live crawl，會先將未完成的 `RUNNING` run 收斂為 `FETCH_FAILED` 並寫入 `crawl_run_interrupted_reconciled`；只有實際收斂時才記錄 sanitized count。這兩個 marker 都代表需要檢查 crawler 與 DB 維運 log，不是成功狀態。
 

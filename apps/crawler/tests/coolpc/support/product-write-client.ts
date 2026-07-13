@@ -252,6 +252,7 @@ export function productItem({
   primaryImageUrl = "https://www.coolpc.com.tw/eval/4/amd7500f.jpg",
   price,
   fetchedAt = new Date("2026-05-27T10:30:00.000Z"),
+  filterTags,
 }: {
   sourceCategoryId?: string;
   ibuyToken?: string;
@@ -262,6 +263,7 @@ export function productItem({
   primaryImageUrl?: string | null;
   price: number;
   fetchedAt?: Date;
+  filterTags?: string[];
 }): ParsedCoolpcProduct {
   return {
     sourceCategoryId,
@@ -274,6 +276,7 @@ export function productItem({
     normalizedName,
     vendorSlug,
     vendorName,
+    filterTags: filterTags ?? extractProductFilterTags(4, name),
     primaryImageUrl,
     price,
     currency: "TWD",

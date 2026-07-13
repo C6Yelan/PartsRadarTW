@@ -7,11 +7,12 @@ import {
   CRAWL_RUN_STATUSES,
 } from "../../../../src/coolpc/crawl-run";
 import { runScheduledCycle } from "../../../../src/scripts/ops/crawl-coolpc-daemon";
-import { createDaemonOptions } from "./crawl-coolpc-daemon-support";
+import { createDaemonOptions, skipFilterSync } from "./crawl-coolpc-daemon-support";
 
 describe("CoolPC scheduled crawler daemon cycle", () => {
   it("releases the external fetch lock before non-crawl follow-up work", async () => {
     const calls: string[] = [];
+    const synchronizedTags = { "4": { "amd test cpu": ["socket:am5"] } };
     const fakeLock = {
       lockDir: "/tmp/external-fetch.lock",
       owner: "crawler-daemon",
@@ -25,8 +26,27 @@ describe("CoolPC scheduled crawler daemon cycle", () => {
         calls.push("acquire-lock");
         return fakeLock;
       },
-      crawlCategories: async () => {
+      refreshFilterSync: async () => {
+        calls.push("refresh-filter-sync");
+        return {
+          outcome: "published",
+          state: {
+            version: 1,
+            lastAttemptAt: "2026-07-13T04:00:00.000Z",
+            lastSuccessAt: "2026-07-13T04:00:00.000Z",
+            lastError: null,
+            sourceHash: "hash",
+            conditionCount: 63,
+            productCount: 1,
+            taggedProductCount: 1,
+            ambiguousProductCount: 0,
+            tagsByIgrp: synchronizedTags,
+          },
+        };
+      },
+      crawlCategories: async (options) => {
         calls.push("crawl-categories");
+        expect(options.sourceFilterTagsByIgrp).toEqual(synchronizedTags);
         return {
           crawlRunId: "crawl-run-1",
           status: CRAWL_RUN_STATUSES.SUCCESS_CHANGED,
@@ -61,6 +81,7 @@ describe("CoolPC scheduled crawler daemon cycle", () => {
     expect(result).toEqual({ shouldBackoff: false });
     expect(calls).toEqual([
       "acquire-lock",
+      "refresh-filter-sync",
       "crawl-categories",
       "release-lock",
       "backfill-new-product-images",
@@ -94,6 +115,7 @@ describe("CoolPC scheduled crawler daemon cycle", () => {
 
     const result = await runScheduledCycle({} as never, createDaemonOptions(), {
       acquireLock: async () => fakeLock,
+      refreshFilterSync: skipFilterSync,
       crawlCategories: async () => {
         calls.push("crawl-categories");
         throw new Error("crawl-run reconciliation failed");
@@ -119,6 +141,7 @@ describe("CoolPC scheduled crawler daemon cycle", () => {
 
     const result = await runScheduledCycle({} as never, createDaemonOptions(), {
       acquireLock: async () => fakeLock,
+      refreshFilterSync: skipFilterSync,
       crawlCategories: async () => ({
         crawlRunId: "crawl-run-1",
         status: CRAWL_RUN_STATUSES.SUSPECTED_BLOCK,
@@ -169,6 +192,7 @@ describe("CoolPC scheduled crawler daemon cycle", () => {
       }),
       {
         acquireLock: async () => fakeLock,
+        refreshFilterSync: skipFilterSync,
         crawlCategories: async () => ({
           crawlRunId: "crawl-run-1",
           status: CRAWL_RUN_STATUSES.FETCH_FAILED,

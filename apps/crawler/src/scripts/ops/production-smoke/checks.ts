@@ -12,6 +12,7 @@ import {
 } from "./results";
 import { checkCrawlerFreshness, checkRecentSuspectedBlocks } from "./checks/crawler-runs";
 import { checkDiscordBotDeliveries } from "./checks/discord-deliveries";
+import { checkCoolpcFilterSync } from "./checks/filter-sync";
 import { checkRecentParseErrors, checkSourceImageAnomalies } from "./checks/parse-errors";
 import {
   checkActiveProductCount,
@@ -39,6 +40,9 @@ export async function runProductionSmoke(
   checks.push(...productsResult.checks);
   checks.push(await checkSourceFreshness(productsResult.sourceStatus, options, now));
   checks.push(await checkCrawlerFreshness(client, options, now));
+  if (options.filterSyncStateFilePath) {
+    checks.push(await checkCoolpcFilterSync(options.filterSyncStateFilePath, now));
+  }
   checks.push(await checkRecentSuspectedBlocks(client, options, now));
   checks.push(await checkRecentParseErrors(client, options, now));
   checks.push(await checkSourceImageAnomalies(client, options, now));
