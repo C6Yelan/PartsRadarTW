@@ -95,7 +95,7 @@ describe("handleDiscordInteraction price report settings categories", () => {
 
     expect(categorySelect.options).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ label: "SSD / HDD", default: true }),
+        expect.objectContaining({ label: "SSD", default: true }),
         expect.objectContaining({ label: "顯示卡", default: true }),
         expect.objectContaining({ label: "CPU", default: false }),
       ]),

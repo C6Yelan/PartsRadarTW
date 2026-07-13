@@ -59,7 +59,50 @@ describe("CoolPC category snapshot processor", () => {
         sourceCategoryId: "category-4",
         fetchedAt: new Date("2026-05-27T11:00:00.000Z"),
         sourceItemKeys: ["coolpc:igrp:4:ibuy:CPU-TOKEN-001", "coolpc:igrp:4:ibuy:CPU-TOKEN-002"],
+        filterTags: [
+          ["socket:am5", "cpu_family:ryzen-5", "integrated_graphics:no"],
+          ["socket:lga1700", "cpu_family:core-i5", "integrated_graphics:yes"],
+        ],
       },
+    ]);
+  });
+
+  it("falls back to local tags and records an issue when source-name joins are mostly missing", async () => {
+    const client = new FakeCrawlerWriteClient([category({ id: "category-4", igrp: 4 })]);
+    const storageDir = await testEnv.createStorageDir();
+    const productWriter = createProductWriterSpy();
+    const rawHtml = (await testEnv.fixture("cpu-category.normal.html")).replace(
+      "</section>",
+      `<div class="item">
+        <div class="w">CPU-TOKEN-003</div>
+        <span>
+          <img alt="" src="/eval/4/amd7700.jpg">
+          <div class="t">AMD Ryzen 7 7700【8核/16緒】</div>
+          <div class="x">含稅：NT8,990</div>
+        </span>
+      </div></section>`,
+    );
+
+    const result = await processCoolpcCategorySnapshot({
+      client,
+      storageDir,
+      crawlRunId: "crawl-run-1",
+      category: category({ id: "category-4", igrp: 4 }),
+      snapshot: snapshot({ rawHtml }),
+      sourceFilterTagsByProductName: {
+        "amd ryzen 5 7500f mpk【6核/12緒】3.7g": ["socket:lga1851"],
+      },
+      writeProducts: productWriter.writeProducts,
+    });
+
+    expect(result.status).toBe(CRAWL_RUN_CATEGORY_RESULT_STATUSES.SUCCESS_CHANGED);
+    expect(productWriter.calls[0]?.filterTags[0]).toContain("socket:am5");
+    expect(productWriter.calls[0]?.filterTags[0]).not.toContain("socket:lga1851");
+    expect(client.parseErrors).toEqual([
+      expect.objectContaining({
+        errorType: "CONTENT_VALIDATION_FAILED",
+        message: "filter_sync_join_coverage_low; matched=1; total=3; source tags were not applied",
+      }),
     ]);
   });
 
@@ -175,5 +218,4 @@ describe("CoolPC category snapshot processor", () => {
     );
     expect(productWriter.calls).toHaveLength(2);
   });
-
 });

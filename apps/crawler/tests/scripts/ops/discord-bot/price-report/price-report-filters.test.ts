@@ -59,7 +59,7 @@ describe("sendPriceReportNow filters", () => {
           price: 2_490,
           capturedAt: "2026-06-07T03:30:00.000Z",
           categoryIgrp: 7,
-          categoryName: "SSD / HDD",
+          categoryName: "SSD",
           vendorSlug: "samsung",
           vendorName: "Samsung",
         }),

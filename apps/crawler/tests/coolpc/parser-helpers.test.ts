@@ -9,7 +9,7 @@ import { normalizeCoolpcProductImageUrl } from "../../src/coolpc/parser/urls";
 describe("CoolPC parser helpers", () => {
   it("keeps the current target categories in code", () => {
     expect(COOLPC_TARGET_CATEGORIES.map((category) => category.igrp)).toEqual([
-      4, 5, 6, 7, 8, 10, 11, 12, 14, 15, 16,
+      4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15, 16,
     ]);
   });
 

@@ -38,7 +38,7 @@ describe("CoolPC category product observation writer", () => {
       normalizedName: item.normalizedName,
       vendorSlug: item.vendorSlug,
       vendorName: item.vendorName,
-      filterTags: ["socket:am5", "cpu_family:ryzen-5"],
+      filterTags: ["socket:am5", "cpu_family:ryzen-5", "integrated_graphics:no"],
       primaryImageUrl: item.primaryImageUrl,
       primaryImageCheckedAt: item.fetchedAt,
       firstSeenAt: item.fetchedAt,

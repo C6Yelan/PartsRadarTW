@@ -5,7 +5,7 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { isProductFilterTagSupported } from "@partsradar/shared";
 
-export const COOLPC_FILTER_SYNC_STATE_VERSION = 1;
+export const COOLPC_FILTER_SYNC_STATE_VERSION = 2;
 const MAX_FILTER_SYNC_STATE_BYTES = 10 * 1024 * 1024;
 
 export interface CoolpcFilterSyncState {

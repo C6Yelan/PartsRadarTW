@@ -1,5 +1,5 @@
 // packages/shared/src/product-facets.test.ts
-// 驗證現有 11 個 CoolPC 分類的 facet registry 與商品名稱 filter tag 解析。
+// 驗證 CoolPC 分類的 facet registry 與商品名稱 filter tag 解析。
 
 import { describe, expect, it } from "vitest";
 import {
@@ -10,12 +10,11 @@ import {
 } from "./product-facets";
 
 describe("product facets", () => {
-  it("defines facets for exactly the existing 11 categories", () => {
-    expect(PRODUCT_FACET_IGRPS).toEqual([4, 5, 6, 7, 8, 10, 11, 12, 14, 15, 16]);
+  it("defines facets for the existing categories", () => {
+    expect(PRODUCT_FACET_IGRPS).toEqual([4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15, 16]);
     expect(PRODUCT_FACET_IGRPS.every((igrp) => getProductFacetDefinitions(igrp).length > 0)).toBe(
       true,
     );
-    expect(getProductFacetDefinitions(9)).toEqual([]);
   });
 
   it("extracts CPU socket, family, and explicit integrated graphics", () => {
@@ -24,6 +23,17 @@ describe("product facets", () => {
       "cpu_family:ryzen-7",
       "integrated_graphics:yes",
     ]);
+  });
+
+  it.each([
+    ["Intel i5-14400F【10核/16緒】", "integrated_graphics:no"],
+    ["Intel i5-14600K【14核/20緒】", "integrated_graphics:yes"],
+    ["AMD R5 7500F MPK【6核/12緒】", "integrated_graphics:no"],
+    ["AMD R7 9700X【8核/16緒】", "integrated_graphics:yes"],
+    ["AMD R5 5500X3D【6核/12緒】", "integrated_graphics:no"],
+    ["AMD R7 5700G【8核/16緒】", "integrated_graphics:yes"],
+  ])("infers deterministic integrated graphics for %s", (name, expectedTag) => {
+    expect(extractProductFilterTags(4, name)).toContain(expectedTag);
   });
 
   it("extracts motherboard chipset without confusing ATX and M-ATX", () => {
@@ -58,17 +68,24 @@ describe("product facets", () => {
     ]);
   });
 
-  it("extracts decision-useful SSD details inside the combined storage category", () => {
+  it("extracts decision-useful SSD details", () => {
     expect(extractProductFilterTags(7, "Samsung 990 PRO 2TB M.2 PCIe 4.0 NVMe SSD")).toEqual([
-      "storage_type:ssd",
       "form_factor:m2",
       "pcie_generation:gen4",
       "capacity_gb:2000",
     ]);
   });
 
+  it("extracts HDD size, capacity, and usage", () => {
+    expect(extractProductFilterTags(8, "Seagate 8TB 3.5吋 NAS碟")).toEqual([
+      "form_factor:3-5-inch",
+      "capacity_gb:8000",
+      "storage_usage:nas",
+    ]);
+  });
+
   it("extracts external storage type, connector, and capacity", () => {
-    expect(extractProductFilterTags(8, "外接 SSD 2TB USB Type-C")).toEqual([
+    expect(extractProductFilterTags(9, "外接 SSD 2TB USB Type-C")).toEqual([
       "external_type:external-ssd",
       "connector:type-c",
       "capacity_gb:2000",
@@ -89,6 +106,24 @@ describe("product facets", () => {
     ]);
   });
 
+  it("extracts common live AIO naming with text between radiator size and water cooling", () => {
+    expect(extractProductFilterTags(11, "華碩 Prime LC 360 ARGB 水冷 / 一體式風扇")).toEqual([
+      "liquid_type:aio",
+      "radiator_size_mm:360",
+    ]);
+  });
+
+  it("keeps explicit water-cooling components out of the AIO type", () => {
+    expect(extractProductFilterTags(11, "開放式水冷 360 冷排")).toEqual([
+      "liquid_type:custom",
+      "radiator_size_mm:360",
+    ]);
+    expect(extractProductFilterTags(11, "240mm 水冷排")).toEqual([
+      "liquid_type:component",
+      "radiator_size_mm:240",
+    ]);
+  });
+
   it("extracts GPU chip, series, and VRAM", () => {
     expect(extractProductFilterTags(12, "NVIDIA GeForce RTX 5070 Ti 16GB")).toEqual([
       "gpu_chip:nvidia",
@@ -101,7 +136,11 @@ describe("product facets", () => {
     "AMD Ryzen TR 9960X盒【24核/48緒】",
     "AMD Ryzen TR PRO 9995WX盒【96核/192緒】",
   ])("recognizes current Ryzen TR naming as Threadripper: %s", (name) => {
-    expect(extractProductFilterTags(4, name)).toEqual(["socket:str5", "cpu_family:threadripper"]);
+    expect(extractProductFilterTags(4, name)).toEqual([
+      "socket:str5",
+      "cpu_family:threadripper",
+      "integrated_graphics:no",
+    ]);
   });
 
   it.each([

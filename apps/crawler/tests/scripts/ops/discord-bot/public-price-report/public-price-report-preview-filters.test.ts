@@ -47,7 +47,7 @@ describe("public price report preview filters", () => {
           price: 19_990,
           capturedAt: oldCapturedAt,
           categoryIgrp: 7,
-          categoryName: "SSD / HDD",
+          categoryName: "SSD",
         }),
         snapshot({
           id: "public-filter-new-category",
@@ -57,7 +57,7 @@ describe("public price report preview filters", () => {
           price: 18_990,
           capturedAt: newCapturedAt,
           categoryIgrp: 7,
-          categoryName: "SSD / HDD",
+          categoryName: "SSD",
         }),
         snapshot({
           id: "public-filter-old-keyword",

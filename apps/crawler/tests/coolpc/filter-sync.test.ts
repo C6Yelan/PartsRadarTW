@@ -36,7 +36,13 @@ describe("CoolPC filter sync", () => {
     ).toEqual(["socket:am5"]);
     expect(
       snapshot.tagsByIgrp["7"]?.[normalizeFilterSyncProductName("測試 M.2 PCIe 4.0 SSD")],
-    ).toEqual(["storage_type:ssd", "form_factor:m2", "pcie_generation:gen4"]);
+    ).toEqual(["form_factor:m2", "pcie_generation:gen4"]);
+    expect(
+      snapshot.tagsByIgrp["8"]?.[normalizeFilterSyncProductName("測試 NAS 3.5吋 HDD")],
+    ).toEqual(["form_factor:3-5-inch", "storage_usage:nas"]);
+    expect(
+      snapshot.tagsByIgrp["9"]?.[normalizeFilterSyncProductName("測試外接 SSD Type-C")],
+    ).toEqual(["external_type:external-ssd", "connector:type-c"]);
     expect(
       snapshot.tagsByIgrp["15"]?.[normalizeFilterSyncProductName("測試 850W ATX 3.1 銅牌電源")],
     ).toEqual(["wattage_range:800-999", "efficiency:bronze", "psu_standard:atx-3"]);

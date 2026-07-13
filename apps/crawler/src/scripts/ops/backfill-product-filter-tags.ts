@@ -1,8 +1,15 @@
 // apps/crawler/src/scripts/ops/backfill-product-filter-tags.ts
 // 依既有商品名稱回填 filter tags；預設 dry-run，只有明確確認後才更新資料庫。
 
+import { resolve } from "node:path";
 import type { Prisma, PrismaClient } from "@partsradar/db";
-import { extractProductFilterTags, PRODUCT_FACET_IGRPS } from "@partsradar/shared";
+import {
+  extractProductFilterTags,
+  mergeProductFilterTags,
+  PRODUCT_FACET_IGRPS,
+} from "@partsradar/shared";
+import { normalizeFilterSyncProductName } from "../../coolpc/filter-sync/parser";
+import { readCoolpcFilterSyncState } from "../../coolpc/filter-sync/state";
 import {
   getPositiveNumberArg,
   loadWorkspaceEnv,
@@ -50,6 +57,8 @@ export interface ProductFilterTagBatchRequest {
   igrp: number | null;
 }
 
+type SourceFilterTagsByIgrp = Readonly<Record<string, Readonly<Record<string, readonly string[]>>>>;
+
 export type ProductFilterTagBatchReader = (
   request: ProductFilterTagBatchRequest,
 ) => Promise<ProductFilterTagCandidate[]>;
@@ -75,11 +84,24 @@ async function main() {
     await loadWorkspaceEnv(options.workspaceRoot);
     const db = await import("@partsradar/db");
     client = db.prisma;
+    const snapshotStorageDir = resolve(
+      options.workspaceRoot,
+      process.env.SNAPSHOT_STORAGE_DIR ?? "storage/snapshots",
+    );
+    const filterSyncState = await readCoolpcFilterSyncState(
+      resolve(snapshotStorageDir, "ops/coolpc-filter-sync-state.json"),
+    );
+    if (!options.dryRun && !filterSyncState?.lastSuccessAt) {
+      throw new Error("Refusing filter tag backfill write without an accepted filter sync state.");
+    }
 
     const summary = await backfillProductFilterTagsInBatches(
       client,
       (request) => readCandidates(client as PrismaClient, request),
-      options,
+      {
+        ...options,
+        sourceFilterTagsByIgrp: filterSyncState?.tagsByIgrp,
+      },
     );
     printSummary(summary, options);
   } finally {
@@ -126,7 +148,9 @@ export function buildProductFilterTagCandidateQuery(request: ProductFilterTagBat
 export async function backfillProductFilterTagsInBatches(
   client: ProductFilterTagUpdateClient,
   readBatch: ProductFilterTagBatchReader,
-  options: Pick<BackfillProductFilterTagsOptions, "batchSize" | "dryRun" | "igrp" | "limit">,
+  options: Pick<BackfillProductFilterTagsOptions, "batchSize" | "dryRun" | "igrp" | "limit"> & {
+    sourceFilterTagsByIgrp?: SourceFilterTagsByIgrp;
+  },
 ): Promise<ProductFilterTagBackfillSummary> {
   const summary = createEmptySummary();
   let afterId: string | null = null;
@@ -142,7 +166,10 @@ export async function backfillProductFilterTagsInBatches(
 
     mergeSummaries(
       summary,
-      await backfillProductFilterTags(client, candidates, { dryRun: options.dryRun }),
+      await backfillProductFilterTags(client, candidates, {
+        dryRun: options.dryRun,
+        sourceFilterTagsByIgrp: options.sourceFilterTagsByIgrp,
+      }),
     );
     afterId = candidates.at(-1)?.id ?? null;
     if (remaining !== null) {
@@ -159,13 +186,25 @@ export async function backfillProductFilterTagsInBatches(
 export async function backfillProductFilterTags(
   client: ProductFilterTagUpdateClient,
   candidates: ProductFilterTagCandidate[],
-  options: Pick<BackfillProductFilterTagsOptions, "dryRun">,
+  options: Pick<BackfillProductFilterTagsOptions, "dryRun"> & {
+    sourceFilterTagsByIgrp?: SourceFilterTagsByIgrp;
+  },
 ): Promise<ProductFilterTagBackfillSummary> {
+  if (!options.dryRun && !options.sourceFilterTagsByIgrp) {
+    throw new Error("Refusing filter tag backfill write without source filter tags.");
+  }
+
   const summary = createEmptySummary();
   summary.selected = candidates.length;
 
   for (const candidate of candidates) {
-    const filterTags = extractProductFilterTags(candidate.sourceCategory.igrp, candidate.name);
+    const igrp = candidate.sourceCategory.igrp;
+    const localTags = extractProductFilterTags(igrp, candidate.name);
+    const sourceTags =
+      options.sourceFilterTagsByIgrp?.[String(igrp)]?.[
+        normalizeFilterSyncProductName(candidate.name)
+      ] ?? [];
+    const filterTags = mergeProductFilterTags(igrp, localTags, sourceTags);
     recordCategoryCoverage(summary, candidate, filterTags);
 
     if (arraysEqual(candidate.filterTags, filterTags)) {

@@ -41,7 +41,7 @@ describe("product filter tag backfill safety", () => {
     const summary = await backfillProductFilterTags(
       client,
       [changedCandidate(), unchangedCandidate()],
-      options,
+      { ...options, sourceFilterTagsByIgrp: {} },
     );
 
     expect(summary).toEqual(
@@ -50,7 +50,9 @@ describe("product filter tag backfill safety", () => {
     expect(client.updateCalls).toEqual([
       {
         where: { id: "product-1" },
-        data: { filterTags: ["socket:am5", "cpu_family:ryzen-7"] },
+        data: {
+          filterTags: ["socket:am5", "cpu_family:ryzen-7", "integrated_graphics:yes"],
+        },
         select: { id: true },
       },
     ]);
@@ -61,6 +63,7 @@ describe("product filter tag backfill safety", () => {
 
     const summary = await backfillProductFilterTags(client, [unchangedCandidate()], {
       dryRun: false,
+      sourceFilterTagsByIgrp: {},
     });
 
     expect(summary).toEqual(summaryForCpu({ selected: 1, unchanged: 1 }));
@@ -107,7 +110,7 @@ describe("product filter tag backfill safety", () => {
     expect(
       buildProductFilterTagCandidateQuery({ afterId: "product-25", take: 10, igrp: null }),
     ).toMatchObject({
-      where: { sourceCategory: { igrp: { in: [4, 5, 6, 7, 8, 10, 11, 12, 14, 15, 16] } } },
+      where: { sourceCategory: { igrp: { in: [4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15, 16] } } },
       orderBy: { id: "asc" },
       take: 10,
       cursor: { id: "product-25" },
@@ -159,7 +162,13 @@ describe("product filter tag backfill safety", () => {
           }
           return stableReader(request);
         },
-        { batchSize: 2, dryRun: false, igrp: null, limit: null },
+        {
+          batchSize: 2,
+          dryRun: false,
+          igrp: null,
+          limit: null,
+          sourceFilterTagsByIgrp: {},
+        },
       ),
     ).rejects.toThrow("interrupted");
 
@@ -168,6 +177,7 @@ describe("product filter tag backfill safety", () => {
       dryRun: false,
       igrp: null,
       limit: null,
+      sourceFilterTagsByIgrp: {},
     });
 
     expect(summary).toEqual(
@@ -199,12 +209,42 @@ describe("product filter tag backfill safety", () => {
     ]);
   });
 
+  it("uses the same source-over-local merge policy as the crawler", async () => {
+    const client = new FakeFilterTagBackfillClient();
+
+    await backfillProductFilterTags(client, [changedCandidate()], {
+      dryRun: false,
+      sourceFilterTagsByIgrp: {
+        "4": {
+          "amd r7 9700x【8核/16緒】3.8g": ["socket:lga1851"],
+        },
+      },
+    });
+
+    expect(client.updateCalls).toEqual([
+      expect.objectContaining({
+        data: {
+          filterTags: ["socket:lga1851", "cpu_family:ryzen-7", "integrated_graphics:yes"],
+        },
+      }),
+    ]);
+  });
+
+  it("refuses writes when source filter tags are unavailable", async () => {
+    await expect(
+      backfillProductFilterTags(new FakeFilterTagBackfillClient(), [changedCandidate()], {
+        dryRun: false,
+      }),
+    ).rejects.toThrow("without source filter tags");
+  });
+
   it("rejects contradictory flags and unsupported categories", async () => {
     const crawlerCwd = await createWorkspace();
     expect(() => parseOptions(["--dry-run", "--confirm-write"], crawlerCwd)).toThrow(
       "Do not combine --dry-run with --confirm-write",
     );
-    expect(() => parseOptions(["--igrp", "9"], crawlerCwd)).toThrow("Unsupported --igrp value");
+    expect(parseOptions(["--igrp", "9"], crawlerCwd).igrp).toBe(9);
+    expect(() => parseOptions(["--igrp", "13"], crawlerCwd)).toThrow("Unsupported --igrp value");
     expect(() => parseOptions(["--batch-size", "2001"], crawlerCwd)).toThrow(
       "--batch-size must not exceed 2000",
     );
@@ -306,6 +346,7 @@ function summaryForCpu({
         facetHits: {
           "socket:am5": hitCount,
           "cpu_family:ryzen-7": hitCount,
+          "integrated_graphics:yes": hitCount,
         },
       },
     ],
@@ -316,7 +357,7 @@ function unchangedCandidate(): ProductFilterTagCandidate {
   return {
     ...changedCandidate(),
     id: "product-2",
-    filterTags: ["socket:am5", "cpu_family:ryzen-7"],
+    filterTags: ["socket:am5", "cpu_family:ryzen-7", "integrated_graphics:yes"],
   };
 }
 

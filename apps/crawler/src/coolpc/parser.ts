@@ -5,7 +5,7 @@
 import {
   createCoolpcCategoryUrl,
   extractProductFilterTags,
-  getProductFacetDefinitions,
+  mergeProductFilterTags,
 } from "@partsradar/shared";
 import { load } from "cheerio";
 import { decode } from "iconv-lite";
@@ -106,6 +106,10 @@ export function parseCoolpcCategoryPage(
       continue;
     }
 
+    if (isMisclassifiedCategoryProduct(context.igrp, name)) {
+      continue;
+    }
+
     if (price === null) {
       issues.push({
         type: "price_parse_failed",
@@ -152,7 +156,7 @@ export function parseCoolpcCategoryPage(
     }
 
     const vendor = classifyProductVendor(context.igrp, name);
-    const filterTags = mergeFilterTags(
+    const filterTags = mergeProductFilterTags(
       context.igrp,
       extractProductFilterTags(context.igrp, name),
       context.sourceFilterTagsByProductName?.[normalizeFilterSyncProductName(name)] ?? [],
@@ -191,23 +195,10 @@ export function parseCoolpcCategoryPage(
   };
 }
 
-function mergeFilterTags(
-  igrp: number,
-  localTags: readonly string[],
-  sourceTags: readonly string[],
-): string[] {
-  const sourceFacetKeys = new Set(sourceTags.map(readFacetKey));
-  const selected = new Set([
-    ...localTags.filter((tag) => !sourceFacetKeys.has(readFacetKey(tag))),
-    ...sourceTags,
-  ]);
-  return getProductFacetDefinitions(igrp).flatMap((definition) =>
-    definition.options
-      .map((option) => `${definition.key}:${option.value}`)
-      .filter((tag) => selected.has(tag)),
+function isMisclassifiedCategoryProduct(igrp: number, name: string): boolean {
+  return (
+    igrp === 4 &&
+    /^\[搭CPU[^\]]*\]/i.test(name) &&
+    /\b(?:H610|B760|Z790|H810|B860|Z890|A520|B550|B650E?|B840|B850|X670E?|X870E?)M?\b/i.test(name)
   );
-}
-
-function readFacetKey(tag: string): string {
-  return tag.slice(0, tag.indexOf(":"));
 }

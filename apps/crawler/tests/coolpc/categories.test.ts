@@ -1,26 +1,28 @@
 // apps/crawler/tests/coolpc/categories.test.ts
-// 鎖定 crawler 實際抓取的 11 個 CoolPC IGrp，避免誤加不存在的 IGrp 9 或改動既有 7/8 分類。
+// 鎖定 crawler 實際抓取的 CoolPC IGrp 與 7/8/9 儲存分類契約。
 
 import { describe, expect, it } from "vitest";
 import { COOLPC_TARGET_CATEGORIES } from "../../src/coolpc/categories";
 
-const EXPECTED_IGRPS = [4, 5, 6, 7, 8, 10, 11, 12, 14, 15, 16];
+const EXPECTED_IGRPS = [4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15, 16];
 
 describe("CoolPC target category contract", () => {
-  it("keeps the exact 11 target IGrp values", () => {
+  it("keeps the exact target IGrp values", () => {
     expect(COOLPC_TARGET_CATEGORIES.map(({ igrp }) => igrp)).toEqual(EXPECTED_IGRPS);
   });
 
-  it("keeps storage mappings on IGrp 7 and 8 while excluding IGrp 9", () => {
+  it("keeps SSD, HDD, and external storage on their actual source IGrp values", () => {
     expect(COOLPC_TARGET_CATEGORIES.find(({ igrp }) => igrp === 7)).toMatchObject({
-      sourceName: "內接硬碟 HDD / 固態 SSD",
-      displayName: "SSD / HDD",
+      sourceName: "固態 SSD",
+      displayName: "SSD",
     });
     expect(COOLPC_TARGET_CATEGORIES.find(({ igrp }) => igrp === 8)).toMatchObject({
-      sourceName: "外接硬碟 / 隨身碟 / 記憶卡",
+      sourceName: "內接硬碟 HDD",
+      displayName: "HDD",
+    });
+    expect(COOLPC_TARGET_CATEGORIES.find(({ igrp }) => igrp === 9)).toMatchObject({
+      sourceName: "USB週邊 / 硬碟座 / 讀卡機",
       displayName: "外接儲存",
     });
-    const actualIgrps: readonly number[] = COOLPC_TARGET_CATEGORIES.map(({ igrp }) => igrp);
-    expect(actualIgrps).not.toContain(9);
   });
 });

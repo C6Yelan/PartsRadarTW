@@ -21,12 +21,17 @@ const coolpcCategories = [
   },
   {
     igrp: 7,
-    sourceName: "內接硬碟 HDD / 固態 SSD",
-    displayName: "SSD / HDD",
+    sourceName: "固態 SSD",
+    displayName: "SSD",
   },
   {
     igrp: 8,
-    sourceName: "外接硬碟 / 隨身碟 / 記憶卡",
+    sourceName: "內接硬碟 HDD",
+    displayName: "HDD",
+  },
+  {
+    igrp: 9,
+    sourceName: "USB週邊 / 硬碟座 / 讀卡機",
     displayName: "外接儲存",
   },
   {

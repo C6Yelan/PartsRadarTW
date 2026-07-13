@@ -9,7 +9,8 @@ const EXPECTED_CATEGORY_MAPPINGS = [
   [5, "motherboard"],
   [6, "memory"],
   [7, "storage"],
-  [8, "external-storage"],
+  [8, "hard-drive"],
+  [9, "external-storage"],
   [10, "cooler"],
   [11, "liquid-cooling"],
   [12, "gpu"],
@@ -19,7 +20,7 @@ const EXPECTED_CATEGORY_MAPPINGS = [
 ] as const;
 
 describe("category slug mapping", () => {
-  it("keeps the public contract aligned to the exact 11 CoolPC categories", () => {
+  it("keeps the public contract aligned to the CoolPC categories", () => {
     expect(CATEGORY_MAPPINGS.map(({ igrp, slug }) => [igrp, slug])).toEqual(
       EXPECTED_CATEGORY_MAPPINGS,
     );
@@ -31,7 +32,6 @@ describe("category slug mapping", () => {
   });
 
   it("does not resolve unknown public or source categories", () => {
-    expect(getCategorySlug(9)).toBeNull();
     expect(getCategorySlug(99)).toBeNull();
     expect(getCategoryIgrp("unknown")).toBeNull();
   });

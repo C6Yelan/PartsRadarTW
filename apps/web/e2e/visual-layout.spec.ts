@@ -85,6 +85,45 @@ test.beforeEach(async ({ page }) => {
               },
             ],
           },
+          {
+            id: "55555555-5555-4555-8555-555555555555",
+            slug: "storage",
+            displayName: "SSD",
+            sourceName: "固態 SSD",
+            facets: [
+              {
+                key: "pcie_generation",
+                label: "PCIe 世代",
+                options: [{ value: "gen4", label: "PCIe 4.0" }],
+              },
+            ],
+          },
+          {
+            id: "66666666-6666-4666-8666-666666666666",
+            slug: "hard-drive",
+            displayName: "HDD",
+            sourceName: "內接硬碟 HDD",
+            facets: [
+              {
+                key: "storage_usage",
+                label: "硬碟用途",
+                options: [{ value: "nas", label: "NAS" }],
+              },
+            ],
+          },
+          {
+            id: "77777777-7777-4777-8777-777777777777",
+            slug: "external-storage",
+            displayName: "外接儲存",
+            sourceName: "USB週邊 / 硬碟座 / 讀卡機",
+            facets: [
+              {
+                key: "external_type",
+                label: "商品類型",
+                options: [{ value: "usb-flash", label: "隨身碟" }],
+              },
+            ],
+          },
         ],
       });
       return;
@@ -121,8 +160,8 @@ test.beforeEach(async ({ page }) => {
           },
           {
             igrp: 7,
-            displayName: "SSD／HDD",
-            sourceName: "儲存裝置",
+            displayName: "SSD",
+            sourceName: "固態 SSD",
             status: fixture === "stale" ? "unavailable" : "ok",
             lastCheckedAt: OBSERVED_AT,
             lastSuccessAt: fixture === "stale" ? null : "2026-07-10T07:40:00.000Z",
@@ -300,6 +339,22 @@ test.beforeEach(async ({ page }) => {
 
     await route.fulfill({ status: 404, body: "" });
   });
+});
+
+test("shows separate SSD, HDD, and external-storage filters @desktop-only", async ({ page }) => {
+  await page.goto("/?category=hard-drive");
+
+  const categories = page.getByRole("radiogroup", { name: "分類" });
+  await expect(categories.getByText("SSD", { exact: true })).toBeVisible();
+  await expect(categories.getByText("HDD", { exact: true })).toBeVisible();
+  await expect(categories.getByText("外接儲存", { exact: true })).toBeVisible();
+  await expect(page.locator(".facet-filter").filter({ hasText: "硬碟用途" })).toBeVisible();
+
+  await categories.getByText("外接儲存", { exact: true }).click();
+  await expect
+    .poll(() => new URL(page.url()).searchParams.get("category"))
+    .toBe("external-storage");
+  await expect(page.locator(".facet-filter").filter({ hasText: "商品類型" })).toBeVisible();
 });
 
 test("keeps the main pages usable without horizontal overflow", async ({ page }, testInfo) => {

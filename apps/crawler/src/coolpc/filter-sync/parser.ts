@@ -82,7 +82,7 @@ export function parseCoolpcFilterSnapshot(html: string): ParsedCoolpcFilterSnaps
       sectionProductCount += 1;
 
       const optgroupLabel = option.parent("optgroup").attr("label")?.trim() ?? "";
-      const tags = new Set(section.baseTags ?? []);
+      const tags = new Set<string>();
 
       for (const conditions of mappedGroups) {
         if (!conditions) {

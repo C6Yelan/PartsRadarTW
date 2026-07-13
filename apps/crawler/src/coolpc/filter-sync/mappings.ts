@@ -11,7 +11,6 @@ export interface SourceFilterSectionMapping {
   igrp: number;
   selectName: string;
   controlName: string;
-  baseTags?: readonly string[];
   groups: readonly (SourceFilterGroupMapping | null)[];
 }
 
@@ -81,7 +80,6 @@ export const SOURCE_FILTER_SECTION_MAPPINGS: readonly SourceFilterSectionMapping
     igrp: 7,
     selectName: "n7",
     controlName: "ssdT",
-    baseTags: ["storage_type:ssd"],
     groups: [
       group("optgroup", {
         "2.5吋": ["form_factor:2-5-inch"],
@@ -93,10 +91,9 @@ export const SOURCE_FILTER_SECTION_MAPPINGS: readonly SourceFilterSectionMapping
     ],
   },
   {
-    igrp: 7,
+    igrp: 8,
     selectName: "n8",
     controlName: "hdT",
-    baseTags: ["storage_type:hdd"],
     groups: [
       group("optgroup", {
         "2.5吋": ["form_factor:2-5-inch"],
@@ -112,7 +109,7 @@ export const SOURCE_FILTER_SECTION_MAPPINGS: readonly SourceFilterSectionMapping
     ],
   },
   {
-    igrp: 8,
+    igrp: 9,
     selectName: "n9",
     controlName: "usbT",
     groups: [

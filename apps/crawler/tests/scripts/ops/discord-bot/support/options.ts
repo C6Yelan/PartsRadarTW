@@ -12,7 +12,7 @@ export const TEST_SOURCE_CATEGORIES = [
   { igrp: 4, displayName: "CPU" },
   { igrp: 5, displayName: "主機板" },
   { igrp: 6, displayName: "記憶體" },
-  { igrp: 7, displayName: "SSD / HDD" },
+  { igrp: 7, displayName: "SSD" },
   { igrp: 12, displayName: "顯示卡" },
 ] as const;
 

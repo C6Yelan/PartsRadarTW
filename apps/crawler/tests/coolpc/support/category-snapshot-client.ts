@@ -254,6 +254,7 @@ export function createProductWriterSpy(): {
     sourceCategoryId: string;
     fetchedAt: Date;
     sourceItemKeys: string[];
+    filterTags: string[][];
   }>;
   writeProducts: WriteCoolpcCategoryProductObservation;
 } {
@@ -263,6 +264,7 @@ export function createProductWriterSpy(): {
     sourceCategoryId: string;
     fetchedAt: Date;
     sourceItemKeys: string[];
+    filterTags: string[][];
   }> = [];
 
   return {
@@ -280,6 +282,7 @@ export function createProductWriterSpy(): {
         sourceCategoryId,
         fetchedAt,
         sourceItemKeys: parsedProducts.map((item) => item.sourceItemKey),
+        filterTags: parsedProducts.map((item) => item.filterTags),
       });
 
       return {

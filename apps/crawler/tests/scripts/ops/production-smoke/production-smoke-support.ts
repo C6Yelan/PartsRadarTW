@@ -37,6 +37,7 @@ export function stubHealthyPublicApi({
     "motherboard",
     "memory",
     "storage",
+    "hard-drive",
     "external-storage",
     "cooler",
     "liquid-cooling",

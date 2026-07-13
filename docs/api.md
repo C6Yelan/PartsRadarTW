@@ -37,7 +37,7 @@ PartsRadarTW 的公開 API 主要服務官方 web UI。它沒有版本化、SLA 
 Category slugs：
 
 ```text
-cpu, motherboard, memory, storage, external-storage, cooler,
+cpu, motherboard, memory, storage, hard-drive, external-storage, cooler,
 liquid-cooling, gpu, case, power-supply, fan-accessory
 ```
 

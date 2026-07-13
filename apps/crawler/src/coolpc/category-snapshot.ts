@@ -17,6 +17,7 @@ import {
   type CrawlRunSourceCategory,
   type ProcessCrawlCategoryResult,
 } from "./crawl-run";
+import { normalizeFilterSyncProductName } from "./filter-sync/parser";
 import { type ParsedCoolpcProduct, parseCoolpcCategoryPage } from "./parser";
 import {
   type CoolpcProductWriteClient,
@@ -146,7 +147,19 @@ export async function processCoolpcCategorySnapshot(
     url,
     options.sourceFilterTagsByProductName,
   );
-  const parseResult = parseCoolpcCategoryPage(snapshot.rawHtml, context);
+  let parseResult = parseCoolpcCategoryPage(snapshot.rawHtml, context);
+  const sourceTags = options.sourceFilterTagsByProductName;
+  const sourceTagJoinCoverage = getSourceTagJoinCoverage(parseResult.items, sourceTags);
+  if (sourceTagJoinCoverage && sourceTagJoinCoverage.ratio < 0.5) {
+    parseResult = parseCoolpcCategoryPage(
+      snapshot.rawHtml,
+      createCategoryContext(category, snapshot.fetchedAt, url),
+    );
+    parseResult.issues.push({
+      type: "content_validation_failed",
+      message: `filter_sync_join_coverage_low; matched=${sourceTagJoinCoverage.matchedCount}; total=${sourceTagJoinCoverage.totalCount}; source tags were not applied`,
+    });
+  }
   const parsedResultHash =
     parseResult.validation.status === "valid"
       ? createStableParsedResultHash(parseResult.items)
@@ -206,6 +219,24 @@ export async function processCoolpcCategorySnapshot(
         : CRAWL_RUN_CATEGORY_RESULT_STATUSES.SUCCESS_CHANGED,
     rawSnapshotId: rawSnapshot.id,
     productWriteSummary,
+  };
+}
+
+function getSourceTagJoinCoverage(
+  items: readonly ParsedCoolpcProduct[],
+  sourceTags: Readonly<Record<string, readonly string[]>> | undefined,
+): { matchedCount: number; totalCount: number; ratio: number } | null {
+  if (!sourceTags || Object.keys(sourceTags).length === 0 || items.length === 0) {
+    return null;
+  }
+
+  const matchedCount = items.filter((item) =>
+    Object.hasOwn(sourceTags, normalizeFilterSyncProductName(item.name)),
+  ).length;
+  return {
+    matchedCount,
+    totalCount: items.length,
+    ratio: matchedCount / items.length,
   };
 }
 

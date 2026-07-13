@@ -31,7 +31,7 @@ describe("CoolPC scheduled crawler daemon cycle", () => {
         return {
           outcome: "published",
           state: {
-            version: 1,
+            version: 2,
             lastAttemptAt: "2026-07-13T04:00:00.000Z",
             lastSuccessAt: "2026-07-13T04:00:00.000Z",
             lastError: null,

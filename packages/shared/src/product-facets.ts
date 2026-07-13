@@ -20,7 +20,7 @@ export interface ParsedProductFilterTag {
 type AddTag = (key: string, value: string) => void;
 type MatchRule = readonly [value: string, pattern: RegExp];
 
-export const PRODUCT_FACET_IGRPS = [4, 5, 6, 7, 8, 10, 11, 12, 14, 15, 16] as const;
+export const PRODUCT_FACET_IGRPS = [4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15, 16] as const;
 
 const CAPACITY_OPTIONS = [
   option("32", "32 GB"),
@@ -142,19 +142,21 @@ const PRODUCT_FACETS_BY_IGRP: Readonly<Record<number, readonly ProductFacetDefin
     ]),
   ],
   7: [
-    facet("storage_type", "儲存類型", [
-      option("ssd", "SSD"),
-      option("hdd", "HDD"),
-    ]),
     facet("form_factor", "尺寸", [
       option("m2", "M.2"),
       option("2-5-inch", "2.5 吋"),
-      option("3-5-inch", "3.5 吋"),
     ]),
     facet("pcie_generation", "PCIe 世代", [
       option("gen3", "PCIe 3.0"),
       option("gen4", "PCIe 4.0"),
       option("gen5", "PCIe 5.0"),
+    ]),
+    facet("capacity_gb", "容量", CAPACITY_OPTIONS),
+  ],
+  8: [
+    facet("form_factor", "尺寸", [
+      option("2-5-inch", "2.5 吋"),
+      option("3-5-inch", "3.5 吋"),
     ]),
     facet("capacity_gb", "容量", CAPACITY_OPTIONS),
     facet("storage_usage", "硬碟用途", [
@@ -164,7 +166,7 @@ const PRODUCT_FACETS_BY_IGRP: Readonly<Record<number, readonly ProductFacetDefin
       option("enterprise", "企業"),
     ]),
   ],
-  8: [
+  9: [
     facet("external_type", "商品類型", [
       option("memory-card", "記憶卡"),
       option("usb-flash", "隨身碟"),
@@ -335,6 +337,24 @@ export function isProductFilterTagSupported(igrp: number, tag: string): boolean 
   );
 }
 
+export function mergeProductFilterTags(
+  igrp: number,
+  localTags: readonly string[],
+  sourceTags: readonly string[],
+): string[] {
+  const sourceFacetKeys = new Set(sourceTags.map(readFacetKey));
+  const selected = new Set([
+    ...localTags.filter((tag) => !sourceFacetKeys.has(readFacetKey(tag))),
+    ...sourceTags,
+  ]);
+
+  return getProductFacetDefinitions(igrp).flatMap((definition) =>
+    definition.options
+      .map((candidate) => `${definition.key}:${candidate.value}`)
+      .filter((tag) => selected.has(tag)),
+  );
+}
+
 export function extractProductFilterTags(igrp: number, productName: string): string[] {
   const definitions = getProductFacetDefinitions(igrp);
 
@@ -365,6 +385,9 @@ export function extractProductFilterTags(igrp: number, productName: string): str
       extractStorageTags(text, add);
       break;
     case 8:
+      extractStorageTags(text, add);
+      break;
+    case 9:
       extractExternalStorageTags(text, add);
       break;
     case 10:
@@ -420,11 +443,48 @@ function extractCpuTags(text: string, add: AddTag): void {
     ["ryzen-9", /\b(?:RYZEN\s*9|R9)\b/],
   ]);
 
-  if (/無內顯/.test(text)) {
+  if (/無內顯/.test(text) || hasKnownCpuWithoutIntegratedGraphics(text)) {
     add("integrated_graphics", "no");
-  } else if (/(?:具|有)?內顯|內建顯示/.test(text)) {
+  } else if (/(?:具|有)?內顯|內建顯示/.test(text) || hasKnownCpuWithIntegratedGraphics(text)) {
     add("integrated_graphics", "yes");
   }
+}
+
+function hasKnownCpuWithoutIntegratedGraphics(text: string): boolean {
+  if (/THREADRIPPER|RYZEN\s+TR\b/.test(text)) {
+    return true;
+  }
+
+  if (/\bI[3579]-\d{4,5}(?:KF|F)\b|\bCORE\s+ULTRA\s+[3579]\s+\d{3}(?:KF|F)\b/.test(text)) {
+    return true;
+  }
+
+  const amdModel = text.match(/\b(?:RYZEN\s*)?R?[3579]\s*([345789]\d{3})([A-Z0-9]*)\b/);
+  if (!amdModel) {
+    return false;
+  }
+
+  const generation = amdModel[1]?.[0];
+  const suffix = amdModel[2] ?? "";
+  if (suffix.includes("G")) {
+    return false;
+  }
+  return suffix.includes("F") || generation === "3" || generation === "4" || generation === "5";
+}
+
+function hasKnownCpuWithIntegratedGraphics(text: string): boolean {
+  if (/\bI[3579]-\d{4,5}[A-Z]*\b|\bCORE\s+ULTRA\s+[3579]\s+\d{3}[A-Z]*\b/.test(text)) {
+    return true;
+  }
+
+  const amdModel = text.match(/\b(?:RYZEN\s*)?R?[3579]\s*([345789]\d{3})([A-Z0-9]*)\b/);
+  if (!amdModel) {
+    return false;
+  }
+
+  const generation = amdModel[1]?.[0];
+  const suffix = amdModel[2] ?? "";
+  return suffix.includes("G") || generation === "7" || generation === "8" || generation === "9";
 }
 
 function extractMotherboardTags(text: string, add: AddTag): void {
@@ -574,19 +634,19 @@ function extractCoolerTags(text: string, add: AddTag): void {
 }
 
 function extractLiquidCoolingTags(text: string, add: AddTag): void {
-  if (/一體式|AIO|封閉式/.test(text)) {
-    add("liquid_type", "aio");
-  } else if (/開放式/.test(text)) {
+  if (/開放式/.test(text)) {
     add("liquid_type", "custom");
-  } else if (/水冷頭|水泵|冷排|水箱|接頭|水冷管/.test(text)) {
+  } else if (/水冷(?:頭|泵|排|箱|接頭|管|液)|水泵|冷排|水箱|止水栓|流量計/.test(text)) {
     add("liquid_type", "component");
+  } else if (/一體式|AIO|封閉式|水冷/.test(text)) {
+    add("liquid_type", "aio");
   }
 
   addFirstNumberMatch(
     add,
     "radiator_size_mm",
     text,
-    /(?:^|[^\d])(120|240|280|360|420)\s*(?:MM|水冷|冷排)/,
+    /(?:^|[^\d])(120|240|280|360|420)(?=[^\d]|$)/,
   );
   extractExplicitSockets(text, add);
 }
@@ -750,6 +810,10 @@ function addAllMatches(
       add(key, value);
     }
   }
+}
+
+function readFacetKey(tag: string): string {
+  return tag.slice(0, tag.indexOf(":"));
 }
 
 function addFirstMatch(

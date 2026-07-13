@@ -189,7 +189,7 @@ describe("handleDiscordInteraction price report settings panel", () => {
 
     const embed = readResponseEmbed(requestBody);
 
-    expect(readEmbedFieldValue(embed, "分類")).toBe("SSD / HDD、顯示卡");
+    expect(readEmbedFieldValue(embed, "分類")).toBe("SSD、顯示卡");
     expect(readEmbedFieldValue(embed, "商品關鍵字")).toBe("RTX 5090");
     expect(readEmbedFieldValue(embed, "內容")).toBe("降價、新增商品");
   });

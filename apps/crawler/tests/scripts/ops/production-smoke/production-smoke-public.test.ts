@@ -38,7 +38,7 @@ describe("production smoke public checks", () => {
         expect.objectContaining({
           name: "categories api",
           status: "OK",
-          message: "categories=11 advancedFilters=motherboard,memory",
+          message: "categories=12 advancedFilters=motherboard,memory",
         }),
         expect.objectContaining({
           name: "product image api",

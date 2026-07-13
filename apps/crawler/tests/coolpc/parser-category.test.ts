@@ -49,7 +49,7 @@ describe("CoolPC category parser", () => {
     }
   });
 
-  it("derives vendor metadata for added external storage, water cooling, and fan categories", () => {
+  it("derives vendor metadata for HDD, water cooling, and fan categories", () => {
     const fixtures = [
       [
         8,
@@ -101,6 +101,27 @@ describe("CoolPC category parser", () => {
     expect(result.items.map((item) => item.name)).toEqual([
       "酷碼 HTK-002 美國道康膏/導熱係數 0.8W/m-K",
     ]);
+  });
+
+  it("skips motherboard promotions embedded in the CPU source category", () => {
+    const html = fixture("cpu-category.normal.html").replace(
+      "</section>",
+      `<div class="item">
+        <div class="w">CPU-BUNDLE-BOARD</div>
+        <span>
+          <img alt="" src="/eval/4/board.jpg">
+          <div class="t">[搭CPU現省500] 技嘉 B860M GAMING X WIFI6E(M-ATX)</div>
+          <div class="x">含稅：NT4990</div>
+        </span>
+      </div></section>`,
+    );
+
+    const result = parseCoolpcCategoryPage(html, context);
+
+    expect(result.items.map((item) => item.name)).not.toContain(
+      "[搭CPU現省500] 技嘉 B860M GAMING X WIFI6E(M-ATX)",
+    );
+    expect(result.items).toHaveLength(2);
   });
 
   it("deduplicates exact duplicate rows from reduced live case and power supply fixtures", () => {
