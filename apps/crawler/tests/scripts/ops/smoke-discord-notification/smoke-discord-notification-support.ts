@@ -12,8 +12,7 @@ import type {
 import {
   createEmptySmokeDiscordNotificationState,
   type SmokeCheckAlertState,
-  type SmokeDiscordNotificationStateV1,
-  type SmokeDiscordNotificationStateV2,
+  type SmokeDiscordNotificationState,
 } from "../../../../src/scripts/ops/smoke-discord-notification";
 import type { SmokeAlertPolicyOptions } from "../../../../src/scripts/ops/smoke-discord-notification/policy";
 
@@ -56,8 +55,8 @@ export function check(
 }
 
 export function state(
-  overrides: Partial<SmokeDiscordNotificationStateV2> = {},
-): SmokeDiscordNotificationStateV2 {
+  overrides: Partial<SmokeDiscordNotificationState> = {},
+): SmokeDiscordNotificationState {
   return { ...createEmptySmokeDiscordNotificationState(), ...overrides };
 }
 
@@ -76,20 +75,6 @@ export function checkState(
     lastNotificationKind: null,
     lastNotificationAt: null,
     lastNotifiedFingerprint: null,
-    ...overrides,
-  };
-}
-
-export function stateV1(
-  overrides: Partial<SmokeDiscordNotificationStateV1> = {},
-): SmokeDiscordNotificationStateV1 {
-  return {
-    version: 1,
-    lastObservedStatus: "WARN",
-    lastObservedAt: "2026-06-06T11:00:00.000Z",
-    lastNotificationKind: "WARN",
-    lastNotificationAt: "2026-06-06T11:00:00.000Z",
-    lastNotificationKey: "WARN:WARN:source freshness",
     ...overrides,
   };
 }

@@ -1,5 +1,5 @@
 // apps/crawler/tests/scripts/ops/smoke-discord-notification/smoke-discord-notification.test.ts
-// 驗證 per-check pending、stable recovery、reminder、migration reconciliation 與 message policy。
+// 驗證 per-check pending、stable recovery、reminder 與 message policy。
 
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -15,7 +15,6 @@ import {
   createWorkspace,
   POLICY_OPTIONS,
   state,
-  stateV1,
   summary,
   WEBHOOK_URL,
 } from "./smoke-discord-notification-support";
@@ -137,7 +136,7 @@ describe("WARN pending and transport-safe metadata", () => {
   });
 });
 
-describe("filter-quality migration and pending policy", () => {
+describe("filter-quality pending policy", () => {
   it("waits three filter-quality WARN cycles and persists the counter across reads", () => {
     let current = state();
     for (const [index, expectedNotifications] of [0, 0, 1].entries()) {
@@ -154,51 +153,6 @@ describe("filter-quality migration and pending policy", () => {
       current = decision.nextState;
     }
     expect(current.checks["product filter quality"]?.consecutiveBad).toBe(3);
-  });
-
-  it("reconciles an already-notified v1 persistent WARN without duplicate alert", () => {
-    const migrated = parseSmokeDiscordNotificationState(
-      stateV1({ lastNotificationKey: "WARN:WARN:product filter quality" }),
-    );
-    const decision = createSmokeDiscordNotificationDecision({
-      summary: summary({
-        status: "WARN",
-        checkedAt: new Date("2026-06-06T12:00:00.000Z"),
-        checks: [check("product filter quality", "WARN")],
-      }),
-      previousState: migrated,
-      options: POLICY_OPTIONS,
-    });
-    expect(decision.notifications).toHaveLength(0);
-    expect(decision.nextState.checks["product filter quality"]).toMatchObject({
-      activeSince: "2026-06-06T11:00:00.000Z",
-      lastNotificationAt: "2026-06-06T11:00:00.000Z",
-      lastNotifiedFingerprint: "product filter quality|WARN|WARNING",
-    });
-  });
-
-  it("does not emit a false recovery on the first v2 OK after v1 migration", () => {
-    const decision = createSmokeDiscordNotificationDecision({
-      summary: summary({ status: "OK" }),
-      previousState: parseSmokeDiscordNotificationState(stateV1()),
-      options: POLICY_OPTIONS,
-    });
-    expect(decision.notifications).toHaveLength(0);
-    expect(decision.nextState.legacyNotification).toBeNull();
-  });
-
-  it("conservatively reconciles all matching checks when a v1 key cannot identify the cause", () => {
-    const decision = createSmokeDiscordNotificationDecision({
-      summary: summary({
-        status: "WARN",
-        checks: [check("source freshness", "WARN"), check("missing product images", "WARN")],
-      }),
-      previousState: parseSmokeDiscordNotificationState(stateV1({ lastNotificationKey: null })),
-      options: POLICY_OPTIONS,
-    });
-    expect(decision.notifications).toHaveLength(0);
-    expect(decision.nextState.checks["source freshness"]?.lastNotificationAt).not.toBeNull();
-    expect(decision.nextState.checks["missing product images"]?.lastNotificationAt).not.toBeNull();
   });
 });
 

@@ -35,7 +35,7 @@ import {
   markSmokeNotificationSent,
   readSmokeDiscordNotificationState,
   type SmokeDiscordNotificationOptions,
-  type SmokeDiscordNotificationStateV2,
+  type SmokeDiscordNotificationState,
   writeSmokeDiscordNotificationState,
 } from "./smoke-discord-notification";
 import { createMonitorExecutionFailureMessage } from "./smoke-discord-notification/message";
@@ -267,7 +267,7 @@ function countChecksByStatus(summary: ProductionSmokeSummary): Record<SmokeStatu
 async function readStateSafely(
   path: string,
   logMessage: (message: string) => void,
-): Promise<SmokeDiscordNotificationStateV2> {
+): Promise<SmokeDiscordNotificationState> {
   try {
     return (
       (await readSmokeDiscordNotificationState(path)) ?? createEmptySmokeDiscordNotificationState()
@@ -282,7 +282,7 @@ async function readStateSafely(
 
 async function writeStateSafely(
   path: string,
-  state: SmokeDiscordNotificationStateV2,
+  state: SmokeDiscordNotificationState,
   logMessage: (message: string) => void,
 ): Promise<boolean> {
   try {
@@ -302,7 +302,7 @@ async function deliverNotifications({
   logMessage,
   sentAt,
 }: {
-  state: SmokeDiscordNotificationStateV2;
+  state: SmokeDiscordNotificationState;
   notifications: Array<
     SmokeNotificationCandidate & { message: DiscordWebhookSendOptions["message"] }
   >;
@@ -310,7 +310,7 @@ async function deliverNotifications({
   sendDiscordWebhook: (options: DiscordWebhookSendOptions) => Promise<DiscordWebhookSendResult>;
   logMessage: (message: string) => void;
   sentAt: Date;
-}): Promise<{ state: SmokeDiscordNotificationStateV2; action: string }> {
+}): Promise<{ state: SmokeDiscordNotificationState; action: string }> {
   if (notifications.length === 0) {
     return { state, action: "none" };
   }

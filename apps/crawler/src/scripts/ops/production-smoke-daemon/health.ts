@@ -1,13 +1,13 @@
 // apps/crawler/src/scripts/ops/production-smoke-daemon/health.ts
 // 純函式判斷 production smoke progress 是否持續完成，不把 WARN summary 誤判為 daemon unhealthy。
 
-import type { SmokeDiscordNotificationStateV2 } from "../smoke-discord-notification";
+import type { SmokeDiscordNotificationState } from "../smoke-discord-notification";
 
 export interface SmokeProgressHealthResult {
   healthy: boolean;
   reason: string;
   lastCompletedAt: string | null;
-  outcome: SmokeDiscordNotificationStateV2["progress"]["lastCycleOutcome"];
+  outcome: SmokeDiscordNotificationState["progress"]["lastCycleOutcome"];
 }
 
 export function evaluateSmokeProgressHealth({
@@ -15,7 +15,7 @@ export function evaluateSmokeProgressHealth({
   now,
   staleThresholdSeconds,
 }: {
-  state: SmokeDiscordNotificationStateV2 | null;
+  state: SmokeDiscordNotificationState | null;
   now: Date;
   staleThresholdSeconds: number;
 }): SmokeProgressHealthResult {

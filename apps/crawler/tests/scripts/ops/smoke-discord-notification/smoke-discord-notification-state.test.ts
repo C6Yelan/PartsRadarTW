@@ -1,16 +1,16 @@
 // apps/crawler/tests/scripts/ops/smoke-discord-notification/smoke-discord-notification-state.test.ts
-// 驗證 smoke state v1 migration、v2 嚴格 schema 與 atomic round trip。
+// 驗證 smoke state schema v2 嚴格解析、拒絕舊版本與 atomic round trip。
 
 import { mkdir, readdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
-  migrateSmokeNotificationStateV1,
+  createEmptySmokeDiscordNotificationState,
   parseSmokeDiscordNotificationState,
   readSmokeDiscordNotificationState,
   writeSmokeDiscordNotificationState,
 } from "../../../../src/scripts/ops/smoke-discord-notification";
-import { checkState, createWorkspace, state, stateV1 } from "./smoke-discord-notification-support";
+import { checkState, createWorkspace, state } from "./smoke-discord-notification-support";
 
 describe("production smoke state file", () => {
   it("returns null when the state file does not exist", async () => {
@@ -20,21 +20,22 @@ describe("production smoke state file", () => {
     ).resolves.toBeNull();
   });
 
-  it("reads and migrates a valid v1 state without losing aggregate metadata", () => {
-    const legacy = stateV1();
-    expect(parseSmokeDiscordNotificationState(legacy)).toEqual(
-      migrateSmokeNotificationStateV1(legacy),
-    );
-    expect(parseSmokeDiscordNotificationState(legacy)).toMatchObject({
+  it("creates and parses the fixed v2 empty state shape", () => {
+    const empty = createEmptySmokeDiscordNotificationState();
+    expect(empty).toEqual({
       version: 2,
-      checks: {},
-      legacyNotification: {
-        lastObservedStatus: "WARN",
-        lastNotificationKind: "WARN",
-        lastNotificationAt: "2026-06-06T11:00:00.000Z",
-        lastNotificationKey: "WARN:WARN:source freshness",
+      progress: {
+        lastCycleStartedAt: null,
+        lastCycleCompletedAt: null,
+        lastCycleDurationMs: null,
+        lastCycleOutcome: null,
+        lastCycleErrorKind: null,
+        consecutiveCycleErrors: 0,
       },
+      checks: {},
     });
+    expect(Object.keys(empty)).toEqual(["version", "progress", "checks"]);
+    expect(parseSmokeDiscordNotificationState(empty)).toEqual(empty);
   });
 
   it("round trips a valid v2 state through an atomic write", async () => {
@@ -64,11 +65,22 @@ describe("production smoke state file", () => {
   });
 
   it.each([
-    [{ version: 999 }, "invalid version"],
+    [{ ...state(), version: Number("1") }, "old version"],
+    [{ ...state(), version: 999 }, "unknown version"],
+    [{ progress: state().progress, checks: {} }, "missing version"],
+    [{ ...state(), obsoleteField: null }, "unexpected top-level field"],
     [state({ progress: { ...state().progress, consecutiveCycleErrors: -1 } }), "invalid counter"],
     [
       state({ progress: { ...state().progress, lastCycleStartedAt: "not-a-date" } }),
       "invalid date",
+    ],
+    [
+      state({
+        checks: {
+          homepage: { ...checkState({ checkName: "homepage" }), consecutiveBad: -1 },
+        },
+      }),
+      "invalid check",
     ],
   ])("rejects %s", (value, _label) => {
     expect(() => parseSmokeDiscordNotificationState(value)).toThrow(

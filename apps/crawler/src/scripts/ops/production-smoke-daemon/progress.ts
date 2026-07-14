@@ -4,13 +4,13 @@
 import type { SmokeStatus } from "../production-smoke";
 import type {
   SmokeCycleOutcome,
-  SmokeDiscordNotificationStateV2,
+  SmokeDiscordNotificationState,
 } from "../smoke-discord-notification";
 
 export function markSmokeCycleStarted(
-  state: SmokeDiscordNotificationStateV2,
+  state: SmokeDiscordNotificationState,
   startedAt: Date,
-): SmokeDiscordNotificationStateV2 {
+): SmokeDiscordNotificationState {
   return {
     ...state,
     progress: {
@@ -21,13 +21,13 @@ export function markSmokeCycleStarted(
 }
 
 export function markSmokeCycleCompleted(
-  state: SmokeDiscordNotificationStateV2,
+  state: SmokeDiscordNotificationState,
   {
     completedAt,
     durationMs,
     outcome,
   }: { completedAt: Date; durationMs: number; outcome: SmokeStatus },
-): SmokeDiscordNotificationStateV2 {
+): SmokeDiscordNotificationState {
   return {
     ...state,
     progress: {
@@ -42,7 +42,7 @@ export function markSmokeCycleCompleted(
 }
 
 export function markSmokeCycleFailed(
-  state: SmokeDiscordNotificationStateV2,
+  state: SmokeDiscordNotificationState,
   {
     completedAt,
     durationMs,
@@ -54,7 +54,7 @@ export function markSmokeCycleFailed(
     outcome: Extract<SmokeCycleOutcome, "ERROR" | "TIMEOUT">;
     errorKind: string;
   },
-): SmokeDiscordNotificationStateV2 {
+): SmokeDiscordNotificationState {
   return {
     ...state,
     progress: {

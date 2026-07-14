@@ -12,7 +12,7 @@ import {
 } from "./smoke-discord-notification/policy";
 import {
   createEmptySmokeDiscordNotificationState,
-  type SmokeDiscordNotificationStateV2,
+  type SmokeDiscordNotificationState,
 } from "./smoke-discord-notification/state";
 
 const DEFAULT_STATE_FILE = "storage/ops/smoke-discord-state.json";
@@ -30,19 +30,15 @@ export {
   markSmokeNotificationSent,
 } from "./smoke-discord-notification/policy";
 export type {
-  LegacySmokeNotificationState,
   SmokeAlertClassification,
   SmokeCheckAlertState,
   SmokeCycleOutcome,
   SmokeDaemonProgressState,
   SmokeDiscordNotificationKind,
   SmokeDiscordNotificationState,
-  SmokeDiscordNotificationStateV1,
-  SmokeDiscordNotificationStateV2,
 } from "./smoke-discord-notification/state";
 export {
   createEmptySmokeDiscordNotificationState,
-  migrateSmokeNotificationStateV1,
   parseSmokeDiscordNotificationState,
   readSmokeDiscordNotificationState,
   writeSmokeDiscordNotificationState,
@@ -58,7 +54,7 @@ export interface SmokeNotificationDeliveryCandidate extends SmokeNotificationCan
 }
 
 export interface SmokeDiscordNotificationDecision {
-  nextState: SmokeDiscordNotificationStateV2;
+  nextState: SmokeDiscordNotificationState;
   notifications: SmokeNotificationDeliveryCandidate[];
 }
 
@@ -129,7 +125,7 @@ export function createSmokeDiscordNotificationDecision({
   options,
 }: {
   summary: ProductionSmokeSummary;
-  previousState: SmokeDiscordNotificationStateV2 | null;
+  previousState: SmokeDiscordNotificationState | null;
   options: SmokeAlertPolicyOptions;
 }): SmokeDiscordNotificationDecision {
   const decision = applySmokeSummaryObservation({

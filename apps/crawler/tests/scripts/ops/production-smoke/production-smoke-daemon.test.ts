@@ -279,6 +279,36 @@ describe("production smoke daemon durable lifecycle", () => {
       progress: { lastCycleOutcome: "OK" },
     });
   });
+
+  it("rejects an old-version state and overwrites it with valid v2 after success", async () => {
+    const fixture = await createDaemonFixture({ webhook: false });
+    await mkdir(dirname(fixture.stateFilePath), { recursive: true });
+    await writeFile(
+      fixture.stateFilePath,
+      JSON.stringify({ version: Number("1"), lastObservedStatus: "WARN" }),
+      "utf8",
+    );
+    const logs: string[] = [];
+    await runProductionSmokeDaemon({
+      ...fixture.runOptions,
+      runSmoke: async () => smokeSummary("OK"),
+      now: sequenceNow("2026-06-06T12:00:00.000Z", "2026-06-06T12:00:00.600Z"),
+      logMessage: (message) => logs.push(message),
+      logWarning: (message) => logs.push(message),
+    });
+    expect(logs).toContain(
+      "Production smoke state is invalid; using an empty state without deleting the file.",
+    );
+    const writtenState = await readSmokeDiscordNotificationState(fixture.stateFilePath);
+    expect(writtenState).toMatchObject({
+      version: 2,
+      progress: { lastCycleOutcome: "OK" },
+    });
+    if (!writtenState) {
+      throw new Error("Expected the successful cycle to write a state file.");
+    }
+    expect(Object.keys(writtenState)).toEqual(["version", "progress", "checks"]);
+  });
 });
 
 function smokeSummary(status: "OK" | "WARN" | "FAIL") {

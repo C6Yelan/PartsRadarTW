@@ -7,7 +7,7 @@ import type {
   SmokeCheckAlertState,
   SmokeCycleOutcome,
   SmokeDiscordNotificationKind,
-  SmokeDiscordNotificationStateV2,
+  SmokeDiscordNotificationState,
 } from "./state";
 
 const FILTER_QUALITY_CHECK_NAME = "product filter quality";
@@ -36,7 +36,7 @@ export interface SmokeNotificationCandidate {
 }
 
 export interface SmokeAlertObservationDecision {
-  nextState: SmokeDiscordNotificationStateV2;
+  nextState: SmokeDiscordNotificationState;
   notifications: SmokeNotificationCandidate[];
 }
 
@@ -67,13 +67,12 @@ export function applySmokeSummaryObservation({
   options,
 }: {
   summary: ProductionSmokeSummary;
-  previousState: SmokeDiscordNotificationStateV2;
+  previousState: SmokeDiscordNotificationState;
   options: SmokeAlertPolicyOptions;
 }): SmokeAlertObservationDecision {
-  const nextState: SmokeDiscordNotificationStateV2 = {
+  const nextState: SmokeDiscordNotificationState = {
     ...previousState,
     checks: { ...previousState.checks },
-    legacyNotification: null,
   };
   const notifications: SmokeNotificationCandidate[] = [];
   if (previousState.checks[MONITOR_EXECUTION_STATE_KEY]) {
@@ -96,8 +95,7 @@ export function applySmokeSummaryObservation({
 
   for (const check of summary.checks) {
     const stateKey = check.name;
-    const previousCheck =
-      previousState.checks[stateKey] ?? reconcileLegacyCheck(previousState, check, options);
+    const previousCheck = previousState.checks[stateKey] ?? null;
     const decision = observeCheck({
       check,
       previousCheck,
@@ -122,7 +120,7 @@ export function applyMonitorFailureObservation({
   observedAt,
   options,
 }: {
-  previousState: SmokeDiscordNotificationStateV2;
+  previousState: SmokeDiscordNotificationState;
   outcome: Extract<SmokeCycleOutcome, "ERROR" | "TIMEOUT">;
   errorKind: string;
   observedAt: Date;
@@ -160,7 +158,6 @@ export function applyMonitorFailureObservation({
     nextState: {
       ...previousState,
       checks: { ...previousState.checks, [MONITOR_EXECUTION_STATE_KEY]: nextCheck },
-      legacyNotification: null,
     },
     notifications: shouldNotify
       ? [
@@ -186,10 +183,10 @@ export function markSmokeNotificationSent({
   notification,
   sentAt,
 }: {
-  state: SmokeDiscordNotificationStateV2;
+  state: SmokeDiscordNotificationState;
   notification: SmokeNotificationCandidate;
   sentAt: Date;
-}): SmokeDiscordNotificationStateV2 {
+}): SmokeDiscordNotificationState {
   const current = state.checks[notification.stateKey];
   if (!current) {
     return state;
@@ -351,46 +348,6 @@ function observeGoodCheck({
       issue: check.message,
       previousStatus,
     },
-  };
-}
-
-function reconcileLegacyCheck(
-  state: SmokeDiscordNotificationStateV2,
-  check: SmokeCheckResult,
-  options: SmokeAlertPolicyOptions,
-): SmokeCheckAlertState | null {
-  const legacy = state.legacyNotification;
-  if (!legacy || check.status === "OK" || legacy.lastObservedStatus !== check.status) {
-    return null;
-  }
-
-  const keyMatches =
-    legacy.lastNotificationKey?.includes(`:${check.status}:${check.name}`) ?? false;
-  const hasStructuredKey =
-    legacy.lastNotificationKey?.startsWith(`${legacy.lastObservedStatus}:`) ?? false;
-  if (hasStructuredKey && !keyMatches) {
-    return null;
-  }
-
-  const classification = classifySmokeCheck(check);
-  const fingerprint = createSmokeFingerprint(check.name, check.status, classification);
-  const wasNotified =
-    legacy.lastNotificationAt !== null &&
-    (legacy.lastNotificationKind === "WARN" || legacy.lastNotificationKind === "FAIL");
-
-  return {
-    checkName: check.name,
-    classification,
-    lastObservedStatus: check.status,
-    lastObservedAt: legacy.lastObservedAt,
-    currentFingerprint: fingerprint,
-    pendingSince: wasNotified ? null : legacy.lastObservedAt,
-    activeSince: wasNotified ? legacy.lastObservedAt : null,
-    consecutiveBad: wasNotified ? getPendingThreshold(check, options) : 0,
-    consecutiveGood: 0,
-    lastNotificationKind: legacy.lastNotificationKind,
-    lastNotificationAt: legacy.lastNotificationAt,
-    lastNotifiedFingerprint: wasNotified ? fingerprint : null,
   };
 }
 

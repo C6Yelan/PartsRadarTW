@@ -1,5 +1,5 @@
 // apps/crawler/src/scripts/ops/smoke-discord-notification/state.ts
-// 讀寫 production smoke 的 durable progress 與 per-check 告警狀態，並安全升級既有 v1 檔案。
+// 讀寫 production smoke schema v2 的 durable progress 與 per-check 告警狀態。
 
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
@@ -35,28 +35,13 @@ export interface SmokeCheckAlertState {
   lastNotifiedFingerprint: string | null;
 }
 
-export interface LegacySmokeNotificationState {
-  lastObservedStatus: SmokeStatus;
-  lastObservedAt: string;
-  lastNotificationKind: SmokeDiscordNotificationKind | null;
-  lastNotificationAt: string | null;
-  lastNotificationKey: string | null;
-}
-
-export interface SmokeDiscordNotificationStateV2 {
+export interface SmokeDiscordNotificationState {
   version: 2;
   progress: SmokeDaemonProgressState;
   checks: Record<string, SmokeCheckAlertState>;
-  legacyNotification: LegacySmokeNotificationState | null;
 }
 
-export interface SmokeDiscordNotificationStateV1 extends LegacySmokeNotificationState {
-  version: 1;
-}
-
-export type SmokeDiscordNotificationState = SmokeDiscordNotificationStateV2;
-
-export function createEmptySmokeDiscordNotificationState(): SmokeDiscordNotificationStateV2 {
+export function createEmptySmokeDiscordNotificationState(): SmokeDiscordNotificationState {
   return {
     version: SMOKE_DISCORD_NOTIFICATION_STATE_VERSION,
     progress: {
@@ -68,14 +53,13 @@ export function createEmptySmokeDiscordNotificationState(): SmokeDiscordNotifica
       consecutiveCycleErrors: 0,
     },
     checks: {},
-    legacyNotification: null,
   };
 }
 
-// 讀取單一 smoke state file；v1 會在記憶體中遷移，首次成功寫入後自然成為 v2。
+// 讀取單一 smoke state file；缺檔視為尚未建立，其餘內容必須符合 schema v2。
 export async function readSmokeDiscordNotificationState(
   path: string,
-): Promise<SmokeDiscordNotificationStateV2 | null> {
+): Promise<SmokeDiscordNotificationState | null> {
   let raw: string;
 
   try {
@@ -91,16 +75,13 @@ export async function readSmokeDiscordNotificationState(
   return parseSmokeDiscordNotificationState(JSON.parse(raw));
 }
 
-// 嚴格驗證 v1/v2 schema；不可信內容由 caller 決定採安全空 state 繼續。
-export function parseSmokeDiscordNotificationState(
-  value: unknown,
-): SmokeDiscordNotificationStateV2 {
-  if (!isRecord(value)) {
+// 嚴格驗證 schema v2；不可信內容由 caller 決定採安全空 state 繼續。
+export function parseSmokeDiscordNotificationState(value: unknown): SmokeDiscordNotificationState {
+  if (
+    !isRecord(value) ||
+    Object.keys(value).some((key) => !["version", "progress", "checks"].includes(key))
+  ) {
     throw invalidStateError();
-  }
-
-  if (value.version === 1) {
-    return migrateSmokeNotificationStateV1(parseStateV1(value));
   }
 
   if (value.version !== SMOKE_DISCORD_NOTIFICATION_STATE_VERSION) {
@@ -125,32 +106,13 @@ export function parseSmokeDiscordNotificationState(
     version: SMOKE_DISCORD_NOTIFICATION_STATE_VERSION,
     progress,
     checks,
-    legacyNotification:
-      value.legacyNotification === null
-        ? null
-        : parseLegacyNotificationState(value.legacyNotification),
-  };
-}
-
-export function migrateSmokeNotificationStateV1(
-  state: SmokeDiscordNotificationStateV1,
-): SmokeDiscordNotificationStateV2 {
-  return {
-    ...createEmptySmokeDiscordNotificationState(),
-    legacyNotification: {
-      lastObservedStatus: state.lastObservedStatus,
-      lastObservedAt: state.lastObservedAt,
-      lastNotificationKind: state.lastNotificationKind,
-      lastNotificationAt: state.lastNotificationAt,
-      lastNotificationKey: state.lastNotificationKey,
-    },
   };
 }
 
 // 以臨時檔加 rename 原子寫入，避免 daemon 中斷留下半套 JSON。
 export async function writeSmokeDiscordNotificationState(
   path: string,
-  state: SmokeDiscordNotificationStateV2,
+  state: SmokeDiscordNotificationState,
 ): Promise<void> {
   const validatedState = parseSmokeDiscordNotificationState(state);
   const directory = dirname(path);
@@ -159,11 +121,6 @@ export async function writeSmokeDiscordNotificationState(
   await mkdir(directory, { recursive: true });
   await writeFile(tempPath, `${JSON.stringify(validatedState, null, 2)}\n`, "utf8");
   await rename(tempPath, path);
-}
-
-function parseStateV1(value: Record<string, unknown>): SmokeDiscordNotificationStateV1 {
-  const legacy = parseLegacyNotificationState(value);
-  return { version: 1, ...legacy };
 }
 
 function parseProgressState(value: unknown): SmokeDaemonProgressState {
@@ -224,29 +181,6 @@ function parseCheckState(value: Record<string, unknown>): SmokeCheckAlertState {
     lastNotificationKind: value.lastNotificationKind,
     lastNotificationAt: value.lastNotificationAt,
     lastNotifiedFingerprint: value.lastNotifiedFingerprint,
-  };
-}
-
-function parseLegacyNotificationState(value: unknown): LegacySmokeNotificationState {
-  if (!isRecord(value)) {
-    throw invalidStateError();
-  }
-  if (
-    !isSmokeStatus(value.lastObservedStatus) ||
-    !isIsoDate(value.lastObservedAt) ||
-    !isNullableNotificationKind(value.lastNotificationKind) ||
-    !isNullableIsoDate(value.lastNotificationAt) ||
-    !isNullableSafeString(value.lastNotificationKey)
-  ) {
-    throw invalidStateError();
-  }
-
-  return {
-    lastObservedStatus: value.lastObservedStatus,
-    lastObservedAt: value.lastObservedAt,
-    lastNotificationKind: value.lastNotificationKind,
-    lastNotificationAt: value.lastNotificationAt,
-    lastNotificationKey: value.lastNotificationKey,
   };
 }
 
