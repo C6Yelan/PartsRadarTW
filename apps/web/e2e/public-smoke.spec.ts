@@ -108,14 +108,20 @@ test.describe("public web smoke", () => {
     } else {
       await expect(heroScreenshot).toBeHidden();
     }
-    const localNavigation = page.getByRole("navigation", { name: "Discord 教學頁內導覽" });
-    await expect(localNavigation.getByRole("link")).toHaveCount(4);
+    await expect(page.getByRole("link", { name: "開始使用" })).toHaveCount(0);
+    await expect(page.locator(".discord-local-nav")).toHaveCount(0);
     await expect(page.getByRole("heading", { name: "快速開始" })).toBeVisible();
     const quickStartSection = page.getByRole("region", { name: "快速開始" });
     await expect(quickStartSection.locator(".discord-step-list > li")).toHaveCount(3);
     await expect(quickStartSection).not.toContainText("/public-report manage");
-    await expect(page.getByRole("link", { name: "前往一般使用者教學" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "前往管理員教學" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "查看一般使用者教學" })).toHaveAttribute(
+      "href",
+      "#quick-start",
+    );
+    await expect(page.getByRole("link", { name: "查看管理員教學" })).toHaveAttribute(
+      "href",
+      "#discord-admin-guide",
+    );
 
     const userGuide = page.getByRole("region", { name: "提醒與個人價格報告" });
     await expect(userGuide.getByText("/watch", { exact: true })).toHaveCount(2);
@@ -158,7 +164,7 @@ test.describe("public web smoke", () => {
     await faqItems.first().locator("summary").press("Enter");
     await expect(faqItems.first()).toHaveAttribute("open", "");
 
-    await localNavigation.getByRole("link", { name: "伺服器管理員" }).click();
+    await page.getByRole("link", { name: "查看管理員教學" }).click();
     await expect(page.locator("#discord-admin-guide")).toBeInViewport();
     await expectImagesLoaded(page.locator(".discord-guide-image:visible"));
     await expectTopbarLinks(page);

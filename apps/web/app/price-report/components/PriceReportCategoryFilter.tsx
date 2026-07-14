@@ -32,13 +32,21 @@ export function PriceReportCategoryFilter({
 
   useEffect(() => {
     if (!isOpen) return;
+    const root = rootRef.current;
 
     const closeOnOutsideClick = (event: PointerEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setIsOpen(false);
+      if (!root?.contains(event.target as Node)) setIsOpen(false);
+    };
+    const closeOnFocusOut = (event: FocusEvent) => {
+      if (!root?.contains(event.relatedTarget as Node | null)) setIsOpen(false);
     };
 
     document.addEventListener("pointerdown", closeOnOutsideClick);
-    return () => document.removeEventListener("pointerdown", closeOnOutsideClick);
+    root?.addEventListener("focusout", closeOnFocusOut);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsideClick);
+      root?.removeEventListener("focusout", closeOnFocusOut);
+    };
   }, [isOpen]);
 
   function closePopover(restoreTriggerFocus = false) {
@@ -59,8 +67,6 @@ export function PriceReportCategoryFilter({
     if (event.key === "Escape") {
       event.preventDefault();
       closePopover(true);
-    } else if (event.key === "Tab") {
-      setIsOpen(false);
     }
   }
 

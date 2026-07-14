@@ -99,35 +99,6 @@
   background: var(--surface-muted);
 }
 
-.discord-local-nav {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-  padding: 10px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface-muted);
-}
-
-.discord-local-nav a {
-  min-height: 38px;
-  padding: 0 12px;
-  border: 1px solid transparent;
-  border-radius: 7px;
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 800;
-  line-height: 36px;
-}
-
-.discord-local-nav a:hover {
-  border-color: var(--border-strong);
-  background: var(--surface-hover);
-  color: var(--text-strong);
-}
-
-.discord-local-nav a:focus-visible,
 .discord-command-details summary:focus-visible,
 .discord-faq-item summary:focus-visible,
 .discord-audience-card a:focus-visible {

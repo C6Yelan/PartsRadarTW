@@ -71,9 +71,6 @@ export default function DiscordPage() {
                   邀請連結準備中
                 </span>
               )}
-              <a className="control-button secondary" href="#quick-start">
-                開始使用
-              </a>
             </div>
           </div>
 
@@ -92,13 +89,6 @@ export default function DiscordPage() {
           </aside>
         </section>
 
-        <nav className="discord-local-nav" aria-label="Discord 教學頁內導覽">
-          <a href="#quick-start">快速開始</a>
-          <a href="#discord-user-guide">一般使用者</a>
-          <a href="#discord-admin-guide">伺服器管理員</a>
-          <a href="#discord-faq">常見問題</a>
-        </nav>
-
         <section className="discord-section" aria-labelledby="audience-title">
           <div className="discord-section-heading">
             <h2 id="audience-title">選擇使用方式</h2>
@@ -111,7 +101,7 @@ export default function DiscordPage() {
                 <h3>管理自己的提醒與報告</h3>
                 <p>追蹤商品目標價、立即查看價格變動，並設定每日私訊報告。</p>
               </div>
-              <a href="#discord-user-guide">前往一般使用者教學</a>
+              <a href="#quick-start">查看一般使用者教學</a>
             </article>
             <article className="discord-audience-card">
               <div>
@@ -120,7 +110,7 @@ export default function DiscordPage() {
                 <p>設定公開報告頻道、測試 bot 權限，並查看最近發送狀態。</p>
               </div>
               <strong>需要「管理伺服器」權限</strong>
-              <a href="#discord-admin-guide">前往管理員教學</a>
+              <a href="#discord-admin-guide">查看管理員教學</a>
             </article>
           </div>
         </section>

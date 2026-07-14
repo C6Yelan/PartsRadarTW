@@ -1786,7 +1786,10 @@ test("organizes Discord guidance by audience with progressive disclosure @deskto
   test.setTimeout(120_000);
   const viewports = [
     { width: 1760, height: 900 },
+    { width: 1440, height: 900 },
     { width: 1280, height: 800 },
+    { width: 1121, height: 800 },
+    { width: 1120, height: 800 },
     { width: 1024, height: 800 },
     { width: 760, height: 844 },
     { width: 390, height: 844 },
@@ -1796,8 +1799,9 @@ test("organizes Discord guidance by audience with progressive disclosure @deskto
     await page.setViewportSize(viewport);
     await page.goto("/discord");
 
-    await expect(page.locator(".discord-actions .control-button")).toHaveCount(2);
-    await expect(page.getByRole("navigation", { name: "Discord 教學頁內導覽" })).toBeVisible();
+    await expect(page.locator(".discord-actions .control-button")).toHaveCount(1);
+    await expect(page.getByRole("link", { name: "開始使用" })).toHaveCount(0);
+    await expect(page.locator(".discord-local-nav")).toHaveCount(0);
     await expect(page.locator("#quick-start .discord-step-list > li")).toHaveCount(3);
     await expect(page.locator("#discord-user-guide .discord-command-summary-list > li")).toHaveCount(
       3,
@@ -1808,6 +1812,13 @@ test("organizes Discord guidance by audience with progressive disclosure @deskto
     await expect(page.getByLabel("公開報告必要權限")).toBeVisible();
 
     const audienceCards = page.locator(".discord-audience-card");
+    await expect(audienceCards.nth(0).getByRole("link")).toHaveCount(1);
+    await expect(audienceCards.nth(0).getByRole("link")).toHaveAttribute("href", "#quick-start");
+    await expect(audienceCards.nth(1).getByRole("link")).toHaveCount(1);
+    await expect(audienceCards.nth(1).getByRole("link")).toHaveAttribute(
+      "href",
+      "#discord-admin-guide",
+    );
     const audienceCardBoxes = await Promise.all([
       audienceCards.nth(0).boundingBox(),
       audienceCards.nth(1).boundingBox(),
@@ -1850,11 +1861,10 @@ test("organizes Discord guidance by audience with progressive disclosure @deskto
   await faqDetails.first().locator("summary").press("Enter");
   await expect(faqDetails.first()).toHaveAttribute("open", "");
 
-  await page
-    .getByRole("navigation", { name: "Discord 教學頁內導覽" })
-    .getByRole("link", { name: "一般使用者" })
-    .click();
-  await expect(page.locator("#discord-user-guide")).toBeInViewport();
+  await page.getByRole("link", { name: "查看一般使用者教學" }).click();
+  await expect(page.locator("#quick-start")).toBeInViewport();
+  await page.getByRole("link", { name: "查看管理員教學" }).click();
+  await expect(page.locator("#discord-admin-guide")).toBeInViewport();
 });
 
 test("uses compact custom price-report filters, aligned table typography, and conditional reset @desktop-only", async ({
@@ -1992,11 +2002,29 @@ test("uses compact custom price-report filters, aligned table typography, and co
       }
       await expect(page.getByRole("navigation", { name: "頁碼" })).toBeVisible();
     }
+    const reportRow = page.locator(".price-report-row").first();
+    const rowBoxBeforeHover = await reportRow.boundingBox();
+    await reportRow.hover();
+    const rowBoxAfterHover = await reportRow.boundingBox();
+    expect(rowBoxAfterHover?.x).toBeCloseTo(rowBoxBeforeHover?.x ?? 0, 1);
+    expect(rowBoxAfterHover?.width).toBeCloseTo(rowBoxBeforeHover?.width ?? 0, 1);
+    expect(rowBoxAfterHover?.height).toBeCloseTo(rowBoxBeforeHover?.height ?? 0, 1);
     await expect(page.getByRole("status").filter({ hasText: "資料最後成功更新" })).toBeVisible();
     await expectNoHorizontalOverflow(page);
   }
 
   await page.setViewportSize({ width: 1760, height: 900 });
+  await page.goto("/?category=cpu");
+  const homeFacetFilter = page.locator(".facet-filter").filter({ hasText: "腳位" });
+  await homeFacetFilter.locator(".facet-menu-trigger").click();
+  const homeFacetOption = homeFacetFilter.locator(".facet-option").first();
+  const homeFacetCheckbox = homeFacetOption.getByRole("checkbox");
+  const homeFacetDefaultStyle = await readOptionStyleSnapshot(homeFacetOption);
+  const homeFacetDefaultIndicator = await readIndicatorStyleSnapshot(homeFacetOption);
+  await homeFacetCheckbox.check();
+  const homeFacetActiveStyle = await readOptionStyleSnapshot(homeFacetOption);
+  const homeFacetActiveIndicator = await readIndicatorStyleSnapshot(homeFacetOption);
+
   await page.goto("/price-report");
   await expect(page.getByRole("button", { name: "重設", exact: true })).toHaveCount(0);
   await expect(page.locator('select[aria-label="時間範圍"]')).toHaveCount(0);
@@ -2049,6 +2077,30 @@ test("uses compact custom price-report filters, aligned table typography, and co
   await expect(categoryDialog).toBeVisible();
   await expect(categoryPopover).toBeVisible();
   await expect(categoryPopover.getByRole("checkbox")).toHaveCount(12);
+  const priceCategoryOption = categoryPopover
+    .locator(".price-report-category-option")
+    .filter({ hasText: "CPU" });
+  const priceCategoryCheckbox = priceCategoryOption.getByRole("checkbox");
+  const priceCategoryDefaultStyle = await readOptionStyleSnapshot(priceCategoryOption);
+  expectStyleFields(priceCategoryDefaultStyle, homeFacetDefaultStyle, [
+    "backgroundColor",
+    "border",
+    "borderRadius",
+    "color",
+    "fontFamily",
+    "fontSize",
+    "fontWeight",
+    "lineHeight",
+    "minHeight",
+    "paddingLeft",
+  ]);
+  expect(priceCategoryDefaultStyle.letterSpacing).toBe(homeFacetDefaultStyle.letterSpacing);
+  expect(priceCategoryDefaultStyle.textAlign).toBe("left");
+  expect(priceCategoryDefaultStyle.whiteSpace).toBe("nowrap");
+  expect(priceCategoryDefaultStyle.wordSpacing).toBe(homeFacetDefaultStyle.wordSpacing);
+  expect(await readIndicatorStyleSnapshot(priceCategoryOption)).toEqual(
+    homeFacetDefaultIndicator,
+  );
   const categoryOverflow = await categoryDialog.evaluate((element) => ({
     clientHeight: element.clientHeight,
     scrollHeight: element.scrollHeight,
@@ -2071,10 +2123,25 @@ test("uses compact custom price-report filters, aligned table typography, and co
   expect(new Set(typography.map((item) => item?.fontFamily)).size).toBe(1);
   expect(new Set(typography.map((item) => item?.letterSpacing)).size).toBe(1);
   expect(new Set(typography.map((item) => item?.wordSpacing)).size).toBe(1);
-  await categoryPopover.getByRole("checkbox", { name: "CPU" }).check();
+  await categoryTrigger.focus();
+  await categoryTrigger.press("Tab");
+  await expect(categoryPopover.getByRole("checkbox").first()).toBeFocused();
+  await priceCategoryCheckbox.focus();
+  await expect(priceCategoryOption).toHaveCSS("outline-style", "solid");
+  await expect(priceCategoryOption).toHaveCSS("outline-width", "2px");
+  await priceCategoryCheckbox.press("Space");
   await expect(categoryPopover).toBeVisible();
   await expect.poll(() => new URL(page.url()).searchParams.getAll("category")).toEqual(["cpu"]);
   await expect(categoryTrigger).toHaveAccessibleName("商品分類，目前CPU");
+  const priceCategoryActiveStyle = await readOptionStyleSnapshot(priceCategoryOption);
+  expectStyleFields(priceCategoryActiveStyle, homeFacetActiveStyle, [
+    "backgroundColor",
+    "border",
+    "color",
+  ]);
+  expect(await readIndicatorStyleSnapshot(priceCategoryOption)).toEqual(
+    homeFacetActiveIndicator,
+  );
   await categoryPopover.getByRole("checkbox", { name: "顯示卡" }).check();
   await expect(categoryPopover).toBeVisible();
   await expect.poll(() => new URL(page.url()).searchParams.getAll("category")).toEqual([
@@ -2098,8 +2165,10 @@ test("uses compact custom price-report filters, aligned table typography, and co
   await expect(categoryPopover).toHaveCount(0);
   await categoryTrigger.press("Space");
   await expect(categoryPopover).toBeVisible();
+  await categoryPopover.getByRole("checkbox", { name: "CPU" }).focus();
   await categoryPopover.getByRole("checkbox", { name: "CPU" }).press("Tab");
-  await expect(categoryPopover).toHaveCount(0);
+  await expect(categoryPopover.getByRole("checkbox", { name: "主機板" })).toBeFocused();
+  await expect(categoryPopover).toBeVisible();
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/price-report");
@@ -2113,6 +2182,14 @@ test("uses compact custom price-report filters, aligned table typography, and co
   const mobileCategoryPopover = page.getByRole("group", { name: "商品分類選項" });
   for (const option of await mobileCategoryPopover.locator("label").all()) {
     expect((await option.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+    const [optionBox, textBox] = await Promise.all([
+      option.boundingBox(),
+      option.locator("span").boundingBox(),
+    ]);
+    expect(textBox?.x ?? 0).toBeGreaterThanOrEqual((optionBox?.x ?? 0) + 31);
+    expect((textBox?.x ?? 0) + (textBox?.width ?? 0)).toBeLessThanOrEqual(
+      (optionBox?.x ?? 0) + (optionBox?.width ?? 0),
+    );
   }
   await expectNoHorizontalOverflow(page);
   await mobileCategoryPopover.getByRole("checkbox", { name: "風扇 / 配件" }).check();
@@ -2125,7 +2202,24 @@ test("uses compact custom price-report filters, aligned table typography, and co
   const homeMovementStyle = await readStyleSnapshot(page.locator(".price-movement").first());
   const homeValueStyle = await readStyleSnapshot(page.locator(".table-cell").first());
   const homeHeaderStyle = await readStyleSnapshot(page.locator(".table-header"));
+  const homeRow = page.locator(".product-row").first();
+  await homeRow.evaluate((element) => {
+    const marker = document.createElement("span");
+    marker.hidden = true;
+    element.parentElement?.append(marker);
+  });
+  const homeRowStyle = await readRowStyleSnapshot(homeRow);
+  await homeRow.hover();
+  await expect(homeRow).toHaveCSS("background-color", "rgba(22, 42, 56, 0.68)");
+  const homeRowHoverBackground = (await readRowStyleSnapshot(homeRow)).backgroundColor;
   await page.goto("/price-report");
+
+  const reportRow = page.locator(".price-report-row").first();
+  expect(await readRowStyleSnapshot(reportRow)).toEqual(homeRowStyle);
+  await reportRow.hover();
+  await expect(reportRow).toHaveCSS("background-color", homeRowHoverBackground);
+  expect((await readRowStyleSnapshot(reportRow)).backgroundColor).toBe(homeRowHoverBackground);
+  await page.mouse.move(0, 0);
 
   const productStyle = await readStyleSnapshot(
     page.locator(".price-report-product-copy a").first(),
@@ -2497,7 +2591,7 @@ test("keeps the main pages usable without horizontal overflow", async ({ page },
     .getByRole("link", { name: "返回查詢" })
     .evaluate((element) => element.getBoundingClientRect().width);
   expect(discordBackLinkWidth).toBeLessThan(180);
-  await page.getByRole("link", { name: "快速開始" }).focus();
+  await page.getByRole("link", { name: "查看一般使用者教學" }).focus();
   await expectUsableLayout(page, testInfo);
 });
 
@@ -2903,6 +2997,38 @@ interface StyleSnapshot {
   whiteSpace: string;
 }
 
+interface OptionStyleSnapshot {
+  backgroundColor: string;
+  border: string;
+  borderRadius: string;
+  color: string;
+  fontFamily: string;
+  fontSize: string;
+  fontWeight: string;
+  letterSpacing: string;
+  lineHeight: string;
+  minHeight: string;
+  paddingLeft: string;
+  textAlign: string;
+  whiteSpace: string;
+  wordSpacing: string;
+}
+
+interface IndicatorStyleSnapshot {
+  backgroundColor: string;
+  border: string;
+  borderRadius: string;
+  left: string;
+  width: string;
+}
+
+interface RowStyleSnapshot {
+  backgroundColor: string;
+  borderBottomColor: string;
+  transitionDuration: string;
+  transitionProperty: string;
+}
+
 async function readStyleSnapshot(locator: Locator): Promise<StyleSnapshot> {
   return locator.evaluate((element) => {
     const style = getComputedStyle(element);
@@ -2921,13 +3047,60 @@ async function readStyleSnapshot(locator: Locator): Promise<StyleSnapshot> {
   });
 }
 
-function expectStyleFields(
-  actual: StyleSnapshot,
-  expected: StyleSnapshot,
-  fields: Array<keyof StyleSnapshot>,
+async function readOptionStyleSnapshot(locator: Locator): Promise<OptionStyleSnapshot> {
+  return locator.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      backgroundColor: style.backgroundColor,
+      border: style.border,
+      borderRadius: style.borderRadius,
+      color: style.color,
+      fontFamily: style.fontFamily,
+      fontSize: style.fontSize,
+      fontWeight: style.fontWeight,
+      letterSpacing: style.letterSpacing,
+      lineHeight: style.lineHeight,
+      minHeight: style.minHeight,
+      paddingLeft: style.paddingLeft,
+      textAlign: style.textAlign,
+      whiteSpace: style.whiteSpace,
+      wordSpacing: style.wordSpacing,
+    };
+  });
+}
+
+async function readIndicatorStyleSnapshot(locator: Locator): Promise<IndicatorStyleSnapshot> {
+  return locator.evaluate((element) => {
+    const style = getComputedStyle(element, "::before");
+    return {
+      backgroundColor: style.backgroundColor,
+      border: style.border,
+      borderRadius: style.borderRadius,
+      left: style.left,
+      width: style.width,
+    };
+  });
+}
+
+async function readRowStyleSnapshot(locator: Locator): Promise<RowStyleSnapshot> {
+  return locator.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      backgroundColor: style.backgroundColor,
+      borderBottomColor: style.borderBottomColor,
+      transitionDuration: style.transitionDuration,
+      transitionProperty: style.transitionProperty,
+    };
+  });
+}
+
+function expectStyleFields<T extends object>(
+  actual: T,
+  expected: T,
+  fields: Array<keyof T>,
 ) {
   for (const field of fields) {
-    expect(actual[field], field).toBe(expected[field]);
+    expect(actual[field], String(field)).toBe(expected[field]);
   }
 }
 

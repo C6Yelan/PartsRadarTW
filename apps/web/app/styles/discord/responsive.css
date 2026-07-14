@@ -38,11 +38,6 @@
     padding: 18px;
   }
 
-  .discord-local-nav a {
-    flex: 1 1 calc(50% - 8px);
-    text-align: center;
-  }
-
   .discord-audience-grid,
   .discord-step-list {
     grid-template-columns: 1fr;
