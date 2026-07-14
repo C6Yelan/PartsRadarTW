@@ -159,7 +159,6 @@ export function ProductToolbar({
             disabledLabel={query.category ? "無廠商資料" : "先選分類"}
             selectedOptions={selectedVendorOptions}
             selectedValues={query.vendors}
-            onClear={onClearVendors}
             onToggle={onToggleVendor}
           />
           <AdvancedFilter

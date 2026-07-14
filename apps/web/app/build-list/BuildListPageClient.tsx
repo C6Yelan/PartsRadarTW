@@ -10,7 +10,6 @@ import TopbarBrandNavigation from "../TopbarBrandNavigation";
 import BuildListEmptyState from "./components/BuildListEmptyState";
 import BuildListItemRow from "./components/BuildListItemRow";
 import BuildListLoadingState from "./components/BuildListLoadingState";
-import BuildListRefreshStatus from "./components/BuildListRefreshStatus";
 import BuildListSummaryPanel from "./components/BuildListSummaryPanel";
 import BuildListUndoToast from "./components/BuildListUndoToast";
 import { downloadBuildListExcel } from "./download";
@@ -18,6 +17,7 @@ import {
   type BuildListIntent,
   type BuildListItem,
   resolveBuildListItems,
+  summarizeBuildListCategories,
   summarizeBuildListItems,
 } from "./model";
 import { useBuildList } from "./use-build-list";
@@ -47,11 +47,8 @@ export default function BuildListPageClient() {
     [intents, refresh.products, refresh.state],
   );
   const summary = useMemo(() => summarizeBuildListItems(items), [items]);
-  const exportItems = useMemo(
-    () => items.filter((item) => item.intent.includeInExport),
-    [items],
-  );
-  const missingItemCount = items.filter((item) => item.availability === "missing").length;
+  const categorySummary = useMemo(() => summarizeBuildListCategories(items), [items]);
+  const exportItems = useMemo(() => items.filter((item) => item.intent.includeInExport), [items]);
   const [removedItemNotice, setRemovedItemNotice] = useState<RemovedItemNotice | null>(null);
 
   useEffect(() => {
@@ -136,18 +133,15 @@ export default function BuildListPageClient() {
 
             <div className="build-list-side-column">
               <BuildListSummaryPanel
-                exportItemCount={exportItems.length}
+                categories={categorySummary}
                 isDownloadDisabled={refresh.state === "loading" || exportItems.length === 0}
+                itemCount={intents.length}
+                lastSuccessfulSyncAt={refresh.lastSuccessfulSyncAt}
                 summary={summary}
                 onClear={handleClearBuildListItems}
                 onDownloadExcel={downloadExcel}
-              />
-              <BuildListRefreshStatus
-                itemCount={intents.length}
-                lastSuccessfulSyncAt={refresh.lastSuccessfulSyncAt}
-                missingItemCount={missingItemCount}
-                state={refresh.state}
                 onRefresh={() => void refresh.refresh()}
+                refreshState={refresh.state}
               />
             </div>
           </section>

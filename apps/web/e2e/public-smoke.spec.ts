@@ -290,8 +290,8 @@ test.describe("public web smoke", () => {
     const missingItem = page.getByRole("article").filter({ hasText: missingProductId });
 
     await expect(page.getByText("3 件商品")).toBeVisible();
-    await expect(page.getByText("已同步；有 1 個品項暫時查不到。")).toBeVisible();
-    await expect(page.getByText("配單只儲存在這個瀏覽器，不會跨裝置同步。")).toBeVisible();
+    await expect(page.getByText("已同步；有 1 個品項暫時無法確認。")).toBeVisible();
+    await expect(page.getByText("配單只儲存在此瀏覽器，不會跨裝置同步。")).toBeVisible();
     await expect(item.getByRole("heading", { name: "最新測試顯示卡 RTX" })).toBeVisible();
     const exportCheckbox = item.getByRole("checkbox", { name: /加入下載配單/ });
     const [checkboxBox, imageBox] = await Promise.all([
@@ -304,27 +304,21 @@ test.describe("public web smoke", () => {
     await expect(item.getByRole("spinbutton", { name: "數量" })).toHaveValue("2");
     await expect(item.getByText("NT$ 14,580")).toBeVisible();
     await expect(missingItem.getByText("暫時無法確認")).toBeVisible();
-    await expect(page.getByText("未計價品項")).toBeVisible();
-    const summaryPanel = page.getByLabel("配單總計");
-    const refreshStatus = page.getByLabel("配單同步狀態");
-    const [downloadBox, refreshBox] = await Promise.all([
-      summaryPanel.getByRole("button", { name: "下載 Excel" }).boundingBox(),
-      refreshStatus.boundingBox(),
-    ]);
-    expect(refreshBox?.y ?? Number.NEGATIVE_INFINITY).toBeGreaterThan(
-      downloadBox?.y ?? Number.POSITIVE_INFINITY,
-    );
-    await expect(summaryPanel.getByLabel("配單同步狀態")).toHaveCount(0);
-    await expect(page.getByText("下載配單包含 2 個品項。")).toBeVisible();
+    const summaryPanel = page.getByLabel("配單摘要與操作");
+    await expect(summaryPanel.getByText("暫未計價")).toBeVisible();
+    await expect(summaryPanel.getByLabel("配單資料狀態")).toBeVisible();
+    await expect(summaryPanel.getByRole("button", { name: "下載 Excel（2）" })).toBeVisible();
 
     await missingItem.getByRole("checkbox", { name: "加入下載配單" }).uncheck();
-    await expect(page.getByText("下載配單包含 1 個品項。")).toBeVisible();
+    await expect(summaryPanel.getByRole("button", { name: "下載 Excel（1）" })).toBeVisible();
     await expect
       .poll(() =>
-        page.evaluate(() =>
-          JSON.parse(window.localStorage.getItem("partsradartw:build-list:v3") ?? "[]").find(
-            (intent: { productId: string }) => intent.productId === "22222222-2222-2222-2222-222222222222",
-          )?.includeInExport,
+        page.evaluate(
+          () =>
+            JSON.parse(window.localStorage.getItem("partsradartw:build-list:v3") ?? "[]").find(
+              (intent: { productId: string }) =>
+                intent.productId === "22222222-2222-2222-2222-222222222222",
+            )?.includeInExport,
         ),
       )
       .toBe(false);

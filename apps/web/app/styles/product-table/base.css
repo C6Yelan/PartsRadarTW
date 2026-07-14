@@ -24,9 +24,8 @@
   font-weight: 800;
 }
 
-.table-header span:nth-child(2),
-.product-main {
-  text-align: left;
+.table-header span:nth-child(2) {
+  text-align: center;
 }
 
 .table-header span:nth-child(3),

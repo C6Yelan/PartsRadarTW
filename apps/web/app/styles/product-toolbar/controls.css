@@ -50,6 +50,14 @@
   min-height: 38px;
 }
 
+.toolbar-price-grid input {
+  text-align: center;
+}
+
+.toolbar-price-grid input::placeholder {
+  text-align: center;
+}
+
 .results-compact-select select {
   appearance: none;
   line-height: 40px;

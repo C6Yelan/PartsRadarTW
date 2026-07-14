@@ -38,7 +38,6 @@
 
   .build-list-side-column {
     position: static;
-    order: -1;
   }
 }
 
@@ -46,6 +45,11 @@
   .build-list-page {
     width: min(100% - 28px, 1600px);
     padding-top: 14px;
+  }
+
+  .build-list-summary-actions .control-button,
+  .build-list-clear-button {
+    min-height: 44px;
   }
 
   .build-list-item {

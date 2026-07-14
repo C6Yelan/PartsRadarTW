@@ -8,8 +8,8 @@ import { type FormEvent, useState } from "react";
 import { API_RATE_LIMITED_MESSAGE } from "../../_shared/api-client";
 import { formatInteger, formatSignedTwdPrice, formatTwdPrice } from "../../_shared/formatting";
 import { formatTaipeiDateTime } from "../../_shared/time";
-import { ProductImage } from "../../product-explorer/components/ProductImage";
 import { Pagination } from "../../product-explorer/components/Pagination";
+import { ProductImage } from "../../product-explorer/components/ProductImage";
 import { getVisiblePages, toDigitsOnly } from "../../product-explorer/query-state";
 import type { PriceReportLoadState, PriceReportResponse, PriceReportResponseItem } from "../types";
 
@@ -52,9 +52,9 @@ export function PriceReportResults({
   return (
     <>
       <section className="price-report-summary" aria-label="價格變動摘要">
-        <SummaryCard className="is-drop" label="降價" value={summary.dropCount} />
-        <SummaryCard className="is-rise" label="漲價" value={summary.riseCount} />
-        <SummaryCard className="is-new" label="新品" value={summary.newProductCount} />
+        <SummaryItem className="is-drop" label="降價" value={summary.dropCount} />
+        <SummaryItem className="is-rise" label="漲價" value={summary.riseCount} />
+        <SummaryItem className="is-new" label="新品" value={summary.newProductCount} />
       </section>
 
       <section className="price-report-results" aria-label="價格變動列表">
@@ -125,10 +125,7 @@ export function PriceReportResults({
             productState={state}
             shouldShowPageJump={report.pagination.totalPages > 7}
             totalPages={report.pagination.totalPages}
-            visiblePages={getVisiblePages(
-              report.pagination.page,
-              report.pagination.totalPages,
-            )}
+            visiblePages={getVisiblePages(report.pagination.page, report.pagination.totalPages)}
             onGoToPage={onPageChange}
             onJumpSubmit={submitPageJump}
             onPageJumpValueChange={(value) => setPageJumpValue(toDigitsOnly(value))}
@@ -139,7 +136,7 @@ export function PriceReportResults({
   );
 }
 
-function SummaryCard({
+function SummaryItem({
   className = "",
   label,
   value,
@@ -149,10 +146,10 @@ function SummaryCard({
   value: number;
 }) {
   return (
-    <article className={`price-report-summary-card ${className}`.trim()}>
+    <div className={`price-report-summary-item ${className}`.trim()}>
       <span>{label}</span>
       <strong>{formatInteger(value)}</strong>
-    </article>
+    </div>
   );
 }
 

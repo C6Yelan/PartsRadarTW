@@ -54,6 +54,17 @@ export interface BuildListIntentSummary {
 export interface BuildListSummary extends BuildListIntentSummary {
   totalAmount: number;
   unpricedItemCount: number;
+  activeItemCount: number;
+  inactiveItemCount: number;
+  missingItemCount: number;
+  unavailableItemCount: number;
+  exportItemCount: number;
+}
+
+export interface BuildListCategorySummary {
+  label: string;
+  itemCount: number;
+  totalQuantity: number;
 }
 
 export function addProductToBuildList(
@@ -229,6 +240,13 @@ export function summarizeBuildListItems(items: BuildListItem[]): BuildListSummar
         totalQuantity: summary.totalQuantity + item.intent.quantity,
         totalAmount: summary.totalAmount + (subtotal ?? 0),
         unpricedItemCount: summary.unpricedItemCount + (subtotal === null ? 1 : 0),
+        activeItemCount: summary.activeItemCount + (item.product?.status.isActive ? 1 : 0),
+        inactiveItemCount:
+          summary.inactiveItemCount + (item.product && !item.product.status.isActive ? 1 : 0),
+        missingItemCount: summary.missingItemCount + (item.availability === "missing" ? 1 : 0),
+        unavailableItemCount:
+          summary.unavailableItemCount + (item.availability === "unavailable" ? 1 : 0),
+        exportItemCount: summary.exportItemCount + (item.intent.includeInExport ? 1 : 0),
       };
     },
     {
@@ -236,8 +254,39 @@ export function summarizeBuildListItems(items: BuildListItem[]): BuildListSummar
       totalQuantity: 0,
       totalAmount: 0,
       unpricedItemCount: 0,
+      activeItemCount: 0,
+      inactiveItemCount: 0,
+      missingItemCount: 0,
+      unavailableItemCount: 0,
+      exportItemCount: 0,
     },
   );
+}
+
+export function summarizeBuildListCategories(items: BuildListItem[]): BuildListCategorySummary[] {
+  const categories = new Map<string, BuildListCategorySummary>();
+
+  for (const item of items) {
+    const label = item.product?.category.displayName;
+
+    if (!label) {
+      continue;
+    }
+
+    const current = categories.get(label);
+    if (current) {
+      current.itemCount += 1;
+      current.totalQuantity += item.intent.quantity;
+    } else {
+      categories.set(label, {
+        label,
+        itemCount: 1,
+        totalQuantity: item.intent.quantity,
+      });
+    }
+  }
+
+  return [...categories.values()];
 }
 
 export function getBuildListLineSubtotal(item: BuildListItem): number | null {

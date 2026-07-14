@@ -10,7 +10,6 @@ interface VendorFilterProps {
   disabledLabel: string;
   selectedOptions: ProductVendorOption[];
   selectedValues: string[];
-  onClear: () => void;
   onToggle: (vendor: string) => void;
 }
 
@@ -20,7 +19,6 @@ export function VendorFilter({
   disabledLabel,
   selectedOptions,
   selectedValues,
-  onClear,
   onToggle,
 }: VendorFilterProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -84,13 +82,6 @@ export function VendorFilter({
           </button>
           {isOpen ? (
             <fieldset aria-label="廠商篩選選單" className="vendor-menu-popover">
-              {selectedValues.length > 0 ? (
-                <div className="vendor-menu-header">
-                  <button type="button" onClick={onClear}>
-                    清除
-                  </button>
-                </div>
-              ) : null}
               <div className="vendor-option-list">
                 {options.map((option) => {
                   const checked = selectedValues.includes(option.slug);

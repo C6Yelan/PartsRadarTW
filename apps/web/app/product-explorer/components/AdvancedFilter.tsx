@@ -56,14 +56,11 @@ function SingleOptionFacet({
   }
 
   const tag = `${definition.key}:${option.value}`;
+  const checked = selectedFacets.includes(tag);
 
   return (
-    <label className="single-option-facet">
-      <input
-        checked={selectedFacets.includes(tag)}
-        type="checkbox"
-        onChange={() => onToggle(tag)}
-      />
+    <label className={checked ? "single-option-facet is-active" : "single-option-facet"}>
+      <input checked={checked} type="checkbox" onChange={() => onToggle(tag)} />
       <span>{option.label}</span>
     </label>
   );

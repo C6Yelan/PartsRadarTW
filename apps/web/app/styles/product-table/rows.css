@@ -25,6 +25,7 @@
 
 .product-main {
   min-width: 0;
+  text-align: left;
 }
 
 .product-main a {

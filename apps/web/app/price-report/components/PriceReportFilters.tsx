@@ -45,10 +45,7 @@ export function PriceReportFilters({
   return (
     <section className="price-report-filters" aria-labelledby="price-report-filters-title">
       <div className="price-report-section-heading">
-        <div>
-          <p className="price-report-eyebrow">篩選條件</p>
-          <h2 id="price-report-filters-title">查看指定範圍的價格動態</h2>
-        </div>
+        <h2 id="price-report-filters-title">篩選價格變動</h2>
         <button className="price-report-reset" type="button" onClick={onReset}>
           重設
         </button>
@@ -69,7 +66,8 @@ export function PriceReportFilters({
         </label>
 
         <fieldset className="price-report-type-control">
-          <legend>變動類型</legend>
+          <legend className="sr-only">變動類型</legend>
+          <span aria-hidden="true">變動類型</span>
           <div className="price-report-type-options">
             {PRICE_REPORT_TYPES.map((type) => {
               const checked = query.types.includes(type);

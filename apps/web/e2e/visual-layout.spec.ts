@@ -490,6 +490,7 @@ test("keeps the product toolbar compact and readable across its layout boundary 
       expect(placeholderFit?.textWidth ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(
         placeholderFit?.availableWidth ?? 0,
       );
+      await expect(input).toHaveCSS("text-align", "center");
     }
 
     const statusButtons = page.locator(".toolbar-segmented-control button");
@@ -601,6 +602,29 @@ test("keeps the product toolbar compact and readable across its layout boundary 
     } else {
       await expect(tableHeader).toBeVisible();
       await expect(productRow.locator(".row-price .cell-label")).toBeHidden();
+      const productHeaderAlignment = await tableHeader
+        .locator("span")
+        .nth(1)
+        .evaluate((element) => {
+          const range = document.createRange();
+          const textNode = element.firstChild;
+          if (!textNode) return null;
+          range.selectNodeContents(textNode);
+          const cellRect = element.getBoundingClientRect();
+          const textRect = range.getBoundingClientRect();
+          return {
+            cellCenter: cellRect.left + cellRect.width / 2,
+            textAlign: getComputedStyle(element).textAlign,
+            textCenter: textRect.left + textRect.width / 2,
+          };
+        });
+      expect(productHeaderAlignment?.textAlign).toBe("center");
+      expect(
+        Math.abs(
+          (productHeaderAlignment?.cellCenter ?? 0) -
+            (productHeaderAlignment?.textCenter ?? Number.POSITIVE_INFINITY),
+        ),
+      ).toBeLessThanOrEqual(2);
     }
 
     const paginationDisplay = await page
@@ -621,6 +645,9 @@ test("keeps the product toolbar compact and readable across its layout boundary 
     expect(productNameLayout.whiteSpace).toBe("normal");
     expect(productNameLayout.lineClamp).toBe("2");
     expect(productNameLayout.scrollWidth).toBeLessThanOrEqual(productNameLayout.clientWidth);
+    if (!usesCompactTable) {
+      await expect(productRow.locator(".product-main")).toHaveCSS("text-align", "left");
+    }
     await expect(productRow.locator(".row-price strong")).toContainText("NT$ 18,990");
     await expect(productRow.locator(".row-status .row-state")).toHaveText("目前上架");
 
@@ -805,8 +832,8 @@ test("keeps the vendor menu open while multi-select requests reload @desktop-onl
   releaseHeldProductsRequest?.();
   await expect.poll(() => new URL(page.url()).searchParams.get("vendors")).toBe("intel,amd");
   await expect(page.locator(".skeleton-row")).toHaveCount(0);
-  await expect(vendorFilter.locator(".vendor-menu-header")).toHaveCount(1);
-  await expect(vendorFilter.getByRole("button", { name: "清除" })).toBeVisible();
+  await expect(vendorFilter.locator(".vendor-menu-header")).toHaveCount(0);
+  await expect(vendorFilter.getByRole("button", { name: "清除" })).toHaveCount(0);
 
   holdNextProductsRequest = true;
   await vendorFilter.locator(".vendor-option").filter({ hasText: "Intel" }).click();
@@ -820,7 +847,7 @@ test("keeps the vendor menu open while multi-select requests reload @desktop-onl
   await expect(page.locator(".skeleton-row")).toHaveCount(0);
 
   holdNextProductsRequest = true;
-  await vendorFilter.getByRole("button", { name: "清除" }).click();
+  await vendorFilter.locator(".vendor-option").filter({ hasText: "AMD" }).click();
   await expect.poll(() => releaseHeldProductsRequest !== null).toBe(true);
   await expect(popover).toBeVisible();
   releaseHeldProductsRequest?.();
@@ -1132,10 +1159,31 @@ test("renders single-option facets as direct keyboard-operable controls @desktop
   await expect(wifiControl).toBeVisible();
   await expect(page.locator(".facet-filter").filter({ hasText: "無線網路" })).toHaveCount(0);
   await expect(page.locator(".facet-menu-trigger").filter({ hasText: "無線網路" })).toHaveCount(0);
+  await expect(wifiCheckbox).toHaveCSS("opacity", "0");
+  await expect(wifiControl).toHaveCSS("min-height", "38px");
   await wifiCheckbox.focus();
   await expect(wifiCheckbox).toBeFocused();
   await page.keyboard.press("Space");
   await expect.poll(() => new URL(page.url()).searchParams.getAll("facet")).toEqual(["wifi:yes"]);
+  await expect(wifiControl).toHaveClass(/is-active/);
+  const wifiActiveStyle = await wifiControl.evaluate((element) => {
+    const styles = getComputedStyle(element);
+    const indicator = getComputedStyle(element, "::before");
+    return {
+      background: styles.backgroundColor,
+      border: styles.borderColor,
+      indicatorBackground: indicator.backgroundColor,
+      expectedBackground: getComputedStyle(document.documentElement)
+        .getPropertyValue("--accent-surface")
+        .trim(),
+      expectedIndicator: getComputedStyle(document.documentElement)
+        .getPropertyValue("--accent-strong")
+        .trim(),
+    };
+  });
+  expect(wifiActiveStyle.background).not.toBe("rgba(0, 0, 0, 0)");
+  expect(wifiActiveStyle.border).not.toBe("");
+  expect(wifiActiveStyle.indicatorBackground).not.toBe("rgba(0, 0, 0, 0)");
   await expect.poll(() => new URL(page.url()).searchParams.get("page")).toBeNull();
   await expect(page.getByRole("button", { name: "移除篩選：無線網路：含 Wi-Fi" })).toBeVisible();
 
@@ -1650,6 +1698,184 @@ test("uses the initial URL and drops other category memory after reload @desktop
   await assertFacetCheckboxStates(page, "晶片組", { unchecked: ["B650"] });
 });
 
+test("uses homepage visual rhythm for price-report filters, summary, and results @desktop-only", async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  const viewports = [
+    { width: 1760, height: 900 },
+    { width: 1280, height: 800 },
+    { width: 1024, height: 800 },
+    { width: 760, height: 844 },
+    { width: 390, height: 844 },
+  ];
+
+  for (const viewport of viewports) {
+    await page.setViewportSize(viewport);
+    await page.goto("/price-report");
+    await expect(page.getByRole("region", { name: "價格變動列表" })).toBeVisible();
+
+    const pageBox = await page.locator(".price-report-page").boundingBox();
+    const expectedGutter = viewport.width <= 760 ? 12 : viewport.width > 1712 ? 40 : 16;
+    expect(pageBox?.x).toBeCloseTo(expectedGutter, 0);
+    expect(viewport.width - (pageBox?.x ?? 0) - (pageBox?.width ?? 0)).toBeCloseTo(
+      expectedGutter,
+      0,
+    );
+
+    const filterGrid = page.locator(".price-report-filter-grid");
+    await expect(filterGrid).toHaveCSS("display", "flex");
+    const filterGap = await filterGrid.evaluate((element) => getComputedStyle(element).columnGap);
+    expect(filterGap).toBe("8px");
+
+    const expectedControlHeight = viewport.width <= 760 ? 44 : 38;
+    for (const control of await page
+      .locator(
+        ".price-report-control select, .price-report-keyword-input input, .price-report-keyword-input button, .price-report-type-options",
+      )
+      .all()) {
+      expect((await control.boundingBox())?.height).toBeCloseTo(expectedControlHeight, 0);
+    }
+
+    if (viewport.width > 760) {
+      const firstRowTops = await page
+        .locator(".price-report-filter-grid > :not(.price-report-keyword-control)")
+        .evaluateAll((elements) => elements.map((element) => element.getBoundingClientRect().top));
+      expect(Math.max(...firstRowTops) - Math.min(...firstRowTops)).toBeLessThanOrEqual(1);
+    }
+
+    const summary = page.locator(".price-report-summary");
+    await expect(summary.locator(".price-report-summary-item")).toHaveCount(3);
+    await expect(summary.locator(".price-report-summary-card")).toHaveCount(0);
+    expect((await summary.boundingBox())?.height).toBeLessThanOrEqual(76);
+    await expect(summary.locator(".price-report-summary-item").nth(1)).toHaveCSS(
+      "border-left-style",
+      "solid",
+    );
+
+    const tableHeader = page.locator(".price-report-table-header");
+    if (viewport.width > 1120) {
+      await expect(tableHeader).toBeVisible();
+      expect((await tableHeader.boundingBox())?.height).toBeCloseTo(48, 0);
+    } else {
+      await expect(tableHeader).toBeHidden();
+      await expect(page.locator(".price-report-cell-label").first()).toBeVisible();
+    }
+    await expect(page.getByRole("status").filter({ hasText: "資料最後成功更新" })).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+  }
+
+  await page.setViewportSize({ width: 1760, height: 900 });
+  await page.goto("/price-report");
+  await page.getByRole("combobox", { name: "時間範圍" }).selectOption("7d");
+  await expect.poll(() => new URL(page.url()).searchParams.get("window")).toBe("7d");
+  await page.getByRole("combobox", { name: "商品分類" }).selectOption("cpu");
+  await expect.poll(() => new URL(page.url()).searchParams.get("category")).toBe("cpu");
+  await page.getByRole("checkbox", { name: "新品" }).click();
+  await expect
+    .poll(() => new URL(page.url()).searchParams.getAll("type"))
+    .toEqual(["drop", "rise", "new"]);
+  await expect(page.getByRole("checkbox", { name: "新品" })).toBeChecked();
+  await page.getByRole("searchbox", { name: "搜尋價格變動商品" }).fill("RTX");
+  await page.getByRole("button", { name: "查詢" }).click();
+  await expect.poll(() => new URL(page.url()).searchParams.get("q")).toBe("RTX");
+  await page.getByRole("button", { name: "2", exact: true }).click();
+  await expect.poll(() => new URL(page.url()).searchParams.get("page")).toBe("2");
+  await page.getByRole("button", { name: "重設" }).click();
+  await expect.poll(() => new URL(page.url()).search).toBe("");
+});
+
+test("presents build-list summary, categories, actions, and data status in one sidebar @desktop-only", async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  const cpuOneId = "11111111-1111-4111-8111-111111111111";
+  const cpuTwoId = "22222222-2222-4222-8222-222222222222";
+  const gpuId = "33333333-3333-4333-8333-333333333333";
+  const missingId = "44444444-4444-4444-8444-444444444444";
+
+  await page.route("**/api/build-list/refresh", async (route) => {
+    await fulfillJson(route, {
+      data: [
+        buildListProduct(cpuOneId, "CPU 零件一", "CPU", 1_000, true),
+        buildListProduct(cpuTwoId, "CPU 零件二", "CPU", 2_000, true),
+        buildListProduct(gpuId, "顯示卡零件", "顯示卡", 3_000, false),
+      ],
+      missingProductIds: [missingId],
+    });
+  });
+  await page.addInitScript(
+    ({ ids, observedAt }) => {
+      window.localStorage.setItem(
+        "partsradartw:build-list:v3",
+        JSON.stringify(
+          ids.map((productId, index) => ({
+            productId,
+            quantity: index === 0 ? 2 : 1,
+            includeInExport: index !== 1,
+            order: index,
+            addedAt: observedAt,
+            updatedAt: observedAt,
+          })),
+        ),
+      );
+    },
+    { ids: [cpuOneId, cpuTwoId, gpuId, missingId], observedAt: OBSERVED_AT },
+  );
+
+  for (const viewport of [
+    { width: 1760, height: 900 },
+    { width: 1280, height: 800 },
+    { width: 1024, height: 800 },
+    { width: 760, height: 844 },
+    { width: 390, height: 844 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto("/build-list");
+    const sidebar = page.getByLabel("配單摘要與操作");
+    await expect(sidebar.getByRole("heading", { name: "配單摘要" })).toBeVisible();
+    await expect(sidebar.getByText("NT$ 7,000")).toBeVisible();
+    await expect(sidebar.getByText("品項數").locator("..")).toContainText("4");
+    await expect(sidebar.getByText("零件數").locator("..")).toContainText("5");
+    await expect(sidebar.getByText("匯出品項").locator("..")).toContainText("3");
+    await expect(sidebar.getByText("可能已下架").locator("..")).toContainText("1");
+    await expect(sidebar.getByText("資料待確認").locator("..")).toContainText("1");
+    await expect(sidebar.getByLabel("CPU，2 個品項，共 3 件")).toContainText("3 件");
+    await expect(sidebar.getByLabel("顯示卡，1 個品項，共 1 件")).toContainText("1 件");
+    await expect(sidebar.getByRole("button", { name: "下載 Excel（3）" })).toBeEnabled();
+    await expect(sidebar.getByRole("button", { name: "重新整理商品資料" })).toBeEnabled();
+    await expect(sidebar.getByText("配單只儲存在此瀏覽器，不會跨裝置同步。")).toBeVisible();
+    await expect(sidebar).not.toContainText(/相容性|瓦數|運費|稅金|折扣/);
+
+    const sideColumn = page.locator(".build-list-side-column");
+    await expect(sideColumn).toHaveCSS("position", viewport.width > 900 ? "sticky" : "static");
+    const overflowStyles = await sideColumn.evaluate((element) => ({
+      sidebar: getComputedStyle(element).overflowY,
+      summary: getComputedStyle(element.firstElementChild as Element).overflowY,
+    }));
+    expect(["auto", "scroll"]).not.toContain(overflowStyles.sidebar);
+    expect(["auto", "scroll"]).not.toContain(overflowStyles.summary);
+    for (const action of await sidebar.locator(".build-list-summary-actions button").all()) {
+      expect((await action.boundingBox())?.width).toBeCloseTo(
+        (await action.locator("..").boundingBox())?.width ?? 0,
+        0,
+      );
+    }
+    await expectNoHorizontalOverflow(page);
+  }
+
+  await page.setViewportSize({ width: 1760, height: 900 });
+  await page.goto("/build-list");
+  const sidebar = page.getByLabel("配單摘要與操作");
+  await sidebar.getByRole("button", { name: "重新整理商品資料" }).click();
+  await expect(
+    sidebar.getByText(/商品資料已更新|正在取得最新商品資料|有 1 個品項暫時無法確認/),
+  ).toBeVisible();
+  page.once("dialog", (dialog) => void dialog.dismiss());
+  await sidebar.getByRole("button", { name: "清空配單" }).click();
+  await expect(sidebar).toBeVisible();
+});
+
 test("keeps the main pages usable without horizontal overflow", async ({ page }, testInfo) => {
   test.setTimeout(60_000);
 
@@ -2081,6 +2307,25 @@ async function expectTransitionDurationAtMost(locator: Locator, maximumMs: numbe
   );
 
   expect(Math.max(...durationsMs)).toBeLessThanOrEqual(maximumMs);
+}
+
+function buildListProduct(
+  id: string,
+  name: string,
+  category: string,
+  amount: number,
+  isActive: boolean,
+) {
+  return {
+    id,
+    name,
+    image: null,
+    category: { displayName: category },
+    price: { amount, currency: "TWD" },
+    source: { url: `https://coolpc.invalid/products/${id}` },
+    status: { isActive },
+    lastSeenAt: OBSERVED_AT,
+  };
 }
 
 async function fulfillJson(route: Route, body: unknown) {

@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import { API_RATE_LIMITED_MESSAGE } from "../../app/_shared/api-client";
-import BuildListRefreshStatus from "../../app/build-list/components/BuildListRefreshStatus";
+import BuildListSummaryPanel from "../../app/build-list/components/BuildListSummaryPanel";
 import { ProductFilters } from "../../app/product-explorer/components/ProductFilters";
 import { ProductTable } from "../../app/product-explorer/components/ProductTable";
 import PriceHistoryPanel from "../../app/products/[id]/price-history-panel";
@@ -46,11 +46,25 @@ describe("public API rate-limit copy", () => {
         />,
       ),
       renderToStaticMarkup(
-        <BuildListRefreshStatus
+        <BuildListSummaryPanel
+          categories={[]}
+          isDownloadDisabled={false}
           itemCount={1}
           lastSuccessfulSyncAt={null}
-          missingItemCount={0}
-          state="rate_limited"
+          refreshState="rate_limited"
+          summary={{
+            itemCount: 1,
+            totalQuantity: 1,
+            totalAmount: 0,
+            unpricedItemCount: 1,
+            activeItemCount: 0,
+            inactiveItemCount: 0,
+            missingItemCount: 0,
+            unavailableItemCount: 1,
+            exportItemCount: 1,
+          }}
+          onClear={() => undefined}
+          onDownloadExcel={() => undefined}
           onRefresh={() => undefined}
         />,
       ),

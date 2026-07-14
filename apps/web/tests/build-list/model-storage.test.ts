@@ -13,10 +13,11 @@ import {
   removeBuildListItem,
   resolveBuildListItems,
   restoreBuildListItem,
+  summarizeBuildListCategories,
   summarizeBuildListIntents,
   summarizeBuildListItems,
-  updateBuildListItemQuantity,
   updateBuildListItemExportSelection,
+  updateBuildListItemQuantity,
 } from "../../app/build-list/model";
 import {
   BUILD_LIST_STORAGE_KEY,
@@ -166,6 +167,66 @@ describe("build list v2 model", () => {
       totalQuantity: 5,
       totalAmount: 16_980,
       unpricedItemCount: 2,
+      activeItemCount: 2,
+      inactiveItemCount: 1,
+      missingItemCount: 1,
+      unavailableItemCount: 0,
+      exportItemCount: 4,
+    });
+  });
+
+  it("summarizes export, availability, and categories without mutating item order", () => {
+    const items = resolveBuildListItems(
+      [
+        intent(PRODUCT_ID_1, { order: 0, quantity: 2 }),
+        intent(PRODUCT_ID_2, { order: 1, quantity: 3, includeInExport: false }),
+        intent(PRODUCT_ID_3, { order: 2 }),
+        intent(PRODUCT_ID_4, { order: 3 }),
+      ],
+      [
+        product(PRODUCT_ID_1, { category: { displayName: "CPU" } }),
+        product(PRODUCT_ID_2, {
+          category: { displayName: "CPU" },
+          status: { isActive: false },
+        }),
+        product(PRODUCT_ID_3, {
+          category: { displayName: "顯示卡" },
+          price: null,
+        }),
+      ],
+      "ready",
+    );
+    const originalOrder = items.map((item) => item.intent.productId);
+
+    expect(summarizeBuildListItems(items)).toEqual({
+      itemCount: 4,
+      totalQuantity: 7,
+      totalAmount: 34_950,
+      unpricedItemCount: 2,
+      activeItemCount: 2,
+      inactiveItemCount: 1,
+      missingItemCount: 1,
+      unavailableItemCount: 0,
+      exportItemCount: 3,
+    });
+    expect(summarizeBuildListCategories(items)).toEqual([
+      { label: "CPU", itemCount: 2, totalQuantity: 5 },
+      { label: "顯示卡", itemCount: 1, totalQuantity: 1 },
+    ]);
+    expect(items.map((item) => item.intent.productId)).toEqual(originalOrder);
+  });
+
+  it("keeps missing and unavailable counts distinct", () => {
+    const missingItems = resolveBuildListItems([intent(PRODUCT_ID_1)], [], "ready");
+    const unavailableItems = resolveBuildListItems([intent(PRODUCT_ID_2)], [], "error");
+
+    expect(summarizeBuildListItems(missingItems)).toMatchObject({
+      missingItemCount: 1,
+      unavailableItemCount: 0,
+    });
+    expect(summarizeBuildListItems(unavailableItems)).toMatchObject({
+      missingItemCount: 0,
+      unavailableItemCount: 1,
     });
   });
 

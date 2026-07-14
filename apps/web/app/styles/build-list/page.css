@@ -39,35 +39,6 @@
   padding: 18px 0 30px;
 }
 
-.build-list-refresh-status {
-  display: grid;
-  gap: 8px;
-  padding-top: 12px;
-  border-top: 1px solid var(--border);
-}
-
-.build-list-refresh-status > div {
-  display: grid;
-  gap: 4px;
-}
-
-.build-list-refresh-status strong {
-  color: var(--text);
-  font-size: 14px;
-}
-
-.build-list-refresh-status span {
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.5;
-}
-
-.build-list-refresh-status .control-button {
-  width: 100%;
-  min-height: 36px;
-  padding-inline: 14px;
-}
-
 .build-list-empty,
 .build-list-summary,
 .build-list-item {
