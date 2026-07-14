@@ -11,6 +11,7 @@ export interface ProductFacetDefinition {
   key: string;
   label: string;
   options: readonly ProductFacetOption[];
+  menuColumns?: 1 | 2 | 3;
 }
 
 export interface ParsedProductFilterTag {
@@ -100,36 +101,41 @@ const PRODUCT_FACETS_BY_IGRP: Readonly<Record<number, readonly ProductFacetDefin
     facet("integrated_graphics", "內建顯示", [option("yes", "有內顯"), option("no", "無內顯")]),
   ],
   5: [
-    facet("socket", "腳位", [...SOCKET_OPTIONS, option("other", "其他腳位")]),
-    facet("chipset", "晶片組", [
-      option("h610", "H610", "Intel LGA 1700"),
-      option("b760", "B760", "Intel LGA 1700"),
-      option("z790", "Z790", "Intel LGA 1700"),
-      option("h810", "H810", "Intel LGA 1851"),
-      option("b860", "B860", "Intel LGA 1851"),
-      option("z890", "Z890", "Intel LGA 1851"),
-      option("h81", "H81", "Intel 舊平台／工作站"),
-      option("h110", "H110", "Intel 舊平台／工作站"),
-      option("h310", "H310", "Intel 舊平台／工作站"),
-      option("h510", "H510", "Intel 舊平台／工作站"),
-      option("w680", "W680", "Intel 舊平台／工作站"),
-      option("w790", "W790", "Intel 舊平台／工作站"),
-      option("w880", "W880", "Intel 舊平台／工作站"),
-      option("w890", "W890", "Intel 舊平台／工作站"),
-      option("a520", "A520", "AMD AM4"),
-      option("b550", "B550", "AMD AM4"),
-      option("a620", "A620", "AMD AM5"),
-      option("b650", "B650", "AMD AM5"),
-      option("b650e", "B650E", "AMD AM5"),
-      option("b840", "B840", "AMD AM5"),
-      option("b850", "B850", "AMD AM5"),
-      option("x670", "X670", "AMD AM5"),
-      option("x670e", "X670E", "AMD AM5"),
-      option("x870", "X870", "AMD AM5"),
-      option("x870e", "X870E", "AMD AM5"),
-      option("trx50", "TRX50", "Threadripper"),
-      option("wrx90", "WRX90", "Threadripper"),
-    ]),
+    facet("socket", "腳位", SOCKET_OPTIONS),
+    facet(
+      "chipset",
+      "晶片組",
+      [
+        option("h610", "H610", "Intel LGA 1700"),
+        option("b760", "B760", "Intel LGA 1700"),
+        option("z790", "Z790", "Intel LGA 1700"),
+        option("h810", "H810", "Intel LGA 1851"),
+        option("b860", "B860", "Intel LGA 1851"),
+        option("z890", "Z890", "Intel LGA 1851"),
+        option("h81", "H81", "Intel 舊平台／工作站"),
+        option("h110", "H110", "Intel 舊平台／工作站"),
+        option("h310", "H310", "Intel 舊平台／工作站"),
+        option("h510", "H510", "Intel 舊平台／工作站"),
+        option("w680", "W680", "Intel 舊平台／工作站"),
+        option("w790", "W790", "Intel 舊平台／工作站"),
+        option("w880", "W880", "Intel 舊平台／工作站"),
+        option("w890", "W890", "Intel 舊平台／工作站"),
+        option("a520", "A520", "AMD AM4"),
+        option("b550", "B550", "AMD AM4"),
+        option("a620", "A620", "AMD AM5"),
+        option("b650", "B650", "AMD AM5"),
+        option("b650e", "B650E", "AMD AM5"),
+        option("b840", "B840", "AMD AM5"),
+        option("b850", "B850", "AMD AM5"),
+        option("x670", "X670", "AMD AM5"),
+        option("x670e", "X670E", "AMD AM5"),
+        option("x870", "X870", "AMD AM5"),
+        option("x870e", "X870E", "AMD AM5"),
+        option("trx50", "TRX50", "Threadripper"),
+        option("wrx90", "WRX90", "Threadripper"),
+      ],
+      3,
+    ),
     facet("form_factor", "主機板尺寸", [
       option("e-atx", "E-ATX"),
       option("atx", "ATX"),
@@ -554,8 +560,6 @@ function extractMotherboardTags(text: string, add: AddTag): void {
     add("socket", "am5");
   } else if (/\b(?:TRX50|WRX90)\b/.test(text)) {
     add("socket", "str5");
-  } else if (/\b(?:H81|H110|H310|H510|W680|W790|W880|W890)/.test(text)) {
-    add("socket", "other");
   }
 
   extractFormFactors(text, add, "form_factor");
@@ -926,6 +930,7 @@ function facet(
   key: string,
   label: string,
   options: readonly ProductFacetOption[],
+  menuColumns?: 1 | 2 | 3,
 ): ProductFacetDefinition {
-  return { key, label, options };
+  return menuColumns ? { key, label, options, menuColumns } : { key, label, options };
 }

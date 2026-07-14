@@ -111,8 +111,15 @@
   .toolbar-price-filter,
   .toolbar-status-filter,
   .toolbar-controls .vendor-filter,
-  .toolbar-controls .facet-filter {
+  .toolbar-controls .facet-filter,
+  .toolbar-controls .single-option-facet {
     flex: 0 0 auto;
+  }
+
+  .toolbar-price-filter,
+  .toolbar-status-filter,
+  .toolbar-controls .vendor-filter,
+  .toolbar-controls .facet-filter {
     grid-template-columns: max-content max-content;
     gap: 5px;
     justify-content: start;

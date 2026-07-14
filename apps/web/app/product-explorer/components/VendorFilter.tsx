@@ -8,7 +8,6 @@ import type { ProductVendorOption } from "../types";
 interface VendorFilterProps {
   options: readonly ProductVendorOption[];
   disabledLabel: string;
-  selectedCategoryName: string;
   selectedOptions: ProductVendorOption[];
   selectedValues: string[];
   onClear: () => void;
@@ -19,7 +18,6 @@ interface VendorFilterProps {
 export function VendorFilter({
   options,
   disabledLabel,
-  selectedCategoryName,
   selectedOptions,
   selectedValues,
   onClear,
@@ -85,15 +83,14 @@ export function VendorFilter({
             <ChevronDownIcon className="filter-chevron" />
           </button>
           {isOpen ? (
-            <div className="vendor-menu-popover">
-              <div className="vendor-menu-header">
-                <span>{selectedCategoryName}</span>
-                {selectedValues.length > 0 ? (
+            <fieldset aria-label="廠商篩選選單" className="vendor-menu-popover">
+              {selectedValues.length > 0 ? (
+                <div className="vendor-menu-header">
                   <button type="button" onClick={onClear}>
                     清除
                   </button>
-                ) : null}
-              </div>
+                </div>
+              ) : null}
               <div className="vendor-option-list">
                 {options.map((option) => {
                   const checked = selectedValues.includes(option.slug);
@@ -114,7 +111,7 @@ export function VendorFilter({
                   );
                 })}
               </div>
-            </div>
+            </fieldset>
           ) : null}
         </div>
       ) : (

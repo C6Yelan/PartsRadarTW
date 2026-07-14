@@ -78,6 +78,8 @@ describe("GET /api/categories handler", () => {
     )();
     const body = await response.json();
     const facets = body.data[0].facets;
+    const socketFacet = facets.find((facet: { key: string }) => facet.key === "socket");
+    const chipsetFacet = facets.find((facet: { key: string }) => facet.key === "chipset");
     const socketOption = facets
       .find((facet: { key: string }) => facet.key === "socket")
       .options.find((option: { value: string }) => option.value === "lga1700");
@@ -87,6 +89,8 @@ describe("GET /api/categories handler", () => {
 
     expect(socketOption).toEqual({ value: "lga1700", label: "LGA 1700" });
     expect(socketOption).not.toHaveProperty("group");
+    expect(socketFacet).not.toHaveProperty("menuColumns");
+    expect(chipsetFacet.menuColumns).toBe(3);
     expect(chipsetOption).toEqual({
       value: "b760",
       label: "B760",

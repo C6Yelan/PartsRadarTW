@@ -28,7 +28,6 @@ interface ProductToolbarProps {
   formError: string | null;
   hasActiveFilters: boolean;
   query: QueryState;
-  selectedCategoryName: string;
   selectedFacetChips: SelectedFacetChip[];
   selectedVendorOptions: ProductVendorOption[];
   totalItems: number;
@@ -51,7 +50,6 @@ export function ProductToolbar({
   formError,
   hasActiveFilters,
   query,
-  selectedCategoryName,
   selectedFacetChips,
   selectedVendorOptions,
   totalItems,
@@ -156,9 +154,9 @@ export function ProductToolbar({
             </div>
           </div>
           <VendorFilter
+            key={query.category}
             options={vendorOptions}
             disabledLabel={query.category ? "無廠商資料" : "先選分類"}
-            selectedCategoryName={selectedCategoryName}
             selectedOptions={selectedVendorOptions}
             selectedValues={query.vendors}
             onClear={onClearVendors}

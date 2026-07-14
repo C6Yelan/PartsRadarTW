@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { encode } from "iconv-lite";
 import { afterEach, describe, expect, it } from "vitest";
 import { isFilterSyncDue, refreshCoolpcFilterSync } from "../../src/coolpc/filter-sync";
+import { SOURCE_FILTER_SECTION_MAPPINGS } from "../../src/coolpc/filter-sync/mappings";
 import {
   normalizeFilterSyncProductName,
   parseCoolpcFilterSnapshot,
@@ -46,6 +47,26 @@ describe("CoolPC filter sync", () => {
     expect(
       snapshot.tagsByIgrp["15"]?.[normalizeFilterSyncProductName("測試 850W ATX 3.1 銅牌電源")],
     ).toEqual(["wattage_range:800-999", "efficiency:bronze", "psu_standard:atx-3"]);
+  });
+
+  it("keeps unsupported legacy motherboard sockets ignored without a catch-all mapping", () => {
+    const motherboardMapping = SOURCE_FILTER_SECTION_MAPPINGS.find((section) => section.igrp === 5);
+    const socketGroup = motherboardMapping?.groups[1];
+
+    expect(socketGroup).not.toBeNull();
+    if (!socketGroup) {
+      return;
+    }
+
+    expect(socketGroup.conditions["1150"]).toBeNull();
+    expect(socketGroup.conditions["1151"]).toBeNull();
+    expect(socketGroup.conditions["1200"]).toBeNull();
+    const mappedTags = SOURCE_FILTER_SECTION_MAPPINGS.flatMap((section) =>
+      section.groups.flatMap((group) =>
+        group ? Object.values(group.conditions).flatMap((tags) => tags ?? []) : [],
+      ),
+    );
+    expect(mappedTags).not.toContain("socket:other");
   });
 
   it("rejects unknown conditions inside a managed source group", async () => {

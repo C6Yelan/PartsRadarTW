@@ -55,6 +55,34 @@ describe("product facets", () => {
     expect(tags).not.toContain("chipset:b650");
   });
 
+  it("removes the legacy motherboard socket catch-all while preserving chipset tags", () => {
+    expect(getFacetOptions(5, "socket").map((option) => option.value)).toEqual([
+      "lga1851",
+      "lga1700",
+      "am5",
+      "am4",
+      "str5",
+    ]);
+    expect(isProductFilterTagSupported(5, "socket:other")).toBe(false);
+    expect(mergeProductFilterTags(5, ["socket:other"], [])).toEqual([]);
+
+    for (const chipset of ["h81", "h110", "h310", "h510", "w680", "w790", "w880", "w890"]) {
+      const tags = extractProductFilterTags(5, `測試 ${chipset.toUpperCase()} 主機板`);
+      expect(tags).toContain(`chipset:${chipset}`);
+      expect(tags).not.toContain("socket:other");
+    }
+  });
+
+  it.each([
+    ["H610 主機板", "socket:lga1700"],
+    ["H810 主機板", "socket:lga1851"],
+    ["A520 主機板", "socket:am4"],
+    ["A620 主機板", "socket:am5"],
+    ["TRX50 主機板", "socket:str5"],
+  ])("keeps supported motherboard socket parsing for %s", (name, expectedSocket) => {
+    expect(extractProductFilterTags(5, name)).toContain(expectedSocket);
+  });
+
   it("extracts memory type, capacity, and speed", () => {
     expect(extractProductFilterTags(6, "桌上型 32GB(雙通16GB*2) DDR5 6000/CL30")).toEqual([
       "module_type:desktop",
@@ -367,6 +395,18 @@ describe("product facets", () => {
   });
 
   it("keeps semantic option groups contiguous and stable", () => {
+    const motherboardDefinitions = getProductFacetDefinitions(5);
+    expect(
+      motherboardDefinitions.find((definition) => definition.key === "chipset")?.menuColumns,
+    ).toBe(3);
+    expect(
+      motherboardDefinitions.find((definition) => definition.key === "socket"),
+    ).not.toHaveProperty("menuColumns");
+    expect(motherboardDefinitions.find((definition) => definition.key === "wifi")).toMatchObject({
+      key: "wifi",
+      label: "無線網路",
+      options: [{ value: "yes", label: "含 Wi-Fi" }],
+    });
     expect(readGroups(5, "chipset")).toEqual([
       ["Intel LGA 1700", ["h610", "b760", "z790"]],
       ["Intel LGA 1851", ["h810", "b860", "z890"]],
@@ -382,6 +422,9 @@ describe("product facets", () => {
         ["4800", "5200", "5600", "6000", "6200", "6400", "6800", "7200", "8000", "8400"],
       ],
     ]);
+    const speedOptions = getFacetOptions(6, "speed_mhz");
+    expect(speedOptions[5]).toMatchObject({ value: "4000", group: "1600～4000 MHz" });
+    expect(speedOptions[6]).toMatchObject({ value: "4800", group: "4800 MHz 以上" });
     expect(readGroups(12, "gpu_series").map(([group]) => group)).toEqual([
       "GeForce",
       "Radeon",

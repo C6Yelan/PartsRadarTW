@@ -15,7 +15,7 @@ export function useProductExplorerViewModel() {
   const { isReady, query, draft, formError, setDraft, setFormError, commitQuery } =
     useProductExplorerQuery();
   const { categories, categoryState } = useCategories();
-  const { products, productState } = useProducts(isReady, query);
+  const { products, productState, vendorOptions } = useProducts(isReady, query);
   const { filtersOpen, keepDesktopFiltersOpen, syncFiltersOpenFromToggle } =
     useResponsiveFiltersOpen();
   const { resultsPanelRef, schedulePageScroll } = usePendingPageScroll(productState, products);
@@ -45,16 +45,6 @@ export function useProductExplorerViewModel() {
     );
   }, [categories, categoryState, commitQuery, isReady, query]);
 
-  const selectedCategoryName = useMemo(() => {
-    if (!query.category) {
-      return "選擇分類";
-    }
-
-    return (
-      categories.find((category) => category.slug === query.category)?.displayName ?? query.category
-    );
-  }, [categories, query.category]);
-
   const selectedFacetChips = useMemo(() => {
     const definitions =
       categories.find((category) => category.slug === query.category)?.facets ?? [];
@@ -82,8 +72,6 @@ export function useProductExplorerViewModel() {
   const visiblePages = getVisiblePages(query.page, totalPages);
   const shouldShowPageJump = totalPages > 10;
   const productListReturnTo = toUrl(query);
-  const vendorOptions =
-    productState === "ready" && query.category ? (products?.meta.vendors ?? []) : [];
   const selectedVendorOptions = useMemo(
     () => vendorOptions.filter((option) => query.vendors.includes(option.slug)),
     [query.vendors, vendorOptions],
@@ -139,7 +127,6 @@ export function useProductExplorerViewModel() {
         formError,
         hasActiveFilters,
         query,
-        selectedCategoryName,
         selectedFacetChips,
         selectedVendorOptions,
         totalItems,

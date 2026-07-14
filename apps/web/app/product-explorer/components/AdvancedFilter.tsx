@@ -22,14 +22,51 @@ export function AdvancedFilter({
   const definitions =
     categories.find((category) => category.slug === selectedCategory)?.facets ?? [];
 
-  return definitions.map((definition) => (
-    <FacetFilter
-      definition={definition}
-      key={definition.key}
-      selectedFacets={selectedFacets}
-      onToggle={onToggle}
-    />
-  ));
+  return definitions.map((definition) =>
+    definition.options.length === 1 ? (
+      <SingleOptionFacet
+        definition={definition}
+        key={definition.key}
+        selectedFacets={selectedFacets}
+        onToggle={onToggle}
+      />
+    ) : (
+      <FacetFilter
+        definition={definition}
+        key={definition.key}
+        selectedFacets={selectedFacets}
+        onToggle={onToggle}
+      />
+    ),
+  );
+}
+
+function SingleOptionFacet({
+  definition,
+  selectedFacets,
+  onToggle,
+}: {
+  definition: ProductFacetDefinition;
+  selectedFacets: string[];
+  onToggle: (tag: string) => void;
+}) {
+  const option = definition.options[0];
+  if (!option) {
+    return null;
+  }
+
+  const tag = `${definition.key}:${option.value}`;
+
+  return (
+    <label className="single-option-facet">
+      <input
+        checked={selectedFacets.includes(tag)}
+        type="checkbox"
+        onChange={() => onToggle(tag)}
+      />
+      <span>{option.label}</span>
+    </label>
+  );
 }
 
 function FacetFilter({
@@ -87,7 +124,7 @@ function FacetFilter({
           <ChevronDownIcon className="filter-chevron" />
         </button>
         {isOpen ? (
-          <div className="facet-menu-popover">
+          <div className="facet-menu-popover" data-menu-columns={definition.menuColumns}>
             <div className={optionGroups ? "facet-option-list is-grouped" : "facet-option-list"}>
               {optionGroups
                 ? optionGroups.map((group) => (

@@ -23,7 +23,6 @@ export function ProductExplorerResultsPanel({
         formError={toolbar.formError}
         hasActiveFilters={toolbar.hasActiveFilters}
         query={toolbar.query}
-        selectedCategoryName={toolbar.selectedCategoryName}
         selectedFacetChips={toolbar.selectedFacetChips}
         selectedVendorOptions={toolbar.selectedVendorOptions}
         totalItems={toolbar.totalItems}

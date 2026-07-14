@@ -80,6 +80,11 @@
     grid-template-columns: 1fr;
   }
 
+  .single-option-facet {
+    display: flex;
+    min-height: 44px;
+  }
+
   .vendor-menu-trigger,
   .vendor-filter-disabled,
   .facet-menu-trigger {
