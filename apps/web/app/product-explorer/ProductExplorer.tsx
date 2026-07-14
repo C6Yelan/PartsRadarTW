@@ -1,15 +1,14 @@
 "use client";
 // apps/web/app/product-explorer/ProductExplorer.tsx
-// 提供首頁商品探索頁的 client-side 組裝入口，串接搜尋、分類、結果、配單入口與聲明區塊。
+// 提供首頁商品探索頁的 client-side 組裝入口，串接搜尋、分類、結果與聲明區塊。
 
-import FloatingBuildListLink from "../build-list/FloatingBuildListLink";
 import SiteDisclaimer from "../site-disclaimer";
 import { ProductExplorerHeader } from "./components/ProductExplorerHeader";
 import { ProductExplorerResultsPanel } from "./components/ProductExplorerResultsPanel";
 import { ProductFilters } from "./components/ProductFilters";
 import { useProductExplorerViewModel } from "./use-product-explorer-view-model";
 
-// 組裝商品探索頁主畫面，將 view model 切分給 header、filter、results 與配單浮動入口。
+// 組裝商品探索頁主畫面，將 view model 切分給 header、filter 與 results。
 export default function ProductExplorer() {
   const viewModel = useProductExplorerViewModel();
 
@@ -39,7 +38,6 @@ export default function ProductExplorer() {
           <ProductExplorerResultsPanel results={viewModel.results} />
         </div>
       </main>
-      <FloatingBuildListLink summary={viewModel.buildList.summary} />
       <SiteDisclaimer />
     </div>
   );

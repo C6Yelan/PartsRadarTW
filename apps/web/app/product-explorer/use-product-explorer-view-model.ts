@@ -1,6 +1,6 @@
 "use client";
 // apps/web/app/product-explorer/use-product-explorer-view-model.ts
-// 組裝商品探索頁的資料、查詢狀態、配單狀態與子元件 action 分組。
+// 組裝商品探索頁的資料、查詢狀態與子元件 action 分組。
 
 import { useEffect, useMemo } from "react";
 import { useProductExplorerActions } from "./actions/use-product-explorer-actions";
@@ -10,7 +10,7 @@ import { usePendingPageScroll, useProductExplorerQuery, useResponsiveFiltersOpen
 import { DEFAULT_QUERY, getVisiblePages, toUrl } from "./query-state";
 import { useProductBuildListActions } from "./use-product-build-list-actions";
 
-// 建立 ProductExplorer 使用的 view model，將 hook 狀態整理成 header、filters、results 與 buildList 區塊。
+// 建立 ProductExplorer 使用的 view model，將 hook 狀態整理成 header、filters 與 results 區塊。
 export function useProductExplorerViewModel() {
   const { isReady, query, draft, formError, setDraft, setFormError, commitQuery } =
     useProductExplorerQuery();
@@ -169,9 +169,6 @@ export function useProductExplorerViewModel() {
           pageJumpValueChange: actions.setPageJumpValue,
         },
       },
-    },
-    buildList: {
-      summary: buildList.summary,
     },
   };
 }

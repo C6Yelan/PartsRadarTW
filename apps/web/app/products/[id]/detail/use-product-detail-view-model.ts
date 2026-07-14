@@ -29,7 +29,6 @@ export function useProductDetailViewModel({
     isProductLimitReached,
     quantityByProductId,
     removeBuildListItem,
-    summary,
     setBuildListItemQuantity,
   } = useBuildList();
 
@@ -89,7 +88,6 @@ export function useProductDetailViewModel({
       canIncreaseBuildListQuantity,
       currentBuildListQuantity,
       isProductLimitReached: currentBuildListQuantity === 0 && isProductLimitReached,
-      summary,
       addCurrentProductToBuildList,
       decreaseCurrentProductBuildListQuantity,
     },

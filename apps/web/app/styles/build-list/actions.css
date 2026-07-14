@@ -56,6 +56,11 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* 為商品頁主要操作保留浮動入口的右下角安全區。 */
+body:has(.build-list-floating-link) .detail-actions {
+  padding-right: 76px;
+}
+
 .build-list-add-button,
 .build-list-detail-action {
   display: inline-flex;

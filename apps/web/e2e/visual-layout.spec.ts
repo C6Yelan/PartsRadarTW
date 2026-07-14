@@ -1860,9 +1860,7 @@ test("uses compact custom price-report filters, aligned table typography, and co
   await page.getByRole("button", { name: "重設", exact: true }).click();
 
   await selectPriceReportOption(page, "排序", "降幅最大");
-  await expect.poll(() => new URL(page.url()).searchParams.get("sort")).toBe(
-    "drop_percent_desc",
-  );
+  await expect.poll(() => new URL(page.url()).searchParams.get("sort")).toBe("drop_percent_desc");
   await expect(page.getByRole("button", { name: "重設", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "重設", exact: true }).click();
 
@@ -1906,21 +1904,19 @@ test("uses compact custom price-report filters, aligned table typography, and co
     scrollHeight: element.scrollHeight,
   }));
   expect(categoryOverflow.scrollHeight).toBeGreaterThan(categoryOverflow.clientHeight);
-  const typography = await categoryListbox
-    .getByRole("option")
-    .evaluateAll((options) =>
-      ["CPU", "SSD", "HDD", "主機板", "風扇 / 配件"].map((label) => {
-        const option = options.find((candidate) => candidate.textContent === label);
-        if (!option) return null;
-        const style = getComputedStyle(option);
-        return {
-          label,
-          fontFamily: style.fontFamily,
-          letterSpacing: style.letterSpacing,
-          wordSpacing: style.wordSpacing,
-        };
-      }),
-    );
+  const typography = await categoryListbox.getByRole("option").evaluateAll((options) =>
+    ["CPU", "SSD", "HDD", "主機板", "風扇 / 配件"].map((label) => {
+      const option = options.find((candidate) => candidate.textContent === label);
+      if (!option) return null;
+      const style = getComputedStyle(option);
+      return {
+        label,
+        fontFamily: style.fontFamily,
+        letterSpacing: style.letterSpacing,
+        wordSpacing: style.wordSpacing,
+      };
+    }),
+  );
   expect(typography.every((item) => item !== null)).toBe(true);
   expect(new Set(typography.map((item) => item?.fontFamily)).size).toBe(1);
   expect(new Set(typography.map((item) => item?.letterSpacing)).size).toBe(1);
@@ -1991,10 +1987,7 @@ test("uses compact custom price-report filters, aligned table typography, and co
     "font-size",
     homeHeaderFontSize,
   );
-  await expect(page.locator(".price-report-product").first()).not.toHaveCSS(
-    "text-align",
-    "center",
-  );
+  await expect(page.locator(".price-report-product").first()).not.toHaveCSS("text-align", "center");
 });
 
 test("presents build-list summary, categories, actions, and data status in one sidebar @desktop-only", async ({
@@ -2095,9 +2088,7 @@ test("presents build-list summary, categories, actions, and data status in one s
   await expect(sidebar.getByText("零件數").locator("..")).toContainText("0");
   await expect(sidebar.getByRole("heading", { name: "零件構成" })).toHaveCount(0);
   await expect(sidebar.getByRole("button", { name: "下載 Excel（0）" })).toBeDisabled();
-  await expect(
-    sidebar.getByText("尚未勾選要納入配單摘要與下載的品項。"),
-  ).toBeVisible();
+  await expect(sidebar.getByText("尚未勾選要納入配單摘要與下載的品項。")).toBeVisible();
   await expect(sidebar.getByRole("button", { name: "重新整理商品資料" })).toBeEnabled();
   await expect(sidebar.getByRole("button", { name: "清空配單" })).toBeEnabled();
 
@@ -2106,9 +2097,7 @@ test("presents build-list summary, categories, actions, and data status in one s
   await expect(sidebar.getByText("NT$ 3,000")).toBeVisible();
   await expect(sidebar.getByRole("button", { name: "下載 Excel（1）" })).toBeEnabled();
   await sidebar.getByRole("button", { name: "重新整理商品資料" }).click();
-  await expect(
-    sidebar.getByText(/商品資料已更新|正在取得最新商品資料/),
-  ).toBeVisible();
+  await expect(sidebar.getByText(/商品資料已更新|正在取得最新商品資料/)).toBeVisible();
   page.once("dialog", (dialog) => void dialog.dismiss());
   await sidebar.getByRole("button", { name: "清空配單" }).click();
   await expect(sidebar).toBeVisible();
@@ -2302,6 +2291,78 @@ test("keeps the main pages usable without horizontal overflow", async ({ page },
   expect(discordBackLinkWidth).toBeLessThan(180);
   await page.getByRole("link", { name: "快速開始" }).focus();
   await expectUsableLayout(page, testInfo);
+});
+
+test("mounts one global build-list link across public routes and required viewports", {
+  tag: "@desktop-only",
+}, async ({ page }) => {
+  test.setTimeout(180_000);
+  await page.addInitScript(
+    ({ productId, observedAt }) => {
+      window.localStorage.setItem(
+        "partsradartw:build-list:v3",
+        JSON.stringify([
+          {
+            productId,
+            quantity: 3,
+            includeInExport: true,
+            order: 0,
+            addedAt: observedAt,
+            updatedAt: observedAt,
+          },
+        ]),
+      );
+    },
+    { productId: PRODUCT_ID, observedAt: OBSERVED_AT },
+  );
+
+  const routes = [
+    "/",
+    `/products/${READY_ROUTE_SLUG}`,
+    "/price-report",
+    "/discord",
+    "/announcements",
+    "/about",
+    "/privacy",
+    "/terms",
+    "/build-list",
+  ];
+  const viewports = [
+    { width: 1760, height: 900 },
+    { width: 1280, height: 800 },
+    { width: 760, height: 844 },
+    { width: 390, height: 844 },
+  ];
+
+  for (const viewport of viewports) {
+    await page.setViewportSize(viewport);
+
+    for (const route of routes) {
+      await page.goto(route);
+      await expect(page.locator("body")).toBeVisible();
+
+      const floatingLink = page.getByRole("link", {
+        exact: true,
+        name: "開啟配單，目前 3 件",
+      });
+
+      if (route === "/build-list") {
+        await expect(page.getByRole("heading", { exact: true, name: "配單" })).toBeVisible();
+        await expect(floatingLink).toHaveCount(0);
+      } else {
+        await expect(floatingLink).toHaveCount(1);
+        await expect(floatingLink).toBeVisible();
+        await expect(floatingLink).toHaveAttribute("href", "/build-list");
+        await expect(floatingLink).toHaveAttribute("title", "開啟配單");
+        await expectFloatingLinkNotToCoverContent(floatingLink, "main");
+
+        await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+        await expectFloatingLinkNotToCoverContent(floatingLink, "footer");
+      }
+
+      await expectNoHorizontalOverflow(page);
+    }
+  }
 });
 
 test("keeps error and empty states usable", async ({ page }, testInfo) => {
@@ -2533,6 +2594,61 @@ async function expectNoHorizontalOverflow(page: Page) {
   return dimensions;
 }
 
+async function expectFloatingLinkNotToCoverContent(floatingLink: Locator, area: "footer" | "main") {
+  const overlappingElements = await floatingLink.evaluate((link, checkedArea) => {
+    const linkRect = link.getBoundingClientRect();
+    const candidates = document.querySelectorAll<HTMLElement>(
+      checkedArea === "footer"
+        ? ".site-footer-nav a, .site-footer-copy p"
+        : [
+            "main .control-button.primary",
+            "main .external-action",
+            "main .build-list-add-button",
+            "main .build-list-detail-action",
+            "main .product-name-link",
+            "main .price-report-product-copy a",
+            "main .row-price strong",
+            "main .price-report-value",
+          ].join(", "),
+    );
+
+    return [...candidates]
+      .filter((candidate) => {
+        const rects = candidate.matches("h1, h2, h3, h4, p")
+          ? (() => {
+              const range = document.createRange();
+              range.selectNodeContents(candidate);
+              return [...range.getClientRects()];
+            })()
+          : [candidate.getBoundingClientRect()];
+
+        return rects.some((rect) => {
+          const isVisible =
+            rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.top < window.innerHeight;
+          const overlaps =
+            rect.left < linkRect.right &&
+            rect.right > linkRect.left &&
+            rect.top < linkRect.bottom &&
+            rect.bottom > linkRect.top;
+
+          return isVisible && overlaps;
+        });
+      })
+      .map((candidate) => ({
+        candidate: candidate.getBoundingClientRect().toJSON(),
+        detailActionsPaddingRight: candidate.closest(".detail-actions")
+          ? getComputedStyle(candidate.closest(".detail-actions") as Element).paddingRight
+          : null,
+        link: linkRect.toJSON(),
+        path: window.location.pathname,
+        text: candidate.textContent?.trim() ?? candidate.tagName,
+        viewport: { height: window.innerHeight, width: window.innerWidth },
+      }));
+  }, area);
+
+  expect(overlappingElements).toEqual([]);
+}
+
 async function expectTransitionDurationAtMost(locator: Locator, maximumMs: number) {
   const durationsMs = await locator.evaluate((element) =>
     window
@@ -2568,10 +2684,13 @@ function buildListProduct(
 
 async function selectPriceReportOption(page: Page, label: string, option: string) {
   await page.getByRole("button", { name: label, exact: true }).click();
-  await page.getByRole("listbox", { name: label, exact: true }).getByRole("option", {
-    name: option,
-    exact: true,
-  }).click();
+  await page
+    .getByRole("listbox", { name: label, exact: true })
+    .getByRole("option", {
+      name: option,
+      exact: true,
+    })
+    .click();
 }
 
 async function getPriceReportControlRects(page: Page) {

@@ -1,5 +1,5 @@
 // apps/web/app/build-list/FloatingBuildListLink.tsx
-// 提供商品頁面共用的浮動配單入口，只顯示 persisted intent 的商品數量。
+// 提供全站共用的浮動配單入口，只顯示 persisted intent 的商品數量。
 
 import Link from "next/link";
 import { CartIcon } from "../_shared/icons";

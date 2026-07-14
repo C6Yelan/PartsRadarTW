@@ -12,7 +12,6 @@ export function useProductBuildListActions() {
     isProductLimitReached,
     quantityByProductId,
     removeBuildListItem,
-    summary,
     setBuildListItemQuantity,
   } = useBuildList();
 
@@ -34,7 +33,6 @@ export function useProductBuildListActions() {
   return {
     quantities: quantityByProductId,
     isProductLimitReached,
-    summary,
     addProductToBuildList,
     decreaseBuildListItemQuantity,
   };

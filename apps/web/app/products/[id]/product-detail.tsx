@@ -5,7 +5,6 @@
 import Link from "next/link";
 import { API_RATE_LIMITED_MESSAGE } from "../../_shared/api-client";
 import { ArrowLeftIcon } from "../../_shared/icons";
-import FloatingBuildListLink from "../../build-list/FloatingBuildListLink";
 import SiteDisclaimer from "../../site-disclaimer";
 import TopbarBrandNavigation from "../../TopbarBrandNavigation";
 import ProductDetailActions from "./detail/ProductDetailActions";
@@ -93,7 +92,6 @@ export default function ProductDetail({
             onRangeChange={viewModel.priceHistory.onRangeChange}
           />
         ) : null}
-        <FloatingBuildListLink summary={viewModel.buildList.summary} />
         <SiteDisclaimer />
       </main>
     </div>

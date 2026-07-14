@@ -39,6 +39,10 @@
   color: var(--text);
 }
 
+body:has(.build-list-floating-link) .site-disclaimer {
+  padding-bottom: 92px;
+}
+
 .detail-shell > .site-disclaimer,
 .not-found-shell > .site-disclaimer {
   width: 100%;

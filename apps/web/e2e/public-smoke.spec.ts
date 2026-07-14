@@ -16,15 +16,23 @@ interface ProductListResponse {
 
 async function expectPublicFooterLinks(page: Page) {
   const footer = page.getByRole("contentinfo");
+  const expectedLinks = ["關於與聯絡", "隱私權", "使用條款", "GitHub（在新分頁開啟）"];
 
-  for (const name of [
-    "關於本站",
-    "隱私權政策",
-    "使用條款",
-    "聯絡與回報",
-  ]) {
+  for (const name of expectedLinks) {
     await expect(footer.getByRole("link", { name })).toBeVisible();
   }
+
+  await expect(footer.getByRole("navigation", { name: "網站資訊" }).getByRole("link")).toHaveCount(
+    expectedLinks.length,
+  );
+  expect(
+    await footer.getByRole("navigation", { name: "網站資訊" }).getByRole("link").allTextContents(),
+  ).toEqual(["關於與聯絡", "隱私權", "使用條款", "GitHub"]);
+
+  const githubLink = footer.getByRole("link", { name: "GitHub（在新分頁開啟）" });
+  await expect(githubLink).toHaveAttribute("href", "https://github.com/C6Yelan/PartsRadarTW");
+  await expect(githubLink).toHaveAttribute("target", "_blank");
+  await expect(githubLink).toHaveAttribute("rel", "noreferrer");
 
   await expect(footer.getByRole("link", { name: "價格變動總覽" })).toHaveCount(0);
   await expect(footer.getByRole("link", { name: "公告", exact: true })).toHaveCount(0);
@@ -107,33 +115,48 @@ test.describe("public web smoke", () => {
 
   test("loads the public information pages", { tag: "@desktop-only" }, async ({ page }) => {
     await page.goto("/about");
-    await expect(page.getByRole("heading", { exact: true, name: "關於本站" })).toBeVisible();
+    await expect(page.getByRole("heading", { exact: true, name: "關於與聯絡" })).toBeVisible();
     await expect(
       page.locator("main").getByText(/商品名稱、分類、價格與來源連結整理自原價屋公開頁面/),
     ).toBeVisible();
     await expect(page.getByText("partsradartw@gmail.com")).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "GitHub repository（在新分頁開啟）" }),
+    ).toHaveAttribute("href", "https://github.com/C6Yelan/PartsRadarTW");
+    await expect(page.locator("main h1")).toHaveCount(0);
+    await expect(page.locator("main h2")).toHaveCount(4);
     await expectTopbarLinks(page);
     await expectPublicFooterLinks(page);
 
     await page.goto("/privacy");
     await expect(page.getByRole("heading", { exact: true, name: "隱私權政策" })).toBeVisible();
     await expect(page.getByText(/配單內容儲存在目前使用的瀏覽器/)).toBeVisible();
-    await expect(page.getByText(/SHA-256|PostgreSQL|Cloudflare Tunnel|localStorage/)).toHaveCount(0);
-    await expect(page.getByRole("navigation", { name: "隱私權政策章節" })).toBeVisible();
-    await expect(page.locator(".public-legal-page .public-info-section").first()).toHaveCSS(
-      "background-color",
-      "rgba(0, 0, 0, 0)",
+    await expect(page.getByText(/SHA-256|PostgreSQL|Cloudflare Tunnel|localStorage/)).toHaveCount(
+      0,
     );
+    await expect(page.locator(".public-legal-toc, .public-legal-page")).toHaveCount(0);
+    await expect(page.locator("main h1")).toHaveCount(0);
+    await expect(page.locator("main h2")).toHaveCount(5);
     await expectTopbarLinks(page);
     await expectPublicFooterLinks(page);
 
     await page.goto("/terms");
     await expect(page.getByRole("heading", { exact: true, name: "使用條款" })).toBeVisible();
-    await expect(page.getByText(/非官方、非商業/).first()).toBeVisible();
-    await expect(page.getByRole("navigation", { name: "使用條款章節" })).toBeVisible();
-    await expectSingleLine(page.getByText(/使用本站即表示你理解/));
+    await expect(page.getByText(/非官方的商品與價格資料整理工具/)).toBeVisible();
+    await expect(page.locator(".public-legal-toc, .public-legal-page")).toHaveCount(0);
+    await expect(page.locator("main h1")).toHaveCount(0);
+    await expect(page.locator("main h2")).toHaveCount(4);
     await expectTopbarLinks(page);
     await expectPublicFooterLinks(page);
+
+    await page.goto("/about#contact");
+    await expect(page.locator("#contact")).toBeInViewport();
+
+    await page.goto("/privacy#privacy-browser-data");
+    await expect(page.locator("#privacy-browser-data")).toBeInViewport();
+
+    await page.goto("/terms#terms-external");
+    await expect(page.locator("#terms-external")).toBeInViewport();
 
     await page.goto("/announcements");
     await expect(page.getByRole("heading", { exact: true, name: "網站公告" })).toBeVisible();
@@ -142,8 +165,12 @@ test.describe("public web smoke", () => {
     const announcementTitle = page.getByRole("heading", { name: "網站公開測試中" });
     const announcementSummary = page.getByText(/商品與價格資訊可能因來源更新時間而有延遲/);
     const [titleSize, summarySize] = await Promise.all([
-      announcementTitle.evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize)),
-      announcementSummary.evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize)),
+      announcementTitle.evaluate((element) =>
+        Number.parseFloat(getComputedStyle(element).fontSize),
+      ),
+      announcementSummary.evaluate((element) =>
+        Number.parseFloat(getComputedStyle(element).fontSize),
+      ),
     ]);
     expect(titleSize).toBeGreaterThan(summarySize);
     await expectTopbarLinks(page);
