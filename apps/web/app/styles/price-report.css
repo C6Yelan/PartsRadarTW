@@ -489,7 +489,6 @@
   padding: 15px 18px;
   border-bottom: 1px solid var(--border);
   background: var(--panel);
-  color: var(--muted);
   text-align: center;
 }
 
@@ -503,8 +502,9 @@
   gap: 12px;
   align-items: center;
   min-width: 0;
-  justify-content: center;
-  text-align: center;
+  justify-self: stretch;
+  justify-content: stretch;
+  text-align: left;
 }
 
 .price-report-product-copy {
@@ -513,14 +513,17 @@
   gap: 10px;
   align-items: center;
   min-width: 0;
+  text-align: left;
 }
 
 .price-report-product-copy a {
   overflow: hidden;
   color: var(--text-strong);
+  font-family: inherit;
   font-size: inherit;
   font-weight: 760;
-  line-height: 1.4;
+  line-height: 1.35;
+  text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -569,6 +572,45 @@
 .price-report-category {
   gap: 6px;
   justify-content: center;
+}
+
+@media (min-width: 1121px) {
+  .price-report-category > span:last-child,
+  .price-report-changed > span:last-child {
+    overflow: hidden;
+    color: var(--text);
+    font-family: inherit;
+    font-size: inherit;
+    font-weight: 400;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .price-report-changed > span:last-child {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .price-report-previous > span:last-child,
+  .price-report-current > span:last-child {
+    color: var(--accent-strong);
+    font-size: 18px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .price-report-amount > span:last-child,
+  .price-report-percent > span:last-child {
+    font-size: 16px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 760;
+    line-height: 1.2;
+    white-space: nowrap;
+  }
+}
+
+.price-report-row.is-new .price-report-change {
+  color: var(--muted);
 }
 
 .price-report-cell-label {
@@ -644,6 +686,12 @@
   .price-report-product {
     justify-content: stretch;
     text-align: left;
+  }
+
+  .price-report-product-copy a {
+    overflow-wrap: anywhere;
+    text-overflow: clip;
+    white-space: normal;
   }
 
   .price-report-cell-label {

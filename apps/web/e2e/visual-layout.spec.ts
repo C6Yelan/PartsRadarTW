@@ -1865,6 +1865,8 @@ test("uses compact custom price-report filters, aligned table typography, and co
     { width: 1760, height: 900 },
     { width: 1440, height: 900 },
     { width: 1280, height: 800 },
+    { width: 1121, height: 800 },
+    { width: 1120, height: 800 },
     { width: 1024, height: 800 },
     { width: 761, height: 844 },
     { width: 760, height: 844 },
@@ -1928,9 +1930,67 @@ test("uses compact custom price-report filters, aligned table typography, and co
       for (const header of await tableHeader.locator("span").all()) {
         await expect(header).toHaveCSS("text-align", "center");
       }
+
+      const product = page.locator(".price-report-product").first();
+      const productCopy = product.locator(".price-report-product-copy");
+      const productLink = productCopy.locator("a");
+      await expect(product).toHaveCSS("text-align", "left");
+      await expect(product).toHaveCSS("justify-content", "stretch");
+      await expect(productCopy).toHaveCSS("text-align", "left");
+      await expect(productLink).toHaveCSS("text-align", "left");
+
+      const [productBox, badgeBox, linkBox, categoryBox] = await Promise.all([
+        product.boundingBox(),
+        product.locator(".price-report-kind").boundingBox(),
+        productLink.boundingBox(),
+        page.locator(".price-report-category").first().boundingBox(),
+      ]);
+      expect(linkBox?.x ?? 0).toBeGreaterThanOrEqual(
+        (badgeBox?.x ?? Number.POSITIVE_INFINITY) + (badgeBox?.width ?? 0),
+      );
+      expect((linkBox?.x ?? Number.POSITIVE_INFINITY) + (linkBox?.width ?? 0)).toBeLessThanOrEqual(
+        (productBox?.x ?? 0) + (productBox?.width ?? 0),
+      );
+      expect(
+        (productBox?.x ?? Number.POSITIVE_INFINITY) + (productBox?.width ?? 0),
+      ).toBeLessThanOrEqual(categoryBox?.x ?? 0);
+
+      for (const cell of await page
+        .locator(
+          ".price-report-category, .price-report-previous, .price-report-current, .price-report-amount, .price-report-percent, .price-report-changed",
+        )
+        .all()) {
+        await expect(cell).toHaveCSS("text-align", "center");
+        const value = cell.locator("span:last-child");
+        const [cellBox, valueBox] = await Promise.all([cell.boundingBox(), value.boundingBox()]);
+        const cellCenter = (cellBox?.x ?? 0) + (cellBox?.width ?? 0) / 2;
+        const valueCenter = (valueBox?.x ?? 0) + (valueBox?.width ?? 0) / 2;
+        expect(Math.abs(cellCenter - valueCenter)).toBeLessThanOrEqual(2);
+      }
     } else {
       await expect(tableHeader).toBeHidden();
       await expect(page.locator(".price-report-cell-label").first()).toBeVisible();
+      await expect(page.locator(".price-report-product").first()).toHaveCSS("text-align", "left");
+      await expect(page.locator(".price-report-product-copy a").first()).toHaveCSS(
+        "white-space",
+        "normal",
+      );
+      for (const cell of await page.locator(".price-report-value").all()) {
+        const label = cell.locator(".price-report-cell-label");
+        const value = cell.locator("span:last-child");
+        const [cellBox, labelBox, valueBox] = await Promise.all([
+          cell.boundingBox(),
+          label.boundingBox(),
+          value.boundingBox(),
+        ]);
+        expect((labelBox?.x ?? 0) + (labelBox?.width ?? 0)).toBeLessThanOrEqual(
+          valueBox?.x ?? 0,
+        );
+        expect((valueBox?.x ?? Number.POSITIVE_INFINITY) + (valueBox?.width ?? 0)).toBeLessThanOrEqual(
+          (cellBox?.x ?? 0) + (cellBox?.width ?? 0),
+        );
+      }
+      await expect(page.getByRole("navigation", { name: "頁碼" })).toBeVisible();
     }
     await expect(page.getByRole("status").filter({ hasText: "資料最後成功更新" })).toBeVisible();
     await expectNoHorizontalOverflow(page);
@@ -2060,61 +2120,82 @@ test("uses compact custom price-report filters, aligned table typography, and co
 
   await page.setViewportSize({ width: 1760, height: 900 });
   await page.goto("/");
-  const homeProductFontSize = await page
-    .locator(".product-main a")
-    .first()
-    .evaluate((element) => getComputedStyle(element).fontSize);
-  const homeProductFontWeight = await page
-    .locator(".product-main a")
-    .first()
-    .evaluate((element) => getComputedStyle(element).fontWeight);
-  const homeValueFontSize = await page
-    .locator(".table-cell")
-    .first()
-    .evaluate((element) => getComputedStyle(element).fontSize);
-  const homeValueFontWeight = await page
-    .locator(".table-cell")
-    .first()
-    .evaluate((element) => getComputedStyle(element).fontWeight);
-  const homeHeaderFontSize = await page
-    .locator(".table-header")
-    .evaluate((element) => getComputedStyle(element).fontSize);
-  const homeHeaderFontWeight = await page
-    .locator(".table-header")
-    .evaluate((element) => getComputedStyle(element).fontWeight);
+  const homeProductStyle = await readStyleSnapshot(page.locator(".product-main a").first());
+  const homePriceStyle = await readStyleSnapshot(page.locator(".row-price strong").first());
+  const homeMovementStyle = await readStyleSnapshot(page.locator(".price-movement").first());
+  const homeValueStyle = await readStyleSnapshot(page.locator(".table-cell").first());
+  const homeHeaderStyle = await readStyleSnapshot(page.locator(".table-header"));
   await page.goto("/price-report");
-  await expect(page.locator(".price-report-product-copy a").first()).toHaveCSS(
-    "font-size",
-    homeProductFontSize,
+
+  const productStyle = await readStyleSnapshot(
+    page.locator(".price-report-product-copy a").first(),
   );
-  await expect(page.locator(".price-report-product-copy a").first()).toHaveCSS(
-    "font-weight",
-    homeProductFontWeight,
-  );
-  await expect(page.locator(".price-report-value").first()).toHaveCSS(
-    "font-size",
-    homeValueFontSize,
-  );
-  await expect(page.locator(".price-report-value").first()).toHaveCSS(
-    "font-weight",
-    homeValueFontWeight,
-  );
-  await expect(page.locator(".price-report-table-header")).toHaveCSS(
-    "font-size",
-    homeHeaderFontSize,
-  );
-  await expect(page.locator(".price-report-table-header")).toHaveCSS(
-    "font-weight",
-    homeHeaderFontWeight,
-  );
-  for (const value of await page.locator(".price-report-value").all()) {
-    await expect(value).toHaveCSS("text-align", "center");
+  expectStyleFields(productStyle, homeProductStyle, [
+    "fontFamily",
+    "fontSize",
+    "fontWeight",
+    "lineHeight",
+    "color",
+  ]);
+
+  for (const selector of [
+    ".price-report-previous > span:last-child",
+    ".price-report-current > span:last-child",
+  ]) {
+    const priceStyle = await readStyleSnapshot(page.locator(selector).first());
+    expectStyleFields(priceStyle, homePriceStyle, [
+      "fontSize",
+      "fontWeight",
+      "color",
+      "fontVariantNumeric",
+      "whiteSpace",
+    ]);
   }
-  await expect(page.locator(".price-report-product").first()).toHaveCSS("text-align", "center");
-  await expect(page.locator(".price-report-product").first()).toHaveCSS(
-    "justify-content",
-    "center",
-  );
+
+  for (const selector of [
+    ".price-report-amount > span:last-child",
+    ".price-report-percent > span:last-child",
+  ]) {
+    const movementStyle = await readStyleSnapshot(page.locator(selector).first());
+    expectStyleFields(movementStyle, homeMovementStyle, [
+      "fontSize",
+      "fontWeight",
+      "fontVariantNumeric",
+      "whiteSpace",
+    ]);
+  }
+
+  for (const selector of [
+    ".price-report-category > span:last-child",
+    ".price-report-changed > span:last-child",
+  ]) {
+    const valueStyle = await readStyleSnapshot(page.locator(selector).first());
+    expectStyleFields(valueStyle, homeValueStyle, [
+      "fontFamily",
+      "fontSize",
+      "fontWeight",
+      "color",
+    ]);
+    expect(valueStyle.textAlign).toBe("center");
+  }
+
+  const reportHeaderStyle = await readStyleSnapshot(page.locator(".price-report-table-header"));
+  expectStyleFields(reportHeaderStyle, homeHeaderStyle, [
+    "minHeight",
+    "fontSize",
+    "fontWeight",
+    "color",
+    "backgroundColor",
+  ]);
+
+  const dropMovementColor = await page
+    .locator(".price-report-row.is-drop .price-report-amount > span:last-child")
+    .evaluate((element) => getComputedStyle(element).color);
+  const riseMovementColor = await page
+    .locator(".price-report-row.is-rise .price-report-amount > span:last-child")
+    .evaluate((element) => getComputedStyle(element).color);
+  expect(dropMovementColor).toBe("rgb(104, 226, 145)");
+  expect(riseMovementColor).toBe("rgb(255, 138, 145)");
 });
 
 test("presents build-list summary, categories, actions, and data status in one sidebar @desktop-only", async ({
@@ -2807,6 +2888,47 @@ function buildListProduct(
     status: { isActive },
     lastSeenAt: OBSERVED_AT,
   };
+}
+
+interface StyleSnapshot {
+  backgroundColor: string;
+  color: string;
+  fontFamily: string;
+  fontSize: string;
+  fontVariantNumeric: string;
+  fontWeight: string;
+  lineHeight: string;
+  minHeight: string;
+  textAlign: string;
+  whiteSpace: string;
+}
+
+async function readStyleSnapshot(locator: Locator): Promise<StyleSnapshot> {
+  return locator.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      backgroundColor: style.backgroundColor,
+      color: style.color,
+      fontFamily: style.fontFamily,
+      fontSize: style.fontSize,
+      fontVariantNumeric: style.fontVariantNumeric,
+      fontWeight: style.fontWeight,
+      lineHeight: style.lineHeight,
+      minHeight: style.minHeight,
+      textAlign: style.textAlign,
+      whiteSpace: style.whiteSpace,
+    };
+  });
+}
+
+function expectStyleFields(
+  actual: StyleSnapshot,
+  expected: StyleSnapshot,
+  fields: Array<keyof StyleSnapshot>,
+) {
+  for (const field of fields) {
+    expect(actual[field], field).toBe(expected[field]);
+  }
 }
 
 async function selectPriceReportOption(page: Page, label: string, option: string) {
