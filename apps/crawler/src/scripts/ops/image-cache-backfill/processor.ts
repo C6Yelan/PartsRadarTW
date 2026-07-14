@@ -2,12 +2,18 @@
 // 執行商品圖片補圖核心流程：讀取候選、避開既有快取、重用相同來源圖並寫入 WebP 縮圖。
 
 import { join, relative } from "node:path";
-import type { PrismaClient } from "@partsradar/db";
+import type { Prisma, PrismaClient } from "@partsradar/db";
 import { normalizeCoolpcProductImageUrl } from "../../../coolpc/parser/urls";
 import { toSafeCliErrorMessage } from "../../shared/script-utils";
 import {
+  CACHED_IMAGE_AUDIT_ORDER_BY,
+  createCachedImageAuditWhere,
+  createDueImageRetryWhere,
+  createNeverCheckedImageRecoveryWhere,
   createProductImageCandidateSelect,
   createProductImageCandidateWhere,
+  DUE_IMAGE_RETRY_ORDER_BY,
+  NEVER_CHECKED_IMAGE_RECOVERY_ORDER_BY,
   PRODUCT_IMAGE_CANDIDATE_ORDER_BY,
 } from "./candidate-query";
 import {
@@ -62,6 +68,19 @@ interface BackfillLoggers {
 
 type ImageCacheStateClient = Pick<PrismaClient, "product">;
 
+export interface ImageRecoverySelectionTelemetry {
+  neverCheckedRead: number;
+  retryDueRead: number;
+  auditRead: number;
+  reconciledExisting: number;
+  selectedForBackfill: number;
+}
+
+export interface ImageRecoveryBatch {
+  candidates: ProductImageCandidate[];
+  telemetry: ImageRecoverySelectionTelemetry;
+}
+
 // 讀取手動補圖候選；保留 limit 直接套用於 DB 查詢，避免全量維運時一次取出過多資料。
 export async function readCandidates(
   client: PrismaClient,
@@ -90,32 +109,81 @@ export async function readCandidates(
   return selected;
 }
 
-// 輪替檢查既有商品快取；有檔案者刷新狀態，缺檔且已到重試時間者交給補圖流程。
-export async function readImageRecoveryCandidates(
+// 依 new、retry、audit 優先序填滿 bounded batch，再校正既有檔案或回傳缺圖候選。
+export async function readBoundedImageRecoveryBatch(
   client: PrismaClient,
   options: ImageBackfillOptions,
   limit: number,
   now = new Date(),
-): Promise<ProductImageCandidate[]> {
-  const candidates = await client.product.findMany({
-    where: createProductImageCandidateWhere(options),
-    select: createProductImageCandidateSelect(),
-    orderBy: [{ imageCacheCheckedAt: "asc" }, ...PRODUCT_IMAGE_CANDIDATE_ORDER_BY],
-    take: limit,
-  });
+): Promise<ImageRecoveryBatch> {
+  const telemetry: ImageRecoverySelectionTelemetry = {
+    neverCheckedRead: 0,
+    retryDueRead: 0,
+    auditRead: 0,
+    reconciledExisting: 0,
+    selectedForBackfill: 0,
+  };
+  const orderedCandidates: ProductImageCandidate[] = [];
+  const seenProductIds = new Set<string>();
+  let totalRead = 0;
+
+  const readLane = async (
+    telemetryKey: "neverCheckedRead" | "retryDueRead" | "auditRead",
+    where: Prisma.ProductWhereInput,
+    orderBy: Prisma.ProductOrderByWithRelationInput[],
+  ): Promise<void> => {
+    const remaining = limit - totalRead;
+    if (remaining <= 0) return;
+
+    const laneCandidates = (await client.product.findMany({
+      where,
+      select: createProductImageCandidateSelect(),
+      orderBy,
+      take: remaining,
+    })) as ProductImageCandidate[];
+    telemetry[telemetryKey] = laneCandidates.length;
+    totalRead += laneCandidates.length;
+
+    for (const candidate of laneCandidates) {
+      if (!seenProductIds.has(candidate.id)) {
+        seenProductIds.add(candidate.id);
+        orderedCandidates.push(candidate);
+      }
+    }
+  };
+
+  await readLane(
+    "neverCheckedRead",
+    createNeverCheckedImageRecoveryWhere(options, now),
+    NEVER_CHECKED_IMAGE_RECOVERY_ORDER_BY,
+  );
+  await readLane(
+    "retryDueRead",
+    createDueImageRetryWhere(options, now),
+    DUE_IMAGE_RETRY_ORDER_BY,
+  );
+  await readLane(
+    "auditRead",
+    createCachedImageAuditWhere(options, now),
+    CACHED_IMAGE_AUDIT_ORDER_BY,
+  );
+
   const missingCandidates: ProductImageCandidate[] = [];
 
-  for (const candidate of candidates) {
+  for (const candidate of orderedCandidates) {
     if (await pathExists(join(options.storageDir, `${candidate.id}.webp`))) {
       await markImageCacheReady(client, candidate.id, now);
-    } else if (!isMissingImageEligible(candidate, options, now)) {
-      await markImageCacheChecked(client, candidate.id, now);
-    } else if (!candidate.imageCacheNextRetryAt || candidate.imageCacheNextRetryAt <= now) {
+      telemetry.reconciledExisting += 1;
+    } else if (
+      isMissingImageEligible(candidate, options, now) &&
+      (!candidate.imageCacheNextRetryAt || candidate.imageCacheNextRetryAt <= now)
+    ) {
       missingCandidates.push(candidate);
     }
   }
 
-  return missingCandidates;
+  telemetry.selectedForBackfill = missingCandidates.length;
+  return { candidates: missingCandidates, telemetry };
 }
 
 function isMissingImageEligible(
@@ -355,17 +423,6 @@ async function markImageCacheReady(
       imageCacheLastSuccessAt: checkedAt,
       imageCacheNextRetryAt: null,
     },
-  });
-}
-
-async function markImageCacheChecked(
-  client: ImageCacheStateClient,
-  productId: string,
-  checkedAt: Date,
-): Promise<void> {
-  await client.product.update({
-    where: { id: productId },
-    data: { imageCacheCheckedAt: checkedAt },
   });
 }
 

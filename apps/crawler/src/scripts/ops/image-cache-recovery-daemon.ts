@@ -8,10 +8,15 @@ import {
   toSafeCliErrorMessage,
 } from "../shared/script-utils";
 import {
+  type BackfillSummary,
   type ImageBackfillOptions,
   parseOptions as parseImageOptions,
 } from "./image-cache-backfill/options";
-import { backfillImages, readImageRecoveryCandidates } from "./image-cache-backfill/processor";
+import {
+  backfillImages,
+  readBoundedImageRecoveryBatch,
+  type ImageRecoverySelectionTelemetry,
+} from "./image-cache-backfill/processor";
 import { createOpsLogger } from "./shared/logger";
 
 const logger = createOpsLogger();
@@ -119,23 +124,24 @@ export async function runImageRecoveryDaemon(
 ): Promise<void> {
   do {
     try {
-      const candidates = await readImageRecoveryCandidates(
+      const cycleNow = new Date();
+      const recoveryBatch = await readBoundedImageRecoveryBatch(
         client,
         options.imageOptions,
         options.batchLimit,
+        cycleNow,
       );
       const summary = await backfillImages(
-        candidates,
+        recoveryBatch.candidates,
         options.imageOptions,
         {
-          log: (message) => logger.info(message),
+          log: (message) => logger.debug(message),
           debugLog: (message) => logger.debug(message),
         },
         client,
       );
-      logger.info(
-        `Image recovery cycle finished. selected=${summary.selected} cached=${summary.cached} reused=${summary.reused} failed=${summary.failed} invalid=${summary.invalid} liveFetches=${summary.liveFetches}`,
-      );
+      const selection = recoveryBatch.telemetry;
+      logger.info(formatImageRecoveryCycleSummary(selection, summary));
     } catch (error) {
       logger.error(`Image recovery cycle failed: ${toSafeCliErrorMessage(error)}`);
       if (options.runOnce) {
@@ -148,6 +154,13 @@ export async function runImageRecoveryDaemon(
     }
     await shutdown.sleep(options.intervalSeconds * 1000);
   } while (!shutdown.requested);
+}
+
+export function formatImageRecoveryCycleSummary(
+  selection: ImageRecoverySelectionTelemetry,
+  summary: BackfillSummary,
+): string {
+  return `Image recovery cycle finished. neverCheckedRead=${selection.neverCheckedRead} retryDueRead=${selection.retryDueRead} auditRead=${selection.auditRead} reconciledExisting=${selection.reconciledExisting} selectedForBackfill=${selection.selectedForBackfill} cached=${summary.cached} reused=${summary.reused} failed=${summary.failed} invalid=${summary.invalid} liveFetches=${summary.liveFetches}`;
 }
 
 function createShutdownController(): ShutdownController {

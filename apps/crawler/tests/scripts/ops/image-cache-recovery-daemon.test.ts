@@ -2,7 +2,10 @@
 
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { parseImageRecoveryDaemonOptions } from "../../../src/scripts/ops/image-cache-recovery-daemon";
+import {
+  formatImageRecoveryCycleSummary,
+  parseImageRecoveryDaemonOptions,
+} from "../../../src/scripts/ops/image-cache-recovery-daemon";
 
 describe("image cache recovery daemon options", () => {
   it("requires explicit live fetch confirmation", () => {
@@ -33,5 +36,31 @@ describe("image cache recovery daemon options", () => {
     expect(options.imageOptions.sourceImageFetchLockDir).toContain("source-image-fetch");
     expect(options.imageOptions.minDelayMs).toBe(1000);
     expect(options.imageOptions.maxDelayMs).toBe(2000);
+  });
+
+  it("formats one bounded selection and processing summary per cycle", () => {
+    expect(
+      formatImageRecoveryCycleSummary(
+        {
+          neverCheckedRead: 18,
+          retryDueRead: 2,
+          auditRead: 5,
+          reconciledExisting: 4,
+          selectedForBackfill: 21,
+        },
+        {
+          selected: 21,
+          cached: 10,
+          dryRun: 0,
+          skipped: 0,
+          reused: 2,
+          invalid: 1,
+          failed: 8,
+          liveFetches: 19,
+        },
+      ),
+    ).toBe(
+      "Image recovery cycle finished. neverCheckedRead=18 retryDueRead=2 auditRead=5 reconciledExisting=4 selectedForBackfill=21 cached=10 reused=2 failed=8 invalid=1 liveFetches=19",
+    );
   });
 });

@@ -9,7 +9,7 @@ import type { ImageBackfillOptions } from "../../../../src/scripts/ops/image-cac
 import {
   backfillImages,
   readCandidates,
-  readImageRecoveryCandidates,
+  readBoundedImageRecoveryBatch,
   type ProductImageCandidate,
 } from "../../../../src/scripts/ops/image-cache-backfill/processor";
 import { tryAcquireExternalFetchLock } from "../../../../src/scripts/ops/external-fetch-lock";
@@ -135,68 +135,93 @@ describe("image cache backfill live request accounting", () => {
     expect(fetchMock).toHaveBeenCalledOnce();
   });
 
-  it("selects an existing product when its WebP is missing", async () => {
+  it("fills a full batch from never-checked products without querying later lanes", async () => {
     const storageDir = await createTempRoot();
-    const candidate = createCandidate("existing-missing", "2026-06-08T08:05:00.000Z");
-    const updates: unknown[] = [];
+    const candidates = Array.from({ length: 25 }, (_, index) =>
+      createCandidate(`new-${index}`, `2026-06-08T08:${String(59 - index).padStart(2, "0")}:00.000Z`),
+    );
+    const findManyArgs: unknown[] = [];
     const client = {
       product: {
-        findMany: async () => [candidate],
-        update: async (args: unknown) => {
-          updates.push(args);
-          return candidate;
+        findMany: async (args: unknown) => {
+          findManyArgs.push(args);
+          return candidates;
         },
       },
     } as never;
 
-    const selected = await readImageRecoveryCandidates(
+    const batch = await readBoundedImageRecoveryBatch(
       client,
       createOptions({ storageDir }),
       25,
       new Date("2026-06-09T08:05:00.000Z"),
     );
 
-    expect(selected.map(({ id }) => id)).toEqual(["existing-missing"]);
-    expect(updates).toEqual([]);
+    expect(findManyArgs).toHaveLength(1);
+    expect(findManyArgs[0]).toMatchObject({
+      take: 25,
+      orderBy: [
+        { isActive: "desc" },
+        { firstSeenAt: "desc" },
+        { sourceCategory: { igrp: "asc" } },
+        { id: "asc" },
+      ],
+      where: {
+        AND: expect.arrayContaining([
+          expect.objectContaining({ imageCachedAt: null, imageCacheCheckedAt: null }),
+        ]),
+      },
+    });
+    expect(batch.candidates).toHaveLength(25);
+    expect(batch.telemetry).toMatchObject({
+      neverCheckedRead: 25,
+      retryDueRead: 0,
+      auditRead: 0,
+      selectedForBackfill: 25,
+    });
   });
 
-  it("marks an inactive historical product cache-ready when its WebP already exists", async () => {
+  it("allocates remaining capacity to retry and then audit lanes", async () => {
     const storageDir = await createTempRoot();
-    const candidate = {
-      ...createCandidate("historical-existing", "2026-05-01T08:05:00.000Z"),
-      isActive: false,
-      priceSnapshots: [{ capturedAt: new Date("2026-05-01T08:05:00.000Z") }],
-    };
-    const updates: unknown[] = [];
-    await writeFile(join(storageDir, `${candidate.id}.webp`), "webp");
+    const neverChecked = Array.from({ length: 20 }, (_, index) =>
+      createCandidate(`new-${index}`, "2026-06-08T08:05:00.000Z"),
+    );
+    const retries = Array.from({ length: 3 }, (_, index) => ({
+      ...createCandidate(`retry-${index}`, "2026-06-07T08:05:00.000Z"),
+      imageCacheCheckedAt: new Date("2026-06-08T08:05:00.000Z"),
+    }));
+    const audits = Array.from({ length: 2 }, (_, index) => ({
+      ...createCandidate(`audit-${index}`, "2026-06-06T08:05:00.000Z"),
+      imageCachedAt: new Date("2026-06-08T08:05:00.000Z"),
+      imageCacheCheckedAt: new Date("2026-06-08T08:05:00.000Z"),
+    }));
+    const findManyArgs: Array<{ take: number }> = [];
+    const laneResults = [neverChecked, retries, audits];
     const client = {
       product: {
-        findMany: async () => [candidate],
-        update: async (args: unknown) => {
-          updates.push(args);
-          return candidate;
+        findMany: async (args: { take: number }) => {
+          findManyArgs.push(args);
+          return laneResults[findManyArgs.length - 1];
         },
       },
     } as never;
 
-    const selected = await readImageRecoveryCandidates(
+    const batch = await readBoundedImageRecoveryBatch(
       client,
-      createOptions({ storageDir, inactiveRetentionDays: 30 }),
+      createOptions({ storageDir }),
       25,
       new Date("2026-06-09T08:05:00.000Z"),
     );
 
-    expect(selected).toEqual([]);
-    expect(updates).toEqual([
-      expect.objectContaining({
-        where: { id: candidate.id },
-        data: expect.objectContaining({
-          imageCachedAt: new Date("2026-06-09T08:05:00.000Z"),
-          imageCacheFailureCount: 0,
-          imageCacheNextRetryAt: null,
-        }),
-      }),
-    ]);
+    expect(findManyArgs.map(({ take }) => take)).toEqual([25, 5, 2]);
+    expect(batch.candidates).toHaveLength(25);
+    expect(batch.telemetry).toEqual({
+      neverCheckedRead: 20,
+      retryDueRead: 3,
+      auditRead: 2,
+      reconciledExisting: 0,
+      selectedForBackfill: 25,
+    });
   });
 
   it("does not reconcile existing WebP metadata during dry-run", async () => {
@@ -216,32 +241,35 @@ describe("image cache backfill live request accounting", () => {
     expect(update).not.toHaveBeenCalled();
   });
 
-  it("reconciles an existing WebP without depending on a still-valid source URL", async () => {
+  it("selects a new product before a large cached audit pool", async () => {
     const storageDir = await createTempRoot();
-    const candidate = {
-      ...createCandidate("existing-invalid-source", "2026-05-01T08:05:00.000Z"),
-      primaryImageUrl: "https://invalid.example/image.jpg",
-      imageCacheFailureCount: 3,
-      imageCacheFailureSince: new Date("2026-05-01T08:05:00.000Z"),
-      imageCacheNextRetryAt: new Date("2026-05-02T08:05:00.000Z"),
-    };
-    const update = vi.fn(async () => candidate);
-    await writeFile(join(storageDir, `${candidate.id}.webp`), "webp");
+    const newProduct = createCandidate("new-product", "2026-06-09T08:04:00.000Z");
+    const cachedProducts = Array.from({ length: 50 }, (_, index) => ({
+      ...createCandidate(`cached-${index}`, "2026-05-01T08:05:00.000Z"),
+      imageCachedAt: new Date("2026-05-01T09:00:00.000Z"),
+      imageCacheCheckedAt: new Date("2026-05-01T09:00:00.000Z"),
+    }));
+    const laneResults = [[newProduct], [], cachedProducts.slice(0, 24)];
+    const findManyArgs: Array<{ take: number }> = [];
+    const client = {
+      product: {
+        findMany: async (args: { take: number }) => {
+          findManyArgs.push(args);
+          return laneResults[findManyArgs.length - 1];
+        },
+      },
+    } as never;
 
-    const summary = await backfillImages(
-      [candidate],
+    const batch = await readBoundedImageRecoveryBatch(
+      client,
       createOptions({ storageDir }),
-      { log: () => {}, debugLog: () => {} },
-      { product: { update } } as never,
+      25,
+      new Date("2026-06-09T08:05:00.000Z"),
     );
 
-    expect(summary).toMatchObject({ selected: 1, skipped: 1, invalid: 0, liveFetches: 0 });
-    expect(update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: candidate.id },
-        data: expect.objectContaining({ imageCacheFailureCount: 0, imageCacheNextRetryAt: null }),
-      }),
-    );
+    expect(findManyArgs.map(({ take }) => take)).toEqual([25, 24, 24]);
+    expect(batch.candidates[0]?.id).toBe("new-product");
+    expect(batch.telemetry).toMatchObject({ neverCheckedRead: 1, auditRead: 24 });
   });
 
   it("only selects missing inactive products inside retention unless explicitly requested", async () => {
@@ -282,39 +310,94 @@ describe("image cache backfill live request accounting", () => {
     ).resolves.toEqual([expired]);
   });
 
-  it("rotates expired inactive recovery rows without fetching or marking them ready", async () => {
+  it("deduplicates the same product across lanes without replacing its consumed budget", async () => {
     const storageDir = await createTempRoot();
-    const candidate = {
-      ...createCandidate("expired-recovery", "2026-04-01T08:05:00.000Z"),
-      isActive: false,
-      priceSnapshots: [{ capturedAt: new Date("2026-04-01T08:05:00.000Z") }],
-    };
-    const updates: unknown[] = [];
+    const duplicate = createCandidate("duplicate", "2026-06-08T08:05:00.000Z");
+    const laneResults = [[duplicate], [duplicate], []];
+    const findManyArgs: Array<{ take: number }> = [];
     const client = {
       product: {
-        findMany: async () => [candidate],
-        update: async (args: unknown) => {
-          updates.push(args);
-          return candidate;
+        findMany: async (args: { take: number }) => {
+          findManyArgs.push(args);
+          return laneResults[findManyArgs.length - 1];
         },
       },
     } as never;
-    const now = new Date("2026-06-09T08:05:00.000Z");
 
-    await expect(
-      readImageRecoveryCandidates(
-        client,
-        createOptions({ storageDir, inactiveRetentionDays: 30 }),
-        25,
-        now,
-      ),
-    ).resolves.toEqual([]);
-    expect(updates).toEqual([
-      {
-        where: { id: candidate.id },
-        data: { imageCacheCheckedAt: now },
+    const batch = await readBoundedImageRecoveryBatch(
+      client,
+      createOptions({ storageDir }),
+      3,
+      new Date("2026-06-09T08:05:00.000Z"),
+    );
+
+    expect(findManyArgs.map(({ take }) => take)).toEqual([3, 2, 1]);
+    expect(batch.candidates.map(({ id }) => id)).toEqual(["duplicate"]);
+  });
+
+  it("reconciles existing WebPs and backfills only missing files", async () => {
+    const storageDir = await createTempRoot();
+    const metadataNullExisting = createCandidate(
+      "metadata-null-existing",
+      "2026-06-08T08:05:00.000Z",
+    );
+    const auditExisting = {
+      ...createCandidate("audit-existing", "2026-06-07T08:05:00.000Z"),
+      imageCachedAt: new Date("2026-06-08T08:05:00.000Z"),
+      imageCacheCheckedAt: new Date("2026-06-08T08:05:00.000Z"),
+      imageCacheFailureCount: 3,
+      imageCacheFailureSince: new Date("2026-06-01T08:05:00.000Z"),
+      imageCacheNextRetryAt: null,
+    };
+    const auditMissing = {
+      ...createCandidate("audit-missing", "2026-06-06T08:05:00.000Z"),
+      imageCachedAt: new Date("2026-06-08T08:05:00.000Z"),
+      imageCacheCheckedAt: new Date("2026-06-08T08:05:00.000Z"),
+    };
+    await writeFile(join(storageDir, `${metadataNullExisting.id}.webp`), "webp");
+    await writeFile(join(storageDir, `${auditExisting.id}.webp`), "webp");
+    const laneResults = [[metadataNullExisting], [], [auditExisting, auditMissing]];
+    const updates: unknown[] = [];
+    let laneIndex = 0;
+    const now = new Date("2026-06-09T08:05:00.000Z");
+    const client = {
+      product: {
+        findMany: async () => laneResults[laneIndex++],
+        update: async (args: unknown) => {
+          updates.push(args);
+          return metadataNullExisting;
+        },
       },
-    ]);
+    } as never;
+
+    const batch = await readBoundedImageRecoveryBatch(
+      client,
+      createOptions({ storageDir }),
+      3,
+      now,
+    );
+
+    expect(batch.candidates.map(({ id }) => id)).toEqual(["audit-missing"]);
+    expect(batch.telemetry).toMatchObject({
+      reconciledExisting: 2,
+      selectedForBackfill: 1,
+    });
+    expect(updates).toHaveLength(2);
+    expect(updates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          where: { id: metadataNullExisting.id },
+          data: expect.objectContaining({
+            imageCachedAt: now,
+            imageCacheCheckedAt: now,
+            imageCacheLastSuccessAt: now,
+            imageCacheFailureCount: 0,
+            imageCacheNextRetryAt: null,
+          }),
+        }),
+        expect.objectContaining({ where: { id: auditExisting.id } }),
+      ]),
+    );
   });
 
   it("does not count a shared-lock deferral as a source request", async () => {

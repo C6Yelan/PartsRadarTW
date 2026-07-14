@@ -66,3 +66,92 @@ export const PRODUCT_IMAGE_CANDIDATE_ORDER_BY: Prisma.ProductOrderByWithRelation
   { sourceCategory: { igrp: "asc" } },
   { id: "asc" },
 ];
+
+function createUsefulImageRecoveryWhere(
+  options: ImageBackfillOptions,
+  now: Date,
+): Prisma.ProductWhereInput {
+  const retentionCutoff = new Date(
+    now.getTime() - options.inactiveRetentionDays * 24 * 60 * 60 * 1000,
+  );
+
+  return {
+    primaryImageUrl: { not: null },
+    sourceCategory: {
+      ...(options.igrp === null ? {} : { igrp: options.igrp }),
+      enabled: true,
+    },
+    OR: [
+      { isActive: true },
+      {
+        isActive: false,
+        priceSnapshots: { some: { capturedAt: { gte: retentionCutoff } } },
+      },
+    ],
+  };
+}
+
+export function createNeverCheckedImageRecoveryWhere(
+  options: ImageBackfillOptions,
+  now: Date,
+): Prisma.ProductWhereInput {
+  return {
+    AND: [
+      createUsefulImageRecoveryWhere(options, now),
+      {
+        imageCachedAt: null,
+        imageCacheCheckedAt: null,
+        OR: [{ imageCacheNextRetryAt: null }, { imageCacheNextRetryAt: { lte: now } }],
+      },
+    ],
+  };
+}
+
+export function createDueImageRetryWhere(
+  options: ImageBackfillOptions,
+  now: Date,
+): Prisma.ProductWhereInput {
+  return {
+    AND: [
+      createUsefulImageRecoveryWhere(options, now),
+      {
+        imageCachedAt: null,
+        imageCacheCheckedAt: { not: null },
+        OR: [{ imageCacheNextRetryAt: null }, { imageCacheNextRetryAt: { lte: now } }],
+      },
+    ],
+  };
+}
+
+export function createCachedImageAuditWhere(
+  options: ImageBackfillOptions,
+  now: Date,
+): Prisma.ProductWhereInput {
+  return {
+    AND: [
+      createUsefulImageRecoveryWhere(options, now),
+      {
+        imageCachedAt: { not: null },
+        OR: [{ imageCacheNextRetryAt: null }, { imageCacheNextRetryAt: { lte: now } }],
+      },
+    ],
+  };
+}
+
+export const NEVER_CHECKED_IMAGE_RECOVERY_ORDER_BY: Prisma.ProductOrderByWithRelationInput[] = [
+  { isActive: "desc" },
+  { firstSeenAt: "desc" },
+  ...PRODUCT_IMAGE_CANDIDATE_ORDER_BY,
+];
+
+export const DUE_IMAGE_RETRY_ORDER_BY: Prisma.ProductOrderByWithRelationInput[] = [
+  { imageCacheNextRetryAt: { sort: "asc", nulls: "first" } },
+  { isActive: "desc" },
+  { lastSeenAt: "desc" },
+  ...PRODUCT_IMAGE_CANDIDATE_ORDER_BY,
+];
+
+export const CACHED_IMAGE_AUDIT_ORDER_BY: Prisma.ProductOrderByWithRelationInput[] = [
+  { imageCacheCheckedAt: { sort: "asc", nulls: "first" } },
+  ...PRODUCT_IMAGE_CANDIDATE_ORDER_BY,
+];
