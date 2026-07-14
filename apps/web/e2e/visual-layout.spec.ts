@@ -238,6 +238,7 @@ test.beforeEach(async ({ page }) => {
 
     if (requestUrl.pathname === "/api/products") {
       const pageNumber = Number(requestUrl.searchParams.get("page") ?? "1");
+      const showsPriceRise = requestUrl.searchParams.get("q") === "rise";
       const vendorsByCategory = {
         cpu: [
           { slug: "intel", name: "Intel" },
@@ -291,8 +292,8 @@ test.beforeEach(async ({ page }) => {
             ...responseProduct,
             priceMovement: {
               rangeDays: 30,
-              deltaAmount: -1_000,
-              deltaPercent: -5,
+              deltaAmount: showsPriceRise ? 300 : -300,
+              deltaPercent: showsPriceRise ? 4.8 : -4.8,
             },
           },
         ],
@@ -698,6 +699,13 @@ test("keeps the product toolbar compact and readable across its layout boundary 
       await expect(productRow.locator(".product-main")).toHaveCSS("text-align", "left");
     }
     await expect(productRow.locator(".row-price strong")).toContainText("NT$ 18,990");
+    const movementText = await productRow.locator(".price-movement").innerText();
+    expect(movementText).toBe("−NT$ 300 / −4.8%");
+    const [amountText, percentText] = movementText.split(" / ");
+    expect(amountText.charCodeAt(0)).toBe(0x2212);
+    expect(percentText.charCodeAt(0)).toBe(0x2212);
+    expect(amountText.startsWith("-")).toBe(false);
+    expect(percentText.startsWith("-")).toBe(false);
     await expect(productRow.locator(".row-status .row-state")).toHaveText("目前上架");
 
     const rowContentLayout = await productRow.evaluate((element) => {
@@ -765,6 +773,20 @@ test("keeps the product toolbar compact and readable across its layout boundary 
   await expect
     .poll(() => new URL(page.url()).searchParams.getAll("facet"))
     .toEqual(["socket:lga1851"]);
+});
+
+test("keeps positive price movement signs consistent across desktop and mobile @desktop-only", async ({
+  page,
+}) => {
+  for (const viewport of [
+    { width: 1280, height: 800 },
+    { width: 390, height: 844 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto("/?category=gpu&q=rise");
+    await expect(page.locator(".price-movement").first()).toHaveText("+NT$ 300 / +4.8%");
+    await expectNoHorizontalOverflow(page);
+  }
 });
 
 test("groups selected CPU facets and keeps the vendor chip first @desktop-only", async ({
@@ -2949,67 +2971,173 @@ test("preserves product explorer state through safe build-list return links @des
   await expect(page.getByRole("link", { name: "回到查詢" })).toHaveAttribute("href", "/");
 });
 
-test("keeps build-list mobile navigation in one scrollable brand row @desktop-only", async ({
+test("matches the product-detail mobile topbar and centers build-list item controls @desktop-only", async ({
   page,
 }) => {
+  const longProductName = "超長型號視覺驗證顯示卡 RTX 5090 OC Edition 32GB 三風扇高效能版本";
+
+  await page.route("**/api/build-list/refresh", async (route) => {
+    await fulfillJson(route, {
+      data: [
+        {
+          ...buildListProduct(PRODUCT_ID, longProductName, "顯示卡", 18_990, true),
+          image: { alt: longProductName, url: "/favicon.svg" },
+        },
+      ],
+      missingProductIds: [],
+    });
+  });
+  await page.addInitScript(
+    ({ observedAt, productId }) => {
+      window.localStorage.setItem(
+        "partsradartw:build-list:v3",
+        JSON.stringify([
+          {
+            productId,
+            quantity: 3,
+            includeInExport: true,
+            order: 0,
+            addedAt: observedAt,
+            updatedAt: observedAt,
+          },
+        ]),
+      );
+    },
+    { observedAt: OBSERVED_AT, productId: PRODUCT_ID },
+  );
+
   for (const viewport of [
     { width: 390, height: 844 },
+    { width: 375, height: 812 },
     { width: 360, height: 800 },
   ]) {
     await page.setViewportSize(viewport);
+
+    await page.goto(`/products/${READY_ROUTE_SLUG}`);
+    const detailTopbarMetrics = await readTopbarLayout(page, ".public-info-topbar");
+
     await page.goto("/build-list");
+    const buildListTopbar = page.locator(".build-list-topbar");
+    for (const name of ["價格變動總覽", "公告", "Discord"]) {
+      await expect(buildListTopbar.getByRole("link", { exact: true, name })).toBeVisible();
+    }
 
-    const brandArea = page.locator(".build-list-topbar .topbar-brand-area");
-    const navigationMetrics = await brandArea.evaluate((element) => {
-      const areaRect = element.getBoundingClientRect();
-      const links = [...element.querySelectorAll("a")].map((link) => {
-        const rect = link.getBoundingClientRect();
-        return {
-          centerY: rect.top + rect.height / 2,
-          text: link.textContent?.trim() ?? "",
-        };
-      });
-      const style = getComputedStyle(element);
-      return {
-        areaBottom: areaRect.bottom,
-        clientWidth: element.clientWidth,
-        flexWrap: style.flexWrap,
-        links,
-        overflowX: style.overflowX,
-        scrollWidth: element.scrollWidth,
-        scrollbarWidth: style.scrollbarWidth,
-      };
-    });
-    expect(navigationMetrics.links).toHaveLength(4);
-    expect(navigationMetrics.flexWrap).toBe("nowrap");
-    expect(navigationMetrics.overflowX).toBe("auto");
-    expect(navigationMetrics.scrollWidth).toBeGreaterThan(navigationMetrics.clientWidth);
-    expect(navigationMetrics.scrollbarWidth).toBe("none");
-    expect(
-      Math.max(...navigationMetrics.links.map((link) => link.centerY)) -
-        Math.min(...navigationMetrics.links.map((link) => link.centerY)),
-    ).toBeLessThanOrEqual(1);
-    expect(navigationMetrics.links.at(-1)?.text).toContain("Discord");
-
-    await brandArea.evaluate((element) => {
-      element.scrollLeft = element.scrollWidth;
-    });
-    await expect
-      .poll(() => brandArea.evaluate((element) => element.scrollLeft))
-      .toBeGreaterThan(0);
-    const discordLink = brandArea.getByRole("link", { name: "Discord" });
-    const [brandBox, discordBox, titleBox, backBox] = await Promise.all([
-      brandArea.boundingBox(),
-      discordLink.boundingBox(),
-      page.locator(".build-list-title").boundingBox(),
-      page.getByRole("link", { name: "返回查詢" }).boundingBox(),
-    ]);
-    expect(discordBox?.x ?? Number.NEGATIVE_INFINITY).toBeGreaterThanOrEqual(brandBox?.x ?? 0);
-    expect((discordBox?.x ?? 0) + (discordBox?.width ?? 0)).toBeLessThanOrEqual(
-      (brandBox?.x ?? 0) + (brandBox?.width ?? 0) + 1,
+    const buildListTopbarMetrics = await readTopbarLayout(page, ".build-list-topbar");
+    expect(buildListTopbarMetrics.gap).toBe(detailTopbarMetrics.gap);
+    expect(buildListTopbarMetrics.navHeights).toEqual(detailTopbarMetrics.navHeights);
+    expect(buildListTopbarMetrics.brand.height).toBeCloseTo(detailTopbarMetrics.brand.height, 0);
+    expect(buildListTopbarMetrics.area.scrollWidth).toBeLessThanOrEqual(
+      buildListTopbarMetrics.area.clientWidth,
     );
-    expect(titleBox?.y ?? 0).toBeGreaterThanOrEqual(navigationMetrics.areaBottom);
-    expect((titleBox?.x ?? 0) + (titleBox?.width ?? 0)).toBeLessThanOrEqual(backBox?.x ?? 0);
+    expect(buildListTopbarMetrics.area.overflowX).not.toBe("auto");
+    expect(buildListTopbarMetrics.area.flexWrap).toBe("wrap");
+    expect(
+      Math.max(...buildListTopbarMetrics.nav.map(({ top }) => top)) -
+        Math.min(...buildListTopbarMetrics.nav.map(({ top }) => top)),
+    ).toBeLessThanOrEqual(2);
+    expect(buildListTopbarMetrics.brand.bottom).toBeLessThanOrEqual(
+      Math.min(...buildListTopbarMetrics.nav.map(({ top }) => top)) + 1,
+    );
+    expect(buildListTopbarMetrics.title.top).toBeGreaterThanOrEqual(
+      buildListTopbarMetrics.area.bottom,
+    );
+    expect(buildListTopbarMetrics.title.right).toBeLessThanOrEqual(
+      buildListTopbarMetrics.back.left,
+    );
+    for (const navRect of buildListTopbarMetrics.nav) {
+      expect(navRect.left).toBeGreaterThanOrEqual(buildListTopbarMetrics.area.left - 1);
+      expect(navRect.right).toBeLessThanOrEqual(buildListTopbarMetrics.area.right + 1);
+    }
+
+    const item = page.locator(".build-list-item").filter({ hasText: longProductName });
+    const checkbox = item.getByRole("checkbox", { name: `將 ${longProductName} 加入下載配單` });
+    const image = item.getByAltText(longProductName);
+    const main = item.locator(".build-list-item-main");
+    const controls = item.locator(".build-list-item-controls");
+    const stepper = item.locator(".quantity-stepper");
+    const removeButton = item.getByRole("button", { name: "移除" });
+    await expect(checkbox).toBeChecked();
+    await expect(image).toBeVisible();
+    await expect(item.getByRole("spinbutton", { name: "數量" })).toHaveValue("3");
+
+    const [itemBox, checkboxBox, imageBox, mainBox, controlsBox, stepperBox, removeBox] =
+      await Promise.all([
+        item.boundingBox(),
+        checkbox.boundingBox(),
+        image.boundingBox(),
+        main.boundingBox(),
+        controls.boundingBox(),
+        stepper.boundingBox(),
+        removeButton.boundingBox(),
+      ]);
+    expect((checkboxBox?.x ?? 0) + (checkboxBox?.width ?? 0)).toBeLessThan(imageBox?.x ?? 0);
+    expect(
+      Math.abs(
+        (checkboxBox?.y ?? 0) +
+          (checkboxBox?.height ?? 0) / 2 -
+          ((imageBox?.y ?? 0) + (imageBox?.height ?? 0) / 2),
+      ),
+    ).toBeLessThanOrEqual(2);
+    expect((imageBox?.x ?? 0) + (imageBox?.width ?? 0)).toBeLessThanOrEqual(mainBox?.x ?? 0);
+    expect(controlsBox?.y ?? 0).toBeGreaterThanOrEqual(mainBox?.y ?? 0);
+    expect(
+      Math.abs(
+        (controlsBox?.x ?? 0) +
+          (controlsBox?.width ?? 0) / 2 -
+          ((itemBox?.x ?? 0) + (itemBox?.width ?? 0) / 2),
+      ),
+    ).toBeLessThanOrEqual(3);
+    expect(Math.abs((stepperBox?.y ?? 0) - (removeBox?.y ?? 0))).toBeLessThanOrEqual(1);
+    expect(removeBox?.x ?? 0).toBeGreaterThanOrEqual(
+      (stepperBox?.x ?? 0) + (stepperBox?.width ?? Number.POSITIVE_INFINITY),
+    );
+    expect(stepperBox?.height ?? 0).toBeGreaterThanOrEqual(44);
+    expect(removeBox?.height ?? 0).toBeGreaterThanOrEqual(44);
+
+    await item.getByRole("button", { name: "增加數量" }).click();
+    await expect(item.getByRole("spinbutton", { name: "數量" })).toHaveValue("4");
+    await item.getByRole("button", { name: "減少數量" }).click();
+    await expect(item.getByRole("spinbutton", { name: "數量" })).toHaveValue("3");
+    await removeButton.click();
+    await expect(page.getByText("已從配單移除")).toBeVisible();
+    await page.getByRole("button", { name: "復原" }).click();
+    await expect(
+      page.locator(".build-list-item").filter({ hasText: longProductName }),
+    ).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+  }
+
+  for (const viewport of [
+    { width: 1280, height: 800 },
+    { width: 1760, height: 900 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto("/build-list");
+    const item = page.locator(".build-list-item").filter({ hasText: longProductName });
+    const [checkboxBox, imageBox, mainBox, controlsBox] = await Promise.all([
+      item.getByRole("checkbox").boundingBox(),
+      item.getByAltText(longProductName).boundingBox(),
+      item.locator(".build-list-item-main").boundingBox(),
+      item.locator(".build-list-item-controls").boundingBox(),
+    ]);
+    await expect(item.locator(".build-list-item-media")).toHaveCSS("display", "contents");
+    expect((checkboxBox?.x ?? 0) + (checkboxBox?.width ?? 0)).toBeLessThan(imageBox?.x ?? 0);
+    expect((imageBox?.x ?? 0) + (imageBox?.width ?? 0)).toBeLessThan(mainBox?.x ?? 0);
+    expect((mainBox?.x ?? 0) + (mainBox?.width ?? 0)).toBeLessThan(controlsBox?.x ?? 0);
+    await expect(page.locator(".build-list-side-column")).toHaveCSS("position", "sticky");
+    const desktopTopbarMetrics = await readTopbarLayout(page, ".build-list-topbar");
+    expect(
+      Math.max(
+        desktopTopbarMetrics.brand.centerY,
+        desktopTopbarMetrics.title.centerY,
+        desktopTopbarMetrics.back.centerY,
+      ) -
+        Math.min(
+          desktopTopbarMetrics.brand.centerY,
+          desktopTopbarMetrics.title.centerY,
+          desktopTopbarMetrics.back.centerY,
+        ),
+    ).toBeLessThanOrEqual(2);
     await expectNoHorizontalOverflow(page);
   }
 });
@@ -3241,6 +3369,50 @@ async function expectNoHorizontalOverflow(page: Page) {
 
   expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth);
   return dimensions;
+}
+
+async function readTopbarLayout(page: Page, selector: string) {
+  return page.locator(selector).evaluate((topbar) => {
+    const brandArea = topbar.querySelector(".topbar-brand-area");
+    const brand = topbar.querySelector(".brand-lockup");
+    const title = topbar.querySelector(".build-list-title, .public-info-topbar-title");
+    const back = topbar.querySelector(".back-link");
+    const navLinks = [...topbar.querySelectorAll(".topbar-nav-link, .discord-topbar-link")];
+
+    if (!brandArea || !brand || !title || !back || navLinks.length !== 3) {
+      throw new Error("Topbar layout contract is incomplete.");
+    }
+
+    const toRect = (element: Element) => {
+      const rect = element.getBoundingClientRect();
+      return {
+        bottom: rect.bottom,
+        centerY: rect.top + rect.height / 2,
+        height: rect.height,
+        left: rect.left,
+        right: rect.right,
+        top: rect.top,
+        width: rect.width,
+      };
+    };
+    const areaStyle = getComputedStyle(brandArea);
+
+    return {
+      area: {
+        ...toRect(brandArea),
+        clientWidth: brandArea.clientWidth,
+        flexWrap: areaStyle.flexWrap,
+        overflowX: areaStyle.overflowX,
+        scrollWidth: brandArea.scrollWidth,
+      },
+      back: toRect(back),
+      brand: toRect(brand),
+      gap: areaStyle.columnGap,
+      nav: navLinks.map(toRect),
+      navHeights: navLinks.map((link) => toRect(link).height),
+      title: toRect(title),
+    };
+  });
 }
 
 async function readTokenLineCounts(locator: Locator, tokens: string[]) {

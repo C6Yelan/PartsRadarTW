@@ -2,7 +2,11 @@
 // 呈現商品探索列表中的單筆商品列，包含圖片、價格、價格變動、上架狀態與配單控制。
 
 import Link from "next/link";
-import { formatSignedTwdPrice, formatTwdPrice } from "../../_shared/formatting";
+import {
+  formatSignedPercent,
+  formatSignedTwdPrice,
+  formatTwdPrice,
+} from "../../_shared/formatting";
 import { BUILD_LIST_MAX_QUANTITY, MAX_BUILD_LIST_PRODUCTS } from "../../build-list/constants";
 import type { ProductListItem } from "../types";
 import { ProductImage } from "./ProductImage";
@@ -115,14 +119,6 @@ function formatPriceMovement(movement: ProductListItem["priceMovement"]) {
   }
 
   return `${formatSignedTwdPrice(deltaAmount)} / ${formatSignedPercent(movement.deltaPercent)}`;
-}
-
-function formatSignedPercent(percent: number) {
-  if (percent === 0) {
-    return "0%";
-  }
-
-  return `${percent > 0 ? "+" : ""}${percent.toFixed(1)}%`;
 }
 
 function getPriceMovementTone(movement: ProductListItem["priceMovement"]) {

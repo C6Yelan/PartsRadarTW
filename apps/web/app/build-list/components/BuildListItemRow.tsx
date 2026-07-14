@@ -29,24 +29,26 @@ export default function BuildListItemRow({
 
   return (
     <article className={`build-list-item${product ? "" : " is-unconfirmed"}`}>
-      <label className="build-list-export-toggle">
-        <input
-          aria-label={`將 ${displayName} 加入下載配單`}
-          checked={intent.includeInExport}
-          type="checkbox"
-          onChange={(event) => onExportSelectionChange(intent.productId, event.target.checked)}
-        />
-      </label>
-      <Link
-        aria-label={`查看 ${displayName} 商品詳細`}
-        className="build-list-item-image-link"
-        href={detailHref}
-      >
-        <BuildListItemImage
-          key={product?.image?.url ?? product?.id ?? intent.productId}
-          product={product}
-        />
-      </Link>
+      <div className="build-list-item-media">
+        <label className="build-list-export-toggle">
+          <input
+            aria-label={`將 ${displayName} 加入下載配單`}
+            checked={intent.includeInExport}
+            type="checkbox"
+            onChange={(event) => onExportSelectionChange(intent.productId, event.target.checked)}
+          />
+        </label>
+        <Link
+          aria-label={`查看 ${displayName} 商品詳細`}
+          className="build-list-item-image-link"
+          href={detailHref}
+        >
+          <BuildListItemImage
+            key={product?.image?.url ?? product?.id ?? intent.productId}
+            product={product}
+          />
+        </Link>
+      </div>
       <div className="build-list-item-main">
         <div className="build-list-item-labels">
           <span className="detail-category-chip">{product?.category.displayName ?? "商品 ID"}</span>

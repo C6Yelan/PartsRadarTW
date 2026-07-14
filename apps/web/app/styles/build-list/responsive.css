@@ -42,22 +42,6 @@
 }
 
 @media (max-width: 760px) {
-  .build-list-topbar > .topbar-brand-area {
-    width: 100%;
-    overflow-x: auto;
-    flex-wrap: nowrap;
-    overscroll-behavior-inline: contain;
-    scrollbar-width: none;
-  }
-
-  .build-list-topbar > .topbar-brand-area::-webkit-scrollbar {
-    display: none;
-  }
-
-  .build-list-topbar .topbar-brand-area .brand-lockup {
-    flex: 0 0 auto;
-  }
-
   .build-list-page {
     width: min(100% - 28px, 1600px);
     padding-top: 14px;
@@ -69,26 +53,25 @@
   }
 
   .build-list-item {
-    grid-template-columns: 20px 64px minmax(0, 1fr);
+    grid-template-columns: auto minmax(0, 1fr);
     grid-template-areas:
-      "export image main"
-      "controls controls controls";
+      "media main"
+      "controls controls";
     align-items: start;
     gap: 12px 14px;
     padding: 14px;
   }
 
-  .build-list-item-image-link {
-    grid-area: image;
+  .build-list-item-media {
+    display: grid;
+    grid-area: media;
+    grid-template-columns: 20px 64px;
+    gap: 14px;
+    align-items: center;
   }
 
   .build-list-item-image {
     width: 64px;
-  }
-
-  .build-list-export-toggle {
-    grid-area: export;
-    align-self: center;
   }
 
   .build-list-item-main {
@@ -98,11 +81,14 @@
   .build-list-item-controls {
     grid-area: controls;
     display: flex;
-    width: 100%;
+    width: fit-content;
+    max-width: 100%;
     gap: 6px;
     align-items: center;
-    flex-wrap: wrap;
-    justify-content: flex-end;
+    flex-wrap: nowrap;
+    justify-content: center;
+    justify-self: center;
+    margin-inline: auto;
   }
 
   .quantity-stepper {

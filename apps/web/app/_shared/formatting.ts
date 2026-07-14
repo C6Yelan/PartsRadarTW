@@ -31,3 +31,25 @@ export function formatSignedTwdPrice(value: number | null | undefined, fallback 
 
   return `${value > 0 ? "+" : "−"}${formatTwdPrice(Math.abs(value))}`;
 }
+
+// 將百分比顯示為帶正負號的文字；負值與價格差額統一使用 Unicode minus sign。
+export function formatSignedPercent(
+  value: number | null | undefined,
+  fractionDigits = 1,
+  fallback = "—",
+): string {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return fallback;
+  }
+
+  if (value === 0) {
+    return "0%";
+  }
+
+  const roundedAbsoluteValue = Number(Math.abs(value).toFixed(fractionDigits));
+  if (roundedAbsoluteValue === 0) {
+    return "0%";
+  }
+
+  return `${value > 0 ? "+" : "−"}${roundedAbsoluteValue.toFixed(fractionDigits)}%`;
+}
