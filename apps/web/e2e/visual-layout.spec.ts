@@ -1517,6 +1517,41 @@ test("resets vendor, grouped facets, status, and page together @desktop-only", a
   await expect(summaryRow.getByRole("button", { name: "重設", exact: true })).toBeVisible();
 });
 
+test("keeps the header search independent from list filter reset @desktop-only", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1760, height: 900 });
+  await page.goto("/?category=cpu");
+
+  const searchInput = page.getByRole("searchbox", { name: "搜尋商品名稱" });
+  await expect(searchInput).toHaveAttribute("autocomplete", "off");
+  await expect(searchInput).not.toHaveAttribute("list", /.+/);
+  await expect(page.locator(".topbar-search datalist, .topbar-search [role='listbox']")).toHaveCount(
+    0,
+  );
+
+  await searchInput.fill("intel");
+  await expect(page.getByRole("button", { name: "重設", exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "搜尋", exact: true }).click();
+  await expect.poll(() => new URL(page.url()).searchParams.get("q")).toBe("intel");
+  await expect(page.getByRole("button", { name: "重設", exact: true })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "全部商品" }).click();
+  const resetButton = page.getByRole("button", { name: "重設", exact: true });
+  await expect(resetButton).toBeVisible();
+  await searchInput.fill("intel core");
+  await resetButton.click();
+
+  await expect.poll(() => new URL(page.url()).searchParams.get("q")).toBe("intel");
+  await expect.poll(() => new URL(page.url()).searchParams.get("status")).toBeNull();
+  await expect(searchInput).toHaveValue("intel core");
+  await expect(page.locator(".active-filter-summary-row")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "清除搜尋字詞" }).click();
+  await expect(searchInput).toHaveValue("");
+  await expect.poll(() => new URL(page.url()).searchParams.get("q")).toBeNull();
+});
+
 test("remembers vendor and facet filters independently per category @desktop-only", async ({
   page,
 }) => {

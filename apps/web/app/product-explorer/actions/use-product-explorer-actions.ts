@@ -124,15 +124,21 @@ export function useProductExplorerActions({
       DEFAULT_QUERY.facets,
     );
 
-    commitQuery({
+    const resetQuery = {
       ...query,
-      q: DEFAULT_QUERY.q,
       minPrice: DEFAULT_QUERY.minPrice,
       maxPrice: DEFAULT_QUERY.maxPrice,
       status: DEFAULT_QUERY.status,
       vendors: DEFAULT_QUERY.vendors,
       facets: DEFAULT_QUERY.facets,
       page: 1,
+    };
+
+    commitQuery(resetQuery, {
+      draftQuery: {
+        ...resetQuery,
+        q: draft.q,
+      },
     });
   }
 

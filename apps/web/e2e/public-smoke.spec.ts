@@ -178,6 +178,9 @@ test.describe("public web smoke", () => {
       page.locator("main").getByText(/商品名稱、分類、價格與來源連結整理自原價屋公開頁面/),
     ).toBeVisible();
     await expect(page.getByText("partsradartw@gmail.com")).toBeVisible();
+    await expect(page.getByText(/若想回報網站問題、內容錯誤或提供建議/)).toBeVisible();
+    await expect(page.getByText(/請勿透過原價屋客服回報本站問題/)).toBeVisible();
+    await expect(page.getByText(/敏感個人資訊/)).toBeVisible();
     await expect(
       page.getByRole("link", { name: "GitHub repository（在新分頁開啟）" }),
     ).toHaveAttribute("href", "https://github.com/C6Yelan/PartsRadarTW");
@@ -219,6 +222,9 @@ test.describe("public web smoke", () => {
     await page.goto("/announcements");
     await expect(page.getByRole("heading", { exact: true, name: "網站公告" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "網站公開測試中" })).toBeVisible();
+    await expect(page.getByText(/免登入的配單整理功能/)).toBeVisible();
+    await expect(page.getByText(/個別商品提供的資訊較少時/)).toBeVisible();
+    await expect(page.getByText(/不會額外爬取其他商店|外部規格網站/)).toHaveCount(0);
     await expectSingleLine(page.getByText(/服務提醒、資料狀態與功能更新/));
     const announcementTitle = page.getByRole("heading", { name: "網站公開測試中" });
     const announcementSummary = page.getByText(/商品與價格資訊可能因來源更新時間而有延遲/);

@@ -34,6 +34,7 @@ export function ProductExplorerHeader({
         </label>
         <SearchIcon className="search-glyph" />
         <input
+          autoComplete="off"
           id="global-search"
           maxLength={100}
           placeholder="搜尋商品名稱、型號..."

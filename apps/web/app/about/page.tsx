@@ -52,7 +52,7 @@ export default function AboutPage() {
       <section className="public-info-section" id="contact">
         <h2>聯絡與回報</h2>
         <p>
-          專案內容可在
+          專案原始碼與公開資訊可在
           <a
             aria-label="GitHub repository（在新分頁開啟）"
             href="https://github.com/C6Yelan/PartsRadarTW"
@@ -62,14 +62,16 @@ export default function AboutPage() {
             GitHub
             <ExternalLinkIcon className="public-external-link-icon" />
           </a>
-          公開瀏覽；網站問題與一般回報請使用下方信箱。
+          查看。
         </p>
         <p>
-          網站問題與一般回報可寄至
+          若想回報網站問題、內容錯誤或提供建議，請來信至
           <a href="mailto:partsradartw@gmail.com">partsradartw@gmail.com</a>
           {"。"}
         </p>
-        <p>請勿透過原價屋客服回報本站問題，也不要在信件中附上密碼、付款資料或其他私人資訊。</p>
+        <p>
+          請勿透過原價屋客服回報本站問題；來信時也請勿提供密碼、付款資料或其他敏感個人資訊。
+        </p>
       </section>
     </PublicInfoPageLayout>
   );

@@ -18,7 +18,7 @@ export const PUBLIC_ANNOUNCEMENTS: readonly PublicAnnouncement[] = [
     title: "網站公開測試中",
     summary: "商品與價格資訊可能因來源更新時間而有延遲，實際價格、庫存與規格請以原價屋頁面為準。",
     body: [
-      "PartsRadarTW 目前以公開測試形式提供商品查詢、類別進階篩選、價格變動總覽與瀏覽器本機配單。",
+      "PartsRadarTW 目前提供商品查詢、進階篩選、價格變動總覽，以及免登入的配單整理功能。",
       "本站是非官方、非商業的資料整理工具，不販售商品，也不代表原價屋或任何品牌。",
     ],
     severity: "info",
@@ -30,8 +30,8 @@ export const PUBLIC_ANNOUNCEMENTS: readonly PublicAnnouncement[] = [
     title: "新增價格變動總覽與類別進階篩選",
     summary: "可依時間、漲跌類型、分類與關鍵字查看價格動態，商品頁也新增類別專屬條件。",
     body: [
-      "價格變動總覽只提供查閱，不會替網站使用者建立通知或修改 Discord 設定。",
-      "進階條件由既有原價屋商品名稱整理，不會額外爬取其他商店或外部規格網站。",
+      "你可以在價格變動總覽縮小查找範圍；若需要價格提醒，請依 Discord 通知頁的說明另行設定。",
+      "進階篩選會依商品頁面可辨識的資訊整理；個別商品提供的資訊較少時，可使用的篩選條件也可能較少。價格、庫存與規格仍以原始商品頁面為準。",
     ],
     severity: "info",
     publishedAt: "2026-07-12",

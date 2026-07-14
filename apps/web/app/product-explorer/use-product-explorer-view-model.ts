@@ -77,7 +77,6 @@ export function useProductExplorerViewModel() {
     [query.vendors, vendorOptions],
   );
   const hasActiveFilters =
-    query.q !== DEFAULT_QUERY.q ||
     query.minPrice !== DEFAULT_QUERY.minPrice ||
     query.maxPrice !== DEFAULT_QUERY.maxPrice ||
     query.status !== DEFAULT_QUERY.status ||
