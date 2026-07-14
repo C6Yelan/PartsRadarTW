@@ -487,6 +487,10 @@
   color: #f3a6ad;
 }
 
+.price-report-rows {
+  background: var(--surface-muted);
+}
+
 .price-report-table-header,
 .price-report-row {
   display: grid;

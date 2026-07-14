@@ -2003,12 +2003,33 @@ test("uses compact custom price-report filters, aligned table typography, and co
       await expect(page.getByRole("navigation", { name: "頁碼" })).toBeVisible();
     }
     const reportRow = page.locator(".price-report-row").first();
+    const reportRows = page.locator(".price-report-rows");
+    const visibleBackground = await readVisibleBackground(reportRow);
+    expect(visibleBackground.backgroundColor).toBe("rgb(13, 25, 34)");
+    expect(visibleBackground.sourceClasses).toContain("price-report-rows");
+    const [rowsBox, firstRowBox, lastRowBox] = await Promise.all([
+      reportRows.boundingBox(),
+      reportRow.boundingBox(),
+      page.locator(".price-report-row").last().boundingBox(),
+    ]);
+    expect(rowsBox?.y).toBeCloseTo(firstRowBox?.y ?? 0, 1);
+    expect((rowsBox?.y ?? 0) + (rowsBox?.height ?? 0)).toBeCloseTo(
+      (lastRowBox?.y ?? 0) + (lastRowBox?.height ?? 0),
+      1,
+    );
     const rowBoxBeforeHover = await reportRow.boundingBox();
+    const borderBeforeHover = (await readRowStyleSnapshot(reportRow)).borderBottomColor;
     await reportRow.hover();
     const rowBoxAfterHover = await reportRow.boundingBox();
     expect(rowBoxAfterHover?.x).toBeCloseTo(rowBoxBeforeHover?.x ?? 0, 1);
     expect(rowBoxAfterHover?.width).toBeCloseTo(rowBoxBeforeHover?.width ?? 0, 1);
     expect(rowBoxAfterHover?.height).toBeCloseTo(rowBoxBeforeHover?.height ?? 0, 1);
+    expect((await readRowStyleSnapshot(reportRow)).borderBottomColor).toBe(borderBeforeHover);
+    await page.mouse.move(0, 0);
+    await expect(reportRow).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+    expect((await readVisibleBackground(reportRow)).backgroundColor).toBe(
+      visibleBackground.backgroundColor,
+    );
     await expect(page.getByRole("status").filter({ hasText: "資料最後成功更新" })).toBeVisible();
     await expectNoHorizontalOverflow(page);
   }
@@ -2203,23 +2224,66 @@ test("uses compact custom price-report filters, aligned table typography, and co
   const homeValueStyle = await readStyleSnapshot(page.locator(".table-cell").first());
   const homeHeaderStyle = await readStyleSnapshot(page.locator(".table-header"));
   const homeRow = page.locator(".product-row").first();
-  await homeRow.evaluate((element) => {
-    const marker = document.createElement("span");
-    marker.hidden = true;
-    element.parentElement?.append(marker);
-  });
+  const homeResultsPanelStyle = await readStyleSnapshot(page.locator(".results-panel"));
+  const homeProductTableStyle = await readStyleSnapshot(page.locator(".product-table"));
+  const homeRowParentStyle = await readStyleSnapshot(homeRow.locator("..").first());
+  const homeVisibleBackground = await readVisibleBackground(homeRow);
   const homeRowStyle = await readRowStyleSnapshot(homeRow);
+  const homeRowBoxBeforeHover = await homeRow.boundingBox();
+  const homeBorderBeforeHover = homeRowStyle.borderBottomColor;
   await homeRow.hover();
   await expect(homeRow).toHaveCSS("background-color", "rgba(22, 42, 56, 0.68)");
   const homeRowHoverBackground = (await readRowStyleSnapshot(homeRow)).backgroundColor;
+  const homeRowBoxAfterHover = await homeRow.boundingBox();
+  expect(homeRowBoxAfterHover).toEqual(homeRowBoxBeforeHover);
+  expect((await readRowStyleSnapshot(homeRow)).borderBottomColor).toBe(homeBorderBeforeHover);
+  await page.mouse.move(0, 0);
+  await expect(homeRow).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  expect((await readVisibleBackground(homeRow)).backgroundColor).toBe(
+    homeVisibleBackground.backgroundColor,
+  );
+  await homeRow.getByRole("button", { name: "加入" }).click();
+  await expect(homeRow).toHaveClass(/is-in-build-list/);
+  const selectedHomeRowStyle = await readStyleSnapshot(homeRow);
+  expect(selectedHomeRowStyle.backgroundColor).not.toBe(homeVisibleBackground.backgroundColor);
+  await expect(homeRow).toHaveCSS("box-shadow", /rgba\(120, 216, 149, 0\.44\)/);
   await page.goto("/price-report");
 
   const reportRow = page.locator(".price-report-row").first();
-  expect(await readRowStyleSnapshot(reportRow)).toEqual(homeRowStyle);
+  const reportResultsStyle = await readStyleSnapshot(page.locator(".price-report-results"));
+  const reportRowsStyle = await readStyleSnapshot(page.locator(".price-report-rows"));
+  const reportRowParentStyle = await readStyleSnapshot(reportRow.locator("..").first());
+  const reportVisibleBackground = await readVisibleBackground(reportRow);
+  expect(homeResultsPanelStyle.backgroundColor).toBe("rgb(13, 25, 34)");
+  expect(homeProductTableStyle.backgroundColor).toBe("rgba(0, 0, 0, 0)");
+  expect(homeRowParentStyle.backgroundColor).toBe("rgba(0, 0, 0, 0)");
+  expect(homeVisibleBackground.sourceClasses).toContain("results-panel");
+  expect(reportResultsStyle.backgroundColor).toBe("rgba(0, 0, 0, 0)");
+  expect(reportRowsStyle.backgroundColor).toBe(homeResultsPanelStyle.backgroundColor);
+  expect(reportRowParentStyle.backgroundColor).toBe(reportRowsStyle.backgroundColor);
+  expect(reportVisibleBackground.backgroundColor).toBe(homeVisibleBackground.backgroundColor);
+  expect(reportVisibleBackground.sourceClasses).toContain("price-report-rows");
+  const reportRowStyle = await readRowStyleSnapshot(reportRow);
+  expectStyleFields(reportRowStyle, homeRowStyle, [
+    "backgroundColor",
+    "transitionDuration",
+    "transitionProperty",
+  ]);
+  const reportBorderBeforeHover = reportRowStyle.borderBottomColor;
+  const reportRowBoxBeforeHover = await reportRow.boundingBox();
   await reportRow.hover();
   await expect(reportRow).toHaveCSS("background-color", homeRowHoverBackground);
   expect((await readRowStyleSnapshot(reportRow)).backgroundColor).toBe(homeRowHoverBackground);
+  expect((await readRowStyleSnapshot(reportRow)).borderBottomColor).toBe(
+    reportBorderBeforeHover,
+  );
+  expect(await reportRow.boundingBox()).toEqual(reportRowBoxBeforeHover);
   await page.mouse.move(0, 0);
+  await expect(reportRow).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  expect((await readVisibleBackground(reportRow)).backgroundColor).toBe(
+    reportVisibleBackground.backgroundColor,
+  );
+  await expect(page.locator(".price-report-row.is-in-build-list")).toHaveCount(0);
 
   const productStyle = await readStyleSnapshot(
     page.locator(".price-report-product-copy a").first(),
@@ -2290,6 +2354,25 @@ test("uses compact custom price-report filters, aligned table typography, and co
     .evaluate((element) => getComputedStyle(element).color);
   expect(dropMovementColor).toBe("rgb(104, 226, 145)");
   expect(riseMovementColor).toBe("rgb(255, 138, 145)");
+  expect(reportHeaderStyle.backgroundColor).toBe("rgb(20, 37, 50)");
+  await expect(page.locator(".price-report-source-status")).toHaveCSS(
+    "background-color",
+    "rgb(16, 28, 38)",
+  );
+  await expect(page.locator(".price-report-summary")).toHaveCSS(
+    "background-color",
+    "rgba(0, 0, 0, 0)",
+  );
+  await expect(page.locator(".pagination-bar")).toHaveCSS(
+    "background-color",
+    "rgba(0, 0, 0, 0)",
+  );
+
+  await page.goto("/price-report?q=stale");
+  await expect(page.locator(".price-report-source-warning")).toHaveCSS(
+    "background-color",
+    "rgba(122, 92, 28, 0.2)",
+  );
 });
 
 test("presents build-list summary, categories, actions, and data status in one sidebar @desktop-only", async ({
@@ -3029,6 +3112,11 @@ interface RowStyleSnapshot {
   transitionProperty: string;
 }
 
+interface VisibleBackground {
+  backgroundColor: string;
+  sourceClasses: string;
+}
+
 async function readStyleSnapshot(locator: Locator): Promise<StyleSnapshot> {
   return locator.evaluate((element) => {
     const style = getComputedStyle(element);
@@ -3091,6 +3179,29 @@ async function readRowStyleSnapshot(locator: Locator): Promise<RowStyleSnapshot>
       transitionDuration: style.transitionDuration,
       transitionProperty: style.transitionProperty,
     };
+  });
+}
+
+async function readVisibleBackground(locator: Locator): Promise<VisibleBackground> {
+  return locator.evaluate((element) => {
+    let current: Element | null = element;
+
+    while (current) {
+      const backgroundColor = getComputedStyle(current).backgroundColor;
+      const alphaMatch = backgroundColor.match(/^rgba\([^,]+,[^,]+,[^,]+,\s*([\d.]+)\)$/);
+      const isVisible = backgroundColor !== "transparent" && Number(alphaMatch?.[1] ?? 1) > 0;
+
+      if (isVisible) {
+        return {
+          backgroundColor,
+          sourceClasses: current.className || current.tagName.toLowerCase(),
+        };
+      }
+
+      current = current.parentElement;
+    }
+
+    return { backgroundColor: "transparent", sourceClasses: "none" };
   });
 }
 
