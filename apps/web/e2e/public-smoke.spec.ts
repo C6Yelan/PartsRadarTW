@@ -81,6 +81,26 @@ test.describe("public web smoke", () => {
 
     await page.goto("/discord");
     await expect(page.getByRole("heading", { exact: true, name: "Discord 通知" })).toBeVisible();
+    const inviteUrl = process.env.DISCORD_BOT_INVITE_URL?.trim();
+    if (inviteUrl) {
+      await expect(
+        page.getByRole("link", { name: "邀請 PartsRadarTW Discord bot，開新分頁" }),
+      ).toHaveAttribute("href", inviteUrl);
+      await expect(
+        page.getByRole("link", { name: "邀請 PartsRadarTW Discord bot，開新分頁" }),
+      ).toHaveAttribute("target", "_blank");
+      await expect(
+        page.getByRole("link", { name: "邀請 PartsRadarTW Discord bot，開新分頁" }),
+      ).toHaveAttribute("rel", "noreferrer");
+    } else {
+      await expect(page.getByText("邀請連結準備中", { exact: true })).toHaveAttribute(
+        "aria-disabled",
+        "true",
+      );
+      await expect(
+        page.getByRole("link", { name: "邀請 PartsRadarTW Discord bot，開新分頁" }),
+      ).toHaveCount(0);
+    }
     const heroScreenshot = page.getByAltText("Discord 指令選單截圖");
     await expect(heroScreenshot).toBeAttached();
     if ((page.viewportSize()?.width ?? 0) > 520) {
@@ -88,27 +108,59 @@ test.describe("public web smoke", () => {
     } else {
       await expect(heroScreenshot).toBeHidden();
     }
+    const localNavigation = page.getByRole("navigation", { name: "Discord 教學頁內導覽" });
+    await expect(localNavigation.getByRole("link")).toHaveCount(4);
     await expect(page.getByRole("heading", { name: "快速開始" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "指令說明" })).toBeVisible();
-    const commandsSection = page.getByRole("region", { name: "指令說明" });
-    await expect(
-      commandsSection.getByRole("heading", { exact: true, name: "目標價提醒" }),
-    ).toBeVisible();
-    await expect(
-      commandsSection.getByRole("heading", {
-        exact: true,
-        name: "即時價格報告與每日私訊價格報告",
-      }),
-    ).toBeVisible();
-    await expect(
-      commandsSection.getByRole("heading", { exact: true, name: "公開價格報告" }),
-    ).toBeVisible();
-    await expectImagesLoaded(page.locator(".discord-guide-image"));
+    const quickStartSection = page.getByRole("region", { name: "快速開始" });
+    await expect(quickStartSection.locator(".discord-step-list > li")).toHaveCount(3);
+    await expect(quickStartSection).not.toContainText("/public-report manage");
+    await expect(page.getByRole("link", { name: "前往一般使用者教學" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "前往管理員教學" })).toBeVisible();
+
+    const userGuide = page.getByRole("region", { name: "提醒與個人價格報告" });
+    await expect(userGuide.getByText("/watch", { exact: true })).toHaveCount(2);
+    await expect(userGuide.getByText("/price-report now", { exact: true })).toHaveCount(2);
+    await expect(userGuide.getByText("/price-report settings", { exact: true })).toHaveCount(2);
+    const userDetails = userGuide.locator("details");
+    await expect(userDetails).toHaveCount(3);
+    await expect(userDetails.nth(0)).toHaveAttribute("open", "");
+    await expect(userDetails.nth(1)).not.toHaveAttribute("open", "");
     await expect(page.getByRole("img", { name: "/watch 目標價提醒面板截圖" })).toBeVisible();
-    await expect(page.getByRole("img", { name: "每日私訊價格報告設定截圖" })).toBeVisible();
-    await expect(page.getByRole("img", { name: "公開價格報告管理面板截圖" })).toBeVisible();
+    await userDetails.nth(1).locator("summary").press("Enter");
+    await expect(userDetails.nth(1)).toHaveAttribute("open", "");
+    await expect(page.getByRole("img", { name: "即時價格報告預覽截圖" })).toBeVisible();
+
+    const adminGuide = page.getByRole("region", { name: "公開價格報告設定" });
+    for (const command of [
+      "/public-report manage",
+      "/public-report test",
+      "/public-report status",
+    ]) {
+      await expect(
+        adminGuide.locator(".discord-command-summary-list").getByText(command, { exact: true }),
+      ).toHaveCount(1);
+      await expect(
+        adminGuide.locator("summary").getByText(command, { exact: true }),
+      ).toHaveCount(1);
+    }
+    await expect(adminGuide.getByLabel("公開報告必要權限")).toContainText(
+      "管理伺服器",
+    );
+    await expect(adminGuide.getByLabel("公開報告必要權限")).toContainText(
+      "傳送訊息",
+    );
+    await expect(adminGuide.locator("details[open]")).toHaveCount(0);
+
     await expect(page.getByRole("heading", { name: "常見問題" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "一般成員能用哪些指令？" })).toBeVisible();
+    const faqItems = page.locator(".discord-faq-item");
+    await expect(faqItems).toHaveCount(3);
+    await expect(page.locator(".discord-faq-item[open]")).toHaveCount(0);
+    await faqItems.first().locator("summary").press("Enter");
+    await expect(faqItems.first()).toHaveAttribute("open", "");
+
+    await localNavigation.getByRole("link", { name: "伺服器管理員" }).click();
+    await expect(page.locator("#discord-admin-guide")).toBeInViewport();
+    await expectImagesLoaded(page.locator(".discord-guide-image:visible"));
     await expectTopbarLinks(page);
     await expectPublicFooterLinks(page);
   });

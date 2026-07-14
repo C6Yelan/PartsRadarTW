@@ -1,5 +1,5 @@
 // apps/web/app/discord/page.tsx
-// 呈現 Discord bot 公開介紹頁，串接邀請入口、指令教學截圖與常見問題。
+// 依一般使用者與伺服器管理員分流 Discord bot 邀請、快速開始與指令教學。
 
 import type { Metadata } from "next";
 import Image from "next/image";
@@ -8,13 +8,13 @@ import { ArrowLeftIcon, ExternalLinkIcon } from "../_shared/icons";
 import SiteDisclaimer from "../site-disclaimer";
 import TopbarBrandNavigation from "../TopbarBrandNavigation";
 import {
+  adminCommandGuides,
+  adminQuickStartSteps,
   discordFaqItems,
   heroScreenshot,
-  personalReportCommandGuides,
-  quickStartSteps,
   screenshotFreshnessNotice,
-  serverReportCommandGuides,
-  targetPriceCommandGuides,
+  userCommandGuides,
+  userQuickStartSteps,
 } from "./content";
 
 export const metadata: Metadata = {
@@ -31,7 +31,6 @@ export const dynamic = "force-dynamic";
 
 const discordInviteUrl = process.env.DISCORD_BOT_INVITE_URL?.trim();
 
-// 組裝 Discord 介紹頁，將靜態內容資料分派到 hero、快速開始、指令教學與 FAQ 區塊。
 export default function DiscordPage() {
   const hasInviteUrl = Boolean(discordInviteUrl);
 
@@ -42,7 +41,7 @@ export default function DiscordPage() {
 
         <div className="discord-topbar-title">
           <h1>Discord 通知</h1>
-          <span>指令教學與公開價格報告</span>
+          <span>提醒、個人報告與伺服器設定</span>
         </div>
         <Link className="back-link" href="/">
           <ArrowLeftIcon />
@@ -54,7 +53,7 @@ export default function DiscordPage() {
         <section className="discord-hero" aria-labelledby="discord-title">
           <div className="discord-hero-copy">
             <h2 id="discord-title">Discord 價格通知</h2>
-            <p>用 Discord 管理目標價提醒、即時價格報告、每日私訊價格報告與公開價格報告。</p>
+            <p>追蹤商品目標價、查看近期價格變動，或為伺服器設定公開價格報告。</p>
             <div className="discord-actions">
               {hasInviteUrl ? (
                 <a
@@ -73,10 +72,7 @@ export default function DiscordPage() {
                 </span>
               )}
               <a className="control-button secondary" href="#quick-start">
-                快速開始
-              </a>
-              <a className="control-button secondary" href="#discord-admin">
-                管理公開價格報告
+                開始使用
               </a>
             </div>
           </div>
@@ -92,146 +88,106 @@ export default function DiscordPage() {
                 width={heroScreenshot.width}
               />
             </div>
-            <p>使用 Discord 指令選單即可找到 PartsRadarTW 的提醒與報告功能。</p>
+            <p>在 Discord 指令選單中選擇提醒、個人報告或管理員功能。</p>
           </aside>
+        </section>
+
+        <nav className="discord-local-nav" aria-label="Discord 教學頁內導覽">
+          <a href="#quick-start">快速開始</a>
+          <a href="#discord-user-guide">一般使用者</a>
+          <a href="#discord-admin-guide">伺服器管理員</a>
+          <a href="#discord-faq">常見問題</a>
+        </nav>
+
+        <section className="discord-section" aria-labelledby="audience-title">
+          <div className="discord-section-heading">
+            <h2 id="audience-title">選擇使用方式</h2>
+            <p>依你的使用情境前往對應教學；一般提醒與個人報告不需要管理員權限。</p>
+          </div>
+          <div className="discord-audience-grid">
+            <article className="discord-audience-card">
+              <div>
+                <span className="discord-audience-label">一般使用者</span>
+                <h3>管理自己的提醒與報告</h3>
+                <p>追蹤商品目標價、立即查看價格變動，並設定每日私訊報告。</p>
+              </div>
+              <a href="#discord-user-guide">前往一般使用者教學</a>
+            </article>
+            <article className="discord-audience-card">
+              <div>
+                <span className="discord-audience-label">伺服器管理員</span>
+                <h3>設定伺服器公開報告</h3>
+                <p>設定公開報告頻道、測試 bot 權限，並查看最近發送狀態。</p>
+              </div>
+              <strong>需要「管理伺服器」權限</strong>
+              <a href="#discord-admin-guide">前往管理員教學</a>
+            </article>
+          </div>
         </section>
 
         <section className="discord-section" id="quick-start" aria-labelledby="quick-start-title">
           <div className="discord-section-heading">
             <h2 id="quick-start-title">快速開始</h2>
-            <p>先完成邀請，再依需求選擇目標價提醒、即時或每日報告，以及公開價格報告。</p>
+            <p>一般使用者只需要三步即可開始設定目標價提醒、即時報告或每日私訊報告。</p>
           </div>
-
-          <ol className="discord-step-list">
-            {quickStartSteps.map((item, index) => (
-              <li key={item.title}>
-                <span className="discord-step-number">{index + 1}</span>
-                <div>
-                  <h3>{item.title}</h3>
-                  <code>{item.command}</code>
-                  <p>{item.description}</p>
-                </div>
-              </li>
-            ))}
-          </ol>
+          <QuickStartSteps items={userQuickStartSteps} />
         </section>
 
-        <section className="discord-section" id="discord-commands" aria-labelledby="commands-title">
+        <section
+          className="discord-section"
+          id="discord-user-guide"
+          aria-labelledby="discord-user-guide-title"
+        >
           <div className="discord-section-heading">
-            <h2 id="commands-title">指令說明</h2>
-            <p>
-              /watch 管理目標價提醒；/price-report 提供即時與每日私訊價格報告；/public-report
-              管理公開價格報告。
-            </p>
-            <p>{screenshotFreshnessNotice}</p>
+            <span className="discord-section-eyebrow">一般使用者</span>
+            <h2 id="discord-user-guide-title">提醒與個人價格報告</h2>
+            <p>先從指令摘要確認用途，需要操作畫面時再展開完整教學。</p>
           </div>
-
-          <div className="discord-command-group">
-            <h3>目標價提醒</h3>
-            <p className="discord-command-group-summary">
-              追蹤單一商品。價格資料更新後若達到目標價，bot 會嘗試透過 DM 傳送提醒。
-            </p>
-            <div className="discord-command-guide-list">
-              {targetPriceCommandGuides.map((guide, index) => (
-                <article className="discord-command-guide" key={guide.image.alt}>
-                  <div className="discord-guide-media">
-                    <div className={`discord-guide-frame is-${guide.image.orientation}`}>
-                      <Image
-                        alt={guide.image.alt}
-                        className="discord-guide-image"
-                        height={guide.image.height}
-                        src={guide.image.src}
-                        width={guide.image.width}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="discord-guide-copy">
-                    <span className="discord-guide-step">提醒 {index + 1}</span>
-                    <h4>{guide.title}</h4>
-                    <code>{guide.command}</code>
-                    <p>{guide.description}</p>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </div>
-
-          <div className="discord-command-group">
-            <h3>即時價格報告與每日私訊價格報告</h3>
-            <p className="discord-command-group-summary">
-              即時報告回覆在目前伺服器頻道或 DM；每日報告依台北時間與個人篩選設定傳到 DM。
-            </p>
-            <div className="discord-command-guide-list">
-              {personalReportCommandGuides.map((guide, index) => (
-                <article className="discord-command-guide" key={guide.image.alt}>
-                  <div className="discord-guide-media">
-                    <div className={`discord-guide-frame is-${guide.image.orientation}`}>
-                      <Image
-                        alt={guide.image.alt}
-                        className="discord-guide-image"
-                        height={guide.image.height}
-                        src={guide.image.src}
-                        width={guide.image.width}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="discord-guide-copy">
-                    <span className="discord-guide-step">報告 {index + 1}</span>
-                    <h4>{guide.title}</h4>
-                    <code>{guide.command}</code>
-                    <p>{guide.description}</p>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </div>
-
-          <div className="discord-command-group" id="discord-admin">
-            <h3>公開價格報告</h3>
-            <p className="discord-command-group-summary">
-              具備「管理伺服器」權限的成員可指定頻道，讓伺服器看到自動產生的價格彙整。
-            </p>
-            <div className="discord-command-guide-list">
-              {serverReportCommandGuides.map((guide, index) => (
-                <article className="discord-command-guide" key={guide.image.alt}>
-                  <div className="discord-guide-media">
-                    <div className={`discord-guide-frame is-${guide.image.orientation}`}>
-                      <Image
-                        alt={guide.image.alt}
-                        className="discord-guide-image"
-                        height={guide.image.height}
-                        src={guide.image.src}
-                        width={guide.image.width}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="discord-guide-copy">
-                    <span className="discord-guide-step">管理 {index + 1}</span>
-                    <h4>{guide.title}</h4>
-                    <code>{guide.command}</code>
-                    <p>{guide.description}</p>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </div>
+          <CommandSummary guides={userCommandGuides} />
+          <p className="discord-screenshot-notice">{screenshotFreshnessNotice}</p>
+          <CommandDetails guides={userCommandGuides} firstOpen />
         </section>
 
-        <section className="discord-section" aria-labelledby="discord-faq-title">
+        <section
+          className="discord-section"
+          id="discord-admin-guide"
+          aria-labelledby="discord-admin-guide-title"
+        >
+          <div className="discord-section-heading">
+            <span className="discord-section-eyebrow">伺服器管理員</span>
+            <h2 id="discord-admin-guide-title">公開價格報告設定</h2>
+            <p>依序確認權限、設定公開報告、發送測試，再查看目前狀態。</p>
+          </div>
+          <aside className="discord-permission-notice" aria-label="公開報告必要權限">
+            <strong>必要權限</strong>
+            <p>
+              使用者需要「管理伺服器」權限；bot 在目標頻道需要「傳送訊息」與「嵌入連結」權限。
+            </p>
+          </aside>
+          <div className="discord-admin-quick-start">
+            <h3>管理員三步設定</h3>
+            <QuickStartSteps items={adminQuickStartSteps} />
+          </div>
+          <CommandSummary guides={adminCommandGuides} />
+          <p className="discord-screenshot-notice">{screenshotFreshnessNotice}</p>
+          <CommandDetails guides={adminCommandGuides} />
+        </section>
+
+        <section
+          className="discord-section"
+          id="discord-faq"
+          aria-labelledby="discord-faq-title"
+        >
           <div className="discord-section-heading">
             <h2 id="discord-faq-title">常見問題</h2>
-            <p>遇到指令權限或私訊問題時，先從這裡確認使用範圍與必要設定。</p>
+            <p>遇到指令權限或私訊問題時，展開對應項目確認必要設定。</p>
           </div>
-
           <div className="discord-faq-list">
             {discordFaqItems.map((item) => (
-              <article className="discord-faq-item" key={item.question}>
-                <h3>{item.question}</h3>
+              <details className="discord-faq-item" key={item.question}>
+                <summary>{item.question}</summary>
                 <p>{item.answer}</p>
-              </article>
+              </details>
             ))}
           </div>
         </section>
@@ -241,3 +197,77 @@ export default function DiscordPage() {
     </div>
   );
 }
+
+function QuickStartSteps({ items }: { items: readonly QuickStartStep[] }) {
+  return (
+    <ol className="discord-step-list">
+      {items.map((item, index) => (
+        <li key={item.title}>
+          <span className="discord-step-number">{index + 1}</span>
+          <div>
+            <h3>{item.title}</h3>
+            <code>{item.command}</code>
+            <p>{item.description}</p>
+          </div>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function CommandSummary({ guides }: { guides: readonly CommandGuide[] }) {
+  return (
+    <ul className="discord-command-summary-list" aria-label="指令摘要">
+      {guides.map((guide) => (
+        <li key={guide.command}>
+          <code>{guide.command}</code>
+          <span>{guide.purpose}</span>
+          <span>{guide.result}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function CommandDetails({
+  firstOpen = false,
+  guides,
+}: {
+  firstOpen?: boolean;
+  guides: readonly CommandGuide[];
+}) {
+  return (
+    <div className="discord-command-details-list">
+      {guides.map((guide, index) => (
+        <details className="discord-command-details" key={guide.command} open={firstOpen && index === 0}>
+          <summary>
+            <code>{guide.command}</code>
+            <span>{guide.title}</span>
+          </summary>
+          <div className="discord-command-details-body">
+            {guide.sections.map((section) => (
+              <article className="discord-guide-content" key={section.image.alt}>
+                <div className="discord-guide-copy">
+                  <h3>{section.title}</h3>
+                  <p>{section.description}</p>
+                </div>
+                <div className={`discord-guide-frame is-${section.image.orientation}`}>
+                  <Image
+                    alt={section.image.alt}
+                    className="discord-guide-image"
+                    height={section.image.height}
+                    src={section.image.src}
+                    width={section.image.width}
+                  />
+                </div>
+              </article>
+            ))}
+          </div>
+        </details>
+      ))}
+    </div>
+  );
+}
+
+type QuickStartStep = (typeof userQuickStartSteps)[number] | (typeof adminQuickStartSteps)[number];
+type CommandGuide = (typeof userCommandGuides)[number] | (typeof adminCommandGuides)[number];

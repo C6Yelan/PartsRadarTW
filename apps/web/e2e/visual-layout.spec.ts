@@ -1780,6 +1780,83 @@ test("uses the shared topbar button for the price-report entry @desktop-only", a
   }
 });
 
+test("organizes Discord guidance by audience with progressive disclosure @desktop-only", async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  const viewports = [
+    { width: 1760, height: 900 },
+    { width: 1280, height: 800 },
+    { width: 1024, height: 800 },
+    { width: 760, height: 844 },
+    { width: 390, height: 844 },
+  ];
+
+  for (const viewport of viewports) {
+    await page.setViewportSize(viewport);
+    await page.goto("/discord");
+
+    await expect(page.locator(".discord-actions .control-button")).toHaveCount(2);
+    await expect(page.getByRole("navigation", { name: "Discord 教學頁內導覽" })).toBeVisible();
+    await expect(page.locator("#quick-start .discord-step-list > li")).toHaveCount(3);
+    await expect(page.locator("#discord-user-guide .discord-command-summary-list > li")).toHaveCount(
+      3,
+    );
+    await expect(page.locator("#discord-admin-guide .discord-command-summary-list > li")).toHaveCount(
+      3,
+    );
+    await expect(page.getByLabel("公開報告必要權限")).toBeVisible();
+
+    const audienceCards = page.locator(".discord-audience-card");
+    const audienceCardBoxes = await Promise.all([
+      audienceCards.nth(0).boundingBox(),
+      audienceCards.nth(1).boundingBox(),
+    ]);
+    if (viewport.width > 760) {
+      expect(audienceCardBoxes[0]?.y).toBeCloseTo(audienceCardBoxes[1]?.y ?? 0, 0);
+    } else {
+      expect(audienceCardBoxes[1]?.y ?? 0).toBeGreaterThan(
+        audienceCardBoxes[0]?.y ?? Number.POSITIVE_INFINITY,
+      );
+    }
+
+    const heroImage = page.getByAltText("Discord 指令選單截圖");
+    if (viewport.width > 520) {
+      await expect(heroImage).toBeVisible();
+      expect((await heroImage.boundingBox())?.width).toBeLessThanOrEqual(380);
+    } else {
+      await expect(heroImage).toBeHidden();
+    }
+
+    for (const image of await page.locator(".discord-guide-image").all()) {
+      expect((await image.getAttribute("alt"))?.trim().length).toBeGreaterThan(0);
+    }
+    await expectNoHorizontalOverflow(page);
+  }
+
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/discord");
+  const userDetails = page.locator("#discord-user-guide details");
+  await expect(userDetails.nth(0)).toHaveAttribute("open", "");
+  await expect(userDetails.nth(1)).not.toHaveAttribute("open", "");
+  await expect(page.getByAltText("即時價格報告預覽截圖")).toBeHidden();
+  await userDetails.nth(1).locator("summary").focus();
+  await userDetails.nth(1).locator("summary").press("Space");
+  await expect(userDetails.nth(1)).toHaveAttribute("open", "");
+  await expect(page.getByAltText("即時價格報告預覽截圖")).toBeVisible();
+
+  const faqDetails = page.locator(".discord-faq-item");
+  await expect(page.locator(".discord-faq-item[open]")).toHaveCount(0);
+  await faqDetails.first().locator("summary").press("Enter");
+  await expect(faqDetails.first()).toHaveAttribute("open", "");
+
+  await page
+    .getByRole("navigation", { name: "Discord 教學頁內導覽" })
+    .getByRole("link", { name: "一般使用者" })
+    .click();
+  await expect(page.locator("#discord-user-guide")).toBeInViewport();
+});
+
 test("uses compact custom price-report filters, aligned table typography, and conditional reset @desktop-only", async ({
   page,
 }) => {

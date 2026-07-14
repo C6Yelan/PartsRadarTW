@@ -1,75 +1,110 @@
 /* apps/web/app/styles/discord/commands.css */
-.discord-command-group {
+.discord-command-summary-list {
   display: grid;
-  gap: 12px;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid rgba(33, 51, 64, 0.78);
+  border-radius: 8px;
+  list-style: none;
 }
 
-.discord-command-group + .discord-command-group {
-  padding-top: 4px;
+.discord-command-summary-list li {
+  display: grid;
+  grid-template-columns: minmax(190px, 0.7fr) minmax(190px, 1fr) minmax(220px, 1fr);
+  gap: 14px;
+  align-items: center;
+  min-width: 0;
+  padding: 11px 14px;
+  background: rgba(11, 23, 32, 0.74);
+}
+
+.discord-command-summary-list li + li {
   border-top: 1px solid rgba(33, 51, 64, 0.78);
 }
 
-.discord-command-group h3 {
-  font-size: 18px;
-  line-height: 1.35;
-}
-
-.discord-command-group-summary {
-  max-width: 720px;
-  margin: -4px 0 0;
-  color: var(--muted);
-  font-size: 14px;
-  line-height: 1.65;
-}
-
-.discord-command-guide-list {
-  display: grid;
-  gap: 14px;
-  margin: 0;
-  padding: 0;
-}
-
-.discord-command-guide {
-  display: grid;
-  grid-template-columns: minmax(300px, 460px) minmax(0, 1fr);
-  gap: 18px;
-  align-items: stretch;
+.discord-command-summary-list span {
   min-width: 0;
-  padding: 14px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.discord-command-summary-list span:last-child {
+  color: var(--text);
+}
+
+.discord-command-details-list {
+  display: grid;
+  gap: 10px;
+}
+
+.discord-command-details,
+.discord-faq-item {
+  min-width: 0;
+  overflow: clip;
   border: 1px solid rgba(33, 51, 64, 0.78);
   border-radius: 8px;
   background: rgba(11, 23, 32, 0.74);
 }
 
-.discord-guide-media {
+.discord-command-details:hover,
+.discord-faq-item:hover {
+  border-color: var(--border-strong);
+}
+
+.discord-command-details[open],
+.discord-faq-item[open] {
+  border-color: rgba(143, 180, 204, 0.36);
+  background: rgba(13, 28, 39, 0.9);
+}
+
+.discord-command-details summary,
+.discord-faq-item summary {
+  cursor: pointer;
+}
+
+.discord-command-details summary {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  min-height: 52px;
+  padding: 9px 14px;
+  color: var(--text-strong);
+  font-weight: 800;
+}
+
+.discord-command-details summary::after {
+  margin-left: auto;
+  color: var(--muted);
+  content: "+";
+  font-size: 18px;
+  line-height: 1;
+}
+
+.discord-command-details[open] > summary::after {
+  content: "−";
+}
+
+.discord-command-details-body {
   display: grid;
+  gap: 14px;
+  padding: 0 14px 14px;
+  border-top: 1px solid rgba(33, 51, 64, 0.78);
+}
+
+.discord-guide-content {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.55fr) minmax(280px, 1fr);
+  gap: 18px;
   align-items: start;
   min-width: 0;
+  padding-top: 14px;
 }
 
-.discord-guide-frame {
-  box-sizing: border-box;
-  display: grid;
-  width: 100%;
-  min-width: 0;
-  max-width: 100%;
-  place-items: center;
-}
-
-.discord-guide-frame.is-portrait {
-  max-width: 430px;
-}
-
-.discord-guide-frame.is-landscape {
-  max-width: 100%;
-}
-
-.discord-guide-image {
-  display: block;
-  width: 100%;
-  height: auto;
-  max-width: 100%;
-  object-fit: contain;
+.discord-guide-content + .discord-guide-content {
+  border-top: 1px solid rgba(33, 51, 64, 0.78);
 }
 
 .discord-guide-copy {
@@ -79,30 +114,10 @@
   min-width: 0;
 }
 
-.discord-guide-step {
-  color: var(--accent);
-  font-size: 12px;
-  font-weight: 850;
-}
-
-.discord-guide-copy h4 {
+.discord-guide-copy h3 {
   margin: 0;
   color: var(--text-strong);
-  font-size: 19px;
-  line-height: 1.25;
-}
-
-.discord-guide-copy code {
-  width: fit-content;
-  max-width: 100%;
-  padding: 4px 8px;
-  border: 1px solid rgba(143, 180, 204, 0.22);
-  border-radius: 6px;
-  background: rgba(3, 8, 13, 0.45);
-  color: var(--text-strong);
-  font-size: 14px;
-  font-weight: 800;
-  overflow-wrap: anywhere;
+  font-size: 17px;
 }
 
 .discord-guide-copy p {
@@ -110,4 +125,33 @@
   color: var(--muted);
   font-size: 14px;
   line-height: 1.7;
+}
+
+.discord-guide-frame {
+  box-sizing: border-box;
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  place-items: start center;
+}
+
+.discord-guide-frame.is-portrait {
+  max-width: 400px;
+}
+
+.discord-guide-frame.is-square {
+  max-width: 480px;
+}
+
+.discord-guide-frame.is-landscape {
+  max-width: 520px;
+}
+
+.discord-guide-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+  object-fit: contain;
 }

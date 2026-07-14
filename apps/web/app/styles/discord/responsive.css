@@ -1,23 +1,16 @@
 /* apps/web/app/styles/discord/responsive.css */
 @media (max-width: 900px) {
-  .discord-hero {
+  .discord-hero,
+  .discord-guide-content {
     grid-template-columns: 1fr;
-  }
-
-  .discord-step-list {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .discord-visual-panel {
-    max-width: 540px;
+    max-width: 380px;
   }
 
-  .discord-command-guide {
-    grid-template-columns: 1fr;
-  }
-
-  .discord-guide-media {
-    max-width: 560px;
+  .discord-guide-frame {
+    justify-self: start;
   }
 }
 
@@ -45,11 +38,13 @@
     padding: 18px;
   }
 
-  .discord-step-list {
-    grid-template-columns: 1fr;
+  .discord-local-nav a {
+    flex: 1 1 calc(50% - 8px);
+    text-align: center;
   }
 
-  .discord-faq-list {
+  .discord-audience-grid,
+  .discord-step-list {
     grid-template-columns: 1fr;
   }
 
@@ -60,6 +55,23 @@
 
   .discord-actions .control-button {
     width: 100%;
+  }
+
+  .discord-command-summary-list li {
+    grid-template-columns: 1fr;
+    gap: 7px;
+  }
+
+  .discord-command-details summary {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 7px;
+    padding-block: 12px;
+  }
+
+  .discord-permission-notice {
+    grid-template-columns: 1fr;
+    gap: 6px;
   }
 }
 
