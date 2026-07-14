@@ -161,6 +161,12 @@
     grid-column: 2;
     grid-row: 1;
     justify-self: end;
+    box-sizing: border-box;
+    min-width: 52px;
+    min-height: 30px;
+    padding-inline: 10px;
+    line-height: 1;
+    white-space: nowrap;
   }
 
   .history-record-price,

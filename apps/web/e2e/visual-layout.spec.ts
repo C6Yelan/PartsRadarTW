@@ -11,6 +11,8 @@ const PRODUCT_ID = "11111111-1111-4111-8111-111111111111";
 const READY_ROUTE_SLUG = "visual-ready-product";
 const ERROR_ROUTE_SLUG = "visual-error-product";
 const OBSERVED_AT = "2026-07-10T08:00:00.000Z";
+const PRICE_REPORT_WRAP_NAME = "AI PRO R9700 Creator / Lexar D400 / Type-C+A / USB3.1 G1";
+const PRICE_REPORT_LONG_SPEC_NAME = "32GB(2920MHz/27cm/鼓風扇/註冊五年保)";
 let releasePriceReportLoading: (() => void) | null = null;
 let holdNextProductsRequest = false;
 let releaseHeldProductsRequest: (() => void) | null = null;
@@ -389,10 +391,10 @@ test.beforeEach(async ({ page }) => {
       const reportItems = [
         {
           productId: PRODUCT_ID,
-          productName: "視覺驗證超長商品名稱 NVIDIA GeForce RTX 顯示卡 OC Edition",
+          productName: PRICE_REPORT_WRAP_NAME,
           image: {
             url: "/favicon.svg",
-            alt: "視覺驗證超長商品名稱 NVIDIA GeForce RTX 顯示卡 OC Edition",
+            alt: PRICE_REPORT_WRAP_NAME,
           },
           category: { igrp: 16, slug: "fan-accessory", displayName: "風扇／配件" },
           previousPrice: 19_990,
@@ -405,7 +407,7 @@ test.beforeEach(async ({ page }) => {
         },
         {
           productId: "22222222-2222-4222-8222-222222222222",
-          productName: "視覺驗證漲價商品",
+          productName: PRICE_REPORT_LONG_SPEC_NAME,
           image: null,
           category: { igrp: 4, slug: "cpu", displayName: "CPU" },
           previousPrice: 10_000,
@@ -499,6 +501,7 @@ test("keeps the product toolbar compact and readable across its layout boundary 
     { width: 761, height: 844 },
     { width: 760, height: 844 },
     { width: 390, height: 844 },
+    { width: 360, height: 800 },
   ];
   const viewportDimensions: Array<{ clientWidth: number; scrollWidth: number; width: number }> = [];
   const groupSelector = [
@@ -1877,6 +1880,28 @@ test("organizes Discord guidance by audience with progressive disclosure @deskto
     for (const image of await page.locator(".discord-guide-image").all()) {
       expect((await image.getAttribute("alt"))?.trim().length).toBeGreaterThan(0);
     }
+    if (viewport.width <= 760) {
+      for (const sequence of await page.locator(".discord-command-guide-sequence").all()) {
+        const gaps = await sequence.evaluate((element) => {
+          const summary = element.querySelector(".discord-command-summary-list");
+          const notice = element.querySelector(".discord-screenshot-notice");
+          const details = element.querySelector(".discord-command-details-list");
+          if (!summary || !notice || !details) return null;
+
+          return {
+            display: getComputedStyle(element).display,
+            noticeToDetails:
+              details.getBoundingClientRect().top - notice.getBoundingClientRect().bottom,
+            summaryToNotice:
+              notice.getBoundingClientRect().top - summary.getBoundingClientRect().bottom,
+          };
+        });
+        expect(gaps).not.toBeNull();
+        expect(gaps?.display).toBe("grid");
+        expect(gaps?.summaryToNotice).toBeCloseTo(10, 0);
+        expect(gaps?.noticeToDetails).toBeCloseTo(10, 0);
+      }
+    }
     await expectNoHorizontalOverflow(page);
   }
 
@@ -1900,6 +1925,49 @@ test("organizes Discord guidance by audience with progressive disclosure @deskto
   await expect(page.locator("#quick-start")).toBeInViewport();
   await page.getByRole("link", { name: "查看管理員教學" }).click();
   await expect(page.locator("#discord-admin-guide")).toBeInViewport();
+});
+
+test("keeps mobile price-history records readable and uses discount wording @desktop-only", async ({
+  page,
+}) => {
+  for (const viewport of [
+    { width: 390, height: 844 },
+    { width: 360, height: 800 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto(`/products/${READY_ROUTE_SLUG}`);
+
+    const badge = page.locator(".history-record-badge.is-down").first();
+    await expect(badge).toHaveText("降價");
+    await expect(page.getByText("下跌", { exact: true })).toHaveCount(0);
+    await expect(page.locator(".history-record-row strong.is-down").first()).toContainText("−NT$");
+    const badgeMetrics = await badge.evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      const textRect = range.getBoundingClientRect();
+      const style = getComputedStyle(element);
+      return {
+        height: rect.height,
+        horizontalCenterOffset: Math.abs(
+          rect.left + rect.width / 2 - (textRect.left + textRect.width / 2),
+        ),
+        minWidth: Number.parseFloat(style.minWidth),
+        paddingLeft: Number.parseFloat(style.paddingLeft),
+        verticalCenterOffset: Math.abs(
+          rect.top + rect.height / 2 - (textRect.top + textRect.height / 2),
+        ),
+        whiteSpace: style.whiteSpace,
+      };
+    });
+    expect(badgeMetrics.minWidth).toBeGreaterThanOrEqual(52);
+    expect(badgeMetrics.height).toBeGreaterThanOrEqual(30);
+    expect(badgeMetrics.paddingLeft).toBeGreaterThanOrEqual(10);
+    expect(badgeMetrics.whiteSpace).toBe("nowrap");
+    expect(badgeMetrics.horizontalCenterOffset).toBeLessThanOrEqual(1);
+    expect(badgeMetrics.verticalCenterOffset).toBeLessThanOrEqual(1);
+    await expectNoHorizontalOverflow(page);
+  }
 });
 
 test("uses compact custom price-report filters, aligned table typography, and conditional reset @desktop-only", async ({
@@ -1984,14 +2052,14 @@ test("uses compact custom price-report filters, aligned table typography, and co
       await expect(productCopy).toHaveCSS("text-align", "left");
       await expect(productLink).toHaveCSS("text-align", "left");
 
-      const [productBox, badgeBox, linkBox, categoryBox] = await Promise.all([
+      const [productBox, imageBox, linkBox, categoryBox] = await Promise.all([
         product.boundingBox(),
-        product.locator(".price-report-kind").boundingBox(),
+        product.locator(".product-image").boundingBox(),
         productLink.boundingBox(),
         page.locator(".price-report-category").first().boundingBox(),
       ]);
       expect(linkBox?.x ?? 0).toBeGreaterThanOrEqual(
-        (badgeBox?.x ?? Number.POSITIVE_INFINITY) + (badgeBox?.width ?? 0),
+        (imageBox?.x ?? Number.POSITIVE_INFINITY) + (imageBox?.width ?? 0),
       );
       expect((linkBox?.x ?? Number.POSITIVE_INFINITY) + (linkBox?.width ?? 0)).toBeLessThanOrEqual(
         (productBox?.x ?? 0) + (productBox?.width ?? 0),
@@ -2020,6 +2088,28 @@ test("uses compact custom price-report filters, aligned table typography, and co
         "white-space",
         "normal",
       );
+      await expect(page.locator(".price-report-product-copy a").first()).toHaveCSS(
+        "word-break",
+        "normal",
+      );
+      await expect(page.locator(".price-report-product-copy a").first()).toHaveCSS(
+        "overflow-wrap",
+        "break-word",
+      );
+      if (viewport.width <= 390) {
+        const tokenLineCounts = await readTokenLineCounts(
+          page.locator(".price-report-product-copy a").first(),
+          ["AI", "PRO", "R9700", "Creator", "Lexar", "D400", "Type-C+A", "USB3.1", "G1"],
+        );
+        expect(Object.values(tokenLineCounts).every((lineCount) => lineCount === 1)).toBe(true);
+        const longSpecTokenLineCounts = await readTokenLineCounts(
+          page.locator(".price-report-product-copy a").nth(1),
+          ["32GB", "2920MHz", "27cm"],
+        );
+        expect(Object.values(longSpecTokenLineCounts).every((lineCount) => lineCount === 1)).toBe(
+          true,
+        );
+      }
       for (const cell of await page.locator(".price-report-value").all()) {
         const label = cell.locator(".price-report-cell-label");
         const value = cell.locator("span:last-child");
@@ -2038,6 +2128,10 @@ test("uses compact custom price-report filters, aligned table typography, and co
       await expect(page.getByRole("navigation", { name: "頁碼" })).toBeVisible();
     }
     const reportRow = page.locator(".price-report-row").first();
+    await expect(reportRow.locator(".price-report-kind")).toHaveCount(0);
+    await expect(reportRow.locator(".price-report-amount > span:last-child")).toHaveText(
+      "−NT$ 1,000",
+    );
     const reportRows = page.locator(".price-report-rows");
     const visibleBackground = await readVisibleBackground(reportRow);
     expect(visibleBackground.backgroundColor).toBe("rgb(13, 25, 34)");
@@ -2630,7 +2724,7 @@ test("keeps the main pages usable without horizontal overflow", async ({ page },
   await expect(page.getByRole("region", { name: "價格變動列表" })).toBeVisible();
   await expect(
     page.getByRole("img", {
-      name: "視覺驗證超長商品名稱 NVIDIA GeForce RTX 顯示卡 OC Edition",
+      name: PRICE_REPORT_WRAP_NAME,
     }),
   ).toBeVisible();
   await expect(page.getByText("符合項目", { exact: true })).toHaveCount(0);
@@ -2772,7 +2866,15 @@ test("mounts one global build-list link across public routes and required viewpo
       } else {
         await expect(floatingLink).toHaveCount(1);
         await expect(floatingLink).toBeVisible();
-        await expect(floatingLink).toHaveAttribute("href", "/build-list");
+        await expect(floatingLink).toHaveAttribute("href", /^\/build-list\?returnTo=/);
+        const floatingHref = new URL(
+          (await floatingLink.getAttribute("href")) ?? "",
+          "https://partsradar.invalid",
+        );
+        const currentUrl = new URL(page.url());
+        expect(floatingHref.searchParams.get("returnTo")).toBe(
+          `${currentUrl.pathname}${currentUrl.search}`,
+        );
         await expect(floatingLink).toHaveAttribute("title", "開啟配單");
         await expectFloatingLinkNotToCoverContent(floatingLink, "main");
 
@@ -2782,6 +2884,133 @@ test("mounts one global build-list link across public routes and required viewpo
 
       await expectNoHorizontalOverflow(page);
     }
+  }
+});
+
+test("preserves product explorer state through safe build-list return links @desktop-only", async ({
+  page,
+}) => {
+  const originalLocation =
+    "/?q=ryzen&category=cpu&facet=socket%3Alga1700&facet=cpu_family%3Acore-i5&minPrice=1000&maxPrice=20000&vendors=intel&status=all&sort=price_desc&page=10&pageSize=50";
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(originalLocation);
+
+  await expect(page.getByRole("searchbox", { name: "搜尋商品名稱" })).toHaveValue("ryzen");
+  await expect(page.getByRole("textbox", { name: "最低價格" })).toHaveValue("1000");
+  await expect(page.getByRole("textbox", { name: "最高價格" })).toHaveValue("20000");
+  await expect(page.getByRole("button", { name: "全部商品" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(page.getByRole("combobox", { name: "排序" })).toHaveValue("price_desc");
+  await expect(page.getByRole("combobox", { name: "每頁顯示" })).toHaveValue("50");
+  await expect(page.getByRole("button", { name: "移除篩選：廠商：Intel" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "移除篩選：腳位：LGA 1700" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "移除篩選：產品系列：Intel Core i5" }),
+  ).toBeVisible();
+
+  const originalUrl = new URL(page.url());
+  const canonicalLocation = `${originalUrl.pathname}${originalUrl.search}`;
+  const floatingLink = page.getByRole("link", { name: /^開啟配單，目前/ });
+  const floatingHref = new URL(
+    (await floatingLink.getAttribute("href")) ?? "",
+    "https://partsradar.invalid",
+  );
+  expect(floatingHref.pathname).toBe("/build-list");
+  expect(floatingHref.searchParams.get("returnTo")).toBe(canonicalLocation);
+  await floatingLink.click();
+
+  await expect.poll(() => new URL(page.url()).pathname).toBe("/build-list");
+  expect(new URL(page.url()).searchParams.get("returnTo")).toBe(canonicalLocation);
+  const topReturnLink = page.getByRole("link", { name: "返回查詢" });
+  const emptyReturnLink = page.getByRole("link", { name: "回到查詢" });
+  await expect(topReturnLink).toHaveAttribute("href", canonicalLocation);
+  await expect(emptyReturnLink).toHaveAttribute("href", canonicalLocation);
+  await topReturnLink.click();
+
+  await expect.poll(() => `${new URL(page.url()).pathname}${new URL(page.url()).search}`).toBe(
+    canonicalLocation,
+  );
+  await expect(page.getByRole("searchbox", { name: "搜尋商品名稱" })).toHaveValue("ryzen");
+  await expect(page.getByRole("button", { name: "全部商品" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(page.getByRole("button", { name: "移除篩選：廠商：Intel" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "移除篩選：腳位：LGA 1700" })).toBeVisible();
+
+  await page.goto("/build-list?returnTo=https%3A%2F%2Fevil.example%2Fpath");
+  await expect(page.getByRole("link", { name: "返回查詢" })).toHaveAttribute("href", "/");
+  await expect(page.getByRole("link", { name: "回到查詢" })).toHaveAttribute("href", "/");
+
+  await page.goto("/build-list");
+  await expect(page.getByRole("link", { name: "返回查詢" })).toHaveAttribute("href", "/");
+  await expect(page.getByRole("link", { name: "回到查詢" })).toHaveAttribute("href", "/");
+});
+
+test("keeps build-list mobile navigation in one scrollable brand row @desktop-only", async ({
+  page,
+}) => {
+  for (const viewport of [
+    { width: 390, height: 844 },
+    { width: 360, height: 800 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto("/build-list");
+
+    const brandArea = page.locator(".build-list-topbar .topbar-brand-area");
+    const navigationMetrics = await brandArea.evaluate((element) => {
+      const areaRect = element.getBoundingClientRect();
+      const links = [...element.querySelectorAll("a")].map((link) => {
+        const rect = link.getBoundingClientRect();
+        return {
+          centerY: rect.top + rect.height / 2,
+          text: link.textContent?.trim() ?? "",
+        };
+      });
+      const style = getComputedStyle(element);
+      return {
+        areaBottom: areaRect.bottom,
+        clientWidth: element.clientWidth,
+        flexWrap: style.flexWrap,
+        links,
+        overflowX: style.overflowX,
+        scrollWidth: element.scrollWidth,
+        scrollbarWidth: style.scrollbarWidth,
+      };
+    });
+    expect(navigationMetrics.links).toHaveLength(4);
+    expect(navigationMetrics.flexWrap).toBe("nowrap");
+    expect(navigationMetrics.overflowX).toBe("auto");
+    expect(navigationMetrics.scrollWidth).toBeGreaterThan(navigationMetrics.clientWidth);
+    expect(navigationMetrics.scrollbarWidth).toBe("none");
+    expect(
+      Math.max(...navigationMetrics.links.map((link) => link.centerY)) -
+        Math.min(...navigationMetrics.links.map((link) => link.centerY)),
+    ).toBeLessThanOrEqual(1);
+    expect(navigationMetrics.links.at(-1)?.text).toContain("Discord");
+
+    await brandArea.evaluate((element) => {
+      element.scrollLeft = element.scrollWidth;
+    });
+    await expect
+      .poll(() => brandArea.evaluate((element) => element.scrollLeft))
+      .toBeGreaterThan(0);
+    const discordLink = brandArea.getByRole("link", { name: "Discord" });
+    const [brandBox, discordBox, titleBox, backBox] = await Promise.all([
+      brandArea.boundingBox(),
+      discordLink.boundingBox(),
+      page.locator(".build-list-title").boundingBox(),
+      page.getByRole("link", { name: "返回查詢" }).boundingBox(),
+    ]);
+    expect(discordBox?.x ?? Number.NEGATIVE_INFINITY).toBeGreaterThanOrEqual(brandBox?.x ?? 0);
+    expect((discordBox?.x ?? 0) + (discordBox?.width ?? 0)).toBeLessThanOrEqual(
+      (brandBox?.x ?? 0) + (brandBox?.width ?? 0) + 1,
+    );
+    expect(titleBox?.y ?? 0).toBeGreaterThanOrEqual(navigationMetrics.areaBottom);
+    expect((titleBox?.x ?? 0) + (titleBox?.width ?? 0)).toBeLessThanOrEqual(backBox?.x ?? 0);
+    await expectNoHorizontalOverflow(page);
   }
 });
 
@@ -3012,6 +3241,31 @@ async function expectNoHorizontalOverflow(page: Page) {
 
   expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth);
   return dimensions;
+}
+
+async function readTokenLineCounts(locator: Locator, tokens: string[]) {
+  return locator.evaluate((element, expectedTokens) => {
+    const textNode = [...element.childNodes].find((node) => node.nodeType === Node.TEXT_NODE);
+    const text = textNode?.textContent ?? "";
+
+    return Object.fromEntries(
+      expectedTokens.map((token) => {
+        const start = text.indexOf(token);
+        if (!textNode || start < 0) {
+          return [token, 0];
+        }
+
+        const range = document.createRange();
+        range.setStart(textNode, start);
+        range.setEnd(textNode, start + token.length);
+        const lineCount = new Set(
+          [...range.getClientRects()].map((rect) => Math.round(rect.top)),
+        ).size;
+
+        return [token, lineCount];
+      }),
+    );
+  }, tokens);
 }
 
 async function expectFloatingLinkNotToCoverContent(floatingLink: Locator, area: "footer" | "main") {

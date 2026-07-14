@@ -133,9 +133,11 @@ export default function DiscordPage() {
             <h2 id="discord-user-guide-title">提醒與個人價格報告</h2>
             <p>先從指令摘要確認用途，需要操作畫面時再展開完整教學。</p>
           </div>
-          <CommandSummary guides={userCommandGuides} />
-          <p className="discord-screenshot-notice">{screenshotFreshnessNotice}</p>
-          <CommandDetails guides={userCommandGuides} firstOpen />
+          <div className="discord-command-guide-sequence">
+            <CommandSummary guides={userCommandGuides} />
+            <p className="discord-screenshot-notice">{screenshotFreshnessNotice}</p>
+            <CommandDetails guides={userCommandGuides} firstOpen />
+          </div>
         </section>
 
         <section
@@ -158,9 +160,11 @@ export default function DiscordPage() {
             <h3>管理員三步設定</h3>
             <QuickStartSteps items={adminQuickStartSteps} />
           </div>
-          <CommandSummary guides={adminCommandGuides} />
-          <p className="discord-screenshot-notice">{screenshotFreshnessNotice}</p>
-          <CommandDetails guides={adminCommandGuides} />
+          <div className="discord-command-guide-sequence">
+            <CommandSummary guides={adminCommandGuides} />
+            <p className="discord-screenshot-notice">{screenshotFreshnessNotice}</p>
+            <CommandDetails guides={adminCommandGuides} />
+          </div>
         </section>
 
         <section

@@ -29,5 +29,5 @@ export function formatSignedTwdPrice(value: number | null | undefined, fallback 
     return formatTwdPrice(0);
   }
 
-  return `${value > 0 ? "+" : "-"}${formatTwdPrice(Math.abs(value))}`;
+  return `${value > 0 ? "+" : "−"}${formatTwdPrice(Math.abs(value))}`;
 }

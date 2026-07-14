@@ -541,16 +541,22 @@
   text-align: left;
 }
 
+.price-report-product > .product-image {
+  grid-area: auto;
+}
+
 .price-report-product-copy {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 10px;
+  grid-template-columns: minmax(0, 1fr);
   align-items: center;
   min-width: 0;
   text-align: left;
 }
 
 .price-report-product-copy a {
+  justify-self: start;
+  width: fit-content;
+  max-width: 100%;
   overflow: hidden;
   color: var(--text-strong);
   font-family: inherit;
@@ -570,31 +576,6 @@
 
 .price-report-product-copy a:hover {
   color: var(--accent-strong);
-}
-
-.price-report-kind {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 42px;
-  min-height: 26px;
-  padding: 0 8px;
-  border: 1px solid currentColor;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 850;
-}
-
-.price-report-kind.is-drop {
-  color: #68e291;
-}
-
-.price-report-kind.is-rise {
-  color: #ff8a91;
-}
-
-.price-report-kind.is-new {
-  color: #78c7ef;
 }
 
 .price-report-value {
@@ -723,8 +704,11 @@
   }
 
   .price-report-product-copy a {
-    overflow-wrap: anywhere;
+    hyphens: none;
+    line-break: auto;
+    overflow-wrap: break-word;
     text-overflow: clip;
+    word-break: normal;
     white-space: normal;
   }
 
@@ -884,18 +868,20 @@
     align-items: flex-start;
   }
 
-  .price-report-product > .product-image {
-    grid-area: auto;
-  }
-
   .price-report-product-copy {
     grid-template-columns: 1fr;
-    gap: 7px;
   }
 
   .price-report-product-copy a {
     overflow: visible;
     text-overflow: clip;
     white-space: normal;
+  }
+}
+
+@media (max-width: 520px) {
+  body:has(.build-list-floating-link) .price-report-product-copy {
+    box-sizing: border-box;
+    padding-right: 64px;
   }
 }

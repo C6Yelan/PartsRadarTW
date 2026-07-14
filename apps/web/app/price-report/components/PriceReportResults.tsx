@@ -20,12 +20,6 @@ interface PriceReportResultsProps {
   onPageChange: (page: number) => void;
 }
 
-const KIND_LABELS = {
-  drop: "降價",
-  rise: "漲價",
-  new: "新品",
-} as const;
-
 export function PriceReportResults({
   report,
   returnTo,
@@ -159,7 +153,6 @@ function PriceReportRow({ item, returnTo }: { item: PriceReportResponseItem; ret
       <div className="price-report-product">
         <ProductImage fallbackLabel={item.category.displayName} image={item.image} />
         <div className="price-report-product-copy">
-          <span className={`price-report-kind is-${item.kind}`}>{KIND_LABELS[item.kind]}</span>
           <Link href={`/products/${item.productId}?returnTo=${encodeURIComponent(returnTo)}`}>
             {item.productName}
           </Link>

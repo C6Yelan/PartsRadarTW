@@ -14,7 +14,7 @@ describe("web formatting", () => {
     expect(formatInteger(12_345)).toBe("12,345");
     expect(formatTwdPrice(12_345)).toBe("NT$ 12,345");
     expect(formatSignedTwdPrice(1000)).toBe("+NT$ 1,000");
-    expect(formatSignedTwdPrice(-1000)).toBe("-NT$ 1,000");
+    expect(formatSignedTwdPrice(-1000)).toBe("−NT$ 1,000");
     expect(formatSignedTwdPrice(0)).toBe("NT$ 0");
   });
 

@@ -5,12 +5,18 @@ import Link from "next/link";
 import { CartIcon } from "../_shared/icons";
 import type { BuildListIntentSummary } from "./model";
 
-export default function FloatingBuildListLink({ summary }: { summary: BuildListIntentSummary }) {
+export default function FloatingBuildListLink({
+  href,
+  summary,
+}: {
+  href: string;
+  summary: BuildListIntentSummary;
+}) {
   return (
     <Link
       aria-label={`開啟配單，目前 ${summary.totalQuantity} 件`}
       className="build-list-floating-link"
-      href="/build-list"
+      href={href}
       title="開啟配單"
     >
       <CartIcon className="build-list-floating-icon" />

@@ -35,6 +35,10 @@
   color: var(--text);
 }
 
+.discord-command-guide-sequence {
+  display: contents;
+}
+
 .discord-command-details-list {
   display: grid;
   gap: 10px;

@@ -57,6 +57,12 @@
     gap: 7px;
   }
 
+  .discord-command-guide-sequence {
+    display: grid;
+    gap: 10px;
+    min-width: 0;
+  }
+
   .discord-command-details summary {
     align-items: flex-start;
     flex-direction: column;

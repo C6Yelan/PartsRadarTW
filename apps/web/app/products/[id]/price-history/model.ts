@@ -266,7 +266,7 @@ function getRecordLabel(deltaAmount: number) {
     return "上漲";
   }
 
-  return "下跌";
+  return "降價";
 }
 
 function getPointKey(point: PriceHistoryPoint) {

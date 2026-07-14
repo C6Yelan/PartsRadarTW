@@ -4,12 +4,12 @@
 import Link from "next/link";
 
 // 呈現配單空狀態，避免未加入商品時顯示空白頁面。
-export default function BuildListEmptyState() {
+export default function BuildListEmptyState({ returnHref }: { returnHref: string }) {
   return (
     <section className="build-list-empty">
       <h2>配單目前沒有品項</h2>
       <p>從商品列表或商品詳細頁加入品項後，這裡會保留品項、數量與排序。</p>
-      <Link className="control-button primary" href="/">
+      <Link className="control-button primary" href={returnHref}>
         回到查詢
       </Link>
     </section>

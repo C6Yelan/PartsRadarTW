@@ -2,7 +2,7 @@
 // 定義 Next.js app router 的全站 HTML shell、預設 metadata 與 global CSS 載入入口。
 
 import type { Metadata } from "next";
-import type { ReactNode } from "react";
+import { type ReactNode, Suspense } from "react";
 import { resolvePublicSiteUrl } from "./_shared/public-site";
 import GlobalFloatingBuildListLink from "./build-list/GlobalFloatingBuildListLink";
 import "./globals.css";
@@ -31,7 +31,9 @@ export default function RootLayout({
     <html lang="zh-Hant">
       <body>
         {children}
-        <GlobalFloatingBuildListLink />
+        <Suspense fallback={null}>
+          <GlobalFloatingBuildListLink />
+        </Suspense>
       </body>
     </html>
   );

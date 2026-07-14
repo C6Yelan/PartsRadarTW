@@ -2,6 +2,7 @@
 // 提供 /build-list route entrypoint，將配單頁互動交給 client component。
 
 import type { Metadata } from "next";
+import { normalizeBuildListReturnHref } from "../products/[id]/return-href";
 import BuildListPageClient from "./BuildListPageClient";
 
 export const metadata: Metadata = {
@@ -16,7 +17,13 @@ export const metadata: Metadata = {
   },
 };
 
-// 接線 Next.js route 與配單 client-side 頁面。
-export default function BuildListPage() {
-  return <BuildListPageClient />;
+interface BuildListPageProps {
+  searchParams: Promise<{ returnTo?: string | string[] }>;
+}
+
+// 接線 Next.js route、正規化返回來源，再交給配單 client-side 頁面。
+export default async function BuildListPage({ searchParams }: BuildListPageProps) {
+  const resolvedSearchParams = await searchParams;
+
+  return <BuildListPageClient returnHref={normalizeBuildListReturnHref(resolvedSearchParams.returnTo)} />;
 }

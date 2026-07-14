@@ -31,7 +31,7 @@ interface RemovedItemNotice {
   label: string;
 }
 
-export default function BuildListPageClient() {
+export default function BuildListPageClient({ returnHref }: { returnHref: string }) {
   const {
     clearBuildListItems,
     intents,
@@ -113,7 +113,7 @@ export default function BuildListPageClient() {
           <span>{allItemsSummary.totalQuantity} 件商品</span>
         </div>
 
-        <Link className="back-link build-list-back-link" href="/">
+        <Link className="back-link build-list-back-link" href={returnHref}>
           <ArrowLeftIcon />
           返回查詢
         </Link>
@@ -122,7 +122,7 @@ export default function BuildListPageClient() {
       <main className="build-list-page" aria-label="配單內容">
         {!isReady ? <BuildListLoadingState /> : null}
 
-        {isReady && allItems.length === 0 ? <BuildListEmptyState /> : null}
+        {isReady && allItems.length === 0 ? <BuildListEmptyState returnHref={returnHref} /> : null}
 
         {isReady && allItems.length > 0 ? (
           <section className="build-list-layout">
