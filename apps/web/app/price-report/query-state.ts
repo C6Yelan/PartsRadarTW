@@ -1,7 +1,7 @@
 // apps/web/app/price-report/query-state.ts
 // 集中價格變動總覽的瀏覽器 URL 與公開 API query 正規化規則。
 
-import { getCategoryIgrp } from "../category-slugs";
+import { CATEGORY_MAPPINGS, type CategorySlug } from "../category-slugs";
 import type {
   PriceReportQuery,
   PriceReportSort,
@@ -14,7 +14,7 @@ export const PRICE_REPORT_TYPES: readonly PriceReportType[] = ["drop", "rise", "
 export const DEFAULT_PRICE_REPORT_QUERY: PriceReportQuery = {
   window: "24h",
   types: ["drop", "rise"],
-  category: "",
+  categories: [],
   q: "",
   sort: "changed_desc",
   page: 1,
@@ -29,13 +29,10 @@ const SORTS: readonly PriceReportSort[] = [
 ];
 
 export function readPriceReportQuery(params: URLSearchParams): PriceReportQuery {
-  const categoryValue = (params.get("category") ?? "").trim();
-  const category = getCategoryIgrp(categoryValue) === null ? "" : categoryValue;
-
   return {
     window: readAllowed(params.get("window"), WINDOWS, DEFAULT_PRICE_REPORT_QUERY.window),
     types: normalizePriceReportTypes(params.getAll("type")),
-    category,
+    categories: normalizePriceReportCategories(params.getAll("category")),
     q: (params.get("q") ?? "").trim().slice(0, 100),
     sort: readAllowed(params.get("sort"), SORTS, DEFAULT_PRICE_REPORT_QUERY.sort),
     page: readPositiveInteger(params.get("page")),
@@ -59,6 +56,15 @@ export function normalizePriceReportTypes(values: string[]): PriceReportType[] {
   return normalized.length > 0 ? normalized : [...DEFAULT_PRICE_REPORT_QUERY.types];
 }
 
+export function normalizePriceReportCategories(values: readonly string[]): CategorySlug[] {
+  const selected = new Set(values.map((value) => value.trim()));
+  const normalized = CATEGORY_MAPPINGS.map(({ slug }) => slug).filter((slug) =>
+    selected.has(slug),
+  );
+
+  return normalized.length === CATEGORY_MAPPINGS.length ? [] : normalized;
+}
+
 export function toPriceReportSearchParams(query: PriceReportQuery): URLSearchParams {
   const params = new URLSearchParams();
 
@@ -72,7 +78,9 @@ export function toPriceReportSearchParams(query: PriceReportQuery): URLSearchPar
     }
   }
 
-  appendIfPresent(params, "category", query.category);
+  for (const category of normalizePriceReportCategories(query.categories)) {
+    params.append("category", category);
+  }
   appendIfPresent(params, "q", query.q);
 
   if (query.sort !== DEFAULT_PRICE_REPORT_QUERY.sort) {
@@ -95,7 +103,7 @@ export function hasNonDefaultPriceReportFilters(query: PriceReportQuery): boolea
   return (
     query.window !== DEFAULT_PRICE_REPORT_QUERY.window ||
     !hasDefaultTypes(query.types) ||
-    query.category.trim() !== "" ||
+    normalizePriceReportCategories(query.categories).length > 0 ||
     query.q.trim() !== "" ||
     query.sort !== DEFAULT_PRICE_REPORT_QUERY.sort
   );

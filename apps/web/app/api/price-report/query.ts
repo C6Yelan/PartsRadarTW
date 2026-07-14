@@ -3,7 +3,7 @@
 
 import type { RecentPriceReportFilters } from "@partsradar/db/price-report";
 
-import { getCategoryIgrp, type CategorySlug } from "../../category-slugs";
+import { CATEGORY_MAPPINGS, getCategoryIgrp, type CategorySlug } from "../../category-slugs";
 import {
   InvalidQueryError,
   parseEnumQuery,
@@ -30,8 +30,8 @@ export type PriceReportSort = (typeof PRICE_REPORT_SORTS)[number];
 export interface PriceReportQuery {
   window: PriceReportWindow;
   types: PriceReportType[];
-  categorySlug: CategorySlug | null;
-  categoryIgrp: number | null;
+  categorySlugs: CategorySlug[];
+  categoryIgrps: number[];
   productKeyword: string | null;
   sort: PriceReportSort;
   page: number;
@@ -50,8 +50,8 @@ export function parsePriceReportQuery(params: URLSearchParams): PriceReportQuery
       PRICE_REPORT_TYPES,
       DEFAULT_PRICE_REPORT_TYPES,
     ),
-    categorySlug: category.slug,
-    categoryIgrp: category.igrp,
+    categorySlugs: category.slugs,
+    categoryIgrps: category.igrps,
     productKeyword:
       parseOptionalTextQuery(params, "q", {
         maxLength: PRICE_REPORT_SEARCH_MAX_LENGTH,
@@ -68,7 +68,7 @@ export function toRecentPriceReportFilters(
   const types = new Set(query.types);
 
   return {
-    categoryIgrps: query.categoryIgrp === null ? [] : [query.categoryIgrp],
+    categoryIgrps: query.categoryIgrps,
     productKeyword: query.productKeyword,
     includePriceDrops: types.has("drop"),
     includePriceRises: types.has("rise"),
@@ -82,24 +82,34 @@ export function getPriceReportSince(until: Date, window: PriceReportWindow): Dat
 }
 
 function parseCategoryQuery(params: URLSearchParams): {
-  slug: CategorySlug | null;
-  igrp: number | null;
+  slugs: CategorySlug[];
+  igrps: number[];
 } {
-  const value = parseOptionalTextQuery(params, "category", {
-    maxLength: PRICE_REPORT_CATEGORY_MAX_LENGTH,
-  });
+  const values = params.getAll("category").map((value) => value.trim());
 
-  if (value === undefined) {
-    return { slug: null, igrp: null };
+  if (values.length === 0) {
+    return { slugs: [], igrps: [] };
   }
 
-  const igrp = getCategoryIgrp(value);
-
-  if (igrp === null) {
-    throw new InvalidQueryError("category", "must be a supported category");
+  if (
+    values.length > CATEGORY_MAPPINGS.length ||
+    new Set(values).size !== values.length ||
+    values.some(
+      (value) =>
+        value.length === 0 ||
+        value.length > PRICE_REPORT_CATEGORY_MAX_LENGTH ||
+        getCategoryIgrp(value) === null,
+    )
+  ) {
+    throw new InvalidQueryError("category", "must contain unique supported categories");
   }
 
-  return { slug: value as CategorySlug, igrp };
+  const selected = new Set(values);
+  const categories = CATEGORY_MAPPINGS.filter(({ slug }) => selected.has(slug));
+  return {
+    slugs: categories.map(({ slug }) => slug),
+    igrps: categories.map(({ igrp }) => igrp),
+  };
 }
 
 function parseRepeatedEnumQuery<TAllowed extends readonly [string, ...string[]]>(

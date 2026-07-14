@@ -10,6 +10,7 @@ import type {
   PriceReportType,
   PriceReportWindow,
 } from "../types";
+import { PriceReportCategoryFilter } from "./PriceReportCategoryFilter";
 import { PriceReportSelect, type PriceReportSelectOption } from "./PriceReportSelect";
 
 interface PriceReportFiltersProps {
@@ -17,7 +18,7 @@ interface PriceReportFiltersProps {
   draftKeyword: string;
   query: PriceReportQuery;
   showReset: boolean;
-  onCategoryChange: (category: string) => void;
+  onCategoriesChange: (categories: PriceReportQuery["categories"]) => void;
   onDraftKeywordChange: (value: string) => void;
   onKeywordSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onReset: () => void;
@@ -50,7 +51,7 @@ export function PriceReportFilters({
   draftKeyword,
   query,
   showReset,
-  onCategoryChange,
+  onCategoriesChange,
   onDraftKeywordChange,
   onKeywordSubmit,
   onReset,
@@ -59,16 +60,7 @@ export function PriceReportFilters({
   onWindowChange,
 }: PriceReportFiltersProps) {
   return (
-    <section className="price-report-filters" aria-labelledby="price-report-filters-title">
-      <div className="price-report-section-heading">
-        <h2 id="price-report-filters-title">篩選價格變動</h2>
-        {showReset ? (
-          <button className="price-report-reset" type="button" onClick={onReset}>
-            重設
-          </button>
-        ) : null}
-      </div>
-
+    <section className="price-report-filters" aria-label="價格變動篩選">
       <form className="price-report-filter-grid" onSubmit={onKeywordSubmit}>
         <div className="price-report-control price-report-window-control">
           <span>時間範圍</span>
@@ -104,17 +96,10 @@ export function PriceReportFilters({
 
         <div className="price-report-control price-report-category-control">
           <span>商品分類</span>
-          <PriceReportSelect
-            ariaLabel="商品分類"
-            options={[
-              { value: "", label: "全部分類" },
-              ...categories.map((category) => ({
-                value: category.slug,
-                label: category.displayName,
-              })),
-            ]}
-            value={query.category}
-            onChange={onCategoryChange}
+          <PriceReportCategoryFilter
+            categories={categories}
+            values={query.categories}
+            onChange={onCategoriesChange}
           />
         </div>
 
@@ -142,6 +127,12 @@ export function PriceReportFilters({
             <button type="submit">查詢</button>
           </span>
         </label>
+
+        {showReset ? (
+          <button className="price-report-reset" type="button" onClick={onReset}>
+            重設
+          </button>
+        ) : null}
       </form>
     </section>
   );

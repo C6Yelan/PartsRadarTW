@@ -125,8 +125,8 @@ function createQuery(overrides: Partial<PriceReportQuery>): PriceReportQuery {
   return {
     window: "24h",
     types: ["drop", "rise", "new"],
-    categorySlug: null,
-    categoryIgrp: null,
+    categorySlugs: [],
+    categoryIgrps: [],
     productKeyword: null,
     sort: "changed_desc",
     page: 1,

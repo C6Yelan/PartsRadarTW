@@ -385,41 +385,59 @@ test.beforeEach(async ({ page }) => {
       const isStale = requestUrl.searchParams.get("q") === "stale";
       const isUnavailable = requestUrl.searchParams.get("q") === "unavailable";
       const pageNumber = Number(requestUrl.searchParams.get("page") ?? "1");
+      const selectedCategories = requestUrl.searchParams.getAll("category");
+      const reportItems = [
+        {
+          productId: PRODUCT_ID,
+          productName: "視覺驗證超長商品名稱 NVIDIA GeForce RTX 顯示卡 OC Edition",
+          image: {
+            url: "/favicon.svg",
+            alt: "視覺驗證超長商品名稱 NVIDIA GeForce RTX 顯示卡 OC Edition",
+          },
+          category: { igrp: 16, slug: "fan-accessory", displayName: "風扇／配件" },
+          previousPrice: 19_990,
+          currentPrice: 18_990,
+          currency: "TWD",
+          deltaAmount: -1_000,
+          deltaPercent: -5,
+          changedAt: OBSERVED_AT,
+          kind: "drop",
+        },
+        {
+          productId: "22222222-2222-4222-8222-222222222222",
+          productName: "視覺驗證漲價商品",
+          image: null,
+          category: { igrp: 4, slug: "cpu", displayName: "CPU" },
+          previousPrice: 10_000,
+          currentPrice: 10_500,
+          currency: "TWD",
+          deltaAmount: 500,
+          deltaPercent: 5,
+          changedAt: OBSERVED_AT,
+          kind: "rise",
+        },
+        {
+          productId: "33333333-3333-4333-8333-333333333333",
+          productName: "視覺驗證顯示卡商品",
+          image: null,
+          category: { igrp: 12, slug: "gpu", displayName: "顯示卡" },
+          previousPrice: 20_000,
+          currentPrice: 19_000,
+          currency: "TWD",
+          deltaAmount: -1_000,
+          deltaPercent: -5,
+          changedAt: OBSERVED_AT,
+          kind: "drop",
+        },
+      ]
+        .filter(
+          (item) =>
+            selectedCategories.length === 0 || selectedCategories.includes(item.category.slug),
+        )
+        .slice(0, selectedCategories.length === 0 ? 2 : undefined);
 
       await fulfillJson(route, {
-        data: isEmpty
-          ? []
-          : [
-              {
-                productId: PRODUCT_ID,
-                productName: "視覺驗證超長商品名稱 NVIDIA GeForce RTX 顯示卡 OC Edition",
-                image: {
-                  url: "/favicon.svg",
-                  alt: "視覺驗證超長商品名稱 NVIDIA GeForce RTX 顯示卡 OC Edition",
-                },
-                category: { igrp: 16, slug: "fan-accessory", displayName: "風扇 / 配件" },
-                previousPrice: 19_990,
-                currentPrice: 18_990,
-                currency: "TWD",
-                deltaAmount: -1_000,
-                deltaPercent: -5,
-                changedAt: OBSERVED_AT,
-                kind: "drop",
-              },
-              {
-                productId: "22222222-2222-4222-8222-222222222222",
-                productName: "視覺驗證漲價商品",
-                image: null,
-                category: { igrp: 4, slug: "cpu", displayName: "CPU" },
-                previousPrice: 10_000,
-                currentPrice: 10_500,
-                currency: "TWD",
-                deltaAmount: 500,
-                deltaPercent: 5,
-                changedAt: OBSERVED_AT,
-                kind: "rise",
-              },
-            ],
+        data: isEmpty ? [] : reportItems,
         summary: {
           dropCount: isEmpty ? 0 : 20,
           riseCount: isEmpty ? 0 : 20,
@@ -1847,17 +1865,14 @@ test("uses compact custom price-report filters, aligned table typography, and co
   await expect(page.locator('select[aria-label="時間範圍"]')).toHaveCount(0);
   await expect(page.locator('select[aria-label="商品分類"]')).toHaveCount(0);
   await expect(page.locator('select[aria-label="排序"]')).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "篩選價格變動" })).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "價格變動篩選" })).toBeVisible();
 
   await selectPriceReportOption(page, "時間範圍", "最近 7 天");
   await expect.poll(() => new URL(page.url()).searchParams.get("window")).toBe("7d");
   await expect(page.getByRole("button", { name: "重設", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "重設", exact: true }).click();
   await expect.poll(() => new URL(page.url()).search).toBe("");
-
-  await selectPriceReportOption(page, "商品分類", "CPU");
-  await expect.poll(() => new URL(page.url()).searchParams.get("category")).toBe("cpu");
-  await expect(page.getByRole("button", { name: "重設", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "重設", exact: true }).click();
 
   await selectPriceReportOption(page, "排序", "降幅最大");
   await expect.poll(() => new URL(page.url()).searchParams.get("sort")).toBe("drop_percent_desc");
@@ -1890,23 +1905,21 @@ test("uses compact custom price-report filters, aligned table typography, and co
   await expect(page.getByRole("button", { name: "重設", exact: true })).toHaveCount(0);
 
   await page.goto("/price-report");
-  const categoryTrigger = page.getByRole("button", { name: "商品分類" });
+  const categoryTrigger = page.getByRole("button", { name: /^商品分類，目前/ });
   await categoryTrigger.click();
-  const categoryListbox = page.getByRole("listbox", { name: "商品分類" });
-  await expect(categoryListbox).toBeVisible();
-  await expect(categoryListbox.getByRole("option")).toHaveCount(13);
-  await expect(categoryListbox.getByRole("option", { name: "全部分類" })).toHaveAttribute(
-    "aria-selected",
-    "true",
-  );
-  const categoryOverflow = await categoryListbox.evaluate((element) => ({
+  const categoryDialog = page.getByRole("dialog", { name: "商品分類選項" });
+  const categoryPopover = page.getByRole("group", { name: "商品分類選項" });
+  await expect(categoryDialog).toBeVisible();
+  await expect(categoryPopover).toBeVisible();
+  await expect(categoryPopover.getByRole("checkbox")).toHaveCount(12);
+  const categoryOverflow = await categoryDialog.evaluate((element) => ({
     clientHeight: element.clientHeight,
     scrollHeight: element.scrollHeight,
   }));
   expect(categoryOverflow.scrollHeight).toBeGreaterThan(categoryOverflow.clientHeight);
-  const typography = await categoryListbox.getByRole("option").evaluateAll((options) =>
+  const typography = await categoryPopover.locator("label").evaluateAll((options) =>
     ["CPU", "SSD", "HDD", "主機板", "風扇 / 配件"].map((label) => {
-      const option = options.find((candidate) => candidate.textContent === label);
+      const option = options.find((candidate) => candidate.textContent?.trim() === label);
       if (!option) return null;
       const style = getComputedStyle(option);
       return {
@@ -1921,44 +1934,51 @@ test("uses compact custom price-report filters, aligned table typography, and co
   expect(new Set(typography.map((item) => item?.fontFamily)).size).toBe(1);
   expect(new Set(typography.map((item) => item?.letterSpacing)).size).toBe(1);
   expect(new Set(typography.map((item) => item?.wordSpacing)).size).toBe(1);
-  await categoryListbox.getByRole("option", { name: "風扇 / 配件" }).click();
-  await expect.poll(() => new URL(page.url()).searchParams.get("category")).toBe("fan-accessory");
-  await expect(categoryListbox).toHaveCount(0);
-
-  await categoryTrigger.click();
-  await page.getByRole("listbox", { name: "商品分類" }).press("End");
-  await page.getByRole("listbox", { name: "商品分類" }).press("Home");
-  await page.getByRole("listbox", { name: "商品分類" }).press("ArrowDown");
-  await page.getByRole("listbox", { name: "商品分類" }).press("ArrowDown");
-  await page.getByRole("listbox", { name: "商品分類" }).press("Enter");
-  await expect.poll(() => new URL(page.url()).searchParams.get("category")).toBe("cpu");
-  await categoryTrigger.click();
-  await page.getByRole("listbox", { name: "商品分類" }).press("Escape");
-  await expect(categoryListbox).toHaveCount(0);
+  await categoryPopover.getByRole("checkbox", { name: "CPU" }).check();
+  await expect(categoryPopover).toBeVisible();
+  await expect.poll(() => new URL(page.url()).searchParams.getAll("category")).toEqual(["cpu"]);
+  await expect(categoryTrigger).toHaveAccessibleName("商品分類，目前CPU");
+  await categoryPopover.getByRole("checkbox", { name: "顯示卡" }).check();
+  await expect(categoryPopover).toBeVisible();
+  await expect.poll(() => new URL(page.url()).searchParams.getAll("category")).toEqual([
+    "cpu",
+    "gpu",
+  ]);
+  await expect(categoryTrigger).toHaveAccessibleName("商品分類，目前已選 2 項");
+  await expect(
+    page.locator(".price-report-category span:not(.price-report-cell-label)"),
+  ).toHaveText(["CPU", "顯示卡"]);
+  await categoryPopover.getByRole("checkbox", { name: "CPU" }).uncheck();
+  await expect.poll(() => new URL(page.url()).searchParams.getAll("category")).toEqual(["gpu"]);
+  await categoryPopover.getByRole("checkbox", { name: "顯示卡" }).uncheck();
+  await expect.poll(() => new URL(page.url()).searchParams.getAll("category")).toEqual([]);
+  await expect(categoryTrigger).toHaveAccessibleName("商品分類，目前全部分類");
+  await categoryPopover.press("Escape");
+  await expect(categoryPopover).toHaveCount(0);
   await expect(categoryTrigger).toBeFocused();
   await categoryTrigger.click();
-  await page.locator(".price-report-section-heading h2").click();
-  await expect(categoryListbox).toHaveCount(0);
+  await page.locator(".price-report-results-heading h2").click();
+  await expect(categoryPopover).toHaveCount(0);
   await categoryTrigger.press("Space");
-  await expect(categoryListbox).toBeVisible();
-  await page.getByRole("listbox", { name: "商品分類" }).press("Tab");
-  await expect(categoryListbox).toHaveCount(0);
+  await expect(categoryPopover).toBeVisible();
+  await categoryPopover.getByRole("checkbox", { name: "CPU" }).press("Tab");
+  await expect(categoryPopover).toHaveCount(0);
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/price-report");
-  const mobileCategoryTrigger = page.getByRole("button", { name: "商品分類", exact: true });
+  const mobileCategoryTrigger = page.getByRole("button", { name: /^商品分類，目前/ });
   const mobileCategoryControl = page.locator(".price-report-category-control");
   expect((await mobileCategoryTrigger.boundingBox())?.width).toBeCloseTo(
     (await mobileCategoryControl.boundingBox())?.width ?? 0,
     0,
   );
   await mobileCategoryTrigger.click();
-  const mobileCategoryListbox = page.getByRole("listbox", { name: "商品分類" });
-  for (const option of await mobileCategoryListbox.getByRole("option").all()) {
+  const mobileCategoryPopover = page.getByRole("group", { name: "商品分類選項" });
+  for (const option of await mobileCategoryPopover.locator("label").all()) {
     expect((await option.boundingBox())?.height).toBeGreaterThanOrEqual(44);
   }
   await expectNoHorizontalOverflow(page);
-  await mobileCategoryListbox.getByRole("option", { name: "風扇 / 配件" }).click();
+  await mobileCategoryPopover.getByRole("checkbox", { name: "風扇 / 配件" }).check();
   await expect.poll(() => new URL(page.url()).searchParams.get("category")).toBe("fan-accessory");
 
   await page.setViewportSize({ width: 1760, height: 900 });
@@ -1967,27 +1987,57 @@ test("uses compact custom price-report filters, aligned table typography, and co
     .locator(".product-main a")
     .first()
     .evaluate((element) => getComputedStyle(element).fontSize);
+  const homeProductFontWeight = await page
+    .locator(".product-main a")
+    .first()
+    .evaluate((element) => getComputedStyle(element).fontWeight);
   const homeValueFontSize = await page
     .locator(".table-cell")
     .first()
     .evaluate((element) => getComputedStyle(element).fontSize);
+  const homeValueFontWeight = await page
+    .locator(".table-cell")
+    .first()
+    .evaluate((element) => getComputedStyle(element).fontWeight);
   const homeHeaderFontSize = await page
     .locator(".table-header")
     .evaluate((element) => getComputedStyle(element).fontSize);
+  const homeHeaderFontWeight = await page
+    .locator(".table-header")
+    .evaluate((element) => getComputedStyle(element).fontWeight);
   await page.goto("/price-report");
   await expect(page.locator(".price-report-product-copy a").first()).toHaveCSS(
     "font-size",
     homeProductFontSize,
   );
+  await expect(page.locator(".price-report-product-copy a").first()).toHaveCSS(
+    "font-weight",
+    homeProductFontWeight,
+  );
   await expect(page.locator(".price-report-value").first()).toHaveCSS(
     "font-size",
     homeValueFontSize,
+  );
+  await expect(page.locator(".price-report-value").first()).toHaveCSS(
+    "font-weight",
+    homeValueFontWeight,
   );
   await expect(page.locator(".price-report-table-header")).toHaveCSS(
     "font-size",
     homeHeaderFontSize,
   );
-  await expect(page.locator(".price-report-product").first()).not.toHaveCSS("text-align", "center");
+  await expect(page.locator(".price-report-table-header")).toHaveCSS(
+    "font-weight",
+    homeHeaderFontWeight,
+  );
+  for (const value of await page.locator(".price-report-value").all()) {
+    await expect(value).toHaveCSS("text-align", "center");
+  }
+  await expect(page.locator(".price-report-product").first()).toHaveCSS("text-align", "center");
+  await expect(page.locator(".price-report-product").first()).toHaveCSS(
+    "justify-content",
+    "center",
+  );
 });
 
 test("presents build-list summary, categories, actions, and data status in one sidebar @desktop-only", async ({
@@ -2697,7 +2747,7 @@ async function getPriceReportControlRects(page: Page) {
   const controls = [
     page.getByRole("button", { name: "時間範圍", exact: true }),
     page.locator(".price-report-type-options"),
-    page.getByRole("button", { name: "商品分類", exact: true }),
+    page.getByRole("button", { name: /^商品分類，目前/ }),
     page.getByRole("button", { name: "排序", exact: true }),
     page.getByRole("searchbox", { name: "搜尋價格變動商品" }),
     page.getByRole("button", { name: "查詢", exact: true }),

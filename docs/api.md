@@ -68,11 +68,14 @@ API 不公開 standalone `ibuyToken`；原價屋連結在 response 組裝時重�
 | --- | --- |
 | `window` | `24h`、`7d` 或 `30d`；預設 `24h`。 |
 | `type` | 可重複且不可重複值；`drop`、`rise`、`new`。預設為 `drop` 與 `rise`。 |
-| `category` | 可選的公開 category slug。 |
+| `category` | 可重複的公開 category slug；未提供代表全部分類。值必須唯一且為已支援的 semantic slug，duplicate 或 unknown value 會回傳 invalid query。 |
 | `q` | 可選商品關鍵字，最多 100 字。 |
 | `sort` | `changed_desc`、`drop_percent_desc`、`rise_percent_desc` 或 `delta_amount_desc`；預設 `changed_desc`。 |
 | `page` | 從 1 開始；預設 1。 |
 | `pageSize` | 預設 20，最大 100。 |
+
+單一分類可使用 `GET /api/price-report?category=cpu`；多分類使用 repeated parameter，
+例如 `GET /api/price-report?category=cpu&category=gpu`。分類值不使用逗號字串，也不在公開 URL 暴露 IGrp。
 
 回應包含：
 

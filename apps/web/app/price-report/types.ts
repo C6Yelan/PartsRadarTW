@@ -14,7 +14,7 @@ export type PriceReportSort =
 export interface PriceReportQuery {
   window: PriceReportWindow;
   types: PriceReportType[];
-  category: string;
+  categories: CategorySlug[];
   q: string;
   sort: PriceReportSort;
   page: number;

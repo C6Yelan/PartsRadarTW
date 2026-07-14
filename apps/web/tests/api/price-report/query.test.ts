@@ -19,8 +19,8 @@ describe("price report query", () => {
     expect(query).toMatchObject({
       window: "24h",
       types: ["drop", "rise"],
-      categorySlug: null,
-      categoryIgrp: null,
+      categorySlugs: [],
+      categoryIgrps: [],
       productKeyword: null,
       sort: "changed_desc",
       page: 1,
@@ -38,25 +38,25 @@ describe("price report query", () => {
     );
   });
 
-  it("maps repeated types, category and keyword to explicit reader filters", () => {
+  it("maps repeated types, categories and keyword to explicit reader filters", () => {
     const query = parsePriceReportQuery(
       new URLSearchParams(
-        "window=7d&type=drop&type=new&category=gpu&q=RTX&sort=drop_percent_desc&page=2&pageSize=50",
+        "window=7d&type=drop&type=new&category=gpu&category=cpu&q=RTX&sort=drop_percent_desc&page=2&pageSize=50",
       ),
     );
 
     expect(query).toMatchObject({
       window: "7d",
       types: ["drop", "new"],
-      categorySlug: "gpu",
-      categoryIgrp: 12,
+      categorySlugs: ["cpu", "gpu"],
+      categoryIgrps: [4, 12],
       productKeyword: "RTX",
       sort: "drop_percent_desc",
       page: 2,
       pageSize: 50,
     });
     expect(toRecentPriceReportFilters(query)).toEqual({
-      categoryIgrps: [12],
+      categoryIgrps: [4, 12],
       productKeyword: "RTX",
       includePriceDrops: true,
       includePriceRises: false,
@@ -70,13 +70,20 @@ describe("price report query", () => {
     );
   });
 
+  it("keeps the legacy single category parameter valid", () => {
+    const query = parsePriceReportQuery(new URLSearchParams("category=cpu"));
+
+    expect(query.categorySlugs).toEqual(["cpu"]);
+    expect(query.categoryIgrps).toEqual([4]);
+  });
+
   it.each([
     "window=1h",
     "type=unknown",
     "type=drop&type=drop",
     "type=",
     "category=unknown",
-    "category=gpu&category=cpu",
+    "category=gpu&category=gpu",
     "sort=price_desc",
     "page=0",
     "pageSize=500",

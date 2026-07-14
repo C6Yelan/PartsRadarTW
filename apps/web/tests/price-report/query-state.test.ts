@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_PRICE_REPORT_QUERY,
   hasNonDefaultPriceReportFilters,
+  normalizePriceReportCategories,
   readPriceReportQuery,
   toPriceReportUrl,
 } from "../../app/price-report/query-state";
@@ -21,20 +22,20 @@ describe("price report query state", () => {
   it("normalizes selected types in canonical order", () => {
     const query = readPriceReportQuery(
       new URLSearchParams(
-        "window=7d&type=new&type=drop&type=invalid&category=gpu&q=RTX&sort=drop_percent_desc&page=2",
+        "window=7d&type=new&type=drop&type=invalid&category=gpu&category=cpu&q=RTX&sort=drop_percent_desc&page=2",
       ),
     );
 
     expect(query).toEqual({
       window: "7d",
       types: ["drop", "new"],
-      category: "gpu",
+      categories: ["cpu", "gpu"],
       q: "RTX",
       sort: "drop_percent_desc",
       page: 2,
     });
     expect(toPriceReportUrl(query)).toBe(
-      "/price-report?window=7d&type=drop&type=new&category=gpu&q=RTX&sort=drop_percent_desc&page=2",
+      "/price-report?window=7d&type=drop&type=new&category=cpu&category=gpu&q=RTX&sort=drop_percent_desc&page=2",
     );
   });
 
@@ -55,6 +56,38 @@ describe("price report query state", () => {
     ).toEqual(DEFAULT_PRICE_REPORT_QUERY);
   });
 
+  it("normalizes categories in mapping order, removes duplicates and omits all selected", () => {
+    expect(normalizePriceReportCategories(["gpu", "unknown", "cpu", "gpu"])).toEqual([
+      "cpu",
+      "gpu",
+    ]);
+    expect(
+      normalizePriceReportCategories([
+        "cpu",
+        "motherboard",
+        "memory",
+        "storage",
+        "hard-drive",
+        "external-storage",
+        "cooler",
+        "liquid-cooling",
+        "gpu",
+        "case",
+        "power-supply",
+        "fan-accessory",
+      ]),
+    ).toEqual([]);
+  });
+
+  it("uses repeated category parameters and omits empty categories", () => {
+    expect(
+      toPriceReportUrl({ ...DEFAULT_PRICE_REPORT_QUERY, categories: ["gpu", "cpu"] }),
+    ).toBe("/price-report?category=cpu&category=gpu");
+    expect(toPriceReportUrl({ ...DEFAULT_PRICE_REPORT_QUERY, categories: [] })).toBe(
+      "/price-report",
+    );
+  });
+
   it("detects only applied non-default filters without treating page as a filter", () => {
     expect(hasNonDefaultPriceReportFilters(DEFAULT_PRICE_REPORT_QUERY)).toBe(false);
     expect(
@@ -70,7 +103,7 @@ describe("price report query state", () => {
       }),
     ).toBe(false);
     expect(
-      hasNonDefaultPriceReportFilters({ ...DEFAULT_PRICE_REPORT_QUERY, category: "cpu" }),
+      hasNonDefaultPriceReportFilters({ ...DEFAULT_PRICE_REPORT_QUERY, categories: ["cpu"] }),
     ).toBe(true);
     expect(
       hasNonDefaultPriceReportFilters({ ...DEFAULT_PRICE_REPORT_QUERY, q: " RTX " }),
@@ -87,7 +120,7 @@ describe("price report query state", () => {
     expect(DEFAULT_PRICE_REPORT_QUERY).toEqual({
       window: "24h",
       types: ["drop", "rise"],
-      category: "",
+      categories: [],
       q: "",
       sort: "changed_desc",
       page: 1,

@@ -54,12 +54,9 @@
 }
 
 .price-report-filters {
-  display: grid;
-  gap: 12px;
   padding: 13px 18px;
 }
 
-.price-report-section-heading,
 .price-report-results-heading {
   display: flex;
   gap: 12px;
@@ -67,7 +64,6 @@
   justify-content: space-between;
 }
 
-.price-report-section-heading h2,
 .price-report-results-heading h2 {
   margin: 0;
   color: var(--text-strong);
@@ -76,7 +72,8 @@
 }
 
 .price-report-reset {
-  min-height: 32px;
+  flex: 0 0 auto;
+  min-height: 38px;
   padding: 0 12px;
   border: 1px solid var(--border);
   border-radius: 7px;
@@ -137,6 +134,12 @@
   min-width: 0;
 }
 
+.price-report-category-filter {
+  position: relative;
+  width: 142px;
+  min-width: 0;
+}
+
 .price-report-sort-control .price-report-select {
   width: 150px;
 }
@@ -184,7 +187,8 @@
   transition: transform 140ms ease;
 }
 
-.price-report-select.is-open .price-report-select-chevron {
+.price-report-select.is-open .price-report-select-chevron,
+.price-report-category-filter.is-open .price-report-select-chevron {
   transform: rotate(180deg);
 }
 
@@ -199,6 +203,7 @@
   min-width: 100%;
   max-width: min(280px, calc(100vw - 48px));
   max-height: min(360px, 48vh);
+  margin: 0;
   padding: 8px;
   overflow-y: auto;
   border: 1px solid var(--border);
@@ -231,6 +236,68 @@
   border-color: var(--border-strong);
   background: var(--accent-surface);
   color: var(--text);
+}
+
+.price-report-category-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 10;
+  display: block;
+  width: max-content;
+  min-width: 220px;
+  max-width: min(280px, calc(100vw - 48px));
+  max-height: min(360px, 48vh);
+  margin: 0;
+  padding: 12px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #0d1a24;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.34);
+}
+
+.price-report-category-option {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  color: var(--muted);
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.price-report-category-options {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.price-report-category-option:hover,
+.price-report-category-option.is-active {
+  border-color: var(--border-strong);
+  background: var(--accent-surface);
+  color: var(--text);
+}
+
+.price-report-category-option:has(input:focus-visible) {
+  border-color: var(--accent-strong);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-strong) 20%, transparent);
+}
+
+.price-report-category-option input {
+  width: 13px;
+  height: 13px;
+  margin: 0;
+  accent-color: var(--accent-strong);
 }
 
 .price-report-type-options {
@@ -423,7 +490,7 @@
   border-bottom: 1px solid var(--border);
   background: var(--panel);
   color: var(--muted);
-  font-size: 16px;
+  text-align: center;
 }
 
 .price-report-row:last-child {
@@ -436,6 +503,8 @@
   gap: 12px;
   align-items: center;
   min-width: 0;
+  justify-content: center;
+  text-align: center;
 }
 
 .price-report-product-copy {
@@ -450,7 +519,7 @@
   overflow: hidden;
   color: var(--text-strong);
   font-size: inherit;
-  font-weight: 800;
+  font-weight: 760;
   line-height: 1.4;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -494,11 +563,12 @@
 .price-report-value {
   min-width: 0;
   overflow-wrap: anywhere;
+  text-align: center;
 }
 
 .price-report-category {
   gap: 6px;
-  justify-content: flex-start;
+  justify-content: center;
 }
 
 .price-report-cell-label {
@@ -564,10 +634,16 @@
     display: flex;
     gap: 12px;
     justify-content: space-between;
+    text-align: left;
   }
 
   .price-report-category {
     justify-content: flex-start;
+  }
+
+  .price-report-product {
+    justify-content: stretch;
+    text-align: left;
   }
 
   .price-report-cell-label {
@@ -609,7 +685,6 @@
     padding: 14px;
   }
 
-  .price-report-section-heading h2,
   .price-report-results-heading h2 {
     font-size: 16px;
   }
@@ -634,6 +709,7 @@
   }
 
   .price-report-select,
+  .price-report-category-filter,
   .price-report-keyword-input {
     width: 100%;
   }
@@ -652,7 +728,24 @@
     margin-top: 8px;
   }
 
+  .price-report-category-popover {
+    position: static;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    max-height: 320px;
+    margin-top: 8px;
+  }
+
   .price-report-select-option {
+    min-height: 44px;
+  }
+
+  .price-report-category-option {
+    min-height: 44px;
+  }
+
+  .price-report-reset {
     min-height: 44px;
   }
 

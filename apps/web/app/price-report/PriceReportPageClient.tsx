@@ -16,6 +16,7 @@ import { PriceReportResults } from "./components/PriceReportResults";
 import {
   DEFAULT_PRICE_REPORT_QUERY,
   hasNonDefaultPriceReportFilters,
+  normalizePriceReportCategories,
   normalizePriceReportTypes,
   readPriceReportQuery,
   toPriceReportUrl,
@@ -140,7 +141,9 @@ export default function PriceReportPageClient() {
           draftKeyword={draftKeyword}
           query={query}
           showReset={hasNonDefaultPriceReportFilters(query)}
-          onCategoryChange={(category) => updateQuery({ category })}
+          onCategoriesChange={(nextCategories) =>
+            updateQuery({ categories: normalizePriceReportCategories(nextCategories) })
+          }
           onDraftKeywordChange={setDraftKeyword}
           onKeywordSubmit={submitKeyword}
           onReset={resetQuery}

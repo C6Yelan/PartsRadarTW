@@ -57,6 +57,32 @@ describe("GET /api/price-report handler", () => {
     expect(fake.productReadCount()).toBe(0);
   });
 
+  it("passes every selected category to the reader and source status", async () => {
+    const fake = createFakeClient(undefined, [
+      sourceCategory(4, new Date("2026-07-10T07:30:00.000Z"), true),
+      sourceCategory(12, null, false),
+      sourceCategory(16, new Date("2026-07-10T07:45:00.000Z"), true),
+    ]);
+    const response = await createGetPriceReportHandler(fake.client, { now: () => NOW })(
+      new Request(
+        "https://parts.example/api/price-report?category=gpu&category=cpu",
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(fake.firstPriceReadArgs()).toMatchObject({
+      where: {
+        product: {
+          sourceCategory: { igrp: { in: [4, 12] } },
+        },
+      },
+    });
+    expect((await response.json()).meta).toMatchObject({
+      sourceStatus: "stale",
+      lastSuccessAt: "2026-07-10T07:30:00.000Z",
+    });
+  });
+
   it("returns a generic error without leaking database details", async () => {
     const fake = createFakeClient(new Error("Prisma DATABASE_URL and secret token"));
     const response = await createGetPriceReportHandler(fake.client)(
@@ -73,14 +99,19 @@ describe("GET /api/price-report handler", () => {
   });
 });
 
-function createFakeClient(priceError?: Error) {
+function createFakeClient(
+  priceError?: Error,
+  sourceCategories: ReturnType<typeof sourceCategory>[] = [],
+) {
   let priceReads = 0;
   let categoryReads = 0;
   let productReads = 0;
+  let firstPriceReadArgs: unknown;
   const client = {
     priceSnapshot: {
-      findMany: async () => {
+      findMany: async (args: unknown) => {
         priceReads += 1;
+        firstPriceReadArgs ??= args;
 
         if (priceError) {
           throw priceError;
@@ -98,7 +129,7 @@ function createFakeClient(priceError?: Error) {
     sourceCategory: {
       findMany: async () => {
         categoryReads += 1;
-        return [];
+        return sourceCategories;
       },
     },
   } as unknown as PriceReportApiReadClient;
@@ -108,5 +139,17 @@ function createFakeClient(priceError?: Error) {
     priceReadCount: () => priceReads,
     categoryReadCount: () => categoryReads,
     productReadCount: () => productReads,
+    firstPriceReadArgs: () => firstPriceReadArgs,
+  };
+}
+
+function sourceCategory(igrp: number, lastSuccessAt: Date | null, hasProduct: boolean) {
+  return {
+    igrp,
+    displayName: `分類 ${igrp}`,
+    sourceName: "原價屋",
+    lastCheckedAt: NOW,
+    lastSuccessAt,
+    products: hasProduct ? [{ id: `product-${igrp}` }] : [],
   };
 }

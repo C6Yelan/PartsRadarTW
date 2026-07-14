@@ -46,10 +46,11 @@ export function createGetPriceReportHandler(
         }),
         client.sourceCategory.findMany(SOURCE_STATUS_CATEGORY_QUERY),
       ]);
+      const selectedCategoryIgrps = new Set(query.categoryIgrps);
       const relevantCategories =
-        query.categoryIgrp === null
+        selectedCategoryIgrps.size === 0
           ? sourceCategories
-          : sourceCategories.filter((category) => category.igrp === query.categoryIgrp);
+          : sourceCategories.filter((category) => selectedCategoryIgrps.has(category.igrp));
       const sourceStatus = buildSourceStatusResponse(relevantCategories, until);
 
       const response = buildPriceReportResponse(report, {
