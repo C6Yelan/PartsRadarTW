@@ -10,11 +10,13 @@ import type {
   PriceReportType,
   PriceReportWindow,
 } from "../types";
+import { PriceReportSelect, type PriceReportSelectOption } from "./PriceReportSelect";
 
 interface PriceReportFiltersProps {
   categories: PriceReportCategory[];
   draftKeyword: string;
   query: PriceReportQuery;
+  showReset: boolean;
   onCategoryChange: (category: string) => void;
   onDraftKeywordChange: (value: string) => void;
   onKeywordSubmit: (event: FormEvent<HTMLFormElement>) => void;
@@ -30,10 +32,24 @@ const TYPE_LABELS: Record<PriceReportType, string> = {
   new: "新品",
 };
 
+const WINDOW_OPTIONS: readonly PriceReportSelectOption<PriceReportWindow>[] = [
+  { value: "24h", label: "最近 24 小時" },
+  { value: "7d", label: "最近 7 天" },
+  { value: "30d", label: "最近 30 天" },
+];
+
+const SORT_OPTIONS: readonly PriceReportSelectOption<PriceReportSort>[] = [
+  { value: "changed_desc", label: "最近變動" },
+  { value: "drop_percent_desc", label: "降幅最大" },
+  { value: "rise_percent_desc", label: "漲幅最大" },
+  { value: "delta_amount_desc", label: "金額變動最大" },
+];
+
 export function PriceReportFilters({
   categories,
   draftKeyword,
   query,
+  showReset,
   onCategoryChange,
   onDraftKeywordChange,
   onKeywordSubmit,
@@ -46,24 +62,23 @@ export function PriceReportFilters({
     <section className="price-report-filters" aria-labelledby="price-report-filters-title">
       <div className="price-report-section-heading">
         <h2 id="price-report-filters-title">篩選價格變動</h2>
-        <button className="price-report-reset" type="button" onClick={onReset}>
-          重設
-        </button>
+        {showReset ? (
+          <button className="price-report-reset" type="button" onClick={onReset}>
+            重設
+          </button>
+        ) : null}
       </div>
 
       <form className="price-report-filter-grid" onSubmit={onKeywordSubmit}>
-        <label className="price-report-control">
+        <div className="price-report-control price-report-window-control">
           <span>時間範圍</span>
-          <select
-            aria-label="時間範圍"
+          <PriceReportSelect
+            ariaLabel="時間範圍"
+            options={WINDOW_OPTIONS}
             value={query.window}
-            onChange={(event) => onWindowChange(event.target.value as PriceReportWindow)}
-          >
-            <option value="24h">最近 24 小時</option>
-            <option value="7d">最近 7 天</option>
-            <option value="30d">最近 30 天</option>
-          </select>
-        </label>
+            onChange={onWindowChange}
+          />
+        </div>
 
         <fieldset className="price-report-type-control">
           <legend className="sr-only">變動類型</legend>
@@ -87,35 +102,31 @@ export function PriceReportFilters({
           </div>
         </fieldset>
 
-        <label className="price-report-control">
+        <div className="price-report-control price-report-category-control">
           <span>商品分類</span>
-          <select
-            aria-label="商品分類"
+          <PriceReportSelect
+            ariaLabel="商品分類"
+            options={[
+              { value: "", label: "全部分類" },
+              ...categories.map((category) => ({
+                value: category.slug,
+                label: category.displayName,
+              })),
+            ]}
             value={query.category}
-            onChange={(event) => onCategoryChange(event.target.value)}
-          >
-            <option value="">全部分類</option>
-            {categories.map((category) => (
-              <option key={category.id} value={category.slug}>
-                {category.displayName}
-              </option>
-            ))}
-          </select>
-        </label>
+            onChange={onCategoryChange}
+          />
+        </div>
 
-        <label className="price-report-control">
+        <div className="price-report-control price-report-sort-control">
           <span>排序</span>
-          <select
-            aria-label="排序"
+          <PriceReportSelect
+            ariaLabel="排序"
+            options={SORT_OPTIONS}
             value={query.sort}
-            onChange={(event) => onSortChange(event.target.value as PriceReportSort)}
-          >
-            <option value="changed_desc">最近變動</option>
-            <option value="drop_percent_desc">降幅最大</option>
-            <option value="rise_percent_desc">漲幅最大</option>
-            <option value="delta_amount_desc">金額變動最大</option>
-          </select>
-        </label>
+            onChange={onSortChange}
+          />
+        </div>
 
         <label className="price-report-control price-report-keyword-control">
           <span>商品關鍵字</span>

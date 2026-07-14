@@ -91,6 +91,16 @@ export function toPriceReportUrl(query: PriceReportQuery): string {
   return search ? `/price-report?${search}` : "/price-report";
 }
 
+export function hasNonDefaultPriceReportFilters(query: PriceReportQuery): boolean {
+  return (
+    query.window !== DEFAULT_PRICE_REPORT_QUERY.window ||
+    !hasDefaultTypes(query.types) ||
+    query.category.trim() !== "" ||
+    query.q.trim() !== "" ||
+    query.sort !== DEFAULT_PRICE_REPORT_QUERY.sort
+  );
+}
+
 function hasDefaultTypes(types: PriceReportType[]): boolean {
   const normalized = normalizePriceReportTypes(types);
   return (

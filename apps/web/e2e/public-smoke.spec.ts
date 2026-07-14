@@ -290,7 +290,7 @@ test.describe("public web smoke", () => {
     const missingItem = page.getByRole("article").filter({ hasText: missingProductId });
 
     await expect(page.getByText("3 件商品")).toBeVisible();
-    await expect(page.getByText("已同步；有 1 個品項暫時無法確認。")).toBeVisible();
+    await expect(page.getByText("已選品項中有 1 個品項暫時無法確認。")).toBeVisible();
     await expect(page.getByText("配單只儲存在此瀏覽器，不會跨裝置同步。")).toBeVisible();
     await expect(item.getByRole("heading", { name: "最新測試顯示卡 RTX" })).toBeVisible();
     const exportCheckbox = item.getByRole("checkbox", { name: /加入下載配單/ });

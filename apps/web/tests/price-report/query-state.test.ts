@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   DEFAULT_PRICE_REPORT_QUERY,
+  hasNonDefaultPriceReportFilters,
   readPriceReportQuery,
   toPriceReportUrl,
 } from "../../app/price-report/query-state";
@@ -52,5 +53,44 @@ describe("price report query state", () => {
         new URLSearchParams("window=1h&type=nope&category=unknown&sort=nope&page=0"),
       ),
     ).toEqual(DEFAULT_PRICE_REPORT_QUERY);
+  });
+
+  it("detects only applied non-default filters without treating page as a filter", () => {
+    expect(hasNonDefaultPriceReportFilters(DEFAULT_PRICE_REPORT_QUERY)).toBe(false);
+    expect(
+      hasNonDefaultPriceReportFilters({ ...DEFAULT_PRICE_REPORT_QUERY, window: "7d" }),
+    ).toBe(true);
+    expect(
+      hasNonDefaultPriceReportFilters({ ...DEFAULT_PRICE_REPORT_QUERY, types: ["drop"] }),
+    ).toBe(true);
+    expect(
+      hasNonDefaultPriceReportFilters({
+        ...DEFAULT_PRICE_REPORT_QUERY,
+        types: ["rise", "drop"],
+      }),
+    ).toBe(false);
+    expect(
+      hasNonDefaultPriceReportFilters({ ...DEFAULT_PRICE_REPORT_QUERY, category: "cpu" }),
+    ).toBe(true);
+    expect(
+      hasNonDefaultPriceReportFilters({ ...DEFAULT_PRICE_REPORT_QUERY, q: " RTX " }),
+    ).toBe(true);
+    expect(
+      hasNonDefaultPriceReportFilters({
+        ...DEFAULT_PRICE_REPORT_QUERY,
+        sort: "drop_percent_desc",
+      }),
+    ).toBe(true);
+    expect(
+      hasNonDefaultPriceReportFilters({ ...DEFAULT_PRICE_REPORT_QUERY, page: 2 }),
+    ).toBe(false);
+    expect(DEFAULT_PRICE_REPORT_QUERY).toEqual({
+      window: "24h",
+      types: ["drop", "rise"],
+      category: "",
+      q: "",
+      sort: "changed_desc",
+      page: 1,
+    });
   });
 });

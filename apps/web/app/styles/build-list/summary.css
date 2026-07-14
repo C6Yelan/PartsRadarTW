@@ -85,6 +85,13 @@
   line-height: 1.6;
 }
 
+.build-list-selection-empty {
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface-muted);
+}
+
 .build-list-category-summary ul {
   display: grid;
   gap: 9px;

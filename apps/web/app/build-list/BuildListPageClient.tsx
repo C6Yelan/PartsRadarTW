@@ -42,13 +42,20 @@ export default function BuildListPageClient() {
     setBuildListItemExportSelection,
   } = useBuildList();
   const refresh = useBuildListRefresh(intents, isReady);
-  const items = useMemo(
+  const allItems = useMemo(
     () => resolveBuildListItems(intents, refresh.products, refresh.state),
     [intents, refresh.products, refresh.state],
   );
-  const summary = useMemo(() => summarizeBuildListItems(items), [items]);
-  const categorySummary = useMemo(() => summarizeBuildListCategories(items), [items]);
-  const exportItems = useMemo(() => items.filter((item) => item.intent.includeInExport), [items]);
+  const allItemsSummary = useMemo(() => summarizeBuildListItems(allItems), [allItems]);
+  const selectedItems = useMemo(
+    () => allItems.filter((item) => item.intent.includeInExport),
+    [allItems],
+  );
+  const selectedSummary = useMemo(() => summarizeBuildListItems(selectedItems), [selectedItems]);
+  const selectedCategorySummary = useMemo(
+    () => summarizeBuildListCategories(selectedItems),
+    [selectedItems],
+  );
   const [removedItemNotice, setRemovedItemNotice] = useState<RemovedItemNotice | null>(null);
 
   useEffect(() => {
@@ -66,7 +73,7 @@ export default function BuildListPageClient() {
   }, [removedItemNotice]);
 
   function downloadExcel() {
-    downloadBuildListExcel(exportItems, refresh.lastSuccessfulSyncAt);
+    downloadBuildListExcel(selectedItems, refresh.lastSuccessfulSyncAt);
   }
 
   function handleRemoveBuildListItem(item: BuildListItem) {
@@ -103,7 +110,7 @@ export default function BuildListPageClient() {
 
         <div className="build-list-title">
           <h1>配單</h1>
-          <span>{summary.totalQuantity} 件商品</span>
+          <span>{allItemsSummary.totalQuantity} 件商品</span>
         </div>
 
         <Link className="back-link build-list-back-link" href="/">
@@ -115,12 +122,12 @@ export default function BuildListPageClient() {
       <main className="build-list-page" aria-label="配單內容">
         {!isReady ? <BuildListLoadingState /> : null}
 
-        {isReady && items.length === 0 ? <BuildListEmptyState /> : null}
+        {isReady && allItems.length === 0 ? <BuildListEmptyState /> : null}
 
-        {isReady && items.length > 0 ? (
+        {isReady && allItems.length > 0 ? (
           <section className="build-list-layout">
             <section className="build-list-items" aria-label="配單品項">
-              {items.map((item) => (
+              {allItems.map((item) => (
                 <BuildListItemRow
                   item={item}
                   key={item.intent.productId}
@@ -133,11 +140,11 @@ export default function BuildListPageClient() {
 
             <div className="build-list-side-column">
               <BuildListSummaryPanel
-                categories={categorySummary}
-                isDownloadDisabled={refresh.state === "loading" || exportItems.length === 0}
+                categories={selectedCategorySummary}
+                isDownloadDisabled={refresh.state === "loading" || selectedItems.length === 0}
                 itemCount={intents.length}
                 lastSuccessfulSyncAt={refresh.lastSuccessfulSyncAt}
-                summary={summary}
+                summary={selectedSummary}
                 onClear={handleClearBuildListItems}
                 onDownloadExcel={downloadExcel}
                 onRefresh={() => void refresh.refresh()}

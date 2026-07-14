@@ -148,11 +148,39 @@ test.beforeEach(async ({ page }) => {
             facets: getProductFacetDefinitions(9),
           },
           {
+            id: "10101010-1010-4010-8010-101010101010",
+            slug: "cooler",
+            displayName: "散熱器",
+            sourceName: "散熱器",
+            facets: getProductFacetDefinitions(10),
+          },
+          {
+            id: "11111111-1111-4111-8111-111111111110",
+            slug: "liquid-cooling",
+            displayName: "水冷",
+            sourceName: "水冷",
+            facets: getProductFacetDefinitions(11),
+          },
+          {
             id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
             slug: "case",
             displayName: "機殼",
             sourceName: "機殼 CASE",
             facets: getProductFacetDefinitions(14),
+          },
+          {
+            id: "15151515-1515-4515-8515-151515151515",
+            slug: "power-supply",
+            displayName: "電源供應器",
+            sourceName: "電源供應器",
+            facets: getProductFacetDefinitions(15),
+          },
+          {
+            id: "16161616-1616-4616-8616-161616161616",
+            slug: "fan-accessory",
+            displayName: "風扇 / 配件",
+            sourceName: "風扇 / 配件",
+            facets: getProductFacetDefinitions(16),
           },
         ],
       });
@@ -1698,14 +1726,52 @@ test("uses the initial URL and drops other category memory after reload @desktop
   await assertFacetCheckboxStates(page, "晶片組", { unchecked: ["B650"] });
 });
 
-test("uses homepage visual rhythm for price-report filters, summary, and results @desktop-only", async ({
+test("uses the shared topbar button for the price-report entry @desktop-only", async ({ page }) => {
+  for (const viewport of [
+    { width: 1440, height: 900 },
+    { width: 390, height: 844 },
+  ]) {
+    await page.setViewportSize(viewport);
+    for (const path of ["/", "/build-list"]) {
+      await page.goto(path);
+      const topbar = page.locator(".topbar");
+      const priceReportLink = topbar.getByRole("link", { name: "價格變動總覽", exact: true });
+      const announcementLink = topbar.getByRole("link", { name: "公告", exact: true });
+      await expect(priceReportLink).toHaveClass(/topbar-nav-link/);
+      await expect(priceReportLink.locator(".price-report-topbar-icon")).toHaveCount(0);
+      const [priceStyles, announcementStyles] = await Promise.all(
+        [priceReportLink, announcementLink].map((link) =>
+          link.evaluate((element) => {
+            const style = getComputedStyle(element);
+            const rect = element.getBoundingClientRect();
+            return {
+              background: style.backgroundColor,
+              borderRadius: style.borderRadius,
+              fontSize: style.fontSize,
+              height: rect.height,
+              paddingInline: style.paddingInline,
+              whiteSpace: style.whiteSpace,
+            };
+          }),
+        ),
+      );
+      expect(priceStyles).toEqual(announcementStyles);
+      expect(priceStyles.whiteSpace).toBe("nowrap");
+      await expectNoHorizontalOverflow(page);
+    }
+  }
+});
+
+test("uses compact custom price-report filters, aligned table typography, and conditional reset @desktop-only", async ({
   page,
 }) => {
-  test.setTimeout(90_000);
+  test.setTimeout(120_000);
   const viewports = [
     { width: 1760, height: 900 },
+    { width: 1440, height: 900 },
     { width: 1280, height: 800 },
     { width: 1024, height: 800 },
+    { width: 761, height: 844 },
     { width: 760, height: 844 },
     { width: 390, height: 844 },
   ];
@@ -1731,17 +1797,24 @@ test("uses homepage visual rhythm for price-report filters, summary, and results
     const expectedControlHeight = viewport.width <= 760 ? 44 : 38;
     for (const control of await page
       .locator(
-        ".price-report-control select, .price-report-keyword-input input, .price-report-keyword-input button, .price-report-type-options",
+        ".price-report-select-trigger, .price-report-keyword-input input, .price-report-keyword-input button, .price-report-type-options",
       )
       .all()) {
       expect((await control.boundingBox())?.height).toBeCloseTo(expectedControlHeight, 0);
     }
 
-    if (viewport.width > 760) {
-      const firstRowTops = await page
-        .locator(".price-report-filter-grid > :not(.price-report-keyword-control)")
-        .evaluateAll((elements) => elements.map((element) => element.getBoundingClientRect().top));
-      expect(Math.max(...firstRowTops) - Math.min(...firstRowTops)).toBeLessThanOrEqual(1);
+    if (viewport.width >= 1440) {
+      const controlTops = await getPriceReportControlRects(page).then((rects) =>
+        rects.map((rect) => rect.top),
+      );
+      expect(Math.max(...controlTops) - Math.min(...controlTops)).toBeLessThanOrEqual(2);
+      const keywordWidth = await page
+        .getByRole("searchbox", { name: "搜尋價格變動商品" })
+        .evaluate((element) => element.getBoundingClientRect().width);
+      const selectWidth = await page
+        .getByRole("button", { name: "時間範圍" })
+        .evaluate((element) => element.getBoundingClientRect().width);
+      expect(keywordWidth).toBeGreaterThan(selectWidth);
     }
 
     const summary = page.locator(".price-report-summary");
@@ -1757,6 +1830,9 @@ test("uses homepage visual rhythm for price-report filters, summary, and results
     if (viewport.width > 1120) {
       await expect(tableHeader).toBeVisible();
       expect((await tableHeader.boundingBox())?.height).toBeCloseTo(48, 0);
+      for (const header of await tableHeader.locator("span").all()) {
+        await expect(header).toHaveCSS("text-align", "center");
+      }
     } else {
       await expect(tableHeader).toBeHidden();
       await expect(page.locator(".price-report-cell-label").first()).toBeVisible();
@@ -1767,22 +1843,158 @@ test("uses homepage visual rhythm for price-report filters, summary, and results
 
   await page.setViewportSize({ width: 1760, height: 900 });
   await page.goto("/price-report");
-  await page.getByRole("combobox", { name: "時間範圍" }).selectOption("7d");
+  await expect(page.getByRole("button", { name: "重設", exact: true })).toHaveCount(0);
+  await expect(page.locator('select[aria-label="時間範圍"]')).toHaveCount(0);
+  await expect(page.locator('select[aria-label="商品分類"]')).toHaveCount(0);
+  await expect(page.locator('select[aria-label="排序"]')).toHaveCount(0);
+
+  await selectPriceReportOption(page, "時間範圍", "最近 7 天");
   await expect.poll(() => new URL(page.url()).searchParams.get("window")).toBe("7d");
-  await page.getByRole("combobox", { name: "商品分類" }).selectOption("cpu");
+  await expect(page.getByRole("button", { name: "重設", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "重設", exact: true }).click();
+  await expect.poll(() => new URL(page.url()).search).toBe("");
+
+  await selectPriceReportOption(page, "商品分類", "CPU");
   await expect.poll(() => new URL(page.url()).searchParams.get("category")).toBe("cpu");
+  await expect(page.getByRole("button", { name: "重設", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "重設", exact: true }).click();
+
+  await selectPriceReportOption(page, "排序", "降幅最大");
+  await expect.poll(() => new URL(page.url()).searchParams.get("sort")).toBe(
+    "drop_percent_desc",
+  );
+  await expect(page.getByRole("button", { name: "重設", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "重設", exact: true }).click();
+
   await page.getByRole("checkbox", { name: "新品" }).click();
   await expect
     .poll(() => new URL(page.url()).searchParams.getAll("type"))
     .toEqual(["drop", "rise", "new"]);
   await expect(page.getByRole("checkbox", { name: "新品" })).toBeChecked();
+  await expect(page.getByRole("button", { name: "重設", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "重設", exact: true }).click();
+
   await page.getByRole("searchbox", { name: "搜尋價格變動商品" }).fill("RTX");
+  await expect(page.getByRole("button", { name: "重設", exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "查詢" }).click();
   await expect.poll(() => new URL(page.url()).searchParams.get("q")).toBe("RTX");
+  await expect(page.getByRole("button", { name: "重設", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "2", exact: true }).click();
   await expect.poll(() => new URL(page.url()).searchParams.get("page")).toBe("2");
   await page.getByRole("button", { name: "重設" }).click();
   await expect.poll(() => new URL(page.url()).search).toBe("");
+  await expect(page.getByRole("button", { name: "重設", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("searchbox", { name: "搜尋價格變動商品" })).toHaveValue("");
+
+  await page.getByRole("searchbox", { name: "搜尋價格變動商品" }).fill("RTX");
+  await expect(page.getByRole("button", { name: "重設", exact: true })).toHaveCount(0);
+  await page.goto("/price-report?page=2");
+  await expect(page.getByRole("button", { name: "重設", exact: true })).toHaveCount(0);
+
+  await page.goto("/price-report");
+  const categoryTrigger = page.getByRole("button", { name: "商品分類" });
+  await categoryTrigger.click();
+  const categoryListbox = page.getByRole("listbox", { name: "商品分類" });
+  await expect(categoryListbox).toBeVisible();
+  await expect(categoryListbox.getByRole("option")).toHaveCount(13);
+  await expect(categoryListbox.getByRole("option", { name: "全部分類" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  const categoryOverflow = await categoryListbox.evaluate((element) => ({
+    clientHeight: element.clientHeight,
+    scrollHeight: element.scrollHeight,
+  }));
+  expect(categoryOverflow.scrollHeight).toBeGreaterThan(categoryOverflow.clientHeight);
+  const typography = await categoryListbox
+    .getByRole("option")
+    .evaluateAll((options) =>
+      ["CPU", "SSD", "HDD", "主機板", "風扇 / 配件"].map((label) => {
+        const option = options.find((candidate) => candidate.textContent === label);
+        if (!option) return null;
+        const style = getComputedStyle(option);
+        return {
+          label,
+          fontFamily: style.fontFamily,
+          letterSpacing: style.letterSpacing,
+          wordSpacing: style.wordSpacing,
+        };
+      }),
+    );
+  expect(typography.every((item) => item !== null)).toBe(true);
+  expect(new Set(typography.map((item) => item?.fontFamily)).size).toBe(1);
+  expect(new Set(typography.map((item) => item?.letterSpacing)).size).toBe(1);
+  expect(new Set(typography.map((item) => item?.wordSpacing)).size).toBe(1);
+  await categoryListbox.getByRole("option", { name: "風扇 / 配件" }).click();
+  await expect.poll(() => new URL(page.url()).searchParams.get("category")).toBe("fan-accessory");
+  await expect(categoryListbox).toHaveCount(0);
+
+  await categoryTrigger.click();
+  await page.getByRole("listbox", { name: "商品分類" }).press("End");
+  await page.getByRole("listbox", { name: "商品分類" }).press("Home");
+  await page.getByRole("listbox", { name: "商品分類" }).press("ArrowDown");
+  await page.getByRole("listbox", { name: "商品分類" }).press("ArrowDown");
+  await page.getByRole("listbox", { name: "商品分類" }).press("Enter");
+  await expect.poll(() => new URL(page.url()).searchParams.get("category")).toBe("cpu");
+  await categoryTrigger.click();
+  await page.getByRole("listbox", { name: "商品分類" }).press("Escape");
+  await expect(categoryListbox).toHaveCount(0);
+  await expect(categoryTrigger).toBeFocused();
+  await categoryTrigger.click();
+  await page.locator(".price-report-section-heading h2").click();
+  await expect(categoryListbox).toHaveCount(0);
+  await categoryTrigger.press("Space");
+  await expect(categoryListbox).toBeVisible();
+  await page.getByRole("listbox", { name: "商品分類" }).press("Tab");
+  await expect(categoryListbox).toHaveCount(0);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/price-report");
+  const mobileCategoryTrigger = page.getByRole("button", { name: "商品分類", exact: true });
+  const mobileCategoryControl = page.locator(".price-report-category-control");
+  expect((await mobileCategoryTrigger.boundingBox())?.width).toBeCloseTo(
+    (await mobileCategoryControl.boundingBox())?.width ?? 0,
+    0,
+  );
+  await mobileCategoryTrigger.click();
+  const mobileCategoryListbox = page.getByRole("listbox", { name: "商品分類" });
+  for (const option of await mobileCategoryListbox.getByRole("option").all()) {
+    expect((await option.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+  }
+  await expectNoHorizontalOverflow(page);
+  await mobileCategoryListbox.getByRole("option", { name: "風扇 / 配件" }).click();
+  await expect.poll(() => new URL(page.url()).searchParams.get("category")).toBe("fan-accessory");
+
+  await page.setViewportSize({ width: 1760, height: 900 });
+  await page.goto("/");
+  const homeProductFontSize = await page
+    .locator(".product-main a")
+    .first()
+    .evaluate((element) => getComputedStyle(element).fontSize);
+  const homeValueFontSize = await page
+    .locator(".table-cell")
+    .first()
+    .evaluate((element) => getComputedStyle(element).fontSize);
+  const homeHeaderFontSize = await page
+    .locator(".table-header")
+    .evaluate((element) => getComputedStyle(element).fontSize);
+  await page.goto("/price-report");
+  await expect(page.locator(".price-report-product-copy a").first()).toHaveCSS(
+    "font-size",
+    homeProductFontSize,
+  );
+  await expect(page.locator(".price-report-value").first()).toHaveCSS(
+    "font-size",
+    homeValueFontSize,
+  );
+  await expect(page.locator(".price-report-table-header")).toHaveCSS(
+    "font-size",
+    homeHeaderFontSize,
+  );
+  await expect(page.locator(".price-report-product").first()).not.toHaveCSS(
+    "text-align",
+    "center",
+  );
 });
 
 test("presents build-list summary, categories, actions, and data status in one sidebar @desktop-only", async ({
@@ -1798,8 +2010,8 @@ test("presents build-list summary, categories, actions, and data status in one s
     await fulfillJson(route, {
       data: [
         buildListProduct(cpuOneId, "CPU 零件一", "CPU", 1_000, true),
-        buildListProduct(cpuTwoId, "CPU 零件二", "CPU", 2_000, true),
-        buildListProduct(gpuId, "顯示卡零件", "顯示卡", 3_000, false),
+        buildListProduct(cpuTwoId, "未勾選主機板", "主機板", 2_000, false),
+        buildListProduct(gpuId, "顯示卡零件", "顯示卡", 3_000, true),
       ],
       missingProductIds: [missingId],
     });
@@ -1833,15 +2045,17 @@ test("presents build-list summary, categories, actions, and data status in one s
     await page.setViewportSize(viewport);
     await page.goto("/build-list");
     const sidebar = page.getByLabel("配單摘要與操作");
+    await expect(page.getByText("5 件商品", { exact: true })).toBeVisible();
     await expect(sidebar.getByRole("heading", { name: "配單摘要" })).toBeVisible();
-    await expect(sidebar.getByText("NT$ 7,000")).toBeVisible();
-    await expect(sidebar.getByText("品項數").locator("..")).toContainText("4");
-    await expect(sidebar.getByText("零件數").locator("..")).toContainText("5");
-    await expect(sidebar.getByText("匯出品項").locator("..")).toContainText("3");
-    await expect(sidebar.getByText("可能已下架").locator("..")).toContainText("1");
+    await expect(sidebar.getByText("NT$ 5,000")).toBeVisible();
+    await expect(sidebar.getByText("品項數").locator("..")).toContainText("3");
+    await expect(sidebar.getByText("零件數").locator("..")).toContainText("4");
+    await expect(sidebar.getByText("匯出品項")).toHaveCount(0);
+    await expect(sidebar.getByText("可能已下架")).toHaveCount(0);
     await expect(sidebar.getByText("資料待確認").locator("..")).toContainText("1");
-    await expect(sidebar.getByLabel("CPU，2 個品項，共 3 件")).toContainText("3 件");
+    await expect(sidebar.getByLabel("CPU，1 個品項，共 2 件")).toContainText("2 件");
     await expect(sidebar.getByLabel("顯示卡，1 個品項，共 1 件")).toContainText("1 件");
+    await expect(sidebar).not.toContainText("主機板");
     await expect(sidebar.getByRole("button", { name: "下載 Excel（3）" })).toBeEnabled();
     await expect(sidebar.getByRole("button", { name: "重新整理商品資料" })).toBeEnabled();
     await expect(sidebar.getByText("配單只儲存在此瀏覽器，不會跨裝置同步。")).toBeVisible();
@@ -1867,9 +2081,33 @@ test("presents build-list summary, categories, actions, and data status in one s
   await page.setViewportSize({ width: 1760, height: 900 });
   await page.goto("/build-list");
   const sidebar = page.getByLabel("配單摘要與操作");
+  await page.getByRole("checkbox", { name: "將 CPU 零件一 加入下載配單" }).uncheck();
+  await expect(sidebar.getByText("品項數").locator("..")).toContainText("2");
+  await expect(sidebar.getByText("零件數").locator("..")).toContainText("2");
+  await expect(sidebar.getByText("NT$ 3,000")).toBeVisible();
+  await expect(sidebar.getByLabel(/CPU，/)).toHaveCount(0);
+  await expect(sidebar.getByRole("button", { name: "下載 Excel（2）" })).toBeEnabled();
+
+  await page.locator(".build-list-export-toggle input:checked").first().uncheck();
+  await page.locator(".build-list-export-toggle input:checked").first().uncheck();
+  await expect(sidebar.getByText("NT$ 0")).toBeVisible();
+  await expect(sidebar.getByText("品項數").locator("..")).toContainText("0");
+  await expect(sidebar.getByText("零件數").locator("..")).toContainText("0");
+  await expect(sidebar.getByRole("heading", { name: "零件構成" })).toHaveCount(0);
+  await expect(sidebar.getByRole("button", { name: "下載 Excel（0）" })).toBeDisabled();
+  await expect(
+    sidebar.getByText("尚未勾選要納入配單摘要與下載的品項。"),
+  ).toBeVisible();
+  await expect(sidebar.getByRole("button", { name: "重新整理商品資料" })).toBeEnabled();
+  await expect(sidebar.getByRole("button", { name: "清空配單" })).toBeEnabled();
+
+  await page.getByRole("checkbox", { name: "將 顯示卡零件 加入下載配單" }).check();
+  await expect(sidebar.getByText("品項數").locator("..")).toContainText("1");
+  await expect(sidebar.getByText("NT$ 3,000")).toBeVisible();
+  await expect(sidebar.getByRole("button", { name: "下載 Excel（1）" })).toBeEnabled();
   await sidebar.getByRole("button", { name: "重新整理商品資料" }).click();
   await expect(
-    sidebar.getByText(/商品資料已更新|正在取得最新商品資料|有 1 個品項暫時無法確認/),
+    sidebar.getByText(/商品資料已更新|正在取得最新商品資料/),
   ).toBeVisible();
   page.once("dialog", (dialog) => void dialog.dismiss());
   await sidebar.getByRole("button", { name: "清空配單" }).click();
@@ -2006,7 +2244,7 @@ test("keeps the main pages usable without horizontal overflow", async ({ page },
   await newProductCheckbox.press("Space");
   await expect.poll(() => new URL(page.url()).searchParams.getAll("type")).toEqual([]);
   await expect(newProductCheckbox).not.toBeChecked();
-  await page.getByRole("combobox", { name: "時間範圍" }).focus();
+  await page.getByRole("button", { name: "時間範圍", exact: true }).focus();
   await expectUsableLayout(page, testInfo);
 
   await page.goto("/privacy");
@@ -2083,7 +2321,7 @@ test("keeps error and empty states usable", async ({ page }, testInfo) => {
   await expect(
     page.getByRole("status").filter({ hasText: "資料可能過期或部分分類尚未成功" }),
   ).toBeVisible();
-  await page.getByRole("combobox", { name: "時間範圍" }).focus();
+  await page.getByRole("button", { name: "時間範圍", exact: true }).focus();
   await expectUsableLayout(page, testInfo);
 
   await page.goto("/price-report?q=unavailable");
@@ -2326,6 +2564,34 @@ function buildListProduct(
     status: { isActive },
     lastSeenAt: OBSERVED_AT,
   };
+}
+
+async function selectPriceReportOption(page: Page, label: string, option: string) {
+  await page.getByRole("button", { name: label, exact: true }).click();
+  await page.getByRole("listbox", { name: label, exact: true }).getByRole("option", {
+    name: option,
+    exact: true,
+  }).click();
+}
+
+async function getPriceReportControlRects(page: Page) {
+  const controls = [
+    page.getByRole("button", { name: "時間範圍", exact: true }),
+    page.locator(".price-report-type-options"),
+    page.getByRole("button", { name: "商品分類", exact: true }),
+    page.getByRole("button", { name: "排序", exact: true }),
+    page.getByRole("searchbox", { name: "搜尋價格變動商品" }),
+    page.getByRole("button", { name: "查詢", exact: true }),
+  ];
+
+  return Promise.all(
+    controls.map((control) =>
+      control.evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+        return { height: rect.height, left: rect.left, top: rect.top, width: rect.width };
+      }),
+    ),
+  );
 }
 
 async function fulfillJson(route: Route, body: unknown) {

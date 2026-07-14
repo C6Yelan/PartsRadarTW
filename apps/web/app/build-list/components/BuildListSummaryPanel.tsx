@@ -47,10 +47,6 @@ export default function BuildListSummaryPanel({
             <dt>零件數</dt>
             <dd>{summary.totalQuantity}</dd>
           </div>
-          <div>
-            <dt>匯出品項</dt>
-            <dd>{summary.exportItemCount}</dd>
-          </div>
           {summary.unpricedItemCount > 0 ? (
             <div>
               <dt>暫未計價</dt>
@@ -70,6 +66,11 @@ export default function BuildListSummaryPanel({
             </div>
           ) : null}
         </dl>
+        {summary.itemCount === 0 ? (
+          <p className="build-list-selection-empty">
+            尚未勾選要納入配單摘要與下載的品項。
+          </p>
+        ) : null}
         <p>價格僅計入目前可確認資料，作為配單估算。</p>
       </section>
 
@@ -99,7 +100,7 @@ export default function BuildListSummaryPanel({
             type="button"
             onClick={onDownloadExcel}
           >
-            下載 Excel（{summary.exportItemCount}）
+            下載 Excel（{summary.itemCount}）
           </button>
           <button
             className="control-button secondary"
@@ -142,7 +143,7 @@ function getRefreshMessage(
   if (state === "rate_limited") return API_RATE_LIMITED_MESSAGE;
   if (state === "error") return "商品資料重新整理失敗，配單內容仍已保留。";
   if (state === "ready" && unconfirmedItemCount > 0) {
-    return `已同步；有 ${unconfirmedItemCount} 個品項暫時無法確認。`;
+    return `已選品項中有 ${unconfirmedItemCount} 個品項暫時無法確認。`;
   }
   if (state === "ready") return "商品資料已更新。";
   return "商品資料尚未同步。";

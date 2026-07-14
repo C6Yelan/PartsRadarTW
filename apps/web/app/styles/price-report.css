@@ -43,10 +43,14 @@
 .price-report-summary,
 .price-report-results {
   min-width: 0;
-  overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--panel);
+}
+
+.price-report-summary,
+.price-report-results {
+  overflow: hidden;
 }
 
 .price-report-filters {
@@ -90,7 +94,7 @@
 
 .price-report-filter-grid {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 8px;
   align-items: center;
 }
@@ -116,7 +120,6 @@
   white-space: nowrap;
 }
 
-.price-report-control select,
 .price-report-keyword-input input {
   box-sizing: border-box;
   min-width: 0;
@@ -128,19 +131,106 @@
   color: var(--text);
 }
 
-.price-report-control select {
+.price-report-select {
+  position: relative;
+  width: 142px;
+  min-width: 0;
+}
+
+.price-report-sort-control .price-report-select {
   width: 150px;
-  padding: 0 10px;
 }
 
-.price-report-control:has(select[aria-label="排序"]) select {
-  width: 160px;
-}
-
-.price-report-control select:focus,
 .price-report-keyword-input input:focus {
   border-color: var(--accent-strong);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-strong) 20%, transparent);
+}
+
+.price-report-select-trigger {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
+  font-weight: 700;
+  letter-spacing: normal;
+  word-spacing: normal;
+}
+
+.price-report-select-trigger > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.price-report-select-trigger:focus-visible {
+  border-color: var(--accent-strong);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-strong) 20%, transparent);
+}
+
+.price-report-select-chevron {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  transition: transform 140ms ease;
+}
+
+.price-report-select.is-open .price-report-select-chevron {
+  transform: rotate(180deg);
+}
+
+.price-report-select-listbox {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 10;
+  display: grid;
+  gap: 4px;
+  width: max-content;
+  min-width: 100%;
+  max-width: min(280px, calc(100vw - 48px));
+  max-height: min(360px, 48vh);
+  padding: 8px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  outline: none;
+  background: #0d1a24;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.34);
+}
+
+.price-report-select-option {
+  min-width: 0;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  font-family: inherit;
+  font-kerning: normal;
+  font-weight: 700;
+  letter-spacing: normal;
+  text-align: left;
+  white-space: nowrap;
+  word-spacing: normal;
+}
+
+.price-report-select-option:hover,
+.price-report-select-option.is-active,
+.price-report-select-option[aria-selected="true"] {
+  border-color: var(--border-strong);
+  background: var(--accent-surface);
+  color: var(--text);
 }
 
 .price-report-type-options {
@@ -191,12 +281,13 @@
 }
 
 .price-report-keyword-control {
-  flex-basis: 100%;
+  flex: 1 1 280px;
 }
 
 .price-report-keyword-input {
   display: grid;
-  grid-template-columns: minmax(240px, 640px) auto;
+  flex: 1 1 auto;
+  grid-template-columns: minmax(180px, 1fr) auto;
   gap: 8px;
   min-width: 0;
 }
@@ -322,13 +413,17 @@
   font-weight: 800;
 }
 
+.price-report-table-header > span {
+  text-align: center;
+}
+
 .price-report-row {
   min-height: 96px;
   padding: 15px 18px;
   border-bottom: 1px solid var(--border);
   background: var(--panel);
   color: var(--muted);
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .price-report-row:last-child {
@@ -354,11 +449,17 @@
 .price-report-product-copy a {
   overflow: hidden;
   color: var(--text-strong);
-  font-size: 14px;
+  font-size: inherit;
   font-weight: 800;
   line-height: 1.4;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+@media (min-width: 761px) and (max-width: 1279px) {
+  .price-report-filter-grid {
+    flex-wrap: wrap;
+  }
 }
 
 .price-report-product-copy a:hover {
@@ -519,6 +620,10 @@
     align-items: stretch;
   }
 
+  .price-report-filter-grid {
+    flex-wrap: wrap;
+  }
+
   .price-report-control,
   .price-report-type-control,
   .price-report-keyword-control {
@@ -528,15 +633,26 @@
     gap: 6px;
   }
 
-  .price-report-control select,
-  .price-report-control:has(select[aria-label="排序"]) select,
+  .price-report-select,
   .price-report-keyword-input {
     width: 100%;
   }
 
-  .price-report-control select,
+  .price-report-select-trigger,
   .price-report-keyword-input input,
   .price-report-keyword-input button {
+    min-height: 44px;
+  }
+
+  .price-report-select-listbox {
+    position: static;
+    width: 100%;
+    max-width: none;
+    max-height: 320px;
+    margin-top: 8px;
+  }
+
+  .price-report-select-option {
     min-height: 44px;
   }
 
