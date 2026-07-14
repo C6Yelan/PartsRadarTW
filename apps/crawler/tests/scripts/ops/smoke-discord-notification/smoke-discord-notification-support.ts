@@ -1,5 +1,5 @@
 // apps/crawler/tests/scripts/ops/smoke-discord-notification/smoke-discord-notification-support.ts
-// 提供 smoke Discord notification 測試共用的 webhook、summary、check 與 state fixture。
+// 提供 smoke v2 policy 測試共用的 summary、check、state 與 policy fixtures。
 
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -9,16 +9,27 @@ import type {
   SmokeCheckResult,
   SmokeStatus,
 } from "../../../../src/scripts/ops/production-smoke";
-import type { SmokeDiscordNotificationState } from "../../../../src/scripts/ops/smoke-discord-notification";
+import {
+  createEmptySmokeDiscordNotificationState,
+  type SmokeCheckAlertState,
+  type SmokeDiscordNotificationStateV1,
+  type SmokeDiscordNotificationStateV2,
+} from "../../../../src/scripts/ops/smoke-discord-notification";
+import type { SmokeAlertPolicyOptions } from "../../../../src/scripts/ops/smoke-discord-notification/policy";
 
 export const WEBHOOK_URL = "https://discord.com/api/webhooks/1234567890/token_ABC.def-ghi";
+export const POLICY_OPTIONS: SmokeAlertPolicyOptions = {
+  warningPendingCycles: 2,
+  filterQualityPendingCycles: 3,
+  recoveryGoodCycles: 2,
+  warnReminderSeconds: 43_200,
+  failReminderSeconds: 3_600,
+};
 
-// 建立隔離 workspace，供 state file 測試寫入暫存告警狀態。
 export async function createWorkspace() {
   return mkdtemp(join(tmpdir(), "partsradar-smoke-discord-"));
 }
 
-// 建立 production smoke summary fixture，預設依狀態產生最小 check 集合。
 export function summary({
   status,
   checkedAt = new Date("2026-06-06T12:00:00.000Z"),
@@ -36,39 +47,49 @@ export function summary({
   };
 }
 
-// 建立單一 smoke check fixture，讓 notification decision 測試可精準控制 key 與狀態。
 export function check(
   name: string,
   status: SmokeStatus,
   message = `${name} ${status}`,
 ): SmokeCheckResult {
+  return { name, status, message };
+}
+
+export function state(
+  overrides: Partial<SmokeDiscordNotificationStateV2> = {},
+): SmokeDiscordNotificationStateV2 {
+  return { ...createEmptySmokeDiscordNotificationState(), ...overrides };
+}
+
+export function checkState(
+  overrides: Partial<SmokeCheckAlertState> & Pick<SmokeCheckAlertState, "checkName">,
+): SmokeCheckAlertState {
   return {
-    name,
-    status,
-    message,
+    classification: "WARNING",
+    lastObservedStatus: "OK",
+    lastObservedAt: "2026-06-06T11:00:00.000Z",
+    currentFingerprint: null,
+    pendingSince: null,
+    activeSince: null,
+    consecutiveBad: 0,
+    consecutiveGood: 0,
+    lastNotificationKind: null,
+    lastNotificationAt: null,
+    lastNotifiedFingerprint: null,
+    ...overrides,
   };
 }
 
-// 建立 smoke Discord notification state fixture，集中維持 state file schema。
-export function state({
-  status,
-  lastObservedAt = "2026-06-06T11:00:00.000Z",
-  lastNotificationKind = null,
-  lastNotificationKey = null,
-  lastNotificationAt = null,
-}: {
-  status: SmokeStatus;
-  lastObservedAt?: string;
-  lastNotificationKind?: SmokeDiscordNotificationState["lastNotificationKind"];
-  lastNotificationKey?: string | null;
-  lastNotificationAt?: string | null;
-}): SmokeDiscordNotificationState {
+export function stateV1(
+  overrides: Partial<SmokeDiscordNotificationStateV1> = {},
+): SmokeDiscordNotificationStateV1 {
   return {
     version: 1,
-    lastObservedStatus: status,
-    lastObservedAt,
-    lastNotificationKind,
-    lastNotificationKey,
-    lastNotificationAt,
+    lastObservedStatus: "WARN",
+    lastObservedAt: "2026-06-06T11:00:00.000Z",
+    lastNotificationKind: "WARN",
+    lastNotificationAt: "2026-06-06T11:00:00.000Z",
+    lastNotificationKey: "WARN:WARN:source freshness",
+    ...overrides,
   };
 }

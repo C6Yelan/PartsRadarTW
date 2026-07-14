@@ -27,6 +27,7 @@
     "ops:image-cache:recovery-daemon": "pnpm --filter @partsradar/crawler ops:image-cache:recovery-daemon",
     "ops:production-smoke": "pnpm --filter @partsradar/crawler ops:production-smoke",
     "ops:production-smoke-daemon": "pnpm --filter @partsradar/crawler ops:production-smoke-daemon",
+    "ops:production-smoke:health": "pnpm --filter @partsradar/crawler ops:production-smoke:health",
     "ops:product-vendors:backfill": "pnpm --filter @partsradar/crawler ops:product-vendors:backfill",
     "ops:product-filter-tags:backfill": "pnpm --filter @partsradar/crawler ops:product-filter-tags:backfill",
     "ops:raw-snapshots:cleanup": "pnpm --filter @partsradar/crawler ops:raw-snapshots:cleanup",

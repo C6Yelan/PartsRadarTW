@@ -2,10 +2,7 @@
 // 解析 production smoke daemon 的排程參數，並合併單輪 smoke 與 Discord 告警設定。
 
 import { getStringArg } from "../../shared/script-utils";
-import {
-  parseProductionSmokeOptions,
-  type ProductionSmokeOptions,
-} from "../production-smoke";
+import { type ProductionSmokeOptions, parseProductionSmokeOptions } from "../production-smoke";
 import {
   parseSmokeDiscordNotificationOptions,
   type SmokeDiscordNotificationOptions,
@@ -13,17 +10,21 @@ import {
 
 export const HELP_FLAG = "--help";
 const RUN_ONCE_FLAG = "--run-once";
-const DEFAULT_SMOKE_INTERVAL_SECONDS = 900;
+const DEFAULT_SMOKE_INTERVAL_SECONDS = 300;
 const DEFAULT_SMOKE_INITIAL_DELAY_SECONDS = 60;
+const DEFAULT_SMOKE_CYCLE_TIMEOUT_MS = 30_000;
 const MIN_SMOKE_INTERVAL_SECONDS = 60;
 const MAX_SMOKE_INTERVAL_SECONDS = 24 * 60 * 60;
 const MIN_INITIAL_DELAY_SECONDS = 0;
 const MAX_INITIAL_DELAY_SECONDS = 24 * 60 * 60;
+const MIN_SMOKE_CYCLE_TIMEOUT_MS = 5_000;
+const MAX_SMOKE_CYCLE_TIMEOUT_MS = 300_000;
 
 // daemon 執行設定；包含單輪 production smoke options、循環排程與 Discord admin webhook 告警設定。
 export interface ProductionSmokeDaemonOptions extends ProductionSmokeOptions {
   intervalSeconds: number;
   initialDelaySeconds: number;
+  cycleTimeoutMs: number;
   runOnce: boolean;
   smokeDiscordNotification: SmokeDiscordNotificationOptions;
 }
@@ -60,6 +61,15 @@ export function parseProductionSmokeDaemonOptions(
       fallback: DEFAULT_SMOKE_INITIAL_DELAY_SECONDS,
       min: MIN_INITIAL_DELAY_SECONDS,
       max: MAX_INITIAL_DELAY_SECONDS,
+    }),
+    cycleTimeoutMs: parseIntegerOption({
+      args,
+      env,
+      argName: "--cycle-timeout-ms",
+      envName: "SMOKE_CYCLE_TIMEOUT_MS",
+      fallback: DEFAULT_SMOKE_CYCLE_TIMEOUT_MS,
+      min: MIN_SMOKE_CYCLE_TIMEOUT_MS,
+      max: MAX_SMOKE_CYCLE_TIMEOUT_MS,
     }),
     runOnce: args.includes(RUN_ONCE_FLAG),
     smokeDiscordNotification: parseSmokeDiscordNotificationOptions(
@@ -115,6 +125,8 @@ Options:
                                      Default: ${DEFAULT_SMOKE_INTERVAL_SECONDS}
   --initial-delay-seconds <sec>      Delay before the first daemon check.
                                      Default: ${DEFAULT_SMOKE_INITIAL_DELAY_SECONDS}
+  --cycle-timeout-ms <ms>            Fatal whole-cycle timeout.
+                                     Default: ${DEFAULT_SMOKE_CYCLE_TIMEOUT_MS}
   --smoke-discord-state-file <path>  State file for Discord smoke notification dedupe.
   --smoke-discord-cooldown-seconds <sec>
                                      Delay before repeating unchanged Discord alerts.

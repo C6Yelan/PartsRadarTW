@@ -16,8 +16,9 @@ services:
       PRODUCT_IMAGE_STORAGE_DIR: "/var/lib/partsradar/product-images"
       LOG_LEVEL: "${LOG_LEVEL:-info}"
       SMOKE_PUBLIC_BASE_URL: "${SMOKE_PUBLIC_BASE_URL:-http://web:3000}"
-      SMOKE_INTERVAL_SECONDS: "${SMOKE_INTERVAL_SECONDS:-900}"
+      SMOKE_INTERVAL_SECONDS: "${SMOKE_INTERVAL_SECONDS:-300}"
       SMOKE_INITIAL_DELAY_SECONDS: "${SMOKE_INITIAL_DELAY_SECONDS:-60}"
+      SMOKE_CYCLE_TIMEOUT_MS: "${SMOKE_CYCLE_TIMEOUT_MS:-30000}"
       SMOKE_TIMEOUT_MS: "${SMOKE_TIMEOUT_MS:-5000}"
       SMOKE_PRODUCT_IMAGE_SAMPLE_SIZE: "${SMOKE_PRODUCT_IMAGE_SAMPLE_SIZE:-5}"
       SMOKE_SOURCE_WARN_AFTER_MINUTES: "${SMOKE_SOURCE_WARN_AFTER_MINUTES:-60}"
@@ -42,6 +43,11 @@ services:
       DISCORD_ADMIN_WEBHOOK_URL: "${DISCORD_ADMIN_WEBHOOK_URL:-replace_with_discord_admin_webhook_url}"
       SMOKE_DISCORD_STATE_FILE: "${SMOKE_DISCORD_STATE_FILE:-/var/lib/partsradar/snapshots/ops/smoke-discord-state.json}"
       SMOKE_DISCORD_COOLDOWN_SECONDS: "${SMOKE_DISCORD_COOLDOWN_SECONDS:-43200}"
+      SMOKE_WARNING_PENDING_CYCLES: "${SMOKE_WARNING_PENDING_CYCLES:-2}"
+      SMOKE_FILTER_QUALITY_PENDING_CYCLES: "${SMOKE_FILTER_QUALITY_PENDING_CYCLES:-3}"
+      SMOKE_RECOVERY_GOOD_CYCLES: "${SMOKE_RECOVERY_GOOD_CYCLES:-2}"
+      SMOKE_FAIL_REMINDER_SECONDS: "${SMOKE_FAIL_REMINDER_SECONDS:-3600}"
+      SMOKE_PROGRESS_STALE_SECONDS: "${SMOKE_PROGRESS_STALE_SECONDS:-900}"
     volumes:
       - snapshots:/var/lib/partsradar/snapshots
       - product_images:/var/lib/partsradar/product-images:ro
@@ -61,6 +67,19 @@ services:
         "@partsradar/crawler",
         "ops:production-smoke-daemon",
       ]
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "pnpm",
+          "--filter",
+          "@partsradar/crawler",
+          "ops:production-smoke:health",
+        ]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
 
   discord-bot:
     image: "${PARTSRADAR_CRAWLER_IMAGE:-partsradar-tw-crawler:local}"

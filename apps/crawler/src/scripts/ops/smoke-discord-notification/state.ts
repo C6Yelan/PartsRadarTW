@@ -1,28 +1,81 @@
 // apps/crawler/src/scripts/ops/smoke-discord-notification/state.ts
-// 讀寫 production smoke Discord 告警的本機狀態檔，支援通知去重、冷卻與恢復判斷。
+// 讀寫 production smoke 的 durable progress 與 per-check 告警狀態，並安全升級既有 v1 檔案。
 
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import type { SmokeStatus } from "../production-smoke";
 
-export const SMOKE_DISCORD_NOTIFICATION_STATE_VERSION = 1;
+export const SMOKE_DISCORD_NOTIFICATION_STATE_VERSION = 2;
 
 export type SmokeDiscordNotificationKind = "WARN" | "FAIL" | "RECOVERED";
+export type SmokeAlertClassification = "PAGE" | "WARNING" | "REPORT";
+export type SmokeCycleOutcome = SmokeStatus | "ERROR" | "TIMEOUT";
 
-// Discord admin webhook 的持久化狀態；僅保存判斷下一輪是否需要通知所需的最小資訊。
-export interface SmokeDiscordNotificationState {
-  version: 1;
+export interface SmokeDaemonProgressState {
+  lastCycleStartedAt: string | null;
+  lastCycleCompletedAt: string | null;
+  lastCycleDurationMs: number | null;
+  lastCycleOutcome: SmokeCycleOutcome | null;
+  lastCycleErrorKind: string | null;
+  consecutiveCycleErrors: number;
+}
+
+export interface SmokeCheckAlertState {
+  checkName: string;
+  classification: SmokeAlertClassification;
+  lastObservedStatus: SmokeStatus;
+  lastObservedAt: string;
+  currentFingerprint: string | null;
+  pendingSince: string | null;
+  activeSince: string | null;
+  consecutiveBad: number;
+  consecutiveGood: number;
+  lastNotificationKind: SmokeDiscordNotificationKind | null;
+  lastNotificationAt: string | null;
+  lastNotifiedFingerprint: string | null;
+}
+
+export interface LegacySmokeNotificationState {
   lastObservedStatus: SmokeStatus;
   lastObservedAt: string;
   lastNotificationKind: SmokeDiscordNotificationKind | null;
-  lastNotificationKey: string | null;
   lastNotificationAt: string | null;
+  lastNotificationKey: string | null;
 }
 
-// 讀取 smoke Discord 狀態檔；檔案尚未建立時視為沒有既有通知狀態。
+export interface SmokeDiscordNotificationStateV2 {
+  version: 2;
+  progress: SmokeDaemonProgressState;
+  checks: Record<string, SmokeCheckAlertState>;
+  legacyNotification: LegacySmokeNotificationState | null;
+}
+
+export interface SmokeDiscordNotificationStateV1 extends LegacySmokeNotificationState {
+  version: 1;
+}
+
+export type SmokeDiscordNotificationState = SmokeDiscordNotificationStateV2;
+
+export function createEmptySmokeDiscordNotificationState(): SmokeDiscordNotificationStateV2 {
+  return {
+    version: SMOKE_DISCORD_NOTIFICATION_STATE_VERSION,
+    progress: {
+      lastCycleStartedAt: null,
+      lastCycleCompletedAt: null,
+      lastCycleDurationMs: null,
+      lastCycleOutcome: null,
+      lastCycleErrorKind: null,
+      consecutiveCycleErrors: 0,
+    },
+    checks: {},
+    legacyNotification: null,
+  };
+}
+
+// 讀取單一 smoke state file；v1 會在記憶體中遷移，首次成功寫入後自然成為 v2。
 export async function readSmokeDiscordNotificationState(
   path: string,
-): Promise<SmokeDiscordNotificationState | null> {
+): Promise<SmokeDiscordNotificationStateV2 | null> {
   let raw: string;
 
   try {
@@ -38,64 +91,213 @@ export async function readSmokeDiscordNotificationState(
   return parseSmokeDiscordNotificationState(JSON.parse(raw));
 }
 
-// 以臨時檔加 rename 寫入狀態，降低 daemon 中斷時留下半套 JSON 的機率。
+// 嚴格驗證 v1/v2 schema；不可信內容由 caller 決定採安全空 state 繼續。
+export function parseSmokeDiscordNotificationState(
+  value: unknown,
+): SmokeDiscordNotificationStateV2 {
+  if (!isRecord(value)) {
+    throw invalidStateError();
+  }
+
+  if (value.version === 1) {
+    return migrateSmokeNotificationStateV1(parseStateV1(value));
+  }
+
+  if (value.version !== SMOKE_DISCORD_NOTIFICATION_STATE_VERSION) {
+    throw invalidStateError();
+  }
+
+  const progress = parseProgressState(value.progress);
+  if (!isRecord(value.checks)) {
+    throw invalidStateError();
+  }
+
+  const checks = Object.fromEntries(
+    Object.entries(value.checks).map(([key, check]) => {
+      if (!key || !isRecord(check)) {
+        throw invalidStateError();
+      }
+      return [key, parseCheckState(check)];
+    }),
+  );
+
+  return {
+    version: SMOKE_DISCORD_NOTIFICATION_STATE_VERSION,
+    progress,
+    checks,
+    legacyNotification:
+      value.legacyNotification === null
+        ? null
+        : parseLegacyNotificationState(value.legacyNotification),
+  };
+}
+
+export function migrateSmokeNotificationStateV1(
+  state: SmokeDiscordNotificationStateV1,
+): SmokeDiscordNotificationStateV2 {
+  return {
+    ...createEmptySmokeDiscordNotificationState(),
+    legacyNotification: {
+      lastObservedStatus: state.lastObservedStatus,
+      lastObservedAt: state.lastObservedAt,
+      lastNotificationKind: state.lastNotificationKind,
+      lastNotificationAt: state.lastNotificationAt,
+      lastNotificationKey: state.lastNotificationKey,
+    },
+  };
+}
+
+// 以臨時檔加 rename 原子寫入，避免 daemon 中斷留下半套 JSON。
 export async function writeSmokeDiscordNotificationState(
   path: string,
-  state: SmokeDiscordNotificationState,
+  state: SmokeDiscordNotificationStateV2,
 ): Promise<void> {
+  const validatedState = parseSmokeDiscordNotificationState(state);
   const directory = dirname(path);
   const tempPath = join(directory, `.${basename(path)}.${process.pid}.${Date.now()}.tmp`);
 
   await mkdir(directory, { recursive: true });
-  await writeFile(tempPath, `${JSON.stringify(state, null, 2)}\n`, "utf8");
+  await writeFile(tempPath, `${JSON.stringify(validatedState, null, 2)}\n`, "utf8");
   await rename(tempPath, path);
 }
 
-// 驗證狀態檔 schema，避免壞檔案讓告警去重邏輯用到不可信資料。
-function parseSmokeDiscordNotificationState(value: unknown): SmokeDiscordNotificationState {
-  if (!value || typeof value !== "object") {
-    throw new Error("Invalid smoke Discord notification state file.");
+function parseStateV1(value: Record<string, unknown>): SmokeDiscordNotificationStateV1 {
+  const legacy = parseLegacyNotificationState(value);
+  return { version: 1, ...legacy };
+}
+
+function parseProgressState(value: unknown): SmokeDaemonProgressState {
+  if (!isRecord(value)) {
+    throw invalidStateError();
   }
 
-  const state = value as Partial<SmokeDiscordNotificationState>;
-
   if (
-    state.version !== SMOKE_DISCORD_NOTIFICATION_STATE_VERSION ||
-    !isSmokeStatus(state.lastObservedStatus) ||
-    typeof state.lastObservedAt !== "string" ||
-    !isNullableNotificationKind(state.lastNotificationKind) ||
-    !isNullableString(state.lastNotificationKey) ||
-    !isNullableString(state.lastNotificationAt)
+    !isNullableIsoDate(value.lastCycleStartedAt) ||
+    !isNullableIsoDate(value.lastCycleCompletedAt) ||
+    !isNullableNonNegativeInteger(value.lastCycleDurationMs) ||
+    !isNullableCycleOutcome(value.lastCycleOutcome) ||
+    !isNullableSafeString(value.lastCycleErrorKind) ||
+    !isNonNegativeInteger(value.consecutiveCycleErrors)
   ) {
-    throw new Error("Invalid smoke Discord notification state file.");
+    throw invalidStateError();
   }
 
   return {
-    version: SMOKE_DISCORD_NOTIFICATION_STATE_VERSION,
-    lastObservedStatus: state.lastObservedStatus,
-    lastObservedAt: state.lastObservedAt,
-    lastNotificationKind: state.lastNotificationKind,
-    lastNotificationKey: state.lastNotificationKey,
-    lastNotificationAt: state.lastNotificationAt,
+    lastCycleStartedAt: value.lastCycleStartedAt,
+    lastCycleCompletedAt: value.lastCycleCompletedAt,
+    lastCycleDurationMs: value.lastCycleDurationMs,
+    lastCycleOutcome: value.lastCycleOutcome,
+    lastCycleErrorKind: value.lastCycleErrorKind,
+    consecutiveCycleErrors: value.consecutiveCycleErrors,
   };
 }
 
-// 限定 production smoke 聚合狀態，避免 state file 混入非 smoke summary 的狀態字串。
+function parseCheckState(value: Record<string, unknown>): SmokeCheckAlertState {
+  if (
+    typeof value.checkName !== "string" ||
+    value.checkName.length === 0 ||
+    !isAlertClassification(value.classification) ||
+    !isSmokeStatus(value.lastObservedStatus) ||
+    !isIsoDate(value.lastObservedAt) ||
+    !isNullableSafeString(value.currentFingerprint) ||
+    !isNullableIsoDate(value.pendingSince) ||
+    !isNullableIsoDate(value.activeSince) ||
+    !isNonNegativeInteger(value.consecutiveBad) ||
+    !isNonNegativeInteger(value.consecutiveGood) ||
+    !isNullableNotificationKind(value.lastNotificationKind) ||
+    !isNullableIsoDate(value.lastNotificationAt) ||
+    !isNullableSafeString(value.lastNotifiedFingerprint)
+  ) {
+    throw invalidStateError();
+  }
+
+  return {
+    checkName: value.checkName,
+    classification: value.classification,
+    lastObservedStatus: value.lastObservedStatus,
+    lastObservedAt: value.lastObservedAt,
+    currentFingerprint: value.currentFingerprint,
+    pendingSince: value.pendingSince,
+    activeSince: value.activeSince,
+    consecutiveBad: value.consecutiveBad,
+    consecutiveGood: value.consecutiveGood,
+    lastNotificationKind: value.lastNotificationKind,
+    lastNotificationAt: value.lastNotificationAt,
+    lastNotifiedFingerprint: value.lastNotifiedFingerprint,
+  };
+}
+
+function parseLegacyNotificationState(value: unknown): LegacySmokeNotificationState {
+  if (!isRecord(value)) {
+    throw invalidStateError();
+  }
+  if (
+    !isSmokeStatus(value.lastObservedStatus) ||
+    !isIsoDate(value.lastObservedAt) ||
+    !isNullableNotificationKind(value.lastNotificationKind) ||
+    !isNullableIsoDate(value.lastNotificationAt) ||
+    !isNullableSafeString(value.lastNotificationKey)
+  ) {
+    throw invalidStateError();
+  }
+
+  return {
+    lastObservedStatus: value.lastObservedStatus,
+    lastObservedAt: value.lastObservedAt,
+    lastNotificationKind: value.lastNotificationKind,
+    lastNotificationAt: value.lastNotificationAt,
+    lastNotificationKey: value.lastNotificationKey,
+  };
+}
+
 function isSmokeStatus(value: unknown): value is SmokeStatus {
   return value === "OK" || value === "WARN" || value === "FAIL";
 }
 
-// 限定可被寫入 state file 的 Discord notification 類型。
+function isAlertClassification(value: unknown): value is SmokeAlertClassification {
+  return value === "PAGE" || value === "WARNING" || value === "REPORT";
+}
+
+function isNullableCycleOutcome(value: unknown): value is SmokeCycleOutcome | null {
+  return value === null || isSmokeStatus(value) || value === "ERROR" || value === "TIMEOUT";
+}
+
 function isNullableNotificationKind(value: unknown): value is SmokeDiscordNotificationKind | null {
   return value === null || value === "WARN" || value === "FAIL" || value === "RECOVERED";
 }
 
-// state file 的 nullable 字串欄位只接受 null 或 string，避免後續時間與 key 判斷誤用。
-function isNullableString(value: unknown): value is string | null {
-  return value === null || typeof value === "string";
+function isIsoDate(value: unknown): value is string {
+  if (typeof value !== "string") {
+    return false;
+  }
+  const parsed = new Date(value);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString() === value;
 }
 
-// 區分 Node.js 檔案系統錯誤，讓 ENOENT 可安全轉成「尚無狀態」。
+function isNullableIsoDate(value: unknown): value is string | null {
+  return value === null || isIsoDate(value);
+}
+
+function isNullableSafeString(value: unknown): value is string | null {
+  return value === null || (typeof value === "string" && value.length <= 500);
+}
+
+function isNonNegativeInteger(value: unknown): value is number {
+  return Number.isSafeInteger(value) && (value as number) >= 0;
+}
+
+function isNullableNonNegativeInteger(value: unknown): value is number | null {
+  return value === null || isNonNegativeInteger(value);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function invalidStateError(): Error {
+  return new Error("Invalid production smoke state file.");
+}
+
 function isNodeError(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && "code" in error;
 }

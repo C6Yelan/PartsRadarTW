@@ -1,62 +1,67 @@
 // apps/crawler/src/scripts/ops/smoke-discord-notification.ts
-// 決定 production smoke admin Discord 告警是否發送，並管理 webhook 設定與通知去重狀態。
+// 解析 smoke 告警設定，並將 summary observation 與 Discord transport 決策解耦。
 
-import type { ProductionSmokeSummary } from "./production-smoke";
-import { type DiscordWebhookMessage, readDiscordWebhookUrl } from "./discord-webhook";
 import { getStringArg, resolveWorkspacePathArgument } from "../shared/script-utils";
+import { type DiscordWebhookMessage, readDiscordWebhookUrl } from "./discord-webhook";
+import type { ProductionSmokeSummary } from "./production-smoke";
+import { createCheckNotificationMessage } from "./smoke-discord-notification/message";
 import {
-  createAbnormalMessage,
-  createRecoveredMessage,
-} from "./smoke-discord-notification/message";
+  applySmokeSummaryObservation,
+  type SmokeAlertPolicyOptions,
+  type SmokeNotificationCandidate,
+} from "./smoke-discord-notification/policy";
 import {
-  SMOKE_DISCORD_NOTIFICATION_STATE_VERSION,
-  type SmokeDiscordNotificationKind,
-  type SmokeDiscordNotificationState,
+  createEmptySmokeDiscordNotificationState,
+  type SmokeDiscordNotificationStateV2,
 } from "./smoke-discord-notification/state";
 
 const DEFAULT_STATE_FILE = "storage/ops/smoke-discord-state.json";
-const DEFAULT_COOLDOWN_SECONDS = 12 * 60 * 60;
-const MIN_COOLDOWN_SECONDS = DEFAULT_COOLDOWN_SECONDS;
-const MAX_COOLDOWN_SECONDS = 7 * 24 * 60 * 60;
+const DEFAULT_WARN_REMINDER_SECONDS = 12 * 60 * 60;
+const DEFAULT_FAIL_REMINDER_SECONDS = 60 * 60;
+const DEFAULT_WARNING_PENDING_CYCLES = 2;
+const DEFAULT_FILTER_QUALITY_PENDING_CYCLES = 3;
+const DEFAULT_RECOVERY_GOOD_CYCLES = 2;
 
 export {
+  applyMonitorFailureObservation,
+  applySmokeSummaryObservation,
+  classifySmokeCheck,
+  createSmokeFingerprint,
+  markSmokeNotificationSent,
+} from "./smoke-discord-notification/policy";
+export type {
+  LegacySmokeNotificationState,
+  SmokeAlertClassification,
+  SmokeCheckAlertState,
+  SmokeCycleOutcome,
+  SmokeDaemonProgressState,
+  SmokeDiscordNotificationKind,
+  SmokeDiscordNotificationState,
+  SmokeDiscordNotificationStateV1,
+  SmokeDiscordNotificationStateV2,
+} from "./smoke-discord-notification/state";
+export {
+  createEmptySmokeDiscordNotificationState,
+  migrateSmokeNotificationStateV1,
+  parseSmokeDiscordNotificationState,
   readSmokeDiscordNotificationState,
   writeSmokeDiscordNotificationState,
 } from "./smoke-discord-notification/state";
-export type {
-  SmokeDiscordNotificationKind,
-  SmokeDiscordNotificationState,
-} from "./smoke-discord-notification/state";
 
-// smoke Discord 告警設定；state file 用來避免相同異常在 cooldown 內重複通知。
-export interface SmokeDiscordNotificationOptions {
+export interface SmokeDiscordNotificationOptions extends SmokeAlertPolicyOptions {
   adminWebhookUrl: string | null;
   stateFilePath: string;
-  cooldownSeconds: number;
 }
 
-// 不發送 Discord 告警時的明確原因，供 daemon log 與測試判斷。
-export type SmokeDiscordNotificationSkipReason =
-  | "missing_webhook_url"
-  | "status_ok_without_previous_alert"
-  | "unchanged_within_cooldown";
+export interface SmokeNotificationDeliveryCandidate extends SmokeNotificationCandidate {
+  message: DiscordWebhookMessage;
+}
 
-// Discord 告警決策結果；send 會附帶 message 與下一份 state，skip 只更新必要觀測狀態。
-export type SmokeDiscordNotificationDecision =
-  | {
-      action: "send";
-      kind: SmokeDiscordNotificationKind;
-      notificationKey: string;
-      message: DiscordWebhookMessage;
-      nextState: SmokeDiscordNotificationState;
-    }
-  | {
-      action: "skip";
-      reason: SmokeDiscordNotificationSkipReason;
-      nextState: SmokeDiscordNotificationState | null;
-    };
+export interface SmokeDiscordNotificationDecision {
+  nextState: SmokeDiscordNotificationStateV2;
+  notifications: SmokeNotificationDeliveryCandidate[];
+}
 
-// 解析 smoke Discord 告警相關 CLI/env 設定，包含 webhook、state file 與重複通知 cooldown。
 export function parseSmokeDiscordNotificationOptions(
   args: string[],
   env: NodeJS.ProcessEnv,
@@ -70,191 +75,78 @@ export function parseSmokeDiscordNotificationOptions(
         env.SMOKE_DISCORD_STATE_FILE ??
         DEFAULT_STATE_FILE,
     ),
-    cooldownSeconds: parseIntegerOption({
+    warnReminderSeconds: parseIntegerOption({
       args,
       env,
       argName: "--smoke-discord-cooldown-seconds",
       envName: "SMOKE_DISCORD_COOLDOWN_SECONDS",
-      fallback: DEFAULT_COOLDOWN_SECONDS,
-      min: MIN_COOLDOWN_SECONDS,
-      max: MAX_COOLDOWN_SECONDS,
+      fallback: DEFAULT_WARN_REMINDER_SECONDS,
+      min: DEFAULT_WARN_REMINDER_SECONDS,
+      max: 7 * 24 * 60 * 60,
+    }),
+    failReminderSeconds: parseIntegerOption({
+      args,
+      env,
+      argName: "--smoke-fail-reminder-seconds",
+      envName: "SMOKE_FAIL_REMINDER_SECONDS",
+      fallback: DEFAULT_FAIL_REMINDER_SECONDS,
+      min: 60,
+      max: 7 * 24 * 60 * 60,
+    }),
+    warningPendingCycles: parseIntegerOption({
+      args,
+      env,
+      argName: "--smoke-warning-pending-cycles",
+      envName: "SMOKE_WARNING_PENDING_CYCLES",
+      fallback: DEFAULT_WARNING_PENDING_CYCLES,
+      min: 1,
+      max: 12,
+    }),
+    filterQualityPendingCycles: parseIntegerOption({
+      args,
+      env,
+      argName: "--smoke-filter-quality-pending-cycles",
+      envName: "SMOKE_FILTER_QUALITY_PENDING_CYCLES",
+      fallback: DEFAULT_FILTER_QUALITY_PENDING_CYCLES,
+      min: 1,
+      max: 12,
+    }),
+    recoveryGoodCycles: parseIntegerOption({
+      args,
+      env,
+      argName: "--smoke-recovery-good-cycles",
+      envName: "SMOKE_RECOVERY_GOOD_CYCLES",
+      fallback: DEFAULT_RECOVERY_GOOD_CYCLES,
+      min: 1,
+      max: 12,
     }),
   };
 }
 
-// 根據本輪 smoke summary、前次 state 與 cooldown 規則決定是否送出 WARN/FAIL/RECOVERED。
 export function createSmokeDiscordNotificationDecision({
   summary,
   previousState,
   options,
-  now = summary.checkedAt,
 }: {
   summary: ProductionSmokeSummary;
-  previousState: SmokeDiscordNotificationState | null;
-  options: Pick<SmokeDiscordNotificationOptions, "adminWebhookUrl" | "cooldownSeconds">;
-  now?: Date;
+  previousState: SmokeDiscordNotificationStateV2 | null;
+  options: SmokeAlertPolicyOptions;
 }): SmokeDiscordNotificationDecision {
-  if (!options.adminWebhookUrl) {
-    return {
-      action: "skip",
-      reason: "missing_webhook_url",
-      nextState: previousState,
-    };
-  }
-
-  if (summary.status === "OK") {
-    if (previousState && previousState.lastObservedStatus !== "OK") {
-      const notificationKey = `RECOVERED:${previousState.lastObservedStatus}->OK`;
-
-      return createSendDecision({
-        kind: "RECOVERED",
-        notificationKey,
-        message: createRecoveredMessage(summary, previousState.lastObservedStatus),
-        previousState,
-        summary,
-        now,
-      });
-    }
-
-    return {
-      action: "skip",
-      reason: "status_ok_without_previous_alert",
-      nextState: createNextState({
-        previousState,
-        summary,
-        now,
-      }),
-    };
-  }
-
-  const notificationKey = createAbnormalNotificationKey(summary);
-  const shouldSend = shouldSendAbnormalNotification({
-    previousState,
+  const decision = applySmokeSummaryObservation({
     summary,
-    cooldownSeconds: options.cooldownSeconds,
-    now,
+    previousState: previousState ?? createEmptySmokeDiscordNotificationState(),
+    options,
   });
 
-  if (!shouldSend) {
-    return {
-      action: "skip",
-      reason: "unchanged_within_cooldown",
-      nextState: createNextState({
-        previousState,
-        summary,
-        now,
-      }),
-    };
-  }
-
-  return createSendDecision({
-    kind: summary.status,
-    notificationKey,
-    message: createAbnormalMessage(summary),
-    previousState,
-    summary,
-    now,
-  });
-}
-
-// 建立 send decision，並同步產生對應的下一份去重 state。
-function createSendDecision({
-  kind,
-  notificationKey,
-  message,
-  previousState,
-  summary,
-  now,
-}: {
-  kind: SmokeDiscordNotificationKind;
-  notificationKey: string;
-  message: DiscordWebhookMessage;
-  previousState: SmokeDiscordNotificationState | null;
-  summary: ProductionSmokeSummary;
-  now: Date;
-}): SmokeDiscordNotificationDecision {
   return {
-    action: "send",
-    kind,
-    notificationKey,
-    message,
-    nextState: createNextState({
-      previousState,
-      summary,
-      now,
-      notificationKind: kind,
-      notificationKey,
-    }),
+    nextState: decision.nextState,
+    notifications: decision.notifications.map((notification) => ({
+      ...notification,
+      message: createCheckNotificationMessage(notification),
+    })),
   };
 }
 
-// 建立下一份通知狀態；即使不發送通知，也會記錄最後觀測到的 smoke 狀態。
-function createNextState({
-  previousState,
-  summary,
-  now,
-  notificationKind,
-  notificationKey,
-}: {
-  previousState: SmokeDiscordNotificationState | null;
-  summary: ProductionSmokeSummary;
-  now: Date;
-  notificationKind?: SmokeDiscordNotificationKind;
-  notificationKey?: string;
-}): SmokeDiscordNotificationState {
-  return {
-    version: SMOKE_DISCORD_NOTIFICATION_STATE_VERSION,
-    lastObservedStatus: summary.status,
-    lastObservedAt: now.toISOString(),
-    lastNotificationKind: notificationKind ?? previousState?.lastNotificationKind ?? null,
-    lastNotificationKey: notificationKey ?? previousState?.lastNotificationKey ?? null,
-    lastNotificationAt:
-      notificationKind && notificationKey
-        ? now.toISOString()
-        : (previousState?.lastNotificationAt ?? null),
-  };
-}
-
-// 僅在狀態轉換或未恢復滿 cooldown 時通知，避免異常細節變動造成重複洗版。
-function shouldSendAbnormalNotification({
-  previousState,
-  summary,
-  cooldownSeconds,
-  now,
-}: {
-  previousState: SmokeDiscordNotificationState | null;
-  summary: ProductionSmokeSummary;
-  cooldownSeconds: number;
-  now: Date;
-}): boolean {
-  if (!previousState || previousState.lastObservedStatus === "OK") {
-    return true;
-  }
-
-  if (previousState.lastObservedStatus !== summary.status) {
-    return true;
-  }
-
-  if (!previousState.lastNotificationAt) {
-    return true;
-  }
-
-  return (
-    now.getTime() - new Date(previousState.lastNotificationAt).getTime() >= cooldownSeconds * 1000
-  );
-}
-
-// 將目前所有非 OK check 組成穩定 key，用來判斷異常組合是否真的改變。
-function createAbnormalNotificationKey(summary: ProductionSmokeSummary): string {
-  const abnormalChecks = summary.checks
-    .filter((check) => check.status !== "OK")
-    .map((check) => `${check.status}:${check.name}`)
-    .sort();
-
-  return `${summary.status}:${abnormalChecks.join("|")}`;
-}
-
-// 解析整數型 notification option，避免錯字或超出範圍的 env 靜默套用預設值。
 function parseIntegerOption({
   args,
   env,
@@ -278,12 +170,9 @@ function parseIntegerOption({
   if (!/^(0|[1-9][0-9]*)$/.test(raw)) {
     throw new Error(message);
   }
-
   const value = Number(raw);
-
   if (!Number.isSafeInteger(value) || value < min || value > max) {
     throw new Error(message);
   }
-
   return value;
 }
