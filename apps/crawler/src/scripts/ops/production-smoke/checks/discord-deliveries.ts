@@ -1,6 +1,7 @@
 // apps/crawler/src/scripts/ops/production-smoke/checks/discord-deliveries.ts
 // 檢查近期 personal / public Discord delivery 的最新失敗與 rate limit 狀態。
 
+import type { DiscordDeliveryErrorCategory } from "@partsradar/db";
 import { MILLISECONDS_PER_HOUR } from "../constants";
 import { ok, warn } from "../results";
 import type { ProductionSmokeClient, ProductionSmokeOptions, SmokeCheckResult } from "../types";
@@ -27,6 +28,9 @@ export async function checkDiscordBotDeliveries(
         kind: true,
         status: true,
         targetPriceWatchId: true,
+        errorCategory: true,
+        httpStatus: true,
+        providerErrorCode: true,
         createdAt: true,
       },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
@@ -52,6 +56,7 @@ export async function checkDiscordBotDeliveries(
     personalRecords,
     toPersonalDiscordDeliveryStreamKey,
     (record) => record.createdAt,
+    isExpectedPersonalDiscord403,
   );
   const publicReports = summarizeLatestDiscordDeliveryStatuses(
     publicRecords,
@@ -61,7 +66,8 @@ export async function checkDiscordBotDeliveries(
   const issueCount =
     personal.failed + personal.rateLimited + publicReports.failed + publicReports.rateLimited;
   const message =
-    `personalFailed=${personal.failed} personalRateLimited=${personal.rateLimited} ` +
+    `personalFailed=${personal.failed} personalExpected403=${personal.expected403} ` +
+    `personalRateLimited=${personal.rateLimited} ` +
     `publicFailed=${publicReports.failed} publicRateLimited=${publicReports.rateLimited} ` +
     `in ${options.recentWindowHours}h`;
 
@@ -79,6 +85,9 @@ interface PersonalDiscordDeliveryHealthRecord extends DiscordDeliveryHealthRecor
   discordUserId: string;
   kind: "PRICE_REPORT_NOW" | "SCHEDULED_PRICE_REPORT" | "TARGET_PRICE";
   targetPriceWatchId: string | null;
+  errorCategory: DiscordDeliveryErrorCategory | null;
+  httpStatus: number | null;
+  providerErrorCode: number | null;
   createdAt: Date;
 }
 
@@ -92,8 +101,10 @@ function summarizeLatestDiscordDeliveryStatuses<T extends DiscordDeliveryHealthR
   records: T[],
   toStreamKey: (record: T) => string,
   toAttemptedAt: (record: T) => Date,
+  isExpectedFailure: (record: T) => boolean = () => false,
 ): {
   failed: number;
+  expected403: number;
   rateLimited: number;
 } {
   const latestByStream = new Map<string, T>();
@@ -111,17 +122,31 @@ function summarizeLatestDiscordDeliveryStatuses<T extends DiscordDeliveryHealthR
   }
 
   let failed = 0;
+  let expected403 = 0;
   let rateLimited = 0;
 
   for (const record of latestByStream.values()) {
     if (record.status === "FAILED") {
-      failed += 1;
+      if (isExpectedFailure(record)) {
+        expected403 += 1;
+      } else {
+        failed += 1;
+      }
     } else if (record.status === "RATE_LIMITED") {
       rateLimited += 1;
     }
   }
 
-  return { failed, rateLimited };
+  return { failed, expected403, rateLimited };
+}
+
+// 個人 DM 的權限型 403 是使用者端可預期狀態；公開頻道 delivery 不套用此排除規則。
+function isExpectedPersonalDiscord403(record: PersonalDiscordDeliveryHealthRecord): boolean {
+  return (
+    record.status === "FAILED" &&
+    record.httpStatus === 403 &&
+    (record.errorCategory === "PERMISSIONS" || record.errorCategory === "DM_UNAVAILABLE")
+  );
 }
 
 // 個人報告以使用者為 stream；目標價通知需加上 watch id，避免不同 watch 互相覆蓋。

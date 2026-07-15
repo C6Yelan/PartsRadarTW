@@ -4,6 +4,7 @@
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { DiscordDeliveryErrorCategory } from "@partsradar/db";
 import { vi } from "vitest";
 import type { runProductionSmoke } from "../../../../src/scripts/ops/production-smoke";
 import type { runProductionSmokeDaemon } from "../../../../src/scripts/ops/production-smoke-daemon";
@@ -14,6 +15,12 @@ export const DISCORD_ADMIN_WEBHOOK_URL =
 export type SendDiscordWebhook = NonNullable<
   Parameters<typeof runProductionSmokeDaemon>[0]["sendDiscordWebhook"]
 >;
+
+interface DiscordDeliveryErrorMetadata {
+  errorCategory: DiscordDeliveryErrorCategory | null;
+  httpStatus: number | null;
+  providerErrorCode: number | null;
+}
 
 // 建立最小 workspace 結構，讓 smoke option parser 可解析 repo root 與 crawler cwd。
 export async function createWorkspace(): Promise<{
@@ -160,25 +167,29 @@ export function createSmokeClient({
     failed?: number;
     rateLimited?: number;
   };
-  discordDeliveryRecords?: Array<{
-    id: string;
-    discordUserId: string;
-    kind: "PRICE_REPORT_NOW" | "SCHEDULED_PRICE_REPORT" | "TARGET_PRICE";
-    status: "SENT" | "SKIPPED" | "FAILED" | "RATE_LIMITED";
-    targetPriceWatchId: string | null;
-    createdAt: Date;
-  }>;
+  discordDeliveryRecords?: Array<
+    {
+      id: string;
+      discordUserId: string;
+      kind: "PRICE_REPORT_NOW" | "SCHEDULED_PRICE_REPORT" | "TARGET_PRICE";
+      status: "SENT" | "SKIPPED" | "FAILED" | "RATE_LIMITED";
+      targetPriceWatchId: string | null;
+      createdAt: Date;
+    } & DiscordDeliveryErrorMetadata
+  >;
   publicDiscordDeliveryCounts?: {
     failed?: number;
     rateLimited?: number;
   };
-  publicDiscordDeliveryRecords?: Array<{
-    id: string;
-    channelId: string;
-    status: "SENT" | "SKIPPED" | "FAILED" | "RATE_LIMITED";
-    createdAt: Date;
-    updatedAt: Date;
-  }>;
+  publicDiscordDeliveryRecords?: Array<
+    {
+      id: string;
+      channelId: string;
+      status: "SENT" | "SKIPPED" | "FAILED" | "RATE_LIMITED";
+      createdAt: Date;
+      updatedAt: Date;
+    } & Partial<DiscordDeliveryErrorMetadata>
+  >;
   historicalImageProducts?: Array<{ id: string }>;
   activeProductCount?: number;
 }) {
@@ -239,7 +250,7 @@ export function createSmokeClient({
 
         return 0;
       },
-      findMany: async () =>
+      findMany: vi.fn(async () =>
         discordDeliveryRecords ?? [
           ...Array.from({ length: discordDeliveryCounts.failed ?? 0 }, (_, index) => ({
             id: `discord-failed-${index + 1}`,
@@ -247,6 +258,9 @@ export function createSmokeClient({
             kind: "SCHEDULED_PRICE_REPORT" as const,
             status: "FAILED" as const,
             targetPriceWatchId: null,
+            errorCategory: "TRANSPORT" as const,
+            httpStatus: null,
+            providerErrorCode: null,
             createdAt: new Date(`2026-06-02T11:${String(50 - index).padStart(2, "0")}:00.000Z`),
           })),
           ...Array.from({ length: discordDeliveryCounts.rateLimited ?? 0 }, (_, index) => ({
@@ -255,9 +269,13 @@ export function createSmokeClient({
             kind: "SCHEDULED_PRICE_REPORT" as const,
             status: "RATE_LIMITED" as const,
             targetPriceWatchId: null,
+            errorCategory: "RATE_LIMITED" as const,
+            httpStatus: 429,
+            providerErrorCode: null,
             createdAt: new Date(`2026-06-02T11:${String(40 - index).padStart(2, "0")}:00.000Z`),
           })),
         ],
+      ),
     },
     discordPublicPriceReportDelivery: {
       findMany: vi.fn(

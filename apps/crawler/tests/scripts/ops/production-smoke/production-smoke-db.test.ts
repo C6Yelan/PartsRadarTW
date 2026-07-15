@@ -144,7 +144,7 @@ describe("production smoke DB-backed checks", () => {
           name: "discord bot deliveries",
           status: "WARN",
           message:
-            "personalFailed=1 personalRateLimited=1 publicFailed=1 publicRateLimited=1 in 24h",
+            "personalFailed=1 personalExpected403=0 personalRateLimited=1 publicFailed=1 publicRateLimited=1 in 24h",
         }),
       ]),
     );
@@ -152,6 +152,190 @@ describe("production smoke DB-backed checks", () => {
 
     expect(JSON.stringify(discordCheck)).not.toContain("discord-user");
     expect(JSON.stringify(discordCheck)).not.toContain("discord-channel");
+  });
+
+  it("treats a personal PERMISSIONS HTTP 403 as observable but non-actionable", async () => {
+    const { summary, client } = await runDiscordDeliverySmoke({
+      discordDeliveryRecords: [
+        personalDelivery({
+          id: "permissions-403",
+          kind: "PRICE_REPORT_NOW",
+          errorCategory: "PERMISSIONS",
+          httpStatus: 403,
+          providerErrorCode: 50013,
+        }),
+      ],
+    });
+    const check = summary.checks.find((item) => item.name === "discord bot deliveries");
+
+    expect(check).toMatchObject({
+      status: "OK",
+      message:
+        "personalFailed=0 personalExpected403=1 personalRateLimited=0 publicFailed=0 publicRateLimited=0 in 24h",
+    });
+    expect(summary.status).toBe("OK");
+    expect(client.discordNotificationDelivery.findMany).toHaveBeenCalledWith({
+      where: { createdAt: { gte: new Date("2026-06-01T12:00:00.000Z") } },
+      select: {
+        id: true,
+        discordUserId: true,
+        kind: true,
+        status: true,
+        targetPriceWatchId: true,
+        errorCategory: true,
+        httpStatus: true,
+        providerErrorCode: true,
+        createdAt: true,
+      },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: 500,
+    });
+  });
+
+  it("treats a personal DM_UNAVAILABLE HTTP 403 as observable but non-actionable", async () => {
+    const { summary } = await runDiscordDeliverySmoke({
+      discordDeliveryRecords: [
+        personalDelivery({
+          id: "dm-unavailable-403",
+          kind: "SCHEDULED_PRICE_REPORT",
+          errorCategory: "DM_UNAVAILABLE",
+          httpStatus: 403,
+          providerErrorCode: 50007,
+        }),
+      ],
+    });
+
+    expect(summary.checks.find((item) => item.name === "discord bot deliveries")).toMatchObject({
+      status: "OK",
+      message:
+        "personalFailed=0 personalExpected403=1 personalRateLimited=0 publicFailed=0 publicRateLimited=0 in 24h",
+    });
+  });
+
+  it("counts expected personal 403 failures independently across all notification streams", async () => {
+    const { summary } = await runDiscordDeliverySmoke({
+      discordDeliveryRecords: [
+        personalDelivery({
+          id: "price-report-now-403",
+          kind: "PRICE_REPORT_NOW",
+          errorCategory: "PERMISSIONS",
+          httpStatus: 403,
+          providerErrorCode: 50001,
+        }),
+        personalDelivery({
+          id: "scheduled-price-report-403",
+          kind: "SCHEDULED_PRICE_REPORT",
+          errorCategory: "DM_UNAVAILABLE",
+          httpStatus: 403,
+          providerErrorCode: 50007,
+        }),
+        personalDelivery({
+          id: "target-price-403",
+          kind: "TARGET_PRICE",
+          targetPriceWatchId: "watch-1",
+          errorCategory: "DM_UNAVAILABLE",
+          httpStatus: 403,
+          providerErrorCode: 50007,
+        }),
+        personalDelivery({
+          id: "target-price-second-watch-403",
+          kind: "TARGET_PRICE",
+          targetPriceWatchId: "watch-2",
+          errorCategory: "PERMISSIONS",
+          httpStatus: 403,
+          providerErrorCode: 50013,
+        }),
+      ],
+    });
+    const check = summary.checks.find((item) => item.name === "discord bot deliveries");
+
+    expect(check).toMatchObject({
+      status: "OK",
+      message:
+        "personalFailed=0 personalExpected403=4 personalRateLimited=0 publicFailed=0 publicRateLimited=0 in 24h",
+    });
+    expect(JSON.stringify(check)).not.toMatch(
+      /discord-user|discord-channel|watch-[12]|errorMessage|token|DATABASE_URL|stack|provider message/,
+    );
+  });
+
+  it("keeps actionable personal failures and rate limits in WARN", async () => {
+    const { summary } = await runDiscordDeliverySmoke({
+      discordDeliveryRecords: [
+        personalDelivery({
+          id: "transport-failure",
+          kind: "SCHEDULED_PRICE_REPORT",
+          errorCategory: "TRANSPORT",
+        }),
+        personalDelivery({
+          id: "provider-failure",
+          discordUserId: "discord-user-2",
+          kind: "PRICE_REPORT_NOW",
+          errorCategory: "PROVIDER",
+          httpStatus: 502,
+        }),
+        personalDelivery({
+          id: "rate-limited",
+          discordUserId: "discord-user-3",
+          kind: "TARGET_PRICE",
+          status: "RATE_LIMITED",
+          targetPriceWatchId: "watch-2",
+          errorCategory: "RATE_LIMITED",
+          httpStatus: 429,
+        }),
+        personalDelivery({
+          id: "permissions-non-403",
+          discordUserId: "discord-user-4",
+          kind: "SCHEDULED_PRICE_REPORT",
+          errorCategory: "PERMISSIONS",
+          httpStatus: 401,
+        }),
+        personalDelivery({
+          id: "unclassified-failure",
+          discordUserId: "discord-user-5",
+          kind: "PRICE_REPORT_NOW",
+          errorCategory: null,
+        }),
+        personalDelivery({
+          id: "expired-interaction",
+          discordUserId: "discord-user-6",
+          kind: "TARGET_PRICE",
+          targetPriceWatchId: "watch-3",
+          errorCategory: "INTERACTION_EXPIRED",
+          httpStatus: 404,
+          providerErrorCode: 10062,
+        }),
+      ],
+    });
+
+    expect(summary.checks.find((item) => item.name === "discord bot deliveries")).toMatchObject({
+      status: "WARN",
+      message:
+        "personalFailed=5 personalExpected403=0 personalRateLimited=1 publicFailed=0 publicRateLimited=0 in 24h",
+    });
+  });
+
+  it("keeps a public report PERMISSIONS HTTP 403 in WARN", async () => {
+    const { summary } = await runDiscordDeliverySmoke({
+      publicDiscordDeliveryRecords: [
+        {
+          id: "public-permissions-403",
+          channelId: "discord-channel-1",
+          status: "FAILED",
+          errorCategory: "PERMISSIONS",
+          httpStatus: 403,
+          providerErrorCode: 50013,
+          createdAt: new Date("2026-06-02T11:30:00.000Z"),
+          updatedAt: new Date("2026-06-02T11:30:00.000Z"),
+        },
+      ],
+    });
+
+    expect(summary.checks.find((item) => item.name === "discord bot deliveries")).toMatchObject({
+      status: "WARN",
+      message:
+        "personalFailed=0 personalExpected403=0 personalRateLimited=0 publicFailed=1 publicRateLimited=0 in 24h",
+    });
   });
 
   it("still fails when true parse errors exceed the configured threshold", async () => {
@@ -210,6 +394,9 @@ describe("production smoke DB-backed checks", () => {
             kind: "SCHEDULED_PRICE_REPORT",
             status: "SENT",
             targetPriceWatchId: null,
+            errorCategory: null,
+            httpStatus: null,
+            providerErrorCode: null,
             createdAt: new Date("2026-06-02T11:10:00.000Z"),
           },
           {
@@ -218,6 +405,9 @@ describe("production smoke DB-backed checks", () => {
             kind: "SCHEDULED_PRICE_REPORT",
             status: "FAILED",
             targetPriceWatchId: null,
+            errorCategory: "DM_UNAVAILABLE",
+            httpStatus: 403,
+            providerErrorCode: 50007,
             createdAt: new Date("2026-06-02T11:00:00.000Z"),
           },
         ],
@@ -244,7 +434,8 @@ describe("production smoke DB-backed checks", () => {
 
     expect(summary.checks.find((check) => check.name === "discord bot deliveries")).toMatchObject({
       status: "OK",
-      message: "personalFailed=0 personalRateLimited=0 publicFailed=0 publicRateLimited=0 in 24h",
+      message:
+        "personalFailed=0 personalExpected403=0 personalRateLimited=0 publicFailed=0 publicRateLimited=0 in 24h",
     });
     expect(summary.status).toBe("OK");
   });
@@ -285,7 +476,8 @@ describe("production smoke DB-backed checks", () => {
 
     expect(summary.checks.find((check) => check.name === "discord bot deliveries")).toMatchObject({
       status: "WARN",
-      message: "personalFailed=0 personalRateLimited=0 publicFailed=1 publicRateLimited=0 in 24h",
+      message:
+        "personalFailed=0 personalExpected403=0 personalRateLimited=0 publicFailed=1 publicRateLimited=0 in 24h",
     });
     expect(client.discordPublicPriceReportDelivery.findMany).toHaveBeenCalledWith({
       where: {
@@ -304,3 +496,40 @@ describe("production smoke DB-backed checks", () => {
     });
   });
 });
+
+type SmokeClientOptions = Parameters<typeof createSmokeClient>[0];
+type PersonalDeliveryRecord = NonNullable<SmokeClientOptions["discordDeliveryRecords"]>[number];
+
+function personalDelivery(
+  overrides: Partial<PersonalDeliveryRecord> &
+    Pick<PersonalDeliveryRecord, "id" | "kind" | "errorCategory">,
+): PersonalDeliveryRecord {
+  return {
+    discordUserId: "discord-user-1",
+    status: "FAILED",
+    targetPriceWatchId: null,
+    httpStatus: null,
+    providerErrorCode: null,
+    createdAt: new Date("2026-06-02T11:30:00.000Z"),
+    ...overrides,
+  };
+}
+
+async function runDiscordDeliverySmoke(
+  overrides: Omit<SmokeClientOptions, "trueParseErrorCount">,
+) {
+  const { crawlerCwd, workspaceRoot } = await createWorkspace();
+  const imageDir = join(workspaceRoot, "product-images");
+  await mkdir(imageDir);
+  await writeFile(join(imageDir, "product-1.webp"), "webp");
+  stubHealthyPublicApi();
+  const options = parseProductionSmokeOptions(
+    [],
+    { PRODUCT_IMAGE_STORAGE_DIR: imageDir },
+    crawlerCwd,
+  );
+  const client = createSmokeClient({ trueParseErrorCount: 0, ...overrides });
+  const summary = await runProductionSmoke(client, options, new Date("2026-06-02T12:00:00.000Z"));
+
+  return { summary, client };
+}
