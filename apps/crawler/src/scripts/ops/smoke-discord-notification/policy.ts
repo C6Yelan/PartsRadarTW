@@ -128,53 +128,29 @@ export function applyMonitorFailureObservation({
 }): SmokeAlertObservationDecision {
   const observedAtIso = observedAt.toISOString();
   const fingerprint = `${MONITOR_EXECUTION_STATE_KEY}|FAIL|PAGE|${outcome}`;
-  const previousCheck = previousState.checks[MONITOR_EXECUTION_STATE_KEY];
-  const sameIncident = previousCheck?.currentFingerprint === fingerprint;
-  const consecutiveBad = sameIncident ? previousCheck.consecutiveBad + 1 : 1;
-  const incidentSince = sameIncident
-    ? (previousCheck.activeSince ?? previousCheck.pendingSince ?? observedAtIso)
-    : observedAtIso;
-  const pendingSince = sameIncident && previousCheck.activeSince ? null : incidentSince;
-  const nextCheck: SmokeCheckAlertState = {
+  const decision = observeAbnormalCheck({
+    stateKey: MONITOR_EXECUTION_STATE_KEY,
     checkName: MONITOR_EXECUTION_STATE_KEY,
+    status: "FAIL",
     classification: "PAGE",
-    lastObservedStatus: "FAIL",
-    lastObservedAt: observedAtIso,
-    currentFingerprint: fingerprint,
-    pendingSince,
-    activeSince: sameIncident ? (previousCheck?.activeSince ?? null) : null,
-    consecutiveBad,
-    consecutiveGood: 0,
-    lastNotificationKind: sameIncident ? (previousCheck?.lastNotificationKind ?? null) : null,
-    lastNotificationAt: sameIncident ? (previousCheck?.lastNotificationAt ?? null) : null,
-    lastNotifiedFingerprint: sameIncident ? (previousCheck?.lastNotifiedFingerprint ?? null) : null,
-  };
-
-  const alreadyNotified =
-    nextCheck.lastNotifiedFingerprint === fingerprint && nextCheck.lastNotificationKind === "FAIL";
-  const shouldNotify = !alreadyNotified || isReminderDue(nextCheck, "FAIL", observedAtIso, options);
+    fingerprint,
+    issue: errorKind,
+    previousCheck: previousState.checks[MONITOR_EXECUTION_STATE_KEY] ?? null,
+    observedAt: observedAtIso,
+    notificationThreshold: 1,
+    notificationHistoryKinds: ["FAIL"],
+    options,
+  });
 
   return {
     nextState: {
       ...previousState,
-      checks: { ...previousState.checks, [MONITOR_EXECUTION_STATE_KEY]: nextCheck },
+      checks: {
+        ...previousState.checks,
+        [MONITOR_EXECUTION_STATE_KEY]: decision.nextCheck,
+      },
     },
-    notifications: shouldNotify
-      ? [
-          {
-            stateKey: MONITOR_EXECUTION_STATE_KEY,
-            kind: "FAIL",
-            checkName: MONITOR_EXECUTION_STATE_KEY,
-            classification: "PAGE",
-            fingerprint,
-            firstObservedAt: nextCheck.activeSince ?? pendingSince ?? observedAtIso,
-            observedAt: observedAtIso,
-            consecutiveCount: consecutiveBad,
-            issue: errorKind,
-            previousStatus: null,
-          },
-        ]
-      : [],
+    notifications: decision.notification ? [decision.notification] : [],
   };
 }
 
@@ -239,6 +215,46 @@ function observeCheck({
   }
 
   const fingerprint = createSmokeFingerprint(check.name, check.status, classification);
+  return observeAbnormalCheck({
+    stateKey,
+    checkName: check.name,
+    status: check.status,
+    classification,
+    fingerprint,
+    issue: check.message,
+    previousCheck,
+    observedAt,
+    notificationThreshold: classification === "REPORT" ? null : getPendingThreshold(check, options),
+    notificationHistoryKinds: ["WARN", "FAIL"],
+    options,
+  });
+}
+
+function observeAbnormalCheck({
+  stateKey,
+  checkName,
+  status,
+  classification,
+  fingerprint,
+  issue,
+  previousCheck,
+  observedAt,
+  notificationThreshold,
+  notificationHistoryKinds,
+  options,
+}: {
+  stateKey: string;
+  checkName: string;
+  status: Exclude<SmokeStatus, "OK">;
+  classification: SmokeAlertClassification;
+  fingerprint: string;
+  issue: string;
+  previousCheck: SmokeCheckAlertState | null;
+  observedAt: string;
+  notificationThreshold: number | null;
+  notificationHistoryKinds: readonly Exclude<SmokeDiscordNotificationKind, "RECOVERED">[];
+  options: SmokeAlertPolicyOptions;
+}): { nextCheck: SmokeCheckAlertState; notification: SmokeNotificationCandidate | null } {
   const sameIncident = previousCheck?.currentFingerprint === fingerprint;
   const consecutiveBad = sameIncident ? previousCheck.consecutiveBad + 1 : 1;
   const incidentSince = sameIncident
@@ -246,9 +262,9 @@ function observeCheck({
     : observedAt;
   const pendingSince = sameIncident && previousCheck.activeSince ? null : incidentSince;
   const nextCheck: SmokeCheckAlertState = {
-    checkName: check.name,
+    checkName,
     classification,
-    lastObservedStatus: check.status,
+    lastObservedStatus: status,
     lastObservedAt: observedAt,
     currentFingerprint: fingerprint,
     pendingSince,
@@ -260,19 +276,17 @@ function observeCheck({
     lastNotifiedFingerprint: sameIncident ? (previousCheck?.lastNotifiedFingerprint ?? null) : null,
   };
 
-  if (classification === "REPORT") {
+  if (notificationThreshold === null || consecutiveBad < notificationThreshold) {
     return { nextCheck, notification: null };
   }
 
-  const threshold = getPendingThreshold(check, options);
-  if (consecutiveBad < threshold) {
-    return { nextCheck, notification: null };
-  }
-
+  const lastNotificationKind = nextCheck.lastNotificationKind;
   const alreadyNotified =
     nextCheck.lastNotifiedFingerprint === fingerprint &&
-    (nextCheck.lastNotificationKind === "WARN" || nextCheck.lastNotificationKind === "FAIL");
-  if (alreadyNotified && !isReminderDue(nextCheck, check.status, observedAt, options)) {
+    lastNotificationKind !== null &&
+    lastNotificationKind !== "RECOVERED" &&
+    notificationHistoryKinds.includes(lastNotificationKind);
+  if (alreadyNotified && !isReminderDue(nextCheck, status, observedAt, options)) {
     return { nextCheck, notification: null };
   }
 
@@ -280,14 +294,14 @@ function observeCheck({
     nextCheck,
     notification: {
       stateKey,
-      kind: check.status,
-      checkName: check.name,
+      kind: status,
+      checkName,
       classification,
       fingerprint,
       firstObservedAt: nextCheck.activeSince ?? pendingSince ?? observedAt,
       observedAt,
       consecutiveCount: consecutiveBad,
-      issue: check.message,
+      issue,
       previousStatus: null,
     },
   };
