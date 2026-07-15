@@ -1,6 +1,7 @@
 // apps/web/app/api/products/[id]/price-history/handler.ts
 // 處理商品價格歷史 API 的 product id 驗證、range query 解析、DB 讀取與安全回應。
 
+import { normalizeProductId } from "../../../../_shared/product-id";
 import { InvalidQueryError } from "../../../_shared/query";
 import {
   internalErrorResponse,
@@ -8,13 +9,12 @@ import {
   jsonOk,
   notFoundResponse,
 } from "../../../_shared/responses";
-import { normalizeProductId } from "../product-id";
 import {
   PRICE_HISTORY_PRODUCT_SELECT,
   PRICE_HISTORY_SNAPSHOT_SELECT,
   type ProductPriceHistoryReadClient,
 } from "./data";
-import { parsePriceHistoryRange, PRICE_HISTORY_MILLISECONDS_PER_DAY } from "./query";
+import { PRICE_HISTORY_MILLISECONDS_PER_DAY, parsePriceHistoryRange } from "./query";
 import { type ProductPriceHistoryResponseBody, toPriceHistoryResponse } from "./response";
 
 interface ProductPriceHistoryHandlerOptions {

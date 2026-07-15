@@ -7,9 +7,9 @@ import {
   formatSignedTwdPrice,
   formatTwdPrice,
 } from "../../_shared/formatting";
+import { ProductImage } from "../../_shared/ProductImage";
 import { BUILD_LIST_MAX_QUANTITY, MAX_BUILD_LIST_PRODUCTS } from "../../build-list/constants";
 import type { ProductListItem } from "../types";
-import { ProductImage } from "./ProductImage";
 
 interface ProductRowProps {
   buildListQuantity: number;

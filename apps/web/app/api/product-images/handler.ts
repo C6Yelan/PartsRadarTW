@@ -1,55 +1,29 @@
 // apps/web/app/api/product-images/handler.ts
-// 讀取站內商品 WebP 縮圖快取，負責 image id 驗證、storage path 組裝與安全回應。
+// 將商品圖片 route name 轉成受信任 UUID，並映射快取讀取結果為安全 HTTP 回應。
 
-import { readFile } from "node:fs/promises";
-import { join, resolve } from "node:path";
-
+import { normalizeProductId } from "../../_shared/product-id";
+import {
+  type ProductImageStorageOptions,
+  readCachedProductImage,
+} from "../../_shared/product-image-storage";
 import { internalErrorResponse, notFoundResponse } from "../_shared/responses";
 
 const PRODUCT_IMAGE_CONTENT_TYPE = "image/webp";
 const PRODUCT_IMAGE_CACHE_CONTROL = "public, max-age=3600";
-const PRODUCT_IMAGE_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const DEFAULT_PRODUCT_IMAGE_STORAGE_DIR = "../../storage/product-images";
-
-export type ProductImageReadFile = (path: string) => Promise<Uint8Array>;
-
-export interface ProductImageHandlerOptions {
-  storageDir?: string;
-  readImageFile?: ProductImageReadFile;
-}
-
-// 只讀取通過 UUID 驗證的站內 WebP 快取；缺檔或無效 id 回傳 null。
-export async function readCachedProductImage(
-  imageId: string,
-  options: ProductImageHandlerOptions = {},
-): Promise<Uint8Array | null> {
-  const normalizedImageId = normalizeProductImageId(imageId);
-
-  if (!normalizedImageId) {
-    return null;
-  }
-
-  const storageDir = resolveProductImageStorageDir(options.storageDir);
-  const readImageFile = options.readImageFile ?? readFile;
-
-  try {
-    return await readImageFile(createProductImagePath(storageDir, normalizedImageId));
-  } catch (error) {
-    if (isFileNotFoundError(error)) {
-      return null;
-    }
-
-    throw error;
-  }
-}
 
 // 建立商品縮圖 API handler；只讀本機快取，不在訪客請求期間抓取來源站圖片。
 export function createGetProductImageHandler(
-  options: ProductImageHandlerOptions = {},
-): (imageId: string) => Promise<Response> {
+  options: ProductImageStorageOptions = {},
+): (imageId: unknown) => Promise<Response> {
   return async (imageId) => {
     try {
-      const bytes = await readCachedProductImage(imageId, options);
+      const normalizedProductId = normalizeProductImageRouteName(imageId);
+
+      if (!normalizedProductId) {
+        return notFoundResponse();
+      }
+
+      const bytes = await readCachedProductImage(normalizedProductId, options);
 
       if (!bytes) {
         return notFoundResponse();
@@ -70,36 +44,19 @@ export function createGetProductImageHandler(
   };
 }
 
-// 正規化 URL path 中的圖片 id，只允許 product UUID 與可選 `.webp` 副檔名。
-function normalizeProductImageId(imageId: string): string | null {
-  const value = imageId.trim().toLowerCase();
-  const normalizedValue = value.endsWith(".webp") ? value.slice(0, -".webp".length) : value;
-
-  return PRODUCT_IMAGE_ID_PATTERN.test(normalizedValue) ? normalizedValue : null;
-}
-
-function resolveProductImageStorageDir(storageDir: string | undefined): string {
-  const value =
-    storageDir ?? process.env.PRODUCT_IMAGE_STORAGE_DIR ?? DEFAULT_PRODUCT_IMAGE_STORAGE_DIR;
-  const trimmedValue = value.trim();
-
-  if (!trimmedValue) {
-    throw new Error("Product image storage directory must not be empty.");
+// 圖片 route 可使用裸 UUID 或單一 `.webp` 副檔名；UUID 格式由共用 policy 決定。
+function normalizeProductImageRouteName(imageId: unknown): string | null {
+  if (typeof imageId !== "string") {
+    return null;
   }
 
-  // handler 建立時先 resolve storage root，request 階段只會接上已驗證的 UUID 檔名。
-  return resolve(trimmedValue);
-}
+  const value = imageId.trim();
+  const hasWebpSuffix = value.toLowerCase().endsWith(".webp");
+  const productId = hasWebpSuffix ? value.slice(0, -".webp".length) : value;
 
-function createProductImagePath(storageDir: string, imageId: string): string {
-  return join(storageDir, `${imageId}.webp`);
-}
+  if (hasWebpSuffix && productId !== productId.trim()) {
+    return null;
+  }
 
-function isFileNotFoundError(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error as NodeJS.ErrnoException).code === "ENOENT"
-  );
+  return normalizeProductId(productId);
 }

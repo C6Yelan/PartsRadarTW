@@ -1,9 +1,9 @@
 // apps/web/app/build-list/model.ts
 // 定義配單 intent、暫存 refresh snapshot 與數量、排序、摘要純函式。
 
+import { normalizeProductId } from "../_shared/product-id";
 import { BUILD_LIST_MAX_QUANTITY, MAX_BUILD_LIST_PRODUCTS } from "./constants";
 import { isRecord, normalizeIsoDate } from "./model/validation";
-import { normalizeBuildListProductId } from "./product-id";
 
 export interface BuildListIntent {
   productId: string;
@@ -72,7 +72,7 @@ export function addProductToBuildList(
   productId: string,
   now = new Date(),
 ): BuildListIntent[] {
-  const normalizedProductId = normalizeBuildListProductId(productId);
+  const normalizedProductId = normalizeProductId(productId);
 
   if (!normalizedProductId) {
     return intents;
@@ -118,7 +118,7 @@ export function updateBuildListItemQuantity(
   quantity: number,
   now = new Date(),
 ): BuildListIntent[] {
-  const normalizedProductId = normalizeBuildListProductId(productId);
+  const normalizedProductId = normalizeProductId(productId);
 
   if (!normalizedProductId) {
     return intents;
@@ -143,7 +143,7 @@ export function updateBuildListItemExportSelection(
   includeInExport: boolean,
   now = new Date(),
 ): BuildListIntent[] {
-  const normalizedProductId = normalizeBuildListProductId(productId);
+  const normalizedProductId = normalizeProductId(productId);
 
   if (!normalizedProductId) return intents;
 
@@ -324,7 +324,7 @@ function normalizeBuildListIntent(value: unknown): BuildListIntent | null {
     return null;
   }
 
-  const productId = normalizeBuildListProductId(value.productId);
+  const productId = normalizeProductId(value.productId);
   const addedAt = normalizeIsoDate(value.addedAt);
   const updatedAt = normalizeIsoDate(value.updatedAt);
   const order = value.order;

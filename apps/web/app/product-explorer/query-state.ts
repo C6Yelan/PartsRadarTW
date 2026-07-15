@@ -2,6 +2,7 @@
 // 集中商品探索頁的 URL query、API search params、篩選選項與分頁狀態轉換規則。
 
 import { getProductFacetDefinitions, isProductFilterTagSupported } from "@partsradar/shared";
+import { toDigitsOnly } from "../_shared/numeric-input";
 import { getCategoryIgrp } from "../category-slugs";
 import type { CategoryItem, ProductSort, ProductStatus, QueryState } from "./types";
 
@@ -146,11 +147,6 @@ export function isNonNegativeInteger(value: string) {
   return /^\d+$/.test(value);
 }
 
-// 保留輸入中的半形數字，供分頁與價格欄位即時清理使用。
-export function toDigitsOnly(value: string) {
-  return value.replace(/\D/g, "");
-}
-
 // 將價格輸入限制為商品探索頁允許的數字長度。
 export function toPriceDigits(value: string) {
   return toDigitsOnly(value).slice(0, MAX_PRICE_DIGITS);
@@ -204,29 +200,6 @@ export function normalizeFacetValues(
 // 回首頁或重設時選擇可用分類；沒有分類資料時保留呼叫端提供的 fallback。
 export function getFallbackCategorySlug(categories: CategoryItem[], fallback: string) {
   return categories.length > 0 ? categories[0].slug : fallback;
-}
-
-// 建立分頁列顯示項目；頁碼間距過大時插入 gap marker 讓 UI 顯示省略。
-export function getVisiblePages(currentPage: number, totalPages: number): Array<number | string> {
-  if (totalPages <= 1) {
-    return [1];
-  }
-
-  const pages = new Set([1, totalPages, currentPage - 1, currentPage, currentPage + 1]);
-  const sortedPages = Array.from(pages)
-    .filter((page) => page >= 1 && page <= totalPages)
-    .sort((left, right) => left - right);
-  const items: Array<number | string> = [];
-
-  for (const page of sortedPages) {
-    const lastItem = items.at(-1);
-    if (typeof lastItem === "number" && page - lastItem > 1) {
-      items.push(`gap-${lastItem}-${page}`);
-    }
-    items.push(page);
-  }
-
-  return items;
 }
 
 function appendIfPresent(params: URLSearchParams, name: string, value: string) {

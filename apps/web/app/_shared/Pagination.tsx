@@ -1,14 +1,13 @@
-// apps/web/app/product-explorer/components/Pagination.tsx
-// 呈現商品列表分頁控制、頁碼按鈕與大量頁數時的跳頁輸入。
+// apps/web/app/_shared/Pagination.tsx
+// 呈現共用分頁控制、頁碼按鈕與大量頁數時的跳頁輸入。
 
 import type { SyntheticEvent } from "react";
-import { toDigitsOnly } from "../query-state";
-import type { LoadState } from "../types";
+import { toDigitsOnly } from "./numeric-input";
 
 interface PaginationProps {
+  isLoading: boolean;
   page: number;
   pageJumpValue: string;
-  productState: LoadState;
   shouldShowPageJump: boolean;
   totalPages: number;
   visiblePages: Array<number | string>;
@@ -17,11 +16,11 @@ interface PaginationProps {
   onPageJumpValueChange: (value: string) => void;
 }
 
-// 顯示商品探索結果的分頁列，將頁碼切換與跳頁提交交給上層 actions 處理。
+// 顯示分頁列，將頁碼切換與跳頁提交交給上層 actions 處理。
 export function Pagination({
+  isLoading,
   page,
   pageJumpValue,
-  productState,
   shouldShowPageJump,
   totalPages,
   visiblePages,
@@ -33,7 +32,7 @@ export function Pagination({
     <div className="pagination-bar">
       <button
         className="icon-button"
-        disabled={page <= 1 || productState === "loading"}
+        disabled={page <= 1 || isLoading}
         type="button"
         onClick={() => onGoToPage(page - 1)}
       >
@@ -61,7 +60,7 @@ export function Pagination({
       </nav>
       <button
         className="icon-button"
-        disabled={page >= Math.max(1, totalPages) || productState === "loading"}
+        disabled={page >= Math.max(1, totalPages) || isLoading}
         type="button"
         onClick={() => onGoToPage(page + 1)}
       >
@@ -81,7 +80,7 @@ export function Pagination({
           <span>頁</span>
           <button
             className="icon-button"
-            disabled={productState === "loading" || pageJumpValue.trim() === ""}
+            disabled={isLoading || pageJumpValue.trim() === ""}
             type="submit"
           >
             前往

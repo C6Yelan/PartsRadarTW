@@ -1,8 +1,8 @@
 // apps/web/app/api/build-list/refresh/validation.ts
 // 驗證批次 refresh request 的 URL、content type、body bytes、UUID 與品項上限。
 
+import { normalizeProductId } from "../../../_shared/product-id";
 import { MAX_BUILD_LIST_PRODUCTS } from "../../../build-list/constants";
-import { normalizeBuildListProductId } from "../../../build-list/product-id";
 
 export const MAX_BUILD_LIST_REFRESH_BODY_BYTES = 4096;
 
@@ -37,7 +37,7 @@ export async function parseBuildListRefreshRequest(request: Request): Promise<st
   const seenProductIds = new Set<string>();
 
   for (const productId of value) {
-    const normalizedProductId = normalizeBuildListProductId(productId);
+    const normalizedProductId = normalizeProductId(productId);
 
     if (!normalizedProductId) {
       return null;

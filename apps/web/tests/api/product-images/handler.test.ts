@@ -45,7 +45,7 @@ describe("product image API helpers", () => {
 
         return IMAGE_BYTES;
       },
-    })(`${PRODUCT_ID.toUpperCase()}.WEBP`);
+    })(`  ${PRODUCT_ID.toUpperCase()}.WEBP  `);
 
     expect(response.status).toBe(200);
     expect(readPath).toBe(join(resolve("/images"), `${PRODUCT_ID}.webp`));
@@ -70,6 +70,30 @@ describe("product image API helpers", () => {
         message: API_ERROR_MESSAGES.notFound,
       },
     });
+    expect(readCallCount).toBe(0);
+  });
+
+  it.each([
+    { label: "a non-string value", imageId: null },
+    { label: "an empty value", imageId: "   " },
+    { label: "a partial UUID", imageId: PRODUCT_ID.slice(0, -1) },
+    { label: "a path-like value", imageId: `${PRODUCT_ID}/image.webp` },
+    { label: "a different extension", imageId: `${PRODUCT_ID}.png` },
+    { label: "an additional extension", imageId: `${PRODUCT_ID}.webp.webp` },
+    { label: "whitespace before the extension", imageId: `${PRODUCT_ID} .webp` },
+  ])("returns 404 for $label without reading storage", async ({ imageId }) => {
+    let readCallCount = 0;
+
+    const response = await createGetProductImageHandler({
+      storageDir: "/images",
+      readImageFile: async () => {
+        readCallCount += 1;
+
+        return IMAGE_BYTES;
+      },
+    })(imageId);
+
+    expect(response.status).toBe(404);
     expect(readCallCount).toBe(0);
   });
 
