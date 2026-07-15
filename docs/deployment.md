@@ -86,6 +86,8 @@ docker image inspect "$PARTSRADAR_WEB_IMAGE" "$PARTSRADAR_CRAWLER_IMAGE" "$PARTS
 
 `product_images` 是可重建但有外部請求成本的 operational data，不應在一般升級中視為可任意刪除的 build cache。
 
+`snapshots` volume 內的 production smoke notification state 只支援 schema v3。v1／v2 state 與其備份不得覆蓋有效 v3 state；舊副本只能在新版部署後驗證 v3 state 與 daemon health 成功後由部署端另行辨識與刪除。這不是刪除 snapshot volume，也不影響 PostgreSQL、product images、raw snapshots 或其他 persisted state 的備份與還原政策。詳細邊界見 [operations.md](operations.md#smoke-notification-state-compatibility)。
+
 ## Migration gate
 
 升級前先建立備份，再檢查目前 migration history：

@@ -1,5 +1,5 @@
 // apps/crawler/src/scripts/ops/smoke-discord-notification/state.ts
-// 讀寫 production smoke schema v3，並窄化升級既有 production v2 state。
+// 讀寫並嚴格驗證 production smoke notification schema v3。
 
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
@@ -56,7 +56,7 @@ export function createEmptySmokeDiscordNotificationState(): SmokeDiscordNotifica
   };
 }
 
-// 讀取單一 smoke state file；缺檔視為尚未建立，v2 會在記憶體中升級為 v3。
+// 讀取單一 smoke state file；缺檔視為尚未建立，其他內容交由 v3 parser 嚴格驗證。
 export async function readSmokeDiscordNotificationState(
   path: string,
 ): Promise<SmokeDiscordNotificationState | null> {
@@ -75,46 +75,20 @@ export async function readSmokeDiscordNotificationState(
   return parseSmokeDiscordNotificationState(JSON.parse(raw));
 }
 
-// 嚴格驗證 v2/v3；只保留 production v2 到 v3 的窄化升級路徑。
+// 只接受完整 schema v3，拒絕舊版本、未知版本與任何額外欄位。
 export function parseSmokeDiscordNotificationState(value: unknown): SmokeDiscordNotificationState {
-  if (!isRecord(value)) {
-    throw invalidStateError();
-  }
-
-  if (value.version === 2) {
-    return parseStateV2(value);
-  }
-  if (value.version !== SMOKE_DISCORD_NOTIFICATION_STATE_VERSION) {
+  if (
+    !isRecord(value) ||
+    value.version !== SMOKE_DISCORD_NOTIFICATION_STATE_VERSION ||
+    !hasOnlyKeys(value, ["version", "progress", "checks"])
+  ) {
     throw invalidStateError();
   }
 
   return parseCurrentState(value);
 }
 
-function parseStateV2(value: Record<string, unknown>): SmokeDiscordNotificationState {
-  if (!hasOnlyKeys(value, ["version", "progress", "checks", "legacyNotification"])) {
-    throw invalidStateError();
-  }
-  if (
-    "legacyNotification" in value &&
-    value.legacyNotification !== null &&
-    !isLegacyNotificationState(value.legacyNotification)
-  ) {
-    throw invalidStateError();
-  }
-
-  return parsePersistedState(value);
-}
-
 function parseCurrentState(value: Record<string, unknown>): SmokeDiscordNotificationState {
-  if (!hasOnlyKeys(value, ["version", "progress", "checks"])) {
-    throw invalidStateError();
-  }
-
-  return parsePersistedState(value);
-}
-
-function parsePersistedState(value: Record<string, unknown>): SmokeDiscordNotificationState {
   const progress = parseProgressState(value.progress);
   if (!isRecord(value.checks)) {
     throw invalidStateError();
@@ -233,24 +207,6 @@ function parseCheckState(value: Record<string, unknown>): SmokeCheckAlertState {
     lastNotificationAt: value.lastNotificationAt,
     lastNotifiedFingerprint: value.lastNotifiedFingerprint,
   };
-}
-
-function isLegacyNotificationState(value: unknown): boolean {
-  return (
-    isRecord(value) &&
-    hasOnlyKeys(value, [
-      "lastObservedStatus",
-      "lastObservedAt",
-      "lastNotificationKind",
-      "lastNotificationAt",
-      "lastNotificationKey",
-    ]) &&
-    isSmokeStatus(value.lastObservedStatus) &&
-    isIsoDate(value.lastObservedAt) &&
-    isNullableNotificationKind(value.lastNotificationKind) &&
-    isNullableIsoDate(value.lastNotificationAt) &&
-    isNullableSafeString(value.lastNotificationKey)
-  );
 }
 
 function isSmokeStatus(value: unknown): value is SmokeStatus {

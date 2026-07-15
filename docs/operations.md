@@ -56,6 +56,12 @@ Full smoke 另檢查 crawler run、CoolPC 篩選同步、parse errors、來源�
 
 預設門檻只是起始值。應依 production baseline 調整 env，不能把「沒有 FAIL」誤寫成門檻已校準。
 
+### Smoke notification state compatibility
+
+Production smoke notification state 只支援 schema v3。v1、v2 與它們的備份都不相容，從舊備份還原時不得直接覆蓋目前的 v3 state。Parser 會拒絕舊版本；daemon 仍依現有安全流程使用空白 v3 state，並在成功週期寫回新狀態。
+
+部署端只能在確認目前 state 為有效 v3、daemon health 正常且已完成預期週期後，才辨識並刪除明確的舊 smoke notification state 副本。不得使用廣泛檔名或遞迴刪除。此規則不適用於 PostgreSQL 備份、Prisma migration、product image storage、raw snapshots、CoolPC filter sync state、其他 daemon state、Discord database records 或其他 Docker volume 資料。
+
 ## Scheduled crawler
 
 使用時機：核心 web 與 DB 驗證完成後啟動價格更新。

@@ -1,5 +1,5 @@
 // apps/crawler/tests/scripts/ops/smoke-discord-notification/smoke-discord-notification-state.test.ts
-// 驗證 smoke state v2 到 v3 升級、嚴格 schema 與 atomic round trip。
+// 驗證 smoke state v3-only 嚴格 schema、舊版本拒絕與 atomic round trip。
 
 import { mkdir, readdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -10,12 +10,7 @@ import {
   readSmokeDiscordNotificationState,
   writeSmokeDiscordNotificationState,
 } from "../../../../src/scripts/ops/smoke-discord-notification";
-import {
-  checkState,
-  createWorkspace,
-  historicalV2State,
-  state,
-} from "./smoke-discord-notification-support";
+import { checkState, createWorkspace, state } from "./smoke-discord-notification-support";
 
 describe("production smoke state file", () => {
   it("returns null when the state file does not exist", async () => {
@@ -41,21 +36,6 @@ describe("production smoke state file", () => {
     });
     expect(Object.keys(empty)).toEqual(["version", "progress", "checks"]);
     expect(parseSmokeDiscordNotificationState(empty)).toEqual(empty);
-  });
-
-  it("migrates historical and post-cleanup v2 states without losing durable data", () => {
-    for (const v2 of [
-      historicalV2State(true),
-      historicalV2State(false),
-      { ...historicalV2State(false), legacyNotification: null },
-    ]) {
-      const migrated = parseSmokeDiscordNotificationState(v2);
-
-      expect(migrated.version).toBe(3);
-      expect(migrated.progress).toEqual(v2.progress);
-      expect(migrated.checks).toEqual(v2.checks);
-      expect(migrated).not.toHaveProperty("legacyNotification");
-    }
   });
 
   it("round trips a valid v3 state through an atomic write", async () => {
@@ -85,15 +65,25 @@ describe("production smoke state file", () => {
   });
 
   it.each([
-    [{ ...state(), version: Number("1") }, "old version"],
+    [{ ...state(), version: Number("1") }, "v1 state"],
+    [
+      {
+        ...state(),
+        version: Number("2"),
+        legacyNotification: {
+          lastObservedStatus: "WARN",
+          lastObservedAt: "2026-06-06T00:05:00.000Z",
+          lastNotificationKind: "WARN",
+          lastNotificationAt: "2026-06-06T00:00:00.000Z",
+          lastNotificationKey: "WARN:WARN:product filter quality",
+        },
+      },
+      "historical v2 state",
+    ],
+    [{ ...state(), version: Number("2") }, "post-cleanup v2 state"],
     [{ ...state(), version: 999 }, "unknown version"],
     [{ progress: state().progress, checks: {} }, "missing version"],
     [{ ...state(), obsoleteField: null }, "unexpected top-level field"],
-    [{ ...historicalV2State(), obsoleteField: null }, "unexpected v2 top-level field"],
-    [
-      { ...historicalV2State(), legacyNotification: { lastObservedStatus: "WARN" } },
-      "invalid legacy notification",
-    ],
     [state({ progress: { ...state().progress, consecutiveCycleErrors: -1 } }), "invalid counter"],
     [
       state({ progress: { ...state().progress, obsoleteField: null } as never }),
@@ -130,6 +120,12 @@ describe("production smoke state file", () => {
     const path = join(workspaceRoot, "storage", "ops", "state.json");
     await mkdir(dirname(path), { recursive: true });
     await writeFile(path, "{not-json SECRET_VALUE", "utf8");
-    await expect(readSmokeDiscordNotificationState(path)).rejects.toThrow();
+    try {
+      await readSmokeDiscordNotificationState(path);
+      throw new Error("Expected corrupted JSON to be rejected.");
+    } catch (error) {
+      expect(error).toBeInstanceOf(SyntaxError);
+      expect(String(error)).not.toContain("SECRET_VALUE");
+    }
   });
 });

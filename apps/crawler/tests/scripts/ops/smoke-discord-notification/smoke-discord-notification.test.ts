@@ -13,7 +13,6 @@ import {
   check,
   checkState,
   createWorkspace,
-  historicalV2State,
   POLICY_OPTIONS,
   state,
   summary,
@@ -154,56 +153,6 @@ describe("filter-quality pending policy", () => {
       current = decision.nextState;
     }
     expect(current.checks["product filter quality"]?.consecutiveBad).toBe(3);
-  });
-
-  it("preserves a notified v2 WARN through cooldown, reminder, and sent-state update", () => {
-    const migrated = parseSmokeDiscordNotificationState(historicalV2State());
-    expect(migrated).toMatchObject({
-      version: 3,
-      progress: historicalV2State().progress,
-      checks: historicalV2State().checks,
-    });
-
-    const nextCycle = decide("WARN", migrated, "2026-06-06T00:05:00.000Z", [
-      check("product filter quality", "WARN", "coverage=97.9%"),
-    ]);
-    expect(nextCycle.notifications).toHaveLength(0);
-    expect(nextCycle.nextState.checks["product filter quality"]).toMatchObject({
-      activeSince: "2026-06-05T23:50:00.000Z",
-      consecutiveBad: 8,
-      lastNotificationAt: "2026-06-06T00:00:00.000Z",
-      lastNotifiedFingerprint: "product filter quality|WARN|WARNING",
-    });
-
-    const beforeBoundary = decide("WARN", migrated, "2026-06-06T11:59:59.000Z", [
-      check("product filter quality", "WARN", "coverage=97.9%"),
-    ]);
-    expect(beforeBoundary.notifications).toHaveLength(0);
-
-    const atBoundary = decide("WARN", migrated, "2026-06-06T12:00:00.000Z", [
-      check("product filter quality", "WARN", "coverage=97.9%"),
-    ]);
-    expect(atBoundary.notifications).toHaveLength(1);
-    expect(atBoundary.notifications[0]).toMatchObject({
-      kind: "WARN",
-      checkName: "product filter quality",
-      fingerprint: "product filter quality|WARN|WARNING",
-    });
-
-    const notification = atBoundary.notifications[0];
-    if (!notification) throw new Error("Expected filter-quality reminder.");
-    const sent = markSmokeNotificationSent({
-      state: atBoundary.nextState,
-      notification,
-      sentAt: new Date("2026-06-06T12:00:01.000Z"),
-    });
-    expect(sent.checks["product filter quality"]).toMatchObject({
-      activeSince: "2026-06-05T23:50:00.000Z",
-      pendingSince: null,
-      lastNotificationKind: "WARN",
-      lastNotificationAt: "2026-06-06T12:00:01.000Z",
-      lastNotifiedFingerprint: "product filter quality|WARN|WARNING",
-    });
   });
 });
 
