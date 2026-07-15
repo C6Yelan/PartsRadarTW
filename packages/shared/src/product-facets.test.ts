@@ -76,9 +76,12 @@ describe("product facets", () => {
   it.each([
     ["H610 主機板", "socket:lga1700"],
     ["H810 主機板", "socket:lga1851"],
+    ["PRO WS W680M-ACE SE 主機板", "socket:lga1700"],
+    ["PRO WS W880-ACE SE 主機板", "socket:lga1851"],
     ["A520 主機板", "socket:am4"],
     ["A620 主機板", "socket:am5"],
     ["TRX50 主機板", "socket:str5"],
+    ["PRO WS WRX90E-SAGE SE 主機板", "socket:str5"],
   ])("keeps supported motherboard socket parsing for %s", (name, expectedSocket) => {
     expect(extractProductFilterTags(5, name)).toContain(expectedSocket);
   });

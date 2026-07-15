@@ -1,5 +1,5 @@
 // apps/crawler/tests/scripts/ops/smoke-discord-notification/smoke-discord-notification-support.ts
-// 提供 smoke v2 policy 測試共用的 summary、check、state 與 policy fixtures。
+// 提供 smoke v3 policy 測試共用的 summary、check、state 與 policy fixtures。
 
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -76,5 +76,45 @@ export function checkState(
     lastNotificationAt: null,
     lastNotifiedFingerprint: null,
     ...overrides,
+  };
+}
+
+export function historicalV2State(includeLegacyNotification = true) {
+  return {
+    version: 2,
+    progress: {
+      lastCycleStartedAt: "2026-06-06T00:05:00.000Z",
+      lastCycleCompletedAt: "2026-06-06T00:05:01.000Z",
+      lastCycleDurationMs: 1000,
+      lastCycleOutcome: "WARN",
+      lastCycleErrorKind: null,
+      consecutiveCycleErrors: 0,
+    },
+    checks: {
+      "product filter quality": checkState({
+        checkName: "product filter quality",
+        lastObservedStatus: "WARN",
+        lastObservedAt: "2026-06-06T00:05:00.000Z",
+        currentFingerprint: "product filter quality|WARN|WARNING",
+        pendingSince: null,
+        activeSince: "2026-06-05T23:50:00.000Z",
+        consecutiveBad: 7,
+        consecutiveGood: 0,
+        lastNotificationKind: "WARN",
+        lastNotificationAt: "2026-06-06T00:00:00.000Z",
+        lastNotifiedFingerprint: "product filter quality|WARN|WARNING",
+      }),
+    },
+    ...(includeLegacyNotification
+      ? {
+          legacyNotification: {
+            lastObservedStatus: "WARN",
+            lastObservedAt: "2026-06-06T00:05:00.000Z",
+            lastNotificationKind: "WARN",
+            lastNotificationAt: "2026-06-06T00:00:00.000Z",
+            lastNotificationKey: "WARN:WARN:product filter quality",
+          },
+        }
+      : {}),
   };
 }

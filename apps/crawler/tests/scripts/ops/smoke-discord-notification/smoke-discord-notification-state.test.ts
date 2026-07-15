@@ -1,5 +1,5 @@
 // apps/crawler/tests/scripts/ops/smoke-discord-notification/smoke-discord-notification-state.test.ts
-// 驗證 smoke state schema v2 嚴格解析、拒絕舊版本與 atomic round trip。
+// 驗證 smoke state v2 到 v3 升級、嚴格 schema 與 atomic round trip。
 
 import { mkdir, readdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -10,7 +10,12 @@ import {
   readSmokeDiscordNotificationState,
   writeSmokeDiscordNotificationState,
 } from "../../../../src/scripts/ops/smoke-discord-notification";
-import { checkState, createWorkspace, state } from "./smoke-discord-notification-support";
+import {
+  checkState,
+  createWorkspace,
+  historicalV2State,
+  state,
+} from "./smoke-discord-notification-support";
 
 describe("production smoke state file", () => {
   it("returns null when the state file does not exist", async () => {
@@ -20,10 +25,10 @@ describe("production smoke state file", () => {
     ).resolves.toBeNull();
   });
 
-  it("creates and parses the fixed v2 empty state shape", () => {
+  it("creates and parses the fixed v3 empty state shape", () => {
     const empty = createEmptySmokeDiscordNotificationState();
     expect(empty).toEqual({
-      version: 2,
+      version: 3,
       progress: {
         lastCycleStartedAt: null,
         lastCycleCompletedAt: null,
@@ -38,7 +43,22 @@ describe("production smoke state file", () => {
     expect(parseSmokeDiscordNotificationState(empty)).toEqual(empty);
   });
 
-  it("round trips a valid v2 state through an atomic write", async () => {
+  it("migrates historical and post-cleanup v2 states without losing durable data", () => {
+    for (const v2 of [
+      historicalV2State(true),
+      historicalV2State(false),
+      { ...historicalV2State(false), legacyNotification: null },
+    ]) {
+      const migrated = parseSmokeDiscordNotificationState(v2);
+
+      expect(migrated.version).toBe(3);
+      expect(migrated.progress).toEqual(v2.progress);
+      expect(migrated.checks).toEqual(v2.checks);
+      expect(migrated).not.toHaveProperty("legacyNotification");
+    }
+  });
+
+  it("round trips a valid v3 state through an atomic write", async () => {
     const workspaceRoot = await createWorkspace();
     const path = join(workspaceRoot, "storage", "ops", "state.json");
     const expected = state({
@@ -69,7 +89,16 @@ describe("production smoke state file", () => {
     [{ ...state(), version: 999 }, "unknown version"],
     [{ progress: state().progress, checks: {} }, "missing version"],
     [{ ...state(), obsoleteField: null }, "unexpected top-level field"],
+    [{ ...historicalV2State(), obsoleteField: null }, "unexpected v2 top-level field"],
+    [
+      { ...historicalV2State(), legacyNotification: { lastObservedStatus: "WARN" } },
+      "invalid legacy notification",
+    ],
     [state({ progress: { ...state().progress, consecutiveCycleErrors: -1 } }), "invalid counter"],
+    [
+      state({ progress: { ...state().progress, obsoleteField: null } as never }),
+      "unexpected progress field",
+    ],
     [
       state({ progress: { ...state().progress, lastCycleStartedAt: "not-a-date" } }),
       "invalid date",
@@ -81,6 +110,14 @@ describe("production smoke state file", () => {
         },
       }),
       "invalid check",
+    ],
+    [
+      state({
+        checks: {
+          homepage: { ...checkState({ checkName: "homepage" }), obsoleteField: null } as never,
+        },
+      }),
+      "unexpected check field",
     ],
   ])("rejects %s", (value, _label) => {
     expect(() => parseSmokeDiscordNotificationState(value)).toThrow(

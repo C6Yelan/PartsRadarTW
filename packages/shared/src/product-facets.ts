@@ -546,19 +546,19 @@ function extractMotherboardTags(text: string, add: AddTag): void {
     ["x670", /\bX670\b/],
     ["x870", /\bX870(?!E)/],
     ["trx50", /\bTRX50\b/],
-    ["wrx90", /\bWRX90\b/],
+    ["wrx90", /\bWRX90(?:E)?\b/],
   ];
   addFirstMatch(add, "chipset", text, chipsetRules);
 
-  if (/\b(?:H610|B760|Z790)/.test(text)) {
+  if (/\b(?:H610|B760|Z790|W680)/.test(text)) {
     add("socket", "lga1700");
-  } else if (/\b(?:H810|B860|Z890)/.test(text)) {
+  } else if (/\b(?:H810|B860|Z890|W880)/.test(text)) {
     add("socket", "lga1851");
   } else if (/\b(?:A520|B550)(?:M|I)?\b/.test(text)) {
     add("socket", "am4");
   } else if (/\b(?:A620|B650|B840|B850|X670|X870)/.test(text)) {
     add("socket", "am5");
-  } else if (/\b(?:TRX50|WRX90)\b/.test(text)) {
+  } else if (/\b(?:TRX50|WRX90)(?:E)?\b/.test(text)) {
     add("socket", "str5");
   }
 

@@ -231,6 +231,27 @@ describe("product filter tag backfill safety", () => {
     ]);
   });
 
+  it("regenerates supported workstation motherboard sockets through the existing backfill", async () => {
+    const client = new FakeFilterTagBackfillClient();
+    const candidate: ProductFilterTagCandidate = {
+      id: "workstation-board",
+      name: "華碩 PRO WS W880-ACE SE(ATX/8*DDR5)",
+      filterTags: [],
+      sourceCategory: { igrp: 5, displayName: "主機板" },
+    };
+
+    const summary = await backfillProductFilterTags(client, [candidate], { dryRun: true });
+
+    expect(summary.changed).toBe(1);
+    expect(summary.categories[0]?.facetHits).toMatchObject({
+      "socket:lga1851": 1,
+      "chipset:w880": 1,
+      "memory_type:ddr5": 1,
+      "form_factor:atx": 1,
+    });
+    expect(client.updateCalls).toEqual([]);
+  });
+
   it("refuses writes when source filter tags are unavailable", async () => {
     await expect(
       backfillProductFilterTags(new FakeFilterTagBackfillClient(), [changedCandidate()], {

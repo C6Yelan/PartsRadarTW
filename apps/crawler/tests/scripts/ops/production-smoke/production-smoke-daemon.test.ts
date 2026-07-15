@@ -88,7 +88,7 @@ describe("production smoke daemon durable lifecycle", () => {
     });
     expect(sendDiscordWebhook).not.toHaveBeenCalled();
     await expect(readSmokeDiscordNotificationState(fixture.stateFilePath)).resolves.toMatchObject({
-      version: 2,
+      version: 3,
       progress: {
         lastCycleStartedAt: "2026-06-06T12:00:00.000Z",
         lastCycleCompletedAt: "2026-06-06T12:00:00.700Z",
@@ -258,7 +258,7 @@ describe("production smoke daemon durable lifecycle", () => {
     ).rejects.toBeInstanceOf(SmokeCycleTimeoutError);
   });
 
-  it("recovers safely from corrupted state and overwrites it with valid v2", async () => {
+  it("recovers safely from corrupted state and overwrites it with valid v3", async () => {
     const fixture = await createDaemonFixture({ webhook: false });
     await mkdir(dirname(fixture.stateFilePath), { recursive: true });
     await writeFile(fixture.stateFilePath, "{secret state contents", "utf8");
@@ -275,12 +275,12 @@ describe("production smoke daemon durable lifecycle", () => {
     );
     expect(logs.join("\n")).not.toContain("secret state contents");
     await expect(readSmokeDiscordNotificationState(fixture.stateFilePath)).resolves.toMatchObject({
-      version: 2,
+      version: 3,
       progress: { lastCycleOutcome: "OK" },
     });
   });
 
-  it("rejects an old-version state and overwrites it with valid v2 after success", async () => {
+  it("rejects a v1 state and overwrites it with valid v3 after success", async () => {
     const fixture = await createDaemonFixture({ webhook: false });
     await mkdir(dirname(fixture.stateFilePath), { recursive: true });
     await writeFile(
@@ -301,7 +301,7 @@ describe("production smoke daemon durable lifecycle", () => {
     );
     const writtenState = await readSmokeDiscordNotificationState(fixture.stateFilePath);
     expect(writtenState).toMatchObject({
-      version: 2,
+      version: 3,
       progress: { lastCycleOutcome: "OK" },
     });
     if (!writtenState) {

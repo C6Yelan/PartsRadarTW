@@ -25,6 +25,15 @@ interface CoverageRequirement {
   applies?: (tags: ReadonlyMap<string, ReadonlySet<string>>) => boolean;
 }
 
+const MOTHERBOARD_CHIPSETS_OUTSIDE_SOCKET_TAXONOMY = new Set([
+  "h81",
+  "h110",
+  "h310",
+  "h510",
+  "w790",
+  "w890",
+]);
+
 export interface ProductFilterQualityAudit {
   products: number;
   emptyProducts: number;
@@ -37,7 +46,15 @@ export interface ProductFilterQualityAudit {
 
 const REQUIREMENTS: Readonly<Record<number, readonly CoverageRequirement[]>> = {
   4: required(["socket", "cpu_family", "integrated_graphics"], 1),
-  5: [...required(["socket", "chipset", "memory_type"], 0.99), ...required(["form_factor"], 0.95)],
+  5: [
+    ...required(["socket"], 0.99, (tags) =>
+      [...(tags.get("chipset") ?? [])].every(
+        (chipset) => !MOTHERBOARD_CHIPSETS_OUTSIDE_SOCKET_TAXONOMY.has(chipset),
+      ),
+    ),
+    ...required(["chipset", "memory_type"], 0.99),
+    ...required(["form_factor"], 0.95),
+  ],
   6: [
     ...required(["memory_type", "capacity_gb", "speed_mhz"], 0.95),
     ...required(["module_type"], 0.9),
