@@ -1,7 +1,13 @@
 // packages/shared/src/product-facets.test.ts
 // 驗證 CoolPC 分類的 facet registry 與商品名稱 filter tag 解析。
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
+import type {
+  ParsedProductFilterTag as PublicParsedProductFilterTag,
+  ProductFacetDefinition as PublicProductFacetDefinition,
+  ProductFacetOption as PublicProductFacetOption,
+} from "./product-facets";
+import * as productFacetFacade from "./product-facets";
 import {
   extractProductFilterTags,
   getProductFacetDefinitions,
@@ -9,8 +15,47 @@ import {
   mergeProductFilterTags,
   PRODUCT_FACET_IGRPS,
 } from "./product-facets";
+import * as extraction from "./product-facets/extraction";
+import type {
+  ParsedProductFilterTag as RegistryParsedProductFilterTag,
+  ProductFacetDefinition as RegistryProductFacetDefinition,
+  ProductFacetOption as RegistryProductFacetOption,
+} from "./product-facets/registry";
+import * as registry from "./product-facets/registry";
 
 describe("product facets", () => {
+  it("keeps the exact public facade and internal module ownership", () => {
+    expect(Object.keys(productFacetFacade).sort()).toEqual([
+      "PRODUCT_FACET_IGRPS",
+      "extractProductFilterTags",
+      "getProductFacetDefinitions",
+      "isProductFilterTagSupported",
+      "mergeProductFilterTags",
+      "parseProductFilterTag",
+    ]);
+    expect(Object.keys(registry).sort()).toEqual([
+      "PRODUCT_FACET_IGRPS",
+      "getProductFacetDefinitions",
+      "isProductFilterTagSupported",
+      "mergeProductFilterTags",
+      "parseProductFilterTag",
+    ]);
+    expect(Object.keys(extraction).sort()).toEqual(["extractProductFilterTags"]);
+
+    expect(productFacetFacade.PRODUCT_FACET_IGRPS).toBe(registry.PRODUCT_FACET_IGRPS);
+    expect(productFacetFacade.getProductFacetDefinitions).toBe(registry.getProductFacetDefinitions);
+    expect(productFacetFacade.isProductFilterTagSupported).toBe(
+      registry.isProductFilterTagSupported,
+    );
+    expect(productFacetFacade.mergeProductFilterTags).toBe(registry.mergeProductFilterTags);
+    expect(productFacetFacade.parseProductFilterTag).toBe(registry.parseProductFilterTag);
+    expect(productFacetFacade.extractProductFilterTags).toBe(extraction.extractProductFilterTags);
+
+    expectTypeOf<PublicProductFacetOption>().toEqualTypeOf<RegistryProductFacetOption>();
+    expectTypeOf<PublicProductFacetDefinition>().toEqualTypeOf<RegistryProductFacetDefinition>();
+    expectTypeOf<PublicParsedProductFilterTag>().toEqualTypeOf<RegistryParsedProductFilterTag>();
+  });
+
   it("defines facets for the existing categories", () => {
     expect(PRODUCT_FACET_IGRPS).toEqual([4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15, 16]);
     expect(PRODUCT_FACET_IGRPS.every((igrp) => getProductFacetDefinitions(igrp).length > 0)).toBe(
