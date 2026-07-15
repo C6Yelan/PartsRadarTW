@@ -9,7 +9,7 @@ import {
   createEmptySmokeDiscordNotificationState,
   writeSmokeDiscordNotificationState,
 } from "../../../../src/scripts/ops/smoke-discord-notification";
-import { createWorkspace } from "./production-smoke-support";
+import { createWorkspace } from "./production-smoke-workspace-support";
 
 const NOW = new Date("2026-06-06T12:15:00.000Z");
 

@@ -7,7 +7,7 @@ import {
   writeCoolpcFilterSyncState,
 } from "../../../../src/coolpc/filter-sync/state";
 import { checkCoolpcFilterSync } from "../../../../src/scripts/ops/production-smoke/checks/filter-sync";
-import { createWorkspace } from "./production-smoke-support";
+import { createWorkspace } from "./production-smoke-workspace-support";
 
 const NOW = new Date("2026-07-13T08:00:00.000Z");
 

@@ -8,11 +8,9 @@ import {
   parseProductionSmokeOptions,
   runProductionSmoke,
 } from "../../../../src/scripts/ops/production-smoke";
-import {
-  createSmokeClient,
-  createWorkspace,
-  stubHealthyPublicApi,
-} from "./production-smoke-support";
+import { createSmokeClient } from "./production-smoke-client-support";
+import { stubHealthyPublicApi } from "./production-smoke-public-api-support";
+import { createWorkspace } from "./production-smoke-workspace-support";
 
 afterEach(() => {
   vi.unstubAllGlobals();
