@@ -13,6 +13,7 @@ import {
 } from "./constants";
 import type { CommandCooldowns } from "./cooldowns";
 import { handleDiscordInteraction } from "./interactions";
+import type { DiscordBotSchedulerStatusReader } from "./scheduler-status";
 import type {
   DiscordBotClient,
   DiscordBotOptions,
@@ -33,6 +34,7 @@ export async function runGatewaySession({
   fetchImpl,
   WebSocketCtor,
   logMessage,
+  schedulerStatus,
 }: {
   client: DiscordBotClient;
   options: DiscordBotOptions;
@@ -41,6 +43,7 @@ export async function runGatewaySession({
   fetchImpl: FetchImpl;
   WebSocketCtor: MinimalWebSocketConstructor;
   logMessage: (message: string) => void;
+  schedulerStatus?: DiscordBotSchedulerStatusReader;
 }): Promise<void> {
   const socket = new WebSocketCtor(options.gatewayUrl);
   let sequence: number | null = null;
@@ -115,6 +118,7 @@ export async function runGatewaySession({
           options,
           cooldowns,
           fetchImpl,
+          schedulerStatus,
         }).catch((error) => {
           logMessage(`Discord interaction handling failed: ${toSafeCliErrorMessage(error)}`);
         });

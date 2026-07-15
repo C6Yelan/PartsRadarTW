@@ -39,9 +39,9 @@ export function createBotHelpMessage(publicBaseUrl: string): DiscordBotMessage {
               "`/public-report settings`\n需要「管理伺服器」權限。設定公開頻道、分類、內容與測試發送。",
           },
           {
-            name: "系統狀態",
+            name: "排程狀態",
             value:
-              "`/status`\n需要「管理伺服器」權限。查看 bot 與商品資料更新狀態。",
+              "`/status`\n需要「管理伺服器」權限。查看排程與背景工作的執行狀態。",
           },
           {
             name: "可使用的位置",

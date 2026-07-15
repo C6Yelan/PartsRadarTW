@@ -73,6 +73,88 @@ describe("sendDiscordDirectMessages", () => {
       global: true,
     });
   });
+
+  it.each([
+    [50007, "Cannot send messages to this user"],
+    [50001, "Missing access"],
+    [50013, "Missing permissions"],
+    [null, "Forbidden"],
+  ])(
+    "normalizes a DM channel 403 with provider code %s to DM_UNAVAILABLE",
+    async (providerErrorCode, providerMessage) => {
+      const body =
+        providerErrorCode === null
+          ? { message: `${providerMessage} private-provider-body` }
+          : { code: providerErrorCode, message: `${providerMessage} private-provider-body` };
+      const result = await sendDiscordDirectMessages({
+        token: TOKEN,
+        apiBaseUrl: API_BASE_URL,
+        userId: "111122223333444455",
+        messages: [{ content: "Report" }],
+        fetchImpl: vi.fn<typeof fetch>(
+          async () => new Response(JSON.stringify(body), { status: 403 }),
+        ) as typeof fetch,
+      });
+
+      expect(result).toEqual({
+        status: "failed",
+        messageCount: 1,
+        sentMessageCount: 0,
+        httpStatus: 403,
+        errorCategory: "DM_UNAVAILABLE",
+        providerErrorCode,
+      });
+      expect(JSON.stringify(result)).not.toContain("private-provider-body");
+    },
+  );
+
+  it("normalizes a 403 while posting to an established DM channel", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async (input) => {
+      if (String(input).endsWith("/users/@me/channels")) {
+        return new Response(JSON.stringify({ id: "dm-channel" }), { status: 200 });
+      }
+
+      return new Response(JSON.stringify({ message: "private DM failure" }), { status: 403 });
+    });
+
+    await expect(
+      sendDiscordDirectMessages({
+        token: TOKEN,
+        apiBaseUrl: API_BASE_URL,
+        userId: "111122223333444455",
+        messages: [{ content: "Report" }],
+        fetchImpl: fetchMock as typeof fetch,
+      }),
+    ).resolves.toEqual({
+      status: "failed",
+      messageCount: 1,
+      sentMessageCount: 0,
+      httpStatus: 403,
+      errorCategory: "DM_UNAVAILABLE",
+      providerErrorCode: null,
+    });
+  });
+
+  it("keeps DM transport failures in the TRANSPORT category", async () => {
+    await expect(
+      sendDiscordDirectMessages({
+        token: TOKEN,
+        apiBaseUrl: API_BASE_URL,
+        userId: "111122223333444455",
+        messages: [{ content: "Report" }],
+        fetchImpl: vi.fn<typeof fetch>(async () => {
+          throw new Error("private transport detail");
+        }) as typeof fetch,
+      }),
+    ).resolves.toEqual({
+      status: "failed",
+      messageCount: 1,
+      sentMessageCount: 0,
+      httpStatus: null,
+      errorCategory: "TRANSPORT",
+      providerErrorCode: null,
+    });
+  });
 });
 
 describe("sendDiscordChannelMessages", () => {

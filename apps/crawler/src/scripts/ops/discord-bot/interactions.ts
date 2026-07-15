@@ -7,6 +7,7 @@ import {
   DISCORD_INTERACTION_TYPE_MODAL_SUBMIT,
 } from "./constants";
 import type { CommandCooldowns } from "./cooldowns";
+import type { DiscordBotSchedulerStatusReader } from "./scheduler-status";
 import type {
   DiscordBotClient,
   DiscordBotOptions,
@@ -24,12 +25,14 @@ export async function handleDiscordInteraction({
   options,
   cooldowns,
   fetchImpl = fetch,
+  schedulerStatus,
 }: {
   client: DiscordBotClient;
   interaction: DiscordInteraction;
   options: DiscordBotOptions;
   cooldowns: CommandCooldowns;
   fetchImpl?: FetchImpl;
+  schedulerStatus?: DiscordBotSchedulerStatusReader;
 }): Promise<void> {
   if (interaction.type === DISCORD_INTERACTION_TYPE_APPLICATION_COMMAND) {
     await handleApplicationCommandInteraction({
@@ -38,6 +41,7 @@ export async function handleDiscordInteraction({
       options,
       cooldowns,
       fetchImpl,
+      schedulerStatus,
     });
     return;
   }

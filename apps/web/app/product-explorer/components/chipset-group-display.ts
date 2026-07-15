@@ -42,3 +42,15 @@ export function parseChipsetGroupDisplay(group: string): ChipsetGroupDisplay {
     originalGroup: group,
   };
 }
+
+export function shouldShowChipsetVendorHeading(
+  group: string,
+  previousGroup: string | null,
+): boolean {
+  const currentVendor = parseChipsetGroupDisplay(group).vendor;
+  const previousVendor = previousGroup
+    ? parseChipsetGroupDisplay(previousGroup).vendor
+    : "unknown";
+
+  return currentVendor !== "unknown" && currentVendor !== previousVendor;
+}

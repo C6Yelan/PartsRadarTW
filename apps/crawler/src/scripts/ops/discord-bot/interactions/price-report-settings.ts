@@ -23,9 +23,9 @@ import {
 } from "../price-report";
 import { toWindowHours } from "../price-report/schedule";
 import {
-  formatDiscordDeliveryFailureFieldValue,
-  formatDiscordDeliveryFailureForUser,
-  formatDiscordRateLimitForUser,
+  formatDiscordDirectMessageFailureFieldValue,
+  formatDiscordDirectMessageFailureForUser,
+  formatDiscordDirectMessageRateLimitForUser,
 } from "../rest";
 import type {
   DiscordBotClient,
@@ -99,10 +99,10 @@ export function formatPriceReportPreviewDmNotice(
   }
 
   if (result.status === "rate_limited") {
-    return formatDiscordRateLimitForUser();
+    return formatDiscordDirectMessageRateLimitForUser();
   }
 
-  return formatDiscordDeliveryFailureForUser(result);
+  return formatDiscordDirectMessageFailureForUser(result);
 }
 
 // 建立個人 price-report modal 驗證錯誤訊息，讓 submit handler 共用同一組使用者回覆。
@@ -224,11 +224,11 @@ function formatPriceReportDeliveryStatus(delivery: PriceReportDeliveryStatus | n
   }
 
   if (delivery.status === "RATE_LIMITED") {
-    return `Discord 限流：${deliveredAt}。${formatDiscordRateLimitForUser()}`;
+    return `${deliveredAt}。${formatDiscordDirectMessageRateLimitForUser()}`;
   }
 
   if (delivery.status === "FAILED") {
-    return `失敗：${deliveredAt}。${formatDiscordDeliveryFailureFieldValue(delivery)}`;
+    return `失敗：${deliveredAt}。${formatDiscordDirectMessageFailureFieldValue(delivery)}`;
   }
 
   return `${delivery.status}：${deliveredAt}，列出 ${delivery.itemCount} 筆。`;

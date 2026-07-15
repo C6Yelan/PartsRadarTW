@@ -141,7 +141,10 @@ describe("handleDiscordInteraction watch manager list", () => {
     );
     const latestNotification = readEmbedFieldValue(requestBody.embeds[0], "最近一次通知");
 
-    expect(latestNotification).toContain("我目前缺少完成這次 Discord 發送所需的權限");
+    expect(latestNotification).toContain("我目前無法傳送私訊給你");
+    expect(latestNotification).toContain("允許伺服器成員傳送私訊");
+    expect(latestNotification).not.toContain("伺服器管理員");
+    expect(latestNotification).not.toContain("目標頻道");
     expect(latestNotification).not.toContain("50013");
     expect(latestNotification).not.toContain("Missing Permissions");
     expect(client.discordNotificationDelivery.findFirst).toHaveBeenCalledWith({

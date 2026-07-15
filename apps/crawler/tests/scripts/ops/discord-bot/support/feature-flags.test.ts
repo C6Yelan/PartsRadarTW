@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { CommandCooldowns } from "../../../../../src/scripts/ops/discord-bot/cooldowns";
 import { runDiscordBotNotificationCycle } from "../../../../../src/scripts/ops/discord-bot/daemon";
 import { handleDiscordInteraction } from "../../../../../src/scripts/ops/discord-bot/interactions";
+import { createDiscordBotSchedulerStatusStore } from "../../../../../src/scripts/ops/discord-bot/scheduler-status";
 import type { DiscordInteraction } from "../../../../../src/scripts/ops/discord-bot/types";
 import { createDiscordBotClient, createDiscordBotOptions, createInteraction } from ".";
 
@@ -30,6 +31,8 @@ describe("Discord bot feature flags", () => {
       },
     };
     const fetchImpl = vi.fn<typeof fetch>();
+    const schedulerStatus = createDiscordBotSchedulerStatusStore();
+    const now = new Date("2026-06-07T12:00:00.000Z");
 
     const result = await runDiscordBotNotificationCycle({
       client: client as never,
@@ -42,7 +45,8 @@ describe("Discord bot feature flags", () => {
       logMessage: vi.fn(),
       scanIntervalMs: 300_000,
       nextTargetPriceScanAtMs: 0,
-      now: new Date("2026-06-07T12:00:00.000Z"),
+      now,
+      schedulerStatus,
     });
 
     expect(result).toEqual({
@@ -57,6 +61,17 @@ describe("Discord bot feature flags", () => {
     expect(client.discordPriceReportSetting.findFirst).not.toHaveBeenCalled();
     expect(client.discordNotificationDelivery.create).not.toHaveBeenCalled();
     expect(fetchImpl).not.toHaveBeenCalled();
+    expect(schedulerStatus.getSnapshot()).toMatchObject({
+      notificationLoop: {
+        lastStartedAt: now,
+        lastCompletedAt: now,
+        lastOutcome: "OK",
+        nextRunAt: new Date("2026-06-07T12:05:00.000Z"),
+      },
+      targetPrice: { lastOutcome: "NOT_RUN" },
+      personalReports: { lastOutcome: "NOT_RUN" },
+      publicReports: { lastOutcome: "NOT_RUN" },
+    });
   });
 
   it("returns safe disabled responses for command surfaces", async () => {

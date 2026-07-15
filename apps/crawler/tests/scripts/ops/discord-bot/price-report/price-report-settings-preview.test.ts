@@ -130,8 +130,8 @@ describe("handleDiscordInteraction price report settings preview", () => {
       if (String(input).endsWith("/users/@me/channels")) {
         return new Response(
           JSON.stringify({
-            code: 50007,
-            message: "Cannot send messages to this user DISCORD_BOT_TOKEN=private-token",
+            code: 50013,
+            message: "Missing permissions DISCORD_BOT_TOKEN=private-token",
             errors: { authorization: "Bearer private-authorization" },
           }),
           { status: 403 },
@@ -152,8 +152,11 @@ describe("handleDiscordInteraction price report settings preview", () => {
     const settingsBody = JSON.parse(String(fetchMock.mock.calls[2]?.[1]?.body));
 
     expect(JSON.stringify(settingsBody)).toContain("我目前無法傳送私訊給你");
-    expect(JSON.stringify(settingsBody)).not.toContain("50007");
-    expect(JSON.stringify(settingsBody)).not.toContain("Cannot send messages");
+    expect(JSON.stringify(settingsBody)).toContain("允許伺服器成員傳送私訊");
+    expect(JSON.stringify(settingsBody)).not.toContain("伺服器管理員");
+    expect(JSON.stringify(settingsBody)).not.toContain("目標頻道");
+    expect(JSON.stringify(settingsBody)).not.toContain("50013");
+    expect(JSON.stringify(settingsBody)).not.toContain("Missing permissions");
     expect(JSON.stringify(settingsBody)).not.toContain("private-token");
     expect(JSON.stringify(settingsBody)).not.toContain("private-authorization");
     expect(client.discordNotificationDelivery.create).toHaveBeenCalledWith({
@@ -164,7 +167,7 @@ describe("handleDiscordInteraction price report settings preview", () => {
         errorCategory: "DM_UNAVAILABLE",
         errorMessage: null,
         httpStatus: 403,
-        providerErrorCode: 50007,
+        providerErrorCode: 50013,
       }),
     });
     expect(JSON.stringify(client.discordNotificationDelivery.create.mock.calls)).not.toContain(

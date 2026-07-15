@@ -39,9 +39,9 @@ export const adminQuickStartSteps = [
     description: "在設定面板按「發送測試」，確認 bot 能在目標頻道傳送訊息。",
   },
   {
-    title: "查看系統狀態",
+    title: "查看排程狀態",
     command: "/status",
-    description: "查看 bot 與商品資料更新狀態。",
+    description: "查看爬蟲、通知與價格報告排程狀態。",
   },
 ] as const;
 
@@ -144,14 +144,14 @@ export const adminCommandGuides = [
   },
   {
     command: "/status",
-    purpose: "查看 bot 與商品資料狀態",
-    result: "顯示目前運作、最近爬取與功能狀態",
-    title: "查看系統狀態",
+    purpose: "查看排程與背景工作狀態",
+    result: "顯示最近執行、下次執行與處理摘要",
+    title: "查看排程狀態",
     sections: [
       {
         description:
-          "具備「管理伺服器」權限的成員可查看 bot、商品資料更新、最近爬取與功能開關。",
-        title: "查看系統狀態",
+          "具備「管理伺服器」權限的成員可查看商品爬蟲、通知掃描與價格報告排程摘要。",
+        title: "查看排程狀態",
       },
     ],
   },

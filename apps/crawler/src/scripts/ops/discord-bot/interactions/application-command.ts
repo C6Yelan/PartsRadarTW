@@ -17,6 +17,7 @@ import {
   sendDiscordInteractionMessages,
   sendInteractionResponse,
 } from "../rest";
+import type { DiscordBotSchedulerStatusReader } from "../scheduler-status";
 import type { DiscordBotClient, DiscordBotOptions, DiscordInteraction, FetchImpl } from "../types";
 import { createBotHelpMessage } from "./bot-help";
 import {
@@ -46,12 +47,14 @@ export async function handleApplicationCommandInteraction({
   options,
   cooldowns,
   fetchImpl,
+  schedulerStatus,
 }: {
   client: DiscordBotClient;
   interaction: DiscordInteraction;
   options: DiscordBotOptions;
   cooldowns: CommandCooldowns;
   fetchImpl: FetchImpl;
+  schedulerStatus?: DiscordBotSchedulerStatusReader;
 }): Promise<void> {
   const botCommand = parseBotInteraction(interaction);
   const command = parsePriceReportInteraction(interaction);
@@ -80,7 +83,13 @@ export async function handleApplicationCommandInteraction({
   }
 
   if (statusCommand) {
-    await handleStatusInteraction({ client, interaction, options, fetchImpl });
+    await handleStatusInteraction({
+      client,
+      interaction,
+      options,
+      fetchImpl,
+      schedulerStatus,
+    });
     return;
   }
 

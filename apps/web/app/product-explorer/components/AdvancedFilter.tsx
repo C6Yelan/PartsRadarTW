@@ -7,7 +7,10 @@ import type { ProductFacetDefinition, ProductFacetOption } from "@partsradar/sha
 import { useEffect, useRef, useState } from "react";
 import { ChevronDownIcon } from "../../_shared/icons";
 import type { CategoryItem } from "../types";
-import { parseChipsetGroupDisplay } from "./chipset-group-display";
+import {
+  parseChipsetGroupDisplay,
+  shouldShowChipsetVendorHeading,
+} from "./chipset-group-display";
 
 export function AdvancedFilter({
   categories,
@@ -125,12 +128,19 @@ function FacetFilter({
           <div className="facet-menu-popover" data-menu-columns={definition.menuColumns}>
             <div className={optionGroups ? "facet-option-list is-grouped" : "facet-option-list"}>
               {optionGroups
-                ? optionGroups.map((group) => (
+                ? optionGroups.map((group, index) => (
                     <FacetOptionGroup
                       definitionKey={definition.key}
                       group={group}
                       key={`${group.label}:${group.options[0]?.value}`}
                       selectedFacets={selectedFacets}
+                      showVendorHeading={
+                        definition.key === "chipset" &&
+                        shouldShowChipsetVendorHeading(
+                          group.label,
+                          optionGroups[index - 1]?.label ?? null,
+                        )
+                      }
                       onToggle={onToggle}
                     />
                   ))
@@ -155,31 +165,33 @@ function FacetOptionGroup({
   definitionKey,
   group,
   selectedFacets,
+  showVendorHeading,
   onToggle,
 }: {
   definitionKey: string;
   group: { label: string; options: ProductFacetOption[] };
   selectedFacets: string[];
+  showVendorHeading: boolean;
   onToggle: (tag: string) => void;
 }) {
   const display = definitionKey === "chipset" ? parseChipsetGroupDisplay(group.label) : null;
 
   return (
-    <fieldset aria-label={display ? undefined : group.label} className="facet-option-group">
+    <fieldset
+      aria-label={
+        display && display.vendor !== "unknown"
+          ? `${display.vendorLabel} ${display.platformLabel}`
+          : group.label
+      }
+      className="facet-option-group"
+    >
+      {display && showVendorHeading ? (
+        <div className="facet-vendor-heading">{display.vendorLabel}</div>
+      ) : null}
       {display ? (
-        <legend className="facet-option-group-header">
-          {display.vendor !== "unknown" ? (
-            <>
-              <span className={`facet-vendor-badge is-${display.vendor}`}>
-                {display.vendorLabel}
-              </span>
-              <span aria-hidden="true" className="facet-group-separator">
-                ·
-              </span>
-            </>
-          ) : null}
+        <div className="facet-option-group-header">
           <span className="facet-platform-label">{display.platformLabel}</span>
-        </legend>
+        </div>
       ) : null}
       {group.options.map((option) => (
         <FacetOption

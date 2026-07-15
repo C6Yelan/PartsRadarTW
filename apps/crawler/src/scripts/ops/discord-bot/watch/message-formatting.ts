@@ -7,7 +7,7 @@ import {
   formatTaiwanDollar,
   toSingleLine,
 } from "../message-text";
-import { formatDiscordDeliveryFailureForUser } from "../rest";
+import { formatDiscordDirectMessageFailureForUser } from "../rest";
 import type { TargetPriceWatchDeliveryStatus, TargetPriceWatchListRecord } from "./records";
 import { WATCH_SELECT_VALUE_PREFIX } from "./reference";
 
@@ -104,7 +104,7 @@ function formatWatchNotificationDeliveryField(
   if (delivery.status === "FAILED") {
     return {
       name: "最近一次通知",
-      value: `失敗：${happenedAt}。\n${formatDiscordDeliveryFailureForUser(delivery)}`,
+      value: `失敗：${happenedAt}。\n${formatDiscordDirectMessageFailureForUser(delivery)}`,
     };
   }
 

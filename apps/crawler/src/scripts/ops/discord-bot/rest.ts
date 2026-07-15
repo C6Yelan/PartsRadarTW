@@ -23,47 +23,32 @@ export {
 export { formatDiscordRestFailure } from "./rest-failure";
 export { sendDiscordRestRequest } from "./rest-request";
 
-// 將 transport boundary 的分類轉成行動導向訊息；不讀取 legacy error_message。
-export function formatDiscordDeliveryFailureForUser(failure: {
+export function formatDiscordDirectMessageFailureForUser(failure: {
   errorCategory: DiscordDeliveryErrorCategory | null;
   httpStatus: number | null;
   providerErrorCode: number | null;
 }): string {
-  if (failure.errorCategory === "DM_UNAVAILABLE") {
-    return "我目前無法傳送私訊給你。請確認你允許此伺服器成員私訊，或先傳訊息給 PartsRadarTW bot 後再試一次。";
-  }
-
-  if (failure.errorCategory === "PERMISSIONS") {
-    return "我目前缺少完成這次 Discord 發送所需的權限。請伺服器管理員檢查 PartsRadarTW bot 與目標頻道權限後再試一次。";
+  if (failure.errorCategory === "DM_UNAVAILABLE" || failure.errorCategory === "PERMISSIONS") {
+    return "我目前無法傳送私訊給你。請在伺服器的隱私設定中允許伺服器成員傳送私訊，或先傳一則私訊給 PartsRadarTW bot 後再試一次。";
   }
 
   if (failure.errorCategory === "RATE_LIMITED") {
-    return formatDiscordRateLimitForUser();
+    return formatDiscordDirectMessageRateLimitForUser();
   }
 
-  if (failure.errorCategory === "INTERACTION_EXPIRED") {
-    return "這次 Discord 指令回應已失效，請重新執行指令。";
-  }
-
-  if (failure.errorCategory === "TRANSPORT") {
-    return "目前無法連上 Discord，請稍後重試。";
-  }
-
-  return "Discord 暫時無法完成通知，請稍後重試；若持續發生，請伺服器管理員檢查 PartsRadarTW bot 設定。";
+  return "目前無法傳送私訊給你，請稍後再試；若持續發生，請確認已允許 PartsRadarTW bot 傳送私訊。";
 }
 
-// 將安全的 delivery 失敗說明裁成設定面板欄位使用的短版文字。
-export function formatDiscordDeliveryFailureFieldValue(failure: {
+export function formatDiscordDirectMessageFailureFieldValue(failure: {
   errorCategory: DiscordDeliveryErrorCategory | null;
   httpStatus: number | null;
   providerErrorCode: number | null;
 }): string {
-  return formatDiscordBotText(formatDiscordDeliveryFailureForUser(failure), 220);
+  return formatDiscordBotText(formatDiscordDirectMessageFailureForUser(failure), 220);
 }
 
-// 將 Discord rate limit 統一轉成使用者可見的稍後重試提示。
-export function formatDiscordRateLimitForUser(): string {
-  return "Discord 暫時限制訊息發送，系統會稍後重試。";
+export function formatDiscordDirectMessageRateLimitForUser(): string {
+  return "Discord 暫時無法傳送私訊，系統會稍後再試。";
 }
 
 // 建立使用者 DM channel 後逐則發送訊息，回傳給排程與互動流程判斷的 delivery result。
@@ -110,7 +95,7 @@ export async function sendDiscordDirectMessages({
       messageCount: messages.length,
       sentMessageCount: 0,
       httpStatus: channelResult.httpStatus,
-      errorCategory: channelResult.errorCategory,
+      errorCategory: normalizeDiscordDirectMessageFailureCategory(channelResult),
       providerErrorCode: channelResult.providerErrorCode,
     };
   }
@@ -128,13 +113,41 @@ export async function sendDiscordDirectMessages({
     };
   }
 
-  return sendDiscordChannelMessages({
+  const messageResult = await sendDiscordChannelMessages({
     token,
     apiBaseUrl,
     channelId,
     messages,
     fetchImpl,
   });
+
+  if (messageResult.status !== "failed") {
+    return messageResult;
+  }
+
+  return {
+    ...messageResult,
+    errorCategory: normalizeDiscordDirectMessageFailureCategory(messageResult),
+  };
+}
+
+function normalizeDiscordDirectMessageFailureCategory(failure: {
+  errorCategory: DiscordDeliveryErrorCategory;
+  httpStatus: number | null;
+  providerErrorCode: number | null;
+}): DiscordDeliveryErrorCategory {
+  if (
+    failure.errorCategory === "DM_UNAVAILABLE" ||
+    failure.errorCategory === "PERMISSIONS" ||
+    failure.httpStatus === 403 ||
+    failure.providerErrorCode === 50001 ||
+    failure.providerErrorCode === 50007 ||
+    failure.providerErrorCode === 50013
+  ) {
+    return "DM_UNAVAILABLE";
+  }
+
+  return failure.errorCategory;
 }
 
 // 向指定 Discord channel 逐則發送訊息，遇到限流或失敗時保留已送出數量。

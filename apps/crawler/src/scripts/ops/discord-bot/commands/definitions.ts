@@ -98,7 +98,7 @@ export function createBotCommand(): Record<string, unknown> {
 export function createStatusCommand(): Record<string, unknown> {
   return {
     name: "status",
-    description: "查看 PartsRadarTW bot 與商品資料更新狀態。",
+    description: "查看 PartsRadarTW 排程與背景工作狀態。",
     type: DISCORD_COMMAND_TYPE_CHAT_INPUT,
     contexts: [DISCORD_APPLICATION_CONTEXT_GUILD],
     dm_permission: false,

@@ -1085,21 +1085,26 @@ test("sizes short facet popovers and separates semantic option groups @desktop-o
   await expect(groups).toHaveCount(6);
   await expect(chipsetFilter.getByRole("group")).toHaveCount(6);
   await expect(headers).toHaveText([
-    "Intel·LGA 1700",
-    "Intel·LGA 1851",
-    "Intel·舊平台／工作站",
-    "AMD·AM4",
-    "AMD·AM5",
-    "AMD·Threadripper",
+    "LGA 1700",
+    "LGA 1851",
+    "舊平台／工作站",
+    "AM4",
+    "AM5",
+    "Threadripper",
   ]);
-  await expect(chipsetFilter.locator(".facet-vendor-badge")).toHaveText([
-    "Intel",
-    "Intel",
-    "Intel",
-    "AMD",
-    "AMD",
-    "AMD",
-  ]);
+  await expect(chipsetFilter.locator(".facet-vendor-heading")).toHaveText(["Intel", "AMD"]);
+  await expect(chipsetFilter.locator(".facet-vendor-badge")).toHaveCount(0);
+  await expect(chipsetFilter.locator(".facet-group-separator")).toHaveCount(0);
+  for (const accessibleName of [
+    "Intel LGA 1700",
+    "Intel LGA 1851",
+    "Intel 舊平台／工作站",
+    "AMD AM4",
+    "AMD AM5",
+    "AMD Threadripper",
+  ]) {
+    await expect(chipsetFilter.getByRole("group", { name: accessibleName })).toHaveCount(1);
+  }
   await expect(headers.locator('input[type="checkbox"]')).toHaveCount(0);
   await expect(chipsetFilter.getByRole("checkbox")).toHaveCount(27);
   await expect(chipsetFilter.locator(".facet-option span")).toHaveText([

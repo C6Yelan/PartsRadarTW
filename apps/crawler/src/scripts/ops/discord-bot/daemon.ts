@@ -17,6 +17,10 @@ import {
   sendDiscordChannelMessages,
   sendDiscordDirectMessages,
 } from "./rest";
+import {
+  createDiscordBotSchedulerStatusStore,
+  type DiscordBotSchedulerStatusStore,
+} from "./scheduler-status";
 import { sendDueTargetPriceNotifications } from "./target-price-notification";
 import type {
   DiscordBotClient,
@@ -59,6 +63,7 @@ export async function runDiscordBotDaemon({
 
   const shutdown = createShutdownController(logMessage);
   const cooldowns = new CommandCooldowns(options.commandCooldownSeconds);
+  const schedulerStatus = createDiscordBotSchedulerStatusStore();
   logMessage(
     `Discord bot features. publicReports=${formatFeatureFlag(options.publicReportsEnabled)} personalReports=${formatFeatureFlag(options.personalReportsEnabled)} targetWatches=${formatFeatureFlag(options.targetWatchesEnabled)} registerCommandsOnStart=${formatFeatureFlag(options.registerCommandsOnStart)}`,
   );
@@ -68,6 +73,7 @@ export async function runDiscordBotDaemon({
     shutdown,
     fetchImpl,
     logMessage,
+    schedulerStatus,
   });
 
   logMessage("Discord bot daemon started.");
@@ -81,6 +87,7 @@ export async function runDiscordBotDaemon({
       fetchImpl,
       WebSocketCtor,
       logMessage,
+      schedulerStatus,
     });
 
     if (!shutdown.requested) {
@@ -100,12 +107,14 @@ async function runNotificationLoop({
   shutdown,
   fetchImpl,
   logMessage,
+  schedulerStatus,
 }: {
   client: DiscordBotClient;
   options: DiscordBotOptions;
   shutdown: ShutdownController;
   fetchImpl: FetchImpl;
   logMessage: (message: string) => void;
+  schedulerStatus: DiscordBotSchedulerStatusStore;
 }): Promise<void> {
   const scanIntervalMs = options.priceReportScheduleIntervalSeconds * 1000;
   let nextTargetPriceScanAtMs = 0;
@@ -118,6 +127,8 @@ async function runNotificationLoop({
       logMessage,
       scanIntervalMs,
       nextTargetPriceScanAtMs,
+      schedulerStatus,
+      clock: () => new Date(),
     });
     nextTargetPriceScanAtMs = result.nextTargetPriceScanAtMs;
 
@@ -134,6 +145,8 @@ export async function runDiscordBotNotificationCycle({
   scanIntervalMs,
   nextTargetPriceScanAtMs,
   now = new Date(),
+  schedulerStatus,
+  clock = () => now,
 }: {
   client: DiscordBotClient;
   options: DiscordBotOptions;
@@ -142,11 +155,16 @@ export async function runDiscordBotNotificationCycle({
   scanIntervalMs: number;
   nextTargetPriceScanAtMs: number;
   now?: Date;
+  schedulerStatus?: DiscordBotSchedulerStatusStore;
+  clock?: () => Date;
 }): Promise<{ nextSleepMs: number; nextTargetPriceScanAtMs: number }> {
+  const cycleStartedAt = now;
   let nextSleepMs = scanIntervalMs;
   let nextTargetScanAt = nextTargetPriceScanAtMs;
+  let cycleFailed = false;
 
   if (options.targetWatchesEnabled && now.getTime() >= nextTargetScanAt) {
+    const startedAt = clock();
     try {
       const summary = await sendDueTargetPriceNotifications({
         client,
@@ -167,15 +185,39 @@ export async function runDiscordBotNotificationCycle({
           `Target price notifications processed. processed=${summary.processedCount} sent=${summary.sentCount} rateLimited=${summary.rateLimitedCount} failed=${summary.failedCount}`,
         );
       }
+
+      const completedAt = clock();
+      schedulerStatus?.recordTargetPrice({
+        startedAt,
+        completedAt,
+        outcome: "OK",
+        nextRunAt: new Date(now.getTime() + scanIntervalMs),
+        ...summary,
+      });
     } catch (error) {
+      cycleFailed = true;
       logMessage(`Target price notification scan failed: ${toSafeCliErrorMessage(error)}`);
+      schedulerStatus?.recordTargetPrice({
+        startedAt,
+        completedAt: clock(),
+        outcome: "ERROR",
+        nextRunAt: new Date(now.getTime() + scanIntervalMs),
+        errorKind: "SCAN_ERROR",
+        scannedCount: 0,
+        dueCount: 0,
+        processedCount: 0,
+        sentCount: 0,
+        rateLimitedCount: 0,
+        failedCount: 0,
+      });
     } finally {
       nextTargetScanAt = now.getTime() + scanIntervalMs;
     }
   }
 
-  try {
-    if (options.publicReportsEnabled) {
+  if (options.publicReportsEnabled) {
+    const startedAt = clock();
+    try {
       const publicSummary = await sendPendingPublicPriceReports({
         client,
         options,
@@ -195,9 +237,34 @@ export async function runDiscordBotNotificationCycle({
           `Public price reports processed. settings=${publicSummary.settingCount} processed=${publicSummary.processedCount} sent=${publicSummary.sentCount} skipped=${publicSummary.skippedCount} rateLimited=${publicSummary.rateLimitedCount} failed=${publicSummary.failedCount}`,
         );
       }
-    }
 
-    if (options.personalReportsEnabled) {
+      schedulerStatus?.recordPublicReports({
+        startedAt,
+        completedAt: clock(),
+        outcome: "OK",
+        ...publicSummary,
+      });
+    } catch (error) {
+      cycleFailed = true;
+      logMessage(`Public price report scan failed: ${toSafeCliErrorMessage(error)}`);
+      schedulerStatus?.recordPublicReports({
+        startedAt,
+        completedAt: clock(),
+        outcome: "ERROR",
+        errorKind: "SCAN_ERROR",
+        settingCount: 0,
+        processedCount: 0,
+        sentCount: 0,
+        skippedCount: 0,
+        rateLimitedCount: 0,
+        failedCount: 0,
+      });
+    }
+  }
+
+  if (options.personalReportsEnabled) {
+    const startedAt = clock();
+    try {
       const summary = await sendDueScheduledPriceReports({
         client,
         options,
@@ -218,19 +285,47 @@ export async function runDiscordBotNotificationCycle({
         );
       }
 
+      const nextDueAt = await readNextScheduledPriceReportDueAt({ client });
       nextSleepMs = calculateScheduledPriceReportSleepMs({
         now,
-        nextDueAt: await readNextScheduledPriceReportDueAt({ client }),
+        nextDueAt,
         maxSleepMs: nextSleepMs,
       });
+      schedulerStatus?.recordPersonalReports({
+        startedAt,
+        completedAt: clock(),
+        outcome: "OK",
+        nextRunAt: nextDueAt,
+        ...summary,
+      });
+    } catch (error) {
+      cycleFailed = true;
+      logMessage(`Scheduled price report scan failed: ${toSafeCliErrorMessage(error)}`);
+      schedulerStatus?.recordPersonalReports({
+        startedAt,
+        completedAt: clock(),
+        outcome: "ERROR",
+        errorKind: "SCAN_ERROR",
+        processedCount: 0,
+        sentCount: 0,
+        rateLimitedCount: 0,
+        failedCount: 0,
+      });
     }
-  } catch (error) {
-    logMessage(`Scheduled price report loop failed: ${toSafeCliErrorMessage(error)}`);
   }
 
   if (options.targetWatchesEnabled) {
     nextSleepMs = Math.min(nextSleepMs, Math.max(1000, nextTargetScanAt - now.getTime()));
   }
+
+  const cycleCompletedAt = clock();
+  schedulerStatus?.recordNotificationLoop({
+    startedAt: cycleStartedAt,
+    completedAt: cycleCompletedAt,
+    outcome: cycleFailed ? "ERROR" : "OK",
+    nextRunAt: new Date(cycleCompletedAt.getTime() + nextSleepMs),
+    errorKind: cycleFailed ? "CHILD_SCHEDULE_ERROR" : null,
+  });
 
   return {
     nextSleepMs,

@@ -1,11 +1,11 @@
-// apps/crawler/tests/scripts/ops/discord-bot/interactions/interaction-status.test.ts
-// 驗證 guild 管理員限定 /status 的安全查詢、狀態文案與 ephemeral 回覆。
+// 驗證 guild 管理員限定 /status 的排程摘要、查詢隔離與 ephemeral 回覆。
 
 import { describe, expect, it, vi } from "vitest";
 import {
   createStatusMessage,
   handleStatusInteraction,
 } from "../../../../../src/scripts/ops/discord-bot/interactions/status";
+import { createDiscordBotSchedulerStatusStore } from "../../../../../src/scripts/ops/discord-bot/scheduler-status";
 import type {
   DiscordBotClient,
   DiscordInteraction,
@@ -15,7 +15,7 @@ import { createDiscordBotOptions } from "../support";
 const NOW = new Date("2026-07-15T04:48:00.000Z");
 
 describe("status interaction", () => {
-  it("requires Manage Guild at runtime and does not query status data when denied", async () => {
+  it("requires Manage Guild at runtime and does not query schedule data when denied", async () => {
     const client = createStatusClient();
     const fetchMock = interactionFetch();
 
@@ -24,24 +24,20 @@ describe("status interaction", () => {
       interaction: statusInteraction("0"),
       options: createDiscordBotOptions(),
       fetchImpl: fetchMock,
+      schedulerStatus: populatedSchedulerStatus(),
       now: NOW,
-      uptimeSeconds: 3723,
     });
 
-    expect(client.crawlRun.findFirst).not.toHaveBeenCalled();
-    expect(client.sourceCategory.count).not.toHaveBeenCalled();
+    expect(client.crawlRun.findMany).not.toHaveBeenCalled();
+    expect(client.discordTargetPriceWatch.count).not.toHaveBeenCalled();
     const body = responseBody(fetchMock);
     expect(body).toMatchObject({ type: 4, data: { flags: 64 } });
     expect(body.data.content).toBe("你沒有使用這個指令的權限。");
     expect(body.data.embeds).toBeUndefined();
   });
 
-  it("returns an ephemeral status embed with a fake timestamp and uptime", async () => {
-    const client = createStatusClient({
-      run: crawlRun("SUCCESS_CHANGED"),
-      enabledCategoryCount: 21,
-      oldestLastSuccessAt: new Date("2026-07-15T03:30:00.000Z"),
-    });
+  it("returns only the five requested schedule fields in an ephemeral embed", async () => {
+    const client = createStatusClient();
     const fetchMock = interactionFetch();
 
     await handleStatusInteraction({
@@ -49,155 +45,334 @@ describe("status interaction", () => {
       interaction: statusInteraction("32"),
       options: createDiscordBotOptions(),
       fetchImpl: fetchMock,
+      schedulerStatus: populatedSchedulerStatus(),
       now: NOW,
-      uptimeSeconds: 3723,
     });
 
     const body = responseBody(fetchMock);
+    const embed = body.data.embeds[0];
     expect(body).toMatchObject({ type: 4, data: { flags: 64 } });
-    expect(body.data.embeds[0]).toMatchObject({
-      title: "PartsRadarTW 系統狀態",
-      description: "目前機器人與商品資料更新概況。",
+    expect(embed).toMatchObject({
+      title: "PartsRadarTW 排程狀態",
+      description: "管理員用排程與背景工作摘要。時間皆為台北時間。",
       timestamp: NOW.toISOString(),
-      fields: expect.arrayContaining([
-        expect.objectContaining({
-          name: "機器人",
-          value: expect.stringContaining("1 小時 2 分鐘"),
-        }),
-        expect.objectContaining({ name: "商品資料更新", value: expect.stringContaining("正常") }),
-        expect.objectContaining({
-          name: "最近一次爬取",
-          value: expect.stringContaining("完成，有價格或商品更新"),
-        }),
-        expect.objectContaining({ name: "資料範圍", value: expect.stringContaining("21") }),
-      ]),
     });
-    expect(client.crawlRun.findFirst).toHaveBeenCalledWith({
-      where: { triggerType: "SCHEDULED" },
-      orderBy: { startedAt: "desc" },
-      select: {
-        status: true,
-        startedAt: true,
-        finishedAt: true,
-        backoffUntil: true,
-        categoryResults: { select: { status: true } },
-      },
-    });
-    expect(JSON.stringify(body)).not.toMatch(
-      /errorMessage|rawSnapshot|parseError|hostname|process PID|DATABASE_URL/,
-    );
+    expect(embed.fields.map((field: { name: string }) => field.name)).toEqual([
+      "商品價格爬蟲",
+      "Discord 通知排程主迴圈",
+      "目標價提醒掃描",
+      "個人價格報告排程",
+      "公開價格報告排程",
+    ]);
+    expect(JSON.stringify(embed)).not.toMatch(/機器人|Gateway|uptime|已運作|資料範圍/);
+    expect(JSON.stringify(embed)).not.toContain('"name":"功能"');
   });
 
   it.each([
-    ["RUNNING", "正在更新"],
     ["SUCCESS_CHANGED", "完成，有價格或商品更新"],
-    ["SUCCESS_UNCHANGED", "完成，沒有新的價格變動"],
+    ["SUCCESS_UNCHANGED", "完成，沒有價格變動"],
     ["SUCCESS_WITH_ERRORS", "完成，但部分分類需要注意"],
     ["FETCH_FAILED", "更新失敗"],
     ["SUSPECTED_BLOCK", "來源網站暫時無法正常讀取"],
     ["PARSE_FAILED", "部分商品資料無法整理"],
-  ])("maps %s to safe user-facing text", async (status, expectedText) => {
+  ])("shows human text and the technical crawler enum for %s", async (status, expectedText) => {
     const message = await createStatusMessage({
-      client: createStatusClient({ run: crawlRun(status) }),
+      client: createStatusClient({ runs: [crawlRun(status), previousCrawlRun()] }),
       options: createDiscordBotOptions(),
+      schedulerStatus: populatedSchedulerStatus(),
       now: NOW,
-      uptimeSeconds: 60,
     });
-    const serialized = JSON.stringify(message);
+    const crawler = fieldValue(message, "商品價格爬蟲");
 
-    expect(serialized).toContain(expectedText);
-    expect(serialized).not.toContain(`"${status}"`);
+    expect(crawler).toContain(expectedText);
+    expect(crawler).toContain(`\`${status}\``);
   });
 
-  it("handles missing runs, no enabled categories, and null category update times", async () => {
+  it("shows a running duration without treating the run as failed", async () => {
+    const message = await createStatusMessage({
+      client: createStatusClient({ runs: [crawlRun("RUNNING"), previousCrawlRun()] }),
+      options: createDiscordBotOptions(),
+      schedulerStatus: populatedSchedulerStatus(),
+      now: NOW,
+    });
+    const crawler = fieldValue(message, "商品價格爬蟲");
+
+    expect(crawler).toContain("狀態：正在更新（`RUNNING`）");
+    expect(crawler).toContain("完成：執行中");
+    expect(crawler).toContain("已執行：48 分鐘 0 秒");
+  });
+
+  it("uses warning severity for a crawler run completed with partial errors", async () => {
     const message = await createStatusMessage({
       client: createStatusClient({
-        run: null,
-        enabledCategoryCount: 0,
-        missingSuccessCount: 0,
-        oldestLastSuccessAt: null,
+        runs: [crawlRun("SUCCESS_WITH_ERRORS"), previousCrawlRun()],
       }),
       options: createDiscordBotOptions(),
+      schedulerStatus: healthySchedulerStatus(),
       now: NOW,
-      uptimeSeconds: 0,
     });
-    const text = JSON.stringify(message);
 
-    expect(text).toContain("尚無排程更新紀錄");
-    expect(text).toContain("已啟用分類：0");
-    expect(text).toContain("最近最舊分類更新：尚無資料");
+    expect(message.embeds?.[0]?.color).toBe(0xeab308);
   });
 
-  it("reports categories without a successful update", async () => {
+  it("shows active backoff and its end time", async () => {
+    const run = crawlRun("SUCCESS_UNCHANGED");
+    run.backoffUntil = new Date("2026-07-15T05:18:00.000Z");
     const message = await createStatusMessage({
-      client: createStatusClient({ missingSuccessCount: 3, oldestLastSuccessAt: null }),
+      client: createStatusClient({ runs: [run, previousCrawlRun()] }),
+      options: createDiscordBotOptions(),
+      schedulerStatus: populatedSchedulerStatus(),
+      now: NOW,
+    });
+    const crawler = fieldValue(message, "商品價格爬蟲");
+
+    expect(crawler).toContain("排程狀態：BACKOFF");
+    expect(crawler).toContain("Backoff：進行中");
+    expect(crawler).toContain("13:18:00");
+  });
+
+  it("calculates start-to-start interval from the latest two scheduled runs", async () => {
+    const message = await createStatusMessage({
+      client: createStatusClient(),
+      options: createDiscordBotOptions(),
+      schedulerStatus: populatedSchedulerStatus(),
+      now: NOW,
+    });
+
+    expect(fieldValue(message, "商品價格爬蟲")).toContain("觀測間隔：1 小時");
+  });
+
+  it("uses a safe observed-interval fallback with only one run", async () => {
+    const message = await createStatusMessage({
+      client: createStatusClient({ runs: [crawlRun("SUCCESS_UNCHANGED")] }),
+      options: createDiscordBotOptions(),
+      schedulerStatus: populatedSchedulerStatus(),
+      now: NOW,
+    });
+
+    expect(fieldValue(message, "商品價格爬蟲")).toContain("觀測間隔：尚無足夠資料");
+  });
+
+  it("shows NOT_RUN before the notification loop completes its first cycle", async () => {
+    const message = await createStatusMessage({
+      client: createStatusClient(),
       options: createDiscordBotOptions(),
       now: NOW,
-      uptimeSeconds: 60,
     });
 
-    expect(JSON.stringify(message)).toContain("尚無成功更新紀錄：3 個分類");
+    expect(fieldValue(message, "Discord 通知排程主迴圈")).toContain(
+      "尚未完成第一輪（`NOT_RUN`）",
+    );
   });
 
-  it("keeps bot status available and does not leak a rejected DB error", async () => {
+  it("shows runtime outcomes and processing summaries for all bot schedules", async () => {
     const message = await createStatusMessage({
-      client: createStatusClient({ reject: true }),
+      client: createStatusClient({ activeWatchCount: 9, enabledPersonalCount: 4, dueCount: 2 }),
       options: createDiscordBotOptions(),
+      schedulerStatus: populatedSchedulerStatus(),
       now: NOW,
-      uptimeSeconds: 60,
     });
-    const text = JSON.stringify(message);
 
-    expect(text).toContain("🟢 運作正常");
-    expect(text).toContain("目前無法讀取資料更新狀態");
-    expect(text).not.toContain("postgresql://private");
-    expect(text).not.toContain("DATABASE_URL");
+    expect(fieldValue(message, "Discord 通知排程主迴圈")).toContain("結果：完成（`OK`）");
+    expect(fieldValue(message, "目標價提醒掃描")).toMatch(
+      /ENABLED[\s\S]*處理／送出／限流／失敗：5／4／0／1[\s\S]*啟用提醒：9/,
+    );
+    expect(fieldValue(message, "個人價格報告排程")).toMatch(
+      /處理／送出／限流／失敗：3／2／1／0[\s\S]*啟用設定：4[\s\S]*目前到期：2/,
+    );
+    expect(fieldValue(message, "公開價格報告排程")).toMatch(
+      /下次掃描：[\s\S]*本輪設定／處理：2／2[\s\S]*送出／略過／限流／失敗：1／1／0／0/,
+    );
   });
+
+  it("shows a safe scheduler error kind without raw errors", async () => {
+    const schedulerStatus = populatedSchedulerStatus();
+    schedulerStatus.recordTargetPrice({
+      startedAt: new Date("2026-07-15T04:40:00.000Z"),
+      completedAt: new Date("2026-07-15T04:40:03.000Z"),
+      outcome: "ERROR",
+      errorKind: "SCAN_ERROR",
+      scannedCount: 0,
+      dueCount: 0,
+      processedCount: 0,
+      sentCount: 0,
+      rateLimitedCount: 0,
+      failedCount: 0,
+    });
+    const message = await createStatusMessage({
+      client: createStatusClient(),
+      options: createDiscordBotOptions(),
+      schedulerStatus,
+      now: NOW,
+    });
+
+    expect(fieldValue(message, "目標價提醒掃描")).toContain("`ERROR`，SCAN_ERROR");
+  });
+
+  it.each(["crawler", "target", "personal", "public"] as const)(
+    "isolates a rejected %s query and never exposes its raw error",
+    async (rejectArea) => {
+      const message = await createStatusMessage({
+        client: createStatusClient({ rejectArea }),
+        options: createDiscordBotOptions(),
+        schedulerStatus: populatedSchedulerStatus(),
+        now: NOW,
+      });
+      const text = JSON.stringify(message);
+
+      expect(message.embeds?.[0]?.fields).toHaveLength(5);
+      expect(text).toContain("QUERY_ERROR");
+      expect(text).not.toContain("postgresql://private");
+      expect(text).not.toContain("DATABASE_URL");
+      expect(text).not.toMatch(/hostname|process PID|private stack/);
+    },
+  );
 });
 
 function createStatusClient({
-  run = crawlRun("SUCCESS_UNCHANGED"),
-  enabledCategoryCount = 2,
-  missingSuccessCount = 0,
-  oldestLastSuccessAt = new Date("2026-07-15T03:30:00.000Z"),
-  reject = false,
+  runs = [crawlRun("SUCCESS_UNCHANGED"), previousCrawlRun()],
+  activeWatchCount = 2,
+  enabledPersonalCount = 3,
+  dueCount = 1,
+  earliestNextSendAt = new Date("2026-07-15T05:00:00.000Z"),
+  enabledPublicCount = 2,
+  rejectArea = null,
 }: {
-  run?: ReturnType<typeof crawlRun> | null;
-  enabledCategoryCount?: number;
-  missingSuccessCount?: number;
-  oldestLastSuccessAt?: Date | null;
-  reject?: boolean;
+  runs?: ReturnType<typeof crawlRun>[];
+  activeWatchCount?: number;
+  enabledPersonalCount?: number;
+  dueCount?: number;
+  earliestNextSendAt?: Date | null;
+  enabledPublicCount?: number;
+  rejectArea?: "crawler" | "target" | "personal" | "public" | null;
 } = {}) {
-  const rejection = new Error("DATABASE_URL=postgresql://private host=secret-container");
-  const count = vi
-    .fn()
-    .mockImplementationOnce(async () => {
-      if (reject) throw rejection;
-      return enabledCategoryCount;
-    })
-    .mockImplementationOnce(async () => {
-      if (reject) throw rejection;
-      return missingSuccessCount;
-    });
+  const rejection = new Error(
+    "DATABASE_URL=postgresql://private host=secret-container private stack",
+  );
+  const rejectIf = (area: NonNullable<typeof rejectArea>) => {
+    if (rejectArea === area) throw rejection;
+  };
 
   return {
     crawlRun: {
+      findMany: vi.fn(async () => {
+        rejectIf("crawler");
+        return runs;
+      }),
       findFirst: vi.fn(async () => {
-        if (reject) throw rejection;
-        return run;
+        rejectIf("crawler");
+        return { finishedAt: new Date("2026-07-15T04:20:00.000Z") };
       }),
     },
-    sourceCategory: {
-      count,
-      findFirst: vi.fn(async () => {
-        if (reject) throw rejection;
-        return oldestLastSuccessAt ? { lastSuccessAt: oldestLastSuccessAt } : null;
+    discordTargetPriceWatch: {
+      count: vi.fn(async () => {
+        rejectIf("target");
+        return activeWatchCount;
       }),
     },
-  } as unknown as Pick<DiscordBotClient, "crawlRun" | "sourceCategory"> & {
-    crawlRun: { findFirst: ReturnType<typeof vi.fn> };
-    sourceCategory: { count: ReturnType<typeof vi.fn> };
+    discordPriceReportSetting: {
+      count: vi.fn(async (args: { where?: { nextSendAt?: unknown } }) => {
+        rejectIf("personal");
+        return args.where?.nextSendAt ? dueCount : enabledPersonalCount;
+      }),
+      findFirst: vi.fn(async () => {
+        rejectIf("personal");
+        return earliestNextSendAt ? { nextSendAt: earliestNextSendAt } : null;
+      }),
+    },
+    discordPublicPriceReportSetting: {
+      count: vi.fn(async () => {
+        rejectIf("public");
+        return enabledPublicCount;
+      }),
+    },
+  } as unknown as Pick<
+    DiscordBotClient,
+    | "crawlRun"
+    | "discordTargetPriceWatch"
+    | "discordPriceReportSetting"
+    | "discordPublicPriceReportSetting"
+  > & {
+    crawlRun: { findMany: ReturnType<typeof vi.fn>; findFirst: ReturnType<typeof vi.fn> };
+    discordTargetPriceWatch: { count: ReturnType<typeof vi.fn> };
   };
+}
+
+function populatedSchedulerStatus() {
+  const store = createDiscordBotSchedulerStatusStore();
+  const startedAt = new Date("2026-07-15T04:40:00.000Z");
+  const completedAt = new Date("2026-07-15T04:40:03.000Z");
+
+  store.recordNotificationLoop({
+    startedAt,
+    completedAt,
+    outcome: "OK",
+    nextRunAt: new Date("2026-07-15T04:45:03.000Z"),
+  });
+  store.recordTargetPrice({
+    startedAt,
+    completedAt,
+    outcome: "OK",
+    nextRunAt: new Date("2026-07-15T04:45:00.000Z"),
+    scannedCount: 8,
+    dueCount: 5,
+    processedCount: 5,
+    sentCount: 4,
+    rateLimitedCount: 0,
+    failedCount: 1,
+  });
+  store.recordPersonalReports({
+    startedAt,
+    completedAt,
+    outcome: "OK",
+    nextRunAt: new Date("2026-07-15T05:00:00.000Z"),
+    processedCount: 3,
+    sentCount: 2,
+    rateLimitedCount: 1,
+    failedCount: 0,
+  });
+  store.recordPublicReports({
+    startedAt,
+    completedAt,
+    outcome: "OK",
+    settingCount: 2,
+    processedCount: 2,
+    sentCount: 1,
+    skippedCount: 1,
+    rateLimitedCount: 0,
+    failedCount: 0,
+  });
+
+  return store;
+}
+
+function healthySchedulerStatus() {
+  const store = populatedSchedulerStatus();
+  const startedAt = new Date("2026-07-15T04:40:00.000Z");
+  const completedAt = new Date("2026-07-15T04:40:03.000Z");
+
+  store.recordTargetPrice({
+    startedAt,
+    completedAt,
+    outcome: "OK",
+    scannedCount: 0,
+    dueCount: 0,
+    processedCount: 0,
+    sentCount: 0,
+    rateLimitedCount: 0,
+    failedCount: 0,
+  });
+  store.recordPersonalReports({
+    startedAt,
+    completedAt,
+    outcome: "OK",
+    processedCount: 0,
+    sentCount: 0,
+    rateLimitedCount: 0,
+    failedCount: 0,
+  });
+
+  return store;
 }
 
 function crawlRun(status: string) {
@@ -205,12 +380,24 @@ function crawlRun(status: string) {
     status,
     startedAt: new Date("2026-07-15T04:00:00.000Z"),
     finishedAt: status === "RUNNING" ? null : new Date("2026-07-15T04:20:00.000Z"),
-    backoffUntil: null,
+    backoffUntil: null as Date | null,
     categoryResults: [
       { status: "SUCCESS_CHANGED" },
       { status: status === "SUCCESS_WITH_ERRORS" ? "FETCH_FAILED" : "SUCCESS_UNCHANGED" },
     ],
   };
+}
+
+function previousCrawlRun() {
+  return {
+    ...crawlRun("SUCCESS_UNCHANGED"),
+    startedAt: new Date("2026-07-15T03:00:00.000Z"),
+    finishedAt: new Date("2026-07-15T03:20:00.000Z"),
+  };
+}
+
+function fieldValue(message: Awaited<ReturnType<typeof createStatusMessage>>, name: string): string {
+  return message.embeds?.[0]?.fields?.find((field) => field.name === name)?.value ?? "";
 }
 
 function statusInteraction(permissions: string): DiscordInteraction {

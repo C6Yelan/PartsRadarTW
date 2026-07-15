@@ -2,7 +2,10 @@
 
 import { describe, expect, it } from "vitest";
 
-import { parseChipsetGroupDisplay } from "../../app/product-explorer/components/chipset-group-display";
+import {
+  parseChipsetGroupDisplay,
+  shouldShowChipsetVendorHeading,
+} from "../../app/product-explorer/components/chipset-group-display";
 
 describe("chipset group display", () => {
   it.each([
@@ -38,4 +41,18 @@ describe("chipset group display", () => {
       originalGroup: "Future workstation platform",
     });
   });
+
+  it.each([
+    ["Intel LGA 1700", null, true],
+    ["Intel LGA 1851", "Intel LGA 1700", false],
+    ["AMD AM4", "Intel 舊平台／工作站", true],
+    ["AMD AM5", "AMD AM4", false],
+    ["Threadripper", "AMD AM5", false],
+    ["Future workstation platform", "Threadripper", false],
+  ])(
+    "detects the vendor boundary for %s after %s",
+    (group, previousGroup, expected) => {
+      expect(shouldShowChipsetVendorHeading(group, previousGroup)).toBe(expected);
+    },
+  );
 });

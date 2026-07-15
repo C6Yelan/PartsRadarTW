@@ -147,32 +147,14 @@
   line-height: 1.35;
 }
 
-.facet-vendor-badge {
-  flex: 0 0 auto;
-  padding: 2px 6px;
-  border: 1px solid transparent;
-  border-radius: 999px;
-  font-size: 11px;
+.facet-vendor-heading {
+  grid-column: 1 / -1;
+  color: var(--text);
+  font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.02em;
-  line-height: 1.2;
-}
-
-.facet-vendor-badge.is-intel {
-  border-color: #315b73;
-  background: #17364a;
-  color: #d7eaf4;
-}
-
-.facet-vendor-badge.is-amd {
-  border-color: #674743;
-  background: #3a2928;
-  color: #f0d1c8;
-}
-
-.facet-group-separator {
-  flex: 0 0 auto;
-  color: var(--faint);
+  line-height: 1.35;
+  margin-bottom: 2px;
 }
 
 .facet-platform-label {

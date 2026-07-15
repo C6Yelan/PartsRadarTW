@@ -97,9 +97,9 @@ describe("handleDiscordInteraction price report settings delivery", () => {
           discordUserId: "111122223333444455",
           kind: "SCHEDULED_PRICE_REPORT",
           status: "FAILED",
-          errorCategory: "DM_UNAVAILABLE",
+          errorCategory: "PERMISSIONS",
           httpStatus: 403,
-          providerErrorCode: 50007,
+          providerErrorCode: 50013,
           errorMessage:
             "legacy raw message Authorization: Bot private-token errors={private-payload}",
           createdAt: new Date("2026-06-07T01:00:00.000Z"),
@@ -127,6 +127,9 @@ describe("handleDiscordInteraction price report settings delivery", () => {
     );
 
     expect(deliveryStatus).toContain("我目前無法傳送私訊給你");
+    expect(deliveryStatus).toContain("允許伺服器成員傳送私訊");
+    expect(deliveryStatus).not.toContain("伺服器管理員");
+    expect(deliveryStatus).not.toContain("目標頻道");
     expect(deliveryStatus).not.toContain("private-token");
     expect(deliveryStatus).not.toContain("private-payload");
   });
@@ -173,10 +176,11 @@ describe("handleDiscordInteraction price report settings delivery", () => {
       "最近一次每日私訊價格報告",
     );
 
-    expect(deliveryStatus).toContain("Discord 暫時無法完成通知");
+    expect(deliveryStatus).toContain("目前無法傳送私訊給你，請稍後再試");
     expect(deliveryStatus).not.toContain("50007");
     expect(deliveryStatus).not.toContain("legacy-private-token");
-    expect(deliveryStatus).not.toContain("無法傳送私訊");
+    expect(deliveryStatus).not.toContain("伺服器管理員");
+    expect(deliveryStatus).not.toContain("目標頻道");
   });
 
   it("does not consume the price report cooldown for settings commands", async () => {
