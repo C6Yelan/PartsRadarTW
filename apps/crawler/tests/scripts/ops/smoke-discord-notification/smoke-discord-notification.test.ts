@@ -4,11 +4,14 @@
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  applyMonitorFailureObservation,
+  applySmokeSummaryObservation,
   createSmokeDiscordNotificationDecision,
   markSmokeNotificationSent,
   parseSmokeDiscordNotificationOptions,
   parseSmokeDiscordNotificationState,
 } from "../../../../src/scripts/ops/smoke-discord-notification";
+import { MONITOR_EXECUTION_STATE_KEY } from "../../../../src/scripts/ops/smoke-discord-notification/policy";
 import {
   check,
   checkState,
@@ -153,6 +156,205 @@ describe("filter-quality pending policy", () => {
       current = decision.nextState;
     }
     expect(current.checks["product filter quality"]?.consecutiveBad).toBe(3);
+  });
+});
+
+describe("monitor execution failure policy", () => {
+  const firstObservedAt = "2026-06-06T12:00:00.000Z";
+  const sentAt = "2026-06-06T12:00:01.000Z";
+  const errorFingerprint = `${MONITOR_EXECUTION_STATE_KEY}|FAIL|PAGE|ERROR`;
+
+  it("pages the first monitor failure and retries while the notification is unsent", () => {
+    const first = observeMonitorFailure("ERROR", state(), firstObservedAt, "DatabaseQueryError");
+
+    expect(first.notifications).toEqual([
+      {
+        stateKey: MONITOR_EXECUTION_STATE_KEY,
+        kind: "FAIL",
+        checkName: MONITOR_EXECUTION_STATE_KEY,
+        classification: "PAGE",
+        fingerprint: errorFingerprint,
+        firstObservedAt,
+        observedAt: firstObservedAt,
+        consecutiveCount: 1,
+        issue: "DatabaseQueryError",
+        previousStatus: null,
+      },
+    ]);
+    expect(first.nextState.checks[MONITOR_EXECUTION_STATE_KEY]).toEqual({
+      checkName: MONITOR_EXECUTION_STATE_KEY,
+      classification: "PAGE",
+      lastObservedStatus: "FAIL",
+      lastObservedAt: firstObservedAt,
+      currentFingerprint: errorFingerprint,
+      pendingSince: firstObservedAt,
+      activeSince: null,
+      consecutiveBad: 1,
+      consecutiveGood: 0,
+      lastNotificationKind: null,
+      lastNotificationAt: null,
+      lastNotifiedFingerprint: null,
+    });
+
+    const retryAt = "2026-06-06T12:05:00.000Z";
+    const retry = observeMonitorFailure("ERROR", first.nextState, retryAt, "DatabaseQueryError");
+    expect(retry.notifications[0]).toMatchObject({
+      fingerprint: errorFingerprint,
+      firstObservedAt,
+      observedAt: retryAt,
+      consecutiveCount: 2,
+      issue: "DatabaseQueryError",
+    });
+    expect(retry.nextState.checks[MONITOR_EXECUTION_STATE_KEY]).toMatchObject({
+      pendingSince: firstObservedAt,
+      activeSince: null,
+      consecutiveBad: 2,
+      lastNotificationKind: null,
+      lastNotificationAt: null,
+      lastNotifiedFingerprint: null,
+    });
+  });
+
+  it("keeps a sent monitor incident quiet before the reminder boundary", () => {
+    const sent = sentMonitorFailureState("ERROR", firstObservedAt, sentAt, "DatabaseQueryError");
+    const beforeReminder = observeMonitorFailure(
+      "ERROR",
+      sent,
+      "2026-06-06T13:00:00.000Z",
+      "DatabaseQueryError",
+    );
+
+    expect(beforeReminder.notifications).toHaveLength(0);
+    expect(beforeReminder.nextState.checks[MONITOR_EXECUTION_STATE_KEY]).toMatchObject({
+      lastObservedAt: "2026-06-06T13:00:00.000Z",
+      currentFingerprint: errorFingerprint,
+      pendingSince: null,
+      activeSince: firstObservedAt,
+      consecutiveBad: 2,
+      lastNotificationKind: "FAIL",
+      lastNotificationAt: sentAt,
+      lastNotifiedFingerprint: errorFingerprint,
+    });
+  });
+
+  it("reminds a monitor incident at the exact failure reminder boundary", () => {
+    const sent = sentMonitorFailureState("ERROR", firstObservedAt, sentAt, "DatabaseQueryError");
+    const reminderAt = "2026-06-06T13:00:01.000Z";
+    const reminder = observeMonitorFailure("ERROR", sent, reminderAt, "DatabaseQueryError");
+
+    expect(reminder.notifications).toEqual([
+      {
+        stateKey: MONITOR_EXECUTION_STATE_KEY,
+        kind: "FAIL",
+        checkName: MONITOR_EXECUTION_STATE_KEY,
+        classification: "PAGE",
+        fingerprint: errorFingerprint,
+        firstObservedAt,
+        observedAt: reminderAt,
+        consecutiveCount: 2,
+        issue: "DatabaseQueryError",
+        previousStatus: null,
+      },
+    ]);
+    expect(reminder.nextState.checks[MONITOR_EXECUTION_STATE_KEY]?.lastNotificationAt).toBe(sentAt);
+  });
+
+  it.each([
+    ["ERROR" as const, "TIMEOUT" as const],
+    ["TIMEOUT" as const, "ERROR" as const],
+  ])("starts a new monitor incident when the outcome changes from %s to %s", (initial, next) => {
+    const sent = sentMonitorFailureState(initial, firstObservedAt, sentAt, `${initial}Kind`);
+    const changedAt = "2026-06-06T12:05:00.000Z";
+    const changed = observeMonitorFailure(next, sent, changedAt, `${next}Kind`);
+    const changedFingerprint = `${MONITOR_EXECUTION_STATE_KEY}|FAIL|PAGE|${next}`;
+
+    expect(changed.notifications[0]).toEqual({
+      stateKey: MONITOR_EXECUTION_STATE_KEY,
+      kind: "FAIL",
+      checkName: MONITOR_EXECUTION_STATE_KEY,
+      classification: "PAGE",
+      fingerprint: changedFingerprint,
+      firstObservedAt: changedAt,
+      observedAt: changedAt,
+      consecutiveCount: 1,
+      issue: `${next}Kind`,
+      previousStatus: null,
+    });
+    expect(changed.nextState.checks[MONITOR_EXECUTION_STATE_KEY]).toMatchObject({
+      classification: "PAGE",
+      lastObservedStatus: "FAIL",
+      currentFingerprint: changedFingerprint,
+      pendingSince: changedAt,
+      activeSince: null,
+      consecutiveBad: 1,
+      consecutiveGood: 0,
+      lastNotificationKind: null,
+      lastNotificationAt: null,
+      lastNotifiedFingerprint: null,
+    });
+  });
+
+  it("recovers a sent monitor incident after the configured good-cycle boundary", () => {
+    const sent = sentMonitorFailureState("ERROR", firstObservedAt, sentAt, "DatabaseQueryError");
+    const firstGoodAt = "2026-06-06T12:05:00.000Z";
+    const firstGood = applySmokeSummaryObservation({
+      summary: summary({ status: "OK", checkedAt: new Date(firstGoodAt), checks: [] }),
+      previousState: sent,
+      options: POLICY_OPTIONS,
+    });
+    expect(firstGood.notifications).toHaveLength(0);
+    expect(firstGood.nextState.checks[MONITOR_EXECUTION_STATE_KEY]).toMatchObject({
+      classification: "WARNING",
+      lastObservedStatus: "OK",
+      currentFingerprint: null,
+      activeSince: firstObservedAt,
+      consecutiveBad: 0,
+      consecutiveGood: 1,
+      lastNotificationKind: "FAIL",
+      lastNotificationAt: sentAt,
+      lastNotifiedFingerprint: errorFingerprint,
+    });
+
+    const recoveredAt = "2026-06-06T12:10:00.000Z";
+    const recovered = applySmokeSummaryObservation({
+      summary: summary({ status: "OK", checkedAt: new Date(recoveredAt), checks: [] }),
+      previousState: firstGood.nextState,
+      options: POLICY_OPTIONS,
+    });
+    expect(recovered.notifications).toEqual([
+      {
+        stateKey: MONITOR_EXECUTION_STATE_KEY,
+        kind: "RECOVERED",
+        checkName: MONITOR_EXECUTION_STATE_KEY,
+        classification: "WARNING",
+        fingerprint: errorFingerprint,
+        firstObservedAt,
+        observedAt: recoveredAt,
+        consecutiveCount: 2,
+        issue: "production smoke completed",
+        previousStatus: "FAIL",
+      },
+    ]);
+
+    const recoveryNotification = recovered.notifications[0];
+    if (!recoveryNotification) throw new Error("Expected monitor recovery notification.");
+    const recoveredSentAt = "2026-06-06T12:10:01.000Z";
+    const recoveredState = markSmokeNotificationSent({
+      state: recovered.nextState,
+      notification: recoveryNotification,
+      sentAt: new Date(recoveredSentAt),
+    });
+    expect(recoveredState.checks[MONITOR_EXECUTION_STATE_KEY]).toMatchObject({
+      classification: "WARNING",
+      currentFingerprint: null,
+      pendingSince: null,
+      activeSince: null,
+      consecutiveBad: 0,
+      consecutiveGood: 0,
+      lastNotificationKind: "RECOVERED",
+      lastNotificationAt: recoveredSentAt,
+      lastNotifiedFingerprint: errorFingerprint,
+    });
   });
 });
 
@@ -323,5 +525,36 @@ function decide(
     summary: summary({ status, checkedAt: new Date(checkedAt), checks }),
     previousState,
     options: POLICY_OPTIONS,
+  });
+}
+
+function observeMonitorFailure(
+  outcome: "ERROR" | "TIMEOUT",
+  previousState: ReturnType<typeof state>,
+  observedAt: string,
+  errorKind: string,
+) {
+  return applyMonitorFailureObservation({
+    previousState,
+    outcome,
+    errorKind,
+    observedAt: new Date(observedAt),
+    options: POLICY_OPTIONS,
+  });
+}
+
+function sentMonitorFailureState(
+  outcome: "ERROR" | "TIMEOUT",
+  observedAt: string,
+  sentAt: string,
+  errorKind: string,
+) {
+  const decision = observeMonitorFailure(outcome, state(), observedAt, errorKind);
+  const notification = decision.notifications[0];
+  if (!notification) throw new Error("Expected monitor failure notification.");
+  return markSmokeNotificationSent({
+    state: decision.nextState,
+    notification,
+    sentAt: new Date(sentAt),
   });
 }
