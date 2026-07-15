@@ -136,10 +136,12 @@ export async function createStatusMessage({
           {
             name: "商品價格爬蟲",
             value: formatCrawlerStatus(crawler, now),
+            inline: true,
           },
           {
             name: "Discord 通知排程主迴圈",
             value: formatNotificationLoop(runtime.notificationLoop, scanIntervalMs),
+            inline: true,
           },
           {
             name: "目標價提醒掃描",
@@ -149,6 +151,7 @@ export async function createStatusMessage({
               scanIntervalMs,
               activeWatchCount,
             }),
+            inline: true,
           },
           {
             name: "個人價格報告排程",
@@ -157,6 +160,7 @@ export async function createStatusMessage({
               enabled: options.personalReportsEnabled,
               databaseStatus: personal,
             }),
+            inline: true,
           },
           {
             name: "公開價格報告排程",
@@ -166,6 +170,7 @@ export async function createStatusMessage({
               enabledSettingCount: enabledPublicSettingCount,
               nextRunAt: runtime.notificationLoop.nextRunAt,
             }),
+            inline: true,
           },
         ],
       },

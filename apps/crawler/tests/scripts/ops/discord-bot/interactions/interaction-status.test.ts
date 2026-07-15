@@ -52,11 +52,13 @@ describe("status interaction", () => {
     const body = responseBody(fetchMock);
     const embed = body.data.embeds[0];
     expect(body).toMatchObject({ type: 4, data: { flags: 64 } });
+    expect(body.data.embeds).toHaveLength(1);
     expect(embed).toMatchObject({
       title: "PartsRadarTW 排程狀態",
       description: "管理員用排程與背景工作摘要。時間皆為台北時間。",
       timestamp: NOW.toISOString(),
     });
+    expect(embed.fields).toHaveLength(5);
     expect(embed.fields.map((field: { name: string }) => field.name)).toEqual([
       "商品價格爬蟲",
       "Discord 通知排程主迴圈",
@@ -64,6 +66,9 @@ describe("status interaction", () => {
       "個人價格報告排程",
       "公開價格報告排程",
     ]);
+    expect(
+      embed.fields.every((field: { inline?: boolean }) => field.inline === true),
+    ).toBe(true);
     expect(JSON.stringify(embed)).not.toMatch(/機器人|Gateway|uptime|已運作|資料範圍/);
     expect(JSON.stringify(embed)).not.toContain('"name":"功能"');
   });
