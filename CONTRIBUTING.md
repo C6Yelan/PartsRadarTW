@@ -23,7 +23,7 @@ pnpm db:seed
 pnpm dev:web
 ```
 
-啟動前請把 `.env` 的必要資料庫欄位改成只供本機使用的值。`pnpm db:seed` 會 upsert 並啟用目前支援的 11 個原價屋分類。
+啟動前請把 `.env` 的必要資料庫欄位改成只供本機使用的值。`pnpm db:seed` 會 upsert 並啟用目前支援的原價屋分類。
 
 ## 程式歸屬
 

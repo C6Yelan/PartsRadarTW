@@ -7,9 +7,15 @@ PartsRadarTW 是一個單一 repository 的 TypeScript monorepo。Web、crawler�
 ```mermaid
 flowchart LR
   CoolPC[原價屋公開頁面] --> Crawler[Crawler daemon]
+  CoolPC --> ImageRecovery[image-cache-recovery-daemon]
+  CoolPC --> ImageBackfill[image-cache-backfill]
   Crawler --> Snapshots[(Raw snapshot volume)]
   Crawler --> Database[(PostgreSQL)]
-  Crawler --> Images[(Product image volume)]
+  Database --> ImageRecovery
+  Database --> ImageBackfill
+  ImageRecovery --> Images[(Product image volume)]
+  ImageBackfill --> Images
+  StorageInit[storage-init] --> Images
   Database --> Web[Next.js web and API]
   Images --> Web
   Web --> Browser[Browser]
@@ -17,6 +23,7 @@ flowchart LR
   Discord --> DiscordAPI[Discord API]
   Smoke[Smoke daemon] --> Web
   Smoke --> Database
+  Images --> Smoke
   Tunnel[Optional Cloudflare Tunnel] --> Web
 ```
 
@@ -31,7 +38,7 @@ Filesystem lock 僅協調同一主機上共享本機 filesystem 或 local named 
 | `apps/web` | Next.js 16／React 19 UI、公開 API、站內圖片讀取與瀏覽器配單。 |
 | `apps/crawler` | 原價屋 fetch／parser、商品寫入、raw snapshot、ops CLI、smoke 與 Discord bot。 |
 | `packages/db` | PostgreSQL 18 的 Prisma schema、migration、seed 與 client。 |
-| `packages/shared` | 跨 app 必須一致的原價屋來源 URL 與公開圖片 URL contract。 |
+| `packages/shared` | 跨 app 必須一致的原價屋來源身分、公開 URL 與 product facet contract。 |
 
 App-private formatter、UI state、API query、Discord message 與測試 helper 不得移入 `packages/shared`。
 
@@ -49,9 +56,9 @@ Fetch、validation 或 parse 失敗不得覆寫最後一份有效商品與價格
 ## 圖片資料流
 
 1. Parser 只保存符合原價屋 allowlist 的來源圖片 URL。
-2. Scheduled crawler 只替當輪新商品補圖；大量修復由 `image-cache-backfill` 手動 service 執行。
-3. 圖片經大小、content type 與 redirect 限制後轉成 WebP，寫入 product image volume。
-4. Web 以 `/api/product-images/{id}.webp` read-only 提供圖片。
+2. `image-cache-recovery-daemon` 週期性限量補圖；大量修復由 `image-cache-backfill` 手動 service 執行，價格 `crawler-daemon` 不處理或等待圖片下載。
+3. 圖片經大小、content type 與 redirect 限制後轉成 WebP，寫入由 `storage-init` 初始化的 product image volume。
+4. Web 以 `/api/product-images/{id}.webp` 提供圖片；Web 與 `smoke-daemon` 都以 read-only mount 讀取 volume。
 
 訪客請求期間不會抓取或 hotlink 原價屋圖片。
 
@@ -83,7 +90,7 @@ Fetch、validation 或 parse 失敗不得覆寫最後一份有效商品與價格
 | --- | --- | --- |
 | `postgres_data` | `postgres` | 無 |
 | `snapshots` | `storage-init`, `crawler`, `crawler-daemon`, cleanup daemon, `smoke-daemon` | 無 |
-| `product_images` | `storage-init`, `crawler-daemon`, `image-cache-backfill` | `web`, `smoke-daemon` |
+| `product_images` | `storage-init`, `image-cache-recovery-daemon`, `image-cache-backfill` | `web`, `smoke-daemon` |
 
 `crawler` 手動 service 不掛載 product image volume；手動圖片補圖必須使用 `image-cache-backfill`。
 
