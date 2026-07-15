@@ -102,9 +102,10 @@ describe("status interaction", () => {
     });
     const crawler = fieldValue(message, "商品價格爬蟲");
 
-    expect(crawler).toContain("狀態：正在更新（`RUNNING`）");
-    expect(crawler).toContain("完成：執行中");
-    expect(crawler).toContain("已執行：48 分鐘 0 秒");
+    expect(crawler).toContain("狀態：RUNNING · 正在更新");
+    expect(crawler).toContain("代碼：`RUNNING`");
+    expect(crawler).toContain("執行：07/15 12:00:00 起（已執行 48 分）");
+    expect(crawler).toContain("最近成功：07/15 12:20:00");
   });
 
   it("uses warning severity for a crawler run completed with partial errors", async () => {
@@ -131,9 +132,8 @@ describe("status interaction", () => {
     });
     const crawler = fieldValue(message, "商品價格爬蟲");
 
-    expect(crawler).toContain("排程狀態：BACKOFF");
-    expect(crawler).toContain("Backoff：進行中");
-    expect(crawler).toContain("13:18:00");
+    expect(crawler).toContain("狀態：BACKOFF · 完成，沒有價格變動");
+    expect(crawler).toContain("Backoff 至：07/15 13:18:00");
   });
 
   it("calculates start-to-start interval from the latest two scheduled runs", async () => {
@@ -144,7 +144,7 @@ describe("status interaction", () => {
       now: NOW,
     });
 
-    expect(fieldValue(message, "商品價格爬蟲")).toContain("觀測間隔：1 小時");
+    expect(fieldValue(message, "商品價格爬蟲")).toContain("間隔：1 小時");
   });
 
   it("uses a safe observed-interval fallback with only one run", async () => {
@@ -155,7 +155,7 @@ describe("status interaction", () => {
       now: NOW,
     });
 
-    expect(fieldValue(message, "商品價格爬蟲")).toContain("觀測間隔：尚無足夠資料");
+    expect(fieldValue(message, "商品價格爬蟲")).toContain("間隔：尚無足夠資料");
   });
 
   it("shows NOT_RUN before the notification loop completes its first cycle", async () => {
@@ -166,27 +166,82 @@ describe("status interaction", () => {
     });
 
     expect(fieldValue(message, "Discord 通知排程主迴圈")).toContain(
-      "尚未完成第一輪（`NOT_RUN`）",
+      "上次：尚未完成第一輪 · `NOT_RUN`",
     );
   });
 
-  it("shows runtime outcomes and processing summaries for all bot schedules", async () => {
+  it("compacts healthy schedule details without losing technical outcomes", async () => {
     const message = await createStatusMessage({
-      client: createStatusClient({ activeWatchCount: 9, enabledPersonalCount: 4, dueCount: 2 }),
+      client: createStatusClient({
+        activeWatchCount: 1,
+        enabledPersonalCount: 1,
+        dueCount: 0,
+        earliestNextSendAt: new Date("2026-07-16T01:00:00.000Z"),
+      }),
       options: createDiscordBotOptions(),
-      schedulerStatus: populatedSchedulerStatus(),
+      schedulerStatus: healthySchedulerStatus(),
+      now: NOW,
+    });
+    const crawler = fieldValue(message, "商品價格爬蟲");
+    const loop = fieldValue(message, "Discord 通知排程主迴圈");
+    const target = fieldValue(message, "目標價提醒掃描");
+    const personal = fieldValue(message, "個人價格報告排程");
+    const publicReport = fieldValue(message, "公開價格報告排程");
+    const allFields = message.embeds?.[0]?.fields?.map((field) => field.value).join("\n") ?? "";
+
+    expect(crawler).toContain("狀態：IDLE · 完成，沒有價格變動");
+    expect(crawler).toContain("代碼：`SUCCESS_UNCHANGED`");
+    expect(crawler).toContain("執行：07/15 12:00:00 → 12:20:00（20 分）");
+    expect(crawler).not.toContain("最近成功");
+    expect(loop).toContain("上次：07/15 12:40:03 · `OK` · 3 秒");
+    expect(loop).toContain("下次：07/15 12:45:03");
+    expect(loop).toContain("週期：5 分鐘");
+    expect(target).toContain("結果：`OK`");
+    expect(target).toContain("啟用提醒：1");
+    expect(target).toContain("掃描／到期／處理／送出：0／0／0／0");
+    expect(personal).toContain("設定／到期：1／0");
+    expect(personal).toContain("下次送出：07/16 09:00");
+    expect(personal).toContain("處理／送出：0／0");
+    expect(publicReport).toContain("設定／處理：2／2");
+    expect(publicReport).toContain("送出／略過：1／1");
+    expect(publicReport).not.toContain("啟用設定");
+    expect(allFields).not.toMatch(/功能：`ENABLED`|Backoff：無|限流／失敗：0／0/);
+    expect(allFields).not.toMatch(/上次掃描|上次開始|上次完成|下次掃描|掃描間隔/);
+    expect(allFields).not.toMatch(/undefined|null|Invalid Date/);
+  });
+
+  it("shows disabled schedules and nonzero anomaly counts only when needed", async () => {
+    const schedulerStatus = populatedSchedulerStatus();
+    schedulerStatus.recordPublicReports({
+      startedAt: new Date("2026-07-15T04:40:00.000Z"),
+      completedAt: new Date("2026-07-15T04:40:03.000Z"),
+      outcome: "OK",
+      settingCount: 2,
+      processedCount: 2,
+      sentCount: 1,
+      skippedCount: 1,
+      rateLimitedCount: 1,
+      failedCount: 2,
+    });
+    const message = await createStatusMessage({
+      client: createStatusClient({ enabledPublicCount: 4 }),
+      options: createDiscordBotOptions({
+        targetWatchesEnabled: false,
+        personalReportsEnabled: false,
+        publicReportsEnabled: false,
+      }),
+      schedulerStatus,
       now: NOW,
     });
 
-    expect(fieldValue(message, "Discord 通知排程主迴圈")).toContain("結果：完成（`OK`）");
     expect(fieldValue(message, "目標價提醒掃描")).toMatch(
-      /ENABLED[\s\S]*處理／送出／限流／失敗：5／4／0／1[\s\S]*啟用提醒：9/,
+      /功能：`DISABLED`[\s\S]*限流／失敗：0／1/,
     );
     expect(fieldValue(message, "個人價格報告排程")).toMatch(
-      /處理／送出／限流／失敗：3／2／1／0[\s\S]*啟用設定：4[\s\S]*目前到期：2/,
+      /功能：`DISABLED`[\s\S]*限流／失敗：1／0/,
     );
     expect(fieldValue(message, "公開價格報告排程")).toMatch(
-      /下次掃描：[\s\S]*本輪設定／處理：2／2[\s\S]*送出／略過／限流／失敗：1／1／0／0/,
+      /功能：`DISABLED`[\s\S]*設定／處理：2／2[\s\S]*啟用設定：4[\s\S]*限流／失敗：1／2/,
     );
   });
 
@@ -211,7 +266,8 @@ describe("status interaction", () => {
       now: NOW,
     });
 
-    expect(fieldValue(message, "目標價提醒掃描")).toContain("`ERROR`，SCAN_ERROR");
+    expect(fieldValue(message, "目標價提醒掃描")).toContain("結果：`ERROR`");
+    expect(fieldValue(message, "目標價提醒掃描")).toContain("錯誤：SCAN_ERROR");
   });
 
   it.each(["crawler", "target", "personal", "public"] as const)(

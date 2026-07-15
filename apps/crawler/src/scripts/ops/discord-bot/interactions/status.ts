@@ -148,7 +148,6 @@ export async function createStatusMessage({
             value: formatTargetPriceStatus({
               state: runtime.targetPrice,
               enabled: options.targetWatchesEnabled,
-              scanIntervalMs,
               activeWatchCount,
             }),
             inline: true,
@@ -168,7 +167,6 @@ export async function createStatusMessage({
               state: runtime.publicReports,
               enabled: options.publicReportsEnabled,
               enabledSettingCount: enabledPublicSettingCount,
-              nextRunAt: runtime.notificationLoop.nextRunAt,
             }),
             inline: true,
           },
@@ -250,68 +248,81 @@ function formatCrawlerStatus(
   const finishedAt = latestRun.finishedAt;
   const durationEnd = finishedAt ?? now;
   const observedInterval = status.runs[1]
-    ? formatDuration(latestRun.startedAt.getTime() - status.runs[1].startedAt.getTime())
+    ? formatCompactDuration(latestRun.startedAt.getTime() - status.runs[1].startedAt.getTime())
     : "尚無足夠資料";
   const successCount = latestRun.categoryResults.filter((result) =>
     result.status.startsWith("SUCCESS_"),
   ).length;
   const failedCount = latestRun.categoryResults.length - successCount;
   const backingOff = latestRun.backoffUntil !== null && latestRun.backoffUntil > now;
+  const runtimeState = backingOff
+    ? "BACKOFF"
+    : latestRun.status === "RUNNING"
+      ? "RUNNING"
+      : "IDLE";
+  const latestRunSucceeded =
+    (latestRun.status === "SUCCESS_CHANGED" || latestRun.status === "SUCCESS_UNCHANGED") &&
+    finishedAt !== null;
+  const latestSuccessMatchesCompletion =
+    latestRunSucceeded &&
+    status.latestSuccessfulFinishedAt !== null &&
+    finishedAt.getTime() === status.latestSuccessfulFinishedAt.getTime();
 
   return [
-    `排程狀態：${backingOff ? "BACKOFF" : latestRun.status === "RUNNING" ? "RUNNING" : "IDLE"}`,
-    `狀態：${runSummary}（\`${formatKnownCrawlerStatus(latestRun.status)}\`）`,
-    `開始：${formatOptionalTime(latestRun.startedAt)}`,
-    `完成：${finishedAt ? formatOptionalTime(finishedAt) : "執行中"}`,
-    `${finishedAt ? "耗時" : "已執行"}：${formatDuration(durationEnd.getTime() - latestRun.startedAt.getTime())}`,
-    `觀測間隔：${observedInterval}`,
-    `成功／失敗分類：${successCount}／${failedCount}`,
-    `Backoff：${backingOff ? `進行中，至 ${formatOptionalTime(latestRun.backoffUntil)}` : "無"}`,
-    `最近成功完成：${formatOptionalTime(status.latestSuccessfulFinishedAt)}`,
-  ].join("\n");
+    `狀態：${runtimeState} · ${runSummary}`,
+    `代碼：\`${formatKnownCrawlerStatus(latestRun.status)}\``,
+    `執行：${formatCrawlerExecution(latestRun.startedAt, finishedAt, durationEnd)}`,
+    `間隔：${observedInterval}`,
+    `分類：${successCount} 成功／${failedCount} 失敗`,
+    backingOff ? `Backoff 至：${formatStatusTime(latestRun.backoffUntil)}` : null,
+    latestSuccessMatchesCompletion
+      ? null
+      : `最近成功：${formatStatusTime(status.latestSuccessfulFinishedAt)}`,
+  ]
+    .filter((line): line is string => line !== null)
+    .join("\n");
 }
 
 function formatNotificationLoop(state: ScheduleExecutionState, scanIntervalMs: number): string {
   if (state.lastOutcome === "NOT_RUN") {
     return [
-      "狀態：尚未完成第一輪（`NOT_RUN`）",
-      `下次喚醒：${formatOptionalTime(state.nextRunAt)}`,
-      `掃描間隔：${formatDuration(scanIntervalMs)}`,
+      "上次：尚未完成第一輪 · `NOT_RUN`",
+      `下次：${formatStatusTime(state.nextRunAt)}`,
+      `週期：${formatSchedulePeriod(scanIntervalMs)}`,
     ].join("\n");
   }
 
   return [
-    `最後一輪開始：${formatOptionalTime(state.lastStartedAt)}`,
-    `最後一輪完成：${formatOptionalTime(state.lastCompletedAt)}`,
-    `耗時：${formatOptionalDuration(state.lastDurationMs)}`,
-    `結果：${formatScheduleOutcome(state)}`,
-    `下次喚醒：${formatOptionalTime(state.nextRunAt)}`,
-    `掃描間隔：${formatDuration(scanIntervalMs)}`,
-  ].join("\n");
+    `上次：${formatStatusTime(state.lastCompletedAt ?? state.lastStartedAt)} · \`${state.lastOutcome}\` · ${formatCompactDuration(state.lastDurationMs)}`,
+    `下次：${formatStatusTime(state.nextRunAt)}`,
+    `週期：${formatSchedulePeriod(scanIntervalMs)}`,
+    state.lastOutcome === "ERROR" ? `錯誤：${formatScheduleErrorKind(state)}` : null,
+  ]
+    .filter((line): line is string => line !== null)
+    .join("\n");
 }
 
 function formatTargetPriceStatus({
   state,
   enabled,
-  scanIntervalMs,
   activeWatchCount,
 }: {
   state: DiscordBotSchedulerStatusSnapshot["targetPrice"];
   enabled: boolean;
-  scanIntervalMs: number;
   activeWatchCount: number | null;
 }): string {
   return [
-    `功能：${enabled ? "ENABLED" : "DISABLED"}`,
-    `掃描間隔：${formatDuration(scanIntervalMs)}`,
-    `上次開始：${formatOptionalTime(state.lastStartedAt)}`,
-    `上次完成：${formatOptionalTime(state.lastCompletedAt)}`,
-    `下次掃描：${formatOptionalTime(state.nextRunAt)}`,
-    `結果：${formatScheduleOutcome(state)}`,
-    `處理／送出／限流／失敗：${state.processedCount}／${state.sentCount}／${state.rateLimitedCount}／${state.failedCount}`,
-    `掃描／到期：${state.scannedCount}／${state.dueCount}`,
+    enabled ? null : "功能：`DISABLED`",
+    `結果：\`${state.lastOutcome}\``,
     `啟用提醒：${formatOptionalCount(activeWatchCount)}`,
-  ].join("\n");
+    `掃描／到期／處理／送出：${state.scannedCount}／${state.dueCount}／${state.processedCount}／${state.sentCount}`,
+    state.rateLimitedCount > 0 || state.failedCount > 0
+      ? `限流／失敗：${state.rateLimitedCount}／${state.failedCount}`
+      : null,
+    state.lastOutcome === "ERROR" ? `錯誤：${formatScheduleErrorKind(state)}` : null,
+  ]
+    .filter((line): line is string => line !== null)
+    .join("\n");
 }
 
 function formatPersonalReportStatus({
@@ -328,44 +339,46 @@ function formatPersonalReportStatus({
   } | null;
 }): string {
   return [
-    `功能：${enabled ? "ENABLED" : "DISABLED"}`,
-    `上次掃描：${formatOptionalTime(state.lastStartedAt)}`,
-    `結果：${formatScheduleOutcome(state)}`,
-    `處理／送出／限流／失敗：${state.processedCount}／${state.sentCount}／${state.rateLimitedCount}／${state.failedCount}`,
-    `啟用設定：${databaseStatus ? databaseStatus.enabledCount : "QUERY_ERROR"}`,
-    `目前到期：${databaseStatus ? databaseStatus.dueCount : "QUERY_ERROR"}`,
-    `最早 nextSendAt：${databaseStatus ? formatOptionalTime(databaseStatus.earliestNextSendAt) : "QUERY_ERROR"}`,
-  ].join("\n");
+    enabled ? null : "功能：`DISABLED`",
+    `結果：\`${state.lastOutcome}\``,
+    `設定／到期：${databaseStatus ? `${databaseStatus.enabledCount}／${databaseStatus.dueCount}` : "QUERY_ERROR／QUERY_ERROR"}`,
+    `下次送出：${databaseStatus ? formatStatusMinute(databaseStatus.earliestNextSendAt) : "QUERY_ERROR"}`,
+    `處理／送出：${state.processedCount}／${state.sentCount}`,
+    state.rateLimitedCount > 0 || state.failedCount > 0
+      ? `限流／失敗：${state.rateLimitedCount}／${state.failedCount}`
+      : null,
+    state.lastOutcome === "ERROR" ? `錯誤：${formatScheduleErrorKind(state)}` : null,
+  ]
+    .filter((line): line is string => line !== null)
+    .join("\n");
 }
 
 function formatPublicReportStatus({
   state,
   enabled,
   enabledSettingCount,
-  nextRunAt,
 }: {
   state: DiscordBotSchedulerStatusSnapshot["publicReports"];
   enabled: boolean;
   enabledSettingCount: number | null;
-  nextRunAt: Date | null;
 }): string {
   return [
-    `功能：${enabled ? "ENABLED" : "DISABLED"}`,
-    `上次掃描：${formatOptionalTime(state.lastStartedAt)}`,
-    `下次掃描：${formatOptionalTime(nextRunAt)}`,
-    `結果：${formatScheduleOutcome(state)}`,
-    `本輪設定／處理：${state.settingCount}／${state.processedCount}`,
-    `送出／略過／限流／失敗：${state.sentCount}／${state.skippedCount}／${state.rateLimitedCount}／${state.failedCount}`,
-    `啟用設定：${formatOptionalCount(enabledSettingCount)}`,
-  ].join("\n");
-}
-
-function formatScheduleOutcome(state: ScheduleExecutionState): string {
-  if (state.lastOutcome === "OK") return "完成（`OK`）";
-  if (state.lastOutcome === "ERROR") {
-    return `失敗（\`ERROR\`，${state.lastErrorKind ?? "SCHEDULE_ERROR"}）`;
-  }
-  return "尚未執行（`NOT_RUN`）";
+    enabled ? null : "功能：`DISABLED`",
+    `結果：\`${state.lastOutcome}\``,
+    `設定／處理：${state.settingCount}／${state.processedCount}`,
+    `送出／略過：${state.sentCount}／${state.skippedCount}`,
+    enabledSettingCount === null
+      ? "啟用設定：QUERY_ERROR"
+      : enabledSettingCount !== state.settingCount
+        ? `啟用設定：${enabledSettingCount}`
+        : null,
+    state.rateLimitedCount > 0 || state.failedCount > 0
+      ? `限流／失敗：${state.rateLimitedCount}／${state.failedCount}`
+      : null,
+    state.lastOutcome === "ERROR" ? `錯誤：${formatScheduleErrorKind(state)}` : null,
+  ]
+    .filter((line): line is string => line !== null)
+    .join("\n");
 }
 
 function resolveOverallSeverity({
@@ -477,10 +490,19 @@ function severityColor(severity: StatusSeverity): number {
   return DISCORD_STATUS_WARNING_COLOR;
 }
 
-function formatOptionalTime(value: Date | null): string {
-  if (!value) return "尚無資料";
+interface StatusTimeParts {
+  year: string;
+  month: string;
+  day: string;
+  hour: string;
+  minute: string;
+  second: string;
+}
 
-  return new Intl.DateTimeFormat("zh-TW", {
+function readStatusTimeParts(value: Date | null): StatusTimeParts | null {
+  if (!value || !Number.isFinite(value.getTime())) return null;
+
+  const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: TIME_ZONE,
     year: "numeric",
     month: "2-digit",
@@ -489,14 +511,53 @@ function formatOptionalTime(value: Date | null): string {
     minute: "2-digit",
     second: "2-digit",
     hour12: false,
-  }).format(value);
+    hourCycle: "h23",
+  }).formatToParts(value);
+
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  const { year, month, day, hour, minute, second } = values;
+  if (!year || !month || !day || !hour || !minute || !second) return null;
+
+  return { year, month, day, hour, minute, second };
 }
 
-function formatOptionalDuration(value: number | null): string {
-  return value === null ? "尚無資料" : formatDuration(value);
+function formatStatusTime(value: Date | null): string {
+  const parts = readStatusTimeParts(value);
+  if (!parts) return "尚無資料";
+
+  return `${parts.month}/${parts.day} ${parts.hour}:${parts.minute}:${parts.second}`;
 }
 
-function formatDuration(value: number): string {
+function formatStatusMinute(value: Date | null): string {
+  const parts = readStatusTimeParts(value);
+  if (!parts) return "尚無資料";
+
+  return `${parts.month}/${parts.day} ${parts.hour}:${parts.minute}`;
+}
+
+function formatCrawlerExecution(startedAt: Date, finishedAt: Date | null, durationEnd: Date): string {
+  const startParts = readStatusTimeParts(startedAt);
+  const start = formatStatusTime(startedAt);
+  const duration = formatCompactDuration(durationEnd.getTime() - startedAt.getTime());
+
+  if (!finishedAt) return `${start} 起（已執行 ${duration}）`;
+
+  const endParts = readStatusTimeParts(finishedAt);
+  const end =
+    startParts &&
+    endParts &&
+    startParts.year === endParts.year &&
+    startParts.month === endParts.month &&
+    startParts.day === endParts.day
+      ? `${endParts.hour}:${endParts.minute}:${endParts.second}`
+      : formatStatusTime(finishedAt);
+
+  return `${start} → ${end}（${duration}）`;
+}
+
+function formatCompactDuration(value: number | null): string {
+  if (value === null || !Number.isFinite(value)) return "尚無資料";
+
   const totalSeconds = Math.max(0, Math.floor(value / 1000));
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
@@ -504,11 +565,22 @@ function formatDuration(value: number): string {
 
   return [
     hours > 0 ? `${hours} 小時` : null,
-    minutes > 0 ? `${minutes} 分鐘` : null,
-    hours === 0 ? `${seconds} 秒` : null,
+    minutes > 0 ? `${minutes} 分` : null,
+    seconds > 0 || totalSeconds === 0 ? `${seconds} 秒` : null,
   ]
     .filter((part): part is string => part !== null)
     .join(" ");
+}
+
+function formatSchedulePeriod(value: number): string {
+  if (!Number.isFinite(value)) return "尚無資料";
+  if (value % 3_600_000 === 0) return `${value / 3_600_000} 小時`;
+  if (value % 60_000 === 0) return `${value / 60_000} 分鐘`;
+  return formatCompactDuration(value);
+}
+
+function formatScheduleErrorKind(state: ScheduleExecutionState): string {
+  return state.lastErrorKind ?? "SCHEDULE_ERROR";
 }
 
 function formatOptionalCount(value: number | null): string {
