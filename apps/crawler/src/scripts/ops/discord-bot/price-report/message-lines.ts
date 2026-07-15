@@ -268,7 +268,7 @@ function stripLeadingSubcategoryName(
 }
 
 // 格式化單筆價格變動商品行，包含價差、前後價格與站內商品連結。
-export function formatPersonalPriceChangeEmbedLine(
+function formatPersonalPriceChangeEmbedLine(
   change: PriceReportPriceChangeItem,
   publicBaseUrl: string,
 ): string {

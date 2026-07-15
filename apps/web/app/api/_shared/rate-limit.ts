@@ -75,7 +75,7 @@ export async function withRateLimit(
 }
 
 // 執行單次 rate limit 判斷；被擋時直接產生 429 response 並記錄 sanitized log。
-export function checkRateLimit(request: Request, scope: RateLimitScope): RateLimitCheck {
+function checkRateLimit(request: Request, scope: RateLimitScope): RateLimitCheck {
   const decision = getGlobalRateLimiter().check(request, scope);
 
   if (decision.allowed) {
@@ -207,7 +207,7 @@ export function getClientIdentifierInfo(request: Request): {
 }
 
 // 建立公開 rate limit headers，讓前端、smoke test 與維運檢查能觀察目前限流狀態。
-export function rateLimitHeaders(decision: RateLimitDecision): Record<string, string> {
+function rateLimitHeaders(decision: RateLimitDecision): Record<string, string> {
   return {
     "X-RateLimit-Client-Source": decision.clientIdentifierSource,
     "X-RateLimit-Limit": String(decision.limit),

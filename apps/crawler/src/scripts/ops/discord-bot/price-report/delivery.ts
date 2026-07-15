@@ -174,7 +174,7 @@ export async function readLatestScheduledPriceReportDelivery({
 }
 
 // 寫入個人價格報告 delivery 紀錄，保留成功、限流與失敗狀態供後續 UI 與重試判讀。
-export async function recordPriceReportDelivery({
+async function recordPriceReportDelivery({
   client,
   discordUserId,
   kind,

@@ -66,7 +66,7 @@ export async function refreshBuildListProducts(
   }
 }
 
-export function normalizeBuildListRefreshResponse(
+function normalizeBuildListRefreshResponse(
   value: unknown,
   requestedProductIds: string[],
 ): BuildListRefreshSuccess | null {

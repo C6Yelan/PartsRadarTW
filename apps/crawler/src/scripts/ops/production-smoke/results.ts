@@ -38,7 +38,7 @@ export function resolveSummaryStatus(checks: SmokeCheckResult[]): SmokeStatus {
 }
 
 // 比較兩個 smoke 狀態並回傳較嚴重者。
-export function worseStatus(left: SmokeStatus, right: SmokeStatus): SmokeStatus {
+function worseStatus(left: SmokeStatus, right: SmokeStatus): SmokeStatus {
   if (left === "FAIL" || right === "FAIL") {
     return "FAIL";
   }

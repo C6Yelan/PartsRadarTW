@@ -15,7 +15,7 @@ export interface ProductVendorMatch {
 }
 
 // 依 IGRP（商品分類）預置的品牌匹配規則表，供解析器進行前置判斷。
-export const PRODUCT_VENDOR_RULES_BY_IGRP: Record<number, readonly ProductVendorRule[]> = {
+const PRODUCT_VENDOR_RULES_BY_IGRP: Record<number, readonly ProductVendorRule[]> = {
   4: [
     { slug: "amd", name: "AMD", keywords: ["AMD"] },
     { slug: "intel", name: "Intel", keywords: ["Intel"] },
@@ -257,7 +257,7 @@ export const PRODUCT_VENDOR_RULES_BY_IGRP: Record<number, readonly ProductVendor
   ],
 };
 
-export function getProductVendorRules(
+function getProductVendorRules(
   igrp: number | string | null | undefined,
 ): readonly ProductVendorRule[] {
   // 先將 IGRP 正規化；無效輸入直接回空清單，避免無效規則查詢。

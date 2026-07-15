@@ -5,25 +5,6 @@ interface IconProps {
   className?: string;
 }
 
-export function TrendIcon({ className }: IconProps) {
-  return (
-    <svg
-      aria-hidden="true"
-      className={iconClassName(className)}
-      fill="none"
-      focusable="false"
-      stroke="currentColor"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth="2"
-      viewBox="0 0 24 24"
-    >
-      <path d="m4 17 5-5 4 4 7-8" />
-      <path d="M15 8h5v5" />
-    </svg>
-  );
-}
-
 function iconClassName(className?: string) {
   return className ? `ui-icon ${className}` : "ui-icon";
 }

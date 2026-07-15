@@ -38,7 +38,6 @@ export type {
   SmokeDiscordNotificationState,
 } from "./smoke-discord-notification/state";
 export {
-  SMOKE_DISCORD_NOTIFICATION_STATE_VERSION,
   createEmptySmokeDiscordNotificationState,
   parseSmokeDiscordNotificationState,
   readSmokeDiscordNotificationState,

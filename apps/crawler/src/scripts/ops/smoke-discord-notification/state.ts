@@ -5,7 +5,7 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import type { SmokeStatus } from "../production-smoke";
 
-export const SMOKE_DISCORD_NOTIFICATION_STATE_VERSION = 3;
+const SMOKE_DISCORD_NOTIFICATION_STATE_VERSION = 3;
 
 export type SmokeDiscordNotificationKind = "WARN" | "FAIL" | "RECOVERED";
 export type SmokeAlertClassification = "PAGE" | "WARNING" | "REPORT";

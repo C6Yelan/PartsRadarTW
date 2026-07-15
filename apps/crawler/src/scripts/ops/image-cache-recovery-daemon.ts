@@ -117,7 +117,7 @@ export function parseImageRecoveryDaemonOptions(
   };
 }
 
-export async function runImageRecoveryDaemon(
+async function runImageRecoveryDaemon(
   client: PrismaClient,
   options: ImageRecoveryDaemonOptions,
   shutdown: ShutdownController,
