@@ -11,29 +11,49 @@ const PRODUCT_IMAGE_CACHE_CONTROL = "public, max-age=3600";
 const PRODUCT_IMAGE_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DEFAULT_PRODUCT_IMAGE_STORAGE_DIR = "../../storage/product-images";
 
-type ProductImageReadFile = (path: string) => Promise<Uint8Array>;
+export type ProductImageReadFile = (path: string) => Promise<Uint8Array>;
 
 export interface ProductImageHandlerOptions {
   storageDir?: string;
   readImageFile?: ProductImageReadFile;
 }
 
+// 只讀取通過 UUID 驗證的站內 WebP 快取；缺檔或無效 id 回傳 null。
+export async function readCachedProductImage(
+  imageId: string,
+  options: ProductImageHandlerOptions = {},
+): Promise<Uint8Array | null> {
+  const normalizedImageId = normalizeProductImageId(imageId);
+
+  if (!normalizedImageId) {
+    return null;
+  }
+
+  const storageDir = resolveProductImageStorageDir(options.storageDir);
+  const readImageFile = options.readImageFile ?? readFile;
+
+  try {
+    return await readImageFile(createProductImagePath(storageDir, normalizedImageId));
+  } catch (error) {
+    if (isFileNotFoundError(error)) {
+      return null;
+    }
+
+    throw error;
+  }
+}
+
 // 建立商品縮圖 API handler；只讀本機快取，不在訪客請求期間抓取來源站圖片。
 export function createGetProductImageHandler(
   options: ProductImageHandlerOptions = {},
 ): (imageId: string) => Promise<Response> {
-  const storageDir = resolveProductImageStorageDir(options.storageDir);
-  const readImageFile = options.readImageFile ?? readFile;
-
   return async (imageId) => {
-    const normalizedImageId = normalizeProductImageId(imageId);
-
-    if (!normalizedImageId) {
-      return notFoundResponse();
-    }
-
     try {
-      const bytes = await readImageFile(createProductImagePath(storageDir, normalizedImageId));
+      const bytes = await readCachedProductImage(imageId, options);
+
+      if (!bytes) {
+        return notFoundResponse();
+      }
 
       return new Response(new Uint8Array(bytes), {
         status: 200,
@@ -44,11 +64,7 @@ export function createGetProductImageHandler(
           "X-Content-Type-Options": "nosniff",
         },
       });
-    } catch (error) {
-      if (isFileNotFoundError(error)) {
-        return notFoundResponse();
-      }
-
+    } catch {
       return internalErrorResponse();
     }
   };

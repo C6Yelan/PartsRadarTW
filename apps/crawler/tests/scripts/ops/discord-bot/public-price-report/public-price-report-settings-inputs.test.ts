@@ -14,6 +14,8 @@ import {
   createPublicReportKeywordModalSubmitInteraction,
   createPublicReportSelectInteraction,
   publicPriceReportSetting,
+  readEmbedFieldValue,
+  readResponseEmbed,
 } from "../support";
 
 describe("public price report settings inputs", () => {
@@ -82,8 +84,7 @@ describe("public price report settings inputs", () => {
     });
 
     const updateBody = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body));
-    expect(JSON.stringify(updateBody.embeds)).toContain("降價");
-    expect(JSON.stringify(updateBody.embeds)).not.toContain("降價、漲價");
+    expect(readEmbedFieldValue(readResponseEmbed(updateBody), "內容")).toBe("降價");
   });
 
   it("allows public reports to include new products", async () => {

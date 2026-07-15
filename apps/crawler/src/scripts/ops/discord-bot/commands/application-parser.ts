@@ -60,7 +60,7 @@ export function parseBotInteraction(interaction: DiscordInteraction): "help" | n
   return subcommand?.name === "help" ? "help" : null;
 }
 
-// 解析 /public-report 維運子命令，保留 allow-list 以避免未註冊或未知子命令被執行。
+// 解析 /public-report settings，拒絕舊名稱與未註冊子命令。
 export function parsePublicReportInteraction(
   interaction: DiscordInteraction,
 ): ParsedPublicReportCommand | null {
@@ -72,15 +72,15 @@ export function parsePublicReportInteraction(
     (option) => option.type === DISCORD_OPTION_TYPE_SUBCOMMAND,
   );
 
-  if (
-    subcommand?.name === "status" ||
-    subcommand?.name === "manage" ||
-    subcommand?.name === "test"
-  ) {
+  if (subcommand?.name === "settings") {
     return { name: subcommand.name };
   }
 
   return null;
+}
+
+export function parseStatusInteraction(interaction: DiscordInteraction): boolean {
+  return interaction.data?.name === "status";
 }
 
 // 將 /price-report now 的時間視窗選項收斂成小時數；未知值回到預設 24 小時。

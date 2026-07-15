@@ -50,7 +50,7 @@ export function createPriceReportCommand(): Record<string, unknown> {
 export function createWatchCommand(): Record<string, unknown> {
   return {
     name: "watch",
-    description: "設定與管理商品目標價格，集中查看目前價格及追蹤狀態。",
+    description: "設定商品目標價，價格達標時透過私訊提醒。",
     type: DISCORD_COMMAND_TYPE_CHAT_INPUT,
     contexts: [DISCORD_APPLICATION_CONTEXT_GUILD, DISCORD_APPLICATION_CONTEXT_BOT_DM],
     dm_permission: true,
@@ -69,18 +69,8 @@ export function createPublicReportCommand(): Record<string, unknown> {
     options: [
       {
         type: DISCORD_OPTION_TYPE_SUBCOMMAND,
-        name: "status",
-        description: "查看公開價格報告狀態。",
-      },
-      {
-        type: DISCORD_OPTION_TYPE_SUBCOMMAND,
-        name: "manage",
+        name: "settings",
         description: "設定公開價格報告頻道與啟用狀態。",
-      },
-      {
-        type: DISCORD_OPTION_TYPE_SUBCOMMAND,
-        name: "test",
-        description: "發送一份測試公開價格報告。",
       },
     ],
   };
@@ -98,8 +88,20 @@ export function createBotCommand(): Record<string, unknown> {
       {
         type: DISCORD_OPTION_TYPE_SUBCOMMAND,
         name: "help",
-        description: "查看 watch、price-report、public-report 的使用方式。",
+        description: "查看提醒、價格報告與管理員功能。",
       },
     ],
+  };
+}
+
+// 建立 guild-only /status，並在 command picker 層級限制 Manage Guild。
+export function createStatusCommand(): Record<string, unknown> {
+  return {
+    name: "status",
+    description: "查看 PartsRadarTW bot 與商品資料更新狀態。",
+    type: DISCORD_COMMAND_TYPE_CHAT_INPUT,
+    contexts: [DISCORD_APPLICATION_CONTEXT_GUILD],
+    dm_permission: false,
+    default_member_permissions: DISCORD_PERMISSION_MANAGE_GUILD.toString(),
   };
 }

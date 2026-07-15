@@ -52,7 +52,8 @@ export interface DiscordActionRowComponent {
 export interface DiscordButtonComponent {
   type: 2;
   style: number;
-  custom_id: string;
+  custom_id?: string;
+  url?: string;
   label: string;
   disabled?: boolean;
 }
@@ -198,6 +199,7 @@ export interface DiscordInteraction {
   };
   member?: {
     user?: DiscordUser;
+    permissions?: string;
   };
   user?: DiscordUser;
 }

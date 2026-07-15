@@ -2,7 +2,6 @@
 // 建立商品詳細頁的 Next.js metadata，限制只使用公開商品欄位組出 SEO 與分享預覽資訊。
 
 import type { Prisma } from "@partsradar/db";
-import { createPublicProductImagePath } from "@partsradar/shared";
 import type { Metadata } from "next";
 import { formatTwdPrice } from "../../_shared/formatting";
 import { DEFAULT_PUBLIC_SITE_URL, resolvePublicSiteUrl } from "../../_shared/public-site";
@@ -13,6 +12,9 @@ const SITE_NAME = "PartsRadarTW";
 const FALLBACK_TITLE = `商品資訊 | ${SITE_NAME}`;
 const FALLBACK_DESCRIPTION = "原價屋電腦零件價格查詢工具";
 const TITLE_MAX_LENGTH = 70;
+const SHARE_TITLE_MAX_LENGTH = 96;
+export const PRODUCT_SHARE_IMAGE_SIZE = { width: 1200, height: 630 } as const;
+export const PRODUCT_SHARE_IMAGE_CONTENT_TYPE = "image/png";
 
 const PRODUCT_METADATA_SELECT = {
   id: true,
@@ -99,7 +101,11 @@ export function buildProductDetailMetadata(
   }
 
   const productUrl = createAbsoluteUrl(publicSiteUrl, `/products/${product.id}`);
-  const imageUrl = createAbsoluteUrl(publicSiteUrl, createPublicProductImagePath(product.id));
+  const openGraphImageUrl = createAbsoluteUrl(
+    publicSiteUrl,
+    `/products/${product.id}/opengraph-image`,
+  );
+  const twitterImageUrl = createAbsoluteUrl(publicSiteUrl, `/products/${product.id}/twitter-image`);
   const price = formatTwdPrice(product.currentPrice.priceSnapshot.price);
   const titleSuffix = ` - ${price} | ${SITE_NAME}`;
   const productName = truncateMetadataText(
@@ -107,7 +113,8 @@ export function buildProductDetailMetadata(
     Math.max(1, TITLE_MAX_LENGTH - titleSuffix.length),
   );
   const title = `${productName}${titleSuffix}`;
-  const description = `這項商品屬於「${product.sourceCategory.displayName}」分類，目前價格為 ${price}；價格資料更新於 ${formatTaipeiDateTime(product.currentPrice.lastSeenAt)}（台北時間）。資料整理自原價屋，實際售價與供貨狀況以來源頁面為準。`;
+  const shareTitle = truncateMetadataText(product.name, SHARE_TITLE_MAX_LENGTH);
+  const description = `${product.sourceCategory.displayName}｜目前 ${price}｜更新 ${formatTaipeiDateTime(product.currentPrice.lastSeenAt)}（台北時間）。實際價格與供貨以原價屋為準。`;
 
   return {
     title,
@@ -116,7 +123,7 @@ export function buildProductDetailMetadata(
       canonical: productUrl,
     },
     openGraph: {
-      title,
+      title: shareTitle,
       description,
       type: "website",
       siteName: SITE_NAME,
@@ -124,17 +131,19 @@ export function buildProductDetailMetadata(
       url: productUrl,
       images: [
         {
-          url: imageUrl,
-          alt: product.name,
-          type: "image/webp",
+          url: openGraphImageUrl,
+          alt: `${product.name} 價格分享卡`,
+          type: PRODUCT_SHARE_IMAGE_CONTENT_TYPE,
+          width: PRODUCT_SHARE_IMAGE_SIZE.width,
+          height: PRODUCT_SHARE_IMAGE_SIZE.height,
         },
       ],
     },
     twitter: {
       card: "summary_large_image",
-      title,
+      title: shareTitle,
       description,
-      images: [imageUrl],
+      images: [twitterImageUrl],
     },
   };
 }
@@ -143,6 +152,15 @@ export function buildProductDetailMetadata(
 function createFallbackProductMetadata(publicSiteUrl: string, productId?: string): Metadata {
   const canonicalPath = productId ? `/products/${productId}` : "/";
   const canonical = createAbsoluteUrl(publicSiteUrl, canonicalPath);
+  const shareImageId = productId ?? "share";
+  const openGraphImageUrl = createAbsoluteUrl(
+    publicSiteUrl,
+    `/products/${shareImageId}/opengraph-image`,
+  );
+  const twitterImageUrl = createAbsoluteUrl(
+    publicSiteUrl,
+    `/products/${shareImageId}/twitter-image`,
+  );
 
   return {
     title: FALLBACK_TITLE,
@@ -157,11 +175,21 @@ function createFallbackProductMetadata(publicSiteUrl: string, productId?: string
       siteName: SITE_NAME,
       locale: "zh_TW",
       url: canonical,
+      images: [
+        {
+          url: openGraphImageUrl,
+          alt: "PartsRadarTW 原價屋零件價格查詢",
+          type: PRODUCT_SHARE_IMAGE_CONTENT_TYPE,
+          width: PRODUCT_SHARE_IMAGE_SIZE.width,
+          height: PRODUCT_SHARE_IMAGE_SIZE.height,
+        },
+      ],
     },
     twitter: {
-      card: "summary",
+      card: "summary_large_image",
       title: FALLBACK_TITLE,
       description: FALLBACK_DESCRIPTION,
+      images: [twitterImageUrl],
     },
   };
 }

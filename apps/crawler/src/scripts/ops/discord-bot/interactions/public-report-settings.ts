@@ -24,7 +24,6 @@ import {
 
 export {
   createPublicPriceReportSettingsPanelMessage,
-  createPublicPriceReportStatusMessage,
   formatPublicReportBotPermissionNotice,
 } from "./public-report-settings/messages";
 

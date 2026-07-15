@@ -9,64 +9,11 @@ import {
   createDiscordBotClient,
   createDiscordBotOptions,
   createPublicReportButtonInteraction,
-  createPublicReportInteraction,
   publicPriceReportSetting,
   snapshot,
 } from "../support";
 
 describe("public price report previews", () => {
-  it("sends a public report preview from the public-report test command", async () => {
-    const now = new Date();
-    const oldCapturedAt = new Date(now.getTime() - 25 * 60 * 60 * 1000).toISOString();
-    const newCapturedAt = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
-    const client = createDiscordBotClient({
-      snapshots: [
-        snapshot({
-          id: "public-test-old",
-          productId: "public-test-product",
-          productName: "華碩 GPU A",
-          crawlRunId: "old-run",
-          price: 12_000,
-          capturedAt: oldCapturedAt,
-        }),
-        snapshot({
-          id: "public-test-new",
-          productId: "public-test-product",
-          productName: "華碩 GPU A",
-          crawlRunId: "new-run",
-          price: 10_990,
-          capturedAt: newCapturedAt,
-        }),
-      ],
-      publicPriceReportSettings: [publicPriceReportSetting({ id: "public-setting-1" })],
-    });
-    const fetchMock = vi.fn<typeof fetch>(
-      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
-    );
-
-    await handleDiscordInteraction({
-      client,
-      options: createDiscordBotOptions(),
-      cooldowns: new CommandCooldowns(60),
-      fetchImpl: fetchMock as typeof fetch,
-      interaction: createPublicReportInteraction({ subcommandName: "test" }),
-    });
-
-    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({
-      type: 5,
-      data: { flags: 64 },
-    });
-    expect(fetchMock.mock.calls[1]?.[0]).toBe(
-      `${API_BASE_URL}/channels/999988887777666655/messages`,
-    );
-    const responseBody = JSON.parse(String(fetchMock.mock.calls[2]?.[1]?.body));
-    expect(responseBody.content).toContain("已發送單次測試公開報告到 <#999988887777666655>");
-    expect(responseBody.content).toContain("不會改變排程進度");
-    expect(client.discordPublicPriceReportDelivery.upsert).not.toHaveBeenCalled();
-    expect(client.discordPublicPriceReportSetting.update).not.toHaveBeenCalled();
-    expect(client.discordPublicPriceReportSetting.upsert).not.toHaveBeenCalled();
-  });
-
   it("sends a public report preview to the configured channel", async () => {
     const now = new Date();
     const oldCapturedAt = new Date(now.getTime() - 25 * 60 * 60 * 1000).toISOString();
@@ -123,8 +70,8 @@ describe("public price report previews", () => {
       },
     });
     const responseBody = JSON.parse(String(fetchMock.mock.calls[2]?.[1]?.body));
-    expect(responseBody.content).toContain("已發送單次測試公開報告到 <#999988887777666655>");
-    expect(responseBody.content).toContain("不會改變排程進度");
+    expect(responseBody.content).toContain("已將測試報告發送到 <#999988887777666655>");
+    expect(responseBody.content).not.toContain("排程進度");
   });
 
   it("shows a channel permission hint when the public report preview send fails", async () => {
@@ -224,14 +171,12 @@ describe("public price report previews", () => {
       options: createDiscordBotOptions(),
       cooldowns: new CommandCooldowns(60),
       fetchImpl: fetchMock as typeof fetch,
-      interaction: createPublicReportInteraction({ subcommandName: "test" }),
+      interaction: createPublicReportButtonInteraction("public-report:preview"),
     });
 
     const responseBody = JSON.parse(String(fetchMock.mock.calls[2]?.[1]?.body));
 
-    expect(responseBody.content).toContain("本次測試未送出且不會自動重試");
-    expect(responseBody.content).toContain("請稍後重新執行測試");
-    expect(responseBody.content).not.toContain("系統會稍後重試");
+    expect(responseBody.content).toBe("Discord 暫時無法接收訊息，請稍後再試。");
     expect(client.discordPublicPriceReportDelivery.upsert).not.toHaveBeenCalled();
     expect(client.discordPublicPriceReportSetting.update).not.toHaveBeenCalled();
   });

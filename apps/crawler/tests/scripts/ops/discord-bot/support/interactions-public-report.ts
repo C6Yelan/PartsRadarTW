@@ -6,12 +6,12 @@ import type { DiscordInteraction } from "../../../../../src/scripts/ops/discord-
 export function createPublicReportInteraction({
   guildId = "guild-1",
   channelId = "999988887777666655",
-  subcommandName = "manage",
+  subcommandName = "settings",
   appPermissions = "18432",
 }: {
   guildId?: string;
   channelId?: string;
-  subcommandName?: "status" | "manage" | "test";
+  subcommandName?: "settings";
   appPermissions?: string;
 } = {}): DiscordInteraction {
   return {

@@ -1,5 +1,5 @@
 // apps/crawler/tests/scripts/ops/discord-bot/public-price-report/public-price-report-settings-panel.test.ts
-// 驗證公開報告狀態、管理面板、頻道設定與 bot 權限不足時的回應。
+// 驗證公開報告設定面板、頻道設定與 bot 權限不足時的回應。
 
 import { describe, expect, it, vi } from "vitest";
 import { CommandCooldowns } from "../../../../../src/scripts/ops/discord-bot/cooldowns";
@@ -16,7 +16,7 @@ import {
 } from "../support";
 
 describe("public price report settings panel", () => {
-  it("shows the public report status from the public-report status command", async () => {
+  it("shows the public report settings panel from the public-report settings command", async () => {
     const client = createDiscordBotClient();
     const fetchMock = vi.fn<typeof fetch>(
       async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
@@ -27,43 +27,7 @@ describe("public price report settings panel", () => {
       options: createDiscordBotOptions(),
       cooldowns: new CommandCooldowns(60),
       fetchImpl: fetchMock as typeof fetch,
-      interaction: createPublicReportInteraction({ subcommandName: "status" }),
-    });
-
-    const requestBody = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
-
-    expect(requestBody).toMatchObject({
-      type: 4,
-      data: {
-        flags: 64,
-        embeds: [
-          expect.objectContaining({
-            title: "公開價格報告狀態",
-            description: expect.stringContaining("最近一次發送紀錄"),
-            fields: expect.arrayContaining([
-              expect.objectContaining({ name: "狀態", value: "尚未設定" }),
-              expect.objectContaining({ name: "發送頻道", value: "尚未設定" }),
-              expect.objectContaining({ name: "目前頻道", value: "<#999988887777666655>" }),
-            ]),
-          }),
-        ],
-      },
-    });
-    expect(requestBody.data.components).toBeUndefined();
-  });
-
-  it("shows the public report settings panel from the public-report manage command", async () => {
-    const client = createDiscordBotClient();
-    const fetchMock = vi.fn<typeof fetch>(
-      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
-    );
-
-    await handleDiscordInteraction({
-      client,
-      options: createDiscordBotOptions(),
-      cooldowns: new CommandCooldowns(60),
-      fetchImpl: fetchMock as typeof fetch,
-      interaction: createPublicReportInteraction({ subcommandName: "manage" }),
+      interaction: createPublicReportInteraction({ subcommandName: "settings" }),
     });
 
     const requestBody = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
@@ -75,11 +39,14 @@ describe("public price report settings panel", () => {
         embeds: [
           expect.objectContaining({
             title: "公開價格報告設定",
-            description: expect.stringContaining("價格變動或新增商品"),
+            description: expect.stringContaining("降價、漲價或新增商品"),
             fields: expect.arrayContaining([
               expect.objectContaining({ name: "狀態", value: "尚未設定" }),
               expect.objectContaining({ name: "發送頻道", value: "尚未設定" }),
-              expect.objectContaining({ name: "目前頻道", value: "<#999988887777666655>" }),
+              expect.objectContaining({
+                name: "你目前所在的頻道",
+                value: "<#999988887777666655>",
+              }),
             ]),
           }),
         ],
@@ -101,9 +68,14 @@ describe("public price report settings panel", () => {
     });
     const settingsEmbed = readResponseEmbed(requestBody.data);
 
-    expect(settingsEmbed.description).toContain("只處理後續輪次，不補發先前輪次");
-    expect(readEmbedFieldValue(settingsEmbed, "排程與測試")).toContain(
-      "手動測試是單次操作，不會自動重試",
+    expect(settingsEmbed.description).toBe(
+      "設定公開報告要發送的頻道與內容。有符合條件的降價、漲價或新增商品時，bot 會自動發送。",
+    );
+    expect(readEmbedFieldValue(settingsEmbed, "發送說明")).toBe(
+      "自動發送失敗時，bot 會稍後再試；「發送測試」只會傳送一次。",
+    );
+    expect(JSON.stringify(settingsEmbed)).not.toMatch(
+      /排程爬蟲|後續輪次|先前輪次|排程進度|cursor|限流/,
     );
     expect(JSON.stringify(requestBody.data)).not.toContain("最多列出");
     expect(JSON.stringify(requestBody.data)).not.toContain("public-report:limit");
@@ -137,6 +109,7 @@ describe("public price report settings panel", () => {
       type: 9,
       data: {
         custom_id: "public-report:keyword-modal",
+        title: "商品名稱關鍵字",
         components: expect.arrayContaining([
           expect.objectContaining({
             component: expect.objectContaining({
@@ -154,6 +127,12 @@ describe("public price report settings panel", () => {
       },
     });
     expect(requestBody.data.components).toHaveLength(5);
+    expect(requestBody.data.components[0]).toMatchObject({
+      label: "其中一組關鍵字 1",
+      description:
+        "同一欄的詞要全部出現在商品名稱中；不同欄只要符合其中一組。全部留空代表不限。",
+      component: { placeholder: "例：RTX 5090" },
+    });
     expect(client.discordPublicPriceReportSetting.findUnique).toHaveBeenCalledWith({
       where: { discordGuildId: "guild-1" },
       select: expect.not.objectContaining({
@@ -162,6 +141,40 @@ describe("public price report settings panel", () => {
         updatedByDiscordUserId: true,
       }),
     });
+  });
+
+  it.each([
+    ["SENT", 23, "06/07 10:00，已發送 23 筆商品。"],
+    ["SKIPPED", 0, "06/07 10:00，當時沒有符合條件的商品。"],
+  ] as const)("shows a human-readable %s delivery result", async (status, itemCount, expected) => {
+    const client = createDiscordBotClient({
+      publicPriceReportDeliveries: [
+        publicPriceReportDelivery({
+          id: `delivery-${status.toLowerCase()}`,
+          crawlRunId: `crawl-run-${status.toLowerCase()}`,
+          channelId: "999988887777666655",
+          status,
+          itemCount,
+          deliveredAt: new Date("2026-06-07T02:00:00.000Z"),
+          updatedAt: new Date("2026-06-07T02:00:00.000Z"),
+        }),
+      ],
+      publicPriceReportSettings: [publicPriceReportSetting({ id: "public-setting-1" })],
+    });
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createPublicReportInteraction({ subcommandName: "settings" }),
+    });
+
+    const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
+    expect(readEmbedFieldValue(readResponseEmbed(body.data), "最近一次發送")).toBe(expected);
   });
 
   it("shows the most recently retried public delivery by updated timestamp", async () => {
@@ -199,17 +212,16 @@ describe("public price report settings panel", () => {
       options: createDiscordBotOptions(),
       cooldowns: new CommandCooldowns(60),
       fetchImpl: fetchMock as typeof fetch,
-      interaction: createPublicReportInteraction({ subcommandName: "status" }),
+      interaction: createPublicReportInteraction({ subcommandName: "settings" }),
     });
 
     const requestBody = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
     const latestDelivery = readEmbedFieldValue(
       readResponseEmbed(requestBody.data),
-      "最近一次公開報告",
+      "最近一次發送",
     );
 
-    expect(latestDelivery).toContain("失敗：06/07 10:00 GMT+8");
-    expect(latestDelivery).toContain("下一次排程檢查時會重試");
+    expect(latestDelivery).toBe("06/07 10:00，發送失敗，bot 會稍後再試。");
     expect(client.discordPublicPriceReportDelivery.findFirst).toHaveBeenCalledWith({
       where: {
         channelId: "999988887777666655",
@@ -222,7 +234,7 @@ describe("public price report settings panel", () => {
     });
   });
 
-  it("labels rate-limited public delivery retries as scheduled work", async () => {
+  it("describes a rate-limited public delivery without operational terms", async () => {
     const client = createDiscordBotClient({
       publicPriceReportDeliveries: [
         publicPriceReportDelivery({
@@ -246,18 +258,19 @@ describe("public price report settings panel", () => {
       options: createDiscordBotOptions(),
       cooldowns: new CommandCooldowns(60),
       fetchImpl: fetchMock as typeof fetch,
-      interaction: createPublicReportInteraction({ subcommandName: "status" }),
+      interaction: createPublicReportInteraction({ subcommandName: "settings" }),
     });
 
     const requestBody = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
     const latestDelivery = readEmbedFieldValue(
       readResponseEmbed(requestBody.data),
-      "最近一次公開報告",
+      "最近一次發送",
     );
 
-    expect(latestDelivery).toContain("Discord 限流：06/07 10:00 GMT+8");
-    expect(latestDelivery).toContain("下一次排程檢查時會重試");
-    expect(latestDelivery).not.toContain("手動測試");
+    expect(latestDelivery).toBe(
+      "06/07 10:00，Discord 暫時無法接收訊息，bot 會稍後再試。",
+    );
+    expect(latestDelivery).not.toContain("限流");
   });
 
   it("sets the current channel as the public report channel", async () => {
@@ -325,7 +338,7 @@ describe("public price report settings panel", () => {
 
     const responseBody = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body));
 
-    expect(responseBody.content).toContain("無法在 <#999988887777666655> 發送公開價格報告");
+    expect(responseBody.content).toContain("目前無法在 <#999988887777666655> 發送訊息");
     expect(responseBody.content).toContain("嵌入連結");
     expect(responseBody.content).not.toContain("Administrator");
   });

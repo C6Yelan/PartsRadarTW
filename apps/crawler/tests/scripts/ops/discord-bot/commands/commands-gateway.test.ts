@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { CommandCooldowns } from "../../../../../src/scripts/ops/discord-bot/cooldowns";
 import { runGatewaySession } from "../../../../../src/scripts/ops/discord-bot/gateway";
 import { registerDiscordBotCommands } from "../../../../../src/scripts/ops/discord-bot/registration";
+import { parsePublicReportInteraction } from "../../../../../src/scripts/ops/discord-bot/commands";
 
 import {
   API_BASE_URL,
@@ -15,7 +16,7 @@ import {
 } from "../support";
 
 describe("registerDiscordBotCommands", () => {
-  it("registers the global price-report, watch, public-report, and bot commands", async () => {
+  it("registers the final global command tree with guild-only administrator commands", async () => {
     const fetchMock = vi.fn<typeof fetch>(
       async () => new Response(JSON.stringify([{ id: "command-1" }]), { status: 200 }),
     );
@@ -56,7 +57,7 @@ describe("registerDiscordBotCommands", () => {
       }),
       expect.objectContaining({
         name: "watch",
-        description: "設定與管理商品目標價格，集中查看目前價格及追蹤狀態。",
+        description: "設定商品目標價，價格達標時透過私訊提醒。",
         contexts: [0, 1],
         dm_permission: true,
       }),
@@ -66,11 +67,7 @@ describe("registerDiscordBotCommands", () => {
         contexts: [0],
         dm_permission: false,
         default_member_permissions: "32",
-        options: [
-          expect.objectContaining({ name: "status" }),
-          expect.objectContaining({ name: "manage" }),
-          expect.objectContaining({ name: "test" }),
-        ],
+        options: [expect.objectContaining({ name: "settings" })],
       }),
       expect.objectContaining({
         name: "bot",
@@ -78,6 +75,12 @@ describe("registerDiscordBotCommands", () => {
         contexts: [0, 1],
         dm_permission: true,
         options: [expect.objectContaining({ name: "help" })],
+      }),
+      expect.objectContaining({
+        name: "status",
+        contexts: [0],
+        dm_permission: false,
+        default_member_permissions: "32",
       }),
     ]);
     const registeredCommands = JSON.parse(String(globalRequestInit.body));
@@ -93,16 +96,30 @@ describe("registerDiscordBotCommands", () => {
       "watch",
       "public-report",
       "bot",
+      "status",
     ]);
     for (const command of registeredCommands.filter(
-      (command: { name: string }) => command.name !== "public-report",
+      (command: { name: string }) => !["public-report", "status"].includes(command.name),
     )) {
       expect(command).not.toHaveProperty("default_member_permissions");
       expect(command).not.toHaveProperty("permissions");
     }
     expect(String(globalRequestInit.body)).not.toContain('"enable"');
     expect(String(globalRequestInit.body)).not.toContain('"disable"');
+    expect(String(globalRequestInit.body)).not.toContain('"manage"');
+    expect(String(globalRequestInit.body)).not.toContain('"test"');
     expect(String(globalRequestInit.body).toLowerCase()).not.toContain("administrator");
+  });
+
+  it.each(["manage", "status", "test"])("rejects the removed public-report %s parser input", (name) => {
+    expect(
+      parsePublicReportInteraction({
+        id: "interaction",
+        token: "token",
+        type: 2,
+        data: { name: "public-report", options: [{ type: 1, name }] },
+      }),
+    ).toBeNull();
   });
 });
 

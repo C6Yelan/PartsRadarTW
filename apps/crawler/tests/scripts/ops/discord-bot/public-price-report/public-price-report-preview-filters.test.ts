@@ -7,7 +7,7 @@ import { handleDiscordInteraction } from "../../../../../src/scripts/ops/discord
 import {
   createDiscordBotClient,
   createDiscordBotOptions,
-  createPublicReportInteraction,
+  createPublicReportButtonInteraction,
   publicPriceReportSetting,
   snapshot,
 } from "../support";
@@ -99,7 +99,7 @@ describe("public price report preview filters", () => {
       options: createDiscordBotOptions(),
       cooldowns: new CommandCooldowns(60),
       fetchImpl: fetchMock as typeof fetch,
-      interaction: createPublicReportInteraction({ subcommandName: "test" }),
+      interaction: createPublicReportButtonInteraction("public-report:preview"),
     });
 
     const reportBody = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body));

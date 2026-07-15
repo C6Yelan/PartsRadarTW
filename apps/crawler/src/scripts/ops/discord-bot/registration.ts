@@ -5,6 +5,7 @@ import {
   createBotCommand,
   createPriceReportCommand,
   createPublicReportCommand,
+  createStatusCommand,
   createWatchCommand,
 } from "./commands";
 import { sendDiscordRestRequest } from "./rest";
@@ -30,6 +31,7 @@ export async function registerDiscordBotCommands({
       createWatchCommand(),
       createPublicReportCommand(),
       createBotCommand(),
+      createStatusCommand(),
     ],
   });
 }

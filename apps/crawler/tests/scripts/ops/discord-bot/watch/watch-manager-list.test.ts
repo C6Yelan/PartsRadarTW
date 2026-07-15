@@ -45,11 +45,11 @@ describe("handleDiscordInteraction watch manager list", () => {
     expect(requestBody).toMatchObject({
       embeds: [
         expect.objectContaining({
-          title: "商品目標價追蹤",
+          title: "目標價提醒",
           description: expect.stringContaining("RTX 5070 測試卡"),
           fields: expect.arrayContaining([
             expect.objectContaining({
-              name: "價格資料時間",
+              name: "價格更新時間",
               value: "06/07 11:00 GMT+8",
             }),
           ]),
@@ -78,6 +78,15 @@ describe("handleDiscordInteraction watch manager list", () => {
         }),
       ]),
     });
+    expect(requestBody.embeds[0].fields.map((field: { name: string }) => field.name)).toEqual([
+      "目前價格",
+      "目標價格",
+      "價格更新時間",
+      "提醒狀態",
+    ]);
+    expect(readEmbedFieldValue(requestBody.embeds[0], "提醒狀態")).toBe(
+      "尚未達標，目前價格比目標價高 NT$1,490。",
+    );
   });
 
   it("shows a readable latest target-price notification failure for a selected watch", async () => {
@@ -151,6 +160,57 @@ describe("handleDiscordInteraction watch manager list", () => {
     });
   });
 
+  it("describes a rate-limited reminder without provider terminology", async () => {
+    const client = createDiscordBotClient({
+      snapshots: [
+        snapshot({
+          id: "snapshot-watch-1",
+          productId: WATCH_PRODUCT_ID,
+          productName: "RTX 5070 測試卡",
+          crawlRunId: "new-run",
+          price: 18_990,
+          capturedAt: "2026-06-07T03:00:00.000Z",
+        }),
+      ],
+      watches: [
+        targetPriceWatch({
+          id: WATCH_ROW_ID,
+          discordUserId: "111122223333444455",
+          productId: WATCH_PRODUCT_ID,
+          targetPrice: 17_500,
+        }),
+      ],
+      deliveries: [
+        notificationDelivery({
+          id: "delivery-watch-rate-limited",
+          discordUserId: "111122223333444455",
+          kind: "TARGET_PRICE",
+          status: "RATE_LIMITED",
+          targetPriceWatchId: WATCH_ROW_ID,
+          errorCategory: "RATE_LIMITED",
+          createdAt: new Date("2026-06-07T01:00:00.000Z"),
+        }),
+      ],
+    });
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createWatchSelectInteraction(`watch:${WATCH_ROW_ID}`, 0),
+    });
+
+    const requestBody = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body));
+    const latestNotification = readEmbedFieldValue(requestBody.embeds[0], "最近一次通知");
+
+    expect(latestNotification).toContain("Discord 暫時無法傳送提醒，bot 會稍後再試。");
+    expect(latestNotification).not.toContain("限流");
+  });
+
   it("shows active target price watches in the watch manager", async () => {
     const client = createDiscordBotClient({
       snapshots: [
@@ -198,8 +258,8 @@ describe("handleDiscordInteraction watch manager list", () => {
     expect(requestBody).toMatchObject({
       embeds: [
         expect.objectContaining({
-          title: "商品目標價追蹤",
-          description: expect.stringContaining("追蹤商品目標價"),
+          title: "目標價提醒",
+          description: expect.stringContaining("價格降到你設定的金額"),
         }),
       ],
       components: expect.arrayContaining([
@@ -220,9 +280,10 @@ describe("handleDiscordInteraction watch manager list", () => {
       ]),
     });
     expect(requestBody.embeds[0].description).not.toContain("此頁面只有你看得到");
-    expect(requestBody.embeds[0].description).toContain("**使用方式**");
-    expect(requestBody.embeds[0].description).toContain("價格達標時會嘗試透過 DM 傳送目標價提醒");
-    expect(requestBody.embeds[0].description).toContain("從選單選商品");
+    expect(requestBody.embeds[0].description).toContain("**新增提醒**");
+    expect(requestBody.embeds[0].description).toContain("**管理提醒**");
+    expect(requestBody.embeds[0].description).toContain("嘗試透過私訊提醒");
+    expect(requestBody.embeds[0].description).toContain("從下方選單選擇商品");
     expect(JSON.stringify(requestBody.components)).not.toContain("watch:filter:");
     expect(JSON.stringify(requestBody.components)).not.toContain("watch:sort:");
     expect(JSON.stringify(requestBody.components)).not.toContain("watch:bulk-remove:");

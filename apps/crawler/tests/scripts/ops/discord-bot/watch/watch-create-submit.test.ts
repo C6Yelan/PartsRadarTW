@@ -106,12 +106,15 @@ describe("handleDiscordInteraction watch create submit", () => {
     expect(requestBody).toMatchObject({
       embeds: [
         expect.objectContaining({
-          title: "商品目標價追蹤",
+          title: "目標價提醒",
           description: expect.stringContaining("RTX 5070 測試卡"),
           fields: expect.arrayContaining([
             expect.objectContaining({ name: "目前價格", value: "NT$18,990" }),
             expect.objectContaining({ name: "目標價格", value: "NT$20,000" }),
-            expect.objectContaining({ name: "追蹤狀態", value: "目前價格已達標。" }),
+            expect.objectContaining({
+              name: "提醒狀態",
+              value: "已達到你設定的目標價，bot 會嘗試傳送私訊提醒。",
+            }),
           ]),
         }),
       ],

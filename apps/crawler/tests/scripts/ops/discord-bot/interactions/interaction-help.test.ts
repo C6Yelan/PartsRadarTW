@@ -43,18 +43,32 @@ describe("handleDiscordInteraction bot help", () => {
       },
     });
     expect(embed).toMatchObject({
-      title: "PartsRadarTW Discord bot 說明",
-      description: expect.stringContaining("**目標價提醒｜`/watch`**"),
+      title: "PartsRadarTW 使用說明",
+      description: "選擇你想完成的事情，再使用對應指令。所有設定面板只會顯示給操作者。",
     });
-    expect(embed.description).toContain("**即時價格報告｜`/price-report now`**");
-    expect(embed.description).toContain("**每日私訊價格報告｜`/price-report settings`**");
-    expect(embed.description).toContain("**公開價格報告｜`/public-report status/manage/test`**");
-    expect(embed.description).toContain("**DM、伺服器與權限**");
-    expect(embed.description).toContain("價格達標時會嘗試透過 DM 傳送目標價提醒");
-    expect(embed.description).toContain("只限伺服器使用");
-    expect(embed.description).toContain("管理伺服器");
-    expect(embed.description).toContain("傳送訊息");
-    expect(embed.description).toContain("嵌入連結");
+    expect(embed.fields).toHaveLength(6);
+    const helpText = JSON.stringify(embed.fields);
+    expect(helpText).toContain("/watch");
+    expect(helpText).toContain("/price-report now");
+    expect(helpText).toContain("/price-report settings");
+    expect(helpText).toContain("/public-report settings");
+    expect(helpText).toContain("/status");
+    expect(helpText).not.toContain("/public-report manage");
+    expect(helpText).not.toContain("/public-report test");
+    expect(requestBody.data.components).toEqual([
+      {
+        type: 1,
+        components: [
+          {
+            type: 2,
+            style: 5,
+            label: "查看完整使用教學",
+            url: "https://partsradar.test/discord",
+          },
+        ],
+      },
+    ]);
+    expect(JSON.stringify(requestBody)).not.toContain("partsradar.net");
     expect(embed).not.toHaveProperty("image");
   });
 });

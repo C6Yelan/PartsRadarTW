@@ -33,10 +33,11 @@ import type { TargetPriceWatchDeliveryStatus, TargetPriceWatchlistResult } from 
 import { normalizeWatchId } from "./reference";
 
 const WATCH_MANAGER_GUIDE =
-  "追蹤商品目標價；價格達標時會嘗試透過 DM 傳送目標價提醒。\n\n" +
-  "**使用方式**\n" +
-  "新增：貼商品頁網址與目標價。\n" +
-  `管理：從選單選商品後編輯或移除，每人最多 ${MAX_TARGET_PRICE_WATCHES_PER_USER} 項。`;
+  "價格降到你設定的金額時，bot 會嘗試透過私訊提醒你。\n\n" +
+  "**新增提醒**\n" +
+  "按下「新增提醒」，貼上 PartsRadarTW 商品連結並輸入目標價。\n\n" +
+  "**管理提醒**\n" +
+  `先從下方選單選擇商品，再修改目標價或移除提醒。每人最多 ${MAX_TARGET_PRICE_WATCHES_PER_USER} 筆。`;
 
 // 建立 /watch 管理面板訊息，依目前清單狀態呈現選取商品、管理操作與分頁控制。
 export function createTargetPriceWatchManagerMessage({
@@ -55,16 +56,16 @@ export function createTargetPriceWatchManagerMessage({
   const selectedWatchId = normalizeWatchId(selectedWatchInput);
   const selectedWatch = result.watches.find((watch) => watch.id === selectedWatchId) ?? null;
   const managerState = selectedWatch
-    ? `**目前選取的商品**\n[${escapeMarkdownLinkText(
+    ? `**已選擇的商品**\n[${escapeMarkdownLinkText(
         formatDiscordBotText(toSingleLine(selectedWatch.product.name), PRODUCT_NAME_MAX_LENGTH),
-      )}](${createProductUrl(publicBaseUrl, selectedWatch.product.id)})\n\n可編輯目標價或移除追蹤。`
+      )}](${createProductUrl(publicBaseUrl, selectedWatch.product.id)})\n\n你可以修改目標價或移除這筆提醒。`
     : result.totalCount > 0
-      ? "**你的追蹤清單**\n從選單選商品查看或管理。"
-      : "**你的追蹤清單**\n尚未追蹤商品，請按「新增追蹤」。";
+      ? "**你的提醒**\n從選單選擇要查看的商品。"
+      : "**你的提醒**\n尚未設定商品提醒，請按「新增提醒」。";
   const description = [
     notice ? `**${notice}**` : null,
     WATCH_MANAGER_GUIDE,
-    result.totalCount > 0 ? `共 ${result.totalCount} 項，最近更新優先。` : null,
+    result.totalCount > 0 ? `共 ${result.totalCount} 筆提醒，最近更新的排在前面。` : null,
     managerState,
   ]
     .filter((section): section is string => section !== null)
@@ -78,7 +79,7 @@ export function createTargetPriceWatchManagerMessage({
         {
           type: DISCORD_COMPONENT_TYPE_STRING_SELECT,
           custom_id: `${WATCH_SELECT_CUSTOM_ID_PREFIX}${result.page}`,
-          placeholder: "選擇要管理的商品",
+          placeholder: "選擇要查看的商品",
           min_values: 1,
           max_values: 1,
           options: result.watches.map((watch) =>
@@ -94,7 +95,7 @@ export function createTargetPriceWatchManagerMessage({
       type: DISCORD_COMPONENT_TYPE_BUTTON,
       style: DISCORD_BUTTON_STYLE_PRIMARY,
       custom_id: WATCH_ADD_CUSTOM_ID,
-      label: "新增追蹤",
+      label: "新增提醒",
     },
     {
       type: DISCORD_COMPONENT_TYPE_BUTTON,
@@ -102,7 +103,7 @@ export function createTargetPriceWatchManagerMessage({
       custom_id: selectedWatch
         ? `${WATCH_EDIT_CUSTOM_ID_PREFIX}${selectedWatch.id}:${selectedWatch.targetPrice}:${result.page}`
         : `${WATCH_EDIT_CUSTOM_ID_PREFIX}none:0:${result.page}`,
-      label: "編輯目標價",
+      label: "修改目標價",
       disabled: selectedWatch === null,
     },
     {
@@ -111,7 +112,7 @@ export function createTargetPriceWatchManagerMessage({
       custom_id: selectedWatch
         ? `${WATCH_REMOVE_CUSTOM_ID_PREFIX}${selectedWatch.id}:${result.page}`
         : `${WATCH_REMOVE_CUSTOM_ID_PREFIX}none:${result.page}`,
-      label: "移除追蹤",
+      label: "移除提醒",
       disabled: selectedWatch === null,
     },
     {
@@ -152,7 +153,7 @@ export function createTargetPriceWatchManagerMessage({
   return {
     embeds: [
       {
-        title: "商品目標價追蹤",
+        title: "目標價提醒",
         description,
         color: DISCORD_EMBED_COLOR,
         fields: selectedWatch

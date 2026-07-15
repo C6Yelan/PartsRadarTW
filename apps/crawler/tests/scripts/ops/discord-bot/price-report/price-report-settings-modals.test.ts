@@ -90,28 +90,34 @@ describe("handleDiscordInteraction price report settings modals", () => {
       type: 9,
       data: {
         custom_id: "price-report:settings:keyword-modal",
-        title: "價格報告關鍵字",
+        title: "商品名稱關鍵字",
       },
     });
     expect(requestBody.data.components).toHaveLength(5);
     expect(requestBody.data.components[0]).toMatchObject({
       type: 18,
-      label: "關鍵字組 1（不同格擇一）",
+      label: "其中一組關鍵字 1",
+      description:
+        "同一欄的詞要全部出現在商品名稱中；不同欄只要符合其中一組。全部留空代表不限。",
       component: {
         type: 4,
         custom_id: "price-report:settings:keyword-input",
         value: "RTX 5090",
+        placeholder: "例：RTX 5090",
       },
     });
     expect(requestBody.data.components[1]).toMatchObject({
+      label: "其中一組關鍵字 2",
       component: {
         custom_id: "price-report:settings:keyword-input:2",
         value: "DDR5",
+        placeholder: "例：RX 9070 XT",
       },
     });
     expect(requestBody.data.components[4].component.custom_id).toBe(
       "price-report:settings:keyword-input:5",
     );
+    expect(JSON.stringify(requestBody.data)).not.toContain("不同格擇一");
   });
 
   it("normalizes full-width daily report time without rewriting dormant max-items", async () => {

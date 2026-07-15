@@ -7,7 +7,7 @@ import {
   formatTaiwanDollar,
   toSingleLine,
 } from "../message-text";
-import { formatDiscordDeliveryFailureForUser, formatDiscordRateLimitForUser } from "../rest";
+import { formatDiscordDeliveryFailureForUser } from "../rest";
 import type { TargetPriceWatchDeliveryStatus, TargetPriceWatchListRecord } from "./records";
 import { WATCH_SELECT_VALUE_PREFIX } from "./reference";
 
@@ -62,17 +62,17 @@ export function formatWatchSummaryFields(
       inline: true,
     },
     {
-      name: "價格資料時間",
-      value: priceSeenAt ? formatTaipeiMinute(priceSeenAt) : "尚無價格資料",
-      inline: true,
-    },
-    {
       name: "目標價格",
       value: formatTaiwanDollar(watch.targetPrice),
       inline: true,
     },
     {
-      name: "追蹤狀態",
+      name: "價格更新時間",
+      value: priceSeenAt ? formatTaipeiMinute(priceSeenAt) : "尚無價格資料",
+      inline: true,
+    },
+    {
+      name: "提醒狀態",
       value: formatWatchStatus({
         currentPrice,
         targetPrice: watch.targetPrice,
@@ -97,7 +97,7 @@ function formatWatchNotificationDeliveryField(
   if (delivery.status === "RATE_LIMITED") {
     return {
       name: "最近一次通知",
-      value: `限流：${happenedAt}。\n${formatDiscordRateLimitForUser()}`,
+      value: `${happenedAt}\nDiscord 暫時無法傳送提醒，bot 會稍後再試。`,
     };
   }
 
@@ -119,12 +119,12 @@ function formatWatchStatus({
   targetPrice: number;
 }): string {
   if (currentPrice === null) {
-    return "等待商品價格資料更新。";
+    return "正在等待最新價格。";
   }
 
   if (currentPrice <= targetPrice) {
-    return "目前價格已達標。";
+    return "已達到你設定的目標價，bot 會嘗試傳送私訊提醒。";
   }
 
-  return `尚未達標；目前價格仍高於目標價 ${formatTaiwanDollar(currentPrice - targetPrice)}。`;
+  return `尚未達標，目前價格比目標價高 ${formatTaiwanDollar(currentPrice - targetPrice)}。`;
 }

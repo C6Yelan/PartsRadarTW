@@ -1,32 +1,67 @@
 // apps/crawler/src/scripts/ops/discord-bot/interactions/bot-help.ts
 // 組裝 /bot help 回覆訊息，提供 Discord 使用者可見的 bot 功能摘要。
 
-import { DISCORD_EMBED_COLOR } from "../constants";
+import {
+  DISCORD_BUTTON_STYLE_LINK,
+  DISCORD_COMPONENT_TYPE_ACTION_ROW,
+  DISCORD_COMPONENT_TYPE_BUTTON,
+  DISCORD_EMBED_COLOR,
+} from "../constants";
 import type { DiscordBotMessage } from "../types";
 
 // 建立 Discord bot 說明 embed，依任務與使用範圍列出主要 slash command。
-export function createBotHelpMessage(): DiscordBotMessage {
+export function createBotHelpMessage(publicBaseUrl: string): DiscordBotMessage {
   return {
     embeds: [
       {
-        title: "PartsRadarTW Discord bot 說明",
+        title: "PartsRadarTW 使用說明",
         color: DISCORD_EMBED_COLOR,
-        description: [
-          "**目標價提醒｜`/watch`**",
-          "貼上商品頁網址並設定目標價；可查看、編輯或單筆移除追蹤。價格達標時會嘗試透過 DM 傳送目標價提醒，管理清單只會回覆給你。",
-          "",
-          "**即時價格報告｜`/price-report now`**",
-          "在目前伺服器頻道或 DM 取得近期價格變動；可選 6、12 或 24 小時統計區間。",
-          "",
-          "**每日私訊價格報告｜`/price-report settings`**",
-          "設定每日台北時間、分類、關鍵字與內容；報告與預覽會傳到你的 DM，請先確認允許 bot 私訊。",
-          "",
-          "**公開價格報告｜`/public-report status/manage/test`**",
-          "只限伺服器使用。具備「管理伺服器」權限的成員可設定固定頻道；bot 在該頻道需要「傳送訊息」與「嵌入連結」權限。",
-          "",
-          "**DM、伺服器與權限**",
-          "`/watch` 與 `/price-report` 可在 DM 或伺服器使用；個人追蹤清單、目標價提醒與每日私訊價格報告不會公開到伺服器頻道。",
-        ].join("\n"),
+        description:
+          "選擇你想完成的事情，再使用對應指令。所有設定面板只會顯示給操作者。",
+        fields: [
+          {
+            name: "追蹤商品目標價",
+            value: "`/watch`\n價格降到你設定的金額時，bot 會嘗試透過私訊提醒你。",
+          },
+          {
+            name: "查看價格變動",
+            value:
+              "`/price-report now`\n立即查看最近 6、12 或 24 小時的降價、漲價與新增商品。",
+          },
+          {
+            name: "設定每日私訊",
+            value:
+              "`/price-report settings`\n設定每天的發送時間、分類、內容與商品名稱關鍵字。",
+          },
+          {
+            name: "伺服器公開報告",
+            value:
+              "`/public-report settings`\n需要「管理伺服器」權限。設定公開頻道、分類、內容與測試發送。",
+          },
+          {
+            name: "系統狀態",
+            value:
+              "`/status`\n需要「管理伺服器」權限。查看 bot 與商品資料更新狀態。",
+          },
+          {
+            name: "可使用的位置",
+            value:
+              "`/watch` 與 `/price-report` 可在私訊或伺服器使用。`/public-report settings` 與 `/status` 只在伺服器使用。",
+          },
+        ],
+      },
+    ],
+    components: [
+      {
+        type: DISCORD_COMPONENT_TYPE_ACTION_ROW,
+        components: [
+          {
+            type: DISCORD_COMPONENT_TYPE_BUTTON,
+            style: DISCORD_BUTTON_STYLE_LINK,
+            label: "查看完整使用教學",
+            url: new URL("/discord", publicBaseUrl).toString(),
+          },
+        ],
       },
     ],
   };

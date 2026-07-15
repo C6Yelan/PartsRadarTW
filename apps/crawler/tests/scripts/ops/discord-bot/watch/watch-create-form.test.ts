@@ -42,15 +42,15 @@ describe("handleDiscordInteraction watch create form", () => {
     expect(requestBody).toMatchObject({
       embeds: [
         expect.objectContaining({
-          title: "商品目標價追蹤",
-          description: expect.stringContaining("尚未追蹤商品"),
+          title: "目標價提醒",
+          description: expect.stringContaining("尚未設定商品提醒"),
         }),
       ],
       components: [
         {
           type: 1,
           components: [
-            expect.objectContaining({ custom_id: "watch:add", label: "新增追蹤" }),
+            expect.objectContaining({ custom_id: "watch:add", label: "新增提醒" }),
             expect.objectContaining({
               custom_id: "watch:edit:none:0:0",
               disabled: true,

@@ -135,7 +135,7 @@ export async function handleModalSubmitInteraction({
         fetchImpl,
         message: createPublicPriceReportSettingsPanelMessage({
           ...currentPanel,
-          notice: "請先使用 /public-report manage 將公開報告設為目前頻道。",
+          notice: "請先在 /public-report settings 按「設為此頻道」。",
         }),
       });
       return;

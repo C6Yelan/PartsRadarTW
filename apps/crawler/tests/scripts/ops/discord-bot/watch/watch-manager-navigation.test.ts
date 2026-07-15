@@ -62,7 +62,7 @@ describe("handleDiscordInteraction watch manager navigation", () => {
     expect(findMessageComponent(firstPage, "watch:page:1")).toEqual(
       expect.objectContaining({ disabled: false }),
     );
-    expect(firstPage.embeds[0].description).toContain("最近更新優先");
+    expect(firstPage.embeds[0].description).toContain("最近更新的排在前面");
     expect(JSON.stringify(firstPage)).not.toContain("watch:filter:");
     expect(JSON.stringify(firstPage)).not.toContain("watch:sort:");
     expect(JSON.stringify(firstPage)).not.toContain("watch:bulk-remove:");

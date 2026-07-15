@@ -185,10 +185,10 @@ describe("handleDiscordInteraction watch edit and remove", () => {
     });
     const requestBody = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body));
     expect(requestBody.embeds[0]).toMatchObject({
-      title: "商品目標價追蹤",
+      title: "目標價提醒",
       description: expect.stringContaining("已移除目標價追蹤"),
     });
-    expect(requestBody.embeds[0].description).toContain("尚未追蹤商品");
+    expect(requestBody.embeds[0].description).toContain("尚未設定商品提醒");
   });
 
   it("refreshes the current watch manager page", async () => {
@@ -209,8 +209,8 @@ describe("handleDiscordInteraction watch edit and remove", () => {
     expect(JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body))).toMatchObject({
       embeds: [
         expect.objectContaining({
-          title: "商品目標價追蹤",
-          description: expect.stringContaining("尚未追蹤商品"),
+          title: "目標價提醒",
+          description: expect.stringContaining("尚未設定商品提醒"),
         }),
       ],
     });

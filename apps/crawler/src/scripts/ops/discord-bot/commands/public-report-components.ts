@@ -7,11 +7,7 @@ import {
   DISCORD_BUTTON_STYLE_SECONDARY,
   DISCORD_COMPONENT_TYPE_ACTION_ROW,
   DISCORD_COMPONENT_TYPE_BUTTON,
-  DISCORD_COMPONENT_TYPE_LABEL,
   DISCORD_COMPONENT_TYPE_STRING_SELECT,
-  DISCORD_COMPONENT_TYPE_TEXT_INPUT,
-  DISCORD_TEXT_INPUT_STYLE_SHORT,
-  MAX_PRICE_REPORT_KEYWORD_LENGTH,
 } from "../constants";
 import type { DiscordMessageComponent, DiscordModal } from "../types";
 import {
@@ -31,7 +27,7 @@ import {
   PUBLIC_REPORT_PREVIEW_CUSTOM_ID,
   PUBLIC_REPORT_SET_CHANNEL_CUSTOM_ID,
 } from "./ids";
-import { splitProductKeywordInputGroups } from "./settings-input";
+import { createProductKeywordModal } from "./keyword-modal";
 
 // 建立 public-report 設定面板，依目前頻道設定狀態控制分類、篩選、測試與啟停操作。
 export function createPublicReportSettingsComponents({
@@ -180,24 +176,9 @@ export function createPublicReportKeywordModal({
 }: {
   keywordValue: string;
 }): DiscordModal {
-  const keywordGroups = splitProductKeywordInputGroups(keywordValue);
-
-  return {
-    custom_id: PUBLIC_REPORT_KEYWORD_MODAL_CUSTOM_ID,
-    title: "公開報告關鍵字",
-    components: PUBLIC_REPORT_KEYWORD_INPUT_CUSTOM_IDS.map((customId, index) => ({
-      type: DISCORD_COMPONENT_TYPE_LABEL,
-      label: `關鍵字組 ${index + 1}（不同格擇一）`,
-      description: index === 0 ? "同一格以空白分隔，需全部符合；全部留空代表不限。" : undefined,
-      component: {
-        type: DISCORD_COMPONENT_TYPE_TEXT_INPUT,
-        custom_id: customId,
-        style: DISCORD_TEXT_INPUT_STYLE_SHORT,
-        max_length: MAX_PRICE_REPORT_KEYWORD_LENGTH,
-        required: false,
-        value: keywordGroups[index] ?? "",
-        placeholder: index === 0 ? "RTX 5090" : index === 1 ? "DDR5" : undefined,
-      },
-    })),
-  };
+  return createProductKeywordModal({
+    modalCustomId: PUBLIC_REPORT_KEYWORD_MODAL_CUSTOM_ID,
+    inputCustomIds: PUBLIC_REPORT_KEYWORD_INPUT_CUSTOM_IDS,
+    keywordValue,
+  });
 }

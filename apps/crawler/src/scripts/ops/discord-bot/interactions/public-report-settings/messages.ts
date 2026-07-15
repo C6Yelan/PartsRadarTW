@@ -1,12 +1,11 @@
 // apps/crawler/src/scripts/ops/discord-bot/interactions/public-report-settings/messages.ts
-// 組裝 public-report 設定面板、狀態訊息、權限提醒與測試發送結果文字。
+// 組裝 public-report 設定面板、權限提醒與測試發送結果文字。
 
 import { createPublicReportSettingsComponents } from "../../commands";
 import {
   DISCORD_EMBED_COLOR,
   DISCORD_PERMISSION_EMBED_LINKS,
   DISCORD_PERMISSION_SEND_MESSAGES,
-  MAX_PRICE_REPORT_ITEMS,
 } from "../../constants";
 import {
   formatPriceReportCategoryFilterLabel,
@@ -21,10 +20,6 @@ import {
   type PublicPriceReportSetting,
   toPublicPriceReportFilters,
 } from "../../public-price-report";
-import {
-  formatDiscordDeliveryFailureFieldValue,
-  formatDiscordDeliveryFailureForUser,
-} from "../../rest";
 import type { DiscordBotEmbed, DiscordBotMessage, DiscordInteraction } from "../../types";
 
 // public-report 設定面板訊息所需的資料契約，由設定讀取流程與 interaction handler 共用。
@@ -68,21 +63,6 @@ export function createPublicPriceReportSettingsPanelMessage({
   };
 }
 
-// 建立只讀的 public-report 狀態訊息，用於 slash command 查詢目前設定與最近發送結果。
-export function createPublicPriceReportStatusMessage(
-  panel: PublicPriceReportSettingsPanel,
-): DiscordBotMessage {
-  return {
-    embeds: [
-      createPublicPriceReportSettingsEmbed({
-        ...panel,
-        title: "公開價格報告狀態",
-        description: "目前公開價格報告的設定與最近一次發送紀錄。",
-      }),
-    ],
-  };
-}
-
 // 依 Discord interaction 帶回的 app_permissions 判斷 bot 是否缺少公開報告發送所需權限。
 export function formatPublicReportBotPermissionNotice(
   interaction: DiscordInteraction,
@@ -103,7 +83,7 @@ export function formatPublicReportBotPermissionNotice(
     return null;
   }
 
-  return `我目前無法在 <#${channelId}> 發送公開價格報告。請確認 PartsRadarTW bot 在該頻道具備「${missing.join("」與「")}」權限。`;
+  return `目前無法在 <#${channelId}> 發送訊息，請確認 bot 具備「${missing.join("」與「")}」權限。`;
 }
 
 // 將測試公開報告的發送結果轉成使用者可讀訊息，並附上當次套用的篩選設定摘要。
@@ -116,22 +96,22 @@ export function formatPublicReportPreviewNotice(
   const settingSummary = formatPublicReportSettingSummary(setting, categories);
 
   if (result.status === "sent") {
-    return `已發送單次測試公開報告到 <#${channelId}>：價格變動 ${result.changeCount}，新增商品 ${result.newProductCount}，列出 ${result.listedCount} 筆，送出 ${result.messageCount} 則訊息。這次測試不會改變排程進度。\n${settingSummary}`;
+    return `已將測試報告發送到 <#${channelId}>：價格變動 ${result.changeCount} 筆、新增商品 ${result.newProductCount} 筆，共列出 ${result.listedCount} 筆。\n${settingSummary}`;
   }
 
   if (result.status === "skipped") {
-    return `過去 24 小時沒有符合設定的公開報告內容，未發送單次測試報告；這次測試不會改變排程進度。\n${settingSummary}`;
+    return `過去 24 小時沒有符合目前設定的商品，因此未發送測試報告。\n${settingSummary}`;
   }
 
   if (result.status === "rate_limited") {
-    return "Discord 暫時限制訊息發送，本次測試未送出且不會自動重試；請稍後重新執行測試。";
+    return "Discord 暫時無法接收訊息，請稍後再試。";
   }
 
   if (result.errorCategory === "PERMISSIONS") {
-    return `本次測試未送出且不會自動重試。我目前無法在 <#${channelId}> 發送公開價格報告。請確認 PartsRadarTW bot 在該頻道具備「傳送訊息」與「嵌入連結」權限。`;
+    return `目前無法在 <#${channelId}> 發送訊息，請確認 bot 具備「傳送訊息」與「嵌入連結」權限。`;
   }
 
-  return `本次測試未送出且不會自動重試。${formatDiscordDeliveryFailureForUser(result)}`;
+  return "發送失敗，請稍後再試。";
 }
 
 // 建立 public-report 設定 embed；互動面板與只讀狀態訊息共用相同欄位排列。
@@ -143,7 +123,7 @@ function createPublicPriceReportSettingsEmbed({
   notice,
   title = "公開價格報告設定",
   description:
-    baseDescription = "公開價格報告會在排程爬蟲完成且有符合設定的價格變動或新增商品時，自動發送到指定頻道；啟用後只處理後續輪次，不補發先前輪次。",
+    baseDescription = "設定公開報告要發送的頻道與內容。有符合條件的降價、漲價或新增商品時，bot 會自動發送。",
 }: PublicPriceReportSettingsPanel & {
   title?: string;
   description?: string;
@@ -160,11 +140,7 @@ function createPublicPriceReportSettingsEmbed({
     fields: [
       {
         name: "狀態",
-        value: setting
-          ? setting.enabled
-            ? "已啟用，自動發送中"
-            : "已暫停，不會自動發送"
-          : "尚未設定",
+        value: setting ? (setting.enabled ? "已開啟" : "已暫停") : "尚未設定",
         inline: true,
       },
       {
@@ -173,7 +149,7 @@ function createPublicPriceReportSettingsEmbed({
         inline: true,
       },
       {
-        name: "目前頻道",
+        name: "你目前所在的頻道",
         value: `<#${currentChannelId}>`,
         inline: true,
       },
@@ -188,24 +164,23 @@ function createPublicPriceReportSettingsEmbed({
         inline: true,
       },
       {
-        name: "商品關鍵字",
+        name: "商品名稱關鍵字",
         value: formatPriceReportKeywordFilterLabel(filters),
         inline: true,
       },
       {
-        name: "最近一次公開報告",
+        name: "最近一次發送",
         value: formatPublicReportDeliveryStatus(latestDelivery),
       },
       {
-        name: "排程與測試",
-        value:
-          "失敗或 Discord 限流的排程公開報告會在下一次排程檢查時重試；手動測試是單次操作，不會自動重試，也不會改變排程進度。",
+        name: "發送說明",
+        value: "自動發送失敗時，bot 會稍後再試；「發送測試」只會傳送一次。",
       },
     ],
   };
 }
 
-// 將最近一次公開報告 delivery 狀態轉成面板欄位文字，保留重試語意給維運判讀。
+// 將最近一次公開報告 delivery 狀態轉成管理員可讀的簡短文字。
 function formatPublicReportDeliveryStatus(
   delivery: PublicPriceReportDeliveryStatus | null,
 ): string {
@@ -213,40 +188,38 @@ function formatPublicReportDeliveryStatus(
     return "尚無公開報告紀錄。";
   }
 
-  const deliveredAt = formatTaipeiMinute(delivery.deliveredAt ?? delivery.updatedAt);
+  const deliveredAt = formatTaipeiMinute(delivery.deliveredAt ?? delivery.updatedAt).replace(
+    " GMT+8",
+    "",
+  );
 
   if (delivery.status === "SENT") {
-    return `成功：${deliveredAt}，列出 ${delivery.itemCount} 筆，送出 ${delivery.messageCount} 則訊息。`;
+    return `${deliveredAt}，已發送 ${delivery.itemCount} 筆商品。`;
   }
 
   if (delivery.status === "SKIPPED") {
-    return `略過：${deliveredAt}，本輪沒有符合設定的公開報告內容，不需補發。`;
+    return `${deliveredAt}，當時沒有符合條件的商品。`;
   }
 
   if (delivery.status === "RATE_LIMITED") {
-    return `Discord 限流：${deliveredAt}。下一次排程檢查時會重試。`;
+    return `${deliveredAt}，Discord 暫時無法接收訊息，bot 會稍後再試。`;
   }
 
   if (delivery.status === "FAILED") {
-    return `失敗：${deliveredAt}。${formatDiscordDeliveryFailureFieldValue(delivery)} 下一次排程檢查時會重試。`;
+    return `${deliveredAt}，發送失敗，bot 會稍後再試。`;
   }
 
-  return `${delivery.status}：${deliveredAt}，列出 ${delivery.itemCount} 筆。`;
+  return `${deliveredAt}，目前無法確認發送結果。`;
 }
 
-// 摘要測試公開報告實際套用的分類、內容、關鍵字與列出上限。
+// 摘要測試公開報告實際套用的分類、內容與關鍵字。
 function formatPublicReportSettingSummary(
   setting: PublicPriceReportSetting,
   categories: PriceReportCategoryOption[],
 ): string {
   const filters = toPublicPriceReportFilters(setting);
 
-  return `套用設定：分類 ${formatPriceReportCategoryFilterLabel(
-    filters,
-    categories,
-  )}；內容 ${formatPriceReportContentFilterLabel(filters)}；關鍵字 ${formatPriceReportKeywordFilterLabel(
-    filters,
-  )}；最多 ${MAX_PRICE_REPORT_ITEMS} 筆。`;
+  return `套用設定：分類 ${formatPriceReportCategoryFilterLabel(filters, categories)}；內容 ${formatPriceReportContentFilterLabel(filters)}；關鍵字 ${formatPriceReportKeywordFilterLabel(filters)}。`;
 }
 
 // 檢查 Discord permission bitset 是否包含指定權限，避免用字串比對權限組合。

@@ -64,8 +64,8 @@ export function createTargetPriceWatchResponseMessage({
   );
   const targetDelta = result.currentPrice - result.watch.targetPrice;
   const status = result.reached
-    ? "目前價格已達標。"
-    : `尚未達標，距離目標價還差 ${formatTaiwanDollar(targetDelta)}。`;
+    ? "已達到你設定的目標價，bot 會嘗試傳送私訊提醒。"
+    : `尚未達標，目前價格比目標價高 ${formatTaiwanDollar(targetDelta)}。`;
 
   return {
     embeds: [
@@ -88,12 +88,12 @@ export function createTargetPriceWatchResponseMessage({
             inline: true,
           },
           {
-            name: "追蹤狀態",
+            name: "提醒狀態",
             value: status,
           },
         ],
         footer: {
-          text: `價格資料時間：${formatTaipeiMinute(result.capturedAt)}`,
+          text: `價格更新時間：${formatTaipeiMinute(result.capturedAt)}`,
         },
       },
     ],

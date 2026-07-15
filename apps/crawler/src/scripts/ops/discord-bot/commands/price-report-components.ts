@@ -11,7 +11,6 @@ import {
   DISCORD_COMPONENT_TYPE_STRING_SELECT,
   DISCORD_COMPONENT_TYPE_TEXT_INPUT,
   DISCORD_TEXT_INPUT_STYLE_SHORT,
-  MAX_PRICE_REPORT_KEYWORD_LENGTH,
 } from "../constants";
 import type { DiscordMessageComponent, DiscordModal } from "../types";
 import {
@@ -33,7 +32,7 @@ import {
   PRICE_REPORT_SETTINGS_TIME_MODAL_CUSTOM_ID,
   PRICE_REPORT_SETTINGS_WINDOW_CUSTOM_ID,
 } from "./ids";
-import { splitProductKeywordInputGroups } from "./settings-input";
+import { createProductKeywordModal } from "./keyword-modal";
 
 // 建立個人 price-report 設定面板的 select menu 與操作按鈕，對應 settings parser 的 custom_id contract。
 export function createPriceReportSettingsComponents({
@@ -220,24 +219,9 @@ export function createPriceReportKeywordModal({
 }: {
   keywordValue: string;
 }): DiscordModal {
-  const keywordGroups = splitProductKeywordInputGroups(keywordValue);
-
-  return {
-    custom_id: PRICE_REPORT_SETTINGS_KEYWORD_MODAL_CUSTOM_ID,
-    title: "價格報告關鍵字",
-    components: PRICE_REPORT_SETTINGS_KEYWORD_INPUT_CUSTOM_IDS.map((customId, index) => ({
-      type: DISCORD_COMPONENT_TYPE_LABEL,
-      label: `關鍵字組 ${index + 1}（不同格擇一）`,
-      description: index === 0 ? "同一格以空白分隔，需全部符合；全部留空代表不限。" : undefined,
-      component: {
-        type: DISCORD_COMPONENT_TYPE_TEXT_INPUT,
-        custom_id: customId,
-        style: DISCORD_TEXT_INPUT_STYLE_SHORT,
-        max_length: MAX_PRICE_REPORT_KEYWORD_LENGTH,
-        required: false,
-        value: keywordGroups[index] ?? "",
-        placeholder: index === 0 ? "RTX 5090" : index === 1 ? "DDR5" : undefined,
-      },
-    })),
-  };
+  return createProductKeywordModal({
+    modalCustomId: PRICE_REPORT_SETTINGS_KEYWORD_MODAL_CUSTOM_ID,
+    inputCustomIds: PRICE_REPORT_SETTINGS_KEYWORD_INPUT_CUSTOM_IDS,
+    keywordValue,
+  });
 }

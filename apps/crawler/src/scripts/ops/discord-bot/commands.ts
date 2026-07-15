@@ -5,6 +5,7 @@ export {
   parseBotInteraction,
   parsePriceReportInteraction,
   parsePublicReportInteraction,
+  parseStatusInteraction,
   parseWatchInteraction,
 } from "./commands/application-parser";
 // Discord bot 內部的 commands 模組邊界；互動 handler 透過此檔取得指令相關能力。
@@ -12,6 +13,7 @@ export {
   createBotCommand,
   createPriceReportCommand,
   createPublicReportCommand,
+  createStatusCommand,
   createWatchCommand,
 } from "./commands/definitions";
 export {

@@ -1897,10 +1897,10 @@ test("organizes Discord guidance by audience with progressive disclosure @deskto
     await expect(page.locator(".discord-local-nav")).toHaveCount(0);
     await expect(page.locator("#quick-start .discord-step-list > li")).toHaveCount(3);
     await expect(page.locator("#discord-user-guide .discord-command-summary-list > li")).toHaveCount(
-      3,
+      4,
     );
     await expect(page.locator("#discord-admin-guide .discord-command-summary-list > li")).toHaveCount(
-      3,
+      2,
     );
     await expect(page.getByLabel("公開報告必要權限")).toBeVisible();
 
@@ -1924,19 +1924,21 @@ test("organizes Discord guidance by audience with progressive disclosure @deskto
       );
     }
 
-    const heroImage = page.getByAltText("Discord 指令選單截圖");
+    const commandSummary = page.getByLabel("Discord 指令操作摘要");
     if (viewport.width > 520) {
-      await expect(heroImage).toBeVisible();
-      expect((await heroImage.boundingBox())?.width).toBeLessThanOrEqual(380);
+      await expect(commandSummary.getByText("/public-report settings", { exact: true })).toBeVisible();
+      await expect(commandSummary.getByText("/status", { exact: true })).toBeVisible();
     } else {
-      await expect(heroImage).toBeHidden();
+      await expect(commandSummary.locator(".discord-visual-frame")).toBeHidden();
     }
 
     for (const image of await page.locator(".discord-guide-image").all()) {
       expect((await image.getAttribute("alt"))?.trim().length).toBeGreaterThan(0);
     }
     if (viewport.width <= 760) {
-      for (const sequence of await page.locator(".discord-command-guide-sequence").all()) {
+      for (const sequence of await page
+        .locator("#discord-user-guide .discord-command-guide-sequence")
+        .all()) {
         const gaps = await sequence.evaluate((element) => {
           const summary = element.querySelector(".discord-command-summary-list");
           const notice = element.querySelector(".discord-screenshot-notice");

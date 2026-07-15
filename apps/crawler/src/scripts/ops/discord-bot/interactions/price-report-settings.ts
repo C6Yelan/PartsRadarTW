@@ -120,7 +120,7 @@ export function formatPriceReportModalValidationMessage(
 
 // 建立商品關鍵字輸入錯誤訊息，對齊 modal 說明中的長度與分組限制。
 export function formatPriceReportKeywordValidationMessage(): string {
-  return `商品關鍵字最多 ${MAX_PRICE_REPORT_KEYWORD_LENGTH} 個字，且最多 ${MAX_PRICE_REPORT_KEYWORD_GROUPS} 組。`;
+  return `商品名稱關鍵字合計最多 ${MAX_PRICE_REPORT_KEYWORD_LENGTH} 個字、最多 ${MAX_PRICE_REPORT_KEYWORD_GROUPS} 組；同一欄的詞需全部符合，不同欄符合其中一組即可。`;
 }
 
 // 將既有 nextSendAt 轉為 modal 可用的台北時間；無法解析時回到 09:00。

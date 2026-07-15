@@ -12,11 +12,10 @@ PartsRadarTW Discord bot 提供個人價格報告、目標價提醒與伺服器�
 | `/price-report now [window]` | Guild、DM | 在目前 context 產生 6／12／24 小時價格報告。 |
 | `/price-report settings` | Guild、DM | 管理每日 DM 報告。 |
 | `/watch` | Guild、DM | 建立、編輯、查看與移除目標價 watch。 |
-| `/public-report status` | Guild | 查看伺服器公開報告狀態。 |
-| `/public-report manage` | Guild | 設定頻道、分類、內容與啟用狀態。 |
-| `/public-report test` | Guild | 發送一次測試報告，不推進 scheduled cursor。 |
+| `/public-report settings` | Guild | 設定頻道、分類、內容、啟用狀態與測試發送。 |
+| `/status` | Guild | 查看 bot 與商品資料更新狀態。 |
 
-`/public-report` 預設要求使用者具備 Manage Guild 權限。
+`/public-report settings` 與 `/status` 預設要求使用者具備 Manage Guild 權限，回覆只會顯示給操作者。
 
 ## 個人報告
 
@@ -40,9 +39,9 @@ PartsRadarTW Discord bot 提供個人價格報告、目標價提醒與伺服器�
 
 ## 公開價格報告
 
-每個 Guild 可設定一個目標頻道與篩選條件。Bot 在 scheduled crawl 完成後讀取尚未處理的 crawl run，送出有變化的商品並保存 delivery cursor／結果。
+每個 Guild 可設定一個目標頻道與篩選條件。商品資料更新完成後，Bot 會送出有變化的商品並保存發送結果。
 
-`/public-report test` 只驗證目前設定與頻道權限，不寫入 scheduled delivery cursor，也不保證後續自動發送一定成功。
+公開報告設定面板會顯示目前狀態、頻道與最近一次發送結果；「發送測試」按鈕可驗證目前設定與頻道權限。
 
 ## 權限
 

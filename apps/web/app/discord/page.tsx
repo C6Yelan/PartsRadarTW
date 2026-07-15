@@ -11,7 +11,6 @@ import {
   adminCommandGuides,
   adminQuickStartSteps,
   discordFaqItems,
-  heroScreenshot,
   screenshotFreshnessNotice,
   userCommandGuides,
   userQuickStartSteps,
@@ -74,16 +73,14 @@ export default function DiscordPage() {
             </div>
           </div>
 
-          <aside className="discord-visual-panel" aria-label="Discord 指令操作示意圖">
-            <div className="discord-visual-frame">
-              <Image
-                alt={heroScreenshot.alt}
-                className="discord-visual-image"
-                height={heroScreenshot.height}
-                priority
-                src={heroScreenshot.src}
-                width={heroScreenshot.width}
-              />
+          <aside className="discord-visual-panel" aria-label="Discord 指令操作摘要">
+            <div className="discord-visual-frame discord-visual-command-list">
+              <code>/watch</code>
+              <code>/price-report now</code>
+              <code>/price-report settings</code>
+              <code>/public-report settings</code>
+              <code>/bot help</code>
+              <code>/status</code>
             </div>
             <p>在 Discord 指令選單中選擇提醒、個人報告或管理員功能。</p>
           </aside>
@@ -107,7 +104,7 @@ export default function DiscordPage() {
               <div>
                 <span className="discord-audience-label">伺服器管理員</span>
                 <h3>設定伺服器公開報告</h3>
-                <p>設定公開報告頻道、測試 bot 權限，並查看最近發送狀態。</p>
+                <p>設定公開報告頻道、測試 bot 權限，並查看系統與商品資料狀態。</p>
               </div>
               <strong>需要「管理伺服器」權限</strong>
               <a href="#discord-admin-guide">查看管理員教學</a>
@@ -148,7 +145,7 @@ export default function DiscordPage() {
           <div className="discord-section-heading">
             <span className="discord-section-eyebrow">伺服器管理員</span>
             <h2 id="discord-admin-guide-title">公開價格報告設定</h2>
-            <p>依序確認權限、設定公開報告、發送測試，再查看目前狀態。</p>
+            <p>依序確認權限、設定公開報告、發送測試，再查看系統狀態。</p>
           </div>
           <aside className="discord-permission-notice" aria-label="公開報告必要權限">
             <strong>必要權限</strong>
@@ -157,12 +154,11 @@ export default function DiscordPage() {
             </p>
           </aside>
           <div className="discord-admin-quick-start">
-            <h3>管理員三步設定</h3>
+            <h3>管理員四步設定</h3>
             <QuickStartSteps items={adminQuickStartSteps} />
           </div>
           <div className="discord-command-guide-sequence">
             <CommandSummary guides={adminCommandGuides} />
-            <p className="discord-screenshot-notice">{screenshotFreshnessNotice}</p>
             <CommandDetails guides={adminCommandGuides} />
           </div>
         </section>
@@ -240,20 +236,22 @@ function CommandDetails({
           </summary>
           <div className="discord-command-details-body">
             {guide.sections.map((section) => (
-              <article className="discord-guide-content" key={section.image.alt}>
+              <article className="discord-guide-content" key={section.title}>
                 <div className="discord-guide-copy">
                   <h3>{section.title}</h3>
                   <p>{section.description}</p>
                 </div>
-                <div className={`discord-guide-frame is-${section.image.orientation}`}>
-                  <Image
-                    alt={section.image.alt}
-                    className="discord-guide-image"
-                    height={section.image.height}
-                    src={section.image.src}
-                    width={section.image.width}
-                  />
-                </div>
+                {"image" in section ? (
+                  <div className={`discord-guide-frame is-${section.image.orientation}`}>
+                    <Image
+                      alt={section.image.alt}
+                      className="discord-guide-image"
+                      height={section.image.height}
+                      src={section.image.src}
+                      width={section.image.width}
+                    />
+                  </div>
+                ) : null}
               </article>
             ))}
           </div>

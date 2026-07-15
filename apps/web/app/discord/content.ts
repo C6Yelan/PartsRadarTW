@@ -1,13 +1,6 @@
 // apps/web/app/discord/content.ts
 // 依一般使用者與伺服器管理員分組 Discord 教學文案與截圖 metadata。
 
-export const heroScreenshot = {
-  alt: "Discord 指令選單截圖",
-  height: 377,
-  src: "/images/discord/commands-screenshot.png",
-  width: 1218,
-} as const;
-
 export const screenshotFreshnessNotice =
   "文字說明反映目前功能；操作截圖為較早版本介面示意，部分欄位與指令文字可能不同。";
 
@@ -37,13 +30,18 @@ export const adminQuickStartSteps = [
   },
   {
     title: "設定公開報告",
-    command: "/public-report manage",
+    command: "/public-report settings",
     description: "選擇公開報告頻道、分類、關鍵字與啟用狀態。",
   },
   {
-    title: "測試並檢查",
-    command: "/public-report test → /public-report status",
-    description: "送出單次測試，再確認啟用狀態、頻道與最近一次發送結果。",
+    title: "發送測試",
+    command: "設定面板 → 發送測試",
+    description: "在設定面板按「發送測試」，確認 bot 能在目標頻道傳送訊息。",
+  },
+  {
+    title: "查看系統狀態",
+    command: "/status",
+    description: "查看 bot 與商品資料更新狀態。",
   },
 ] as const;
 
@@ -116,64 +114,44 @@ export const userCommandGuides = [
       },
     ],
   },
+  {
+    command: "/bot help",
+    purpose: "查看指令使用說明",
+    result: "顯示只有自己看得到的說明面板",
+    title: "查看 Bot 使用說明",
+    sections: [
+      {
+        description: "依照想完成的事情查看對應指令，並可前往網站閱讀完整教學。",
+        title: "查看完整指令說明",
+      },
+    ],
+  },
 ] as const;
 
 export const adminCommandGuides = [
   {
-    command: "/public-report manage",
+    command: "/public-report settings",
     purpose: "設定公開價格報告",
-    result: "指定頻道、篩選條件與啟用狀態",
+    result: "指定頻道、篩選條件、測試與啟用狀態",
     title: "設定公開價格報告",
     sections: [
       {
-        description: "具備「管理伺服器」權限的成員可設定頻道、分類、關鍵字與啟用狀態。",
-        image: {
-          alt: "公開價格報告管理面板截圖",
-          height: 571,
-          orientation: "portrait",
-          src: "/images/discord/public-report-manage.png",
-          width: 490,
-        },
+        description:
+          "具備「管理伺服器」權限的成員可設定頻道、分類、關鍵字與啟用狀態，並在同一面板發送測試。",
         title: "設定公開價格報告",
       },
     ],
   },
   {
-    command: "/public-report test",
-    purpose: "測試 bot 權限與設定",
-    result: "發送單次測試，不推進排程進度",
-    title: "測試公開價格報告",
+    command: "/status",
+    purpose: "查看 bot 與商品資料狀態",
+    result: "顯示目前運作、最近爬取與功能狀態",
+    title: "查看系統狀態",
     sections: [
       {
         description:
-          "送出單次測試，確認 bot 具備「傳送訊息」與「嵌入連結」權限；失敗不會自動重試，也不會改變排程進度。",
-        image: {
-          alt: "公開價格報告測試截圖",
-          height: 761,
-          orientation: "portrait",
-          src: "/images/discord/public-report-test.png",
-          width: 526,
-        },
-        title: "測試公開價格報告",
-      },
-    ],
-  },
-  {
-    command: "/public-report status",
-    purpose: "檢查公開報告狀態",
-    result: "查看頻道與最近一次發送結果",
-    title: "檢查公開價格報告",
-    sections: [
-      {
-        description: "查看公開價格報告的啟用狀態、頻道與最近一次發送結果。",
-        image: {
-          alt: "公開價格報告狀態截圖",
-          height: 314,
-          orientation: "landscape",
-          src: "/images/discord/public-report-status.png",
-          width: 372,
-        },
-        title: "檢查公開價格報告",
+          "具備「管理伺服器」權限的成員可查看 bot、商品資料更新、最近爬取與功能開關。",
+        title: "查看系統狀態",
       },
     ],
   },
@@ -183,7 +161,7 @@ export const discordFaqItems = [
   {
     question: "一般成員能用哪些指令？",
     answer:
-      "一般成員可使用 /watch、/price-report 與 /bot help；/public-report 只限伺服器，且需要「管理伺服器」權限。",
+      "一般成員可使用 /watch、/price-report 與 /bot help；/public-report settings 與 /status 只限伺服器，且需要「管理伺服器」權限。",
   },
   {
     question: "看不到 /public-report 怎麼辦？",

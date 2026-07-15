@@ -82,7 +82,7 @@ describe("Discord bot feature flags", () => {
       options,
       cooldowns: new CommandCooldowns(60),
       fetchImpl: fetchMock as typeof fetch,
-      interaction: createPublicReportInteraction("status"),
+      interaction: createPublicReportInteraction("settings"),
     });
     await handleDiscordInteraction({
       client,

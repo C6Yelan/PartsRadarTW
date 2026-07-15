@@ -5,6 +5,7 @@ import {
   parseBotInteraction,
   parsePriceReportInteraction,
   parsePublicReportInteraction,
+  parseStatusInteraction,
   parseWatchInteraction,
 } from "../commands";
 import type { CommandCooldowns } from "../cooldowns";
@@ -24,10 +25,8 @@ import {
 } from "./price-report-settings";
 import {
   createPublicPriceReportSettingsPanelMessage,
-  createPublicPriceReportStatusMessage,
   readPublicPriceReportSettingsPanel,
   readPublicReportInteractionContext,
-  sendPublicReportTest,
 } from "./public-report-settings";
 import {
   sendFeatureDisabledResponse,
@@ -38,6 +37,7 @@ import {
   createTargetPriceWatchManagerMessageWithDelivery,
   readTargetPriceWatchManagerPage,
 } from "./watch-manager";
+import { handleStatusInteraction } from "./status";
 
 // 處理 slash command 入口，依 /bot、/price-report、/public-report、/watch 分派到對應互動流程。
 export async function handleApplicationCommandInteraction({
@@ -58,8 +58,12 @@ export async function handleApplicationCommandInteraction({
   const watchCommand = command || botCommand ? false : parseWatchInteraction(interaction);
   const publicReportCommand =
     command || watchCommand || botCommand ? null : parsePublicReportInteraction(interaction);
+  const statusCommand =
+    command || watchCommand || botCommand || publicReportCommand
+      ? false
+      : parseStatusInteraction(interaction);
 
-  if (!botCommand && !command && !watchCommand && !publicReportCommand) {
+  if (!botCommand && !command && !watchCommand && !publicReportCommand && !statusCommand) {
     await sendUnsupportedInteractionResponse({ interaction, options, fetchImpl });
     return;
   }
@@ -70,8 +74,13 @@ export async function handleApplicationCommandInteraction({
       apiBaseUrl: options.apiBaseUrl,
       interaction,
       fetchImpl,
-      message: createBotHelpMessage(),
+      message: createBotHelpMessage(options.publicBaseUrl),
     });
+    return;
+  }
+
+  if (statusCommand) {
+    await handleStatusInteraction({ client, interaction, options, fetchImpl });
     return;
   }
 
@@ -185,20 +194,6 @@ export async function handleApplicationCommandInteraction({
       return;
     }
 
-    if (publicReportCommand.name === "test") {
-      await sendPublicReportTest({
-        client,
-        interaction,
-        options,
-        cooldowns,
-        fetchImpl,
-        discordUserId,
-        publicContext,
-        missingSettingMessage: "尚未設定公開報告頻道，請先使用 `/public-report manage` 設定。",
-      });
-      return;
-    }
-
     const panel = await readPublicPriceReportSettingsPanel({
       client,
       discordGuildId: publicContext.discordGuildId,
@@ -210,10 +205,7 @@ export async function handleApplicationCommandInteraction({
       apiBaseUrl: options.apiBaseUrl,
       interaction,
       fetchImpl,
-      message:
-        publicReportCommand.name === "status"
-          ? createPublicPriceReportStatusMessage(panel)
-          : createPublicPriceReportSettingsPanelMessage(panel),
+      message: createPublicPriceReportSettingsPanelMessage(panel),
     });
     return;
   }
