@@ -13,14 +13,11 @@ import {
 import { parseProductionSmokeDaemonOptions } from "../../../../src/scripts/ops/production-smoke-daemon/options";
 import { readSmokeDiscordNotificationState } from "../../../../src/scripts/ops/smoke-discord-notification";
 import {
-  createWorkspace,
   DISCORD_ADMIN_WEBHOOK_URL,
   idleShutdown,
-} from "./production-smoke-support";
-
-type SendDiscordWebhook = NonNullable<
-  Parameters<typeof runProductionSmokeDaemon>[0]["sendDiscordWebhook"]
->;
+  type SendDiscordWebhook,
+} from "./production-smoke-daemon-support";
+import { createWorkspace } from "./production-smoke-workspace-support";
 
 describe("production smoke daemon options", () => {
   it("matches the production five-minute interval and reliability defaults", async () => {

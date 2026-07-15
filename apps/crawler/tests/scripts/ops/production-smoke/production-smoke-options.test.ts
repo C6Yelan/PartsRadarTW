@@ -7,7 +7,7 @@ import {
   parseProductionSmokeOptions,
   printProductionSmokeSummary,
 } from "../../../../src/scripts/ops/production-smoke";
-import { createWorkspace } from "./production-smoke-support";
+import { createWorkspace } from "./production-smoke-workspace-support";
 
 afterEach(() => {
   vi.unstubAllGlobals();
