@@ -9,6 +9,7 @@ import {
   getNumberArg,
   getPositiveNumberArg,
   loadWorkspaceEnv,
+  parseBoundedIntegerOption,
   resolveWorkspacePathArgument,
   resolveWorkspaceRoot,
   sanitizeSensitiveText,
@@ -106,6 +107,98 @@ describe("script utils", () => {
 
     for (const value of ["0", "123abc", "1.5", "-1", "", "9007199254740992"]) {
       expect(() => getPositiveNumberArg(["--limit", value], "--limit")).toThrow();
+    }
+  });
+
+  it("applies CLI, env, and fallback precedence for bounded integer options", () => {
+    expect(
+      parseBoundedIntegerOption({
+        args: ["--count", "7"],
+        env: { TEST_COUNT: "invalid" },
+        argName: "--count",
+        envName: "TEST_COUNT",
+        fallback: 9,
+        min: 0,
+        max: 10,
+      }),
+    ).toBe(7);
+    expect(
+      parseBoundedIntegerOption({
+        args: [],
+        env: { TEST_COUNT: "8" },
+        argName: "--count",
+        envName: "TEST_COUNT",
+        fallback: 99,
+        min: 0,
+        max: 10,
+      }),
+    ).toBe(8);
+    expect(
+      parseBoundedIntegerOption({
+        args: [],
+        env: {},
+        argName: "--count",
+        envName: "TEST_COUNT",
+        fallback: 9,
+        min: 0,
+        max: 10,
+      }),
+    ).toBe(9);
+  });
+
+  it("accepts zero when permitted and inclusive bounded integer limits", () => {
+    expect(
+      parseBoundedIntegerOption({
+        args: ["--count", "0"],
+        env: {},
+        argName: "--count",
+        envName: "TEST_COUNT",
+        fallback: 3,
+        min: 0,
+        max: 4,
+      }),
+    ).toBe(0);
+
+    for (const value of ["2", "4"]) {
+      expect(
+        parseBoundedIntegerOption({
+          args: ["--count", value],
+          env: {},
+          argName: "--count",
+          envName: "TEST_COUNT",
+          fallback: 3,
+          min: 2,
+          max: 4,
+        }),
+      ).toBe(Number(value));
+    }
+  });
+
+  it("rejects invalid bounded integers with exact option and bound wording", () => {
+    const cases = [
+      { raw: "01", min: 0, max: 10 },
+      { raw: "-1", min: 0, max: 10 },
+      { raw: "1.5", min: 0, max: 10 },
+      { raw: "2ms", min: 0, max: 10 },
+      { raw: "9007199254740992", min: 0, max: Number.MAX_VALUE },
+      { raw: "0", min: 1, max: 10 },
+      { raw: "11", min: 1, max: 10 },
+    ];
+
+    for (const { raw, min, max } of cases) {
+      expect(() =>
+        parseBoundedIntegerOption({
+          args: ["--count", raw],
+          env: {},
+          argName: "--count",
+          envName: "TEST_COUNT",
+          fallback: 5,
+          min,
+          max,
+        }),
+      ).toThrowError(
+        new Error(`--count/TEST_COUNT must be an integer between ${min} and ${max}.`),
+      );
     }
   });
 

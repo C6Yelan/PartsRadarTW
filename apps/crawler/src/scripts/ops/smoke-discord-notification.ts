@@ -1,7 +1,11 @@
 // apps/crawler/src/scripts/ops/smoke-discord-notification.ts
 // 解析 smoke 告警設定，並將 summary observation 與 Discord transport 決策解耦。
 
-import { getStringArg, resolveWorkspacePathArgument } from "../shared/script-utils";
+import {
+  getStringArg,
+  parseBoundedIntegerOption,
+  resolveWorkspacePathArgument,
+} from "../shared/script-utils";
 import { type DiscordWebhookMessage, readDiscordWebhookUrl } from "./discord-webhook";
 import type { ProductionSmokeSummary } from "./production-smoke";
 import { createCheckNotificationMessage } from "./smoke-discord-notification/message";
@@ -25,16 +29,11 @@ const DEFAULT_RECOVERY_GOOD_CYCLES = 2;
 export {
   applyMonitorFailureObservation,
   applySmokeSummaryObservation,
-  classifySmokeCheck,
-  createSmokeFingerprint,
   markSmokeNotificationSent,
 } from "./smoke-discord-notification/policy";
 export type {
-  SmokeAlertClassification,
   SmokeCheckAlertState,
   SmokeCycleOutcome,
-  SmokeDaemonProgressState,
-  SmokeDiscordNotificationKind,
   SmokeDiscordNotificationState,
 } from "./smoke-discord-notification/state";
 export {
@@ -71,7 +70,7 @@ export function parseSmokeDiscordNotificationOptions(
         env.SMOKE_DISCORD_STATE_FILE ??
         DEFAULT_STATE_FILE,
     ),
-    warnReminderSeconds: parseIntegerOption({
+    warnReminderSeconds: parseBoundedIntegerOption({
       args,
       env,
       argName: "--smoke-discord-cooldown-seconds",
@@ -80,7 +79,7 @@ export function parseSmokeDiscordNotificationOptions(
       min: DEFAULT_WARN_REMINDER_SECONDS,
       max: 7 * 24 * 60 * 60,
     }),
-    failReminderSeconds: parseIntegerOption({
+    failReminderSeconds: parseBoundedIntegerOption({
       args,
       env,
       argName: "--smoke-fail-reminder-seconds",
@@ -89,7 +88,7 @@ export function parseSmokeDiscordNotificationOptions(
       min: 60,
       max: 7 * 24 * 60 * 60,
     }),
-    warningPendingCycles: parseIntegerOption({
+    warningPendingCycles: parseBoundedIntegerOption({
       args,
       env,
       argName: "--smoke-warning-pending-cycles",
@@ -98,7 +97,7 @@ export function parseSmokeDiscordNotificationOptions(
       min: 1,
       max: 12,
     }),
-    filterQualityPendingCycles: parseIntegerOption({
+    filterQualityPendingCycles: parseBoundedIntegerOption({
       args,
       env,
       argName: "--smoke-filter-quality-pending-cycles",
@@ -107,7 +106,7 @@ export function parseSmokeDiscordNotificationOptions(
       min: 1,
       max: 12,
     }),
-    recoveryGoodCycles: parseIntegerOption({
+    recoveryGoodCycles: parseBoundedIntegerOption({
       args,
       env,
       argName: "--smoke-recovery-good-cycles",
@@ -141,34 +140,4 @@ export function createSmokeDiscordNotificationDecision({
       message: createCheckNotificationMessage(notification),
     })),
   };
-}
-
-function parseIntegerOption({
-  args,
-  env,
-  argName,
-  envName,
-  fallback,
-  min,
-  max,
-}: {
-  args: string[];
-  env: NodeJS.ProcessEnv;
-  argName: string;
-  envName: string;
-  fallback: number;
-  min: number;
-  max: number;
-}): number {
-  const raw = getStringArg(args, argName) ?? env[envName] ?? String(fallback);
-  const message = `${argName}/${envName} must be an integer between ${min} and ${max}.`;
-
-  if (!/^(0|[1-9][0-9]*)$/.test(raw)) {
-    throw new Error(message);
-  }
-  const value = Number(raw);
-  if (!Number.isSafeInteger(value) || value < min || value > max) {
-    throw new Error(message);
-  }
-  return value;
 }

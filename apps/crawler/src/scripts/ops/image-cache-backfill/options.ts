@@ -11,6 +11,7 @@ import {
 } from "../../shared/script-utils";
 import { DEFAULT_RAW_SNAPSHOT_STORAGE_DIR } from "../../../coolpc/raw-snapshot-storage";
 import { parseExternalFetchLockStaleSeconds } from "../external-fetch-lock";
+import { DEFAULT_INACTIVE_IMAGE_RETENTION_DAYS } from "../shared/image-retention";
 
 const CONFIRM_LIVE_FETCH_FLAG = "--confirm-live-fetch";
 const DEFAULT_STORAGE_DIR = "storage/product-images";
@@ -18,7 +19,6 @@ const DEFAULT_MIN_DELAY_MS = 5000;
 const DEFAULT_MAX_DELAY_MS = 12000;
 const DEFAULT_TIMEOUT_MS = 15000;
 const DEFAULT_MAX_SOURCE_BYTES = 5 * 1024 * 1024;
-export const DEFAULT_INACTIVE_IMAGE_RETENTION_DAYS = 30;
 
 // 手動補圖流程傳給候選查詢、圖片下載與寫檔 processor 的設定契約。
 export interface ImageBackfillOptions {

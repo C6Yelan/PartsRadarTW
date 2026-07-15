@@ -5,11 +5,12 @@ import type { PrismaClient } from "@partsradar/db";
 import { loadWorkspaceEnv, resolveWorkspaceRoot, toSafeCliErrorMessage } from "../shared/script-utils";
 import { HELP_FLAG } from "./production-smoke/constants";
 import { runProductionPublicSmoke, runProductionSmoke } from "./production-smoke/checks";
-import { parseProductionSmokeOptions, printProductionSmokeHelp } from "./production-smoke/options";
+import { parseProductionSmokeOptions } from "./production-smoke/options";
+import { printProductionSmokeHelp } from "./production-smoke/options/help";
 import { printProductionSmokeSummary } from "./production-smoke/summary";
 
 export { runProductionPublicSmoke, runProductionSmoke } from "./production-smoke/checks";
-export { parseProductionSmokeOptions, printProductionSmokeHelp } from "./production-smoke/options";
+export { parseProductionSmokeOptions } from "./production-smoke/options";
 export { printProductionSmokeSummary } from "./production-smoke/summary";
 export type {
   ProductionSmokeClient,

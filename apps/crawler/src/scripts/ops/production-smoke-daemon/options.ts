@@ -1,7 +1,7 @@
 // apps/crawler/src/scripts/ops/production-smoke-daemon/options.ts
 // 解析 production smoke daemon 的排程參數，並合併單輪 smoke 與 Discord 告警設定。
 
-import { getStringArg } from "../../shared/script-utils";
+import { parseBoundedIntegerOption } from "../../shared/script-utils";
 import { type ProductionSmokeOptions, parseProductionSmokeOptions } from "../production-smoke";
 import {
   parseSmokeDiscordNotificationOptions,
@@ -44,7 +44,7 @@ export function parseProductionSmokeDaemonOptions(
 
   return {
     ...smokeOptions,
-    intervalSeconds: parseIntegerOption({
+    intervalSeconds: parseBoundedIntegerOption({
       args,
       env,
       argName: "--interval-seconds",
@@ -53,7 +53,7 @@ export function parseProductionSmokeDaemonOptions(
       min: MIN_SMOKE_INTERVAL_SECONDS,
       max: MAX_SMOKE_INTERVAL_SECONDS,
     }),
-    initialDelaySeconds: parseIntegerOption({
+    initialDelaySeconds: parseBoundedIntegerOption({
       args,
       env,
       argName: "--initial-delay-seconds",
@@ -62,7 +62,7 @@ export function parseProductionSmokeDaemonOptions(
       min: MIN_INITIAL_DELAY_SECONDS,
       max: MAX_INITIAL_DELAY_SECONDS,
     }),
-    cycleTimeoutMs: parseIntegerOption({
+    cycleTimeoutMs: parseBoundedIntegerOption({
       args,
       env,
       argName: "--cycle-timeout-ms",
@@ -78,40 +78,6 @@ export function parseProductionSmokeDaemonOptions(
       smokeOptions.workspaceRoot,
     ),
   };
-}
-
-// 解析 daemon 專屬整數 option，限制 interval 與 initial delay 不被誤設成無效或極端值。
-function parseIntegerOption({
-  args,
-  env,
-  argName,
-  envName,
-  fallback,
-  min,
-  max,
-}: {
-  args: string[];
-  env: NodeJS.ProcessEnv;
-  argName: string;
-  envName: string;
-  fallback: number;
-  min: number;
-  max: number;
-}): number {
-  const raw = getStringArg(args, argName) ?? env[envName] ?? String(fallback);
-  const message = `${argName}/${envName} must be an integer between ${min} and ${max}.`;
-
-  if (!/^(0|[1-9][0-9]*)$/.test(raw)) {
-    throw new Error(message);
-  }
-
-  const value = Number(raw);
-
-  if (!Number.isSafeInteger(value) || value < min || value > max) {
-    throw new Error(message);
-  }
-
-  return value;
 }
 
 // 輸出 production smoke daemon 的手動啟動說明；完整 smoke 門檻仍由 production smoke help / runbook 說明。

@@ -65,6 +65,40 @@ export function getStringArg(args: string[], name: string): string | undefined {
   return value;
 }
 
+// 解析 CLI/env 的有界整數選項，統一覆寫優先序、格式與安全範圍檢查。
+export function parseBoundedIntegerOption({
+  args,
+  env,
+  argName,
+  envName,
+  fallback,
+  min,
+  max,
+}: {
+  args: string[];
+  env: NodeJS.ProcessEnv;
+  argName: string;
+  envName: string;
+  fallback: number;
+  min: number;
+  max: number;
+}): number {
+  const raw = getStringArg(args, argName) ?? env[envName] ?? String(fallback);
+  const message = `${argName}/${envName} must be an integer between ${min} and ${max}.`;
+
+  if (!NON_NEGATIVE_INTEGER_PATTERN.test(raw)) {
+    throw new Error(message);
+  }
+
+  const value = Number(raw);
+
+  if (!Number.isSafeInteger(value) || value < min || value > max) {
+    throw new Error(message);
+  }
+
+  return value;
+}
+
 // 讀取非負整數 CLI 參數；未提供時回傳 fallback。
 export function getNumberArg(args: string[], name: string, fallback: number): number {
   const raw = getStringArg(args, name);

@@ -1,7 +1,7 @@
 // apps/crawler/src/scripts/ops/discord-bot/options.ts
 // 解析 Discord bot CLI/env 設定，包含 token、API 端點、功能旗標與排程參數。
 
-import { getStringArg } from "../../shared/script-utils";
+import { parseBoundedIntegerOption } from "../../shared/script-utils";
 import { normalizePublicBaseUrl } from "../shared/public-base-url";
 import {
   DEFAULT_COMMAND_COOLDOWN_SECONDS,
@@ -36,7 +36,7 @@ export function parseDiscordBotOptions(
     publicReportsEnabled: readBooleanEnv(env, "DISCORD_FEATURE_PUBLIC_REPORTS_ENABLED", true),
     personalReportsEnabled: readBooleanEnv(env, "DISCORD_FEATURE_PERSONAL_REPORTS_ENABLED", true),
     targetWatchesEnabled: readBooleanEnv(env, "DISCORD_FEATURE_TARGET_WATCHES_ENABLED", true),
-    commandCooldownSeconds: parseIntegerOption({
+    commandCooldownSeconds: parseBoundedIntegerOption({
       args,
       env,
       argName: "--command-cooldown-seconds",
@@ -45,7 +45,7 @@ export function parseDiscordBotOptions(
       min: 0,
       max: 3600,
     }),
-    priceReportScheduleIntervalSeconds: parseIntegerOption({
+    priceReportScheduleIntervalSeconds: parseBoundedIntegerOption({
       args,
       env,
       argName: "--price-report-schedule-interval-seconds",
@@ -96,40 +96,6 @@ function readBooleanEnv(env: NodeJS.ProcessEnv, key: string, fallback: boolean):
   }
 
   throw new Error(`${key} must be true or false.`);
-}
-
-// 共用整數 option parser，統一 CLI arg、env、default 與上下限檢查。
-function parseIntegerOption({
-  args,
-  env,
-  argName,
-  envName,
-  fallback,
-  min,
-  max,
-}: {
-  args: string[];
-  env: NodeJS.ProcessEnv;
-  argName: string;
-  envName: string;
-  fallback: number;
-  min: number;
-  max: number;
-}): number {
-  const raw = getStringArg(args, argName) ?? env[envName] ?? String(fallback);
-  const message = `${argName}/${envName} must be an integer between ${min} and ${max}.`;
-
-  if (!/^(0|[1-9][0-9]*)$/.test(raw)) {
-    throw new Error(message);
-  }
-
-  const value = Number(raw);
-
-  if (!Number.isSafeInteger(value) || value < min || value > max) {
-    throw new Error(message);
-  }
-
-  return value;
 }
 
 // 正規化 Discord REST API base URL，移除 path 尾端斜線與 query/hash。
