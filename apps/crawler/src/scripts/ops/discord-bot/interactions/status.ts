@@ -153,6 +153,11 @@ export async function createStatusMessage({
             inline: true,
           },
           {
+            name: "\u200b",
+            value: "\u200b",
+            inline: false,
+          },
+          {
             name: "個人價格報告排程",
             value: formatPersonalReportStatus({
               state: runtime.personalReports,

@@ -36,7 +36,7 @@ describe("status interaction", () => {
     expect(body.data.embeds).toBeUndefined();
   });
 
-  it("returns only the five requested schedule fields in an ephemeral embed", async () => {
+  it("returns five schedule fields with one row separator in an ephemeral embed", async () => {
     const client = createStatusClient();
     const fetchMock = interactionFetch();
 
@@ -58,17 +58,21 @@ describe("status interaction", () => {
       description: "管理員用排程與背景工作摘要。時間皆為台北時間。",
       timestamp: NOW.toISOString(),
     });
-    expect(embed.fields).toHaveLength(5);
-    expect(embed.fields.map((field: { name: string }) => field.name)).toEqual([
+    const fields = embed.fields as Array<{ name: string; value: string; inline?: boolean }>;
+    const scheduleFields = fields.filter((field) => field.name !== "\u200b");
+
+    expect(fields).toHaveLength(6);
+    expect(fields[3]).toEqual({ name: "\u200b", value: "\u200b", inline: false });
+    expect(fields.filter((field) => field.name === "\u200b")).toHaveLength(1);
+    expect(scheduleFields).toHaveLength(5);
+    expect(scheduleFields.map((field) => field.name)).toEqual([
       "商品價格爬蟲",
       "Discord 通知排程主迴圈",
       "目標價提醒掃描",
       "個人價格報告排程",
       "公開價格報告排程",
     ]);
-    expect(
-      embed.fields.every((field: { inline?: boolean }) => field.inline === true),
-    ).toBe(true);
+    expect(scheduleFields.every((field) => field.inline === true)).toBe(true);
     expect(JSON.stringify(embed)).not.toMatch(/機器人|Gateway|uptime|已運作|資料範圍/);
     expect(JSON.stringify(embed)).not.toContain('"name":"功能"');
   });
@@ -281,7 +285,7 @@ describe("status interaction", () => {
       });
       const text = JSON.stringify(message);
 
-      expect(message.embeds?.[0]?.fields).toHaveLength(5);
+      expect(message.embeds?.[0]?.fields).toHaveLength(6);
       expect(text).toContain("QUERY_ERROR");
       expect(text).not.toContain("postgresql://private");
       expect(text).not.toContain("DATABASE_URL");
