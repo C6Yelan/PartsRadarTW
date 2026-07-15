@@ -4,11 +4,20 @@
 import { describe, expect, it } from "vitest";
 import { COOLPC_TARGET_CATEGORIES } from "../../src/coolpc/categories";
 
-const EXPECTED_IGRPS = [4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15, 16];
-
 describe("CoolPC target category contract", () => {
-  it("keeps the exact target IGrp values", () => {
-    expect(COOLPC_TARGET_CATEGORIES.map(({ igrp }) => igrp)).toEqual(EXPECTED_IGRPS);
+  it("keeps crawler-specific title keyword enrichment", () => {
+    expect(
+      COOLPC_TARGET_CATEGORIES.filter(({ expectedTitleKeywords }) => expectedTitleKeywords).map(
+        ({ igrp, expectedTitleKeywords }) => ({ igrp, expectedTitleKeywords }),
+      ),
+    ).toEqual([
+      { igrp: 7, expectedTitleKeywords: ["內接硬碟", "固態SSD", "HDD", "SSD"] },
+      { igrp: 8, expectedTitleKeywords: ["外接硬碟", "隨身碟", "記憶卡"] },
+      { igrp: 9, expectedTitleKeywords: ["USB週邊", "硬碟座", "讀卡機"] },
+      { igrp: 10, expectedTitleKeywords: ["CPU散熱", "散熱墊", "散熱膏", "散熱"] },
+      { igrp: 11, expectedTitleKeywords: ["水冷", "封閉式", "開放式"] },
+      { igrp: 16, expectedTitleKeywords: ["機殼風扇", "機殼配件", "風扇", "配件"] },
+    ]);
   });
 
   it("keeps SSD, HDD, and external storage on their actual source IGrp values", () => {

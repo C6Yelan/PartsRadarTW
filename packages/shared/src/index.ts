@@ -3,3 +3,4 @@
 export * from "./product-image-url";
 export * from "./product-facets";
 export * from "./coolpc-source";
+export * from "./coolpc-category-identity";

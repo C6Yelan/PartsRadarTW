@@ -2,10 +2,11 @@
 // 處理 CoolPC 分類頁抓取結果與 crawl run 的銜接：
 // 先落 raw snapshot，成功解析後再交給分類商品觀測寫入流程。
 
-import type { ParseErrorType as PrismaParseErrorType } from "@partsradar/db";
 import { createCoolpcCategoryUrl } from "@partsradar/shared";
 import {
   buildParseFailureMessage,
+  type CoolpcLatestSuccessfulSnapshotReadClient,
+  type CoolpcParseIssueWriteClient,
   createCategoryContext,
   createStableParsedResultHash,
   findLatestSuccessfulParsedResultHash,
@@ -57,59 +58,11 @@ export type ProcessCoolpcCategorySnapshotOptions =
       writeProducts: WriteCoolpcCategoryProductObservation;
     });
 
-export interface CoolpcCategorySnapshotWriteClient extends RawSnapshotWriteClient {
-  parseError: {
-    createMany(args: { data: ParseErrorCreateManyData[] }): Promise<{ count: number }>;
-    upsert(args: {
-      where: { fingerprint: string };
-      create: ParseErrorCreateManyData & {
-        fingerprint: string;
-        occurrenceCount: number;
-        lastSeenAt: Date;
-      };
-      update: {
-        crawlRunId: string;
-        rawSnapshotId: string | null;
-        message: string;
-        occurrenceCount: { increment: number };
-        lastSeenAt: Date;
-      };
-    }): Promise<{ id: string }>;
-  };
-  rawSnapshot: RawSnapshotWriteClient["rawSnapshot"] & {
-    findMany(args: {
-      where: {
-        sourceCategoryId: string;
-        contentStatus: typeof RAW_SNAPSHOT_CONTENT_STATUSES.VALID;
-        parsedResultHash: { not: null };
-        categoryResults: {
-          some: {
-            status: {
-              in: Array<
-                | typeof CRAWL_RUN_CATEGORY_RESULT_STATUSES.SUCCESS_CHANGED
-                | typeof CRAWL_RUN_CATEGORY_RESULT_STATUSES.SUCCESS_UNCHANGED
-              >;
-            };
-          };
-        };
-      };
-      orderBy: { fetchedAt: "desc" };
-      take: 1;
-      select: { parsedResultHash: true };
-    }): Promise<Array<{ parsedResultHash: string | null }>>;
-  };
-}
-
-interface ParseErrorCreateManyData {
-  crawlRunId: string;
-  rawSnapshotId: string | null;
-  sourceCategoryId: string;
-  errorType: PrismaParseErrorType;
-  message: string;
-  rawName: string | null;
-  rawPriceText: string | null;
-  rawToken: string | null;
-  rawImageUrl: string | null;
+export interface CoolpcCategorySnapshotWriteClient
+  extends RawSnapshotWriteClient,
+    CoolpcParseIssueWriteClient {
+  rawSnapshot: RawSnapshotWriteClient["rawSnapshot"] &
+    CoolpcLatestSuccessfulSnapshotReadClient["rawSnapshot"];
 }
 
 export type WriteCoolpcCategoryProductObservation = (options: {

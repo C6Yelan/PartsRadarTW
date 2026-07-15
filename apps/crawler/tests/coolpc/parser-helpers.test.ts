@@ -1,8 +1,7 @@
 // apps/crawler/tests/coolpc/parser-helpers.test.ts
-// 驗證 CoolPC parser 的分類範圍、價格解析與圖片 URL 正規化規則。
+// 驗證 CoolPC parser 的價格解析與圖片 URL 正規化規則。
 
 import { describe, expect, it } from "vitest";
-import { COOLPC_TARGET_CATEGORIES } from "../../src/coolpc/categories";
 import { parsePriceText } from "../../src/coolpc/parser/normalization";
 import {
   normalizeCoolpcProductImageUrl,
@@ -10,12 +9,6 @@ import {
 } from "../../src/coolpc/parser/urls";
 
 describe("CoolPC parser helpers", () => {
-  it("keeps the current target categories in code", () => {
-    expect(COOLPC_TARGET_CATEGORIES.map((category) => category.igrp)).toEqual([
-      4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15, 16,
-    ]);
-  });
-
   it("parses supported TWD price formats", () => {
     expect(parsePriceText("含稅：NT4880")).toBe(4880);
     expect(parsePriceText("含稅：NT4,880")).toBe(4880);
