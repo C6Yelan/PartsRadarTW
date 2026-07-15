@@ -131,6 +131,55 @@
   border-top: 1px solid var(--border);
 }
 
+.facet-option-group-header {
+  box-sizing: border-box;
+  display: flex;
+  grid-column: 1 / -1;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+  width: 100%;
+  min-height: 24px;
+  padding: 0 4px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.facet-vendor-badge {
+  flex: 0 0 auto;
+  padding: 2px 6px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+}
+
+.facet-vendor-badge.is-intel {
+  border-color: #315b73;
+  background: #17364a;
+  color: #d7eaf4;
+}
+
+.facet-vendor-badge.is-amd {
+  border-color: #674743;
+  background: #3a2928;
+  color: #f0d1c8;
+}
+
+.facet-group-separator {
+  flex: 0 0 auto;
+  color: var(--faint);
+}
+
+.facet-platform-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 @media (min-width: 761px) {
   .facet-menu-popover[data-menu-columns="2"] .facet-option-group,
   .facet-menu-popover[data-menu-columns="2"] .facet-option-list:not(.is-grouped) {

@@ -1081,16 +1081,27 @@ test("sizes short facet popovers and separates semantic option groups @desktop-o
   const chipsetFilter = page.locator(".facet-filter").filter({ hasText: "晶片組" });
   await chipsetFilter.locator(".facet-menu-trigger").click();
   const groups = chipsetFilter.locator(".facet-option-group");
+  const headers = chipsetFilter.locator(".facet-option-group-header");
   await expect(groups).toHaveCount(6);
   await expect(chipsetFilter.getByRole("group")).toHaveCount(6);
-  await expect(groups).toHaveText([
-    "H610B760Z790",
-    "H810B860Z890",
-    "H81H110H310H510W680W790W880W890",
-    "A520B550",
-    "A620B650B650EB840B850X670X670EX870X870E",
-    "TRX50WRX90",
+  await expect(headers).toHaveText([
+    "Intel·LGA 1700",
+    "Intel·LGA 1851",
+    "Intel·舊平台／工作站",
+    "AMD·AM4",
+    "AMD·AM5",
+    "AMD·Threadripper",
   ]);
+  await expect(chipsetFilter.locator(".facet-vendor-badge")).toHaveText([
+    "Intel",
+    "Intel",
+    "Intel",
+    "AMD",
+    "AMD",
+    "AMD",
+  ]);
+  await expect(headers.locator('input[type="checkbox"]')).toHaveCount(0);
+  await expect(chipsetFilter.getByRole("checkbox")).toHaveCount(27);
   await expect(chipsetFilter.locator(".facet-option span")).toHaveText([
     "H610",
     "B760",
@@ -1154,6 +1165,17 @@ test("sizes short facet popovers and separates semantic option groups @desktop-o
         columns: firstGroupStyle.gridTemplateColumns.split(" ").length,
         dividerWidths: groups.slice(1).map((group) => group.getBoundingClientRect().width),
         firstGroupWidth: groups[0]?.getBoundingClientRect().width,
+        headerLayouts: groups.map((group) => {
+          const header = group.querySelector<HTMLElement>(".facet-option-group-header");
+          const firstOption = group.querySelector<HTMLElement>(".facet-option");
+          const headerRect = header?.getBoundingClientRect();
+          return {
+            bottom: headerRect?.bottom,
+            firstOptionTop: firstOption?.getBoundingClientRect().top,
+            position: header ? window.getComputedStyle(header).position : null,
+            width: headerRect?.width,
+          };
+        }),
         h610: readRect("H610"),
         b760: readRect("B760"),
         z790: readRect("Z790"),
@@ -1177,6 +1199,13 @@ test("sizes short facet popovers and separates semantic option groups @desktop-o
     for (const dividerWidth of layout.dividerWidths) {
       expect(dividerWidth).toBeCloseTo(layout.firstGroupWidth ?? 0, 0);
     }
+    for (const header of layout.headerLayouts) {
+      expect(header.position).toBe("static");
+      expect(header.width).toBeCloseTo(layout.firstGroupWidth ?? 0, 0);
+      expect(header.bottom ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(
+        header.firstOptionTop ?? 0,
+      );
+    }
     await expectNoHorizontalOverflow(page);
   }
 
@@ -1186,6 +1215,10 @@ test("sizes short facet popovers and separates semantic option groups @desktop-o
   await expect
     .poll(() => new URL(page.url()).searchParams.getAll("facet"))
     .toEqual(["chipset:h610", "chipset:w680", "chipset:wrx90"]);
+  await chipsetFilter.getByRole("checkbox", { name: "W680" }).uncheck();
+  await expect
+    .poll(() => new URL(page.url()).searchParams.getAll("facet"))
+    .toEqual(["chipset:h610", "chipset:wrx90"]);
   await expect(chipsetFilter.locator(".facet-menu-popover")).toBeVisible();
   await expectNoHorizontalOverflow(page);
 });
