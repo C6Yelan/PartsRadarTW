@@ -1,11 +1,11 @@
 // apps/crawler/tests/coolpc/manual-crawl-options.test.ts
-// 驗證 manual live crawl 的確認旗標、storage allowlist 與執行失敗傳播。
+// 驗證 manual live crawl 的確認旗標、storage allowlist、執行失敗與摘要輸出。
 
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { runManualCrawl } from "../../src/scripts/manual/crawl-coolpc-once";
+import { printSummary, runManualCrawl } from "../../src/scripts/manual/crawl-coolpc-once";
 import {
   type CrawlOptions,
   parseOptions,
@@ -91,6 +91,81 @@ describe("manual CoolPC crawl execution", () => {
     await expect(result).rejects.toBe(reconciliationError);
     expect(crawlCategories).toHaveBeenCalledOnce();
     expect(release).toHaveBeenCalledOnce();
+  });
+});
+
+describe("manual CoolPC crawl summary output", () => {
+  it("prints crawler-owned diagnostics without a pseudo-public product projection", () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+
+    printSummary({
+      workspaceRoot: "/repo",
+      storageDir: "/repo/temp/coolpc-daemon/snapshots",
+      beforeCounts: {
+        products: 10,
+        activeProducts: 8,
+        productsWithImages: 7,
+        currentPrices: 8,
+        priceSnapshots: 20,
+        rawSnapshots: 4,
+      },
+      afterCounts: {
+        products: 12,
+        activeProducts: 9,
+        productsWithImages: 7,
+        currentPrices: 9,
+        priceSnapshots: 23,
+        rawSnapshots: 5,
+      },
+      runResult: {
+        crawlRunId: "crawl-run-03",
+        status: "SUCCESS_WITH_ERRORS",
+        stoppedBySuspectedBlock: false,
+        categoryResults: [
+          {
+            sourceCategoryId: "category-4",
+            igrp: 4,
+            status: "SUCCESS_CHANGED",
+            rawSnapshotId: "snapshot-4",
+            errorMessage: null,
+            productWriteSummary: null,
+          },
+          {
+            sourceCategoryId: "category-5",
+            igrp: 5,
+            status: "FETCH_FAILED",
+            rawSnapshotId: null,
+            errorMessage: "source fetch failed",
+            productWriteSummary: null,
+          },
+        ],
+      },
+    });
+
+    const lines = log.mock.calls.map(([line]) => line);
+    log.mockRestore();
+
+    expect(lines).toEqual([
+      "",
+      "CoolPC manual crawl finished.",
+      "- Mode: live fetch",
+      "- Crawl run: crawl-run-03",
+      "- Status: SUCCESS_WITH_ERRORS",
+      "- Stopped by suspected block: no",
+      "- Snapshot storage: temp/coolpc-daemon/snapshots",
+      "",
+      "Category results:",
+      "- IGrp=4: SUCCESS_CHANGED",
+      "- IGrp=5: FETCH_FAILED (source fetch failed)",
+      "",
+      "DB changes:",
+      "- products: 12 (+2)",
+      "- active products: 9 (+1)",
+      "- products with images: 7 (+0)",
+      "- current prices: 9 (+1)",
+      "- price snapshots: 23 (+3)",
+      "- raw snapshots: 5 (+1)",
+    ]);
   });
 });
 
