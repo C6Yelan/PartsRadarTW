@@ -4,9 +4,9 @@ PartsRadarTW 會處理公開商品資料、部署 secrets、raw source snapshots
 
 ## 回報安全問題
 
-本專案目前尚未公開私人安全通報管道，GitHub private vulnerability reporting 也尚未啟用。
+GitHub private vulnerability reporting 目前尚未啟用。若發現安全漏洞，請寄信至 `partsradartw@gmail.com`，主旨註明 `[Security]`，並提供受影響功能、可能影響與最小重現步驟。
 
-請不要在公開 issue、Discussion 或 pull request 貼出 token、webhook、連線字串、個人資料、完整 exploit 或尚未修補的敏感細節。在維護者提供私人管道前，需要保密的弱點無法被安全接收；部署維護者應優先啟用 GitHub private vulnerability reporting 或公布可驗證的私人聯絡方式。
+請不要在公開 issue、Discussion 或 pull request 貼出 token、webhook、連線字串、個人資料、完整 exploit 或尚未修補的敏感細節；來信也請勿附上真實密碼、token 或不必要的個人資料。
 
 本專案沒有發布版本化的安全支援週期。安全修正以目前維護中的程式為準。
 
