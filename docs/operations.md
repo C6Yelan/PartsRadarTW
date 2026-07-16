@@ -222,11 +222,13 @@ docker compose -f compose.yml -f compose.ops.yml logs --tail=100 discord-bot
 
 使用時機：每次 production migration前，以及固定營運週期。
 
-建立 DB dump、product image archive 與 checksum。腳本使用 restrictive umask；備份仍應放在受限權限、加密且有離機副本的儲存位置：
+建立 DB dump、product image archive、版本 metadata 與 checksum。腳本使用 restrictive umask，先在同一個 `BACKUP_DIR` 寫入隱藏 staging directory，所有 checksum 自驗成功後才原子發布 timestamp directory；既有 target 不會被覆寫。備份仍應放在受限權限、加密且有離機副本的儲存位置：
 
 ```bash
 pnpm backup:create
 ```
+
+`BACKUP_DIR` 可使用絕對路徑。`product_images` volume 是 format v2 的必要 artifact；不存在或無法存取時整次備份失敗，不再靜默產生 DB-only backup。腳本只處理 Compose named volumes，不會自動封存 repo-local 或任意 host-path storage。
 
 若需納入 snapshots：
 
@@ -234,15 +236,19 @@ pnpm backup:create
 BACKUP_INCLUDE_SNAPSHOTS=1 pnpm backup:create
 ```
 
-Restore drill：
+設定 `BACKUP_INCLUDE_SNAPSHOTS=1` 後，`snapshots` volume 也成為必要 artifact。需要 DB 與 volumes 接近同一恢復點時，建立備份前應先暫停 crawler、image recovery、snapshot cleanup 與其他相關 writers；`pg_dump` 本身提供一致的 DB snapshot，但不同 volume archive 不是跨媒介交易。
+
+Restore drill 必須先準備與 production 分離、PostgreSQL major version 相容且已啟動 `postgres` service 的 disposable Compose project，再明確確認目標：
 
 ```bash
-bash scripts/ops/restore-drill.sh backups/<timestamp>
+COMPOSE_PROJECT_NAME=<disposable-project> \
+RESTORE_DRILL_CONFIRM_DISPOSABLE=1 \
+bash scripts/ops/restore-drill.sh /secure/backups/<timestamp>
 ```
 
-腳本會要求 `SHA256SUMS` 以唯一、安全的相對路徑列出 `postgres.dump`，驗證全部 checksum，並拒絕把 drill DB 指向正式或 PostgreSQL system database。Production gate 應在獨立的 disposable Compose project／PostgreSQL cluster 執行，避免 drill 與正式資料庫共享 failure domain。成功標準：Checksum 可驗證、dump 可還原到暫時 DB、`source_categories` 可查詢，drill DB 於完成後刪除。
+腳本會要求 `SHA256SUMS` 以唯一、安全的相對路徑列出 artifacts，驗證全部 checksum 與 dump catalog，並拒絕覆寫既有 drill DB、正式 DB 或 PostgreSQL system database。還原後會確認 Prisma migration history 是 repository migration 的有效前綴、沒有 unresolved migration，並查詢核心資料表。所有受 checksum 保護的 product image／snapshot archive 都會完整解壓到全新暫存 Docker volume，輸出 regular-file count後移除；不會掛載或寫入正式 volumes。Legacy backup仍可執行 DB-only／partial drill，但會明確警告缺少的 archive。
 
-失敗處理：部署 NO-GO。腳本預設也會在 restore 或 probe 失敗時刪除 drill DB；只有明確設定 `KEEP_RESTORE_DRILL_DB=1` 才會保留。Cleanup 失敗時需手動移除暫存 DB，且不得覆寫 production DB。
+成功標準：Checksum、dump catalog、DB restore、migration／table probes與所有列入 manifest 的 archive extraction 全部通過，且暫存 DB／volumes完成清理。失敗時部署 NO-GO。腳本預設也會在 restore 或 probe失敗時刪除 drill DB；只有明確設定 `KEEP_RESTORE_DRILL_DB=1` 才會保留 DB，暫存 archive volumes仍一律清理。Cleanup失敗時需依輸出的精確名稱手動移除，且不得覆寫 production DB或 volumes。
 
 ## Cloudflare Tunnel
 
