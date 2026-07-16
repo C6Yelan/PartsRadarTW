@@ -2,6 +2,7 @@
 // 呼叫配單批次 refresh API，驗證 public response，並將失敗收斂成頁面狀態。
 
 import { isRateLimitedApiError, toApiRequestError } from "../_shared/api-client";
+import { normalizeProductId } from "../_shared/product-id";
 import { MAX_BUILD_LIST_PRODUCTS } from "./constants";
 import type { BuildListProductSnapshot } from "./model";
 import {
@@ -11,7 +12,6 @@ import {
   toImageUrl,
   toNonEmptyString,
 } from "./model/validation";
-import { normalizeBuildListProductId } from "./product-id";
 
 export interface BuildListRefreshSuccess {
   status: "ready";
@@ -91,7 +91,7 @@ function normalizeBuildListRefreshResponse(
   const missingProductIdSet = new Set<string>();
 
   for (const candidate of value.missingProductIds) {
-    const productId = normalizeBuildListProductId(candidate);
+    const productId = normalizeProductId(candidate);
 
     if (
       !productId ||
@@ -133,7 +133,7 @@ function normalizeBuildListProductSnapshot(value: unknown): BuildListProductSnap
     return null;
   }
 
-  const id = normalizeBuildListProductId(value.id);
+  const id = normalizeProductId(value.id);
   const name = toNonEmptyString(value.name);
   const categoryDisplayName = toNonEmptyString(value.category.displayName);
   const sourceUrl = toHttpUrl(value.source.url);

@@ -2,8 +2,8 @@
 // apps/web/app/product-explorer/components/ProductExplorerResultsPanel.tsx
 // 組裝商品探索結果區塊，將 toolbar、商品表格與分頁控制接到 view model。
 
+import { Pagination } from "../../_shared/Pagination";
 import type { useProductExplorerViewModel } from "../use-product-explorer-view-model";
-import { Pagination } from "./Pagination";
 import { ProductTable } from "./ProductTable";
 import { ProductToolbar } from "./ProductToolbar";
 
@@ -49,9 +49,9 @@ export function ProductExplorerResultsPanel({
       />
 
       <Pagination
+        isLoading={pagination.isLoading}
         page={pagination.page}
         pageJumpValue={pagination.pageJumpValue}
-        productState={pagination.productState}
         shouldShowPageJump={pagination.shouldShowPageJump}
         totalPages={pagination.totalPages}
         visiblePages={pagination.visiblePages}

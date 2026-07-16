@@ -3,6 +3,7 @@
 
 import {
   getStringArg,
+  parseBoundedIntegerOption,
   resolveWorkspacePathArgument,
   resolveWorkspaceRoot,
 } from "../../shared/script-utils";
@@ -32,12 +33,24 @@ import {
   HELP_FLAG,
   PUBLIC_ONLY_FLAG,
 } from "./constants";
-import { DEFAULT_INACTIVE_IMAGE_RETENTION_DAYS } from "../image-cache-backfill/options";
+import { DEFAULT_INACTIVE_IMAGE_RETENTION_DAYS } from "../shared/image-retention";
 import { printProductionSmokeHelp } from "./options/help";
-import { normalizeBaseUrl, parseIntegerOption } from "./options/values";
 import type { ProductionSmokeOptions } from "./types";
 
-export { printProductionSmokeHelp } from "./options/help";
+// 正規化公開網站 smoke test 的 base URL，只允許 HTTP(S) 端點。
+function normalizeBaseUrl(value: string): string {
+  try {
+    const url = new URL(value);
+
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      throw new Error("invalid protocol");
+    }
+
+    return url.toString();
+  } catch {
+    throw new Error("--base-url/SMOKE_PUBLIC_BASE_URL must be a valid HTTP(S) URL.");
+  }
+}
 
 // 將 CLI args 與 env 組合成 production smoke 執行設定，並套用各檢查項目的安全上下限。
 export function parseProductionSmokeOptions(
@@ -64,7 +77,7 @@ export function parseProductionSmokeOptions(
     filterSyncStateFilePath: filterSyncStateFile
       ? resolveWorkspacePathArgument(workspaceRoot, filterSyncStateFile)
       : null,
-    timeoutMs: parseIntegerOption({
+    timeoutMs: parseBoundedIntegerOption({
       args,
       env,
       argName: "--timeout-ms",
@@ -79,7 +92,7 @@ export function parseProductionSmokeOptions(
         env.PRODUCT_IMAGE_STORAGE_DIR ??
         DEFAULT_PRODUCT_IMAGE_STORAGE_DIR,
     ),
-    productImageSampleSize: parseIntegerOption({
+    productImageSampleSize: parseBoundedIntegerOption({
       args,
       env,
       argName: "--product-image-sample-size",
@@ -88,7 +101,7 @@ export function parseProductionSmokeOptions(
       min: 1,
       max: 50,
     }),
-    imageInactiveRetentionDays: parseIntegerOption({
+    imageInactiveRetentionDays: parseBoundedIntegerOption({
       args,
       env,
       argName: "--image-inactive-retention-days",
@@ -97,7 +110,7 @@ export function parseProductionSmokeOptions(
       min: 0,
       max: 3650,
     }),
-    sourceWarnAfterMinutes: parseIntegerOption({
+    sourceWarnAfterMinutes: parseBoundedIntegerOption({
       args,
       env,
       argName: "--source-warn-after-minutes",
@@ -106,7 +119,7 @@ export function parseProductionSmokeOptions(
       min: 1,
       max: 24 * 60,
     }),
-    sourceFailAfterMinutes: parseIntegerOption({
+    sourceFailAfterMinutes: parseBoundedIntegerOption({
       args,
       env,
       argName: "--source-fail-after-minutes",
@@ -115,7 +128,7 @@ export function parseProductionSmokeOptions(
       min: 1,
       max: 7 * 24 * 60,
     }),
-    crawlerWarnAfterMinutes: parseIntegerOption({
+    crawlerWarnAfterMinutes: parseBoundedIntegerOption({
       args,
       env,
       argName: "--crawler-warn-after-minutes",
@@ -124,7 +137,7 @@ export function parseProductionSmokeOptions(
       min: 1,
       max: 7 * 24 * 60,
     }),
-    crawlerFailAfterMinutes: parseIntegerOption({
+    crawlerFailAfterMinutes: parseBoundedIntegerOption({
       args,
       env,
       argName: "--crawler-fail-after-minutes",
@@ -133,7 +146,7 @@ export function parseProductionSmokeOptions(
       min: 1,
       max: 14 * 24 * 60,
     }),
-    recentWindowHours: parseIntegerOption({
+    recentWindowHours: parseBoundedIntegerOption({
       args,
       env,
       argName: "--recent-window-hours",
@@ -142,7 +155,7 @@ export function parseProductionSmokeOptions(
       min: 1,
       max: 30 * 24,
     }),
-    parseErrorWarnCount: parseIntegerOption({
+    parseErrorWarnCount: parseBoundedIntegerOption({
       args,
       env,
       argName: "--parse-error-warn-count",
@@ -151,7 +164,7 @@ export function parseProductionSmokeOptions(
       min: 0,
       max: 100000,
     }),
-    parseErrorFailCount: parseIntegerOption({
+    parseErrorFailCount: parseBoundedIntegerOption({
       args,
       env,
       argName: "--parse-error-fail-count",
@@ -160,7 +173,7 @@ export function parseProductionSmokeOptions(
       min: 0,
       max: 100000,
     }),
-    sourceImageFailureMinConsecutive: parseIntegerOption({
+    sourceImageFailureMinConsecutive: parseBoundedIntegerOption({
       args,
       env,
       argName: "--source-image-failure-min-consecutive",
@@ -169,7 +182,7 @@ export function parseProductionSmokeOptions(
       min: 1,
       max: 5,
     }),
-    sourceImageFailureWarnCount: parseIntegerOption({
+    sourceImageFailureWarnCount: parseBoundedIntegerOption({
       args,
       env,
       argName: "--source-image-failure-warn-count",
@@ -178,7 +191,7 @@ export function parseProductionSmokeOptions(
       min: 0,
       max: 1000000,
     }),
-    sourceImageFailureFailCount: parseIntegerOption({
+    sourceImageFailureFailCount: parseBoundedIntegerOption({
       args,
       env,
       argName: "--source-image-failure-fail-count",
@@ -187,7 +200,7 @@ export function parseProductionSmokeOptions(
       min: 0,
       max: 1000000,
     }),
-    minActiveProducts: parseIntegerOption({
+    minActiveProducts: parseBoundedIntegerOption({
       args,
       env,
       argName: "--min-active-products",
@@ -196,7 +209,7 @@ export function parseProductionSmokeOptions(
       min: 1,
       max: 1000000,
     }),
-    missingImageWarnCount: parseIntegerOption({
+    missingImageWarnCount: parseBoundedIntegerOption({
       args,
       env,
       argName: "--missing-image-warn-count",
@@ -205,7 +218,7 @@ export function parseProductionSmokeOptions(
       min: 0,
       max: 1000000,
     }),
-    missingImageFailCount: parseIntegerOption({
+    missingImageFailCount: parseBoundedIntegerOption({
       args,
       env,
       argName: "--missing-image-fail-count",
@@ -214,7 +227,7 @@ export function parseProductionSmokeOptions(
       min: 0,
       max: 1000000,
     }),
-    rawSnapshotNormalRetentionDays: parseIntegerOption({
+    rawSnapshotNormalRetentionDays: parseBoundedIntegerOption({
       args,
       env,
       argName: "--raw-snapshot-normal-retention-days",
@@ -223,7 +236,7 @@ export function parseProductionSmokeOptions(
       min: 1,
       max: 365,
     }),
-    rawSnapshotAbnormalRetentionDays: parseIntegerOption({
+    rawSnapshotAbnormalRetentionDays: parseBoundedIntegerOption({
       args,
       env,
       argName: "--raw-snapshot-abnormal-retention-days",
@@ -232,7 +245,7 @@ export function parseProductionSmokeOptions(
       min: 1,
       max: 365,
     }),
-    rawSnapshotRetentionGraceDays: parseIntegerOption({
+    rawSnapshotRetentionGraceDays: parseBoundedIntegerOption({
       args,
       env,
       argName: "--raw-snapshot-retention-grace-days",
@@ -241,7 +254,7 @@ export function parseProductionSmokeOptions(
       min: 0,
       max: 30,
     }),
-    rawSnapshotWarnCount: parseIntegerOption({
+    rawSnapshotWarnCount: parseBoundedIntegerOption({
       args,
       env,
       argName: "--raw-snapshot-warn-count",
@@ -250,7 +263,7 @@ export function parseProductionSmokeOptions(
       min: 0,
       max: 1000000,
     }),
-    rawSnapshotFailCount: parseIntegerOption({
+    rawSnapshotFailCount: parseBoundedIntegerOption({
       args,
       env,
       argName: "--raw-snapshot-fail-count",

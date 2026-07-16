@@ -1,5 +1,5 @@
-// apps/web/app/product-explorer/components/ProductImage.tsx
-// 呈現商品探索列表的商品圖片，並在缺圖或載入失敗時顯示分類 fallback。
+// apps/web/app/_shared/ProductImage.tsx
+// 呈現商品圖片，並在缺圖或載入失敗時顯示分類 fallback。
 
 import { useState } from "react";
 

@@ -19,7 +19,64 @@ import {
   createParsedResultHash,
   type RawSnapshotContentStatusValue,
 } from "../raw-snapshot-writer";
-import type { CoolpcCategorySnapshotWriteClient } from "../category-snapshot";
+
+interface ParseErrorCreateManyData {
+  crawlRunId: string;
+  rawSnapshotId: string | null;
+  sourceCategoryId: string;
+  errorType: PrismaParseErrorType;
+  message: string;
+  rawName: string | null;
+  rawPriceText: string | null;
+  rawToken: string | null;
+  rawImageUrl: string | null;
+}
+
+export interface CoolpcLatestSuccessfulSnapshotReadClient {
+  rawSnapshot: {
+    findMany(args: {
+      where: {
+        sourceCategoryId: string;
+        contentStatus: typeof RAW_SNAPSHOT_CONTENT_STATUSES.VALID;
+        parsedResultHash: { not: null };
+        categoryResults: {
+          some: {
+            status: {
+              in: Array<
+                | typeof CRAWL_RUN_CATEGORY_RESULT_STATUSES.SUCCESS_CHANGED
+                | typeof CRAWL_RUN_CATEGORY_RESULT_STATUSES.SUCCESS_UNCHANGED
+              >;
+            };
+          };
+        };
+      };
+      orderBy: { fetchedAt: "desc" };
+      take: 1;
+      select: { parsedResultHash: true };
+    }): Promise<Array<{ parsedResultHash: string | null }>>;
+  };
+}
+
+export interface CoolpcParseIssueWriteClient {
+  parseError: {
+    createMany(args: { data: ParseErrorCreateManyData[] }): Promise<{ count: number }>;
+    upsert(args: {
+      where: { fingerprint: string };
+      create: ParseErrorCreateManyData & {
+        fingerprint: string;
+        occurrenceCount: number;
+        lastSeenAt: Date;
+      };
+      update: {
+        crawlRunId: string;
+        rawSnapshotId: string | null;
+        message: string;
+        occurrenceCount: { increment: number };
+        lastSeenAt: Date;
+      };
+    }): Promise<{ id: string }>;
+  };
+}
 
 const PRISMA_PARSE_ERROR_TYPES = {
   missing_ibuy_token: "MISSING_IBUY_TOKEN",
@@ -95,7 +152,7 @@ export function createStableParsedResultHash(items: ParsedCoolpcProduct[]): stri
  * 供本次結果做 SUCCESS_CHANGED / SUCCESS_UNCHANGED 判定。
  */
 export async function findLatestSuccessfulParsedResultHash(
-  client: CoolpcCategorySnapshotWriteClient,
+  client: CoolpcLatestSuccessfulSnapshotReadClient,
   sourceCategoryId: string,
 ): Promise<string | null> {
   const [latestSnapshot] = await client.rawSnapshot.findMany({
@@ -133,7 +190,7 @@ export async function recordParseIssues({
   sourceCategoryId,
   issues,
 }: {
-  client: CoolpcCategorySnapshotWriteClient;
+  client: CoolpcParseIssueWriteClient;
   crawlRunId: string;
   rawSnapshotId: string;
   sourceCategoryId: string;

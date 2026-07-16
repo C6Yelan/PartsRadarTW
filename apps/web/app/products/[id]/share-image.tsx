@@ -4,12 +4,12 @@
 import type { Prisma } from "@partsradar/db";
 import { ImageResponse } from "next/og";
 import { formatTwdPrice } from "../../_shared/formatting";
-import { formatTaipeiDateTime } from "../../_shared/time";
+import { normalizeProductId } from "../../_shared/product-id";
 import {
+  type ProductImageStorageOptions,
   readCachedProductImage,
-  type ProductImageHandlerOptions,
-} from "../../api/product-images/handler";
-import { normalizeProductId } from "../../api/products/[id]/product-id";
+} from "../../_shared/product-image-storage";
+import { formatTaipeiDateTime } from "../../_shared/time";
 import { PRODUCT_SHARE_IMAGE_SIZE } from "./metadata";
 
 const SHARE_PRODUCT_SELECT = {
@@ -37,7 +37,7 @@ export async function createProductShareImageResponse({
 }: {
   client: ProductShareImageClient;
   productId: string;
-  imageOptions?: ProductImageHandlerOptions;
+  imageOptions?: ProductImageStorageOptions;
 }): Promise<ImageResponse> {
   const normalizedId = normalizeProductId(productId);
   let product: ShareProduct | null = null;
@@ -53,9 +53,7 @@ export async function createProductShareImageResponse({
         },
         select: SHARE_PRODUCT_SELECT,
       });
-      const cachedWebp = product
-        ? await readCachedProductImage(normalizedId, imageOptions)
-        : null;
+      const cachedWebp = product ? await readCachedProductImage(normalizedId, imageOptions) : null;
       imageBytes = cachedWebp ? await convertCachedWebpForImageResponse(cachedWebp) : null;
     } catch {
       imageBytes = null;

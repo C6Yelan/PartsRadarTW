@@ -4,9 +4,9 @@
 import type { Prisma } from "@partsradar/db";
 import type { Metadata } from "next";
 import { formatTwdPrice } from "../../_shared/formatting";
+import { normalizeProductId } from "../../_shared/product-id";
 import { DEFAULT_PUBLIC_SITE_URL, resolvePublicSiteUrl } from "../../_shared/public-site";
 import { formatTaipeiDateTime } from "../../_shared/time";
-import { normalizeProductId } from "../../api/products/[id]/product-id";
 
 const SITE_NAME = "PartsRadarTW";
 const FALLBACK_TITLE = `商品資訊 | ${SITE_NAME}`;

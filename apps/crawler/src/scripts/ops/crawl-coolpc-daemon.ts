@@ -1,5 +1,5 @@
 // apps/crawler/src/scripts/ops/crawl-coolpc-daemon.ts
-// 啟動 scheduled CoolPC crawler daemon，負責週期性抓取分類、寫入商品資料並補齊新增商品圖片。
+// 啟動 scheduled CoolPC crawler daemon，負責週期性抓取分類並寫入商品與價格資料。
 
 import type { PrismaClient } from "@partsradar/db";
 import { CRAWL_TRIGGER_TYPES, type RunCoolpcCrawlOnceResult } from "../../coolpc/crawl-run";
@@ -83,7 +83,7 @@ async function main(): Promise<void> {
   }
 }
 
-// 執行單輪 scheduled crawl；分類抓取受 lock 保護，釋放後才處理不應延遲下一輪價格抓取的補圖。
+// 執行單輪 scheduled crawl；以 external fetch lock 保護篩選條件同步與分類抓取。
 export async function runScheduledCycle(
   client: PrismaClient,
   options: CoolpcDaemonOptions,

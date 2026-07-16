@@ -7,10 +7,11 @@ import Link from "next/link";
 import { type FormEvent, useState } from "react";
 import { API_RATE_LIMITED_MESSAGE } from "../../_shared/api-client";
 import { formatInteger, formatSignedTwdPrice, formatTwdPrice } from "../../_shared/formatting";
+import { toDigitsOnly } from "../../_shared/numeric-input";
+import { Pagination } from "../../_shared/Pagination";
+import { ProductImage } from "../../_shared/ProductImage";
+import { getVisiblePages } from "../../_shared/pagination";
 import { formatTaipeiDateTime } from "../../_shared/time";
-import { Pagination } from "../../product-explorer/components/Pagination";
-import { ProductImage } from "../../product-explorer/components/ProductImage";
-import { getVisiblePages, toDigitsOnly } from "../../product-explorer/query-state";
 import type { PriceReportLoadState, PriceReportResponse, PriceReportResponseItem } from "../types";
 
 interface PriceReportResultsProps {
@@ -32,6 +33,7 @@ export function PriceReportResults({
     riseCount: 0,
     newProductCount: 0,
   };
+  const isLoading = state === "loading";
 
   function submitPageJump(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -114,9 +116,9 @@ export function PriceReportResults({
 
         {state === "ready" && report && report.pagination.totalPages > 1 ? (
           <Pagination
+            isLoading={isLoading}
             page={report.pagination.page}
             pageJumpValue={pageJumpValue}
-            productState={state}
             shouldShowPageJump={report.pagination.totalPages > 7}
             totalPages={report.pagination.totalPages}
             visiblePages={getVisiblePages(report.pagination.page, report.pagination.totalPages)}

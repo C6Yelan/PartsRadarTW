@@ -25,9 +25,8 @@ PartsRadarTW 的公開 API 主要服務官方 web UI。它沒有版本化、SLA 
 | --- | --- |
 | `q` | 最多 100 字；空白分隔 token 必須各自命中名稱或品牌欄位。 |
 | `category` | 公開 category slug。 |
-| `igrp` | 舊版 read-only alias；只接受已支援分類。新 client 應使用 `category`。 |
 | `vendors` | 逗號分隔且不可重複；必須同時提供 category。 |
-| `facet` | 可重複的 `key:value`；必須同時提供 `category` 或相容用的 `igrp` alias，最多 50 筆。單筆 trim 後須為 1–100 字、不可重複，且必須是該分類支援的值。 |
+| `facet` | 可重複的 `key:value`；必須同時提供 `category`，最多 50 筆。單筆 trim 後須為 1–100 字、不可重複，且必須是該分類支援的值。 |
 | `minPrice`, `maxPrice` | 非負整數，且 min 不得大於 max。 |
 | `status` | `active`、`inactive` 或 `all`；預設 `active`。 |
 | `sort` | `price_asc`、`price_desc`、`price_drop_desc`、`price_rise_desc`、`name_asc`。 |

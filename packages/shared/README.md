@@ -6,6 +6,8 @@ packages.
 Allowed exports:
 
 - source identity and source URL helpers used by both crawler and web/API code;
+- product-facet definitions and filter-tag contracts shared by crawler and web/API
+  code;
 - public URL constructors whose output is part of API responses, metadata, or ops
   smoke output.
 

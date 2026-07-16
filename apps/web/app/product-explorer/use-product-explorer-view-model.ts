@@ -3,11 +3,12 @@
 // 組裝商品探索頁的資料、查詢狀態與子元件 action 分組。
 
 import { useEffect, useMemo } from "react";
+import { getVisiblePages } from "../_shared/pagination";
 import { useProductExplorerActions } from "./actions/use-product-explorer-actions";
 import { useCategories } from "./data/use-categories";
 import { useProducts } from "./data/use-products";
 import { usePendingPageScroll, useProductExplorerQuery, useResponsiveFiltersOpen } from "./hooks";
-import { DEFAULT_QUERY, getVisiblePages, toUrl } from "./query-state";
+import { DEFAULT_QUERY, toUrl } from "./query-state";
 import { useProductBuildListActions } from "./use-product-build-list-actions";
 
 // 建立 ProductExplorer 使用的 view model，將 hook 狀態整理成 header、filters 與 results 區塊。
@@ -139,9 +140,9 @@ export function useProductExplorerViewModel() {
         productState,
       },
       pagination: {
+        isLoading: productState === "loading",
         page: query.page,
         pageJumpValue: actions.pageJumpValue,
-        productState,
         shouldShowPageJump,
         totalPages,
         visiblePages,
