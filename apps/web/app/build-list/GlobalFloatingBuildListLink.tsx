@@ -2,8 +2,9 @@
 // apps/web/app/build-list/GlobalFloatingBuildListLink.tsx
 // 在配單頁以外的公開 route 掛載單一浮動配單入口，並沿用既有 persisted intent 狀態。
 
+import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import FloatingBuildListLink from "./FloatingBuildListLink";
+import { CartIcon } from "../_shared/icons";
 import { useBuildList } from "./use-build-list";
 
 export default function GlobalFloatingBuildListLink() {
@@ -19,5 +20,17 @@ export default function GlobalFloatingBuildListLink() {
   const currentLocation = `${pathname}${search ? `?${search}` : ""}`;
   const buildListParams = new URLSearchParams({ returnTo: currentLocation });
 
-  return <FloatingBuildListLink href={`/build-list?${buildListParams}`} summary={summary} />;
+  return (
+    <Link
+      aria-label={`開啟配單，目前 ${summary.totalQuantity} 件`}
+      className="build-list-floating-link"
+      href={`/build-list?${buildListParams}`}
+      title="開啟配單"
+    >
+      <CartIcon className="build-list-floating-icon" />
+      <span className="build-list-floating-badge" aria-hidden="true">
+        {summary.totalQuantity}
+      </span>
+    </Link>
+  );
 }

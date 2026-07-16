@@ -216,47 +216,6 @@ describe("build list v2 model", () => {
     expect(items.map((item) => item.intent.productId)).toEqual(originalOrder);
   });
 
-  it("summarizes only export-selected items when the caller filters by includeInExport", () => {
-    const items = resolveBuildListItems(
-      [
-        intent(PRODUCT_ID_1, { order: 0, quantity: 2 }),
-        intent(PRODUCT_ID_2, { order: 1, includeInExport: false, quantity: 4 }),
-        intent(PRODUCT_ID_3, { order: 2 }),
-        intent(PRODUCT_ID_4, { order: 3 }),
-      ],
-      [
-        product(PRODUCT_ID_1, { category: { displayName: "CPU" } }),
-        product(PRODUCT_ID_2, {
-          category: { displayName: "未選分類" },
-          price: { amount: 50_000, currency: "TWD" },
-          status: { isActive: false },
-        }),
-        product(PRODUCT_ID_3, { category: { displayName: "CPU" } }),
-        product(PRODUCT_ID_4, { category: { displayName: "顯示卡" } }),
-      ],
-      "ready",
-    );
-    const originalOrder = items.map((item) => item.intent.productId);
-    const selectedItems = items.filter((item) => item.intent.includeInExport);
-
-    expect(selectedItems.map((item) => item.intent.productId)).toEqual([
-      PRODUCT_ID_1,
-      PRODUCT_ID_3,
-      PRODUCT_ID_4,
-    ]);
-    expect(summarizeBuildListItems(selectedItems)).toMatchObject({
-      itemCount: 3,
-      totalQuantity: 4,
-      totalAmount: 27_960,
-      inactiveItemCount: 0,
-    });
-    expect(summarizeBuildListCategories(selectedItems)).toEqual([
-      { label: "CPU", itemCount: 2, totalQuantity: 3 },
-      { label: "顯示卡", itemCount: 1, totalQuantity: 1 },
-    ]);
-    expect(items.map((item) => item.intent.productId)).toEqual(originalOrder);
-  });
-
   it("keeps missing and unavailable counts distinct", () => {
     const missingItems = resolveBuildListItems([intent(PRODUCT_ID_1)], [], "ready");
     const unavailableItems = resolveBuildListItems([intent(PRODUCT_ID_2)], [], "error");

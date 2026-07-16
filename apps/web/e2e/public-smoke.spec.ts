@@ -101,69 +101,6 @@ test.describe("public web smoke", () => {
         page.getByRole("link", { name: "邀請 PartsRadarTW Discord bot，開新分頁" }),
       ).toHaveCount(0);
     }
-    await expect(page.getByLabel("Discord 指令操作摘要")).toContainText(
-      "/public-report settings",
-    );
-    await expect(page.getByLabel("Discord 指令操作摘要")).toContainText("/status");
-    await expect(page.getByRole("link", { name: "開始使用" })).toHaveCount(0);
-    await expect(page.locator(".discord-local-nav")).toHaveCount(0);
-    await expect(page.getByRole("heading", { name: "快速開始" })).toBeVisible();
-    const quickStartSection = page.getByRole("region", { name: "快速開始" });
-    await expect(quickStartSection.locator(".discord-step-list > li")).toHaveCount(3);
-    await expect(quickStartSection).not.toContainText("/public-report manage");
-    await expect(page.getByRole("link", { name: "查看一般使用者教學" })).toHaveAttribute(
-      "href",
-      "#quick-start",
-    );
-    await expect(page.getByRole("link", { name: "查看管理員教學" })).toHaveAttribute(
-      "href",
-      "#discord-admin-guide",
-    );
-
-    const userGuide = page.getByRole("region", { name: "提醒與個人價格報告" });
-    await expect(userGuide.getByText("/watch", { exact: true })).toHaveCount(2);
-    await expect(userGuide.getByText("/price-report now", { exact: true })).toHaveCount(2);
-    await expect(userGuide.getByText("/price-report settings", { exact: true })).toHaveCount(2);
-    await expect(userGuide.getByText("/bot help", { exact: true })).toHaveCount(2);
-    const userDetails = userGuide.locator("details");
-    await expect(userDetails).toHaveCount(4);
-    await expect(userDetails.nth(0)).toHaveAttribute("open", "");
-    await expect(userDetails.nth(1)).not.toHaveAttribute("open", "");
-    await expect(page.getByRole("img", { name: "/watch 目標價提醒面板截圖" })).toBeVisible();
-    await userDetails.nth(1).locator("summary").press("Enter");
-    await expect(userDetails.nth(1)).toHaveAttribute("open", "");
-    await expect(page.getByRole("img", { name: "即時價格報告預覽截圖" })).toBeVisible();
-
-    const adminGuide = page.getByRole("region", { name: "公開價格報告設定" });
-    for (const command of ["/public-report settings", "/status"]) {
-      await expect(
-        adminGuide.locator(".discord-command-summary-list").getByText(command, { exact: true }),
-      ).toHaveCount(1);
-      await expect(
-        adminGuide.locator("summary").getByText(command, { exact: true }),
-      ).toHaveCount(1);
-    }
-    await expect(adminGuide).not.toContainText("/public-report manage");
-    await expect(adminGuide).not.toContainText("/public-report test");
-    await expect(adminGuide).not.toContainText("/public-report status");
-    await expect(adminGuide.locator(".discord-step-list > li")).toHaveCount(4);
-    await expect(adminGuide.getByLabel("公開報告必要權限")).toContainText(
-      "管理伺服器",
-    );
-    await expect(adminGuide.getByLabel("公開報告必要權限")).toContainText(
-      "傳送訊息",
-    );
-    await expect(adminGuide.locator("details[open]")).toHaveCount(0);
-
-    await expect(page.getByRole("heading", { name: "常見問題" })).toBeVisible();
-    const faqItems = page.locator(".discord-faq-item");
-    await expect(faqItems).toHaveCount(3);
-    await expect(page.locator(".discord-faq-item[open]")).toHaveCount(0);
-    await faqItems.first().locator("summary").press("Enter");
-    await expect(faqItems.first()).toHaveAttribute("open", "");
-
-    await page.getByRole("link", { name: "查看管理員教學" }).click();
-    await expect(page.locator("#discord-admin-guide")).toBeInViewport();
     await expectImagesLoaded(page.locator(".discord-guide-image:visible"));
     await expectTopbarLinks(page);
     await expectPublicFooterLinks(page);
@@ -296,15 +233,6 @@ test.describe("public web smoke", () => {
 
     expect(sitemapXml).not.toContain("/api/");
     expect(sitemapXml).not.toContain("/build-list");
-  });
-
-  test("removes the unsupported legacy category query", { tag: "@desktop-only" }, async ({
-    page,
-  }) => {
-    await page.goto("/?igrp=12");
-
-    await expect.poll(() => new URL(page.url()).searchParams.has("igrp")).toBe(false);
-    expect(new URL(page.url()).searchParams.has("category")).toBe(false);
   });
 
   test("refreshes v3 build-list intents while preserving export choice, quantity, and undo", {

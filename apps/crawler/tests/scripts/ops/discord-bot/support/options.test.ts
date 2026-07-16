@@ -6,7 +6,7 @@ import {
   parseDiscordBotOptions,
   printDiscordBotHelp,
 } from "../../../../../src/scripts/ops/discord-bot/options";
-import { APPLICATION_ID, PUBLIC_BASE_URL, TOKEN } from "./options";
+import { APPLICATION_ID, TOKEN } from "./options";
 
 describe("Discord bot options", () => {
   it("parses required bot settings and safe defaults", () => {
@@ -14,12 +14,12 @@ describe("Discord bot options", () => {
       parseDiscordBotOptions([], {
         DISCORD_BOT_TOKEN: TOKEN,
         DISCORD_APPLICATION_ID: APPLICATION_ID,
-        PARTSRADAR_PUBLIC_BASE_URL: PUBLIC_BASE_URL,
+        PARTSRADAR_PUBLIC_BASE_URL: "  https://partsradar.test/base/?source=test#section  ",
       }),
     ).toMatchObject({
       token: TOKEN,
       applicationId: APPLICATION_ID,
-      publicBaseUrl: "https://partsradar.test/",
+      publicBaseUrl: "https://partsradar.test/base",
       apiBaseUrl: "https://discord.com/api/v10",
       registerCommandsOnStart: true,
       publicReportsEnabled: true,

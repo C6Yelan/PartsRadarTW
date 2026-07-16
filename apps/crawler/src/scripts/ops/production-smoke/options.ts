@@ -7,6 +7,7 @@ import {
   resolveWorkspacePathArgument,
   resolveWorkspaceRoot,
 } from "../../shared/script-utils";
+import { DEFAULT_INACTIVE_IMAGE_RETENTION_DAYS } from "../shared/image-retention";
 import {
   DEFAULT_BASE_URL,
   DEFAULT_CRAWLER_FAIL_AFTER_MINUTES,
@@ -30,11 +31,8 @@ import {
   DEFAULT_SOURCE_IMAGE_FAILURE_WARN_COUNT,
   DEFAULT_SOURCE_WARN_AFTER_MINUTES,
   DEFAULT_TIMEOUT_MS,
-  HELP_FLAG,
   PUBLIC_ONLY_FLAG,
 } from "./constants";
-import { DEFAULT_INACTIVE_IMAGE_RETENTION_DAYS } from "../shared/image-retention";
-import { printProductionSmokeHelp } from "./options/help";
 import type { ProductionSmokeOptions } from "./types";
 
 // 正規化公開網站 smoke test 的 base URL，只允許 HTTP(S) 端點。
@@ -58,11 +56,6 @@ export function parseProductionSmokeOptions(
   env: NodeJS.ProcessEnv = process.env,
   cwd = process.cwd(),
 ): ProductionSmokeOptions {
-  if (args.includes(HELP_FLAG)) {
-    printProductionSmokeHelp();
-    process.exit(0);
-  }
-
   const workspaceRoot = resolveWorkspaceRoot(cwd);
   const baseUrl = normalizeBaseUrl(
     getStringArg(args, "--base-url") ?? env.SMOKE_PUBLIC_BASE_URL ?? DEFAULT_BASE_URL,

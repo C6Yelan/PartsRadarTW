@@ -38,12 +38,6 @@ describe("web formatting", () => {
 
     expect(negativePrice).toBe("−NT$ 300");
     expect(negativePercent).toBe("−4.8%");
-    expect(negativePrice.startsWith("−")).toBe(true);
-    expect(negativePercent.startsWith("−")).toBe(true);
-    expect(negativePrice.charCodeAt(0)).toBe(0x2212);
-    expect(negativePercent.charCodeAt(0)).toBe(0x2212);
-    expect(negativePrice.startsWith("-")).toBe(false);
-    expect(negativePercent.startsWith("-")).toBe(false);
 
     expect(formatSignedTwdPrice(300)).toBe("+NT$ 300");
     expect(formatSignedPercent(4.8)).toBe("+4.8%");

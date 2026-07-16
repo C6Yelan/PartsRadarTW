@@ -2,7 +2,6 @@
 // 解析 Discord bot CLI/env 設定，包含 token、API 端點、功能旗標與排程參數。
 
 import { parseBoundedIntegerOption } from "../../shared/script-utils";
-import { normalizePublicBaseUrl } from "../shared/public-base-url";
 import {
   DEFAULT_COMMAND_COOLDOWN_SECONDS,
   DEFAULT_DISCORD_API_BASE_URL,
@@ -21,8 +20,9 @@ export function parseDiscordBotOptions(
   return {
     token: readRequiredSecret(env, "DISCORD_BOT_TOKEN"),
     applicationId: readRequiredSnowflake(env, "DISCORD_APPLICATION_ID"),
-    publicBaseUrl: normalizePublicBaseUrl(
-      env.PARTSRADAR_PUBLIC_BASE_URL ?? DEFAULT_PUBLIC_BASE_URL,
+    publicBaseUrl: normalizeHttpBaseUrl(
+      (env.PARTSRADAR_PUBLIC_BASE_URL ?? DEFAULT_PUBLIC_BASE_URL).trim(),
+      "PARTSRADAR_PUBLIC_BASE_URL",
     ),
     apiBaseUrl: normalizeHttpBaseUrl(
       env.DISCORD_API_BASE_URL ?? DEFAULT_DISCORD_API_BASE_URL,
@@ -98,7 +98,7 @@ function readBooleanEnv(env: NodeJS.ProcessEnv, key: string, fallback: boolean):
   throw new Error(`${key} must be true or false.`);
 }
 
-// 正規化 Discord REST API base URL，移除 path 尾端斜線與 query/hash。
+// 正規化 HTTP(S) base URL，移除 path 尾端斜線與 query/hash。
 function normalizeHttpBaseUrl(value: string, label: string): string {
   let url: URL;
 

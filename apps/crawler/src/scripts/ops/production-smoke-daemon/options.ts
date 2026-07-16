@@ -35,11 +35,6 @@ export function parseProductionSmokeDaemonOptions(
   env: NodeJS.ProcessEnv = process.env,
   cwd = process.cwd(),
 ): ProductionSmokeDaemonOptions {
-  if (args.includes(HELP_FLAG)) {
-    printHelp();
-    process.exit(0);
-  }
-
   const smokeOptions = parseProductionSmokeOptions(args, env, cwd);
 
   return {

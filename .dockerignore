@@ -42,10 +42,12 @@ compose*.yml
 docker-compose*.yml
 docs/
 README.md
+CONTRIBUTING.md
+SECURITY.md
 LICENSE
 
 # Test-only files
-vitest.config.ts
+vitest*.config.ts
 playwright.config.ts
 apps/**/tests/
 packages/**/tests/

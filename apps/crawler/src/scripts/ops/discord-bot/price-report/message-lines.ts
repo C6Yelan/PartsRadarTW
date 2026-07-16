@@ -16,7 +16,6 @@ import {
   formatTaiwanDollar,
   toSingleLine,
 } from "../message-text";
-import { escapeMarkdownText, formatSignedTaiwanDollar } from "./message-text";
 
 // 報告行分組所需的商品分類資訊與已格式化行文字。
 export interface GroupedReportLineItem {
@@ -234,6 +233,16 @@ function shouldShowReportSubcategoryHeading(
 
 function formatReportHeading(value: string): string {
   return escapeMarkdownText(formatDiscordBotText(toSingleLine(value), 80));
+}
+
+function formatSignedTaiwanDollar(amount: number): string {
+  const sign = amount > 0 ? "+" : amount < 0 ? "-" : "";
+
+  return `${sign}${formatTaiwanDollar(Math.abs(amount))}`;
+}
+
+function escapeMarkdownText(value: string): string {
+  return value.replace(/([\\*_~`|[\]])/g, "\\$1");
 }
 
 function formatReportProductLinkText(

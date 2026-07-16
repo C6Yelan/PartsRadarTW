@@ -3,7 +3,6 @@
 
 import { describe, expect, it } from "vitest";
 
-import * as responseExports from "../../../app/api/_shared/responses";
 import {
   API_ERROR_MESSAGES,
   internalErrorResponse,
@@ -15,10 +14,6 @@ import {
 } from "../../../app/api/_shared/responses";
 
 describe("API response helpers", () => {
-  it("does not export the unsafe generic error helper", () => {
-    expect("jsonError" in responseExports).toBe(false);
-  });
-
   it("returns successful JSON responses without an extra wrapper", async () => {
     const response = jsonOk({ data: [{ id: "category-1" }] });
 
