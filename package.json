@@ -19,8 +19,6 @@
     "e2e:install": "playwright install chromium",
     "check": "pnpm typecheck && pnpm lint && pnpm build",
     "monitor:public-smoke": "pnpm ops:production-smoke -- --public-only",
-    "backup:create": "bash scripts/ops/create-backup.sh",
-    "backup:restore-drill": "bash scripts/ops/restore-drill.sh",
     "ops:crawl-coolpc-daemon": "pnpm --filter @partsradar/crawler ops:crawl-coolpc-daemon",
     "ops:discord-bot": "pnpm --filter @partsradar/crawler ops:discord-bot",
     "ops:image-cache:backfill": "pnpm --filter @partsradar/crawler ops:image-cache:backfill",

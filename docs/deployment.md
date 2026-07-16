@@ -81,7 +81,7 @@ docker image inspect "$PARTSRADAR_WEB_IMAGE" "$PARTSRADAR_CRAWLER_IMAGE" "$PARTS
 | Volume | 內容 | 備份優先度 |
 | --- | --- | --- |
 | `postgres_data` | Domain truth、價格歷史、Discord 設定與 delivery metadata。 | 必須 |
-| `product_images` | 站內 WebP 商品圖片；重新建立需再次對來源站抓取。 | 必須（backup format v2） |
+| `product_images` | 站內 WebP 商品圖片；重新建立需再次對來源站抓取。 | 必須 |
 | `snapshots` | Raw HTML、locks 與 smoke state。 | 依排障／稽核需求 |
 
 `product_images` 是可重建但有外部請求成本的 operational data，不應在一般升級中視為可任意刪除的 build cache。
@@ -129,7 +129,7 @@ scripts/ops/compose-production.sh up -d --no-build
 ## 既有部署升級
 
 1. 凍結要部署的 commit，保留舊 reference，依前節準備新 release image reference並記錄 image ID／digest，再完成本機 release validation 與 Compose config 檢查。
-2. 在現有 PostgreSQL 仍可用時建立備份，驗證 checksum 並完成 restore drill。
+2. 在現有 PostgreSQL 仍可用時，使用部署環境的備份機制建立備份、驗證完整性並完成隔離還原驗證。
 3. 進入 maintenance window：停止 public ingress、drain requests，再停止舊 web、crawler、cleanup、smoke 與 Discord writers。
 4. 依前述 migration gate 檢查既有 history；有 checksum 落差就停止。
 5. 執行 `docker compose up -d --no-build`，再依首次部署第 4 步驗證核心服務。
@@ -157,7 +157,7 @@ Web 與 PostgreSQL 預設綁定 `127.0.0.1`。若使用 Cloudflare Tunnel：
 - PostgreSQL 18 disposable migration matrix
 - 所有啟用 Compose profiles 的 config
 - `web`、`crawler`、`migrate` image build
-- Backup 與 restore drill（既有部署升級；首次部署改驗證空庫初始化）
+- 部署端備份與隔離還原驗證（既有部署升級；首次部署改驗證空庫初始化）
 - Private full smoke，再執行 public-only smoke
 
 Smoke threshold 是部署預設，不等於已依 production baseline 校準。WARN 必須判讀；FAIL 必須阻止 cutover。
