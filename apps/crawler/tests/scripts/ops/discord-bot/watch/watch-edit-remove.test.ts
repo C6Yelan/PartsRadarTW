@@ -4,15 +4,14 @@
 import { describe, expect, it, vi } from "vitest";
 import { CommandCooldowns } from "../../../../../src/scripts/ops/discord-bot/cooldowns";
 import { handleDiscordInteraction } from "../../../../../src/scripts/ops/discord-bot/interactions";
+import { createDiscordBotClient } from "../support/client";
 import {
-  createDiscordBotClient,
-  createDiscordBotOptions,
   createWatchButtonInteraction,
   createWatchEditModalSubmitInteraction,
-  createWatchManagerClient,
-  findMessageComponent,
-  WATCH_ROW_ID,
-} from "../support";
+} from "../support/interactions-watch";
+import { findMessageComponent } from "../support/message-assertions";
+import { createDiscordBotOptions, WATCH_ROW_ID } from "../support/options";
+import { createWatchManagerClient } from "../support/watch-clients";
 
 describe("handleDiscordInteraction watch edit and remove", () => {
   it("opens a prefilled edit form for the selected watch", async () => {

@@ -5,14 +5,9 @@ import { describe, expect, it, vi } from "vitest";
 import { sendDueTargetPriceNotifications } from "../../../../../src/scripts/ops/discord-bot/target-price-notification";
 import type { DiscordBotMessage } from "../../../../../src/scripts/ops/discord-bot/types";
 
-import {
-  createDiscordBotClient,
-  PUBLIC_BASE_URL,
-  snapshot,
-  targetPriceWatch,
-  WATCH_PRODUCT_ID,
-  WATCH_ROW_ID,
-} from "../support";
+import { createDiscordBotClient } from "../support/client";
+import { snapshot, targetPriceWatch } from "../support/data-factories";
+import { PUBLIC_BASE_URL, WATCH_PRODUCT_ID, WATCH_ROW_ID } from "../support/options";
 
 describe("target price notification delivery", () => {
   it("sends a reached target price once and records the delivery", async () => {

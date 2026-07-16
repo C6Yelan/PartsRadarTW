@@ -3,14 +3,14 @@
 
 import { readRecentPriceReport } from "@partsradar/db/price-report";
 import { HOUR_MS, MAX_PRICE_REPORT_ITEMS } from "../constants";
+import { DEFAULT_PRICE_REPORT_FILTERS, type PriceReportFilters } from "../price-report/filters";
 import { createPublicPriceReportMessages } from "../price-report/messages";
 import type {
   DiscordBotClient,
   DiscordBotMessage,
-  DiscordMessageSendResult,
   DiscordDeliveryFailureMetadata,
+  DiscordMessageSendResult,
 } from "../types";
-import { DEFAULT_PUBLIC_PRICE_REPORT_FILTERS, type PriceReportFilters } from "./filters";
 
 // 公開報告測試發送結果，供設定面板轉成使用者可讀狀態訊息。
 export type PublicPriceReportPreviewResult =
@@ -52,7 +52,7 @@ export async function sendPublicPriceReportPreview({
   client,
   channelId,
   publicBaseUrl,
-  filters = DEFAULT_PUBLIC_PRICE_REPORT_FILTERS,
+  filters = DEFAULT_PRICE_REPORT_FILTERS,
   now = new Date(),
   sendChannelMessages,
 }: {

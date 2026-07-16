@@ -1,6 +1,10 @@
 // apps/crawler/src/scripts/ops/discord-bot/commands/settings-input.ts
 // 驗證並正規化 Discord 設定面板送回的 select value 與 modal 文字輸入。
 
+import {
+  canonicalizePriceReportKeyword,
+  tokenizePriceReportKeywordGroups,
+} from "@partsradar/shared";
 import { MAX_PRICE_REPORT_KEYWORD_GROUPS, MAX_PRICE_REPORT_KEYWORD_LENGTH } from "../constants";
 import {
   PRICE_REPORT_CATEGORY_OPTION_LIMIT,
@@ -66,14 +70,14 @@ function parseProductKeywordInput(value: unknown): string | null | undefined {
     return undefined;
   }
 
-  const productKeyword = normalizeProductKeywordInput(value);
+  const productKeyword = canonicalizePriceReportKeyword(value);
 
   if (productKeyword.length === 0) {
     return null;
   }
 
   return productKeyword.length <= MAX_PRICE_REPORT_KEYWORD_LENGTH &&
-    countProductKeywordGroups(productKeyword) <= MAX_PRICE_REPORT_KEYWORD_GROUPS
+    tokenizePriceReportKeywordGroups(productKeyword).length <= MAX_PRICE_REPORT_KEYWORD_GROUPS
     ? productKeyword
     : undefined;
 }
@@ -103,10 +107,8 @@ export function parseProductKeywordInputs(values: unknown[]): string | null | un
 
 // 將既有逗號分組格式拆成 modal 的五個輸入欄預填值。
 export function splitProductKeywordInputGroups(value: string): string[] {
-  return normalizeProductKeywordInput(value)
-    .split(",")
-    .map((group) => group.trim())
-    .filter(Boolean)
+  return tokenizePriceReportKeywordGroups(value)
+    .map((tokens) => tokens.join(" "))
     .slice(0, MAX_PRICE_REPORT_KEYWORD_GROUPS);
 }
 
@@ -157,19 +159,4 @@ export function parseTimeOfDay(value: unknown): { hour: number; minute: number }
     hour: Number(match[1]),
     minute: Number(match[2]),
   };
-}
-
-// 正規化使用者關鍵字輸入，支援中文逗號並壓平每組關鍵字內的多餘空白。
-function normalizeProductKeywordInput(value: string): string {
-  return value
-    .replace(/，/g, ",")
-    .split(",")
-    .map((group) => group.trim().replace(/\s+/g, " "))
-    .filter(Boolean)
-    .join(", ");
-}
-
-// 計算關鍵字逗號分組數，對應 UI 說明與最大組數限制。
-function countProductKeywordGroups(keyword: string): number {
-  return keyword.split(",").filter((group) => group.trim().length > 0).length;
 }

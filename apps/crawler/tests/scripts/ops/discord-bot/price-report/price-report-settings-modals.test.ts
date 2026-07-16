@@ -4,13 +4,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { CommandCooldowns } from "../../../../../src/scripts/ops/discord-bot/cooldowns";
 import { handleDiscordInteraction } from "../../../../../src/scripts/ops/discord-bot/interactions";
-import {
-  createComponentInteraction,
-  createDiscordBotClient,
-  createDiscordBotOptions,
-  createSettingsModalSubmitInteraction,
-  priceReportSetting,
-} from "../support";
+import { createDiscordBotClient } from "../support/client";
+import { priceReportSetting } from "../support/data-factories";
+import { createComponentInteraction } from "../support/interactions-core";
+import { createSettingsModalSubmitInteraction } from "../support/interactions-price-report";
+import { createDiscordBotOptions } from "../support/options";
 
 describe("handleDiscordInteraction price report settings modals", () => {
   it("opens a time-only modal while preserving the existing wire ids", async () => {
@@ -97,8 +95,7 @@ describe("handleDiscordInteraction price report settings modals", () => {
     expect(requestBody.data.components[0]).toMatchObject({
       type: 18,
       label: "其中一組關鍵字 1",
-      description:
-        "同一欄的詞要全部出現在商品名稱中；不同欄只要符合其中一組。全部留空代表不限。",
+      description: "同一欄的詞要全部出現在商品名稱中；不同欄只要符合其中一組。全部留空代表不限。",
       component: {
         type: 4,
         custom_id: "price-report:settings:keyword-input",

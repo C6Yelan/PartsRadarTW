@@ -1,13 +1,13 @@
 // apps/web/app/price-report/query-state.ts
 // 集中價格變動總覽的瀏覽器 URL 與公開 API query 正規化規則。
 
-import { CATEGORY_MAPPINGS, type CategorySlug } from "../category-slugs";
 import type {
-  PriceReportQuery,
   PriceReportSort,
   PriceReportType,
   PriceReportWindow,
-} from "./types";
+} from "../api/price-report/query";
+import { CATEGORY_MAPPINGS, type CategorySlug } from "../category-slugs";
+import type { PriceReportQuery } from "./types";
 
 export const PRICE_REPORT_TYPES: readonly PriceReportType[] = ["drop", "rise", "new"];
 
@@ -58,9 +58,7 @@ export function normalizePriceReportTypes(values: string[]): PriceReportType[] {
 
 export function normalizePriceReportCategories(values: readonly string[]): CategorySlug[] {
   const selected = new Set(values.map((value) => value.trim()));
-  const normalized = CATEGORY_MAPPINGS.map(({ slug }) => slug).filter((slug) =>
-    selected.has(slug),
-  );
+  const normalized = CATEGORY_MAPPINGS.map(({ slug }) => slug).filter((slug) => selected.has(slug));
 
   return normalized.length === CATEGORY_MAPPINGS.length ? [] : normalized;
 }

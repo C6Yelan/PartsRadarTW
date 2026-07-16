@@ -1,12 +1,16 @@
 // packages/db/src/price-report/utils.ts
 // 提供價格報告 reader 共用的篩選正規化、Prisma 查詢條件、分組與排序規則。
 
+import {
+  canonicalizePriceReportKeyword,
+  tokenizePriceReportKeywordGroups,
+} from "@partsradar/shared";
 import type { Prisma } from "@prisma/client";
 import type {
   CrawlRunPriceSnapshot,
   PreviousPriceSnapshot,
-  PriceReportPriceChangeItem,
   PriceReportNewProductItem,
+  PriceReportPriceChangeItem,
   RecentPriceReportFilters,
 } from "./types";
 
@@ -112,13 +116,13 @@ function normalizeProductKeyword(value: string | null | undefined): string | nul
     return null;
   }
 
-  const keyword = normalizeProductKeywordText(value);
+  const keyword = canonicalizePriceReportKeyword(value);
 
   return keyword.length > 0 ? keyword : null;
 }
 
 function createProductKeywordFilter(keyword: string): Prisma.ProductWhereInput {
-  const groups = parseProductKeywordGroups(keyword);
+  const groups = tokenizePriceReportKeywordGroups(keyword);
 
   if (groups.length === 0) {
     return {};
@@ -151,20 +155,4 @@ function createProductKeywordGroupFilter(tokens: string[]): Prisma.ProductWhereI
       },
     })),
   };
-}
-
-function parseProductKeywordGroups(keyword: string): string[][] {
-  return keyword
-    .split(",")
-    .map((group) => group.trim().split(/\s+/).filter(Boolean))
-    .filter((tokens) => tokens.length > 0);
-}
-
-function normalizeProductKeywordText(value: string): string {
-  return value
-    .replace(/，/g, ",")
-    .split(",")
-    .map((group) => group.trim().replace(/\s+/g, " "))
-    .filter(Boolean)
-    .join(", ");
 }

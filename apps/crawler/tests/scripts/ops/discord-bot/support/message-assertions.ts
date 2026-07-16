@@ -1,11 +1,10 @@
-// apps/crawler/tests/scripts/ops/discord-bot/support/index.ts
-// 彙整 Discord bot 測試共用 helper、fixture 與 fake client 入口。
+// apps/crawler/tests/scripts/ops/discord-bot/support/message-assertions.ts
+// 提供 Discord bot 測試讀取 embed 與 message component 的窄 helper。
+
 import type {
   DiscordBotEmbed,
   DiscordBotMessage,
 } from "../../../../../src/scripts/ops/discord-bot/types";
-
-export * from "./options";
 
 // 從 interaction response 或一般 message body 取出第一個 embed。
 export function readResponseEmbed(body: {
@@ -35,32 +34,3 @@ export function findMessageComponent(
     ?.flatMap((row) => row.components)
     .find((component) => component.custom_id === customId);
 }
-
-// 計算 message 內所有 embed 文字長度，對齊 Discord embed size 測試。
-export function calculateMessageEmbedTextLength(message: DiscordBotMessage): number {
-  return (message.embeds ?? []).reduce(
-    (total, embed) =>
-      total +
-      textLength(embed.title) +
-      textLength(embed.description) +
-      textLength(embed.footer?.text) +
-      (embed.fields ?? []).reduce(
-        (fieldTotal, field) => fieldTotal + textLength(field.name) + textLength(field.value),
-        0,
-      ),
-    0,
-  );
-}
-
-function textLength(value: string | undefined): number {
-  return value?.length ?? 0;
-}
-
-export * from "./client";
-export * from "./data-factories";
-export type * from "./data-types";
-export * from "./interactions-core";
-export * from "./interactions-price-report";
-export * from "./interactions-public-report";
-export * from "./interactions-watch";
-export * from "./watch-clients";

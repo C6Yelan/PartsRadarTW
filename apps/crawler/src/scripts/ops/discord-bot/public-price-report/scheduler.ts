@@ -9,16 +9,19 @@ import {
   MAX_PRICE_REPORT_ITEMS,
 } from "../constants";
 import { NO_DISCORD_DELIVERY_ERROR, toDiscordDeliveryErrorFields } from "../delivery-error-fields";
-import { filterNewProductsForReport, filterPriceChangesForReport } from "../price-report/filters";
+import {
+  filterNewProductsForReport,
+  filterPriceChangesForReport,
+  toPriceReportFilters,
+} from "../price-report/filters";
 import { createPublicPriceReportMessages } from "../price-report/messages";
 import type {
   DiscordBotClient,
   DiscordBotMessage,
-  DiscordMessageSendResult,
   DiscordBotOptions,
+  DiscordMessageSendResult,
 } from "../types";
 import { type PublicPriceReportStatus, recordPublicPriceReportDelivery } from "./delivery";
-import { toPublicPriceReportFilters } from "./filters";
 import { PUBLIC_PRICE_REPORT_SETTING_SELECT, type PublicPriceReportSetting } from "./settings";
 
 // 單輪公開價格報告排程處理摘要，供 Discord bot daemon log 與維運觀察使用。
@@ -193,7 +196,7 @@ async function sendPublicPriceReportForCrawlRun({
   ) => Promise<DiscordMessageSendResult>;
 }): Promise<PublicPriceReportStatus> {
   const readResult = await readCrawlRunPriceChangeSummary(client, crawlRunId);
-  const filters = toPublicPriceReportFilters(setting);
+  const filters = toPriceReportFilters(setting);
   const changes = filterPriceChangesForReport(readResult.changes, filters);
   const newProducts = filterNewProductsForReport(readResult.newProducts, filters);
   const channelId = setting.channelId;

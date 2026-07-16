@@ -2,9 +2,9 @@
 // 顯示價格走勢圖上的固定高低點標記與互動 tooltip。
 
 import type { CSSProperties } from "react";
-import { formatTwdPrice } from "../../../../_shared/formatting";
+import { formatSignedPercent, formatTwdPrice } from "../../../../_shared/formatting";
 import { formatTaipeiMonthDayTime } from "../../../../_shared/time";
-import { formatPointSource, formatSignedPercent } from "../format";
+import { formatPointSource } from "../format";
 import type { ChartConfig, ChartMarker, ChartPoint } from "../types";
 
 // 將 chart marker 座標轉成圖表容器內的百分比位置，固定標示最高或最低點。
@@ -54,6 +54,8 @@ export function HistoryTooltip({
       <strong>{formatTwdPrice(point.amount)}</strong>
       <small>{`${formatPointSource(point.observationType)} · ${formatSignedPercent(
         point.percentChange,
+        2,
+        "",
       )}`}</small>
     </div>
   );

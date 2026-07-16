@@ -2,12 +2,11 @@
 // 提供 public-report interaction 共用流程，包含伺服器頻道 context、測試發送與設定面板資料讀取。
 
 import type { CommandCooldowns } from "../cooldowns";
-import { readPriceReportCategories } from "../price-report";
+import { readPriceReportCategories, toPriceReportFilters } from "../price-report";
 import {
   readLatestPublicPriceReportDelivery,
   readPublicPriceReportSetting,
   sendPublicPriceReportPreview,
-  toPublicPriceReportFilters,
 } from "../public-price-report";
 import {
   deferInteractionResponse,
@@ -121,7 +120,7 @@ export async function sendPublicReportTest({
     client,
     channelId: setting.channelId,
     publicBaseUrl: options.publicBaseUrl,
-    filters: toPublicPriceReportFilters(setting),
+    filters: toPriceReportFilters(setting),
     sendChannelMessages: (channelId, messages) =>
       sendDiscordChannelMessages({
         token: options.token,

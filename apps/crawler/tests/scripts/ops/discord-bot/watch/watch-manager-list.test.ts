@@ -4,19 +4,15 @@
 import { describe, expect, it, vi } from "vitest";
 import { CommandCooldowns } from "../../../../../src/scripts/ops/discord-bot/cooldowns";
 import { handleDiscordInteraction } from "../../../../../src/scripts/ops/discord-bot/interactions";
+import { createDiscordBotClient } from "../support/client";
+import { notificationDelivery, snapshot, targetPriceWatch } from "../support/data-factories";
 import {
-  createDiscordBotClient,
-  createDiscordBotOptions,
-  createWatchManagerClient,
   createWatchOpenInteraction,
   createWatchSelectInteraction,
-  notificationDelivery,
-  readEmbedFieldValue,
-  snapshot,
-  targetPriceWatch,
-  WATCH_PRODUCT_ID,
-  WATCH_ROW_ID,
-} from "../support";
+} from "../support/interactions-watch";
+import { readEmbedFieldValue } from "../support/message-assertions";
+import { createDiscordBotOptions, WATCH_PRODUCT_ID, WATCH_ROW_ID } from "../support/options";
+import { createWatchManagerClient } from "../support/watch-clients";
 
 describe("handleDiscordInteraction watch manager list", () => {
   it("selects a watch and enables its edit and remove actions", async () => {

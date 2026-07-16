@@ -3,8 +3,8 @@
 
 import type { PrismaClient } from "@partsradar/db";
 import { CRAWL_TRIGGER_TYPES, type RunCoolpcCrawlOnceResult } from "../../coolpc/crawl-run";
-import { assertSeededCategories, runCoolpcCategoryCrawl } from "../../coolpc/live-crawl";
 import { refreshCoolpcFilterSync } from "../../coolpc/filter-sync";
+import { assertSeededCategories, runCoolpcCategoryCrawl } from "../../coolpc/live-crawl";
 import {
   loadWorkspaceEnv,
   resolveWorkspaceRoot,
@@ -21,15 +21,11 @@ import {
 } from "./crawl-coolpc-daemon/summary";
 import { tryAcquireExternalFetchLock } from "./external-fetch-lock";
 import { createOpsLogger } from "./shared/logger";
+import { createInterruptibleShutdownController } from "./shared/shutdown";
 
 const SCHEDULED_CRAWL_USER_AGENT =
   "PartsRadarTW scheduled crawler (+https://github.com/C6Yelan/PartsRadarTW)";
 const logger = createOpsLogger();
-
-interface ShutdownController {
-  readonly requested: boolean;
-  sleep(ms: number): Promise<void>;
-}
 
 // 單輪 scheduled crawl 結果，回傳下一輪是否進入 backoff 或使用較短 retry。
 interface ScheduledCycleResult {
@@ -50,7 +46,11 @@ async function main(): Promise<void> {
   await loadWorkspaceEnv(workspaceRoot);
   const options = parseDaemonOptions(args);
   let client: PrismaClient | null = null;
-  const shutdown = createShutdownController();
+  const shutdown = createInterruptibleShutdownController({
+    onSignal: (signal) => {
+      log(`Received ${signal}; stopping after the current crawler step.`);
+    },
+  });
 
   try {
     const db = await import("@partsradar/db");
@@ -184,48 +184,6 @@ export async function runScheduledCycle(
         shouldBackoff,
         retryAfterSeconds,
       };
-}
-
-// 註冊 SIGINT/SIGTERM，讓 crawler 在目前步驟結束後停止，並可喚醒等待中的下一輪 sleep。
-function createShutdownController(): ShutdownController {
-  let stopRequested = false;
-  let wakeSleeper: (() => void) | null = null;
-
-  const requestStop = (signal: NodeJS.Signals): void => {
-    if (!stopRequested) {
-      log(`Received ${signal}; stopping after the current crawler step.`);
-    }
-
-    stopRequested = true;
-    wakeSleeper?.();
-  };
-
-  process.once("SIGINT", requestStop);
-  process.once("SIGTERM", requestStop);
-
-  return {
-    get requested() {
-      return stopRequested;
-    },
-    sleep(ms: number) {
-      if (stopRequested) {
-        return Promise.resolve();
-      }
-
-      return new Promise<void>((resolve) => {
-        const timeoutId = setTimeout(() => {
-          wakeSleeper = null;
-          resolve();
-        }, ms);
-
-        wakeSleeper = () => {
-          clearTimeout(timeoutId);
-          wakeSleeper = null;
-          resolve();
-        };
-      });
-    },
-  };
 }
 
 // 透過 ops logger 輸出 scheduled crawler 訊息，讓格式與其他 daemon 一致。

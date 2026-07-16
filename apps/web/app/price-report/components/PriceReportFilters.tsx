@@ -2,14 +2,13 @@
 // 顯示時間、類型、分類、排序與關鍵字等唯讀報告篩選控制。
 
 import type { FormEvent } from "react";
-import { PRICE_REPORT_TYPES } from "../query-state";
 import type {
-  PriceReportCategory,
-  PriceReportQuery,
   PriceReportSort,
   PriceReportType,
   PriceReportWindow,
-} from "../types";
+} from "../../api/price-report/query";
+import { PRICE_REPORT_TYPES } from "../query-state";
+import type { PriceReportCategory, PriceReportQuery } from "../types";
 import { PriceReportCategoryFilter } from "./PriceReportCategoryFilter";
 import { PriceReportSelect, type PriceReportSelectOption } from "./PriceReportSelect";
 

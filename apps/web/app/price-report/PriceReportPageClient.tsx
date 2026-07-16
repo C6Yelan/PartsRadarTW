@@ -8,6 +8,12 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { isRateLimitedApiError } from "../_shared/api-client";
 import { ArrowLeftIcon } from "../_shared/icons";
+import type {
+  PriceReportSort,
+  PriceReportType,
+  PriceReportWindow,
+} from "../api/price-report/query";
+import type { PriceReportResponseBody } from "../api/price-report/response";
 import SiteDisclaimer from "../site-disclaimer";
 import TopbarBrandNavigation from "../TopbarBrandNavigation";
 import { fetchPriceReport, fetchPriceReportCategories } from "./api";
@@ -21,15 +27,7 @@ import {
   readPriceReportQuery,
   toPriceReportUrl,
 } from "./query-state";
-import type {
-  PriceReportCategory,
-  PriceReportLoadState,
-  PriceReportQuery,
-  PriceReportResponse,
-  PriceReportSort,
-  PriceReportType,
-  PriceReportWindow,
-} from "./types";
+import type { PriceReportCategory, PriceReportLoadState, PriceReportQuery } from "./types";
 
 export default function PriceReportPageClient() {
   const router = useRouter();
@@ -41,7 +39,7 @@ export default function PriceReportPageClient() {
   );
   const [draftKeyword, setDraftKeyword] = useState(query.q);
   const [categories, setCategories] = useState<PriceReportCategory[]>([]);
-  const [report, setReport] = useState<PriceReportResponse | null>(null);
+  const [report, setReport] = useState<PriceReportResponseBody | null>(null);
   const [state, setState] = useState<PriceReportLoadState>("loading");
 
   useEffect(() => {

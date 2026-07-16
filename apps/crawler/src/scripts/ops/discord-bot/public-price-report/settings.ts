@@ -2,8 +2,8 @@
 // 管理 Discord 伺服器公開價格報告設定，包含頻道、啟停、篩選與清除。
 
 import type { Prisma } from "@partsradar/db";
+import { normalizePriceReportFilters, toPriceReportFilters } from "../price-report/filters";
 import type { DiscordBotClient } from "../types";
-import { normalizePublicPriceReportFilters, toPublicPriceReportFilters } from "./filters";
 
 // 公開報告設定讀取時固定使用的欄位集合，供設定面板與排程共用。
 export const PUBLIC_PRICE_REPORT_SETTING_SELECT = {
@@ -158,8 +158,8 @@ export async function updatePublicPriceReportFilters({
     return null;
   }
 
-  const currentFilters = toPublicPriceReportFilters(current);
-  const filters = normalizePublicPriceReportFilters({
+  const currentFilters = toPriceReportFilters(current);
+  const filters = normalizePriceReportFilters({
     ...currentFilters,
     categoryIgrps: categoryIgrps ?? currentFilters.categoryIgrps,
     productKeyword: productKeyword === undefined ? currentFilters.productKeyword : productKeyword,

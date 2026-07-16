@@ -6,7 +6,7 @@ import {
   parseDiscordBotOptions,
   printDiscordBotHelp,
 } from "../../../../../src/scripts/ops/discord-bot/options";
-import { APPLICATION_ID, PUBLIC_BASE_URL, TOKEN } from ".";
+import { APPLICATION_ID, PUBLIC_BASE_URL, TOKEN } from "./options";
 
 describe("Discord bot options", () => {
   it("parses required bot settings and safe defaults", () => {

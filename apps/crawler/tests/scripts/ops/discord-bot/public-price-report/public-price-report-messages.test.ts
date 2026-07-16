@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import { createPublicPriceReportMessages } from "../../../../../src/scripts/ops/discord-bot/price-report/messages";
-import { PUBLIC_BASE_URL } from "../support";
+import { PUBLIC_BASE_URL } from "../support/options";
 
 describe("public price report messages", () => {
   it("creates public price-change report messages with the bot embed format", () => {

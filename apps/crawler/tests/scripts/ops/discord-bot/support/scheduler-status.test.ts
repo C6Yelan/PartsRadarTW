@@ -3,7 +3,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { runDiscordBotNotificationCycle } from "../../../../../src/scripts/ops/discord-bot/daemon";
 import { createDiscordBotSchedulerStatusStore } from "../../../../../src/scripts/ops/discord-bot/scheduler-status";
-import { createDiscordBotOptions } from ".";
+import { createDiscordBotOptions } from "./options";
 
 describe("Discord bot scheduler status store", () => {
   it("starts as NOT_RUN and records safe execution metadata", () => {

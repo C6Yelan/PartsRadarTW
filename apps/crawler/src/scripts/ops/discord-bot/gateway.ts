@@ -2,6 +2,7 @@
 // 管理 Discord Gateway WebSocket session，處理 identify、heartbeat、互動事件與關閉流程。
 
 import { toSafeCliErrorMessage } from "../../shared/script-utils";
+import { createInterruptibleShutdownController } from "../shared/shutdown";
 import {
   GATEWAY_OP_DISPATCH,
   GATEWAY_OP_HEARTBEAT,
@@ -198,50 +199,9 @@ export function getWebSocketConstructor(): MinimalWebSocketConstructor {
 export function createShutdownController(
   logMessage: (message: string) => void,
 ): ShutdownController {
-  let stopRequested = false;
-  let wakeSleeper: (() => void) | null = null;
-  const stopCallbacks = new Set<() => void>();
-
-  const requestStop = (signal: NodeJS.Signals): void => {
-    if (!stopRequested) {
+  return createInterruptibleShutdownController({
+    onSignal: (signal) => {
       logMessage(`Received ${signal}; stopping Discord bot daemon.`);
-    }
-
-    stopRequested = true;
-    wakeSleeper?.();
-
-    for (const callback of stopCallbacks) {
-      callback();
-    }
-  };
-
-  process.once("SIGINT", requestStop);
-  process.once("SIGTERM", requestStop);
-
-  return {
-    get requested() {
-      return stopRequested;
     },
-    onStop(callback) {
-      stopCallbacks.add(callback);
-    },
-    sleep(ms) {
-      if (stopRequested) {
-        return Promise.resolve();
-      }
-
-      return new Promise<void>((resolve) => {
-        const timeoutId = setTimeout(() => {
-          wakeSleeper = null;
-          resolve();
-        }, ms);
-
-        wakeSleeper = () => {
-          clearTimeout(timeoutId);
-          wakeSleeper = null;
-          resolve();
-        };
-      });
-    },
-  };
+  });
 }

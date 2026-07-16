@@ -28,6 +28,7 @@ import {
   sanitizeSmokeErrorKind,
 } from "./production-smoke-daemon/progress";
 import { createOpsLogger } from "./shared/logger";
+import { createInterruptibleShutdownController } from "./shared/shutdown";
 import {
   applyMonitorFailureObservation,
   createEmptySmokeDiscordNotificationState,
@@ -79,7 +80,11 @@ async function main(): Promise<void> {
   await loadWorkspaceEnv(workspaceRoot);
   const options = parseProductionSmokeDaemonOptions(args);
   let client: PrismaClient | null = null;
-  const shutdown = createShutdownController();
+  const shutdown = createInterruptibleShutdownController({
+    onSignal: (signal) => {
+      log(`Received ${signal}; stopping after the current smoke check.`);
+    },
+  });
 
   try {
     const db = await import("@partsradar/db");
@@ -373,42 +378,6 @@ function logDiscordDeliveryFailure(
   } else {
     logMessage(`Smoke Discord notification skipped by sender. reason=${result.reason}`);
   }
-}
-
-function createShutdownController(): ShutdownController {
-  let stopRequested = false;
-  let wakeSleeper: (() => void) | null = null;
-  const requestStop = (signal: NodeJS.Signals): void => {
-    if (!stopRequested) {
-      log(`Received ${signal}; stopping after the current smoke check.`);
-    }
-    stopRequested = true;
-    wakeSleeper?.();
-  };
-  process.once("SIGINT", requestStop);
-  process.once("SIGTERM", requestStop);
-  return {
-    get requested() {
-      return stopRequested;
-    },
-    sleep(ms: number) {
-      return new Promise((resolve) => {
-        if (stopRequested) {
-          resolve();
-          return;
-        }
-        const timeoutId = setTimeout(() => {
-          wakeSleeper = null;
-          resolve();
-        }, ms);
-        wakeSleeper = () => {
-          clearTimeout(timeoutId);
-          wakeSleeper = null;
-          resolve();
-        };
-      });
-    },
-  };
 }
 
 function log(message: string): void {

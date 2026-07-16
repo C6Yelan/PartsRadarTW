@@ -7,12 +7,12 @@ import {
   type parsePublicReportComponentInteraction,
 } from "../commands";
 import type { CommandCooldowns } from "../cooldowns";
+import { toPriceReportFilters } from "../price-report";
 import {
   clearPublicPriceReportSetting,
   readPublicPriceReportSetting,
   setPublicPriceReportChannel,
   setPublicPriceReportEnabled,
-  toPublicPriceReportFilters,
   updatePublicPriceReportFilters,
 } from "../public-price-report";
 import {
@@ -159,7 +159,7 @@ export async function handlePublicReportComponentInteraction({
       discordGuildId: publicContext.discordGuildId,
       currentChannelId: publicContext.channelId,
     });
-    const currentFilters = toPublicPriceReportFilters(currentPanel.setting);
+    const currentFilters = toPriceReportFilters(currentPanel.setting);
     const categoryIgrps =
       component.name === "update_categories"
         ? parsePriceReportCategorySelection(component.values, currentPanel.categories)

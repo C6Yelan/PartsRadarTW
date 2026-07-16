@@ -5,15 +5,14 @@ import { describe, expect, it, vi } from "vitest";
 import { MAX_TARGET_PRICE_WATCHES_PER_USER } from "../../../../../src/scripts/ops/discord-bot/constants";
 import { CommandCooldowns } from "../../../../../src/scripts/ops/discord-bot/cooldowns";
 import { handleDiscordInteraction } from "../../../../../src/scripts/ops/discord-bot/interactions";
+import { createDiscordBotClient } from "../support/client";
+import { snapshot, targetPriceWatch } from "../support/data-factories";
 import {
-  createDiscordBotClient,
-  createDiscordBotOptions,
   createWatchButtonInteraction,
   createWatchOpenInteraction,
-  findMessageComponent,
-  snapshot,
-  targetPriceWatch,
-} from "../support";
+} from "../support/interactions-watch";
+import { findMessageComponent } from "../support/message-assertions";
+import { createDiscordBotOptions } from "../support/options";
 
 describe("handleDiscordInteraction watch manager navigation", () => {
   it("uses a fixed recent-first order and paginates at the Discord select limit", async () => {

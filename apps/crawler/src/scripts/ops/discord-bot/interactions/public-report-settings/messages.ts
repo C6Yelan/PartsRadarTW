@@ -13,12 +13,12 @@ import {
   formatPriceReportKeywordFilterLabel,
   formatTaipeiMinute,
   type PriceReportCategoryOption,
+  toPriceReportFilters,
 } from "../../price-report";
-import {
-  type PublicPriceReportDeliveryStatus,
-  type PublicPriceReportPreviewResult,
-  type PublicPriceReportSetting,
-  toPublicPriceReportFilters,
+import type {
+  PublicPriceReportDeliveryStatus,
+  PublicPriceReportPreviewResult,
+  PublicPriceReportSetting,
 } from "../../public-price-report";
 import type { DiscordBotEmbed, DiscordBotMessage, DiscordInteraction } from "../../types";
 
@@ -39,7 +39,7 @@ export function createPublicPriceReportSettingsPanelMessage({
   currentChannelId,
   notice,
 }: PublicPriceReportSettingsPanel): DiscordBotMessage {
-  const filters = toPublicPriceReportFilters(setting);
+  const filters = toPriceReportFilters(setting);
 
   return {
     embeds: [
@@ -128,7 +128,7 @@ function createPublicPriceReportSettingsEmbed({
   title?: string;
   description?: string;
 }): DiscordBotEmbed {
-  const filters = toPublicPriceReportFilters(setting);
+  const filters = toPriceReportFilters(setting);
   const description = [notice ? `**${notice}**` : null, baseDescription]
     .filter((line): line is string => line !== null)
     .join("\n");
@@ -217,7 +217,7 @@ function formatPublicReportSettingSummary(
   setting: PublicPriceReportSetting,
   categories: PriceReportCategoryOption[],
 ): string {
-  const filters = toPublicPriceReportFilters(setting);
+  const filters = toPriceReportFilters(setting);
 
   return `套用設定：分類 ${formatPriceReportCategoryFilterLabel(filters, categories)}；內容 ${formatPriceReportContentFilterLabel(filters)}；關鍵字 ${formatPriceReportKeywordFilterLabel(filters)}。`;
 }

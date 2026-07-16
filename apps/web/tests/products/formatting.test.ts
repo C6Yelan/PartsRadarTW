@@ -29,6 +29,7 @@ describe("web formatting", () => {
     expect(formatSignedTwdPrice(Number.POSITIVE_INFINITY, "資料不足")).toBe("資料不足");
     expect(formatSignedPercent(null)).toBe("—");
     expect(formatSignedPercent(Number.NaN, 1, "資料不足")).toBe("資料不足");
+    expect(formatSignedPercent(null, 2, "")).toBe("");
   });
 
   it("uses U+2212 for negative signed prices and percentages", () => {
@@ -46,6 +47,9 @@ describe("web formatting", () => {
 
     expect(formatSignedTwdPrice(300)).toBe("+NT$ 300");
     expect(formatSignedPercent(4.8)).toBe("+4.8%");
+    expect(formatSignedPercent(4.8, 2)).toBe("+4.80%");
+    expect(formatSignedPercent(-4.8, 2)).toBe("−4.80%");
+    expect(formatSignedPercent(0, 2)).toBe("0%");
     expect(formatSignedPercent(0)).toBe("0%");
     expect(formatSignedPercent(-0)).toBe("0%");
     expect(formatSignedPercent(0.01)).toBe("0%");

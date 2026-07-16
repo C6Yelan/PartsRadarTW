@@ -1,9 +1,13 @@
 // apps/web/app/products/[id]/price-history/summary-cards.tsx
 // 呈現價格歷史摘要卡片，包含期間變動、歷史區間位置與高低均價資訊。
 
-import { formatSignedTwdPrice, formatTwdPrice } from "../../../_shared/formatting";
+import {
+  formatSignedPercent,
+  formatSignedTwdPrice,
+  formatTwdPrice,
+} from "../../../_shared/formatting";
 import { formatTaipeiMonthDay } from "../../../_shared/time";
-import { formatHistoryPointCount, formatSignedPercent } from "./format";
+import { formatHistoryPointCount } from "./format";
 import type { HistoryViewSummary, PriceHistoryRangeDays, PriceHistoryRangeKey } from "./types";
 
 // 顯示選定期間首尾價格差與價格訊號，提供價格趨勢的快速判讀。
@@ -13,6 +17,8 @@ export function PeriodDeltaCard({ summary }: { summary: HistoryViewSummary }) {
       <span>期間變動</span>
       <strong>{`${formatSignedTwdPrice(summary.deltaAmount, "資料不足")} / ${formatSignedPercent(
         summary.deltaPercent,
+        2,
+        "",
       )}`}</strong>
       <small>{summary.signal.label}</small>
     </div>

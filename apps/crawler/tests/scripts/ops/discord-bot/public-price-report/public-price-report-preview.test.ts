@@ -4,14 +4,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { CommandCooldowns } from "../../../../../src/scripts/ops/discord-bot/cooldowns";
 import { handleDiscordInteraction } from "../../../../../src/scripts/ops/discord-bot/interactions";
-import {
-  API_BASE_URL,
-  createDiscordBotClient,
-  createDiscordBotOptions,
-  createPublicReportButtonInteraction,
-  publicPriceReportSetting,
-  snapshot,
-} from "../support";
+import { createDiscordBotClient } from "../support/client";
+import { publicPriceReportSetting, snapshot } from "../support/data-factories";
+import { createPublicReportButtonInteraction } from "../support/interactions-public-report";
+import { API_BASE_URL, createDiscordBotOptions } from "../support/options";
 
 describe("public price report previews", () => {
   it("sends a public report preview to the configured channel", async () => {

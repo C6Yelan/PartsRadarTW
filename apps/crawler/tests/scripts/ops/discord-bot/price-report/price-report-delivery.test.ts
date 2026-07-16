@@ -6,12 +6,9 @@ import { DISCORD_MESSAGE_EMBED_TOTAL_MAX_LENGTH } from "../../../../../src/scrip
 import { sendPriceReportNow } from "../../../../../src/scripts/ops/discord-bot/price-report";
 import type { DiscordBotMessage } from "../../../../../src/scripts/ops/discord-bot/types";
 
-import {
-  calculateMessageEmbedTextLength,
-  createDiscordBotClient,
-  PUBLIC_BASE_URL,
-  snapshot,
-} from "../support";
+import { createDiscordBotClient } from "../support/client";
+import { snapshot } from "../support/data-factories";
+import { PUBLIC_BASE_URL } from "../support/options";
 
 describe("sendPriceReportNow delivery", () => {
   it("sends a recent price report in the command context and records the delivery", async () => {
@@ -230,3 +227,22 @@ describe("sendPriceReportNow delivery", () => {
     });
   });
 });
+
+function calculateMessageEmbedTextLength(message: DiscordBotMessage): number {
+  return (message.embeds ?? []).reduce(
+    (total, embed) =>
+      total +
+      textLength(embed.title) +
+      textLength(embed.description) +
+      textLength(embed.footer?.text) +
+      (embed.fields ?? []).reduce(
+        (fieldTotal, field) => fieldTotal + textLength(field.name) + textLength(field.value),
+        0,
+      ),
+    0,
+  );
+}
+
+function textLength(value: string | undefined): number {
+  return value?.length ?? 0;
+}

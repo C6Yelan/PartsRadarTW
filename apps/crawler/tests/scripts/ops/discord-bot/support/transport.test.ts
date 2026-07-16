@@ -10,7 +10,7 @@ import {
   sendDiscordRestRequest,
 } from "../../../../../src/scripts/ops/discord-bot/rest";
 
-import { API_BASE_URL, APPLICATION_ID, TOKEN } from ".";
+import { API_BASE_URL, APPLICATION_ID, TOKEN } from "./options";
 
 describe("sendDiscordDirectMessages", () => {
   it("creates a DM channel and posts all report messages with mentions disabled", async () => {
@@ -79,34 +79,31 @@ describe("sendDiscordDirectMessages", () => {
     [50001, "Missing access"],
     [50013, "Missing permissions"],
     [null, "Forbidden"],
-  ])(
-    "normalizes a DM channel 403 with provider code %s to DM_UNAVAILABLE",
-    async (providerErrorCode, providerMessage) => {
-      const body =
-        providerErrorCode === null
-          ? { message: `${providerMessage} private-provider-body` }
-          : { code: providerErrorCode, message: `${providerMessage} private-provider-body` };
-      const result = await sendDiscordDirectMessages({
-        token: TOKEN,
-        apiBaseUrl: API_BASE_URL,
-        userId: "111122223333444455",
-        messages: [{ content: "Report" }],
-        fetchImpl: vi.fn<typeof fetch>(
-          async () => new Response(JSON.stringify(body), { status: 403 }),
-        ) as typeof fetch,
-      });
+  ])("normalizes a DM channel 403 with provider code %s to DM_UNAVAILABLE", async (providerErrorCode, providerMessage) => {
+    const body =
+      providerErrorCode === null
+        ? { message: `${providerMessage} private-provider-body` }
+        : { code: providerErrorCode, message: `${providerMessage} private-provider-body` };
+    const result = await sendDiscordDirectMessages({
+      token: TOKEN,
+      apiBaseUrl: API_BASE_URL,
+      userId: "111122223333444455",
+      messages: [{ content: "Report" }],
+      fetchImpl: vi.fn<typeof fetch>(
+        async () => new Response(JSON.stringify(body), { status: 403 }),
+      ) as typeof fetch,
+    });
 
-      expect(result).toEqual({
-        status: "failed",
-        messageCount: 1,
-        sentMessageCount: 0,
-        httpStatus: 403,
-        errorCategory: "DM_UNAVAILABLE",
-        providerErrorCode,
-      });
-      expect(JSON.stringify(result)).not.toContain("private-provider-body");
-    },
-  );
+    expect(result).toEqual({
+      status: "failed",
+      messageCount: 1,
+      sentMessageCount: 0,
+      httpStatus: 403,
+      errorCategory: "DM_UNAVAILABLE",
+      providerErrorCode,
+    });
+    expect(JSON.stringify(result)).not.toContain("private-provider-body");
+  });
 
   it("normalizes a 403 while posting to an established DM channel", async () => {
     const fetchMock = vi.fn<typeof fetch>(async (input) => {

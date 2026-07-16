@@ -7,7 +7,9 @@ import { runDiscordBotNotificationCycle } from "../../../../../src/scripts/ops/d
 import { handleDiscordInteraction } from "../../../../../src/scripts/ops/discord-bot/interactions";
 import { createDiscordBotSchedulerStatusStore } from "../../../../../src/scripts/ops/discord-bot/scheduler-status";
 import type { DiscordInteraction } from "../../../../../src/scripts/ops/discord-bot/types";
-import { createDiscordBotClient, createDiscordBotOptions, createInteraction } from ".";
+import { createDiscordBotClient } from "./client";
+import { createInteraction } from "./interactions-core";
+import { createDiscordBotOptions } from "./options";
 
 describe("Discord bot feature flags", () => {
   it("skips disabled notification cycle work without reading or writing delivery state", async () => {

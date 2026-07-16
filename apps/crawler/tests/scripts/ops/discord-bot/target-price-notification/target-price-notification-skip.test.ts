@@ -4,15 +4,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { sendDueTargetPriceNotifications } from "../../../../../src/scripts/ops/discord-bot/target-price-notification";
 
-import {
-  createDiscordBotClient,
-  createWatchManagerClient,
-  PUBLIC_BASE_URL,
-  snapshot,
-  targetPriceWatch,
-  WATCH_PRODUCT_ID,
-  WATCH_ROW_ID,
-} from "../support";
+import { createDiscordBotClient } from "../support/client";
+import { snapshot, targetPriceWatch } from "../support/data-factories";
+import { PUBLIC_BASE_URL, WATCH_PRODUCT_ID, WATCH_ROW_ID } from "../support/options";
+import { createWatchManagerClient } from "../support/watch-clients";
 
 describe("target price notification skips", () => {
   it("does not send when the current price is above the target", async () => {

@@ -4,14 +4,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { CommandCooldowns } from "../../../../../src/scripts/ops/discord-bot/cooldowns";
 import { handleDiscordInteraction } from "../../../../../src/scripts/ops/discord-bot/interactions";
-import {
-  createDiscordBotClient,
-  createDiscordBotOptions,
-  createInteraction,
-  priceReportSetting,
-  readEmbedFieldValue,
-  readResponseEmbed,
-} from "../support";
+import { createDiscordBotClient } from "../support/client";
+import { priceReportSetting } from "../support/data-factories";
+import { createInteraction } from "../support/interactions-core";
+import { readEmbedFieldValue, readResponseEmbed } from "../support/message-assertions";
+import { createDiscordBotOptions } from "../support/options";
 
 describe("handleDiscordInteraction price report settings panel", () => {
   it("sends the settings panel from the settings command", async () => {

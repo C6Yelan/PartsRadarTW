@@ -4,6 +4,7 @@
 import { useState } from "react";
 
 interface ProductImageProps {
+  className?: string;
   fallbackLabel: string;
   image: {
     url: string;
@@ -12,13 +13,17 @@ interface ProductImageProps {
 }
 
 // 顯示單一商品縮圖，圖片失敗時切換為無圖狀態以避免破圖留在列表中。
-export function ProductImage({ fallbackLabel, image }: ProductImageProps) {
+export function ProductImage({
+  className = "product-image",
+  fallbackLabel,
+  image,
+}: ProductImageProps) {
   const [hasError, setHasError] = useState(false);
 
   if (!image || hasError) {
     return (
       <div
-        className="product-image fallback"
+        className={`${className} fallback`}
         aria-label={`${fallbackLabel}圖片暫時無法顯示`}
         role="img"
       >
@@ -34,7 +39,7 @@ export function ProductImage({ fallbackLabel, image }: ProductImageProps) {
     // biome-ignore lint/performance/noImgElement: Product images are served by the local API; plain img keeps the fallback path direct.
     <img
       alt={image.alt}
-      className="product-image"
+      className={className}
       draggable={false}
       loading="lazy"
       referrerPolicy="no-referrer"

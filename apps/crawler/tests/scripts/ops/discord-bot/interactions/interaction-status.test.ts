@@ -10,7 +10,7 @@ import type {
   DiscordBotClient,
   DiscordInteraction,
 } from "../../../../../src/scripts/ops/discord-bot/types";
-import { createDiscordBotOptions } from "../support";
+import { createDiscordBotOptions } from "../support/options";
 
 const NOW = new Date("2026-07-15T04:48:00.000Z");
 
@@ -274,24 +274,26 @@ describe("status interaction", () => {
     expect(fieldValue(message, "目標價提醒掃描")).toContain("錯誤：SCAN_ERROR");
   });
 
-  it.each(["crawler", "target", "personal", "public"] as const)(
-    "isolates a rejected %s query and never exposes its raw error",
-    async (rejectArea) => {
-      const message = await createStatusMessage({
-        client: createStatusClient({ rejectArea }),
-        options: createDiscordBotOptions(),
-        schedulerStatus: populatedSchedulerStatus(),
-        now: NOW,
-      });
-      const text = JSON.stringify(message);
+  it.each([
+    "crawler",
+    "target",
+    "personal",
+    "public",
+  ] as const)("isolates a rejected %s query and never exposes its raw error", async (rejectArea) => {
+    const message = await createStatusMessage({
+      client: createStatusClient({ rejectArea }),
+      options: createDiscordBotOptions(),
+      schedulerStatus: populatedSchedulerStatus(),
+      now: NOW,
+    });
+    const text = JSON.stringify(message);
 
-      expect(message.embeds?.[0]?.fields).toHaveLength(6);
-      expect(text).toContain("QUERY_ERROR");
-      expect(text).not.toContain("postgresql://private");
-      expect(text).not.toContain("DATABASE_URL");
-      expect(text).not.toMatch(/hostname|process PID|private stack/);
-    },
-  );
+    expect(message.embeds?.[0]?.fields).toHaveLength(6);
+    expect(text).toContain("QUERY_ERROR");
+    expect(text).not.toContain("postgresql://private");
+    expect(text).not.toContain("DATABASE_URL");
+    expect(text).not.toMatch(/hostname|process PID|private stack/);
+  });
 });
 
 function createStatusClient({
@@ -461,7 +463,10 @@ function previousCrawlRun() {
   };
 }
 
-function fieldValue(message: Awaited<ReturnType<typeof createStatusMessage>>, name: string): string {
+function fieldValue(
+  message: Awaited<ReturnType<typeof createStatusMessage>>,
+  name: string,
+): string {
   return message.embeds?.[0]?.fields?.find((field) => field.name === name)?.value ?? "";
 }
 

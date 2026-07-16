@@ -1,7 +1,6 @@
-// apps/web/app/products/[id]/return-href.ts
-// 正規化商品詳細頁 returnTo query，限制返回連結只能指向站內允許頁面。
+// 正規化頁面 returnTo query，限制返回連結只能指向站內允許頁面。
 
-import { getCategoryIgrp } from "../../category-slugs";
+import { getCategoryIgrp } from "../category-slugs";
 
 const INTERNAL_RETURN_URL_ORIGIN = "https://return.partsradar.invalid";
 const ALLOWED_RETURN_PATHS = new Set(["/", "/build-list", "/price-report"]);
@@ -16,8 +15,8 @@ const BUILD_LIST_RETURN_PATHS = new Set([
 ]);
 const PRODUCT_DETAIL_PATH_PATTERN = /^\/products\/[^/]+$/;
 
-// 將 query string 中的 returnTo 轉成安全 href，避免外站或不支援路徑被放進返回連結。
-export function normalizeReturnHref(value: string | string[] | undefined) {
+// 將商品詳細頁的 returnTo 轉成安全 href，避免外站或不支援路徑被放進返回連結。
+export function normalizeProductDetailReturnHref(value: string | string[] | undefined) {
   return normalizeInternalReturnHref(value, (url) => ALLOWED_RETURN_PATHS.has(url.pathname));
 }
 

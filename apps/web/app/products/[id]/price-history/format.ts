@@ -22,19 +22,6 @@ export function getPointAriaLabel(point: ChartPoint) {
   )}，${formatTwdPrice(point.amount)}`;
 }
 
-// 將百分比變化格式化為帶正負號的小數百分比；缺值時不顯示。
-export function formatSignedPercent(percent: number | null) {
-  if (percent === null) {
-    return "";
-  }
-
-  if (percent === 0) {
-    return "0%";
-  }
-
-  return `${percent > 0 ? "+" : ""}${percent.toFixed(2)}%`;
-}
-
 // 將價格觀測來源轉成圖表、tooltip 與輔助文字可讀的中文標籤。
 export function formatPointSource(observationType: PriceHistoryPoint["observationType"]) {
   return observationType === "price_snapshot" ? "價格變動" : "價格確認";

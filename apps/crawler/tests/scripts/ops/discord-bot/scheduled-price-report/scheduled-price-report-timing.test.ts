@@ -7,7 +7,8 @@ import {
   readNextScheduledPriceReportDueAt,
 } from "../../../../../src/scripts/ops/discord-bot/price-report";
 
-import { createDiscordBotClient, priceReportSetting } from "../support";
+import { createDiscordBotClient } from "../support/client";
+import { priceReportSetting } from "../support/data-factories";
 
 describe("scheduled price report timing", () => {
   it("calculates precise scheduled report sleeps without busy polling", () => {

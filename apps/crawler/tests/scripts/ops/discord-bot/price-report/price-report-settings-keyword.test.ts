@@ -8,14 +8,11 @@ import {
 } from "../../../../../src/scripts/ops/discord-bot/constants";
 import { CommandCooldowns } from "../../../../../src/scripts/ops/discord-bot/cooldowns";
 import { handleDiscordInteraction } from "../../../../../src/scripts/ops/discord-bot/interactions";
-import {
-  createDiscordBotClient,
-  createDiscordBotOptions,
-  createKeywordModalSubmitInteraction,
-  priceReportSetting,
-  readEmbedFieldValue,
-  readResponseEmbed,
-} from "../support";
+import { createDiscordBotClient } from "../support/client";
+import { priceReportSetting } from "../support/data-factories";
+import { createKeywordModalSubmitInteraction } from "../support/interactions-price-report";
+import { readEmbedFieldValue, readResponseEmbed } from "../support/message-assertions";
+import { createDiscordBotOptions } from "../support/options";
 
 describe("handleDiscordInteraction price report settings keyword", () => {
   it("updates the daily report product keyword from the settings modal", async () => {

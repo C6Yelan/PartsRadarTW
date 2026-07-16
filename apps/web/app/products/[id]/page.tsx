@@ -2,9 +2,9 @@
 // 串接 Next.js 商品詳細頁 route、metadata 產生與返回連結正規化。
 
 import type { Metadata } from "next";
+import { normalizeProductDetailReturnHref } from "../../_shared/return-href";
 import { createProductDetailMetadata, type ProductMetadataReadClient } from "./metadata";
 import ProductDetail from "./product-detail";
-import { normalizeReturnHref } from "./return-href";
 
 // Next.js app route 提供的商品詳細頁參數契約。
 interface ProductDetailPageProps {
@@ -36,7 +36,7 @@ export default async function ProductDetailPage({ params, searchParams }: Produc
     <ProductDetail
       key={id}
       productId={id}
-      returnHref={normalizeReturnHref(resolvedSearchParams.returnTo)}
+      returnHref={normalizeProductDetailReturnHref(resolvedSearchParams.returnTo)}
     />
   );
 }

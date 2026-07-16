@@ -4,7 +4,8 @@
 import { describe, expect, it } from "vitest";
 import { enableDailyScheduledPriceReport } from "../../../../../src/scripts/ops/discord-bot/price-report";
 
-import { createDiscordBotClient, priceReportSetting } from "../support";
+import { createDiscordBotClient } from "../support/client";
+import { priceReportSetting } from "../support/data-factories";
 
 describe("scheduled price report settings", () => {
   it("enables daily report settings for a Discord user", async () => {

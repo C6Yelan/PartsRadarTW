@@ -4,12 +4,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { CommandCooldowns } from "../../../../../src/scripts/ops/discord-bot/cooldowns";
 import { handleDiscordInteraction } from "../../../../../src/scripts/ops/discord-bot/interactions";
-import {
-  createBotHelpInteraction,
-  createDiscordBotClient,
-  createDiscordBotOptions,
-  readResponseEmbed,
-} from "../support";
+import { createDiscordBotClient } from "../support/client";
+import { createBotHelpInteraction } from "../support/interactions-core";
+import { readResponseEmbed } from "../support/message-assertions";
+import { createDiscordBotOptions } from "../support/options";
 
 describe("handleDiscordInteraction bot help", () => {
   it("responds to bot help with an ephemeral Traditional Chinese embed", async () => {

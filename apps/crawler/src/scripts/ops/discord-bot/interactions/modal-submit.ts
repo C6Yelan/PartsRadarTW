@@ -13,7 +13,7 @@ import {
   toPriceReportFilters,
 } from "../price-report";
 import { toWindowHours } from "../price-report/schedule";
-import { toPublicPriceReportFilters, updatePublicPriceReportFilters } from "../public-price-report";
+import { updatePublicPriceReportFilters } from "../public-price-report";
 import { sendInteractionResponse } from "../rest";
 import type { DiscordBotClient, DiscordBotOptions, DiscordInteraction, FetchImpl } from "../types";
 import { handleTargetPriceWatchModalSubmit } from "./modal-submit/watch";
@@ -141,7 +141,7 @@ export async function handleModalSubmitInteraction({
       return;
     }
 
-    const currentFilters = toPublicPriceReportFilters(currentPanel.setting);
+    const currentFilters = toPriceReportFilters(currentPanel.setting);
     await updatePublicPriceReportFilters({
       client,
       discordGuildId: publicContext.discordGuildId,

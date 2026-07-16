@@ -2,18 +2,13 @@
 // 驗證 Discord bot slash command 註冊 payload 與 Gateway identify 的低權限 intents 設定。
 
 import { describe, expect, it, vi } from "vitest";
+import { parsePublicReportInteraction } from "../../../../../src/scripts/ops/discord-bot/commands";
 import { CommandCooldowns } from "../../../../../src/scripts/ops/discord-bot/cooldowns";
 import { runGatewaySession } from "../../../../../src/scripts/ops/discord-bot/gateway";
 import { registerDiscordBotCommands } from "../../../../../src/scripts/ops/discord-bot/registration";
-import { parsePublicReportInteraction } from "../../../../../src/scripts/ops/discord-bot/commands";
 
-import {
-  API_BASE_URL,
-  APPLICATION_ID,
-  createDiscordBotClient,
-  createDiscordBotOptions,
-  TOKEN,
-} from "../support";
+import { createDiscordBotClient } from "../support/client";
+import { API_BASE_URL, APPLICATION_ID, createDiscordBotOptions, TOKEN } from "../support/options";
 
 describe("registerDiscordBotCommands", () => {
   it("registers the final global command tree with guild-only administrator commands", async () => {
@@ -111,7 +106,11 @@ describe("registerDiscordBotCommands", () => {
     expect(String(globalRequestInit.body).toLowerCase()).not.toContain("administrator");
   });
 
-  it.each(["manage", "status", "test"])("rejects the removed public-report %s parser input", (name) => {
+  it.each([
+    "manage",
+    "status",
+    "test",
+  ])("rejects the removed public-report %s parser input", (name) => {
     expect(
       parsePublicReportInteraction({
         id: "interaction",

@@ -21,6 +21,7 @@ import {
   type RawSnapshotCleanupDaemonOptions,
 } from "./cleanup-raw-snapshots-daemon/options";
 import { createOpsLogger } from "./shared/logger";
+import { createInterruptibleShutdownController } from "./shared/shutdown";
 
 const logger = createOpsLogger();
 
@@ -53,7 +54,11 @@ async function main(): Promise<void> {
   await loadWorkspaceEnv(workspaceRoot);
   const options = parseRawSnapshotCleanupDaemonOptions(args);
   let client: PrismaClient | null = null;
-  const shutdown = createShutdownController();
+  const shutdown = createInterruptibleShutdownController({
+    onSignal: (signal) => {
+      log(`Received ${signal}; stopping after the current cleanup step.`);
+    },
+  });
 
   try {
     const db = await import("@partsradar/db");
@@ -135,48 +140,6 @@ async function runCleanupCycle({
 
     return { ok: false, error };
   }
-}
-
-// 註冊 SIGINT/SIGTERM，讓 daemon 能在目前 cleanup step 結束後停止，且可中斷等待中的 sleep。
-function createShutdownController(): ShutdownController {
-  let stopRequested = false;
-  let wakeSleeper: (() => void) | null = null;
-
-  const requestStop = (signal: NodeJS.Signals): void => {
-    if (!stopRequested) {
-      log(`Received ${signal}; stopping after the current cleanup step.`);
-    }
-
-    stopRequested = true;
-    wakeSleeper?.();
-  };
-
-  process.once("SIGINT", requestStop);
-  process.once("SIGTERM", requestStop);
-
-  return {
-    get requested() {
-      return stopRequested;
-    },
-    sleep(ms: number) {
-      if (stopRequested) {
-        return Promise.resolve();
-      }
-
-      return new Promise<void>((resolve) => {
-        const timeoutId = setTimeout(() => {
-          wakeSleeper = null;
-          resolve();
-        }, ms);
-
-        wakeSleeper = () => {
-          clearTimeout(timeoutId);
-          wakeSleeper = null;
-          resolve();
-        };
-      });
-    },
-  };
 }
 
 // 輸出單輪 cleanup 的高層摘要，避免 log 夾帶 raw path 或逐筆 metadata。

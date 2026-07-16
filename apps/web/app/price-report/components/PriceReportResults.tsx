@@ -6,16 +6,25 @@
 import Link from "next/link";
 import { type FormEvent, useState } from "react";
 import { API_RATE_LIMITED_MESSAGE } from "../../_shared/api-client";
-import { formatInteger, formatSignedTwdPrice, formatTwdPrice } from "../../_shared/formatting";
+import {
+  formatInteger,
+  formatSignedPercent,
+  formatSignedTwdPrice,
+  formatTwdPrice,
+} from "../../_shared/formatting";
 import { toDigitsOnly } from "../../_shared/numeric-input";
 import { Pagination } from "../../_shared/Pagination";
 import { ProductImage } from "../../_shared/ProductImage";
 import { getVisiblePages } from "../../_shared/pagination";
 import { formatTaipeiDateTime } from "../../_shared/time";
-import type { PriceReportLoadState, PriceReportResponse, PriceReportResponseItem } from "../types";
+import type {
+  PriceReportResponseBody,
+  PriceReportResponseItem,
+} from "../../api/price-report/response";
+import type { PriceReportLoadState } from "../types";
 
 interface PriceReportResultsProps {
-  report: PriceReportResponse | null;
+  report: PriceReportResponseBody | null;
   returnTo: string;
   state: PriceReportLoadState;
   onPageChange: (page: number) => void;
@@ -181,7 +190,7 @@ function PriceReportRow({ item, returnTo }: { item: PriceReportResponseItem; ret
         area="percent"
         className="price-report-change"
         label="漲跌比例"
-        value={formatSignedPercent(item.deltaPercent)}
+        value={formatSignedPercent(item.deltaPercent, 2)}
       />
       <ReportValue
         area="changed"
@@ -220,14 +229,6 @@ function PriceReportSkeleton() {
       ))}
     </div>
   );
-}
-
-function formatSignedPercent(value: number | null): string {
-  if (value === null) {
-    return "—";
-  }
-
-  return `${value > 0 ? "+" : ""}${value.toFixed(2)}%`;
 }
 
 function formatCategoryLabel(value: string): string {

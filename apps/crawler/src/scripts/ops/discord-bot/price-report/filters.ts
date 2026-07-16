@@ -1,11 +1,15 @@
 // apps/crawler/src/scripts/ops/discord-bot/price-report/filters.ts
 // 定義 price-report 篩選條件，並提供分類、內容類型與商品關鍵字的正規化、套用與顯示文字。
 
-import { MAX_PRICE_REPORT_KEYWORD_GROUPS, MAX_PRICE_REPORT_KEYWORD_LENGTH } from "../constants";
 import type {
   PriceReportNewProductItem,
   PriceReportPriceChangeItem,
 } from "@partsradar/db/price-report";
+import {
+  canonicalizePriceReportKeyword,
+  tokenizePriceReportKeywordGroups,
+} from "@partsradar/shared";
+import { MAX_PRICE_REPORT_KEYWORD_GROUPS, MAX_PRICE_REPORT_KEYWORD_LENGTH } from "../constants";
 
 // Discord 設定面板使用的來源分類選項，對應 CoolPC sourceCategory 的 IGrp 與顯示名稱。
 export interface PriceReportCategoryOption {
@@ -46,7 +50,7 @@ export function filterPriceChangesForReport(
 ): PriceReportPriceChangeItem[] {
   const normalizedFilters = normalizePriceReportFilters(filters);
   const categoryIgrps = new Set(normalizedFilters.categoryIgrps);
-  const keywordGroups = parseProductKeywordGroups(normalizedFilters.productKeyword);
+  const keywordGroups = tokenizePriceReportKeywordGroups(normalizedFilters.productKeyword);
 
   return priceChanges.filter((change) => {
     if (categoryIgrps.size > 0 && !categoryIgrps.has(change.category.igrp)) {
@@ -72,7 +76,7 @@ export function filterNewProductsForReport(
 ): PriceReportNewProductItem[] {
   const normalizedFilters = normalizePriceReportFilters(filters);
   const categoryIgrps = new Set(normalizedFilters.categoryIgrps);
-  const keywordGroups = parseProductKeywordGroups(normalizedFilters.productKeyword);
+  const keywordGroups = tokenizePriceReportKeywordGroups(normalizedFilters.productKeyword);
 
   if (!normalizedFilters.includeNewProducts) {
     return [];
@@ -180,33 +184,13 @@ function normalizePriceReportProductKeyword(value: string | null | undefined): s
     return null;
   }
 
-  const keyword = normalizePriceReportProductKeywordText(value);
+  const keyword = canonicalizePriceReportKeyword(value);
 
   return keyword.length > 0 &&
     keyword.length <= MAX_PRICE_REPORT_KEYWORD_LENGTH &&
-    parseProductKeywordGroups(keyword).length <= MAX_PRICE_REPORT_KEYWORD_GROUPS
+    tokenizePriceReportKeywordGroups(keyword).length <= MAX_PRICE_REPORT_KEYWORD_GROUPS
     ? keyword
     : null;
-}
-
-function normalizePriceReportProductKeywordText(value: string): string {
-  return value
-    .replace(/，/g, ",")
-    .split(",")
-    .map((group) => group.trim().replace(/\s+/g, " "))
-    .filter(Boolean)
-    .join(", ");
-}
-
-function parseProductKeywordGroups(keyword: string | null): string[][] {
-  if (!keyword) {
-    return [];
-  }
-
-  return keyword
-    .split(",")
-    .map((group) => group.trim().split(/\s+/).filter(Boolean))
-    .filter((tokens) => tokens.length > 0);
 }
 
 function matchesProductKeywordGroups(productName: string, groups: string[][]): boolean {

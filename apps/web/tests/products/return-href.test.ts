@@ -5,35 +5,41 @@ import { describe, expect, it } from "vitest";
 
 import {
   normalizeBuildListReturnHref,
-  normalizeReturnHref,
-} from "../../app/products/[id]/return-href";
+  normalizeProductDetailReturnHref,
+} from "../../app/_shared/return-href";
 
 describe("product detail return href", () => {
   it("allows the product explorer root path and build list path", () => {
-    expect(normalizeReturnHref("/?category=gpu&q=ryzen&page=2")).toBe(
+    expect(normalizeProductDetailReturnHref("/?category=gpu&q=ryzen&page=2")).toBe(
       "/?category=gpu&q=ryzen&page=2",
     );
-    expect(normalizeReturnHref(["/?status=inactive", "/?q=ignored"])).toBe("/?status=inactive");
-    expect(normalizeReturnHref("/build-list")).toBe("/build-list");
+    expect(normalizeProductDetailReturnHref(["/?status=inactive", "/?q=ignored"])).toBe(
+      "/?status=inactive",
+    );
+    expect(normalizeProductDetailReturnHref("/build-list")).toBe("/build-list");
     expect(
-      normalizeReturnHref("/price-report?window=7d&type=drop&type=rise&category=gpu&page=2"),
+      normalizeProductDetailReturnHref(
+        "/price-report?window=7d&type=drop&type=rise&category=gpu&page=2",
+      ),
     ).toBe("/price-report?window=7d&type=drop&type=rise&category=gpu&page=2");
   });
 
   it("rejects the removed legacy category query and invalid semantic categories", () => {
-    expect(normalizeReturnHref("/?igrp=7")).toBe("/");
-    expect(normalizeReturnHref("/?category=storage&igrp=7")).toBe("/");
-    expect(normalizeReturnHref("/?category=cpu&igrp=7")).toBe("/");
-    expect(normalizeReturnHref("/?category=unknown")).toBe("/");
+    expect(normalizeProductDetailReturnHref("/?igrp=7")).toBe("/");
+    expect(normalizeProductDetailReturnHref("/?category=storage&igrp=7")).toBe("/");
+    expect(normalizeProductDetailReturnHref("/?category=cpu&igrp=7")).toBe("/");
+    expect(normalizeProductDetailReturnHref("/?category=unknown")).toBe("/");
   });
 
   it("falls back home for external, protocol-relative, or unsupported return URLs", () => {
-    expect(normalizeReturnHref(undefined)).toBe("/");
-    expect(normalizeReturnHref("https://example.test/?q=ryzen")).toBe("/");
-    expect(normalizeReturnHref("//example.test/?q=ryzen")).toBe("/");
-    expect(normalizeReturnHref("/products/11111111-1111-1111-1111-111111111111?category=gpu")).toBe(
-      "/",
-    );
+    expect(normalizeProductDetailReturnHref(undefined)).toBe("/");
+    expect(normalizeProductDetailReturnHref("https://example.test/?q=ryzen")).toBe("/");
+    expect(normalizeProductDetailReturnHref("//example.test/?q=ryzen")).toBe("/");
+    expect(
+      normalizeProductDetailReturnHref(
+        "/products/11111111-1111-1111-1111-111111111111?category=gpu",
+      ),
+    ).toBe("/");
   });
 });
 

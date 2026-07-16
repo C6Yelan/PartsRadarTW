@@ -5,13 +5,13 @@ import { describe, expect, it, vi } from "vitest";
 import { MAX_TARGET_PRICE_WATCHES_PER_USER } from "../../../../../src/scripts/ops/discord-bot/constants";
 import { CommandCooldowns } from "../../../../../src/scripts/ops/discord-bot/cooldowns";
 import { handleDiscordInteraction } from "../../../../../src/scripts/ops/discord-bot/interactions";
+import { createDiscordBotClient } from "../support/client";
 import {
-  createDiscordBotClient,
-  createDiscordBotOptions,
   createTargetPriceWatchModalSubmitInteraction,
   createWatchButtonInteraction,
   createWatchOpenInteraction,
-} from "../support";
+} from "../support/interactions-watch";
+import { createDiscordBotOptions } from "../support/options";
 
 describe("handleDiscordInteraction watch create form", () => {
   it("opens an empty target price watch manager from the watch command", async () => {

@@ -5,7 +5,9 @@ import { describe, expect, it, vi } from "vitest";
 import { sendPriceReportNow } from "../../../../../src/scripts/ops/discord-bot/price-report";
 import type { DiscordBotMessage } from "../../../../../src/scripts/ops/discord-bot/types";
 
-import { createDiscordBotClient, PUBLIC_BASE_URL, snapshot } from "../support";
+import { createDiscordBotClient } from "../support/client";
+import { snapshot } from "../support/data-factories";
+import { PUBLIC_BASE_URL } from "../support/options";
 
 describe("sendPriceReportNow filters", () => {
   it("filters price reports by category and event type", async () => {

@@ -5,10 +5,10 @@
 import Link from "next/link";
 import { formatTwdPrice } from "../../_shared/formatting";
 import { ExternalLinkIcon } from "../../_shared/icons";
+import { ProductImage } from "../../_shared/ProductImage";
 import { formatTaipeiDateTime } from "../../_shared/time";
 import { BUILD_LIST_MAX_QUANTITY } from "../constants";
 import { type BuildListItem, getBuildListLineSubtotal } from "../model";
-import BuildListItemImage from "./BuildListItemImage";
 
 export default function BuildListItemRow({
   item,
@@ -43,9 +43,11 @@ export default function BuildListItemRow({
           className="build-list-item-image-link"
           href={detailHref}
         >
-          <BuildListItemImage
+          <ProductImage
+            className="build-list-item-image"
+            fallbackLabel={product?.category.displayName ?? "商品資料"}
+            image={product?.image ?? null}
             key={product?.image?.url ?? product?.id ?? intent.productId}
-            product={product}
           />
         </Link>
       </div>

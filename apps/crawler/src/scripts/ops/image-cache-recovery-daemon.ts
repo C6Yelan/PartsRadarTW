@@ -14,10 +14,11 @@ import {
 } from "./image-cache-backfill/options";
 import {
   backfillImages,
-  readBoundedImageRecoveryBatch,
   type ImageRecoverySelectionTelemetry,
+  readBoundedImageRecoveryBatch,
 } from "./image-cache-backfill/processor";
 import { createOpsLogger } from "./shared/logger";
+import { createInterruptibleShutdownController } from "./shared/shutdown";
 
 const logger = createOpsLogger();
 const DEFAULT_INTERVAL_SECONDS = 300;
@@ -45,7 +46,7 @@ async function main(): Promise<void> {
   const workspaceRoot = resolveWorkspaceRoot();
   await loadWorkspaceEnv(workspaceRoot);
   const options = parseImageRecoveryDaemonOptions(args);
-  const shutdown = createShutdownController();
+  const shutdown = createInterruptibleShutdownController();
   let client: PrismaClient | null = null;
 
   try {
@@ -161,37 +162,6 @@ export function formatImageRecoveryCycleSummary(
   summary: BackfillSummary,
 ): string {
   return `Image recovery cycle finished. neverCheckedRead=${selection.neverCheckedRead} retryDueRead=${selection.retryDueRead} auditRead=${selection.auditRead} reconciledExisting=${selection.reconciledExisting} selectedForBackfill=${selection.selectedForBackfill} cached=${summary.cached} reused=${summary.reused} failed=${summary.failed} invalid=${summary.invalid} liveFetches=${summary.liveFetches}`;
-}
-
-function createShutdownController(): ShutdownController {
-  let requested = false;
-  let wake: (() => void) | null = null;
-  const stop = () => {
-    requested = true;
-    wake?.();
-  };
-  process.once("SIGINT", stop);
-  process.once("SIGTERM", stop);
-
-  return {
-    get requested() {
-      return requested;
-    },
-    sleep(ms) {
-      if (requested) return Promise.resolve();
-      return new Promise((resolve) => {
-        const timeoutId = setTimeout(() => {
-          wake = null;
-          resolve();
-        }, ms);
-        wake = () => {
-          clearTimeout(timeoutId);
-          wake = null;
-          resolve();
-        };
-      });
-    },
-  };
 }
 
 function readPositiveInteger(raw: string | undefined, fallback: number, name: string): number {

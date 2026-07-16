@@ -6,15 +6,10 @@ import { MAX_TARGET_PRICE_WATCHES_PER_USER } from "../../../../../src/scripts/op
 import { CommandCooldowns } from "../../../../../src/scripts/ops/discord-bot/cooldowns";
 import { handleDiscordInteraction } from "../../../../../src/scripts/ops/discord-bot/interactions";
 import { normalizeWatchProductReference } from "../../../../../src/scripts/ops/discord-bot/watch";
-import {
-  createDiscordBotClient,
-  createDiscordBotOptions,
-  createTargetPriceWatchModalSubmitInteraction,
-  snapshot,
-  targetPriceWatch,
-  WATCH_PRODUCT_ID,
-  WATCH_ROW_ID,
-} from "../support";
+import { createDiscordBotClient } from "../support/client";
+import { snapshot, targetPriceWatch } from "../support/data-factories";
+import { createTargetPriceWatchModalSubmitInteraction } from "../support/interactions-watch";
+import { createDiscordBotOptions, WATCH_PRODUCT_ID, WATCH_ROW_ID } from "../support/options";
 
 describe("normalizeWatchProductReference", () => {
   it("accepts product ids and PartsRadarTW product URLs", () => {

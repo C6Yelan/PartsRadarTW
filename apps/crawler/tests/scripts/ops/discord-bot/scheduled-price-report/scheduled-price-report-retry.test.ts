@@ -5,7 +5,9 @@ import { describe, expect, it, vi } from "vitest";
 import { sendDueScheduledPriceReports } from "../../../../../src/scripts/ops/discord-bot/price-report";
 import type { DiscordBotMessage } from "../../../../../src/scripts/ops/discord-bot/types";
 
-import { createDiscordBotClient, PUBLIC_BASE_URL, priceReportSetting, snapshot } from "../support";
+import { createDiscordBotClient } from "../support/client";
+import { priceReportSetting, snapshot } from "../support/data-factories";
+import { PUBLIC_BASE_URL } from "../support/options";
 
 describe("scheduled price report retry", () => {
   it("retries scheduled reports soon after a failed delivery", async () => {

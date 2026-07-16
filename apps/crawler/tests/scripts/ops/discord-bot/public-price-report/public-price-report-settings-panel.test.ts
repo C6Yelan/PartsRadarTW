@@ -4,16 +4,14 @@
 import { describe, expect, it, vi } from "vitest";
 import { CommandCooldowns } from "../../../../../src/scripts/ops/discord-bot/cooldowns";
 import { handleDiscordInteraction } from "../../../../../src/scripts/ops/discord-bot/interactions";
+import { createDiscordBotClient } from "../support/client";
+import { publicPriceReportDelivery, publicPriceReportSetting } from "../support/data-factories";
 import {
-  createDiscordBotClient,
-  createDiscordBotOptions,
   createPublicReportButtonInteraction,
   createPublicReportInteraction,
-  publicPriceReportDelivery,
-  publicPriceReportSetting,
-  readEmbedFieldValue,
-  readResponseEmbed,
-} from "../support";
+} from "../support/interactions-public-report";
+import { readEmbedFieldValue, readResponseEmbed } from "../support/message-assertions";
+import { createDiscordBotOptions } from "../support/options";
 
 describe("public price report settings panel", () => {
   it("shows the public report settings panel from the public-report settings command", async () => {
@@ -129,8 +127,7 @@ describe("public price report settings panel", () => {
     expect(requestBody.data.components).toHaveLength(5);
     expect(requestBody.data.components[0]).toMatchObject({
       label: "其中一組關鍵字 1",
-      description:
-        "同一欄的詞要全部出現在商品名稱中；不同欄只要符合其中一組。全部留空代表不限。",
+      description: "同一欄的詞要全部出現在商品名稱中；不同欄只要符合其中一組。全部留空代表不限。",
       component: { placeholder: "例：RTX 5090" },
     });
     expect(client.discordPublicPriceReportSetting.findUnique).toHaveBeenCalledWith({
@@ -216,10 +213,7 @@ describe("public price report settings panel", () => {
     });
 
     const requestBody = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
-    const latestDelivery = readEmbedFieldValue(
-      readResponseEmbed(requestBody.data),
-      "最近一次發送",
-    );
+    const latestDelivery = readEmbedFieldValue(readResponseEmbed(requestBody.data), "最近一次發送");
 
     expect(latestDelivery).toBe("06/07 10:00，發送失敗，bot 會稍後再試。");
     expect(client.discordPublicPriceReportDelivery.findFirst).toHaveBeenCalledWith({
@@ -262,14 +256,9 @@ describe("public price report settings panel", () => {
     });
 
     const requestBody = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
-    const latestDelivery = readEmbedFieldValue(
-      readResponseEmbed(requestBody.data),
-      "最近一次發送",
-    );
+    const latestDelivery = readEmbedFieldValue(readResponseEmbed(requestBody.data), "最近一次發送");
 
-    expect(latestDelivery).toBe(
-      "06/07 10:00，Discord 暫時無法接收訊息，bot 會稍後再試。",
-    );
+    expect(latestDelivery).toBe("06/07 10:00，Discord 暫時無法接收訊息，bot 會稍後再試。");
     expect(latestDelivery).not.toContain("限流");
   });
 
