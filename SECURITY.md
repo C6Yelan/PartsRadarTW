@@ -12,16 +12,11 @@ PartsRadarTW 會處理公開商品資料、部署 secrets、raw source snapshots
 
 ## 公開介面
 
-公開部署包含網站頁面與以下 API：
-
-- 商品分類、列表、詳細資料與價格歷史。
-- 本地商品圖片讀取。
-- crawler 來源狀態。
-- read-only 配單 refresh。
+公開部署包含網站頁面與 [Public API](docs/api.md) 列出的 routes。
 
 網站沒有登入、管理後台、付款或下單介面。配單 refresh 不會保存 request body。
 
-API input 會在 DB 查詢前驗證，錯誤回應不包含 Prisma、DB、crawler 或 env 細節。每個 web process 使用有界 LRU rate limiter；它不是跨 replica 的分散式限流器。
+API input 會在 DB 查詢前驗證，錯誤回應不包含 Prisma、DB、crawler 或 env 細節。
 
 ## Secrets 與部署
 
@@ -37,22 +32,13 @@ Web 會設定 CSP、`Referrer-Policy`、`X-Content-Type-Options`、`X-Frame-Opti
 
 - Raw HTML、parse errors、crawler stack trace、DB 欄位與內部識別不屬於 public API。
 - 商品來源圖片只接受固定原價屋 HTTPS host/path，經 crawler 下載並轉成站內 WebP；訪客圖片請求不會 proxy 外部 URL。
-- 正常 raw snapshot 預設保留 30 天，異常 snapshot 預設 90 天；實際部署仍須啟動 cleanup 並監控結果。
+- Raw snapshot 依內容狀態採不同保留期；實際部署必須依 [cleanup runbook](docs/operations.md#raw-snapshot-cleanup) 啟動並監控 cleanup。
 - 瀏覽器配單只保存商品 ID、數量、順序與時間戳於 localStorage；refresh 商品資料不持久化。
 - Discord 功能會保存 Discord user、guild、channel ID、價格報告偏好、目標價 watch 與 delivery audit metadata。程式目前沒有完整的 Discord 資料 retention／自助刪除 policy，因此不得宣稱沒有個人資料或保證固定刪除期限。
 
-## Rate limit 預設
+## Rate limiting
 
-每個 web process 的預設窗口為 60 秒：
-
-| Scope | 上限 |
-| --- | ---: |
-| 一般 read API | 120 |
-| 配單 refresh | 120，使用獨立 bucket |
-| 商品列表 | 360 |
-| 商品圖片 | 1200 |
-
-大量公開流量仍應在可信任的 reverse proxy 或 edge 層加入額外限制。
+每個 web process 使用有界 LRU rate limiter，設定與預設值以 [`.env.example`](.env.example) 為準。它不是跨 replica 的分散式限流器；大量公開流量仍應在可信任的 reverse proxy 或 edge 層加入額外限制。
 
 ## 維運安全
 

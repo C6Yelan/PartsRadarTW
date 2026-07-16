@@ -27,14 +27,7 @@ pnpm dev:web
 
 ## 程式歸屬
 
-| 路徑 | 責任 |
-| --- | --- |
-| `apps/web` | Next.js 頁面、公開 Route Handlers、瀏覽器配單與 UI。 |
-| `apps/crawler` | 原價屋抓取與解析、維運 CLI、smoke、Discord bot。 |
-| `packages/db` | Prisma schema、migration、seed 與 DB client。 |
-| `packages/shared` | crawler 與 web 必須完全一致的來源身分與 URL contract。 |
-
-`packages/shared` 不是通用工具箱。UI formatter、API query、Discord 訊息、配單與 app-private helper 應留在所屬 app；完整規則見 [`packages/shared/README.md`](packages/shared/README.md)。
+Workspace 責任與資料流見 [Architecture](docs/architecture.md#workspace-責任)。變更應留在擁有該行為的 app；`packages/shared` 只收錄必須跨 app 保持一致的 contract，允許的匯出以 [`packages/shared/README.md`](packages/shared/README.md) 為準。
 
 新增 import 時直接指向擁有該 symbol 的模組。只有 package public API 或確實被多個 production consumer 使用的 feature facade 才應 re-export。
 

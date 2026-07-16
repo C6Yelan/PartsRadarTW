@@ -60,25 +60,11 @@ bot applications.commands
 - `DISCORD_BOT_TOKEN`
 - `DISCORD_APPLICATION_ID`
 
-選用設定：
-
-- `DISCORD_BOT_INVITE_URL`
-- `DISCORD_BOT_REGISTER_COMMANDS_ON_START`
-- `DISCORD_FEATURE_PUBLIC_REPORTS_ENABLED`
-- `DISCORD_FEATURE_PERSONAL_REPORTS_ENABLED`
-- `DISCORD_FEATURE_TARGET_WATCHES_ENABLED`
-- `DISCORD_BOT_COMMAND_COOLDOWN_SECONDS`
-- `DISCORD_PRICE_REPORT_SCHEDULE_INTERVAL_SECONDS`
+選用設定與預設值以 [`.env.example`](../.env.example) 為準。
 
 功能 flag 只停用對應行為，不刪除 commands、settings 或 delivery history。
 
-手動註冊 commands：
-
-```bash
-pnpm ops:discord-bot -- --register-commands
-```
-
-Compose 啟動方式見 [deployment.md](deployment.md)；維運檢查見 [operations.md](operations.md)。
+Command 註冊、Compose 啟動與維運檢查見 [operations.md](operations.md#discord-bot)；部署順序見 [deployment.md](deployment.md)。
 
 ## 保存資料與限制
 

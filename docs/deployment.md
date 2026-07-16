@@ -81,12 +81,12 @@ docker image inspect "$PARTSRADAR_WEB_IMAGE" "$PARTSRADAR_CRAWLER_IMAGE" "$PARTS
 | Volume | 內容 | 備份優先度 |
 | --- | --- | --- |
 | `postgres_data` | Domain truth、價格歷史、Discord 設定與 delivery metadata。 | 必須 |
-| `product_images` | 站內 WebP 商品圖片；重新建立需再次對來源站抓取。 | 建議保留 |
+| `product_images` | 站內 WebP 商品圖片；重新建立需再次對來源站抓取。 | 必須（backup format v2） |
 | `snapshots` | Raw HTML、locks 與 smoke state。 | 依排障／稽核需求 |
 
 `product_images` 是可重建但有外部請求成本的 operational data，不應在一般升級中視為可任意刪除的 build cache。
 
-`snapshots` volume 內的 production smoke notification state 只支援 schema v3。v1／v2 state 與其備份不得覆蓋有效 v3 state；舊副本只能在新版部署後驗證 v3 state 與 daemon health 成功後由部署端另行辨識與刪除。這不是刪除 snapshot volume，也不影響 PostgreSQL、product images、raw snapshots 或其他 persisted state 的備份與還原政策。詳細邊界見 [operations.md](operations.md#smoke-notification-state-compatibility)。
+舊版 production smoke notification state 不得覆蓋有效 v3 state；辨識、還原與刪除邊界見 [operations.md](operations.md#smoke-notification-state-compatibility)。
 
 ## Migration gate
 
@@ -116,21 +116,15 @@ docker compose up -d --no-build
 
 `storage-init`、`migrate` 與 `seed` 是 one-shot dependency；`web` 只會在 PostgreSQL healthy、migration／seed 成功後啟動。
 
-4. 確認核心狀態：
-
-```bash
-docker compose ps -a
-docker compose logs --tail=100 migrate seed web
-curl --fail http://127.0.0.1:3000/api/source-status
-```
-
-5. 必要時先以 dry-run 檢查圖片補圖，再以正式 topology 入口啟動所有背景服務與 ingress：
+4. 依 [核心服務健康檢查](operations.md#核心服務健康檢查) 確認 migration、seed、web 與公開 API。
+5. 必要時先依 [Product image backfill](operations.md#product-image-backfill) 完成圖片補圖 dry-run；若啟用 Discord，先依 [Discord bot runbook](operations.md#discord-bot) 註冊 commands。
+6. 以正式 topology 入口啟動所有背景服務與 ingress：
 
 ```bash
 scripts/ops/compose-production.sh up -d --no-build
 ```
 
-6. 啟動前必須已完成 Discord command 註冊與功能檢查；啟動後再執行 public-only smoke 與瀏覽器關鍵流程。
+7. 執行 public-only smoke 與瀏覽器關鍵流程。
 
 ## 既有部署升級
 
@@ -139,18 +133,10 @@ scripts/ops/compose-production.sh up -d --no-build
 3. 進入 maintenance window：停止 public ingress、drain requests，再停止舊 web、crawler、cleanup、smoke 與 Discord writers。
 4. 依前述 migration gate 檢查既有 history；有 checksum 落差就停止。
 5. 執行 `docker compose up -d --no-build`，再依首次部署第 4 步驗證核心服務。
-6. 若既有商品需要首次建立或依新規則重算 `filter_tags`，依 [Product filter tag backfill](operations.md#product-filter-tag-backfill) 完成 dry-run、審查、confirm-write及第二次 `changed=0` dry-run；失敗或統計異常時停止 rollout且不要恢復 writers。
+6. 若本次 release 需要資料 backfill，在 writers 仍停止時依 [Operations](operations.md) 的對應流程完成 dry-run、審查與確認寫入；失敗或統計異常時停止 rollout。
 7. 依首次部署第 5–7 步以同一組 reference重建並驗證 writers、Discord 與 public ingress。
 
 詳細指令與成功標準見 [operations.md](operations.md)。
-
-## Docker targets
-
-- `web`：Next.js standalone runtime。
-- `crawler`：Crawler、ops 與 Discord 共用 runtime；預設 command 只顯示安全的 manual crawl help。
-- `migrate`：執行 Prisma production migration。
-
-三個 runtime 都以 non-root `node` 執行。`storage-init` 只在 one-shot container 內以 root 建立 volume 目錄並調整 ownership。
 
 ## Public ingress
 
@@ -178,7 +164,7 @@ Smoke threshold 是部署預設，不等於已依 production baseline 校準。W
 
 ## Rollback
 
-- 發現應用程式問題時先停 external writers 與 public ingress，再保留 DB／volume 證據。
+- 先依 [Incident 與 rollback](operations.md#incident-與-rollback) 停止 external writers 與 public ingress並保存證據。
 - 只在 schema 向後相容時，把 `PARTSRADAR_WEB_IMAGE`／`PARTSRADAR_CRAWLER_IMAGE` 切回部署前記錄的 reference；維持目前 schema 與 migrate image，再以 `--no-build --force-recreate` 重建受影響的 web／crawler／ops services。
 
 ```bash
@@ -186,9 +172,5 @@ docker compose up -d --no-build --force-recreate web
 docker compose -f compose.yml -f compose.crawler.yml --profile scheduled-crawler up -d --no-build --force-recreate crawler-daemon image-cache-recovery-daemon raw-snapshot-cleanup-daemon
 docker compose -f compose.yml -f compose.ops.yml --profile ops --profile discord-bot up -d --no-build --force-recreate smoke-daemon discord-bot
 ```
-
-- 不以 `prisma migrate reset` 或刪除 volume作為 production rollback。
-- DB rollback 必須使用部署前備份與已演練的還原程序；先還原到隔離環境驗證。
-- Product image與snapshot volume除非已證明損壞，否則維持原狀。
 
 無法確認 migration history、備份可還原或 release smoke 時，部署判定應為 NO-GO。

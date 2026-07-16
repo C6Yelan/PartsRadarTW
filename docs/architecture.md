@@ -29,18 +29,16 @@ flowchart LR
 
 沒有 queue、event bus、多來源 abstraction 或共用 domain framework。排程程序透過 PostgreSQL 與具名 volume 協調。
 
-Filesystem lock 僅協調同一主機上共享本機 filesystem 或 local named volume 的程序。持有者會定期更新 timed lease，程序異常終止後由 stale timeout 回收；它不提供 NFS／multi-host fencing 保證，若 holder 暫停超過 timeout，恢復時仍可能短暫與 replacement 重疊。
+Filesystem lock 僅協調同一主機上共享本機 filesystem 或 local named volume 的程序，不提供 NFS／multi-host fencing 保證。
 
 ## Workspace 責任
 
 | 區域 | 責任 |
 | --- | --- |
-| `apps/web` | Next.js 16／React 19 UI、公開 API、站內圖片讀取與瀏覽器配單。 |
+| `apps/web` | Next.js／React UI、公開 API、站內圖片讀取與瀏覽器配單。 |
 | `apps/crawler` | 原價屋 fetch／parser、商品寫入、raw snapshot、ops CLI、smoke 與 Discord bot。 |
-| `packages/db` | PostgreSQL 18 的 Prisma schema、migration、seed 與 client。 |
-| `packages/shared` | 跨 app 必須一致的原價屋來源身分、公開 URL 與 product facet contract。 |
-
-App-private formatter、UI state、API query、Discord message 與測試 helper 不得移入 `packages/shared`。
+| `packages/db` | PostgreSQL 的 Prisma schema、migration、seed 與 client。 |
+| `packages/shared` | 跨 app 必須一致的 contract；允許的匯出見 [`packages/shared/README.md`](../packages/shared/README.md)。 |
 
 ## 商品資料流
 
@@ -73,16 +71,9 @@ Fetch、validation 或 parse 失敗不得覆寫最後一份有效商品與價格
 - 金額為整數 TWD；machine timestamps 使用 UTC，使用者畫面轉成 `Asia/Taipei`。
 - Source status 代表 crawler／來源資料健康，不代表庫存或可購買狀態。
 
-## Compose topology
+## Runtime topology
 
-| Profile | Services | 用途 |
-| --- | --- | --- |
-| 無 profile | `postgres`, `storage-init`, `migrate`, `seed`, `web` | 核心服務。 |
-| `manual-crawler` | `crawler`, `image-cache-backfill` | 手動 crawl、cleanup 與圖片／vendor backfill。 |
-| `scheduled-crawler` | `crawler-daemon`, `image-cache-recovery-daemon`, `raw-snapshot-cleanup-daemon` | 排程抓取、獨立圖片修復與 snapshot 保留。 |
-| `ops` | `smoke-daemon` | Web、DB、crawler 與 delivery 健康檢查。 |
-| `discord-bot` | `discord-bot` | Slash commands 與通知排程。 |
-| `public-tunnel` | `cloudflared` | 選用 public ingress。 |
+Compose files、profiles 與啟動入口由 [Deployment](deployment.md#compose-files) 統一維護。
 
 ## Storage ownership
 

@@ -33,13 +33,6 @@ PartsRadarTW 的公開 API 主要服務官方 web UI。它沒有版本化、SLA 
 | `page` | 從 1 開始；預設 1。 |
 | `pageSize` | 預設 20，最大 100。 |
 
-Category slugs：
-
-```text
-cpu, motherboard, memory, storage, hard-drive, external-storage, cooler,
-liquid-cooling, gpu, case, power-supply, fan-accessory
-```
-
 同一 facet key 的多個值使用 OR，不同 key 之間使用 AND。可用 key、label 與 value 由
 `GET /api/categories` 回應的 `facets` 提供。
 
