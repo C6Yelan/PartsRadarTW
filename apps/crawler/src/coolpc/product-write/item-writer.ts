@@ -192,6 +192,10 @@ function buildProductSeenUpdateData(
                 imageCacheCheckedAt: null,
                 imageCacheFailureCount: 0 as const,
                 imageCacheLastError: null,
+                imageCacheLastErrorKind: null,
+                imageCacheLastHttpStatus: null,
+                imageCacheFailureSince: null,
+                imageCacheLastSuccessAt: null,
                 imageCacheNextRetryAt: null,
               }
             : {}),

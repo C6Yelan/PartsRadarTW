@@ -177,6 +177,8 @@ describe("sendDiscordChannelMessages", () => {
     const [url, request] = fetchMock.mock.calls[0] as [Parameters<typeof fetch>[0], RequestInit];
     expect(String(url)).toBe(`${API_BASE_URL}/channels/999988887777666655/messages`);
     expect(request.method).toBe("POST");
+    expect(request.redirect).toBe("error");
+    expect(request.signal).toBeInstanceOf(AbortSignal);
     expect(JSON.parse(String(request.body))).toMatchObject({
       content: "Public report @everyone",
       allowed_mentions: {
@@ -274,6 +276,35 @@ describe("sendDiscordChannelMessages", () => {
       providerErrorCode: null,
     });
     expect(JSON.stringify(result)).not.toContain("private-transport-token");
+  });
+
+  it("stops reading an oversized provider response", async () => {
+    let streamCancelled = false;
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new Uint8Array(256 * 1024));
+        controller.enqueue(new Uint8Array([1]));
+      },
+      cancel() {
+        streamCancelled = true;
+      },
+    });
+    const result = await sendDiscordRestRequest({
+      token: TOKEN,
+      apiBaseUrl: API_BASE_URL,
+      fetchImpl: vi.fn<typeof fetch>(async () => new Response(body, { status: 200 })),
+      method: "POST",
+      path: "/channels/999988887777666655/messages",
+      body: { content: "test" },
+    });
+
+    expect(result).toEqual({
+      status: "failed",
+      httpStatus: null,
+      errorCategory: "TRANSPORT",
+      providerErrorCode: null,
+    });
+    expect(streamCancelled).toBe(true);
   });
 });
 

@@ -140,17 +140,39 @@ export async function fetchSourceImageBytes(
       );
     }
 
-    const bytes = Buffer.from(await response.arrayBuffer());
+    const chunks: Uint8Array[] = [];
+    let receivedBytes = 0;
 
-    if (bytes.byteLength > options.maxSourceBytes) {
-      throw new SourceImageFetchError(
-        `Source image is too large: ${formatBytes(bytes.byteLength)}`,
-        "too_large",
-        response.status,
-      );
+    if (response.body) {
+      const reader = response.body.getReader();
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+
+          if (done) {
+            break;
+          }
+
+          receivedBytes += value.byteLength;
+
+          if (receivedBytes > options.maxSourceBytes) {
+            await reader.cancel().catch(() => undefined);
+            throw new SourceImageFetchError(
+              `Source image is too large: ${formatBytes(receivedBytes)}`,
+              "too_large",
+              response.status,
+            );
+          }
+
+          chunks.push(value);
+        }
+      } finally {
+        reader.releaseLock();
+      }
     }
 
-    return bytes;
+    return Buffer.concat(chunks, receivedBytes);
   } finally {
     clearTimeout(timeoutId);
     await sourceImageFetchLock.release();

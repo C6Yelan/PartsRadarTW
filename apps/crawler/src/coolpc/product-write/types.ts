@@ -149,6 +149,10 @@ export interface ProductSeenUpdateData {
   imageCacheCheckedAt?: null;
   imageCacheFailureCount?: 0;
   imageCacheLastError?: null;
+  imageCacheLastErrorKind?: null;
+  imageCacheLastHttpStatus?: null;
+  imageCacheFailureSince?: null;
+  imageCacheLastSuccessAt?: null;
   imageCacheNextRetryAt?: null;
   sourceUrl: string;
   isActive: true;

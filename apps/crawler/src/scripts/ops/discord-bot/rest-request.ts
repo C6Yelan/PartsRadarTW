@@ -3,6 +3,9 @@
 
 import type { DiscordRestOptions, DiscordRestResult } from "./types";
 
+const DISCORD_REST_TIMEOUT_MS = 15_000;
+const DISCORD_RESPONSE_MAX_BYTES = 256 * 1024;
+
 // 發送單次 Discord REST 請求，回傳給上層分流的技術結果；使用者文案需再經過 formatter 泛化。
 export async function sendDiscordRestRequest<T>({
   token,
@@ -25,6 +28,8 @@ export async function sendDiscordRestRequest<T>({
         "user-agent": "PartsRadarTW Discord bot (+https://github.com/C6Yelan/PartsRadarTW)",
       },
       body: body === undefined ? undefined : JSON.stringify(body),
+      redirect: "error",
+      signal: AbortSignal.timeout(DISCORD_REST_TIMEOUT_MS),
     });
 
     if (response.status === 429) {
@@ -76,7 +81,36 @@ export async function sendDiscordRestRequest<T>({
 
 // Discord 成功或錯誤回應都可能沒有 body；解析失敗時交由上層以狀態碼判斷。
 async function readDiscordJson<T>(response: Response): Promise<T | null> {
-  const text = await response.text();
+  if (!response.body) {
+    return null;
+  }
+
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let receivedBytes = 0;
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+
+      if (done) {
+        break;
+      }
+
+      receivedBytes += value.byteLength;
+
+      if (receivedBytes > DISCORD_RESPONSE_MAX_BYTES) {
+        await reader.cancel().catch(() => undefined);
+        throw new Error("Discord response exceeded the byte limit.");
+      }
+
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const text = Buffer.concat(chunks, receivedBytes).toString("utf8");
 
   if (!text.trim()) {
     return null;

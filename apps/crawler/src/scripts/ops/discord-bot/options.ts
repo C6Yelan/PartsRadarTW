@@ -17,6 +17,37 @@ export function parseDiscordBotOptions(
   args: string[],
   env: NodeJS.ProcessEnv = process.env,
 ): DiscordBotOptions {
+  const apiBaseUrl = normalizeHttpBaseUrl(
+    env.DISCORD_API_BASE_URL ?? DEFAULT_DISCORD_API_BASE_URL,
+    "DISCORD_API_BASE_URL",
+  );
+  const gatewayUrl = normalizeWebSocketUrl(
+    env.DISCORD_GATEWAY_URL ?? DEFAULT_DISCORD_GATEWAY_URL,
+    "DISCORD_GATEWAY_URL",
+  );
+
+  if (env.NODE_ENV === "production") {
+    const apiUrl = new URL(apiBaseUrl);
+    const gateway = new URL(gatewayUrl);
+
+    if (
+      apiUrl.origin !== "https://discord.com" ||
+      apiUrl.username ||
+      apiUrl.password ||
+      !apiUrl.pathname.startsWith("/api/")
+    ) {
+      throw new Error(
+        "DISCORD_API_BASE_URL must use the official Discord HTTPS API in production.",
+      );
+    }
+
+    if (gateway.origin !== "wss://gateway.discord.gg" || gateway.username || gateway.password) {
+      throw new Error(
+        "DISCORD_GATEWAY_URL must use the official Discord WSS gateway in production.",
+      );
+    }
+  }
+
   return {
     token: readRequiredSecret(env, "DISCORD_BOT_TOKEN"),
     applicationId: readRequiredSnowflake(env, "DISCORD_APPLICATION_ID"),
@@ -24,14 +55,8 @@ export function parseDiscordBotOptions(
       (env.PARTSRADAR_PUBLIC_BASE_URL ?? DEFAULT_PUBLIC_BASE_URL).trim(),
       "PARTSRADAR_PUBLIC_BASE_URL",
     ),
-    apiBaseUrl: normalizeHttpBaseUrl(
-      env.DISCORD_API_BASE_URL ?? DEFAULT_DISCORD_API_BASE_URL,
-      "DISCORD_API_BASE_URL",
-    ),
-    gatewayUrl: normalizeWebSocketUrl(
-      env.DISCORD_GATEWAY_URL ?? DEFAULT_DISCORD_GATEWAY_URL,
-      "DISCORD_GATEWAY_URL",
-    ),
+    apiBaseUrl,
+    gatewayUrl,
     registerCommandsOnStart: readBooleanEnv(env, "DISCORD_BOT_REGISTER_COMMANDS_ON_START", true),
     publicReportsEnabled: readBooleanEnv(env, "DISCORD_FEATURE_PUBLIC_REPORTS_ENABLED", true),
     personalReportsEnabled: readBooleanEnv(env, "DISCORD_FEATURE_PERSONAL_REPORTS_ENABLED", true),

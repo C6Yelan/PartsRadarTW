@@ -74,6 +74,28 @@ describe("Discord bot options", () => {
     ).toThrow("DISCORD_APPLICATION_ID must be a Discord snowflake id");
   });
 
+  it("only accepts official Discord transport endpoints in production", () => {
+    const productionEnv = {
+      NODE_ENV: "production",
+      DISCORD_BOT_TOKEN: TOKEN,
+      DISCORD_APPLICATION_ID: APPLICATION_ID,
+    };
+
+    expect(() => parseDiscordBotOptions([], productionEnv)).not.toThrow();
+    expect(() =>
+      parseDiscordBotOptions([], {
+        ...productionEnv,
+        DISCORD_API_BASE_URL: "https://discord.test/api/v10",
+      }),
+    ).toThrow("official Discord HTTPS API");
+    expect(() =>
+      parseDiscordBotOptions([], {
+        ...productionEnv,
+        DISCORD_GATEWAY_URL: "wss://discord.test/gateway",
+      }),
+    ).toThrow("official Discord WSS gateway");
+  });
+
   it("keeps help focused on startup and one-shot command registration", () => {
     const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
 

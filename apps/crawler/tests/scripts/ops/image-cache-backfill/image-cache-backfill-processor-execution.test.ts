@@ -216,4 +216,37 @@ describe("image cache backfill live request accounting", () => {
     expect(summary).toMatchObject({ failed: 1, liveFetches: 1 });
     expect(fetchMock).toHaveBeenCalledOnce();
   });
+
+  it("stops reading a source image stream as soon as the byte limit is exceeded", async () => {
+    const storageDir = await createTempRoot(tempRoots);
+    let streamCancelled = false;
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new Uint8Array([1, 2, 3]));
+        controller.enqueue(new Uint8Array([4, 5, 6]));
+      },
+      cancel() {
+        streamCancelled = true;
+      },
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(body, {
+            status: 200,
+            headers: { "content-type": "image/png" },
+          }),
+      ),
+    );
+
+    const summary = await backfillImages(
+      [createCandidate("oversized-stream", "2026-06-08T08:05:00.000Z")],
+      createOptions({ storageDir, maxSourceBytes: 5 }),
+      { log: () => {}, debugLog: () => {} },
+    );
+
+    expect(summary).toMatchObject({ failed: 1, liveFetches: 1 });
+    expect(streamCancelled).toBe(true);
+  });
 });

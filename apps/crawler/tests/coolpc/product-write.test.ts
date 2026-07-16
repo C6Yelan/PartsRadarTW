@@ -64,17 +64,29 @@ describe("CoolPC category product observation writer", () => {
     });
   });
 
-  it("updates product identity fields and creates a new price snapshot when price changes", async () => {
+  it("updates product fields and clears stale image diagnostics when values change", async () => {
     const client = new FakeCoolpcProductWriteClient();
     const previousSeenAt = new Date("2026-05-27T10:00:00.000Z");
     client.seedProductWithCurrentPrice(
       productItem({
         name: "AMD Ryzen 5 7500F old name",
         normalizedName: "amd ryzen 5 7500f old name",
+        primaryImageUrl: "https://www.coolpc.com.tw/eval/4/old-image.jpg",
         price: 4880,
         fetchedAt: previousSeenAt,
       }),
     );
+    Object.assign(client.products[0] ?? {}, {
+      imageCachedAt: previousSeenAt,
+      imageCacheCheckedAt: previousSeenAt,
+      imageCacheFailureCount: 3,
+      imageCacheLastError: "old failure",
+      imageCacheLastErrorKind: "http",
+      imageCacheLastHttpStatus: 404,
+      imageCacheFailureSince: previousSeenAt,
+      imageCacheLastSuccessAt: previousSeenAt,
+      imageCacheNextRetryAt: previousSeenAt,
+    });
     const nextItem = productItem({
       name: "AMD Ryzen 5 7500F MPK【6核/12緒】3.7G",
       normalizedName: "amd ryzen 5 7500f mpk【6核/12緒】3.7g",
@@ -106,6 +118,15 @@ describe("CoolPC category product observation writer", () => {
       vendorName: nextItem.vendorName,
       primaryImageUrl: nextItem.primaryImageUrl,
       primaryImageCheckedAt: nextItem.fetchedAt,
+      imageCachedAt: null,
+      imageCacheCheckedAt: null,
+      imageCacheFailureCount: 0,
+      imageCacheLastError: null,
+      imageCacheLastErrorKind: null,
+      imageCacheLastHttpStatus: null,
+      imageCacheFailureSince: null,
+      imageCacheLastSuccessAt: null,
+      imageCacheNextRetryAt: null,
       lastSeenAt: nextItem.fetchedAt,
       isActive: true,
       missingSince: null,
