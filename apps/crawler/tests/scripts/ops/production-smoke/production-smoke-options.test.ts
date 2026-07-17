@@ -38,6 +38,8 @@ describe("production smoke options", () => {
       sourceImageFailureWarnCount: 100,
       sourceImageFailureFailCount: 300,
       minActiveProducts: 1,
+      filterEmptyWarnMinCount: 10,
+      filterEmptyWarnRatio: 0.005,
       missingImageWarnCount: 30,
       missingImageFailCount: 100,
     });
@@ -65,6 +67,8 @@ describe("production smoke options", () => {
         "2500",
         "--missing-image-warn-count",
         "10",
+        "--filter-empty-warn-min-count",
+        "12",
         "--image-inactive-retention-days",
         "45",
         "--filter-sync-state-file",
@@ -76,6 +80,7 @@ describe("production smoke options", () => {
         PRODUCT_IMAGE_STORAGE_DIR: "custom-images",
         SMOKE_CRAWLER_FAIL_AFTER_MINUTES: "240",
         SMOKE_SOURCE_IMAGE_FAILURE_WARN_COUNT: "3000",
+        SMOKE_FILTER_EMPTY_WARN_RATIO: "0.01",
       },
       crawlerCwd,
     );
@@ -87,6 +92,8 @@ describe("production smoke options", () => {
     expect(options.sourceWarnAfterMinutes).toBe(45);
     expect(options.crawlerFailAfterMinutes).toBe(240);
     expect(options.missingImageWarnCount).toBe(10);
+    expect(options.filterEmptyWarnMinCount).toBe(12);
+    expect(options.filterEmptyWarnRatio).toBe(0.01);
     expect(options.imageInactiveRetentionDays).toBe(45);
     expect(options.sourceImageFailureMinConsecutive).toBe(4);
     expect(options.sourceImageFailureWarnCount).toBe(1500);
@@ -106,6 +113,14 @@ describe("production smoke options", () => {
     expect(() => parseProductionSmokeOptions(["--timeout-ms", "999"], {}, crawlerCwd)).toThrow(
       "--timeout-ms/SMOKE_TIMEOUT_MS must be an integer",
     );
+    expect(() =>
+      parseProductionSmokeOptions([], { SMOKE_FILTER_EMPTY_WARN_MIN_COUNT: "1.5" }, crawlerCwd),
+    ).toThrow("SMOKE_FILTER_EMPTY_WARN_MIN_COUNT must be an integer");
+    for (const ratio of ["-0.1", "1.01", "not-a-number"]) {
+      expect(() =>
+        parseProductionSmokeOptions([], { SMOKE_FILTER_EMPTY_WARN_RATIO: ratio }, crawlerCwd),
+      ).toThrow("SMOKE_FILTER_EMPTY_WARN_RATIO must be a number between 0 and 1");
+    }
   });
 });
 

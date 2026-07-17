@@ -1,6 +1,19 @@
 // apps/crawler/src/scripts/ops/production-smoke/checks.ts
 // 編排 production smoke 的公開端點、資料庫健康度、爬蟲狀態與通知狀態檢查。
 
+import { checkCrawlerFreshness, checkRecentSuspectedBlocks } from "./checks/crawler-runs";
+import { checkDiscordBotDeliveries } from "./checks/discord-deliveries";
+import { checkCoolpcFilterSync } from "./checks/filter-sync";
+import { checkRecentParseErrors } from "./checks/parse-errors";
+import { checkProductFilterQuality } from "./checks/product-filter-quality";
+import {
+  checkActiveProductCount,
+  checkHistoricalImageCacheMetadata,
+  checkMissingProductImages,
+  checkSourceImageFetchFailures,
+} from "./checks/product-health";
+import { checkPublicEndpoints } from "./checks/public-http";
+import { checkRawSnapshotRetention } from "./checks/raw-snapshot-retention";
 import {
   fail,
   formatAgeMinutes,
@@ -10,19 +23,6 @@ import {
   resolveSummaryStatus,
   warn,
 } from "./results";
-import { checkCrawlerFreshness, checkRecentSuspectedBlocks } from "./checks/crawler-runs";
-import { checkDiscordBotDeliveries } from "./checks/discord-deliveries";
-import { checkCoolpcFilterSync } from "./checks/filter-sync";
-import { checkRecentParseErrors } from "./checks/parse-errors";
-import {
-  checkActiveProductCount,
-  checkHistoricalImageCacheMetadata,
-  checkMissingProductImages,
-  checkSourceImageFetchFailures,
-} from "./checks/product-health";
-import { checkProductFilterQuality } from "./checks/product-filter-quality";
-import { checkPublicEndpoints } from "./checks/public-http";
-import { checkRawSnapshotRetention } from "./checks/raw-snapshot-retention";
 import type {
   ProductionSmokeClient,
   ProductionSmokeOptions,
@@ -49,7 +49,7 @@ export async function runProductionSmoke(
   checks.push(await checkRecentParseErrors(client, options, now));
   checks.push(await checkSourceImageFetchFailures(client, options, now));
   checks.push(await checkActiveProductCount(client, options));
-  checks.push(await checkProductFilterQuality(client));
+  checks.push(await checkProductFilterQuality(client, options));
   checks.push(await checkMissingProductImages(client, options));
   checks.push(await checkHistoricalImageCacheMetadata(client, options, now));
   checks.push(await checkRawSnapshotRetention(client, options, now));

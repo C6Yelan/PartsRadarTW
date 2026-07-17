@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  assessProductFilterQuality,
   auditProductFilterQuality,
   type ProductFilterQualityCandidate,
 } from "../../../../src/scripts/ops/production-smoke/checks/product-filter-quality";
@@ -21,12 +22,7 @@ describe("product filter quality audit", () => {
 
   it("still fails socket coverage when an applicable motherboard is missing its socket", () => {
     const audit = auditProductFilterQuality([
-      product("covered", 5, [
-        "socket:am5",
-        "chipset:b850",
-        "memory_type:ddr5",
-        "form_factor:atx",
-      ]),
+      product("covered", 5, ["socket:am5", "chipset:b850", "memory_type:ddr5", "form_factor:atx"]),
       product("missing", 5, ["chipset:b850", "memory_type:ddr5", "form_factor:atx"]),
     ]);
 
@@ -87,7 +83,90 @@ describe("product filter quality audit", () => {
     expect(audit.belowMinimum).toContain("coverage=8:storage_usage:0/1<98.0%");
     expect(audit.zeroCountOptions).toContain("zero=8:storage_usage:nas");
   });
+
+  it.each([
+    ["allows one unclassified product in 1000", 1, 1000, "OK"],
+    ["allows nine unclassified products in 1000", 9, 1000, "OK"],
+    ["warns for ten unclassified products in 1000", 10, 1000, "WARN"],
+    ["allows ten unclassified products in 10000", 10, 10000, "OK"],
+    ["warns for twenty unclassified products in 3000", 20, 3000, "WARN"],
+  ])("%s", (_label, emptyCount, totalCount, expectedStatus) => {
+    const audit = auditProductFilterQuality(caseProducts(totalCount, emptyCount));
+    const result = assessProductFilterQuality(audit, [], defaultEmptyThreshold);
+
+    expect(result.status).toBe(expectedStatus);
+  });
+
+  it("warns when required coverage is low even below the empty threshold", () => {
+    const audit = auditProductFilterQuality(caseProducts(100, 2));
+
+    expect(assessProductFilterQuality(audit, [], defaultEmptyThreshold).status).toBe("WARN");
+    expect(audit.belowMinimum).toContain("coverage=14:motherboard_support:98/100<99.0%");
+  });
+
+  it("fails for an unsupported tag", () => {
+    const audit = auditProductFilterQuality([
+      product("cpu", 4, [
+        "socket:am5",
+        "cpu_family:ryzen-7",
+        "integrated_graphics:yes",
+        "unknown:value",
+      ]),
+    ]);
+
+    expect(assessProductFilterQuality(audit, [], defaultEmptyThreshold).status).toBe("FAIL");
+  });
+
+  it("fails for conflicting tags", () => {
+    const audit = auditProductFilterQuality([
+      product("cpu", 4, [
+        "socket:am5",
+        "socket:lga1700",
+        "cpu_family:ryzen-7",
+        "integrated_graphics:yes",
+      ]),
+    ]);
+
+    expect(assessProductFilterQuality(audit, [], defaultEmptyThreshold).status).toBe("FAIL");
+  });
+
+  it("keeps zero-count options informational when every quality gate passes", () => {
+    const audit = auditProductFilterQuality(caseProducts(100, 0));
+    const result = assessProductFilterQuality(audit, [], defaultEmptyThreshold);
+
+    expect(audit.zeroCountOptions.length).toBeGreaterThan(0);
+    expect(result.status).toBe("OK");
+  });
+
+  it("reports the empty count, ratio, thresholds, and unclassified samples", () => {
+    const audit = auditProductFilterQuality(caseProducts(3159, 7));
+    const result = assessProductFilterQuality(audit, [], defaultEmptyThreshold);
+
+    expect(result.status).toBe("OK");
+    expect(result.message).toContain("empty=7 (0.22%, warn at >=10 and >=0.50%)");
+    expect(result.message).toContain("all required coverage gates passed");
+    expect(result.message).toContain("unclassified sample(s): case-1");
+  });
+
+  it("identifies an exceeded empty threshold in the warning message", () => {
+    const audit = auditProductFilterQuality(caseProducts(3200, 18));
+    const result = assessProductFilterQuality(audit, [], defaultEmptyThreshold);
+
+    expect(result.status).toBe("WARN");
+    expect(result.message).toContain("empty threshold exceeded: 18/3200 (0.56%)");
+  });
 });
+
+const defaultEmptyThreshold = {
+  filterEmptyWarnMinCount: 10,
+  filterEmptyWarnRatio: 0.005,
+};
+
+function caseProducts(totalCount: number, emptyCount: number): ProductFilterQualityCandidate[] {
+  return Array.from({ length: totalCount }, (_, index) =>
+    product(`case-${index + 1}`, 14, index < emptyCount ? [] : ["motherboard_support:atx"]),
+  );
+}
 
 function product(id: string, igrp: number, filterTags: string[]): ProductFilterQualityCandidate {
   return {

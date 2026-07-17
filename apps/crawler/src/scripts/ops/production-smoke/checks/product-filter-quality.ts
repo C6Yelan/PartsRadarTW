@@ -4,7 +4,7 @@ import {
   parseProductFilterTag,
 } from "@partsradar/shared";
 import { fail, ok, warn } from "../results";
-import type { ProductionSmokeClient, SmokeCheckResult } from "../types";
+import type { ProductionSmokeClient, ProductionSmokeOptions, SmokeCheckResult } from "../types";
 
 export interface ProductFilterQualityCandidate {
   id: string;
@@ -37,6 +37,7 @@ const MOTHERBOARD_CHIPSETS_OUTSIDE_SOCKET_TAXONOMY = new Set([
 export interface ProductFilterQualityAudit {
   products: number;
   emptyProducts: number;
+  unclassifiedSamples: string[];
   unsupportedTags: string[];
   conflicts: string[];
   zeroCountOptions: string[];
@@ -83,6 +84,7 @@ let previousCoverage: ProductFilterCoverageSnapshot | null = null;
 
 export async function checkProductFilterQuality(
   client: ProductionSmokeClient,
+  options: Pick<ProductionSmokeOptions, "filterEmptyWarnMinCount" | "filterEmptyWarnRatio">,
 ): Promise<SmokeCheckResult> {
   const products = await client.product.findMany({
     where: {
@@ -98,19 +100,26 @@ export async function checkProductFilterQuality(
   const audit = auditProductFilterQuality(products);
   const drops = compareCoverage(previousCoverage, audit.coverage);
   previousCoverage = audit.coverage;
+  return assessProductFilterQuality(audit, drops, options);
+}
+
+export function assessProductFilterQuality(
+  audit: ProductFilterQualityAudit,
+  drops: readonly string[],
+  options: Pick<ProductionSmokeOptions, "filterEmptyWarnMinCount" | "filterEmptyWarnRatio">,
+): SmokeCheckResult {
   const issues = [...audit.belowMinimum, ...drops, ...audit.unsupportedTags, ...audit.conflicts];
-  const optionalWarnings = [...(audit.emptyProducts > 0 ? [`empty=${audit.emptyProducts}`] : [])];
-  const message = formatAuditMessage(
-    audit.products,
-    audit.zeroCountOptions.length,
-    issues,
-    optionalWarnings,
-  );
+  const emptyRatio = audit.products === 0 ? 0 : audit.emptyProducts / audit.products;
+  const emptyThresholdExceeded =
+    audit.emptyProducts > 0 &&
+    audit.emptyProducts >= options.filterEmptyWarnMinCount &&
+    emptyRatio >= options.filterEmptyWarnRatio;
+  const message = formatAuditMessage(audit, issues, options, emptyRatio, emptyThresholdExceeded);
 
   if (audit.unsupportedTags.length > 0 || audit.conflicts.length > 0) {
     return fail("product filter quality", message);
   }
-  if (issues.length > 0 || optionalWarnings.length > 0) {
+  if (issues.length > 0 || emptyThresholdExceeded) {
     return warn("product filter quality", message);
   }
   return ok("product filter quality", message);
@@ -124,12 +133,16 @@ export function auditProductFilterQuality(
   const optionCounts = new Map<string, number>();
   const coverage: ProductFilterCoverageSnapshot = {};
   let emptyProducts = 0;
+  const unclassifiedSamples: string[] = [];
 
   for (const product of products) {
     const igrp = product.sourceCategory.igrp;
     const tagsByKey = groupTags(product.filterTags);
     if (product.filterTags.length === 0) {
       emptyProducts += 1;
+      if (unclassifiedSamples.length < 5) {
+        unclassifiedSamples.push(product.id);
+      }
     }
     for (const tag of product.filterTags) {
       if (!isProductFilterTagSupported(igrp, tag)) {
@@ -194,6 +207,7 @@ export function auditProductFilterQuality(
   return {
     products: products.length,
     emptyProducts,
+    unclassifiedSamples,
     unsupportedTags: [...unsupportedTags],
     conflicts: [...conflicts],
     zeroCountOptions,
@@ -240,15 +254,36 @@ function compareCoverage(
 }
 
 function formatAuditMessage(
-  products: number,
-  zeroCountOptions: number,
+  audit: ProductFilterQualityAudit,
   issues: readonly string[],
-  warnings: readonly string[],
+  options: Pick<ProductionSmokeOptions, "filterEmptyWarnMinCount" | "filterEmptyWarnRatio">,
+  emptyRatio: number,
+  emptyThresholdExceeded: boolean,
 ): string {
-  const details = [...issues, ...warnings];
-  return `${products} active product(s), ${zeroCountOptions} zero-count option(s); ${details.length === 0 ? "all quality gates passed" : details.slice(0, 8).join(", ")}${details.length > 8 ? `, +${details.length - 8} more` : ""}`;
+  const details = [
+    ...(emptyThresholdExceeded
+      ? [
+          `empty threshold exceeded: ${audit.emptyProducts}/${audit.products} (${precisePercent(emptyRatio)})`,
+        ]
+      : []),
+    ...issues,
+  ];
+  const gateSummary =
+    details.length === 0
+      ? "all required coverage gates passed"
+      : `${details.slice(0, 8).join(", ")}${details.length > 8 ? `, +${details.length - 8} more` : ""}`;
+  const sampleSummary =
+    audit.unclassifiedSamples.length > 0
+      ? `; unclassified sample(s): ${audit.unclassifiedSamples.join(", ")}`
+      : "";
+
+  return `${audit.products} active product(s), empty=${audit.emptyProducts} (${precisePercent(emptyRatio)}, warn at >=${options.filterEmptyWarnMinCount} and >=${precisePercent(options.filterEmptyWarnRatio)}), ${audit.zeroCountOptions.length} zero-count option(s); ${gateSummary}${sampleSummary}`;
 }
 
 function percent(ratio: number): string {
   return `${(ratio * 100).toFixed(1)}%`;
+}
+
+function precisePercent(ratio: number): string {
+  return `${(ratio * 100).toFixed(2)}%`;
 }

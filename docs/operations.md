@@ -54,6 +54,8 @@ docker compose -f compose.yml -f compose.ops.yml --profile ops run --rm smoke-da
 
 Full smoke 另檢查 crawler run、CoolPC 篩選同步、parse errors、來源圖片異常、商品篩選品質、active products、缺圖、snapshot retention 與近期 Discord delivery。只有 FAIL 使用 non-zero exit；WARN 不會自動阻止 shell pipeline，因此部署流程必須解析摘要。
 
+商品篩選品質預設只在無標籤商品同時達到 10 筆與全體 active products 的 0.5% 時發出 WARN，可用 `SMOKE_FILTER_EMPTY_WARN_MIN_COUNT`（非負整數）與 `SMOKE_FILTER_EMPTY_WARN_RATIO`（0–1）調整。少量無法分類商品會保留在訊息的 empty 統計與 unclassified sample 中，但不影響狀態；每分類必要欄位 coverage、coverage drop、unsupported tags 與 conflicts 仍維持原有判定，zero-count options 僅供診斷。
+
 預設門檻只是起始值。應依 production baseline 調整 env，不能把「沒有 FAIL」誤寫成門檻已校準。
 
 ### Smoke notification state compatibility

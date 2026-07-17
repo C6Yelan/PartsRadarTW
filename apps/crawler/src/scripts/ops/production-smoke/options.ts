@@ -12,6 +12,8 @@ import {
   DEFAULT_BASE_URL,
   DEFAULT_CRAWLER_FAIL_AFTER_MINUTES,
   DEFAULT_CRAWLER_WARN_AFTER_MINUTES,
+  DEFAULT_FILTER_EMPTY_WARN_MIN_COUNT,
+  DEFAULT_FILTER_EMPTY_WARN_RATIO,
   DEFAULT_MIN_ACTIVE_PRODUCTS,
   DEFAULT_MISSING_IMAGE_FAIL_COUNT,
   DEFAULT_MISSING_IMAGE_WARN_COUNT,
@@ -202,6 +204,20 @@ export function parseProductionSmokeOptions(
       min: 1,
       max: 1000000,
     }),
+    filterEmptyWarnMinCount: parseBoundedIntegerOption({
+      args,
+      env,
+      argName: "--filter-empty-warn-min-count",
+      envName: "SMOKE_FILTER_EMPTY_WARN_MIN_COUNT",
+      fallback: DEFAULT_FILTER_EMPTY_WARN_MIN_COUNT,
+      min: 0,
+      max: 1000000,
+    }),
+    filterEmptyWarnRatio: parseRatioOption(
+      getStringArg(args, "--filter-empty-warn-ratio") ??
+        env.SMOKE_FILTER_EMPTY_WARN_RATIO ??
+        String(DEFAULT_FILTER_EMPTY_WARN_RATIO),
+    ),
     missingImageWarnCount: parseBoundedIntegerOption({
       args,
       env,
@@ -266,4 +282,21 @@ export function parseProductionSmokeOptions(
       max: 1000000,
     }),
   };
+}
+
+function parseRatioOption(raw: string): number {
+  const message =
+    "--filter-empty-warn-ratio/SMOKE_FILTER_EMPTY_WARN_RATIO must be a number between 0 and 1.";
+
+  if (!/^(?:0(?:\.\d+)?|1(?:\.0+)?)$/.test(raw)) {
+    throw new Error(message);
+  }
+
+  const value = Number(raw);
+
+  if (!Number.isFinite(value) || value < 0 || value > 1) {
+    throw new Error(message);
+  }
+
+  return value;
 }

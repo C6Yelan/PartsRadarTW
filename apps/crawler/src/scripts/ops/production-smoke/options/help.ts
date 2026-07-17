@@ -3,6 +3,8 @@
 
 import {
   DEFAULT_BASE_URL,
+  DEFAULT_FILTER_EMPTY_WARN_MIN_COUNT,
+  DEFAULT_FILTER_EMPTY_WARN_RATIO,
   DEFAULT_PRODUCT_IMAGE_STORAGE_DIR,
   DEFAULT_SOURCE_IMAGE_FAILURE_FAIL_COUNT,
   DEFAULT_SOURCE_IMAGE_FAILURE_MIN_CONSECUTIVE,
@@ -37,6 +39,10 @@ Options:
                                            Warn at this many affected products. Default: ${DEFAULT_SOURCE_IMAGE_FAILURE_WARN_COUNT}
   --source-image-failure-fail-count <count>
                                            Fail at this many affected products. Default: ${DEFAULT_SOURCE_IMAGE_FAILURE_FAIL_COUNT}
+  --filter-empty-warn-min-count <count>    Warn when unclassified products reach this count and ratio.
+                                           Default: SMOKE_FILTER_EMPTY_WARN_MIN_COUNT, then ${DEFAULT_FILTER_EMPTY_WARN_MIN_COUNT}
+  --filter-empty-warn-ratio <ratio>        Required unclassified ratio for WARN (0-1).
+                                           Default: SMOKE_FILTER_EMPTY_WARN_RATIO, then ${DEFAULT_FILTER_EMPTY_WARN_RATIO}
   --help                                   Show this help message.
 `);
 }

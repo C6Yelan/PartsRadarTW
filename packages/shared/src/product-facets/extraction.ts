@@ -468,7 +468,7 @@ function extractFormFactors(text: string, add: AddTag, key: string): void {
     ["e-atx", /(?:^|[(/,\s])E-?ATX(?=$|[^A-Z0-9-])/],
     ["atx", /(?:^|[(/,\s])ATX(?=$|[^A-Z0-9-])/],
     ["m-atx", /(?:^|[(/,\s])(?:M-?ATX|MICRO\s*ATX)(?=$|[^A-Z0-9-])/],
-    ["mini-itx", /MINI-?ITX|(?:^|[(/,\s])ITX(?=$|[/(),\s])/],
+    ["mini-itx", /(?:^|[^A-Z0-9])(?:MINI-?ITX|ITX)(?=$|[^A-Z0-9])/],
     ["eeb", /(?:^|[(/,\s])EEB(?=$|[^A-Z0-9-])/],
   ]);
 }

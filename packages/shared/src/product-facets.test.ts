@@ -236,6 +236,31 @@ describe("product facets", () => {
     expect(tags).not.toContain("motherboard_support:atx");
   });
 
+  it.each([
+    "ITX【SFX】",
+    "ITX【電源另購】",
+    "/ITX",
+    "(Mini-ITX)",
+    "ITX/ATX",
+  ])("accepts punctuation around the ITX form factor: %s", (name) => {
+    expect(extractProductFilterTags(14, name)).toContain("motherboard_support:mini-itx");
+  });
+
+  it.each([
+    "BITX",
+    "ITX2",
+    "XITXMODEL",
+    "MINI-ITXPRO",
+  ])("does not extract ITX from an alphanumeric token: %s", (name) => {
+    expect(extractProductFilterTags(14, name)).not.toContain("motherboard_support:mini-itx");
+  });
+
+  it("does not invent case support tags for a bundle-only power supply", () => {
+    expect(
+      extractProductFilterTags(14, "【限搭購喬思伯機殼】全漢 金鋼彈 SFX 750W 電源"),
+    ).not.toContain("motherboard_support:mini-itx");
+  });
+
   it("extracts an included PSU when the wattage appears between 內附 and 電源", () => {
     expect(
       extractProductFilterTags(

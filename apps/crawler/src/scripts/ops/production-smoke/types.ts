@@ -26,6 +26,8 @@ export interface ProductionSmokeOptions {
   sourceImageFailureWarnCount: number;
   sourceImageFailureFailCount: number;
   minActiveProducts: number;
+  filterEmptyWarnMinCount: number;
+  filterEmptyWarnRatio: number;
   missingImageWarnCount: number;
   missingImageFailCount: number;
   rawSnapshotNormalRetentionDays: number;
