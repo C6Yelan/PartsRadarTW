@@ -9,6 +9,7 @@ import {
 } from "@partsradar/shared";
 import { load } from "cheerio";
 import { decode } from "iconv-lite";
+import { normalizeFilterSyncProductName } from "./filter-sync/parser";
 import { extractCoolpcProductCandidates } from "./parser/candidates";
 import { validateCoolpcCategoryPage } from "./parser/content-validation";
 import {
@@ -29,7 +30,6 @@ import {
   shouldReportInvalidCoolpcProductImageUrl,
 } from "./parser/urls";
 import { classifyProductVendor } from "./vendor-classification";
-import { normalizeFilterSyncProductName } from "./filter-sync/parser";
 
 export type {
   ContentValidationStatus,
@@ -204,9 +204,33 @@ export function parseCoolpcCategoryPage(
 }
 
 function isMisclassifiedCategoryProduct(igrp: number, name: string): boolean {
-  return (
+  const isBundledCpuMotherboard =
     igrp === 4 &&
     /^\[搭CPU[^\]]*\]/i.test(name) &&
-    /\b(?:H610|B760|Z790|H810|B860|Z890|A520|B550|B650E?|B840|B850|X670E?|X870E?)M?\b/i.test(name)
-  );
+    /\b(?:H610|B760|Z790|H810|B860|Z890|A520|B550|B650E?|B840|B850|X670E?|X870E?)M?\b/i.test(name);
+
+  if (isBundledCpuMotherboard) {
+    return true;
+  }
+
+  if (
+    igrp !== 14 ||
+    !/^(?:【[^】]*限搭購[^】]*機殼[^】]*】|\[[^\]]*限搭購[^\]]*機殼[^\]]*\])/i.test(name)
+  ) {
+    return false;
+  }
+
+  if (/\d{3,4}\s*W(?=$|[^A-Z0-9])/i.test(name)) {
+    return true;
+  }
+
+  const powerSupplyFeatureCount = [
+    /(?:金|銀|銅|白金|鈦金)牌/i,
+    /全模(?:組)?|半模(?:組)?/i,
+    /ATX\s*3(?:\.[01])?/i,
+    /SFX(?:-L|規格)?/i,
+    /電源供應器|\bPSU\b/i,
+  ].filter((pattern) => pattern.test(name)).length;
+
+  return powerSupplyFeatureCount >= 2;
 }

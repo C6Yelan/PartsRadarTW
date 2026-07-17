@@ -38,6 +38,45 @@ describe("CoolPC category product observation writer missing lifecycle", () => {
     });
   });
 
+  it("immediately hides an excluded bundle-only power supply from the case category", async () => {
+    const client = new FakeCoolpcProductWriteClient();
+    const fetchedAt = new Date("2026-07-17T11:00:00.000Z");
+    client.seedProductWithCurrentPrice({
+      ...productItem({
+        sourceCategoryId: "category-14",
+        ibuyToken: "CASE-BUNDLE-PSU",
+        name: "【限搭購喬思伯機殼】全漢 金鋼彈 650W 金牌 全模【SFX規格】",
+        normalizedName: "【限搭購喬思伯機殼】全漢 金鋼彈 650w 金牌 全模【sfx規格】",
+        price: 3490,
+      }),
+      igrp: 14,
+      sourceName: "CASE 機殼(+電源)",
+      displayName: "機殼",
+      sourceItemKey: "coolpc:igrp:14:ibuy:CASE-BUNDLE-PSU",
+      sourceUrl: "https://www.coolpc.com.tw/eachview.php?IGrp=14",
+    });
+
+    const result = await writeCoolpcCategoryProductObservation({
+      client,
+      crawlRunId: "crawl-run-2",
+      rawSnapshotId: "raw-snapshot-2",
+      sourceCategoryId: "category-14",
+      fetchedAt,
+      parsedProducts: [],
+      excludedIbuyTokens: ["CASE-BUNDLE-PSU"],
+    });
+
+    expect(result).toMatchObject({
+      missingProductUpdatedCount: 1,
+      markedInactiveProductCount: 1,
+    });
+    expect(client.products[0]).toMatchObject({
+      isActive: false,
+      missingSince: fetchedAt,
+      missingSeenCount: 6,
+    });
+  });
+
   it("marks existing products missing when they are absent from a successful category parse", async () => {
     const client = new FakeCoolpcProductWriteClient();
     const previousSeenAt = new Date("2026-05-27T10:00:00.000Z");

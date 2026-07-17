@@ -125,6 +125,65 @@ describe("CoolPC category parser", () => {
     expect(result.items).toHaveLength(2);
   });
 
+  it("excludes bundle-only power supplies embedded in the case source category", () => {
+    const result = parseCoolpcCategoryPage(
+      categoryProductsHtml(14, [
+        {
+          token: "CASE-BUNDLE-PSU",
+          name: "【限搭購喬思伯機殼】全漢 金鋼彈 650W 金牌 全模【SFX規格】",
+        },
+        {
+          token: "CASE-BUNDLE-PSU-FEATURES",
+          name: "[限搭購喬思伯機殼] 全漢 金鋼彈 金牌 全模【SFX規格】",
+        },
+        {
+          token: "FRACTAL-RIDGE",
+          name: "Fractal Design Ridge 黑 顯卡長33.5/CPU高7/ITX【SFX】",
+        },
+      ]),
+      contextForCategory(14),
+    );
+
+    expect(result.validation.status).toBe("valid");
+    expect(result.canImport).toBe(true);
+    expect(result.issues).toEqual([]);
+    expect(result.excludedIbuyTokens).toEqual(["CASE-BUNDLE-PSU", "CASE-BUNDLE-PSU-FEATURES"]);
+    expect(result.items.map((item) => item.ibuyToken)).toEqual(["FRACTAL-RIDGE"]);
+    expect(result.items[0]?.filterTags).toContain("motherboard_support:mini-itx");
+  });
+
+  it.each([
+    ["FRACTAL-TERRA", "Fractal Design Terra 黑 顯卡長32.2/CPU高7.7/ITX【SFX】"],
+    ["REGULAR-SFX-CASE", "一般 ITX 機殼 支援 SFX 電源"],
+    ["BUNDLE-WITHOUT-PSU", "【限搭購喬思伯機殼】喬思伯 Z20 M-ATX 機殼"],
+    ["BUNDLE-SINGLE-PSU-SIGNAL", "[限搭購喬思伯機殼] 喬思伯 D31 支援 SFX 電源"],
+  ])("keeps case products without the full exclusion signal: %s", (token, name) => {
+    const result = parseCoolpcCategoryPage(
+      categoryProductsHtml(14, [{ token, name }]),
+      contextForCategory(14),
+    );
+
+    expect(result.canImport).toBe(true);
+    expect(result.excludedIbuyTokens).toEqual([]);
+    expect(result.items.map((item) => item.ibuyToken)).toEqual([token]);
+  });
+
+  it("does not apply the case-category exclusion rule to another IGrp", () => {
+    const result = parseCoolpcCategoryPage(
+      categoryProductsHtml(15, [
+        {
+          token: "PSU-CATEGORY-ITEM",
+          name: "【限搭購喬思伯機殼】全漢 金鋼彈 650W 金牌 全模【SFX規格】",
+        },
+      ]),
+      contextForCategory(15),
+    );
+
+    expect(result.canImport).toBe(true);
+    expect(result.excludedIbuyTokens).toEqual([]);
+    expect(result.items.map((item) => item.ibuyToken)).toEqual(["PSU-CATEGORY-ITEM"]);
+  });
+
   it("deduplicates exact duplicate rows from reduced live case and power supply fixtures", () => {
     const fixtures = [
       [14, "coolpc-live-igrp-14-duplicate.html"],
@@ -247,3 +306,28 @@ describe("CoolPC category parser", () => {
     ]);
   });
 });
+
+function categoryProductsHtml(
+  igrp: number,
+  products: readonly { token: string; name: string }[],
+): string {
+  const category = contextForCategory(igrp);
+  const rows = products
+    .map(
+      ({ token, name }) => `<div class="item">
+        <div class="w">${token}</div>
+        <span>
+          <img alt="" src="/eval/${igrp}/product.jpg">
+          <div class="t">${name}</div>
+          <div class="x">含稅：NT4,190</div>
+        </span>
+      </div>`,
+    )
+    .join("\n");
+
+  return `<!doctype html>
+<html lang="zh-Hant-TW">
+  <head><title>原價屋${category.sourceName}總覽</title></head>
+  <body><section class="category">${rows}</section></body>
+</html>`;
+}
