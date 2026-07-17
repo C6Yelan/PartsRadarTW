@@ -204,6 +204,10 @@ export function parseCoolpcCategoryPage(
 }
 
 function isMisclassifiedCategoryProduct(igrp: number, name: string): boolean {
+  if (/^(?:\[加購優惠\]|【加購優惠】)/.test(name)) {
+    return true;
+  }
+
   const isBundledCpuMotherboard =
     igrp === 4 &&
     /^\[搭CPU[^\]]*\]/i.test(name) &&

@@ -77,6 +77,49 @@ describe("CoolPC category product observation writer missing lifecycle", () => {
     });
   });
 
+  it("immediately hides an excluded conditional add-on while preserving its history", async () => {
+    const client = new FakeCoolpcProductWriteClient();
+    const previousSeenAt = new Date("2026-07-17T10:00:00.000Z");
+    const fetchedAt = new Date("2026-07-17T11:00:00.000Z");
+    client.seedProductWithCurrentPrice({
+      ...productItem({
+        sourceCategoryId: "category-5",
+        ibuyToken: "CONDITIONAL-ADD-ON",
+        name: '[加購優惠]買技嘉Z890主板"加購"美光 Crucial PRO 超頻32GB D5-5600',
+        normalizedName: '[加購優惠]買技嘉z890主板"加購"美光 crucial pro 超頻32gb d5-5600',
+        price: 1999,
+        fetchedAt: previousSeenAt,
+      }),
+      igrp: 5,
+      sourceName: "主機板 MB",
+      displayName: "主機板",
+      sourceItemKey: "coolpc:igrp:5:ibuy:CONDITIONAL-ADD-ON",
+      sourceUrl: "https://www.coolpc.com.tw/eachview.php?IGrp=5",
+    });
+
+    const result = await writeCoolpcCategoryProductObservation({
+      client,
+      crawlRunId: "crawl-run-2",
+      rawSnapshotId: "raw-snapshot-2",
+      sourceCategoryId: "category-5",
+      fetchedAt,
+      parsedProducts: [],
+      excludedIbuyTokens: ["CONDITIONAL-ADD-ON"],
+    });
+
+    expect(result).toMatchObject({
+      missingProductUpdatedCount: 1,
+      markedInactiveProductCount: 1,
+    });
+    expect(client.products[0]).toMatchObject({
+      isActive: false,
+      missingSince: fetchedAt,
+      missingSeenCount: 6,
+    });
+    expect(client.priceSnapshots).toHaveLength(1);
+    expect(client.currentPrices).toHaveLength(1);
+  });
+
   it("marks existing products missing when they are absent from a successful category parse", async () => {
     const client = new FakeCoolpcProductWriteClient();
     const previousSeenAt = new Date("2026-05-27T10:00:00.000Z");

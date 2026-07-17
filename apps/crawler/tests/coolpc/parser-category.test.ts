@@ -125,6 +125,69 @@ describe("CoolPC category parser", () => {
     expect(result.items).toHaveLength(2);
   });
 
+  it("excludes both exact conditional add-on prefixes from parsed products", () => {
+    const result = parseCoolpcCategoryPage(
+      categoryProductsHtml(5, [
+        {
+          token: "CONDITIONAL-ADD-ON-ASCII",
+          name: '[加購優惠]買技嘉Z890主板"加購"美光 Crucial PRO 超頻32GB D5-5600',
+        },
+        {
+          token: "CONDITIONAL-ADD-ON-CJK",
+          name: "【加購優惠】買主機板加購 DDR5 32GB 記憶體",
+        },
+        {
+          token: "REGULAR-MOTHERBOARD",
+          name: "技嘉 Z890 AORUS ELITE WIFI7 主機板(ATX/DDR5)",
+        },
+      ]),
+      contextForCategory(5),
+    );
+
+    expect(result.validation.status).toBe("valid");
+    expect(result.canImport).toBe(true);
+    expect(result.issues).toEqual([]);
+    expect(result.excludedIbuyTokens).toEqual([
+      "CONDITIONAL-ADD-ON-ASCII",
+      "CONDITIONAL-ADD-ON-CJK",
+    ]);
+    expect(result.items.map((item) => item.ibuyToken)).toEqual(["REGULAR-MOTHERBOARD"]);
+  });
+
+  it("applies the conditional add-on exclusion to another IGrp", () => {
+    const result = parseCoolpcCategoryPage(
+      categoryProductsHtml(12, [
+        { token: "GPU-ADD-ON", name: "[加購優惠]買主機板加購 RTX 5070" },
+        { token: "REGULAR-GPU", name: "技嘉 RTX 5070 12GB 顯示卡" },
+      ]),
+      contextForCategory(12),
+    );
+
+    expect(result.canImport).toBe(true);
+    expect(result.issues).toEqual([]);
+    expect(result.excludedIbuyTokens).toEqual(["GPU-ADD-ON"]);
+    expect(result.items.map((item) => item.ibuyToken)).toEqual(["REGULAR-GPU"]);
+  });
+
+  it.each([
+    [12, "搭機優惠", "[搭機優惠] RTX 5070"],
+    [12, "限搭機", "[限搭機] RTX 5070"],
+    [6, "限任搭", "[限任搭] DDR5 32GB 記憶體"],
+    [4, "任搭", "任搭主機板 AMD R7 9700X【8核/16緒】"],
+    [14, "需搭配", "需搭配 SFX 電供的 ITX 機殼"],
+    [14, "建議搭配", "建議搭配 SFX 電供 Fractal Design Ridge ITX 機殼"],
+    [5, "中段加購優惠", "技嘉 Z890 主板 加購優惠 美光 DDR5 記憶體"],
+  ])("keeps non-target conditional wording: %s", (igrp, token, name) => {
+    const result = parseCoolpcCategoryPage(
+      categoryProductsHtml(igrp, [{ token, name }]),
+      contextForCategory(igrp),
+    );
+
+    expect(result.canImport).toBe(true);
+    expect(result.excludedIbuyTokens).toEqual([]);
+    expect(result.items.map((item) => item.ibuyToken)).toEqual([token]);
+  });
+
   it("excludes bundle-only power supplies embedded in the case source category", () => {
     const result = parseCoolpcCategoryPage(
       categoryProductsHtml(14, [
