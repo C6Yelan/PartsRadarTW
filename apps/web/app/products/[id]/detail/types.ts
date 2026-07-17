@@ -36,6 +36,8 @@ export interface ProductDetailBody {
   };
   status: {
     isActive: boolean;
+    isExcluded: boolean;
+    exclusionReason: "misclassified_bundle_product" | "conditional_add_on" | null;
   };
   lastSeenAt: string;
 }

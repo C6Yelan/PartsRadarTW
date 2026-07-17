@@ -121,7 +121,9 @@ describe("CoolPC category parser", () => {
     expect(result.items.map((item) => item.name)).not.toContain(
       "[搭CPU現省500] 技嘉 B860M GAMING X WIFI6E(M-ATX)",
     );
-    expect(result.excludedIbuyTokens).toEqual(["CPU-BUNDLE-BOARD"]);
+    expect(result.excludedProducts).toEqual([
+      { ibuyToken: "CPU-BUNDLE-BOARD", reason: "misclassified_bundle_product" },
+    ]);
     expect(result.items).toHaveLength(2);
   });
 
@@ -147,9 +149,9 @@ describe("CoolPC category parser", () => {
     expect(result.validation.status).toBe("valid");
     expect(result.canImport).toBe(true);
     expect(result.issues).toEqual([]);
-    expect(result.excludedIbuyTokens).toEqual([
-      "CONDITIONAL-ADD-ON-ASCII",
-      "CONDITIONAL-ADD-ON-CJK",
+    expect(result.excludedProducts).toEqual([
+      { ibuyToken: "CONDITIONAL-ADD-ON-ASCII", reason: "conditional_add_on" },
+      { ibuyToken: "CONDITIONAL-ADD-ON-CJK", reason: "conditional_add_on" },
     ]);
     expect(result.items.map((item) => item.ibuyToken)).toEqual(["REGULAR-MOTHERBOARD"]);
   });
@@ -165,7 +167,9 @@ describe("CoolPC category parser", () => {
 
     expect(result.canImport).toBe(true);
     expect(result.issues).toEqual([]);
-    expect(result.excludedIbuyTokens).toEqual(["GPU-ADD-ON"]);
+    expect(result.excludedProducts).toEqual([
+      { ibuyToken: "GPU-ADD-ON", reason: "conditional_add_on" },
+    ]);
     expect(result.items.map((item) => item.ibuyToken)).toEqual(["REGULAR-GPU"]);
   });
 
@@ -184,7 +188,7 @@ describe("CoolPC category parser", () => {
     );
 
     expect(result.canImport).toBe(true);
-    expect(result.excludedIbuyTokens).toEqual([]);
+    expect(result.excludedProducts).toEqual([]);
     expect(result.items.map((item) => item.ibuyToken)).toEqual([token]);
   });
 
@@ -210,7 +214,10 @@ describe("CoolPC category parser", () => {
     expect(result.validation.status).toBe("valid");
     expect(result.canImport).toBe(true);
     expect(result.issues).toEqual([]);
-    expect(result.excludedIbuyTokens).toEqual(["CASE-BUNDLE-PSU", "CASE-BUNDLE-PSU-FEATURES"]);
+    expect(result.excludedProducts).toEqual([
+      { ibuyToken: "CASE-BUNDLE-PSU", reason: "misclassified_bundle_product" },
+      { ibuyToken: "CASE-BUNDLE-PSU-FEATURES", reason: "misclassified_bundle_product" },
+    ]);
     expect(result.items.map((item) => item.ibuyToken)).toEqual(["FRACTAL-RIDGE"]);
     expect(result.items[0]?.filterTags).toContain("motherboard_support:mini-itx");
   });
@@ -227,7 +234,7 @@ describe("CoolPC category parser", () => {
     );
 
     expect(result.canImport).toBe(true);
-    expect(result.excludedIbuyTokens).toEqual([]);
+    expect(result.excludedProducts).toEqual([]);
     expect(result.items.map((item) => item.ibuyToken)).toEqual([token]);
   });
 
@@ -243,7 +250,7 @@ describe("CoolPC category parser", () => {
     );
 
     expect(result.canImport).toBe(true);
-    expect(result.excludedIbuyTokens).toEqual([]);
+    expect(result.excludedProducts).toEqual([]);
     expect(result.items.map((item) => item.ibuyToken)).toEqual(["PSU-CATEGORY-ITEM"]);
   });
 

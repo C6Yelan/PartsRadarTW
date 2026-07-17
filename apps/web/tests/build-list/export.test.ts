@@ -141,7 +141,7 @@ function items(): BuildListItem[] {
         source: {
           url: "https://www.coolpc.com.tw/evaluate.php?iBuy=GPU-RTX-4060",
         },
-        status: { isActive: false },
+        status: { isActive: false, isExcluded: false, exclusionReason: null },
       }),
       { order: 1, includeInExport: false },
     ),
@@ -190,6 +190,8 @@ function snapshot(
     },
     status: {
       isActive: true,
+      isExcluded: false,
+      exclusionReason: null,
     },
     lastSeenAt: "2026-05-28T11:55:00.000Z",
     ...overrides,

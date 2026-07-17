@@ -145,6 +145,8 @@ function normalizeBuildListProductSnapshot(value: unknown): BuildListProductSnap
     !categoryDisplayName ||
     !sourceUrl ||
     typeof value.status.isActive !== "boolean" ||
+    typeof value.status.isExcluded !== "boolean" ||
+    !isExclusionReason(value.status.exclusionReason) ||
     !lastSeenAt
   ) {
     return null;
@@ -170,9 +172,19 @@ function normalizeBuildListProductSnapshot(value: unknown): BuildListProductSnap
     },
     status: {
       isActive: value.status.isActive,
+      isExcluded: value.status.isExcluded,
+      exclusionReason: value.status.exclusionReason,
     },
     lastSeenAt,
   };
+}
+
+function isExclusionReason(
+  value: unknown,
+): value is BuildListProductSnapshot["status"]["exclusionReason"] {
+  return (
+    value === null || value === "misclassified_bundle_product" || value === "conditional_add_on"
+  );
 }
 
 function normalizeBuildListProductImage(

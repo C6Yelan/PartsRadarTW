@@ -33,6 +33,8 @@ export interface BuildListProductSnapshot {
   };
   status: {
     isActive: boolean;
+    isExcluded: boolean;
+    exclusionReason: "misclassified_bundle_product" | "conditional_add_on" | null;
   };
   lastSeenAt: string;
 }
@@ -240,9 +242,14 @@ export function summarizeBuildListItems(items: BuildListItem[]): BuildListSummar
         totalQuantity: summary.totalQuantity + item.intent.quantity,
         totalAmount: summary.totalAmount + (subtotal ?? 0),
         unpricedItemCount: summary.unpricedItemCount + (subtotal === null ? 1 : 0),
-        activeItemCount: summary.activeItemCount + (item.product?.status.isActive ? 1 : 0),
+        activeItemCount:
+          summary.activeItemCount +
+          (item.product?.status.isActive && !item.product.status.isExcluded ? 1 : 0),
         inactiveItemCount:
-          summary.inactiveItemCount + (item.product && !item.product.status.isActive ? 1 : 0),
+          summary.inactiveItemCount +
+          (item.product && !item.product.status.isActive && !item.product.status.isExcluded
+            ? 1
+            : 0),
         missingItemCount: summary.missingItemCount + (item.availability === "missing" ? 1 : 0),
         unavailableItemCount:
           summary.unavailableItemCount + (item.availability === "unavailable" ? 1 : 0),

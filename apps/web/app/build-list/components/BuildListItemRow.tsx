@@ -132,6 +132,10 @@ function getBuildListItemStatus(item: BuildListItem): {
   tone: "ok" | "warning";
 } {
   if (item.product) {
+    if (item.product.status.isExcluded) {
+      return { label: "未納入列表", tone: "warning" };
+    }
+
     return item.product.status.isActive
       ? { label: "目前上架", tone: "ok" }
       : { label: "可能已下架", tone: "warning" };

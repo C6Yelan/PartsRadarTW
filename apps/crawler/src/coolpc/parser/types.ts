@@ -4,6 +4,13 @@
 // 僅支援台幣價格。
 export type Currency = "TWD";
 
+export type ProductExclusionReason = "misclassified_bundle_product" | "conditional_add_on";
+
+export interface ExcludedCoolpcProduct {
+  ibuyToken: string;
+  reason: ProductExclusionReason;
+}
+
 // parser 前驗證的總體結果狀態。
 export type ContentValidationStatus = "valid" | "invalid" | "suspected_block";
 
@@ -83,7 +90,7 @@ export interface ContentValidationResult {
 export interface CoolpcParseResult {
   validation: ContentValidationResult;
   items: ParsedCoolpcProduct[];
-  excludedIbuyTokens: string[];
+  excludedProducts: ExcludedCoolpcProduct[];
   issues: CoolpcParseIssue[];
   deduplicatedItemCount: number;
   canImport: boolean;

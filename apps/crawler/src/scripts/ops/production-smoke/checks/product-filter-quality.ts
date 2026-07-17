@@ -89,6 +89,7 @@ export async function checkProductFilterQuality(
   const products = await client.product.findMany({
     where: {
       isActive: true,
+      isExcluded: false,
       sourceCategory: { igrp: { in: Object.keys(REQUIREMENTS).map(Number) } },
     },
     select: {

@@ -35,6 +35,8 @@ export interface ProductDetailResponseBody {
   };
   status: {
     isActive: boolean;
+    isExcluded: boolean;
+    exclusionReason: "misclassified_bundle_product" | "conditional_add_on" | null;
   };
   lastSeenAt: string;
 }
@@ -70,6 +72,8 @@ export function toProductDetailResponse(product: ProductDetailRecord): ProductDe
     },
     status: {
       isActive: product.isActive,
+      isExcluded: product.isExcluded,
+      exclusionReason: product.exclusionReason,
     },
     lastSeenAt: product.lastSeenAt.toISOString(),
   };

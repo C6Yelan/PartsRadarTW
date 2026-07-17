@@ -141,6 +141,8 @@ function snapshot(productId: string) {
     },
     status: {
       isActive: true,
+      isExcluded: false,
+      exclusionReason: null,
     },
     lastSeenAt: "2026-05-28T11:55:00.000Z",
   };

@@ -2,6 +2,7 @@
 // 提供 product-write 與 data-flow 測試用的記憶體 fake client、商品 factory 與價格資料列型別。
 
 import type { ParsedCoolpcProduct } from "../../../src/coolpc/parser/types";
+import type { ProductExclusionReason } from "../../../src/coolpc/parser";
 import type { CoolpcProductWriteClient } from "../../../src/coolpc/product-write";
 import { extractProductFilterTags } from "@partsradar/shared";
 
@@ -18,6 +19,8 @@ export interface FakeProduct {
   primaryImageCheckedAt: Date | null;
   sourceUrl: string;
   isActive: boolean;
+  isExcluded: boolean;
+  exclusionReason: ProductExclusionReason | null;
   missingSince: Date | null;
   missingSeenCount: number;
   firstSeenAt: Date;
@@ -97,6 +100,8 @@ export class FakeCoolpcProductWriteClient implements CoolpcProductWriteClient {
           id: product.id,
           ibuyToken: product.ibuyToken,
           isActive: product.isActive,
+          isExcluded: product.isExcluded,
+          exclusionReason: product.exclusionReason,
           missingSince: product.missingSince,
           missingSeenCount: product.missingSeenCount,
         })),
@@ -114,6 +119,8 @@ export class FakeCoolpcProductWriteClient implements CoolpcProductWriteClient {
         primaryImageCheckedAt: data.primaryImageCheckedAt,
         sourceUrl: data.sourceUrl,
         isActive: data.isActive,
+        isExcluded: data.isExcluded,
+        exclusionReason: data.exclusionReason,
         missingSince: data.missingSince,
         missingSeenCount: data.missingSeenCount,
         firstSeenAt: data.firstSeenAt,
@@ -189,7 +196,12 @@ export class FakeCoolpcProductWriteClient implements CoolpcProductWriteClient {
   // 建立已有 current price 的既有商品，供更新、價格變動與 missing lifecycle 測試使用。
   seedProductWithCurrentPrice(
     item: ParsedCoolpcProduct,
-    overrides: Partial<Pick<FakeProduct, "isActive" | "missingSince" | "missingSeenCount">> = {},
+    overrides: Partial<
+      Pick<
+        FakeProduct,
+        "isActive" | "isExcluded" | "exclusionReason" | "missingSince" | "missingSeenCount"
+      >
+    > = {},
   ): void {
     this.seedProductWithoutCurrentPrice(item, overrides);
     const productId = this.products[this.products.length - 1]?.id;
@@ -218,7 +230,12 @@ export class FakeCoolpcProductWriteClient implements CoolpcProductWriteClient {
   // 建立沒有 current price 的既有商品，用來驗證修復 current price 缺口的分支。
   seedProductWithoutCurrentPrice(
     item: ParsedCoolpcProduct,
-    overrides: Partial<Pick<FakeProduct, "isActive" | "missingSince" | "missingSeenCount">> = {},
+    overrides: Partial<
+      Pick<
+        FakeProduct,
+        "isActive" | "isExcluded" | "exclusionReason" | "missingSince" | "missingSeenCount"
+      >
+    > = {},
   ): void {
     this.products.push({
       id: `product-${this.products.length + 1}`,
@@ -233,6 +250,8 @@ export class FakeCoolpcProductWriteClient implements CoolpcProductWriteClient {
       primaryImageCheckedAt: item.fetchedAt,
       sourceUrl: item.sourceUrl,
       isActive: overrides.isActive ?? true,
+      isExcluded: overrides.isExcluded ?? false,
+      exclusionReason: overrides.exclusionReason ?? null,
       missingSince: overrides.missingSince ?? null,
       missingSeenCount: overrides.missingSeenCount ?? 0,
       firstSeenAt: item.fetchedAt,

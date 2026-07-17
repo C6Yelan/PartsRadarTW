@@ -35,6 +35,7 @@ export async function readCrawlRunPriceChangeSummary(
     where: {
       crawlRunId,
       product: {
+        isExcluded: false,
         sourceCategory: {
           enabled: true,
         },
@@ -172,11 +173,10 @@ export async function readRecentPriceReport(
         gte: since,
         lte: until,
       },
-      ...(Object.keys(productFilter).length > 0
-        ? {
-            product: productFilter,
-          }
-        : {}),
+      product: {
+        isExcluded: false,
+        ...productFilter,
+      },
     },
     select: PRICE_SNAPSHOT_WITH_PRODUCT_SELECT,
     orderBy: CURRENT_PRICE_SNAPSHOT_ORDER_BY,

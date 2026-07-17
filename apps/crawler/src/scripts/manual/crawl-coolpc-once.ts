@@ -105,9 +105,9 @@ async function collectDbCounts(client: PrismaClient): Promise<DbCounts> {
     priceSnapshots,
     rawSnapshots,
   ] = await Promise.all([
-    client.product.count(),
-    client.product.count({ where: { isActive: true } }),
-    client.product.count({ where: { primaryImageUrl: { not: null } } }),
+    client.product.count({ where: { isExcluded: false } }),
+    client.product.count({ where: { isActive: true, isExcluded: false } }),
+    client.product.count({ where: { isExcluded: false, primaryImageUrl: { not: null } } }),
     client.currentPrice.count(),
     client.priceSnapshot.count(),
     client.rawSnapshot.count(),

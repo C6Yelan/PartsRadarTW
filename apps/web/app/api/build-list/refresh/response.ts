@@ -37,6 +37,8 @@ export function toBuildListRefreshProduct(
     },
     status: {
       isActive: product.isActive,
+      isExcluded: product.isExcluded,
+      exclusionReason: product.exclusionReason,
     },
     lastSeenAt: product.lastSeenAt.toISOString(),
   };

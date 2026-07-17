@@ -14,6 +14,8 @@ describe("ProductDetailFacts", () => {
         product={product({
           status: {
             isActive: false,
+            isExcluded: false,
+            exclusionReason: null,
           },
         })}
       />,
@@ -21,6 +23,25 @@ describe("ProductDetailFacts", () => {
 
     expect(html).toContain("這項商品目前未在來源頁面看到，可能已下架或暫時無法確認。");
     expect(html).toContain("最後在原價屋看到");
+  });
+
+  it("shows an exclusion notice without presenting the product as delisted", () => {
+    const html = renderToStaticMarkup(
+      <ProductDetailFacts
+        product={product({
+          status: {
+            isActive: true,
+            isExcluded: true,
+            exclusionReason: "misclassified_bundle_product",
+          },
+        })}
+      />,
+    );
+
+    expect(html).toContain("此項目為搭購商品或不屬於目前分類，因此未納入列表。");
+    expect(html).toContain("未納入列表");
+    expect(html).not.toContain("可能已下架");
+    expect(html).not.toContain("最後在原價屋看到");
   });
 
   it("does not show the availability notice for active products", () => {
@@ -57,6 +78,8 @@ function product(overrides: Partial<ProductDetailBody> = {}): ProductDetailBody 
     },
     status: {
       isActive: true,
+      isExcluded: false,
+      exclusionReason: null,
     },
     lastSeenAt: "2026-07-10T08:00:00.000Z",
     ...overrides,

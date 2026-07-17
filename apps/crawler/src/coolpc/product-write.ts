@@ -24,7 +24,7 @@ export async function writeCoolpcCategoryProductObservation({
   sourceCategoryId,
   fetchedAt,
   parsedProducts,
-  excludedIbuyTokens = [],
+  excludedProducts = [],
 }: WriteCoolpcCategoryProductObservationOptions): Promise<WriteCoolpcCategoryProductObservationResult> {
   // 商品資料、價格快照、現用價格需一起更新，交易邊界放在這裡統一處理，避免各呼叫端自行拼出不一致規則。
   return client.$transaction((transactionClient) =>
@@ -35,7 +35,7 @@ export async function writeCoolpcCategoryProductObservation({
       sourceCategoryId,
       fetchedAt,
       parsedProducts,
-      excludedIbuyTokens,
+      excludedProducts,
     }),
   );
 }
@@ -47,7 +47,7 @@ async function writeCoolpcCategoryProductObservationInTransaction({
   sourceCategoryId,
   fetchedAt,
   parsedProducts,
-  excludedIbuyTokens,
+  excludedProducts,
 }: Omit<WriteCoolpcCategoryProductObservationOptions, "client" | "rawSnapshotId"> & {
   client: CoolpcProductWriteDelegates;
   rawSnapshotId: string | null;
@@ -87,7 +87,9 @@ async function writeCoolpcCategoryProductObservationInTransaction({
     sourceCategoryId,
     fetchedAt,
     presentIbuyTokens,
-    excludedIbuyTokens: new Set(excludedIbuyTokens),
+    excludedProducts: new Map(
+      (excludedProducts ?? []).map((product) => [product.ibuyToken, product.reason]),
+    ),
   });
   result.missingProductUpdatedCount = missingResult.missingProductUpdatedCount;
   result.markedInactiveProductCount = missingResult.markedInactiveProductCount;

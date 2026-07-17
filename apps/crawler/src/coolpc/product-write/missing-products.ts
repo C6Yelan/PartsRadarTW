@@ -4,6 +4,7 @@ import type {
   CoolpcProductWriteDelegates,
   WriteCoolpcCategoryProductObservationResult,
 } from "./types";
+import type { ProductExclusionReason } from "../parser";
 
 // 連續幾次成功回報才轉為停用，避免一次缺頁或暫時抓不到就誤下架。
 const MISSING_SUCCESSFUL_CRAWLS_BEFORE_INACTIVE = 6;
@@ -13,13 +14,13 @@ export async function markMissingProducts({
   sourceCategoryId,
   fetchedAt,
   presentIbuyTokens,
-  excludedIbuyTokens = new Set(),
+  excludedProducts = new Map(),
 }: {
   client: CoolpcProductWriteDelegates;
   sourceCategoryId: string;
   fetchedAt: Date;
   presentIbuyTokens: ReadonlySet<string>;
-  excludedIbuyTokens?: ReadonlySet<string>;
+  excludedProducts?: ReadonlyMap<string, ProductExclusionReason>;
 }): Promise<
   Pick<
     WriteCoolpcCategoryProductObservationResult,
@@ -33,6 +34,8 @@ export async function markMissingProducts({
       id: true,
       ibuyToken: true,
       isActive: true,
+      isExcluded: true,
+      exclusionReason: true,
       missingSince: true,
       missingSeenCount: true,
     },
@@ -49,10 +52,14 @@ export async function markMissingProducts({
       continue;
     }
 
-    if (excludedIbuyTokens.has(product.ibuyToken)) {
+    const exclusionReason = excludedProducts.get(product.ibuyToken);
+    if (exclusionReason) {
       if (
-        !product.isActive &&
-        product.missingSeenCount >= MISSING_SUCCESSFUL_CRAWLS_BEFORE_INACTIVE
+        product.isActive &&
+        product.isExcluded &&
+        product.exclusionReason === exclusionReason &&
+        product.missingSince === null &&
+        product.missingSeenCount === 0
       ) {
         continue;
       }
@@ -60,19 +67,14 @@ export async function markMissingProducts({
       await client.product.update({
         where: { id: product.id },
         data: {
-          isActive: false,
-          missingSince: product.missingSince ?? fetchedAt,
-          missingSeenCount: Math.max(
-            product.missingSeenCount,
-            MISSING_SUCCESSFUL_CRAWLS_BEFORE_INACTIVE,
-          ),
+          isActive: true,
+          isExcluded: true,
+          exclusionReason,
+          missingSince: null,
+          missingSeenCount: 0,
         },
         select: { id: true },
       });
-      result.missingProductUpdatedCount += 1;
-      if (product.isActive) {
-        result.markedInactiveProductCount += 1;
-      }
       continue;
     }
 

@@ -82,6 +82,7 @@ export function buildProductWhere(
   options: { includeVendors: boolean },
 ): Prisma.ProductWhereInput {
   const where: Prisma.ProductWhereInput = {
+    isExcluded: false,
     sourceCategory: {
       enabled: true,
       ...(query.igrp !== undefined ? { igrp: query.igrp } : {}),
@@ -130,6 +131,7 @@ export function buildProductVendorOptionsWhere(query: ProductListQuery): Prisma.
   }
 
   return {
+    isExcluded: false,
     sourceCategory: {
       enabled: true,
       igrp: query.igrp,

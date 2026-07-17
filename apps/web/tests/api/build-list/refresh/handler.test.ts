@@ -57,6 +57,8 @@ describe("POST /api/build-list/refresh handler", () => {
           },
           status: {
             isActive: false,
+            isExcluded: false,
+            exclusionReason: null,
           },
           lastSeenAt: "2026-05-28T11:55:00.000Z",
         },
@@ -190,6 +192,8 @@ function product(overrides: Partial<ProductRecord> = {}): ProductRecord {
     name: "GPU RTX 4070",
     primaryImageUrl: "https://www.coolpc.com.tw/eval/12/gpu-rtx-4070.jpg",
     isActive: true,
+    isExcluded: false,
+    exclusionReason: null,
     lastSeenAt: new Date("2026-05-28T11:55:00.000Z"),
     currentPrice: {
       priceSnapshot: {

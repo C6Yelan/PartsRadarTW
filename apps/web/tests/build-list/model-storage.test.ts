@@ -142,7 +142,7 @@ describe("build list v2 model", () => {
       [
         product(PRODUCT_ID_2, {
           price: { amount: 3000, currency: "TWD" },
-          status: { isActive: false },
+          status: { isActive: false, isExcluded: false, exclusionReason: null },
         }),
         product(PRODUCT_ID_4, { price: null }),
         product(PRODUCT_ID_1),
@@ -187,7 +187,7 @@ describe("build list v2 model", () => {
         product(PRODUCT_ID_1, { category: { displayName: "CPU" } }),
         product(PRODUCT_ID_2, {
           category: { displayName: "CPU" },
-          status: { isActive: false },
+          status: { isActive: false, isExcluded: false, exclusionReason: null },
         }),
         product(PRODUCT_ID_3, {
           category: { displayName: "顯示卡" },
@@ -329,6 +329,8 @@ function product(
     },
     status: {
       isActive: true,
+      isExcluded: false,
+      exclusionReason: null,
     },
     lastSeenAt: "2026-05-28T11:55:00.000Z",
     ...overrides,

@@ -61,6 +61,8 @@ describe("GET /api/products/{id} handler", () => {
       },
       status: {
         isActive: true,
+        isExcluded: false,
+        exclusionReason: null,
       },
       lastSeenAt: "2026-05-28T11:55:00.000Z",
     });
@@ -112,6 +114,26 @@ describe("GET /api/products/{id} handler", () => {
     expect(await response.json()).toMatchObject({
       status: {
         isActive: false,
+      },
+    });
+  });
+
+  it("returns excluded product details for direct legacy URLs", async () => {
+    const response = await createGetProductHandler(
+      fakeProductDetailClient(
+        product({
+          isExcluded: true,
+          exclusionReason: "misclassified_bundle_product",
+        }),
+      ),
+    )(PRODUCT_ID);
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      status: {
+        isActive: true,
+        isExcluded: true,
+        exclusionReason: "misclassified_bundle_product",
       },
     });
   });
@@ -200,6 +222,8 @@ function product(overrides: Partial<NonNullable<ProductRecord>> = {}): NonNullab
     primaryImageUrl: "https://www.coolpc.com.tw/eval/12/gpu-rtx-4070.jpg",
     imageCachedAt: new Date("2026-05-28T11:50:00.000Z"),
     isActive: true,
+    isExcluded: false,
+    exclusionReason: null,
     lastSeenAt: new Date("2026-05-28T11:55:00.000Z"),
     currentPrice: {
       lastSeenAt: new Date("2026-05-28T11:55:00.000Z"),

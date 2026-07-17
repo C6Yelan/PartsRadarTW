@@ -131,6 +131,10 @@ function getBuildListExportStatus(item: BuildListItem): string {
     return "暫時無法確認";
   }
 
+  if (item.product.status.isExcluded) {
+    return "未納入列表";
+  }
+
   return item.product.status.isActive ? "目前上架" : "可能已下架";
 }
 

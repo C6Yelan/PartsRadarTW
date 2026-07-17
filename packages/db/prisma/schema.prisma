@@ -154,6 +154,8 @@ model Product {
   imageCacheNextRetryAt    DateTime?                     @map("image_cache_next_retry_at") @db.Timestamptz(6)
   sourceUrl                String                        @map("source_url") @db.Text
   isActive                 Boolean                       @default(true) @map("is_active")
+  isExcluded               Boolean                       @default(false) @map("is_excluded")
+  exclusionReason          ProductExclusionReason?       @map("exclusion_reason")
   missingSince             DateTime?                     @map("missing_since") @db.Timestamptz(6)
   missingSeenCount         Int                           @default(0) @map("missing_seen_count")
   firstSeenAt              DateTime                      @map("first_seen_at") @db.Timestamptz(6)
@@ -170,11 +172,17 @@ model Product {
   @@index([sourceCategoryId, vendorSlug], map: "products_source_category_id_vendor_slug_idx")
   @@index([filterTags], type: Gin, map: "products_filter_tags_idx")
   @@index([isActive], map: "products_is_active_idx")
+  @@index([isExcluded], map: "products_is_excluded_idx")
   @@index([lastSeenAt], map: "products_last_seen_at_idx")
   @@index([primaryImageCheckedAt], map: "products_primary_image_checked_at_idx")
   @@index([imageCacheCheckedAt], map: "products_image_cache_checked_at_idx")
   @@index([imageCacheNextRetryAt], map: "products_image_cache_next_retry_at_idx")
   @@map("products")
+}
+
+enum ProductExclusionReason {
+  misclassified_bundle_product
+  conditional_add_on
 }
 
 model PriceSnapshot {

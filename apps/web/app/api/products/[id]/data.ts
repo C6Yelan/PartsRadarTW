@@ -11,6 +11,8 @@ export const PRODUCT_DETAIL_SELECT = {
   primaryImageUrl: true,
   imageCachedAt: true,
   isActive: true,
+  isExcluded: true,
+  exclusionReason: true,
   lastSeenAt: true,
   currentPrice: {
     select: {

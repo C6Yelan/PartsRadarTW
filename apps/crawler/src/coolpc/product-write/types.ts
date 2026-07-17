@@ -1,6 +1,6 @@
 // apps/crawler/src/coolpc/product-write/types.ts
 // 定義 CoolPC 產品觀測寫入流程所需的輸入/輸出與資料寫入介面，讓流程邏輯與資料存取邊界解耦。
-import type { ParsedCoolpcProduct } from "../parser";
+import type { ExcludedCoolpcProduct, ParsedCoolpcProduct, ProductExclusionReason } from "../parser";
 
 // 寫入一次分類結果的輸入參數：含 crawl run 追蹤、原始快照、分類 ID 及已解析商品清單。
 export interface WriteCoolpcCategoryProductObservationOptions {
@@ -10,7 +10,7 @@ export interface WriteCoolpcCategoryProductObservationOptions {
   sourceCategoryId: string;
   fetchedAt: Date;
   parsedProducts: ParsedCoolpcProduct[];
-  excludedIbuyTokens?: readonly string[];
+  excludedProducts?: readonly ExcludedCoolpcProduct[];
 }
 
 // 單次分類寫入的結果摘要，供上游彙總與排程監控顯示。
@@ -51,6 +51,8 @@ export interface CoolpcProductWriteDelegates {
         id: true;
         ibuyToken: true;
         isActive: true;
+        isExcluded: true;
+        exclusionReason: true;
         missingSince: true;
         missingSeenCount: true;
       };
@@ -62,7 +64,9 @@ export interface CoolpcProductWriteDelegates {
         | ProductSeenUpdateData
         | {
             isActive: boolean;
-            missingSince: Date;
+            isExcluded?: boolean;
+            exclusionReason?: ProductExclusionReason | null;
+            missingSince: Date | null;
             missingSeenCount: number;
           };
       select: { id: true };
@@ -106,6 +110,8 @@ export interface ExistingProductForMissingWrite {
   id: string;
   ibuyToken: string;
   isActive: boolean;
+  isExcluded: boolean;
+  exclusionReason: ProductExclusionReason | null;
   missingSince: Date | null;
   missingSeenCount: number;
 }
@@ -130,6 +136,8 @@ export interface ProductCreateData {
   primaryImageCheckedAt: Date | null;
   sourceUrl: string;
   isActive: true;
+  isExcluded: false;
+  exclusionReason: null;
   missingSince: null;
   missingSeenCount: 0;
   firstSeenAt: Date;
@@ -156,6 +164,8 @@ export interface ProductSeenUpdateData {
   imageCacheNextRetryAt?: null;
   sourceUrl: string;
   isActive: true;
+  isExcluded: false;
+  exclusionReason: null;
   missingSince: null;
   missingSeenCount: 0;
   lastSeenAt: Date;

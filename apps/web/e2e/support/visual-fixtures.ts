@@ -47,6 +47,8 @@ export function buildVisualProduct() {
     },
     status: {
       isActive: true,
+      isExcluded: false,
+      exclusionReason: null,
     },
     lastSeenAt: OBSERVED_AT,
   };

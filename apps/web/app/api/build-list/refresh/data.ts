@@ -9,6 +9,8 @@ export const BUILD_LIST_REFRESH_SELECT = {
   name: true,
   primaryImageUrl: true,
   isActive: true,
+  isExcluded: true,
+  exclusionReason: true,
   lastSeenAt: true,
   sourceCategory: {
     select: {

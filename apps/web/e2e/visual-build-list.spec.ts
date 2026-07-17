@@ -790,7 +790,7 @@ function buildListProduct(
     category: { displayName: category },
     price: { amount, currency: "TWD" },
     source: { url: `https://coolpc.invalid/products/${id}` },
-    status: { isActive },
+    status: { isActive, isExcluded: false, exclusionReason: null },
     lastSeenAt: OBSERVED_AT,
   };
 }

@@ -48,6 +48,7 @@ export async function sendDueTargetPriceNotifications({
       OR: [{ notificationClaimedAt: null }, { notificationClaimedAt: { lte: staleClaimBefore } }],
       product: {
         isActive: true,
+        isExcluded: false,
         currentPrice: {
           isNot: null,
         },

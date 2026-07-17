@@ -20,7 +20,9 @@ import {
 import type {
   CoolpcParseIssue,
   CoolpcParseResult,
+  ExcludedCoolpcProduct,
   ParsedCoolpcProduct,
+  ProductExclusionReason,
   SourceCategoryContext,
 } from "./parser/types";
 import {
@@ -35,8 +37,10 @@ export type {
   ContentValidationStatus,
   CoolpcParseIssue,
   CoolpcParseResult,
+  ExcludedCoolpcProduct,
   ParsedCoolpcProduct,
   ParseErrorType,
+  ProductExclusionReason,
   SourceCategoryContext,
 } from "./parser/types";
 
@@ -56,7 +60,7 @@ export function parseCoolpcCategoryPage(
     return {
       validation,
       items: [],
-      excludedIbuyTokens: [],
+      excludedProducts: [],
       issues: [
         {
           type: "content_validation_failed",
@@ -71,7 +75,7 @@ export function parseCoolpcCategoryPage(
   const $ = load(html);
   const candidates = extractCoolpcProductCandidates($);
   const items: ParsedCoolpcProduct[] = [];
-  const excludedIbuyTokens: string[] = [];
+  const excludedProducts: ExcludedCoolpcProduct[] = [];
   const issues: CoolpcParseIssue[] = [];
   const seenItemsBySourceKey = new Map<string, ParsedCoolpcProduct>();
   let deduplicatedItemCount = 0;
@@ -109,8 +113,9 @@ export function parseCoolpcCategoryPage(
       continue;
     }
 
-    if (isMisclassifiedCategoryProduct(context.igrp, name)) {
-      excludedIbuyTokens.push(ibuyToken);
+    const exclusionReason = getProductExclusionReason(context.igrp, name);
+    if (exclusionReason) {
+      excludedProducts.push({ ibuyToken, reason: exclusionReason });
       continue;
     }
 
@@ -196,16 +201,16 @@ export function parseCoolpcCategoryPage(
   return {
     validation,
     items,
-    excludedIbuyTokens,
+    excludedProducts,
     issues,
     deduplicatedItemCount,
     canImport: items.length > 0 && !hasFatalIssue,
   };
 }
 
-function isMisclassifiedCategoryProduct(igrp: number, name: string): boolean {
+function getProductExclusionReason(igrp: number, name: string): ProductExclusionReason | null {
   if (/^(?:\[加購優惠\]|【加購優惠】)/.test(name)) {
-    return true;
+    return "conditional_add_on";
   }
 
   const isBundledCpuMotherboard =
@@ -214,18 +219,18 @@ function isMisclassifiedCategoryProduct(igrp: number, name: string): boolean {
     /\b(?:H610|B760|Z790|H810|B860|Z890|A520|B550|B650E?|B840|B850|X670E?|X870E?)M?\b/i.test(name);
 
   if (isBundledCpuMotherboard) {
-    return true;
+    return "misclassified_bundle_product";
   }
 
   if (
     igrp !== 14 ||
     !/^(?:【[^】]*限搭購[^】]*機殼[^】]*】|\[[^\]]*限搭購[^\]]*機殼[^\]]*\])/i.test(name)
   ) {
-    return false;
+    return null;
   }
 
   if (/\d{3,4}\s*W(?=$|[^A-Z0-9])/i.test(name)) {
-    return true;
+    return "misclassified_bundle_product";
   }
 
   const powerSupplyFeatureCount = [
@@ -236,5 +241,5 @@ function isMisclassifiedCategoryProduct(igrp: number, name: string): boolean {
     /電源供應器|\bPSU\b/i,
   ].filter((pattern) => pattern.test(name)).length;
 
-  return powerSupplyFeatureCount >= 2;
+  return powerSupplyFeatureCount >= 2 ? "misclassified_bundle_product" : null;
 }

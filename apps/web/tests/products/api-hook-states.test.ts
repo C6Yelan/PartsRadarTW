@@ -298,6 +298,8 @@ function buildListSuccessBody(name: string) {
         },
         status: {
           isActive: true,
+          isExcluded: false,
+          exclusionReason: null,
         },
         lastSeenAt: "2026-07-10T08:00:00.000Z",
       },

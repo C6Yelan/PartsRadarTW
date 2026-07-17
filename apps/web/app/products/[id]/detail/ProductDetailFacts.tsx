@@ -9,7 +9,11 @@ import type { ProductDetailBody } from "./types";
 export default function ProductDetailFacts({ product }: { product: ProductDetailBody }) {
   return (
     <>
-      {!product.status.isActive ? (
+      {product.status.isExcluded ? (
+        <div className="quiet-alert" role="status">
+          此項目為搭購商品或不屬於目前分類，因此未納入列表。
+        </div>
+      ) : !product.status.isActive ? (
         <div className="quiet-alert warning" role="status">
           這項商品目前未在來源頁面看到，可能已下架或暫時無法確認。
         </div>
@@ -25,7 +29,7 @@ export default function ProductDetailFacts({ product }: { product: ProductDetail
           <dt>價格資料更新</dt>
           <dd>{formatTaipeiDateTime(product.price.lastSeenAt)}</dd>
         </div>
-        {!product.status.isActive ? (
+        {!product.status.isActive && !product.status.isExcluded ? (
           <div>
             <dt>最後在原價屋看到</dt>
             <dd>{formatTaipeiDateTime(product.lastSeenAt)}</dd>
@@ -33,7 +37,13 @@ export default function ProductDetailFacts({ product }: { product: ProductDetail
         ) : null}
         <div>
           <dt>上架狀態</dt>
-          <dd>{product.status.isActive ? "目前上架" : "可能已下架"}</dd>
+          <dd>
+            {product.status.isExcluded
+              ? "未納入列表"
+              : product.status.isActive
+                ? "目前上架"
+                : "可能已下架"}
+          </dd>
         </div>
       </dl>
     </>

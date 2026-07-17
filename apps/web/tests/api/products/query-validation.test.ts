@@ -28,6 +28,7 @@ describe("GET /api/products query validation", () => {
     expect(response.status).toBe(200);
     expect(client.lastProductVendorOptionsArgs).toMatchObject({
       where: {
+        isExcluded: false,
         sourceCategory: {
           enabled: true,
           igrp: 12,
@@ -79,6 +80,7 @@ describe("GET /api/products query validation", () => {
     });
     expect(client.lastProductFindProductsArgs).toMatchObject({
       where: {
+        isExcluded: false,
         sourceCategory: {
           enabled: true,
           igrp: 12,

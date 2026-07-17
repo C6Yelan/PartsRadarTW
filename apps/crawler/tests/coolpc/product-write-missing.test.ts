@@ -24,37 +24,46 @@ describe("CoolPC category product observation writer missing lifecycle", () => {
       sourceCategoryId: "category-4",
       fetchedAt,
       parsedProducts: [],
-      excludedIbuyTokens: ["CPU-BUNDLE-BOARD"],
+      excludedProducts: [{ ibuyToken: "CPU-BUNDLE-BOARD", reason: "misclassified_bundle_product" }],
     });
 
     expect(result).toMatchObject({
-      missingProductUpdatedCount: 1,
-      markedInactiveProductCount: 1,
+      missingProductUpdatedCount: 0,
+      markedInactiveProductCount: 0,
     });
     expect(client.products[0]).toMatchObject({
-      isActive: false,
-      missingSince: fetchedAt,
-      missingSeenCount: 6,
+      isActive: true,
+      isExcluded: true,
+      exclusionReason: "misclassified_bundle_product",
+      missingSince: null,
+      missingSeenCount: 0,
     });
   });
 
   it("immediately hides an excluded bundle-only power supply from the case category", async () => {
     const client = new FakeCoolpcProductWriteClient();
     const fetchedAt = new Date("2026-07-17T11:00:00.000Z");
-    client.seedProductWithCurrentPrice({
-      ...productItem({
-        sourceCategoryId: "category-14",
-        ibuyToken: "CASE-BUNDLE-PSU",
-        name: "【限搭購喬思伯機殼】全漢 金鋼彈 650W 金牌 全模【SFX規格】",
-        normalizedName: "【限搭購喬思伯機殼】全漢 金鋼彈 650w 金牌 全模【sfx規格】",
-        price: 3490,
-      }),
-      igrp: 14,
-      sourceName: "CASE 機殼(+電源)",
-      displayName: "機殼",
-      sourceItemKey: "coolpc:igrp:14:ibuy:CASE-BUNDLE-PSU",
-      sourceUrl: "https://www.coolpc.com.tw/eachview.php?IGrp=14",
-    });
+    client.seedProductWithCurrentPrice(
+      {
+        ...productItem({
+          sourceCategoryId: "category-14",
+          ibuyToken: "CASE-BUNDLE-PSU",
+          name: "【限搭購喬思伯機殼】全漢 金鋼彈 650W 金牌 全模【SFX規格】",
+          normalizedName: "【限搭購喬思伯機殼】全漢 金鋼彈 650w 金牌 全模【sfx規格】",
+          price: 3490,
+        }),
+        igrp: 14,
+        sourceName: "CASE 機殼(+電源)",
+        displayName: "機殼",
+        sourceItemKey: "coolpc:igrp:14:ibuy:CASE-BUNDLE-PSU",
+        sourceUrl: "https://www.coolpc.com.tw/eachview.php?IGrp=14",
+      },
+      {
+        isActive: false,
+        missingSince: new Date("2026-07-17T08:39:00.000Z"),
+        missingSeenCount: 6,
+      },
+    );
 
     const result = await writeCoolpcCategoryProductObservation({
       client,
@@ -63,17 +72,19 @@ describe("CoolPC category product observation writer missing lifecycle", () => {
       sourceCategoryId: "category-14",
       fetchedAt,
       parsedProducts: [],
-      excludedIbuyTokens: ["CASE-BUNDLE-PSU"],
+      excludedProducts: [{ ibuyToken: "CASE-BUNDLE-PSU", reason: "misclassified_bundle_product" }],
     });
 
     expect(result).toMatchObject({
-      missingProductUpdatedCount: 1,
-      markedInactiveProductCount: 1,
+      missingProductUpdatedCount: 0,
+      markedInactiveProductCount: 0,
     });
     expect(client.products[0]).toMatchObject({
-      isActive: false,
-      missingSince: fetchedAt,
-      missingSeenCount: 6,
+      isActive: true,
+      isExcluded: true,
+      exclusionReason: "misclassified_bundle_product",
+      missingSince: null,
+      missingSeenCount: 0,
     });
   });
 
@@ -104,17 +115,19 @@ describe("CoolPC category product observation writer missing lifecycle", () => {
       sourceCategoryId: "category-5",
       fetchedAt,
       parsedProducts: [],
-      excludedIbuyTokens: ["CONDITIONAL-ADD-ON"],
+      excludedProducts: [{ ibuyToken: "CONDITIONAL-ADD-ON", reason: "conditional_add_on" }],
     });
 
     expect(result).toMatchObject({
-      missingProductUpdatedCount: 1,
-      markedInactiveProductCount: 1,
+      missingProductUpdatedCount: 0,
+      markedInactiveProductCount: 0,
     });
     expect(client.products[0]).toMatchObject({
-      isActive: false,
-      missingSince: fetchedAt,
-      missingSeenCount: 6,
+      isActive: true,
+      isExcluded: true,
+      exclusionReason: "conditional_add_on",
+      missingSince: null,
+      missingSeenCount: 0,
     });
     expect(client.priceSnapshots).toHaveLength(1);
     expect(client.currentPrices).toHaveLength(1);
@@ -200,6 +213,27 @@ describe("CoolPC category product observation writer missing lifecycle", () => {
     expect(client.currentPrices).toHaveLength(1);
   });
 
+  it("keeps a missing product active through the first five successful crawls", async () => {
+    const client = new FakeCoolpcProductWriteClient();
+    client.seedProductWithCurrentPrice(productItem({ price: 4880 }));
+
+    for (let crawlNumber = 1; crawlNumber <= 5; crawlNumber += 1) {
+      await writeCoolpcCategoryProductObservation({
+        client,
+        crawlRunId: `crawl-run-${crawlNumber + 1}`,
+        sourceCategoryId: "category-4",
+        fetchedAt: new Date(Date.UTC(2026, 4, 27 + crawlNumber, 11)),
+        parsedProducts: [],
+      });
+
+      expect(client.products[0]).toMatchObject({
+        isActive: true,
+        isExcluded: false,
+        missingSeenCount: crawlNumber,
+      });
+    }
+  });
+
   it("restores an inactive product when the same source identity reappears", async () => {
     const client = new FakeCoolpcProductWriteClient();
     const previousSeenAt = new Date("2026-05-27T10:00:00.000Z");
@@ -236,6 +270,32 @@ describe("CoolPC category product observation writer missing lifecycle", () => {
       priceSnapshotId: "price-snapshot-1",
       lastSeenAt: nextSeenAt,
       priceChangedAt: previousSeenAt,
+    });
+  });
+
+  it("restores an excluded product when the same source identity is parsed normally", async () => {
+    const client = new FakeCoolpcProductWriteClient();
+    const nextSeenAt = new Date("2026-05-27T11:00:00.000Z");
+    client.seedProductWithCurrentPrice(productItem({ price: 4880 }), {
+      isExcluded: true,
+      exclusionReason: "conditional_add_on",
+    });
+
+    await writeCoolpcCategoryProductObservation({
+      client,
+      crawlRunId: "crawl-run-2",
+      sourceCategoryId: "category-4",
+      fetchedAt: nextSeenAt,
+      parsedProducts: [productItem({ price: 4880, fetchedAt: nextSeenAt })],
+    });
+
+    expect(client.products[0]).toMatchObject({
+      isActive: true,
+      isExcluded: false,
+      exclusionReason: null,
+      missingSince: null,
+      missingSeenCount: 0,
+      lastSeenAt: nextSeenAt,
     });
   });
 });

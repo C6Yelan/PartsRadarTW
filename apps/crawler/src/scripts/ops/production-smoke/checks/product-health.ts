@@ -94,6 +94,7 @@ export async function checkSourceImageFetchFailures(
   const products = await client.product.findMany({
     where: {
       isActive: true,
+      isExcluded: false,
       imageCacheFailureCount: { gte: options.sourceImageFailureMinConsecutive },
     },
     select: {
@@ -143,6 +144,7 @@ export async function checkSourceImageFetchFailures(
 function displayReadyProductWhere() {
   return {
     isActive: true,
+    isExcluded: false,
     primaryImageUrl: {
       not: null,
     },

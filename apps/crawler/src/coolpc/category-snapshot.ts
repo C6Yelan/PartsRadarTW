@@ -19,7 +19,11 @@ import {
   type ProcessCrawlCategoryResult,
 } from "./crawl-run";
 import { normalizeFilterSyncProductName } from "./filter-sync/parser";
-import { type ParsedCoolpcProduct, parseCoolpcCategoryPage } from "./parser";
+import {
+  type ExcludedCoolpcProduct,
+  type ParsedCoolpcProduct,
+  parseCoolpcCategoryPage,
+} from "./parser";
 import {
   type CoolpcProductWriteClient,
   type WriteCoolpcCategoryProductObservationResult,
@@ -71,7 +75,7 @@ export type WriteCoolpcCategoryProductObservation = (options: {
   sourceCategoryId: string;
   fetchedAt: Date;
   parsedProducts: ParsedCoolpcProduct[];
-  excludedIbuyTokens?: readonly string[];
+  excludedProducts?: readonly ExcludedCoolpcProduct[];
 }) => Promise<WriteCoolpcCategoryProductObservationResult>;
 
 /**
@@ -179,7 +183,7 @@ export async function processCoolpcCategorySnapshot(
     sourceCategoryId: category.id,
     fetchedAt: snapshot.fetchedAt,
     parsedProducts: parseResult.items,
-    excludedIbuyTokens: parseResult.excludedIbuyTokens,
+    excludedProducts: parseResult.excludedProducts,
   });
 
   return {
