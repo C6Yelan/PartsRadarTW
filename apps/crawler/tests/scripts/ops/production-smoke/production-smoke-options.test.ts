@@ -24,6 +24,7 @@ describe("production smoke options", () => {
       baseUrl: "http://127.0.0.1:3000/",
       publicOnly: false,
       filterSyncStateFilePath: null,
+      crawlerRuntimeStatusFilePath: null,
       timeoutMs: 5000,
       productImageSampleSize: 5,
       imageInactiveRetentionDays: 30,
@@ -81,6 +82,7 @@ describe("production smoke options", () => {
         SMOKE_CRAWLER_FAIL_AFTER_MINUTES: "240",
         SMOKE_SOURCE_IMAGE_FAILURE_WARN_COUNT: "3000",
         SMOKE_FILTER_EMPTY_WARN_RATIO: "0.01",
+        SMOKE_CRAWLER_RUNTIME_STATUS_FILE: "storage/crawler-runtime-status.json",
       },
       crawlerCwd,
     );
@@ -101,6 +103,9 @@ describe("production smoke options", () => {
     expect(options.productImageStorageDir).toBe(join(workspaceRoot, "custom-images"));
     expect(options.filterSyncStateFilePath).toBe(
       join(workspaceRoot, "storage", "filter-sync.json"),
+    );
+    expect(options.crawlerRuntimeStatusFilePath).toBe(
+      join(workspaceRoot, "storage", "crawler-runtime-status.json"),
     );
   });
 

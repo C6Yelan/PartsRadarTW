@@ -12,6 +12,7 @@ export interface ProductionSmokeOptions {
   publicOnly: boolean;
   timeoutMs: number;
   filterSyncStateFilePath: string | null;
+  crawlerRuntimeStatusFilePath: string | null;
   productImageStorageDir: string;
   productImageSampleSize: number;
   imageInactiveRetentionDays: number;

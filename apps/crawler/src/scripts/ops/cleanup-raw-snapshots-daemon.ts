@@ -83,6 +83,17 @@ export async function runRawSnapshotCleanupDaemon({
   acquireMutationLock = tryAcquireRawSnapshotMutationLock,
   logMessage = log,
 }: RunRawSnapshotCleanupDaemonOptions): Promise<void> {
+  if (!options.runOnce && options.initialDelaySeconds > 0) {
+    const firstRunAt = new Date(Date.now() + options.initialDelaySeconds * 1000).toISOString();
+    logMessage(
+      `Delaying first raw snapshot cleanup until ${firstRunAt} (${options.initialDelaySeconds}s) so crawler startup has priority.`,
+    );
+    await shutdown.sleep(options.initialDelaySeconds * 1000);
+    if (shutdown.requested) {
+      return;
+    }
+  }
+
   do {
     const result = await runCleanupCycle({
       client,

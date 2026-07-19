@@ -35,6 +35,15 @@ interface TryAcquireRawSnapshotMutationLockOptions {
 
 export type RawSnapshotMutationLockHandle = FilesystemLockHandle;
 
+export class RawSnapshotStorageBusyError extends Error {
+  constructor() {
+    super(
+      "Raw snapshot storage is busy; another crawler or cleanup process holds the mutation lock.",
+    );
+    this.name = "RawSnapshotStorageBusyError";
+  }
+}
+
 // requested path 必須先落在明確 root 下，再以 canonical path 複核，避免 parent/sibling 與 symlink escape。
 export function resolveAllowlistedRawSnapshotStorage({
   workspaceRoot,

@@ -64,6 +64,7 @@ export function parseProductionSmokeOptions(
   );
   const filterSyncStateFile =
     getStringArg(args, "--filter-sync-state-file") ?? env.SMOKE_FILTER_SYNC_STATE_FILE;
+  const crawlerRuntimeStatusFile = env.SMOKE_CRAWLER_RUNTIME_STATUS_FILE;
 
   return {
     workspaceRoot,
@@ -71,6 +72,9 @@ export function parseProductionSmokeOptions(
     publicOnly: args.includes(PUBLIC_ONLY_FLAG),
     filterSyncStateFilePath: filterSyncStateFile
       ? resolveWorkspacePathArgument(workspaceRoot, filterSyncStateFile)
+      : null,
+    crawlerRuntimeStatusFilePath: crawlerRuntimeStatusFile
+      ? resolveWorkspacePathArgument(workspaceRoot, crawlerRuntimeStatusFile)
       : null,
     timeoutMs: parseBoundedIntegerOption({
       args,

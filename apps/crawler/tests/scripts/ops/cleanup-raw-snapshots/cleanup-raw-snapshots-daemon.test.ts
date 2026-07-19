@@ -51,6 +51,7 @@ describe("raw snapshot cleanup daemon options", () => {
       abnormalRetentionDays: 90,
       dryRun: false,
       intervalSeconds: 86400,
+      initialDelaySeconds: 300,
       runOnce: false,
     });
   });
@@ -81,6 +82,7 @@ describe("raw snapshot cleanup daemon options", () => {
       abnormalRetentionDays: 14,
       dryRun: false,
       intervalSeconds: 7200,
+      initialDelaySeconds: 300,
       runOnce: true,
     });
   });
@@ -95,6 +97,25 @@ describe("raw snapshot cleanup daemon options", () => {
         crawlerCwd,
       ).intervalSeconds,
     ).toBe(43200);
+  });
+
+  it("reads and validates the startup delay from env", async () => {
+    const { crawlerCwd } = await createWorkspace();
+
+    expect(
+      parseRawSnapshotCleanupDaemonOptions(
+        ["--confirm-delete"],
+        { RAW_SNAPSHOT_CLEANUP_INITIAL_DELAY_SECONDS: "180" },
+        crawlerCwd,
+      ).initialDelaySeconds,
+    ).toBe(180);
+    expect(() =>
+      parseRawSnapshotCleanupDaemonOptions(
+        ["--confirm-delete"],
+        { RAW_SNAPSHOT_CLEANUP_INITIAL_DELAY_SECONDS: "3601" },
+        crawlerCwd,
+      ),
+    ).toThrow("between 0 and 3600 seconds");
   });
 
   it("rejects too frequent cleanup intervals", async () => {
@@ -179,7 +200,11 @@ describe("raw snapshot cleanup daemon options", () => {
     await expect(
       runRawSnapshotCleanupDaemon({
         client: {} as never,
-        options: createDaemonOptions({ runOnce: false, intervalSeconds: 3600 }),
+        options: createDaemonOptions({
+          runOnce: false,
+          intervalSeconds: 3600,
+          initialDelaySeconds: 0,
+        }),
         shutdown,
         cleanup: async () => {
           throw new Error("temporary cleanup failure");
@@ -190,6 +215,39 @@ describe("raw snapshot cleanup daemon options", () => {
     ).resolves.toBeUndefined();
     expect(logs).toContain("Raw snapshot cleanup cycle failed: temporary cleanup failure");
     expect(shutdown.sleepCalls).toEqual([3600 * 1000]);
+  });
+
+  it("delays the first daemon cleanup cycle so crawler startup has priority", async () => {
+    const calls: string[] = [];
+    const sleepCalls: number[] = [];
+    const shutdown = {
+      get requested() {
+        return sleepCalls.length >= 2;
+      },
+      sleepCalls,
+      async sleep(ms: number) {
+        sleepCalls.push(ms);
+      },
+    };
+
+    await runRawSnapshotCleanupDaemon({
+      client: {} as never,
+      options: createDaemonOptions({
+        runOnce: false,
+        intervalSeconds: 3600,
+        initialDelaySeconds: 300,
+      }),
+      shutdown,
+      cleanup: async () => {
+        calls.push("cleanup");
+        return SUCCESSFUL_CLEANUP_RESULT;
+      },
+      acquireMutationLock: async () => createFakeMutationLock(),
+      logMessage: () => {},
+    });
+
+    expect(calls).toEqual(["cleanup"]);
+    expect(shutdown.sleepCalls).toEqual([300_000, 3_600_000]);
   });
 
   it("runs one successful cleanup cycle in run-once mode", async () => {
@@ -242,6 +300,7 @@ function createDaemonOptions(
     abnormalRetentionDays: 90,
     dryRun: false,
     intervalSeconds: 86400,
+    initialDelaySeconds: 300,
     runOnce: false,
     ...overrides,
   };

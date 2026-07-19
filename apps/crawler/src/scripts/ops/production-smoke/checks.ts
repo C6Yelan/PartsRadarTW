@@ -1,6 +1,10 @@
 // apps/crawler/src/scripts/ops/production-smoke/checks.ts
 // 編排 production smoke 的公開端點、資料庫健康度、爬蟲狀態與通知狀態檢查。
 
+import {
+  isActiveCrawlerLockWait,
+  readCrawlerRuntimeStatus,
+} from "../crawl-coolpc-daemon/runtime-status";
 import { checkCrawlerFreshness, checkRecentSuspectedBlocks } from "./checks/crawler-runs";
 import { checkDiscordBotDeliveries } from "./checks/discord-deliveries";
 import { checkCoolpcFilterSync } from "./checks/filter-sync";
@@ -100,7 +104,14 @@ async function checkSourceFreshness(
   }
 
   const ageMinutes = minutesBetween(lastSuccessAt, now);
-  const message = `lastSuccessAt=${formatAgeMinutes(ageMinutes)} status=${sourceStatus.status}`;
+  const runtimeStatus =
+    ageMinutes >= options.sourceWarnAfterMinutes
+      ? await readCrawlerRuntimeStatus(options.crawlerRuntimeStatusFilePath)
+      : null;
+  const lockBusySuffix = isActiveCrawlerLockWait(runtimeStatus, now)
+    ? ` daemon=LOCK_BUSY lockBusySince=${runtimeStatus.lockBusySince ?? runtimeStatus.observedAt} retry=${runtimeStatus.consecutiveLockBusyCount}`
+    : "";
+  const message = `lastSuccessAt=${formatAgeMinutes(ageMinutes)} status=${sourceStatus.status}${lockBusySuffix}`;
 
   if (ageMinutes >= options.sourceFailAfterMinutes || sourceStatus.status === "unavailable") {
     return fail("source freshness", message);

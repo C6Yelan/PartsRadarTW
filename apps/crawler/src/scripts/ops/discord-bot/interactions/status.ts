@@ -2,6 +2,11 @@
 // 建立管理員限定的排程與背景工作狀態面板，不暴露原始錯誤或執行環境資訊。
 
 import {
+  type CrawlerRuntimeStatus,
+  isActiveCrawlerLockWait,
+  readCrawlerRuntimeStatus,
+} from "../../crawl-coolpc-daemon/runtime-status";
+import {
   DISCORD_PERMISSION_MANAGE_GUILD,
   DISCORD_TARGET_PRICE_REACHED_COLOR,
   TIME_ZONE,
@@ -48,6 +53,7 @@ export async function handleStatusInteraction({
   options,
   fetchImpl,
   schedulerStatus,
+  crawlerRuntimeStatus,
   now = new Date(),
 }: {
   client: StatusClient;
@@ -55,6 +61,7 @@ export async function handleStatusInteraction({
   options: DiscordBotOptions;
   fetchImpl: FetchImpl;
   schedulerStatus?: DiscordBotSchedulerStatusReader;
+  crawlerRuntimeStatus?: CrawlerRuntimeStatus | null;
   now?: Date;
 }): Promise<void> {
   if (!hasManageGuildPermission(interaction)) {
@@ -68,7 +75,13 @@ export async function handleStatusInteraction({
     return;
   }
 
-  const message = await createStatusMessage({ client, options, schedulerStatus, now });
+  const message = await createStatusMessage({
+    client,
+    options,
+    schedulerStatus,
+    crawlerRuntimeStatus,
+    now,
+  });
 
   await sendInteractionResponse({
     token: options.token,
@@ -83,6 +96,7 @@ export async function createStatusMessage({
   client,
   options,
   schedulerStatus,
+  crawlerRuntimeStatus,
   now = new Date(),
 }: {
   client: StatusClient;
@@ -94,22 +108,27 @@ export async function createStatusMessage({
     | "targetWatchesEnabled"
   >;
   schedulerStatus?: DiscordBotSchedulerStatusReader;
+  crawlerRuntimeStatus?: CrawlerRuntimeStatus | null;
   now?: Date;
 }): Promise<DiscordBotMessage> {
-  const runtime =
-    schedulerStatus?.getSnapshot() ?? createEmptyDiscordBotSchedulerStatusSnapshot();
-  const [crawlerResult, targetCountResult, personalResult, publicResult] =
-    await Promise.allSettled([
+  const runtime = schedulerStatus?.getSnapshot() ?? createEmptyDiscordBotSchedulerStatusSnapshot();
+  const crawlerDaemonRuntime =
+    crawlerRuntimeStatus === undefined
+      ? await readCrawlerRuntimeStatus(process.env.CRAWLER_RUNTIME_STATUS_FILE)
+      : crawlerRuntimeStatus;
+  const [crawlerResult, targetCountResult, personalResult, publicResult] = await Promise.allSettled(
+    [
       readCrawlerStatus(client),
       client.discordTargetPriceWatch.count({ where: { enabled: true } }),
       readPersonalReportDatabaseStatus(client, now),
       client.discordPublicPriceReportSetting.count({ where: { enabled: true } }),
-    ]);
+    ],
+  );
   const crawler = crawlerResult.status === "fulfilled" ? crawlerResult.value : null;
-  const activeWatchCount = targetCountResult.status === "fulfilled" ? targetCountResult.value : null;
+  const activeWatchCount =
+    targetCountResult.status === "fulfilled" ? targetCountResult.value : null;
   const personal = personalResult.status === "fulfilled" ? personalResult.value : null;
-  const enabledPublicSettingCount =
-    publicResult.status === "fulfilled" ? publicResult.value : null;
+  const enabledPublicSettingCount = publicResult.status === "fulfilled" ? publicResult.value : null;
   const severity = resolveOverallSeverity({
     crawlerRuns: crawler?.runs ?? null,
     runtime,
@@ -121,6 +140,7 @@ export async function createStatusMessage({
     queryFailed: [crawlerResult, targetCountResult, personalResult, publicResult].some(
       (result) => result.status === "rejected",
     ),
+    crawlerDaemonRuntime,
     now,
   });
   const scanIntervalMs = options.priceReportScheduleIntervalSeconds * 1000;
@@ -135,7 +155,7 @@ export async function createStatusMessage({
         fields: [
           {
             name: "商品價格爬蟲",
-            value: formatCrawlerStatus(crawler, now),
+            value: formatCrawlerStatus(crawler, now, crawlerDaemonRuntime),
             inline: true,
           },
           {
@@ -216,7 +236,10 @@ async function readCrawlerStatus(client: StatusClient): Promise<{
   };
 }
 
-async function readPersonalReportDatabaseStatus(client: StatusClient, now: Date): Promise<{
+async function readPersonalReportDatabaseStatus(
+  client: StatusClient,
+  now: Date,
+): Promise<{
   enabledCount: number;
   dueCount: number;
   earliestNextSendAt: Date | null;
@@ -243,8 +266,21 @@ async function readPersonalReportDatabaseStatus(client: StatusClient, now: Date)
 function formatCrawlerStatus(
   status: { runs: CrawlerRunRecord[]; latestSuccessfulFinishedAt: Date | null } | null,
   now: Date,
+  runtime: CrawlerRuntimeStatus | null,
 ): string {
   if (!status) return "QUERY_ERROR｜目前無法讀取";
+
+  if (isActiveCrawlerLockWait(runtime, now)) {
+    const lockBusySince = new Date(runtime.lockBusySince ?? runtime.observedAt);
+    return [
+      "狀態：WAITING_LOCK · 等待本機 storage lock",
+      "代碼：`LOCK_BUSY`",
+      `持續：${formatCompactDuration(now.getTime() - lockBusySince.getTime())}`,
+      `重試：第 ${runtime.consecutiveLockBusyCount} 次`,
+      `下次嘗試：${formatStatusTime(runtime.nextAttemptAt ? new Date(runtime.nextAttemptAt) : null)}`,
+      `最近成功：${formatStatusTime(status.latestSuccessfulFinishedAt)}`,
+    ].join("\n");
+  }
 
   const latestRun = status.runs[0];
   if (!latestRun) return "排程狀態：尚無排程執行紀錄";
@@ -260,11 +296,7 @@ function formatCrawlerStatus(
   ).length;
   const failedCount = latestRun.categoryResults.length - successCount;
   const backingOff = latestRun.backoffUntil !== null && latestRun.backoffUntil > now;
-  const runtimeState = backingOff
-    ? "BACKOFF"
-    : latestRun.status === "RUNNING"
-      ? "RUNNING"
-      : "IDLE";
+  const runtimeState = backingOff ? "BACKOFF" : latestRun.status === "RUNNING" ? "RUNNING" : "IDLE";
   const latestRunSucceeded =
     (latestRun.status === "SUCCESS_CHANGED" || latestRun.status === "SUCCESS_UNCHANGED") &&
     finishedAt !== null;
@@ -391,6 +423,7 @@ function resolveOverallSeverity({
   runtime,
   enabledSchedules,
   queryFailed,
+  crawlerDaemonRuntime,
   now,
 }: {
   crawlerRuns: CrawlerRunRecord[] | null;
@@ -401,6 +434,7 @@ function resolveOverallSeverity({
     publicReports: boolean;
   };
   queryFailed: boolean;
+  crawlerDaemonRuntime: CrawlerRuntimeStatus | null;
   now: Date;
 }): StatusSeverity {
   const latestRun = crawlerRuns?.[0];
@@ -419,6 +453,7 @@ function resolveOverallSeverity({
   }
 
   if (
+    isActiveCrawlerLockWait(crawlerDaemonRuntime, now) ||
     queryFailed ||
     !latestRun ||
     latestRun.status === "RUNNING" ||
@@ -540,7 +575,11 @@ function formatStatusMinute(value: Date | null): string {
   return `${parts.month}/${parts.day} ${parts.hour}:${parts.minute}`;
 }
 
-function formatCrawlerExecution(startedAt: Date, finishedAt: Date | null, durationEnd: Date): string {
+function formatCrawlerExecution(
+  startedAt: Date,
+  finishedAt: Date | null,
+  durationEnd: Date,
+): string {
   const startParts = readStatusTimeParts(startedAt);
   const start = formatStatusTime(startedAt);
   const duration = formatCompactDuration(durationEnd.getTime() - startedAt.getTime());

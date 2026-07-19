@@ -42,6 +42,8 @@ describe("CoolPC scheduled crawler daemon options", () => {
     ["--backoff-seconds", "CRAWLER_BACKOFF_SECONDS"],
     ["--category-delay-ms", "CRAWLER_CATEGORY_DELAY_MS"],
     ["--lock-retry-seconds", "CRAWLER_LOCK_RETRY_SECONDS"],
+    ["--lock-busy-retry-seconds", "CRAWLER_LOCK_BUSY_RETRY_SECONDS"],
+    ["--lock-busy-max-retries", "CRAWLER_LOCK_BUSY_MAX_RETRIES"],
     ["--lock-dir", "EXTERNAL_FETCH_LOCK_DIR"],
     ["--lock-stale-seconds", "EXTERNAL_FETCH_LOCK_STALE_SECONDS"],
     ["--filter-sync-interval-seconds", "CRAWLER_FILTER_SYNC_INTERVAL_SECONDS"],
@@ -61,6 +63,8 @@ describe("CoolPC scheduled crawler daemon options", () => {
         CRAWLER_INTERVAL_SECONDS: "600",
         CRAWLER_BACKOFF_SECONDS: "7200",
         CRAWLER_LOCK_RETRY_SECONDS: "90",
+        CRAWLER_LOCK_BUSY_RETRY_SECONDS: "45",
+        CRAWLER_LOCK_BUSY_MAX_RETRIES: "5",
         CRAWLER_CATEGORY_DELAY_MS: "5000",
         CRAWLER_FILTER_SYNC_INTERVAL_SECONDS: "86400",
         SNAPSHOT_STORAGE_DIR: "storage/snapshots",
@@ -73,12 +77,15 @@ describe("CoolPC scheduled crawler daemon options", () => {
     expect(options).toEqual({
       workspaceRoot,
       storageDir: join(workspaceRoot, "storage", "snapshots"),
+      mutationRoot: join(workspaceRoot, "storage", "snapshots"),
       intervalSeconds: 600,
       backoffSeconds: 7200,
       categoryDelayMs: 5000,
       lockDir: join(workspaceRoot, "storage", "snapshots", ".locks", "external-fetch"),
       lockStaleSeconds: 21600,
       lockRetrySeconds: 90,
+      lockBusyRetrySeconds: 45,
+      lockBusyMaxRetries: 5,
       runOnce: false,
       filterSyncIntervalSeconds: 86400,
       filterSyncStateFilePath: join(
@@ -87,6 +94,13 @@ describe("CoolPC scheduled crawler daemon options", () => {
         "snapshots",
         "ops",
         "coolpc-filter-sync-state.json",
+      ),
+      runtimeStatusFilePath: join(
+        workspaceRoot,
+        "storage",
+        "snapshots",
+        "ops",
+        "crawler-runtime-status.json",
       ),
     });
   });

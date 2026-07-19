@@ -26,6 +26,7 @@ export function stubHealthyPublicApi({
   nullImageProductIds = new Set<string>(),
   productCount = 1,
   rateLimitClientSource = "cf",
+  sourceLastSuccessAt = "2026-06-02T11:50:00.000Z",
 }: {
   buildListStatus?: number;
   categorySlugs?: string[];
@@ -35,6 +36,7 @@ export function stubHealthyPublicApi({
   nullImageProductIds?: Set<string>;
   productCount?: number;
   rateLimitClientSource?: string;
+  sourceLastSuccessAt?: string;
 } = {}): void {
   vi.stubGlobal(
     "fetch",
@@ -52,7 +54,7 @@ export function stubHealthyPublicApi({
       if (url.pathname === "/api/source-status") {
         return Response.json({
           status: "ok",
-          lastSuccessAt: "2026-06-02T11:50:00.000Z",
+          lastSuccessAt: sourceLastSuccessAt,
         });
       }
 

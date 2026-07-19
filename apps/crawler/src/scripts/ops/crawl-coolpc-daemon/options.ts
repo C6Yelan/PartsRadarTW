@@ -1,9 +1,9 @@
 // apps/crawler/src/scripts/ops/crawl-coolpc-daemon/options.ts
 // 解析 scheduled CoolPC crawler daemon 的 CLI/env 設定，集中管理排程與外部抓取鎖參數。
 
-import { DEFAULT_COOLPC_CATEGORY_DELAY_MS } from "../../../coolpc/live-crawl";
-import { DEFAULT_FILTER_SYNC_INTERVAL_SECONDS } from "../../../coolpc/filter-sync";
 import { join } from "node:path";
+import { DEFAULT_FILTER_SYNC_INTERVAL_SECONDS } from "../../../coolpc/filter-sync";
+import { DEFAULT_COOLPC_CATEGORY_DELAY_MS } from "../../../coolpc/live-crawl";
 import {
   DEFAULT_RAW_SNAPSHOT_STORAGE_DIR,
   resolveAllowlistedRawSnapshotStorage,
@@ -20,10 +20,16 @@ export const DEFAULT_STORAGE_DIR = DEFAULT_RAW_SNAPSHOT_STORAGE_DIR;
 export const DEFAULT_INTERVAL_SECONDS = 1800;
 const DEFAULT_BACKOFF_SECONDS = 3600;
 const DEFAULT_LOCK_RETRY_SECONDS = 120;
+const DEFAULT_LOCK_BUSY_RETRY_SECONDS = 45;
+const DEFAULT_LOCK_BUSY_MAX_RETRIES = 5;
 const MIN_INTERVAL_SECONDS = 60;
 const MIN_BACKOFF_SECONDS = 60;
 const MIN_LOCK_RETRY_SECONDS = 30;
 const MAX_LOCK_RETRY_SECONDS = 600;
+const MIN_LOCK_BUSY_RETRY_SECONDS = 30;
+const MAX_LOCK_BUSY_RETRY_SECONDS = 60;
+const MIN_LOCK_BUSY_MAX_RETRIES = 1;
+const MAX_LOCK_BUSY_MAX_RETRIES = 10;
 const MIN_CATEGORY_DELAY_MS = 3000;
 const MAX_CATEGORY_DELAY_MS = 60000;
 const MIN_FILTER_SYNC_INTERVAL_SECONDS = 60 * 60;
@@ -33,6 +39,8 @@ const ENV_ONLY_DAEMON_OPTIONS = {
   "--backoff-seconds": "CRAWLER_BACKOFF_SECONDS",
   "--category-delay-ms": "CRAWLER_CATEGORY_DELAY_MS",
   "--lock-retry-seconds": "CRAWLER_LOCK_RETRY_SECONDS",
+  "--lock-busy-retry-seconds": "CRAWLER_LOCK_BUSY_RETRY_SECONDS",
+  "--lock-busy-max-retries": "CRAWLER_LOCK_BUSY_MAX_RETRIES",
   "--lock-dir": "EXTERNAL_FETCH_LOCK_DIR",
   "--lock-stale-seconds": "EXTERNAL_FETCH_LOCK_STALE_SECONDS",
   "--filter-sync-interval-seconds": "CRAWLER_FILTER_SYNC_INTERVAL_SECONDS",
@@ -42,15 +50,19 @@ const ENV_ONLY_DAEMON_OPTIONS = {
 export interface CoolpcDaemonOptions {
   workspaceRoot: string;
   storageDir: string;
+  mutationRoot: string;
   intervalSeconds: number;
   backoffSeconds: number;
   categoryDelayMs: number;
   lockDir: string;
   lockStaleSeconds: number;
   lockRetrySeconds: number;
+  lockBusyRetrySeconds: number;
+  lockBusyMaxRetries: number;
   runOnce: boolean;
   filterSyncIntervalSeconds: number;
   filterSyncStateFilePath: string;
+  runtimeStatusFilePath: string;
 }
 
 // 共用整數 env parser 的輸入契約，讓 env、default 與上下限驗證維持一致。
@@ -104,6 +116,7 @@ export function parseDaemonOptions(
   return {
     workspaceRoot,
     storageDir,
+    mutationRoot,
     intervalSeconds: parseIntegerEnvironmentValue({
       env,
       envName: "CRAWLER_INTERVAL_SECONDS",
@@ -132,6 +145,20 @@ export function parseDaemonOptions(
       min: MIN_LOCK_RETRY_SECONDS,
       max: MAX_LOCK_RETRY_SECONDS,
     }),
+    lockBusyRetrySeconds: parseIntegerEnvironmentValue({
+      env,
+      envName: "CRAWLER_LOCK_BUSY_RETRY_SECONDS",
+      fallback: DEFAULT_LOCK_BUSY_RETRY_SECONDS,
+      min: MIN_LOCK_BUSY_RETRY_SECONDS,
+      max: MAX_LOCK_BUSY_RETRY_SECONDS,
+    }),
+    lockBusyMaxRetries: parseIntegerEnvironmentValue({
+      env,
+      envName: "CRAWLER_LOCK_BUSY_MAX_RETRIES",
+      fallback: DEFAULT_LOCK_BUSY_MAX_RETRIES,
+      min: MIN_LOCK_BUSY_MAX_RETRIES,
+      max: MAX_LOCK_BUSY_MAX_RETRIES,
+    }),
     runOnce: args.includes("--run-once"),
     filterSyncIntervalSeconds: parseIntegerEnvironmentValue({
       env,
@@ -141,6 +168,7 @@ export function parseDaemonOptions(
       max: 30 * 24 * 60 * 60,
     }),
     filterSyncStateFilePath: join(storageDir, "ops", "coolpc-filter-sync-state.json"),
+    runtimeStatusFilePath: join(storageDir, "ops", "crawler-runtime-status.json"),
   };
 }
 

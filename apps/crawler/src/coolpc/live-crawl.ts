@@ -12,6 +12,8 @@ import {
 } from "./crawl-run";
 import { fetchLiveCategorySnapshot } from "./live-crawl/fetch";
 import {
+  type RawSnapshotMutationLockHandle,
+  RawSnapshotStorageBusyError,
   resolveAllowlistedRawSnapshotStorage,
   tryAcquireRawSnapshotMutationLock,
 } from "./raw-snapshot-storage";
@@ -44,6 +46,7 @@ interface CrawlTimingOptions {
 
 interface RunCoolpcCategoryCrawlDependencies {
   acquireMutationLock?: typeof tryAcquireRawSnapshotMutationLock;
+  preAcquiredMutationLock?: RawSnapshotMutationLockHandle;
   reconcileRuns?: typeof reconcileInterruptedCrawlRuns;
   runCrawl?: typeof runCoolpcCrawlOnce;
 }
@@ -77,17 +80,18 @@ export async function runCoolpcCategoryCrawl(
   });
 
   const acquireMutationLock = dependencies.acquireMutationLock ?? tryAcquireRawSnapshotMutationLock;
+  const preAcquiredMutationLock = dependencies.preAcquiredMutationLock;
   const reconcileRuns = dependencies.reconcileRuns ?? reconcileInterruptedCrawlRuns;
   const runCrawl = dependencies.runCrawl ?? runCoolpcCrawlOnce;
-  const mutationLock = await acquireMutationLock({
-    mutationRoot: storageLocation.mutationRoot,
-    owner: triggerType === CRAWL_TRIGGER_TYPES.SCHEDULED ? "scheduled-crawler" : "manual-crawler",
-  });
+  const mutationLock =
+    preAcquiredMutationLock ??
+    (await acquireMutationLock({
+      mutationRoot: storageLocation.mutationRoot,
+      owner: triggerType === CRAWL_TRIGGER_TYPES.SCHEDULED ? "scheduled-crawler" : "manual-crawler",
+    }));
 
   if (!mutationLock) {
-    throw new Error(
-      "Raw snapshot storage is busy; another crawler or cleanup process holds the mutation lock.",
-    );
+    throw new RawSnapshotStorageBusyError();
   }
 
   try {
@@ -129,7 +133,9 @@ export async function runCoolpcCategoryCrawl(
       },
     });
   } finally {
-    await mutationLock.release();
+    if (!preAcquiredMutationLock) {
+      await mutationLock.release();
+    }
   }
 }
 

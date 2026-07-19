@@ -1,19 +1,20 @@
 // apps/crawler/src/scripts/ops/cleanup-raw-snapshots-daemon/options.ts
 // 解析 raw snapshot cleanup daemon 的 CLI/env 選項，將 daemon 週期設定與一次性 cleanup 共用參數分流。
 
+import { getStringArg, resolveWorkspaceRoot } from "../../shared/script-utils";
 import {
   type CleanupOptions,
   normalizeCleanupArgs,
   parseCleanupOptions,
   validateCleanupArgs,
 } from "../cleanup-raw-snapshots";
-import { getStringArg, resolveWorkspaceRoot } from "../../shared/script-utils";
 
 const CONFIRM_DELETE_FLAG = "--confirm-delete";
 export const HELP_FLAG = "--help";
 const RUN_ONCE_FLAG = "--run-once";
 const INTERVAL_SECONDS_FLAG = "--interval-seconds";
 const DEFAULT_CLEANUP_INTERVAL_SECONDS = 24 * 60 * 60;
+const DEFAULT_CLEANUP_INITIAL_DELAY_SECONDS = 5 * 60;
 const MIN_CLEANUP_INTERVAL_SECONDS = 60 * 60;
 const MAX_CLEANUP_INTERVAL_SECONDS = 7 * 24 * 60 * 60;
 const CLEANUP_VALUE_FLAGS = new Set([
@@ -35,6 +36,7 @@ const VALUE_FLAGS = new Set([...CLEANUP_VALUE_FLAGS, ...DAEMON_VALUE_FLAGS]);
 // raw snapshot cleanup daemon 的執行設定：包含共用清理參數，以及 daemon 自己的週期與單次執行模式。
 export interface RawSnapshotCleanupDaemonOptions extends CleanupOptions {
   intervalSeconds: number;
+  initialDelaySeconds: number;
   runOnce: boolean;
 }
 
@@ -61,8 +63,28 @@ export function parseRawSnapshotCleanupDaemonOptions(
   return {
     ...cleanupOptions,
     intervalSeconds: parseIntervalSeconds(normalizedArgs, env),
+    initialDelaySeconds: parseInitialDelaySeconds(env),
     runOnce: normalizedArgs.includes(RUN_ONCE_FLAG),
   };
+}
+
+function parseInitialDelaySeconds(env: NodeJS.ProcessEnv): number {
+  const raw =
+    env.RAW_SNAPSHOT_CLEANUP_INITIAL_DELAY_SECONDS?.trim() ??
+    String(DEFAULT_CLEANUP_INITIAL_DELAY_SECONDS);
+  const message =
+    "RAW_SNAPSHOT_CLEANUP_INITIAL_DELAY_SECONDS must be an integer between 0 and 3600 seconds.";
+
+  if (!/^(0|[1-9][0-9]*)$/.test(raw)) {
+    throw new Error(message);
+  }
+
+  const value = Number(raw);
+  if (!Number.isSafeInteger(value) || value < 0 || value > 3600) {
+    throw new Error(message);
+  }
+
+  return value;
 }
 
 // 先驗證 daemon 與 cleanup 兩組允許的旗標，避免未知參數被下游 cleanup parser 誤解。
@@ -150,6 +172,8 @@ Options:
   --run-once                      Run one cleanup cycle, then exit.
   --interval-seconds <sec>        Delay between cleanup cycles.
                                   Default: ${DEFAULT_CLEANUP_INTERVAL_SECONDS}, range: ${MIN_CLEANUP_INTERVAL_SECONDS}-${MAX_CLEANUP_INTERVAL_SECONDS}
+  RAW_SNAPSHOT_CLEANUP_INITIAL_DELAY_SECONDS
+                                  Startup delay before the first daemon cycle. Default: ${DEFAULT_CLEANUP_INITIAL_DELAY_SECONDS}
   --normal-retention-days <days>  Retention for VALID snapshots.
   --abnormal-retention-days <days>
                                   Retention for INVALID and SUSPECTED_BLOCK snapshots.

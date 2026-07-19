@@ -80,6 +80,41 @@ describe("production smoke public checks", () => {
     );
   });
 
+  it("annotates stale source freshness with persistent local lock contention", async () => {
+    const { crawlerCwd, workspaceRoot } = await createWorkspace();
+    const runtimeStatusFile = join(workspaceRoot, "crawler-runtime-status.json");
+    await writeFile(
+      runtimeStatusFile,
+      JSON.stringify({
+        version: 1,
+        state: "WAITING_LOCK",
+        cycleResult: "LOCK_BUSY",
+        observedAt: "2026-06-02T11:59:00.000Z",
+        nextAttemptAt: "2026-06-02T12:04:00.000Z",
+        lockBusySince: "2026-06-02T10:50:00.000Z",
+        consecutiveLockBusyCount: 6,
+      }),
+    );
+    stubHealthyPublicApi({ sourceLastSuccessAt: "2026-06-02T10:50:00.000Z" });
+    const options = parseProductionSmokeOptions(
+      ["--public-only"],
+      { SMOKE_CRAWLER_RUNTIME_STATUS_FILE: runtimeStatusFile },
+      crawlerCwd,
+    );
+    const summary = await runProductionPublicSmoke(options, new Date("2026-06-02T12:00:00.000Z"));
+
+    expect(summary.checks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "source freshness",
+          status: "WARN",
+          message:
+            "lastSuccessAt=1h10m ago status=ok daemon=LOCK_BUSY lockBusySince=2026-06-02T10:50:00.000Z retry=6",
+        }),
+      ]),
+    );
+  });
+
   it("fails public-only checks when a v2 route is missing", async () => {
     const { crawlerCwd } = await createWorkspace();
     stubHealthyPublicApi({ buildListStatus: 404 });

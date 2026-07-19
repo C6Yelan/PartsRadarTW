@@ -6,7 +6,10 @@ import {
   CRAWL_RUN_CATEGORY_RESULT_STATUSES,
   CRAWL_RUN_STATUSES,
 } from "../../../../src/coolpc/crawl-run";
-import { runScheduledCycle } from "../../../../src/scripts/ops/crawl-coolpc-daemon";
+import {
+  resolveLockBusyRetrySeconds,
+  runScheduledCycle,
+} from "../../../../src/scripts/ops/crawl-coolpc-daemon";
 import { createDaemonOptions, skipFilterSync } from "./crawl-coolpc-daemon-support";
 
 describe("CoolPC scheduled crawler daemon cycle", () => {
@@ -20,11 +23,22 @@ describe("CoolPC scheduled crawler daemon cycle", () => {
         calls.push("release-lock");
       },
     };
+    const fakeMutationLock = {
+      ...fakeLock,
+      owner: "scheduled-crawler",
+      async release() {
+        calls.push("release-mutation-lock");
+      },
+    };
 
     const result = await runScheduledCycle({} as never, createDaemonOptions(), {
       acquireLock: async () => {
         calls.push("acquire-lock");
         return fakeLock;
+      },
+      acquireMutationLock: async () => {
+        calls.push("acquire-mutation-lock");
+        return fakeMutationLock;
       },
       refreshFilterSync: async () => {
         calls.push("refresh-filter-sync");
@@ -74,19 +88,59 @@ describe("CoolPC scheduled crawler daemon cycle", () => {
       },
     });
 
-    expect(result).toEqual({ shouldBackoff: false });
+    expect(result).toEqual({
+      outcome: "COMPLETED",
+      cycleResult: "SUCCESS",
+      shouldBackoff: false,
+    });
     expect(calls).toEqual([
+      "acquire-mutation-lock",
       "acquire-lock",
       "refresh-filter-sync",
       "crawl-categories",
       "release-lock",
+      "release-mutation-lock",
     ]);
   });
 
-  it("retries soon without crawling when another process holds the lock", async () => {
+  it("classifies raw snapshot lock contention before external work", async () => {
     const calls: string[] = [];
 
     const result = await runScheduledCycle({} as never, createDaemonOptions(), {
+      acquireMutationLock: async () => null,
+      acquireLock: async () => {
+        calls.push("acquire-external-lock");
+        return null;
+      },
+      refreshFilterSync: async () => {
+        calls.push("refresh-filter-sync");
+        return { outcome: "skipped", state: null };
+      },
+      crawlCategories: async () => {
+        calls.push("crawl-categories");
+        throw new Error("should not crawl without lock");
+      },
+    });
+
+    expect(result).toEqual({
+      outcome: "LOCK_BUSY",
+      cycleResult: "LOCK_BUSY",
+      shouldBackoff: false,
+    });
+    expect(calls).toEqual([]);
+  });
+
+  it("retries soon without crawling when another process holds the external lock", async () => {
+    const calls: string[] = [];
+
+    const result = await runScheduledCycle({} as never, createDaemonOptions(), {
+      acquireMutationLock: async () => ({
+        lockDir: "/tmp/mutation.lock",
+        owner: "scheduled-crawler",
+        async release() {
+          calls.push("release-mutation-lock");
+        },
+      }),
       acquireLock: async () => null,
       crawlCategories: async () => {
         calls.push("crawl-categories");
@@ -94,8 +148,52 @@ describe("CoolPC scheduled crawler daemon cycle", () => {
       },
     });
 
-    expect(result).toEqual({ shouldBackoff: false, retryAfterSeconds: 120 });
+    expect(result).toEqual({
+      outcome: "EXTERNAL_LOCK_BUSY",
+      cycleResult: "LOCK_BUSY",
+      shouldBackoff: false,
+      retryAfterSeconds: 120,
+    });
+    expect(calls).toEqual(["release-mutation-lock"]);
+  });
+
+  it("starts the crawl on the next short retry after the mutation lock is released", async () => {
+    let mutationAttempt = 0;
+    const calls: string[] = [];
+    const dependencies = {
+      acquireMutationLock: async () => {
+        mutationAttempt += 1;
+        return mutationAttempt === 1 ? null : fakeMutationLock(calls);
+      },
+      acquireLock: async () => ({
+        lockDir: "/tmp/external-fetch.lock",
+        owner: "crawler-daemon",
+        async release() {
+          calls.push("release-lock");
+        },
+      }),
+      refreshFilterSync: skipFilterSync,
+      crawlCategories: async () => {
+        calls.push("crawl-categories");
+        return {
+          crawlRunId: "crawl-run-after-lock-release",
+          status: CRAWL_RUN_STATUSES.SUCCESS_UNCHANGED,
+          stoppedBySuspectedBlock: false,
+          categoryResults: [],
+        };
+      },
+    };
+
+    await expect(
+      runScheduledCycle({} as never, createDaemonOptions(), dependencies),
+    ).resolves.toMatchObject({ outcome: "LOCK_BUSY", cycleResult: "LOCK_BUSY" });
     expect(calls).toEqual([]);
+    expect(resolveLockBusyRetrySeconds(createDaemonOptions(), 1, () => 0.5)).toBe(45);
+
+    await expect(
+      runScheduledCycle({} as never, createDaemonOptions(), dependencies),
+    ).resolves.toEqual({ outcome: "COMPLETED", cycleResult: "SUCCESS", shouldBackoff: false });
+    expect(calls).toEqual(["crawl-categories", "release-lock", "release-mutation-lock"]);
   });
 
   it("backs off and releases the external lock when crawl reconciliation fails", async () => {
@@ -110,6 +208,7 @@ describe("CoolPC scheduled crawler daemon cycle", () => {
 
     const result = await runScheduledCycle({} as never, createDaemonOptions(), {
       acquireLock: async () => fakeLock,
+      acquireMutationLock: async () => fakeMutationLock(calls),
       refreshFilterSync: skipFilterSync,
       crawlCategories: async () => {
         calls.push("crawl-categories");
@@ -117,8 +216,12 @@ describe("CoolPC scheduled crawler daemon cycle", () => {
       },
     });
 
-    expect(result).toEqual({ shouldBackoff: true });
-    expect(calls).toEqual(["crawl-categories", "release-lock"]);
+    expect(result).toEqual({
+      outcome: "CRAWL_FAILURE",
+      cycleResult: "INTERNAL_FAILURE",
+      shouldBackoff: true,
+    });
+    expect(calls).toEqual(["crawl-categories", "release-lock", "release-mutation-lock"]);
   });
 
   it("backs off after a suspected block", async () => {
@@ -133,6 +236,7 @@ describe("CoolPC scheduled crawler daemon cycle", () => {
 
     const result = await runScheduledCycle({} as never, createDaemonOptions(), {
       acquireLock: async () => fakeLock,
+      acquireMutationLock: async () => fakeMutationLock(calls),
       refreshFilterSync: skipFilterSync,
       crawlCategories: async () => ({
         crawlRunId: "crawl-run-1",
@@ -160,8 +264,12 @@ describe("CoolPC scheduled crawler daemon cycle", () => {
       }),
     });
 
-    expect(result).toEqual({ shouldBackoff: true });
-    expect(calls).toEqual(["release-lock"]);
+    expect(result).toEqual({
+      outcome: "COMPLETED",
+      cycleResult: "SUSPECTED_BLOCK",
+      shouldBackoff: true,
+    });
+    expect(calls).toEqual(["release-lock", "release-mutation-lock"]);
   });
 
   it("retries sooner when every category failed during fetch", async () => {
@@ -181,6 +289,7 @@ describe("CoolPC scheduled crawler daemon cycle", () => {
       }),
       {
         acquireLock: async () => fakeLock,
+        acquireMutationLock: async () => fakeMutationLock(calls),
         refreshFilterSync: skipFilterSync,
         crawlCategories: async () => ({
           crawlRunId: "crawl-run-1",
@@ -210,7 +319,33 @@ describe("CoolPC scheduled crawler daemon cycle", () => {
       },
     );
 
-    expect(result).toEqual({ shouldBackoff: true, retryAfterSeconds: 600 });
-    expect(calls).toEqual(["release-lock"]);
+    expect(result).toEqual({
+      outcome: "COMPLETED",
+      cycleResult: "SOURCE_FAILURE",
+      shouldBackoff: true,
+      retryAfterSeconds: 600,
+    });
+    expect(calls).toEqual(["release-lock", "release-mutation-lock"]);
+  });
+
+  it("uses jittered short retries before a bounded persistent-lock retry", () => {
+    const options = createDaemonOptions({
+      lockBusyRetrySeconds: 45,
+      lockBusyMaxRetries: 5,
+    });
+
+    expect(resolveLockBusyRetrySeconds(options, 1, () => 0)).toBe(41);
+    expect(resolveLockBusyRetrySeconds(options, 5, () => 1)).toBe(50);
+    expect(resolveLockBusyRetrySeconds(options, 6, () => 0)).toBe(300);
   });
 });
+
+function fakeMutationLock(calls: string[]) {
+  return {
+    lockDir: "/tmp/mutation.lock",
+    owner: "scheduled-crawler",
+    async release() {
+      calls.push("release-mutation-lock");
+    },
+  };
+}

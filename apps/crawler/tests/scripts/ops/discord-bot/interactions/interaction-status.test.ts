@@ -140,6 +140,31 @@ describe("status interaction", () => {
     expect(crawler).toContain("Backoff 至：07/15 13:18:00");
   });
 
+  it("shows active local storage lock contention without inventing a crawl run", async () => {
+    const message = await createStatusMessage({
+      client: createStatusClient(),
+      options: createDiscordBotOptions(),
+      schedulerStatus: healthySchedulerStatus(),
+      crawlerRuntimeStatus: {
+        version: 1,
+        state: "WAITING_LOCK",
+        cycleResult: "LOCK_BUSY",
+        observedAt: "2026-07-15T04:47:30.000Z",
+        nextAttemptAt: "2026-07-15T04:49:00.000Z",
+        lockBusySince: "2026-07-15T04:45:00.000Z",
+        consecutiveLockBusyCount: 3,
+      },
+      now: NOW,
+    });
+    const crawler = fieldValue(message, "商品價格爬蟲");
+
+    expect(crawler).toContain("狀態：WAITING_LOCK · 等待本機 storage lock");
+    expect(crawler).toContain("代碼：`LOCK_BUSY`");
+    expect(crawler).toContain("持續：3 分");
+    expect(crawler).toContain("重試：第 3 次");
+    expect(message.embeds?.[0]?.color).toBe(0xeab308);
+  });
+
   it("calculates start-to-start interval from the latest two scheduled runs", async () => {
     const message = await createStatusMessage({
       client: createStatusClient(),

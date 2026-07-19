@@ -6,12 +6,20 @@ import { CRAWL_TRIGGER_TYPES, type RunCoolpcCrawlOnceResult } from "../../coolpc
 import { refreshCoolpcFilterSync } from "../../coolpc/filter-sync";
 import { assertSeededCategories, runCoolpcCategoryCrawl } from "../../coolpc/live-crawl";
 import {
+  RawSnapshotStorageBusyError,
+  tryAcquireRawSnapshotMutationLock,
+} from "../../coolpc/raw-snapshot-storage";
+import {
   loadWorkspaceEnv,
   resolveWorkspaceRoot,
   toSafeCliErrorMessage,
 } from "../shared/script-utils";
 import { printHelp } from "./crawl-coolpc-daemon/help";
 import { type CoolpcDaemonOptions, parseDaemonOptions } from "./crawl-coolpc-daemon/options";
+import {
+  type CrawlerDaemonCycleResult,
+  writeCrawlerRuntimeStatus,
+} from "./crawl-coolpc-daemon/runtime-status";
 import {
   type ProductWriteSummaryTotals,
   printCycleSummary,
@@ -29,6 +37,8 @@ const logger = createOpsLogger();
 
 // 單輪 scheduled crawl 結果，回傳下一輪是否進入 backoff 或使用較短 retry。
 interface ScheduledCycleResult {
+  outcome: "COMPLETED" | "CRAWL_FAILURE" | "EXTERNAL_LOCK_BUSY" | "LOCK_BUSY";
+  cycleResult: CrawlerDaemonCycleResult;
   shouldBackoff: boolean;
   retryAfterSeconds?: number;
 }
@@ -45,6 +55,8 @@ async function main(): Promise<void> {
   const workspaceRoot = resolveWorkspaceRoot();
   await loadWorkspaceEnv(workspaceRoot);
   const options = parseDaemonOptions(args);
+  let consecutiveLockBusyCount = 0;
+  let lockBusySince: string | null = null;
   let client: PrismaClient | null = null;
   const shutdown = createInterruptibleShutdownController({
     onSignal: (signal) => {
@@ -62,18 +74,47 @@ async function main(): Promise<void> {
     );
 
     do {
+      await writeRuntimeStatusSafely(options.runtimeStatusFilePath, {
+        version: 1,
+        state: "RUNNING",
+        cycleResult: "SUCCESS",
+        observedAt: new Date().toISOString(),
+        nextAttemptAt: null,
+        lockBusySince,
+        consecutiveLockBusyCount,
+      });
       const result = await runScheduledCycle(client, options);
-
+      consecutiveLockBusyCount = result.outcome === "LOCK_BUSY" ? consecutiveLockBusyCount + 1 : 0;
+      lockBusySince =
+        result.outcome === "LOCK_BUSY" ? (lockBusySince ?? new Date().toISOString()) : null;
+      const waitSeconds =
+        result.outcome === "LOCK_BUSY"
+          ? resolveLockBusyRetrySeconds(options, consecutiveLockBusyCount)
+          : (result.retryAfterSeconds ??
+            (result.shouldBackoff ? options.backoffSeconds : options.intervalSeconds));
+      const nextRunAt =
+        options.runOnce || shutdown.requested
+          ? null
+          : new Date(Date.now() + waitSeconds * 1000).toISOString();
+      await writeRuntimeStatusSafely(options.runtimeStatusFilePath, {
+        version: 1,
+        state:
+          result.outcome === "LOCK_BUSY"
+            ? "WAITING_LOCK"
+            : result.shouldBackoff
+              ? "BACKOFF"
+              : "IDLE",
+        cycleResult: result.cycleResult,
+        observedAt: new Date().toISOString(),
+        nextAttemptAt: nextRunAt,
+        lockBusySince,
+        consecutiveLockBusyCount,
+      });
       if (options.runOnce || shutdown.requested) {
         break;
       }
-
-      const waitSeconds =
-        result.retryAfterSeconds ??
-        (result.shouldBackoff ? options.backoffSeconds : options.intervalSeconds);
-      const nextRunAt = new Date(Date.now() + waitSeconds * 1000).toISOString();
       log(
-        `Next CoolPC scheduled crawl at ${nextRunAt} (${waitSeconds}s, ${result.shouldBackoff ? "backoff" : "normal interval"}).`,
+        `Next CoolPC scheduled crawl at ${nextRunAt} (${waitSeconds}s, ${describeWaitReason(result, consecutiveLockBusyCount)}).`,
       );
       await shutdown.sleep(waitSeconds * 1000);
     } while (!shutdown.requested);
@@ -89,101 +130,206 @@ export async function runScheduledCycle(
   options: CoolpcDaemonOptions,
   dependencies: {
     acquireLock?: typeof tryAcquireExternalFetchLock;
+    acquireMutationLock?: typeof tryAcquireRawSnapshotMutationLock;
     crawlCategories?: typeof runCoolpcCategoryCrawl;
     refreshFilterSync?: typeof refreshCoolpcFilterSync;
   } = {},
 ): Promise<ScheduledCycleResult> {
   const acquireLock = dependencies.acquireLock ?? tryAcquireExternalFetchLock;
+  const acquireMutationLock = dependencies.acquireMutationLock ?? tryAcquireRawSnapshotMutationLock;
   const crawlCategories = dependencies.crawlCategories ?? runCoolpcCategoryCrawl;
   const refreshFilterSync = dependencies.refreshFilterSync ?? refreshCoolpcFilterSync;
-  const lock = await acquireLock({
-    lockDir: options.lockDir,
-    owner: "crawler-daemon",
-    staleSeconds: options.lockStaleSeconds,
+  const mutationLock = await acquireMutationLock({
+    mutationRoot: options.mutationRoot,
+    owner: "scheduled-crawler",
   });
 
-  if (!lock) {
-    log(
-      `Skipping CoolPC scheduled crawl because another crawler process holds the external fetch lock. Retrying in ${options.lockRetrySeconds}s.`,
-    );
+  if (!mutationLock) {
+    logger.warn("CoolPC scheduled crawl is waiting for the raw snapshot mutation lock.", {
+      cycleResult: "LOCK_BUSY",
+    });
 
     return {
+      outcome: "LOCK_BUSY",
+      cycleResult: "LOCK_BUSY",
       shouldBackoff: false,
-      retryAfterSeconds: options.lockRetrySeconds,
     };
   }
 
-  log("Starting CoolPC scheduled crawl cycle.");
-
-  let result: RunCoolpcCrawlOnceResult;
-  let productWriteSummary: ProductWriteSummaryTotals;
-  let shouldBackoff: boolean;
-  let sourceFilterTagsByIgrp = {};
-
   try {
+    const lock = await acquireLock({
+      lockDir: options.lockDir,
+      owner: "crawler-daemon",
+      staleSeconds: options.lockStaleSeconds,
+    });
+
+    if (!lock) {
+      log(
+        `Skipping CoolPC scheduled crawl because another crawler process holds the external fetch lock. Retrying in ${options.lockRetrySeconds}s.`,
+      );
+
+      return {
+        outcome: "EXTERNAL_LOCK_BUSY",
+        cycleResult: "LOCK_BUSY",
+        shouldBackoff: false,
+        retryAfterSeconds: options.lockRetrySeconds,
+      };
+    }
+
+    log("Starting CoolPC scheduled crawl cycle.");
+
+    let result: RunCoolpcCrawlOnceResult;
+    let productWriteSummary: ProductWriteSummaryTotals;
+    let shouldBackoff: boolean;
+    let sourceFilterTagsByIgrp = {};
+
     try {
-      const filterSync = await refreshFilterSync({
-        stateFilePath: options.filterSyncStateFilePath,
-        intervalSeconds: options.filterSyncIntervalSeconds,
-        timeoutMs: 30_000,
-        userAgent: SCHEDULED_CRAWL_USER_AGENT,
-      });
-      sourceFilterTagsByIgrp = filterSync.state?.tagsByIgrp ?? {};
-      if (filterSync.outcome === "published") {
+      try {
+        const filterSync = await refreshFilterSync({
+          stateFilePath: options.filterSyncStateFilePath,
+          intervalSeconds: options.filterSyncIntervalSeconds,
+          timeoutMs: 30_000,
+          userAgent: SCHEDULED_CRAWL_USER_AGENT,
+        });
+        sourceFilterTagsByIgrp = filterSync.state?.tagsByIgrp ?? {};
+        if (filterSync.outcome === "published") {
+          log(
+            `CoolPC filter sync published. conditions=${filterSync.state?.conditionCount ?? 0} products=${filterSync.state?.productCount ?? 0} tagged=${filterSync.state?.taggedProductCount ?? 0} ambiguous=${filterSync.state?.ambiguousProductCount ?? 0}`,
+          );
+        } else if (filterSync.outcome === "failed") {
+          log(
+            `CoolPC filter sync failed; using last known good state. error=${toSafeCliErrorMessage(filterSync.state?.lastError ?? "unknown")}`,
+          );
+        }
+      } catch (error) {
         log(
-          `CoolPC filter sync published. conditions=${filterSync.state?.conditionCount ?? 0} products=${filterSync.state?.productCount ?? 0} tagged=${filterSync.state?.taggedProductCount ?? 0} ambiguous=${filterSync.state?.ambiguousProductCount ?? 0}`,
-        );
-      } else if (filterSync.outcome === "failed") {
-        log(
-          `CoolPC filter sync failed; using last known good state. error=${toSafeCliErrorMessage(filterSync.state?.lastError ?? "unknown")}`,
+          `CoolPC filter sync failed before state was available; continuing with built-in rules. error=${toSafeCliErrorMessage(error)}`,
         );
       }
+
+      result = await crawlCategories(
+        {
+          client,
+          workspaceRoot: options.workspaceRoot,
+          storageDir: options.storageDir,
+          triggerType: CRAWL_TRIGGER_TYPES.SCHEDULED,
+          delayMs: options.categoryDelayMs,
+          fetchUserAgent: SCHEDULED_CRAWL_USER_AGENT,
+          log,
+          sourceFilterTagsByIgrp,
+        },
+        { preAcquiredMutationLock: mutationLock },
+      );
+
+      productWriteSummary = summarizeProductWrites(result);
+      shouldBackoff = shouldBackoffAfter(result);
+      printCycleSummary(result, productWriteSummary, log);
     } catch (error) {
+      if (error instanceof RawSnapshotStorageBusyError) {
+        logger.warn("CoolPC scheduled crawl is waiting for the raw snapshot mutation lock.", {
+          cycleResult: "LOCK_BUSY",
+        });
+        return { outcome: "LOCK_BUSY", cycleResult: "LOCK_BUSY", shouldBackoff: false };
+      }
+
+      logger.error("CoolPC scheduled crawl cycle failed.", {
+        cycleResult: "INTERNAL_FAILURE",
+        error: toSafeCliErrorMessage(error),
+      });
+
+      return {
+        outcome: "CRAWL_FAILURE",
+        cycleResult: "INTERNAL_FAILURE",
+        shouldBackoff: true,
+      };
+    } finally {
+      await lock.release();
+    }
+
+    const retryAfterSeconds = resolveAllFetchFailedRetrySeconds(result, options);
+
+    if (retryAfterSeconds !== undefined) {
       log(
-        `CoolPC filter sync failed before state was available; continuing with built-in rules. error=${toSafeCliErrorMessage(error)}`,
+        `All CoolPC categories failed during fetch. Retrying in ${retryAfterSeconds}s before using the regular ${options.backoffSeconds}s backoff.`,
       );
     }
 
-    result = await crawlCategories({
-      client,
-      workspaceRoot: options.workspaceRoot,
-      storageDir: options.storageDir,
-      triggerType: CRAWL_TRIGGER_TYPES.SCHEDULED,
-      delayMs: options.categoryDelayMs,
-      fetchUserAgent: SCHEDULED_CRAWL_USER_AGENT,
-      log,
-      sourceFilterTagsByIgrp,
-    });
-
-    productWriteSummary = summarizeProductWrites(result);
-    shouldBackoff = shouldBackoffAfter(result);
-    printCycleSummary(result, productWriteSummary, log);
-  } catch (error) {
-    log(`CoolPC scheduled crawl cycle failed: ${toSafeCliErrorMessage(error)}`);
-
-    return {
-      shouldBackoff: true,
-    };
+    return retryAfterSeconds === undefined
+      ? {
+          outcome: "COMPLETED",
+          cycleResult: classifyCycleResult(result),
+          shouldBackoff,
+        }
+      : {
+          outcome: "COMPLETED",
+          cycleResult: classifyCycleResult(result),
+          shouldBackoff,
+          retryAfterSeconds,
+        };
   } finally {
-    await lock.release();
+    await mutationLock.release();
+  }
+}
+
+function classifyCycleResult(result: RunCoolpcCrawlOnceResult): CrawlerDaemonCycleResult {
+  if (
+    result.stoppedBySuspectedBlock ||
+    result.status === "SUSPECTED_BLOCK" ||
+    result.categoryResults.some((category) => category.status === "SUSPECTED_BLOCK")
+  ) {
+    return "SUSPECTED_BLOCK";
+  }
+  if (
+    result.status === "PARSE_FAILED" ||
+    result.categoryResults.some((category) => category.status === "PARSE_FAILED")
+  ) {
+    return "PARSE_FAILURE";
+  }
+  if (
+    result.status === "FETCH_FAILED" ||
+    result.categoryResults.some((category) => category.status === "FETCH_FAILED")
+  ) {
+    return "SOURCE_FAILURE";
+  }
+  return "SUCCESS";
+}
+
+async function writeRuntimeStatusSafely(
+  path: string,
+  status: Parameters<typeof writeCrawlerRuntimeStatus>[1],
+): Promise<void> {
+  try {
+    await writeCrawlerRuntimeStatus(path, status);
+  } catch (error) {
+    logger.warn("Unable to write crawler runtime status.", {
+      error: toSafeCliErrorMessage(error),
+    });
+  }
+}
+
+const PERSISTENT_LOCK_BUSY_RETRY_SECONDS = 5 * 60;
+
+export function resolveLockBusyRetrySeconds(
+  options: Pick<CoolpcDaemonOptions, "lockBusyMaxRetries" | "lockBusyRetrySeconds">,
+  consecutiveLockBusyCount: number,
+  random = Math.random,
+): number {
+  if (consecutiveLockBusyCount > options.lockBusyMaxRetries) {
+    return PERSISTENT_LOCK_BUSY_RETRY_SECONDS;
   }
 
-  const retryAfterSeconds = resolveAllFetchFailedRetrySeconds(result, options);
+  const jitterMultiplier = 0.9 + random() * 0.2;
+  return Math.round(options.lockBusyRetrySeconds * jitterMultiplier);
+}
 
-  if (retryAfterSeconds !== undefined) {
-    log(
-      `All CoolPC categories failed during fetch. Retrying in ${retryAfterSeconds}s before using the regular ${options.backoffSeconds}s backoff.`,
-    );
+function describeWaitReason(
+  result: ScheduledCycleResult,
+  consecutiveLockBusyCount: number,
+): string {
+  if (result.outcome === "LOCK_BUSY") {
+    return `lock busy retry ${consecutiveLockBusyCount}`;
   }
-
-  return retryAfterSeconds === undefined
-    ? {
-        shouldBackoff,
-      }
-    : {
-        shouldBackoff,
-        retryAfterSeconds,
-      };
+  return result.shouldBackoff ? "backoff" : "normal interval";
 }
 
 // 透過 ops logger 輸出 scheduled crawler 訊息，讓格式與其他 daemon 一致。

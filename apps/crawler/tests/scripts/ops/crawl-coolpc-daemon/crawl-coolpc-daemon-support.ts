@@ -39,15 +39,19 @@ export function createDaemonOptions(
   return {
     workspaceRoot: "/workspace",
     storageDir: "/workspace/storage/snapshots",
+    mutationRoot: "/workspace/storage/snapshots",
     intervalSeconds: 1800,
     backoffSeconds: 3600,
     categoryDelayMs: 8000,
     lockDir: "/workspace/storage/snapshots/.locks/external-fetch",
     lockStaleSeconds: 43200,
     lockRetrySeconds: 120,
+    lockBusyRetrySeconds: 45,
+    lockBusyMaxRetries: 5,
     runOnce: false,
     filterSyncIntervalSeconds: 604800,
     filterSyncStateFilePath: "/workspace/storage/snapshots/ops/coolpc-filter-sync-state.json",
+    runtimeStatusFilePath: "/workspace/storage/snapshots/ops/crawler-runtime-status.json",
     ...overrides,
   };
 }
