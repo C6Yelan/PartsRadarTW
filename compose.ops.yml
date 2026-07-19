@@ -43,6 +43,7 @@ services:
       SMOKE_RAW_SNAPSHOT_FAIL_COUNT: "${SMOKE_RAW_SNAPSHOT_FAIL_COUNT:-100}"
       SMOKE_FILTER_SYNC_STATE_FILE: "${SMOKE_FILTER_SYNC_STATE_FILE:-/var/lib/partsradar/snapshots/ops/coolpc-filter-sync-state.json}"
       SMOKE_CRAWLER_RUNTIME_STATUS_FILE: "${SMOKE_CRAWLER_RUNTIME_STATUS_FILE:-/var/lib/partsradar/snapshots/ops/crawler-runtime-status.json}"
+      SMOKE_RAW_SNAPSHOT_CLEANUP_RUNTIME_STATUS_FILE: "${SMOKE_RAW_SNAPSHOT_CLEANUP_RUNTIME_STATUS_FILE:-/var/lib/partsradar/snapshots/ops/cleanup-runtime-status.json}"
       DISCORD_ADMIN_WEBHOOK_URL: "${DISCORD_ADMIN_WEBHOOK_URL:-replace_with_discord_admin_webhook_url}"
       SMOKE_DISCORD_STATE_FILE: "${SMOKE_DISCORD_STATE_FILE:-/var/lib/partsradar/snapshots/ops/smoke-discord-state.json}"
       SMOKE_DISCORD_COOLDOWN_SECONDS: "${SMOKE_DISCORD_COOLDOWN_SECONDS:-43200}"

@@ -5,11 +5,15 @@ import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { tryAcquireRawSnapshotMutationLock } from "../../../../src/coolpc/raw-snapshot-storage";
+import {
+  RawSnapshotStorageBusyError,
+  tryAcquireRawSnapshotMutationLock,
+} from "../../../../src/coolpc/raw-snapshot-storage";
 import {
   formatStorageDirForSummary,
   normalizeCleanupArgs,
   parseCleanupOptions,
+  RawSnapshotCleanupExecutionError,
   runRawSnapshotCleanup,
   validateCleanupArgs,
 } from "../../../../src/scripts/ops/cleanup-raw-snapshots";
@@ -218,7 +222,7 @@ describe("raw snapshot cleanup mutation lock", () => {
         owner: "test-cleanup",
         cleanup,
       }),
-    ).rejects.toThrow("another crawler or cleanup process holds the mutation lock");
+    ).rejects.toBeInstanceOf(RawSnapshotStorageBusyError);
     expect(cleanup).not.toHaveBeenCalled();
 
     await writerLock?.release();
@@ -243,7 +247,7 @@ describe("raw snapshot cleanup mutation lock", () => {
           release,
         })) as never,
       }),
-    ).rejects.toThrow("delete failed");
+    ).rejects.toBeInstanceOf(RawSnapshotCleanupExecutionError);
     expect(release).toHaveBeenCalledOnce();
   });
 

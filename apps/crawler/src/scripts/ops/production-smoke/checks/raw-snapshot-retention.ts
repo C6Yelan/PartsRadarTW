@@ -1,6 +1,10 @@
 // apps/crawler/src/scripts/ops/production-smoke/checks/raw-snapshot-retention.ts
 // 檢查 raw snapshot metadata 是否超過保留期限加 grace window，避免 cleanup daemon 漂移。
 
+import {
+  isActivePersistentCleanupLockWait,
+  readRawSnapshotCleanupRuntimeStatus,
+} from "../../cleanup-raw-snapshots-daemon/runtime-status";
 import { MILLISECONDS_PER_DAY } from "../constants";
 import { thresholdCheck } from "../results";
 import type { ProductionSmokeClient, ProductionSmokeOptions, SmokeCheckResult } from "../types";
@@ -42,11 +46,24 @@ export async function checkRawSnapshotRetention(
   const expiredCount = expiredNormalCount + expiredAbnormalCount;
   const message = `expired=${expiredCount} normal=${expiredNormalCount} abnormal=${expiredAbnormalCount}`;
 
-  return thresholdCheck(
+  const retentionResult = thresholdCheck(
     "raw snapshot retention",
     expiredCount,
     options.rawSnapshotWarnCount,
     options.rawSnapshotFailCount,
     message,
   );
+  const cleanupRuntimeStatus = await readRawSnapshotCleanupRuntimeStatus(
+    options.rawSnapshotCleanupRuntimeStatusFilePath,
+  );
+
+  if (!isActivePersistentCleanupLockWait(cleanupRuntimeStatus, now)) {
+    return retentionResult;
+  }
+
+  return {
+    ...retentionResult,
+    status: retentionResult.status === "OK" ? "WARN" : retentionResult.status,
+    message: `${retentionResult.message}; Snapshot cleanup waiting for crawler storage lock since=${cleanupRuntimeStatus.lockBusySince ?? cleanupRuntimeStatus.observedAt} retry=${cleanupRuntimeStatus.consecutiveLockBusyCount}`,
+  };
 }

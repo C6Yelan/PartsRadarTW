@@ -1,6 +1,7 @@
 // apps/crawler/src/scripts/ops/cleanup-raw-snapshots-daemon/options.ts
 // 解析 raw snapshot cleanup daemon 的 CLI/env 選項，將 daemon 週期設定與一次性 cleanup 共用參數分流。
 
+import { join } from "node:path";
 import { getStringArg, resolveWorkspaceRoot } from "../../shared/script-utils";
 import {
   type CleanupOptions,
@@ -15,6 +16,8 @@ const RUN_ONCE_FLAG = "--run-once";
 const INTERVAL_SECONDS_FLAG = "--interval-seconds";
 const DEFAULT_CLEANUP_INTERVAL_SECONDS = 24 * 60 * 60;
 const DEFAULT_CLEANUP_INITIAL_DELAY_SECONDS = 5 * 60;
+const DEFAULT_LOCK_BUSY_RETRY_SECONDS = 60;
+const DEFAULT_LOCK_BUSY_MAX_RETRIES = 5;
 const MIN_CLEANUP_INTERVAL_SECONDS = 60 * 60;
 const MAX_CLEANUP_INTERVAL_SECONDS = 7 * 24 * 60 * 60;
 const CLEANUP_VALUE_FLAGS = new Set([
@@ -37,6 +40,9 @@ const VALUE_FLAGS = new Set([...CLEANUP_VALUE_FLAGS, ...DAEMON_VALUE_FLAGS]);
 export interface RawSnapshotCleanupDaemonOptions extends CleanupOptions {
   intervalSeconds: number;
   initialDelaySeconds: number;
+  lockBusyRetrySeconds: number;
+  lockBusyMaxRetries: number;
+  runtimeStatusFilePath: string;
   runOnce: boolean;
 }
 
@@ -64,8 +70,51 @@ export function parseRawSnapshotCleanupDaemonOptions(
     ...cleanupOptions,
     intervalSeconds: parseIntervalSeconds(normalizedArgs, env),
     initialDelaySeconds: parseInitialDelaySeconds(env),
+    lockBusyRetrySeconds: parseIntegerEnvironmentValue({
+      env,
+      envName: "RAW_SNAPSHOT_CLEANUP_LOCK_BUSY_RETRY_SECONDS",
+      fallback: DEFAULT_LOCK_BUSY_RETRY_SECONDS,
+      min: 30,
+      max: 60,
+    }),
+    lockBusyMaxRetries: parseIntegerEnvironmentValue({
+      env,
+      envName: "RAW_SNAPSHOT_CLEANUP_LOCK_BUSY_MAX_RETRIES",
+      fallback: DEFAULT_LOCK_BUSY_MAX_RETRIES,
+      min: 1,
+      max: 10,
+    }),
+    runtimeStatusFilePath: join(cleanupOptions.mutationRoot, "ops", "cleanup-runtime-status.json"),
     runOnce: normalizedArgs.includes(RUN_ONCE_FLAG),
   };
+}
+
+function parseIntegerEnvironmentValue({
+  env,
+  envName,
+  fallback,
+  min,
+  max,
+}: {
+  env: NodeJS.ProcessEnv;
+  envName: string;
+  fallback: number;
+  min: number;
+  max: number;
+}): number {
+  const raw = env[envName]?.trim() ?? String(fallback);
+  const message = `${envName} must be an integer between ${min} and ${max}.`;
+
+  if (!/^(0|[1-9][0-9]*)$/.test(raw)) {
+    throw new Error(message);
+  }
+
+  const value = Number(raw);
+  if (!Number.isSafeInteger(value) || value < min || value > max) {
+    throw new Error(message);
+  }
+
+  return value;
 }
 
 function parseInitialDelaySeconds(env: NodeJS.ProcessEnv): number {
@@ -174,6 +223,10 @@ Options:
                                   Default: ${DEFAULT_CLEANUP_INTERVAL_SECONDS}, range: ${MIN_CLEANUP_INTERVAL_SECONDS}-${MAX_CLEANUP_INTERVAL_SECONDS}
   RAW_SNAPSHOT_CLEANUP_INITIAL_DELAY_SECONDS
                                   Startup delay before the first daemon cycle. Default: ${DEFAULT_CLEANUP_INITIAL_DELAY_SECONDS}
+  RAW_SNAPSHOT_CLEANUP_LOCK_BUSY_RETRY_SECONDS
+                                  Mutation lock retry base. Default: ${DEFAULT_LOCK_BUSY_RETRY_SECONDS}, range: 30-60
+  RAW_SNAPSHOT_CLEANUP_LOCK_BUSY_MAX_RETRIES
+                                  Short retries before a 10-minute retry. Default: ${DEFAULT_LOCK_BUSY_MAX_RETRIES}, range: 1-10
   --normal-retention-days <days>  Retention for VALID snapshots.
   --abnormal-retention-days <days>
                                   Retention for INVALID and SUSPECTED_BLOCK snapshots.

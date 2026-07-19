@@ -12,6 +12,7 @@ import {
 } from "../../coolpc/raw-snapshot-cleanup";
 import {
   DEFAULT_RAW_SNAPSHOT_STORAGE_DIR,
+  RawSnapshotStorageBusyError,
   resolveAllowlistedRawSnapshotStorage,
   tryAcquireRawSnapshotMutationLock,
 } from "../../coolpc/raw-snapshot-storage";
@@ -50,6 +51,13 @@ export type RawSnapshotCleanupExecutor = (options: {
   abnormalRetentionDays: number;
   dryRun: boolean;
 }) => Promise<CleanupRawSnapshotsResult>;
+
+export class RawSnapshotCleanupExecutionError extends Error {
+  constructor(cause: unknown) {
+    super(toSafeCliErrorMessage(cause), { cause });
+    this.name = "RawSnapshotCleanupExecutionError";
+  }
+}
 
 interface CleanupStorageValidationOptions {
   additionalAllowedRootsForTesting?: string[];
@@ -160,13 +168,15 @@ export async function runRawSnapshotCleanup({
   });
 
   if (!lock) {
-    throw new Error(
-      "Raw snapshot storage is busy; another crawler or cleanup process holds the mutation lock.",
-    );
+    throw new RawSnapshotStorageBusyError();
   }
 
   try {
-    return await cleanup(cleanupOptions);
+    try {
+      return await cleanup(cleanupOptions);
+    } catch (error) {
+      throw new RawSnapshotCleanupExecutionError(error);
+    }
   } finally {
     await lock.release();
   }

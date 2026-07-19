@@ -7,19 +7,30 @@ import {
   cleanupRawSnapshotsWithPrisma,
   type PrismaRawSnapshotCleanupClient,
 } from "../../coolpc/raw-snapshot-cleanup";
-import { tryAcquireRawSnapshotMutationLock } from "../../coolpc/raw-snapshot-storage";
+import {
+  RawSnapshotStorageBusyError,
+  tryAcquireRawSnapshotMutationLock,
+} from "../../coolpc/raw-snapshot-storage";
 import {
   loadWorkspaceEnv,
   resolveWorkspaceRoot,
   toSafeCliErrorMessage,
 } from "../shared/script-utils";
-import { type RawSnapshotCleanupExecutor, runRawSnapshotCleanup } from "./cleanup-raw-snapshots";
+import {
+  RawSnapshotCleanupExecutionError,
+  type RawSnapshotCleanupExecutor,
+  runRawSnapshotCleanup,
+} from "./cleanup-raw-snapshots";
 import {
   HELP_FLAG,
   parseRawSnapshotCleanupDaemonOptions,
   printHelp,
   type RawSnapshotCleanupDaemonOptions,
 } from "./cleanup-raw-snapshots-daemon/options";
+import {
+  type RawSnapshotCleanupCycleResult,
+  writeRawSnapshotCleanupRuntimeStatus,
+} from "./cleanup-raw-snapshots-daemon/runtime-status";
 import { createOpsLogger } from "./shared/logger";
 import { createInterruptibleShutdownController } from "./shared/shutdown";
 
@@ -38,7 +49,15 @@ export interface RunRawSnapshotCleanupDaemonOptions {
   shutdown: ShutdownController;
   cleanup?: RawSnapshotCleanupExecutor;
   acquireMutationLock?: typeof tryAcquireRawSnapshotMutationLock;
-  logMessage?: (message: string) => void;
+  logMessage?: (message: string, fields?: Record<string, unknown>) => void;
+  now?: () => Date;
+  random?: () => number;
+  writeRuntimeStatus?: typeof writeRawSnapshotCleanupRuntimeStatus;
+}
+
+interface CleanupCycleResult {
+  cycleResult: RawSnapshotCleanupCycleResult;
+  error?: unknown;
 }
 
 // CLI 入口載入環境、建立 DB client，並啟動可安全停止的 cleanup loop。
@@ -65,7 +84,7 @@ async function main(): Promise<void> {
     client = db.prisma;
 
     log(
-      `Raw snapshot cleanup daemon started. interval=${options.intervalSeconds}s runOnce=${options.runOnce ? "yes" : "no"} storage=${options.storageDir}`,
+      `Raw snapshot cleanup daemon started. interval=${options.intervalSeconds}s lockBusyRetry=${options.lockBusyRetrySeconds}s lockBusyMaxRetries=${options.lockBusyMaxRetries} runOnce=${options.runOnce ? "yes" : "no"} storage=${options.storageDir}`,
     );
     await runRawSnapshotCleanupDaemon({ client, options, shutdown });
   } finally {
@@ -82,9 +101,15 @@ export async function runRawSnapshotCleanupDaemon({
   cleanup = cleanupRawSnapshotsWithPrisma,
   acquireMutationLock = tryAcquireRawSnapshotMutationLock,
   logMessage = log,
+  now = () => new Date(),
+  random = Math.random,
+  writeRuntimeStatus = writeRawSnapshotCleanupRuntimeStatus,
 }: RunRawSnapshotCleanupDaemonOptions): Promise<void> {
+  let consecutiveLockBusyCount = 0;
+  let lockBusySince: string | null = null;
+
   if (!options.runOnce && options.initialDelaySeconds > 0) {
-    const firstRunAt = new Date(Date.now() + options.initialDelaySeconds * 1000).toISOString();
+    const firstRunAt = new Date(now().getTime() + options.initialDelaySeconds * 1000).toISOString();
     logMessage(
       `Delaying first raw snapshot cleanup until ${firstRunAt} (${options.initialDelaySeconds}s) so crawler startup has priority.`,
     );
@@ -102,20 +127,80 @@ export async function runRawSnapshotCleanupDaemon({
       acquireMutationLock,
       logMessage,
     });
+    consecutiveLockBusyCount =
+      result.cycleResult === "LOCK_BUSY" ? consecutiveLockBusyCount + 1 : 0;
+    lockBusySince =
+      result.cycleResult === "LOCK_BUSY" ? (lockBusySince ?? now().toISOString()) : null;
+    const persistentLockBusy =
+      result.cycleResult === "LOCK_BUSY" && consecutiveLockBusyCount > options.lockBusyMaxRetries;
+    const retrySeconds =
+      result.cycleResult === "LOCK_BUSY"
+        ? resolveCleanupLockBusyRetrySeconds(options, consecutiveLockBusyCount, random)
+        : resolveCleanupRetrySeconds(result.cycleResult, options.intervalSeconds);
+    const nextAttemptAt =
+      options.runOnce || shutdown.requested
+        ? null
+        : new Date(now().getTime() + retrySeconds * 1000).toISOString();
 
-    if (!result.ok && options.runOnce) {
+    await writeRuntimeStatusSafely(
+      options.runtimeStatusFilePath,
+      {
+        version: 1,
+        state:
+          result.cycleResult === "LOCK_BUSY"
+            ? "WAITING_LOCK"
+            : result.cycleResult === "SUCCESS"
+              ? "IDLE"
+              : "BACKOFF",
+        cycleResult: result.cycleResult,
+        observedAt: now().toISOString(),
+        nextAttemptAt,
+        lockBusySince,
+        consecutiveLockBusyCount,
+        persistentLockBusy,
+      },
+      logMessage,
+      writeRuntimeStatus,
+    );
+
+    if (result.cycleResult !== "SUCCESS" && options.runOnce) {
       throw result.error;
     }
+    if (options.runOnce || shutdown.requested) break;
 
-    if (options.runOnce || shutdown.requested) {
-      break;
-    }
-
-    const waitMs = options.intervalSeconds * 1000;
-    const nextRunAt = new Date(Date.now() + waitMs).toISOString();
-    logMessage(`Next raw snapshot cleanup at ${nextRunAt} (${options.intervalSeconds}s).`);
-    await shutdown.sleep(waitMs);
+    logMessage("Next raw snapshot cleanup scheduled.", {
+      cycleResult: result.cycleResult,
+      consecutiveLockBusyCount,
+      nextAttemptAt,
+      retrySeconds,
+    });
+    await shutdown.sleep(retrySeconds * 1000);
   } while (!shutdown.requested);
+}
+
+const PERSISTENT_LOCK_BUSY_RETRY_SECONDS = 10 * 60;
+const CLEANUP_FAILURE_RETRY_SECONDS = 15 * 60;
+const INTERNAL_FAILURE_RETRY_SECONDS = 30 * 60;
+
+function resolveCleanupRetrySeconds(
+  cycleResult: Exclude<RawSnapshotCleanupCycleResult, "LOCK_BUSY">,
+  intervalSeconds: number,
+): number {
+  if (cycleResult === "CLEANUP_FAILURE") return CLEANUP_FAILURE_RETRY_SECONDS;
+  if (cycleResult === "INTERNAL_FAILURE") return INTERNAL_FAILURE_RETRY_SECONDS;
+  return intervalSeconds;
+}
+
+export function resolveCleanupLockBusyRetrySeconds(
+  options: Pick<RawSnapshotCleanupDaemonOptions, "lockBusyMaxRetries" | "lockBusyRetrySeconds">,
+  consecutiveLockBusyCount: number,
+  random = Math.random,
+): number {
+  if (consecutiveLockBusyCount > options.lockBusyMaxRetries) {
+    return PERSISTENT_LOCK_BUSY_RETRY_SECONDS;
+  }
+
+  return Math.round(options.lockBusyRetrySeconds * (0.9 + random() * 0.1));
 }
 
 // 包住單輪 cleanup 的錯誤邊界，避免常駐 daemon 因一次清理失敗直接結束。
@@ -130,8 +215,8 @@ async function runCleanupCycle({
   options: RawSnapshotCleanupDaemonOptions;
   cleanup: RawSnapshotCleanupExecutor;
   acquireMutationLock: typeof tryAcquireRawSnapshotMutationLock;
-  logMessage: (message: string) => void;
-}): Promise<{ ok: true } | { ok: false; error: unknown }> {
+  logMessage: (message: string, fields?: Record<string, unknown>) => void;
+}): Promise<CleanupCycleResult> {
   logMessage("Starting raw snapshot cleanup cycle.");
 
   try {
@@ -145,11 +230,41 @@ async function runCleanupCycle({
 
     printCleanupSummary(result, logMessage);
 
-    return { ok: true };
+    return { cycleResult: "SUCCESS" };
   } catch (error) {
-    logMessage(`Raw snapshot cleanup cycle failed: ${toSafeCliErrorMessage(error)}`);
+    if (error instanceof RawSnapshotStorageBusyError) {
+      return { cycleResult: "LOCK_BUSY", error };
+    }
 
-    return { ok: false, error };
+    if (error instanceof RawSnapshotCleanupExecutionError) {
+      logMessage("Raw snapshot cleanup cycle failed.", {
+        cycleResult: "CLEANUP_FAILURE",
+        error: toSafeCliErrorMessage(error),
+      });
+      return { cycleResult: "CLEANUP_FAILURE", error };
+    }
+
+    logMessage("Raw snapshot cleanup cycle failed.", {
+      cycleResult: "INTERNAL_FAILURE",
+      error: toSafeCliErrorMessage(error),
+    });
+    return { cycleResult: "INTERNAL_FAILURE", error };
+  }
+}
+
+async function writeRuntimeStatusSafely(
+  path: string,
+  status: Parameters<typeof writeRawSnapshotCleanupRuntimeStatus>[1],
+  logMessage: (message: string, fields?: Record<string, unknown>) => void,
+  writeRuntimeStatus: typeof writeRawSnapshotCleanupRuntimeStatus,
+): Promise<void> {
+  try {
+    await writeRuntimeStatus(path, status);
+  } catch (error) {
+    logMessage("Unable to write raw snapshot cleanup runtime status.", {
+      cycleResult: "INTERNAL_FAILURE",
+      error: toSafeCliErrorMessage(error),
+    });
   }
 }
 
@@ -163,8 +278,8 @@ function printCleanupSummary(
   );
 }
 
-function log(message: string): void {
-  logger.info(message);
+function log(message: string, fields?: Record<string, unknown>): void {
+  logger.info(message, fields);
 }
 
 if (require.main === module) {
