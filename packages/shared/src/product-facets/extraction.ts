@@ -33,7 +33,7 @@ export function extractProductFilterTags(igrp: number, productName: string): str
       extractMemoryTags(text, add);
       break;
     case 7:
-      extractStorageTags(text, add);
+      extractStorageTags(text, add, true);
       break;
     case 8:
       extractStorageTags(text, add);
@@ -239,7 +239,7 @@ function extractMemoryTags(text: string, add: AddTag): void {
   );
 }
 
-function extractStorageTags(text: string, add: AddTag): void {
+function extractStorageTags(text: string, add: AddTag, includeCapacityBucket = false): void {
   if (/\bSSD\b|\bNVME\b|M\.?2/.test(text)) {
     add("storage_type", "ssd");
   }
@@ -262,7 +262,13 @@ function extractStorageTags(text: string, add: AddTag): void {
     ["gen4", /PCI-?E\s*(?:GEN\s*)?4(?:\.0)?/],
     ["gen5", /PCI-?E\s*(?:GEN\s*)?5(?:\.0)?/],
   ]);
-  extractStorageCapacity(text, add);
+  const capacityGb = extractStorageCapacity(text, add);
+  if (includeCapacityBucket && capacityGb) {
+    const bucket = SSD_CAPACITY_BUCKETS[capacityGb];
+    if (bucket) {
+      add("capacity_bucket", bucket);
+    }
+  }
   addAllMatches(add, "storage_usage", text, [
     ["nas", /\bNAS\b|NAS碟|那嘶狼|【紅標(?:PLUS|PRO)?】/],
     ["surveillance", /監控|【紫標(?:PRO)?】/],
@@ -492,21 +498,41 @@ function extractFanSize(text: string, add: AddTag): void {
   }
 }
 
-function extractStorageCapacity(text: string, add: AddTag): void {
+const SSD_CAPACITY_BUCKETS: Readonly<Record<string, string>> = {
+  "128": "128",
+  "240": "240-256",
+  "256": "240-256",
+  "480": "480-512",
+  "500": "480-512",
+  "512": "480-512",
+  "960": "about-1tb",
+  "1000": "about-1tb",
+  "1024": "about-1tb",
+  "2000": "about-2tb",
+  "2048": "about-2tb",
+  "4000": "4000",
+  "8000": "8000",
+};
+
+function extractStorageCapacity(text: string, add: AddTag): string | null {
   const terabyteMatch = text.match(
     /(?:^|[^\d])(1|2|3|4|5|6|8|10|12|14|16|18|20|22|24|26|28|30)\s*T(?:B)?\b/,
   );
   if (terabyteMatch?.[1]) {
-    add("capacity_gb", String(Number(terabyteMatch[1]) * 1000));
-    return;
+    const capacityGb = String(Number(terabyteMatch[1]) * 1000);
+    add("capacity_gb", capacityGb);
+    return capacityGb;
   }
 
-  addFirstNumberMatch(
-    add,
-    "capacity_gb",
-    text,
-    /(?:^|[^\d])(32|64|128|256|480|500|512)\s*G(?:B)?(?=$|[^A-Z0-9]|MICRO\s*SD)/,
+  const gigabyteMatch = text.match(
+    /(?:^|[^\d])(32|64|128|240|256|480|500|512|960|1024|2048)\s*G(?:B)?(?=$|[^A-Z0-9]|MICRO\s*SD)/,
   );
+  if (!gigabyteMatch?.[1]) {
+    return null;
+  }
+
+  add("capacity_gb", gigabyteMatch[1]);
+  return gigabyteMatch[1];
 }
 
 function addAllMatches(add: AddTag, key: string, text: string, rules: readonly MatchRule[]): void {

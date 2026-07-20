@@ -1,7 +1,7 @@
 // apps/web/e2e/support/visual-fixtures.ts
 // 提供視覺 E2E 規格共用的不可變資料與回應 builders，不持有跨測試狀態。
 
-import { getProductFacetDefinitions } from "@partsradar/shared";
+import { getPublicProductFacetDefinitions } from "@partsradar/shared";
 
 const VISUAL_BASE_URL = new URL(process.env.E2E_BASE_URL ?? "http://127.0.0.1:3100");
 
@@ -123,70 +123,70 @@ export function buildVisualCategories() {
         slug: "motherboard",
         displayName: "主機板",
         sourceName: "主機板 MB",
-        facets: getProductFacetDefinitions(5),
+        facets: getPublicProductFacetDefinitions(5),
       },
       {
         id: "99999999-9999-4999-8999-999999999999",
         slug: "memory",
         displayName: "記憶體",
         sourceName: "記憶體 RAM",
-        facets: getProductFacetDefinitions(6),
+        facets: getPublicProductFacetDefinitions(6),
       },
       {
         id: "55555555-5555-4555-8555-555555555555",
         slug: "storage",
         displayName: "SSD",
         sourceName: "固態 SSD",
-        facets: getProductFacetDefinitions(7),
+        facets: getPublicProductFacetDefinitions(7),
       },
       {
         id: "66666666-6666-4666-8666-666666666666",
         slug: "hard-drive",
         displayName: "HDD",
         sourceName: "內接硬碟 HDD",
-        facets: getProductFacetDefinitions(8),
+        facets: getPublicProductFacetDefinitions(8),
       },
       {
         id: "77777777-7777-4777-8777-777777777777",
         slug: "external-storage",
         displayName: "外接儲存",
         sourceName: "USB週邊 / 硬碟座 / 讀卡機",
-        facets: getProductFacetDefinitions(9),
+        facets: getPublicProductFacetDefinitions(9),
       },
       {
         id: "10101010-1010-4010-8010-101010101010",
         slug: "cooler",
         displayName: "散熱器",
         sourceName: "散熱器",
-        facets: getProductFacetDefinitions(10),
+        facets: getPublicProductFacetDefinitions(10),
       },
       {
         id: "11111111-1111-4111-8111-111111111110",
         slug: "liquid-cooling",
         displayName: "水冷",
         sourceName: "水冷",
-        facets: getProductFacetDefinitions(11),
+        facets: getPublicProductFacetDefinitions(11),
       },
       {
         id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         slug: "case",
         displayName: "機殼",
         sourceName: "機殼 CASE",
-        facets: getProductFacetDefinitions(14),
+        facets: getPublicProductFacetDefinitions(14),
       },
       {
         id: "15151515-1515-4515-8515-151515151515",
         slug: "power-supply",
         displayName: "電源供應器",
         sourceName: "電源供應器",
-        facets: getProductFacetDefinitions(15),
+        facets: getPublicProductFacetDefinitions(15),
       },
       {
         id: "16161616-1616-4616-8616-161616161616",
         slug: "fan-accessory",
         displayName: "風扇 / 配件",
         sourceName: "風扇 / 配件",
-        facets: getProductFacetDefinitions(16),
+        facets: getPublicProductFacetDefinitions(16),
       },
     ],
   };

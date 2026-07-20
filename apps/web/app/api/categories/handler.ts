@@ -1,12 +1,9 @@
 // apps/web/app/api/categories/handler.ts
 // 處理公開分類 API 的 enabled sourceCategory 讀取、slug mapping 與安全 JSON 回應。
 
-import {
-  getProductFacetDefinitions,
-  type ProductFacetDefinition,
-} from "@partsradar/shared";
+import { getPublicProductFacetDefinitions, type ProductFacetDefinition } from "@partsradar/shared";
 
-import { getCategorySlug, type CategorySlug } from "../../category-slugs";
+import { type CategorySlug, getCategorySlug } from "../../category-slugs";
 import { internalErrorResponse, jsonOk } from "../_shared/responses";
 
 interface CategoryRecord {
@@ -31,9 +28,26 @@ interface CategoryFindManyArgs {
   };
 }
 
+interface SsdFacetProductFindManyArgs {
+  where: {
+    isActive: true;
+    isExcluded: false;
+    currentPrice: { isNot: null };
+    sourceCategory: { enabled: true; igrp: 7 };
+  };
+  select: { filterTags: true };
+}
+
+interface SsdFacetProductRecord {
+  filterTags: string[];
+}
+
 export interface CategoriesReadClient {
   sourceCategory: {
     findMany(args: CategoryFindManyArgs): Promise<CategoryRecord[]>;
+  };
+  product: {
+    findMany(args: SsdFacetProductFindManyArgs): Promise<SsdFacetProductRecord[]>;
   };
 }
 
@@ -63,9 +77,24 @@ export function createGetCategoriesHandler(client: CategoriesReadClient): () => 
           sourceName: true,
         },
       });
+      const ssdFacetTags = categories.some((category) => category.igrp === 7)
+        ? new Set(
+            (
+              await client.product.findMany({
+                where: {
+                  isActive: true,
+                  isExcluded: false,
+                  currentPrice: { isNot: null },
+                  sourceCategory: { enabled: true, igrp: 7 },
+                },
+                select: { filterTags: true },
+              })
+            ).flatMap((product) => product.filterTags),
+          )
+        : undefined;
 
       return jsonOk<CategoriesResponseBody>({
-        data: categories.map(toCategoryResponseItem),
+        data: categories.map((category) => toCategoryResponseItem(category, ssdFacetTags)),
       });
     } catch {
       return internalErrorResponse();
@@ -74,7 +103,10 @@ export function createGetCategoriesHandler(client: CategoriesReadClient): () => 
 }
 
 // 將 DB category row 轉成 public slug；未登錄的 enabled IGrp 視為 server contract error。
-function toCategoryResponseItem(category: CategoryRecord): CategoryResponseItem {
+function toCategoryResponseItem(
+  category: CategoryRecord,
+  availableSsdTags?: ReadonlySet<string>,
+): CategoryResponseItem {
   const slug = getCategorySlug(category.igrp);
 
   if (!slug) {
@@ -86,6 +118,6 @@ function toCategoryResponseItem(category: CategoryRecord): CategoryResponseItem 
     slug,
     displayName: category.displayName,
     sourceName: category.sourceName,
-    facets: getProductFacetDefinitions(category.igrp),
+    facets: getPublicProductFacetDefinitions(category.igrp, availableSsdTags),
   };
 }

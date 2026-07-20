@@ -252,6 +252,31 @@ describe("product filter tag backfill safety", () => {
     expect(client.updateCalls).toEqual([]);
   });
 
+  it("backfills exact SSD capacities together with their display buckets", async () => {
+    const client = new FakeFilterTagBackfillClient();
+    const candidate: ProductFilterTagCandidate = {
+      id: "ssd-1024",
+      name: "金士頓 SKC600 SSD 1024G ~搭機價~",
+      filterTags: [],
+      sourceCategory: { igrp: 7, displayName: "SSD" },
+    };
+
+    const summary = await backfillProductFilterTags(client, [candidate], {
+      dryRun: false,
+      sourceFilterTagsByIgrp: {},
+    });
+
+    expect(summary.categories[0]?.facetHits).toMatchObject({
+      "capacity_gb:1024": 1,
+      "capacity_bucket:about-1tb": 1,
+    });
+    expect(client.updateCalls).toEqual([
+      expect.objectContaining({
+        data: { filterTags: ["capacity_gb:1024", "capacity_bucket:about-1tb"] },
+      }),
+    ]);
+  });
+
   it("refuses writes when source filter tags are unavailable", async () => {
     await expect(
       backfillProductFilterTags(new FakeFilterTagBackfillClient(), [changedCandidate()], {

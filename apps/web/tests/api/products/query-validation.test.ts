@@ -223,6 +223,29 @@ describe("GET /api/products query validation", () => {
     expect(client.lastProductCountArgs?.where).toEqual(client.lastProductFindProductsArgs?.where);
   });
 
+  it("accepts legacy exact SSD capacity and new bucket filters together", async () => {
+    const client = fakeProductsClient({
+      products: [],
+      totalItems: 0,
+      sourceCategories: [],
+    });
+
+    const response = await createGetProductsHandler(client, { now: () => NOW })(
+      new Request(
+        "https://parts.example/api/products?category=storage&facet=capacity_gb:1024&facet=capacity_bucket:about-1tb",
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(client.lastProductFindProductsArgs?.where).toMatchObject({
+      sourceCategory: { enabled: true, igrp: 7 },
+      AND: [
+        { filterTags: { hasSome: ["capacity_gb:1024"] } },
+        { filterTags: { hasSome: ["capacity_bucket:about-1tb"] } },
+      ],
+    });
+  });
+
   it.each([
     "facet=socket:am5",
     "category=cpu&facet=chipset:b850",

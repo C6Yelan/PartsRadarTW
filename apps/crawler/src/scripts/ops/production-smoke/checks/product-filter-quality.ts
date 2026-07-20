@@ -60,7 +60,7 @@ const REQUIREMENTS: Readonly<Record<number, readonly CoverageRequirement[]>> = {
     ...required(["memory_type", "capacity_gb", "speed_mhz"], 0.95),
     ...required(["module_type"], 0.9),
   ],
-  7: required(["capacity_gb"], 0.95),
+  7: required(["capacity_gb", "capacity_bucket"], 0.95),
   8: [...required(["capacity_gb"], 1), ...required(["storage_usage"], 0.98)],
   9: required(["external_type", "capacity_gb"], 0.95),
   10: required(["cooler_type"], 0.95),

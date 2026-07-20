@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   extractProductFilterTags,
   getProductFacetDefinitions,
+  getPublicProductFacetDefinitions,
   isProductFilterTagSupported,
   mergeProductFilterTags,
   PRODUCT_FACET_IGRPS,
@@ -100,7 +101,38 @@ describe("product facets", () => {
       "form_factor:m2",
       "pcie_generation:gen4",
       "capacity_gb:2000",
+      "capacity_bucket:about-2tb",
     ]);
+  });
+
+  it.each([
+    ["SSD 240G", "240", "240-256"],
+    ["SSD 240GB", "240", "240-256"],
+    ["SSD 960G", "960", "about-1tb"],
+    ["SSD 1024G", "1024", "about-1tb"],
+    ["SSD 2048G", "2048", "about-2tb"],
+    ["SSD 1024G ~搭機價~", "1024", "about-1tb"],
+    ["SSD 2048G ~搭機價~", "2048", "about-2tb"],
+  ])("keeps the exact SSD capacity and adds its display bucket: %s", (name, exact, bucket) => {
+    expect(extractProductFilterTags(7, name)).toEqual([
+      `capacity_gb:${exact}`,
+      `capacity_bucket:${bucket}`,
+    ]);
+  });
+
+  it.each([
+    ["SSD 240G", "capacity_bucket:240-256"],
+    ["SSD 256G", "capacity_bucket:240-256"],
+    ["SSD 480G", "capacity_bucket:480-512"],
+    ["SSD 500G", "capacity_bucket:480-512"],
+    ["SSD 512G", "capacity_bucket:480-512"],
+    ["SSD 960G", "capacity_bucket:about-1tb"],
+    ["SSD 1TB", "capacity_bucket:about-1tb"],
+    ["SSD 1024G", "capacity_bucket:about-1tb"],
+    ["SSD 2TB", "capacity_bucket:about-2tb"],
+    ["SSD 2048G", "capacity_bucket:about-2tb"],
+  ])("maps SSD capacities into stable bucket tags: %s", (name, bucketTag) => {
+    expect(extractProductFilterTags(7, name)).toContain(bucketTag);
   });
 
   it("extracts HDD size, capacity, and usage", () => {
@@ -385,12 +417,16 @@ describe("product facets", () => {
 
     expect(ssdCapacities).toEqual([
       "128",
+      "240",
       "256",
       "480",
       "500",
       "512",
+      "960",
       "1000",
+      "1024",
       "2000",
+      "2048",
       "4000",
       "8000",
     ]);
@@ -405,9 +441,36 @@ describe("product facets", () => {
     expect(externalCapacities).toHaveLength(25);
   });
 
+  it("publishes SSD buckets instead of exact capacities and can hide empty buckets", () => {
+    const publicDefinitions = getPublicProductFacetDefinitions(
+      7,
+      new Set(["capacity_bucket:240-256", "capacity_bucket:about-1tb"]),
+    );
+
+    expect(publicDefinitions.some((definition) => definition.key === "capacity_gb")).toBe(false);
+    expect(
+      publicDefinitions
+        .find((definition) => definition.key === "capacity_bucket")
+        ?.options.map((option) => [option.value, option.label]),
+    ).toEqual([
+      ["240-256", "240–256 GB"],
+      ["about-1tb", "約 1 TB"],
+    ]);
+    expect(
+      getProductFacetDefinitions(8).some((definition) => definition.key === "capacity_bucket"),
+    ).toBe(false);
+    expect(
+      getProductFacetDefinitions(9).some((definition) => definition.key === "capacity_bucket"),
+    ).toBe(false);
+  });
+
   it("rejects excluded capacity tags and parser matches only in the affected categories", () => {
     expect(isProductFilterTagSupported(7, "capacity_gb:32")).toBe(false);
     expect(isProductFilterTagSupported(7, "capacity_gb:3000")).toBe(false);
+    expect(isProductFilterTagSupported(7, "capacity_gb:1024")).toBe(true);
+    expect(isProductFilterTagSupported(7, "capacity_bucket:about-1tb")).toBe(true);
+    expect(isProductFilterTagSupported(8, "capacity_bucket:about-1tb")).toBe(false);
+    expect(isProductFilterTagSupported(9, "capacity_bucket:about-1tb")).toBe(false);
     expect(isProductFilterTagSupported(8, "capacity_gb:480")).toBe(false);
     expect(isProductFilterTagSupported(9, "capacity_gb:480")).toBe(true);
     expect(isProductFilterTagSupported(9, "capacity_gb:3000")).toBe(true);

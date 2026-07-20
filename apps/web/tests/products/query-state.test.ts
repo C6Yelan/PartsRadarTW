@@ -44,6 +44,20 @@ describe("product explorer category query state", () => {
     expect(toUrl(query)).toBe("/?category=cpu&facet=socket%3Aam5&facet=cpu_family%3Aryzen-7");
   });
 
+  it("keeps legacy exact SSD capacity URLs and accepts the new bucket URL", () => {
+    const query = readQueryFromSearchParams(
+      new URLSearchParams(
+        "category=storage&facet=capacity_gb:1024&facet=capacity_bucket:about-1tb",
+      ),
+    );
+
+    expect(query.facets).toEqual(["capacity_gb:1024", "capacity_bucket:about-1tb"]);
+    expect(toApiSearchParams(query).getAll("facet")).toEqual([
+      "capacity_gb:1024",
+      "capacity_bucket:about-1tb",
+    ]);
+  });
+
   it("clears facets without a compatible category", () => {
     expect(readQueryFromSearchParams(new URLSearchParams("facet=socket:am5")).facets).toEqual([]);
     expect(

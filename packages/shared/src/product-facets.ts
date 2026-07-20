@@ -9,6 +9,7 @@ export type {
 } from "./product-facets/registry";
 export {
   getProductFacetDefinitions,
+  getPublicProductFacetDefinitions,
   isProductFilterTagSupported,
   mergeProductFilterTags,
   PRODUCT_FACET_IGRPS,

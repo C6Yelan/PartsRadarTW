@@ -49,25 +49,33 @@ const CAPACITY_OPTIONS = [
   option("30000", "30 TB", "10 TB 以上"),
 ] as const;
 
+const SSD_CAPACITY_OPTIONS = [
+  option("128", "128 GB"),
+  option("240", "240 GB"),
+  option("256", "256 GB"),
+  option("480", "480 GB"),
+  option("500", "500 GB"),
+  option("512", "512 GB"),
+  option("960", "960 GB"),
+  option("1000", "1 TB"),
+  option("1024", "1024 GB"),
+  option("2000", "2 TB"),
+  option("2048", "2048 GB"),
+  option("4000", "4 TB"),
+  option("8000", "8 TB"),
+] as const;
+
+const SSD_CAPACITY_BUCKET_OPTIONS = [
+  option("128", "128 GB"),
+  option("240-256", "240–256 GB"),
+  option("480-512", "480–512 GB"),
+  option("about-1tb", "約 1 TB"),
+  option("about-2tb", "約 2 TB"),
+  option("4000", "4 TB"),
+  option("8000", "8 TB"),
+] as const;
+
 const CAPACITY_EXCLUSIONS_BY_IGRP: Readonly<Record<number, ReadonlySet<string>>> = {
-  7: new Set([
-    "32",
-    "64",
-    "3000",
-    "5000",
-    "6000",
-    "10000",
-    "12000",
-    "14000",
-    "16000",
-    "18000",
-    "20000",
-    "22000",
-    "24000",
-    "26000",
-    "28000",
-    "30000",
-  ]),
   8: new Set(["32", "64", "128", "256", "480", "512"]),
   9: new Set(),
 };
@@ -192,7 +200,8 @@ const PRODUCT_FACETS_BY_IGRP: Readonly<Record<number, readonly ProductFacetDefin
       option("gen4", "PCIe 4.0"),
       option("gen5", "PCIe 5.0"),
     ]),
-    facet("capacity_gb", "容量", getCapacityOptionsForIgrp(7)),
+    facet("capacity_gb", "標稱容量", SSD_CAPACITY_OPTIONS),
+    facet("capacity_bucket", "容量", SSD_CAPACITY_BUCKET_OPTIONS),
   ],
   8: [
     facet("form_factor", "尺寸", [option("2-5-inch", "2.5 吋"), option("3-5-inch", "3.5 吋")]),
@@ -332,6 +341,25 @@ const EMPTY_FACETS: readonly ProductFacetDefinition[] = [];
 
 export function getProductFacetDefinitions(igrp: number): readonly ProductFacetDefinition[] {
   return PRODUCT_FACETS_BY_IGRP[igrp] ?? EMPTY_FACETS;
+}
+
+export function getPublicProductFacetDefinitions(
+  igrp: number,
+  availableTags?: ReadonlySet<string>,
+): readonly ProductFacetDefinition[] {
+  return getProductFacetDefinitions(igrp).flatMap((definition) => {
+    if (igrp === 7 && definition.key === "capacity_gb") {
+      return [];
+    }
+    if (igrp !== 7 || definition.key !== "capacity_bucket" || !availableTags) {
+      return [definition];
+    }
+
+    const options = definition.options.filter((option) =>
+      availableTags.has(`${definition.key}:${option.value}`),
+    );
+    return options.length > 0 ? [{ ...definition, options }] : [];
+  });
 }
 
 export function parseProductFilterTag(tag: string): ParsedProductFilterTag | null {

@@ -1,7 +1,7 @@
 // apps/web/tests/api/categories/handler.test.ts
 // 驗證公開分類 API handler 的 enabled 篩選、來源排序、response shape 與安全錯誤回應。
 
-import { getProductFacetDefinitions } from "@partsradar/shared";
+import { getPublicProductFacetDefinitions } from "@partsradar/shared";
 import { describe, expect, it } from "vitest";
 
 import { API_ERROR_MESSAGES } from "../../../app/api/_shared/responses";
@@ -52,14 +52,14 @@ describe("GET /api/categories handler", () => {
           slug: "cpu",
           displayName: "CPU",
           sourceName: "處理器 CPU",
-          facets: getProductFacetDefinitions(4),
+          facets: getPublicProductFacetDefinitions(4),
         },
         {
           id: "category-5",
           slug: "motherboard",
           displayName: "主機板",
           sourceName: "主機板 MB",
-          facets: getProductFacetDefinitions(5),
+          facets: getPublicProductFacetDefinitions(5),
         },
       ],
     });
@@ -98,6 +98,36 @@ describe("GET /api/categories handler", () => {
     });
   });
 
+  it("publishes only SSD capacity buckets backed by active priced products", async () => {
+    const client = fakeCategoriesClient(
+      [category({ id: "category-7", igrp: 7, displayName: "SSD", sourceName: "SSD" })],
+      [
+        ["capacity_gb:240", "capacity_bucket:240-256"],
+        ["capacity_gb:1024", "capacity_bucket:about-1tb"],
+      ],
+    );
+    const response = await createGetCategoriesHandler(client)();
+    const body = await response.json();
+
+    expect(client.lastProductFindManyArgs).toEqual({
+      where: {
+        isActive: true,
+        isExcluded: false,
+        currentPrice: { isNot: null },
+        sourceCategory: { enabled: true, igrp: 7 },
+      },
+      select: { filterTags: true },
+    });
+    expect(
+      body.data[0].facets.find((facet: { key: string }) => facet.key === "capacity_gb"),
+    ).toBeUndefined();
+    expect(
+      body.data[0].facets
+        .find((facet: { key: string }) => facet.key === "capacity_bucket")
+        .options.map((option: { value: string }) => option.value),
+    ).toEqual(["240-256", "about-1tb"]);
+  });
+
   it("returns a generic 500 response when an enabled category has no public slug", async () => {
     const response = await createGetCategoriesHandler(
       fakeCategoriesClient([category({ igrp: 99 })]),
@@ -119,6 +149,9 @@ describe("GET /api/categories handler", () => {
           throw new Error("DATABASE_URL=postgresql://partsradar:secret@localhost:5432/db");
         },
       },
+      product: {
+        findMany: async () => [],
+      },
     })();
 
     expect(response.status).toBe(500);
@@ -132,6 +165,7 @@ describe("GET /api/categories handler", () => {
 });
 
 type FindManyArgs = Parameters<CategoriesReadClient["sourceCategory"]["findMany"]>[0];
+type ProductFindManyArgs = Parameters<CategoriesReadClient["product"]["findMany"]>[0];
 
 interface FakeCategory {
   id: string;
@@ -141,14 +175,18 @@ interface FakeCategory {
   enabled: boolean;
 }
 
-function fakeCategoriesClient(categories: FakeCategory[]) {
+function fakeCategoriesClient(categories: FakeCategory[], ssdFilterTags: string[][] = []) {
   const client = {
     lastFindManyArgs: undefined as FindManyArgs | undefined,
+    lastProductFindManyArgs: undefined as ProductFindManyArgs | undefined,
   };
 
   return {
     get lastFindManyArgs() {
       return client.lastFindManyArgs;
+    },
+    get lastProductFindManyArgs() {
+      return client.lastProductFindManyArgs;
     },
     sourceCategory: {
       async findMany(args) {
@@ -159,7 +197,16 @@ function fakeCategoriesClient(categories: FakeCategory[]) {
           .sort((left, right) => left.igrp - right.igrp);
       },
     },
-  } satisfies CategoriesReadClient & { lastFindManyArgs?: FindManyArgs };
+    product: {
+      async findMany(args) {
+        client.lastProductFindManyArgs = args;
+        return ssdFilterTags.map((filterTags) => ({ filterTags }));
+      },
+    },
+  } satisfies CategoriesReadClient & {
+    lastFindManyArgs?: FindManyArgs;
+    lastProductFindManyArgs?: ProductFindManyArgs;
+  };
 }
 
 function category(overrides: Partial<FakeCategory> = {}): FakeCategory {

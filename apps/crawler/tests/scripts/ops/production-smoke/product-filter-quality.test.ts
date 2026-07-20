@@ -84,6 +84,22 @@ describe("product filter quality audit", () => {
     expect(audit.zeroCountOptions).toContain("zero=8:storage_usage:nas");
   });
 
+  it("requires both exact SSD capacity and its display bucket without treating them as conflict", () => {
+    const complete = auditProductFilterQuality([
+      product("ssd-complete", 7, ["capacity_gb:1024", "capacity_bucket:about-1tb"]),
+    ]);
+    const missingBucket = auditProductFilterQuality([
+      product("ssd-missing-bucket", 7, ["capacity_gb:1024"]),
+    ]);
+
+    expect(complete.coverage["7:capacity_gb"]).toBe(1);
+    expect(complete.coverage["7:capacity_bucket"]).toBe(1);
+    expect(complete.conflicts).toEqual([]);
+    expect(complete.unsupportedTags).toEqual([]);
+    expect(complete.belowMinimum).toEqual([]);
+    expect(missingBucket.belowMinimum).toContain("coverage=7:capacity_bucket:0/1<95.0%");
+  });
+
   it.each([
     ["allows one unclassified product in 1000", 1, 1000, "OK"],
     ["allows nine unclassified products in 1000", 9, 1000, "OK"],
