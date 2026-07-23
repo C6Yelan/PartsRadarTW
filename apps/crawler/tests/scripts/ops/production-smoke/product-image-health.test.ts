@@ -35,6 +35,7 @@ describe("source image fetch failure smoke check", () => {
       expect.objectContaining({
         where: {
           isActive: true,
+          isExcluded: false,
           imageCacheFailureCount: { gte: 3 },
         },
       }),
