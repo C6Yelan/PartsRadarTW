@@ -29,6 +29,7 @@ export type {
   CrawlRunStatus,
   DiscordDeliveryErrorCategory,
   DiscordPriceReportSetting,
+  DiscordPublicReportAccessStatus,
   ParseErrorType,
   Prisma,
 } from "@prisma/client";

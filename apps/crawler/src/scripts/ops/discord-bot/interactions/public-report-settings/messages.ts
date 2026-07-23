@@ -140,7 +140,7 @@ function createPublicPriceReportSettingsEmbed({
     fields: [
       {
         name: "狀態",
-        value: setting ? (setting.enabled ? "已開啟" : "已暫停") : "尚未設定",
+        value: formatPublicReportSettingStatus(setting),
         inline: true,
       },
       {
@@ -170,11 +170,14 @@ function createPublicPriceReportSettingsEmbed({
       },
       {
         name: "最近一次發送",
-        value: formatPublicReportDeliveryStatus(latestDelivery),
+        value: formatPublicReportDeliveryStatus(latestDelivery, setting),
       },
       {
         name: "發送說明",
-        value: "自動發送失敗時，bot 會稍後再試；「發送測試」只會傳送一次。",
+        value:
+          setting && setting.accessStatus !== "ACTIVE"
+            ? "公開報告已停止；重新啟用或設定頻道後，會從下一個爬蟲輪次開始。"
+            : "自動發送失敗時，bot 會稍後再試；「發送測試」只會傳送一次。",
       },
     ],
   };
@@ -183,6 +186,7 @@ function createPublicPriceReportSettingsEmbed({
 // 將最近一次公開報告 delivery 狀態轉成管理員可讀的簡短文字。
 function formatPublicReportDeliveryStatus(
   delivery: PublicPriceReportDeliveryStatus | null,
+  setting: PublicPriceReportSetting | null,
 ): string {
   if (!delivery) {
     return "尚無公開報告紀錄。";
@@ -206,10 +210,34 @@ function formatPublicReportDeliveryStatus(
   }
 
   if (delivery.status === "FAILED") {
+    if (setting && setting.accessStatus !== "ACTIVE") {
+      return `${deliveredAt}，發送失敗，公開報告已停止。`;
+    }
+
     return `${deliveredAt}，發送失敗，bot 會稍後再試。`;
   }
 
   return `${deliveredAt}，目前無法確認發送結果。`;
+}
+
+function formatPublicReportSettingStatus(setting: PublicPriceReportSetting | null): string {
+  if (!setting) {
+    return "尚未設定";
+  }
+
+  if (setting.accessStatus === "PAUSED_PERMISSION") {
+    return "已停用（權限不足）";
+  }
+
+  if (setting.accessStatus === "DISABLED_CHANNEL_GONE") {
+    return "已停用（頻道不存在）";
+  }
+
+  if (setting.accessStatus === "DISABLED_BOT_REMOVED") {
+    return "已停用（Bot 已離開伺服器）";
+  }
+
+  return setting.enabled ? "已開啟" : "已暫停";
 }
 
 // 摘要測試公開報告實際套用的分類、內容與關鍵字。

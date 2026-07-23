@@ -3,6 +3,7 @@
 
 import { createDiscordMessagePayload } from "./message-payload";
 import { formatDiscordBotText } from "./message-text";
+import type { DiscordPublicReportAccessProbeResult } from "./public-price-report/access-policy";
 import { sendDiscordRestRequest } from "./rest-request";
 import type {
   DiscordBotMessage,
@@ -209,6 +210,55 @@ export async function sendDiscordChannelMessages({
     messageCount: messages.length,
     httpStatuses,
   };
+}
+
+// 依序驗證 bot 是否仍可讀取 Guild 與 Channel，供公開報告 50001/50013 二次分類。
+export async function probeDiscordPublicReportAccess({
+  token,
+  apiBaseUrl,
+  guildId,
+  channelId,
+  fetchImpl = fetch,
+}: {
+  token: string;
+  apiBaseUrl: string;
+  guildId: string;
+  channelId: string;
+  fetchImpl?: FetchImpl;
+}): Promise<DiscordPublicReportAccessProbeResult> {
+  const guildResult = await sendDiscordRestRequest<unknown>({
+    token,
+    apiBaseUrl,
+    fetchImpl,
+    method: "GET",
+    path: `/guilds/${guildId}`,
+  });
+
+  if (guildResult.status !== "ok") {
+    return {
+      status: "unavailable",
+      resource: "guild",
+      result: guildResult,
+    };
+  }
+
+  const channelResult = await sendDiscordRestRequest<unknown>({
+    token,
+    apiBaseUrl,
+    fetchImpl,
+    method: "GET",
+    path: `/channels/${channelId}`,
+  });
+
+  if (channelResult.status !== "ok") {
+    return {
+      status: "unavailable",
+      resource: "channel",
+      result: channelResult,
+    };
+  }
+
+  return { status: "accessible" };
 }
 
 // 透過 interaction webhook 發送多則回覆；第一則覆寫 deferred original message，後續使用 follow-up。

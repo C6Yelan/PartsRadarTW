@@ -11,9 +11,11 @@ import {
   sendDueScheduledPriceReports,
 } from "./price-report";
 import { sendPendingPublicPriceReports } from "./public-price-report";
+import { notifyPublicReportAccessDisabled } from "./public-price-report/access-alert";
 import { registerDiscordBotCommands } from "./registration";
 import {
   formatDiscordRestFailure,
+  probeDiscordPublicReportAccess,
   sendDiscordChannelMessages,
   sendDiscordDirectMessages,
 } from "./rest";
@@ -31,6 +33,9 @@ import type {
 } from "./types";
 
 const logger = createOpsLogger();
+type PublicReportAccessDisabledCallback = NonNullable<
+  Parameters<typeof sendPendingPublicPriceReports>[0]["onAccessDisabled"]
+>;
 
 // 執行 Discord bot 主程序；gateway 負責互動事件，notification loop 負責排程與目標價通知。
 export async function runDiscordBotDaemon({
@@ -64,6 +69,14 @@ export async function runDiscordBotDaemon({
   const shutdown = createShutdownController(logMessage);
   const cooldowns = new CommandCooldowns(options.commandCooldownSeconds);
   const schedulerStatus = createDiscordBotSchedulerStatusStore();
+  const unavailableGuildIds = new Set<string>();
+  const onPublicReportAccessDisabled: PublicReportAccessDisabledCallback = (event) =>
+    notifyPublicReportAccessDisabled({
+      webhookUrl: options.adminWebhookUrl,
+      fetchImpl,
+      logMessage,
+      ...event,
+    });
   logMessage(
     `Discord bot features. publicReports=${formatFeatureFlag(options.publicReportsEnabled)} personalReports=${formatFeatureFlag(options.personalReportsEnabled)} targetWatches=${formatFeatureFlag(options.targetWatchesEnabled)} registerCommandsOnStart=${formatFeatureFlag(options.registerCommandsOnStart)}`,
   );
@@ -74,6 +87,8 @@ export async function runDiscordBotDaemon({
     fetchImpl,
     logMessage,
     schedulerStatus,
+    unavailableGuildIds,
+    onPublicReportAccessDisabled,
   });
 
   logMessage("Discord bot daemon started.");
@@ -88,6 +103,8 @@ export async function runDiscordBotDaemon({
       WebSocketCtor,
       logMessage,
       schedulerStatus,
+      unavailableGuildIds,
+      onPublicReportAccessDisabled,
     });
 
     if (!shutdown.requested) {
@@ -108,6 +125,8 @@ async function runNotificationLoop({
   fetchImpl,
   logMessage,
   schedulerStatus,
+  unavailableGuildIds,
+  onPublicReportAccessDisabled,
 }: {
   client: DiscordBotClient;
   options: DiscordBotOptions;
@@ -115,6 +134,8 @@ async function runNotificationLoop({
   fetchImpl: FetchImpl;
   logMessage: (message: string) => void;
   schedulerStatus: DiscordBotSchedulerStatusStore;
+  unavailableGuildIds: ReadonlySet<string>;
+  onPublicReportAccessDisabled: PublicReportAccessDisabledCallback;
 }): Promise<void> {
   const scanIntervalMs = options.priceReportScheduleIntervalSeconds * 1000;
   let nextTargetPriceScanAtMs = 0;
@@ -128,6 +149,8 @@ async function runNotificationLoop({
       scanIntervalMs,
       nextTargetPriceScanAtMs,
       schedulerStatus,
+      unavailableGuildIds,
+      onPublicReportAccessDisabled,
       clock: () => new Date(),
     });
     nextTargetPriceScanAtMs = result.nextTargetPriceScanAtMs;
@@ -146,6 +169,8 @@ export async function runDiscordBotNotificationCycle({
   nextTargetPriceScanAtMs,
   now = new Date(),
   schedulerStatus,
+  unavailableGuildIds,
+  onPublicReportAccessDisabled,
   clock = () => now,
 }: {
   client: DiscordBotClient;
@@ -156,12 +181,15 @@ export async function runDiscordBotNotificationCycle({
   nextTargetPriceScanAtMs: number;
   now?: Date;
   schedulerStatus?: DiscordBotSchedulerStatusStore;
+  unavailableGuildIds?: ReadonlySet<string>;
+  onPublicReportAccessDisabled?: PublicReportAccessDisabledCallback;
   clock?: () => Date;
 }): Promise<{ nextSleepMs: number; nextTargetPriceScanAtMs: number }> {
   const cycleStartedAt = now;
   let nextSleepMs = scanIntervalMs;
   let nextTargetScanAt = nextTargetPriceScanAtMs;
   let cycleFailed = false;
+  let globalDiscordUnavailable = false;
 
   if (options.targetWatchesEnabled && now.getTime() >= nextTargetScanAt) {
     const startedAt = clock();
@@ -218,6 +246,10 @@ export async function runDiscordBotNotificationCycle({
   if (options.publicReportsEnabled) {
     const startedAt = clock();
     try {
+      if (!onPublicReportAccessDisabled) {
+        throw new Error("Public report access-disabled callback is required.");
+      }
+
       const publicSummary = await sendPendingPublicPriceReports({
         client,
         options,
@@ -230,6 +262,16 @@ export async function runDiscordBotNotificationCycle({
             messages,
             fetchImpl,
           }),
+        probeAccess: (setting) =>
+          probeDiscordPublicReportAccess({
+            token: options.token,
+            apiBaseUrl: options.apiBaseUrl,
+            guildId: setting.discordGuildId,
+            channelId: setting.channelId,
+            fetchImpl,
+          }),
+        unavailableGuildIds,
+        onAccessDisabled: onPublicReportAccessDisabled,
       });
 
       if (publicSummary.processedCount > 0) {
@@ -244,6 +286,14 @@ export async function runDiscordBotNotificationCycle({
         outcome: "OK",
         ...publicSummary,
       });
+      if (publicSummary.retryNotBefore) {
+        nextSleepMs = Math.min(
+          nextSleepMs,
+          Math.max(1000, publicSummary.retryNotBefore.getTime() - now.getTime()),
+        );
+      }
+      globalDiscordUnavailable =
+        publicSummary.globalRateLimited || publicSummary.globalAuthFailed;
     } catch (error) {
       cycleFailed = true;
       logMessage(`Public price report scan failed: ${toSafeCliErrorMessage(error)}`);
@@ -262,7 +312,7 @@ export async function runDiscordBotNotificationCycle({
     }
   }
 
-  if (options.personalReportsEnabled) {
+  if (options.personalReportsEnabled && !globalDiscordUnavailable) {
     const startedAt = clock();
     try {
       const summary = await sendDueScheduledPriceReports({

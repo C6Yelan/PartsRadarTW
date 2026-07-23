@@ -123,7 +123,7 @@ describe("registerDiscordBotCommands", () => {
 });
 
 describe("runGatewaySession", () => {
-  it("identifies with no gateway intents", async () => {
+  it("identifies with the standard GUILDS gateway intent", async () => {
     class TestWebSocket {
       static instance: TestWebSocket | null = null;
 
@@ -164,6 +164,8 @@ describe("runGatewaySession", () => {
       fetchImpl: vi.fn() as typeof fetch,
       WebSocketCtor: TestWebSocket,
       logMessage: vi.fn(),
+      unavailableGuildIds: new Set(),
+      onPublicReportAccessDisabled: vi.fn(),
     });
     const socket = TestWebSocket.instance;
 
@@ -181,7 +183,7 @@ describe("runGatewaySession", () => {
       op: 2,
       d: {
         token: TOKEN,
-        intents: 0,
+        intents: 1,
       },
     });
 

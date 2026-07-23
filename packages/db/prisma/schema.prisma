@@ -111,6 +111,15 @@ enum DiscordDeliveryErrorCategory {
   @@map("discord_delivery_error_category")
 }
 
+enum DiscordPublicReportAccessStatus {
+  ACTIVE                @map("active")
+  PAUSED_PERMISSION     @map("paused_permission")
+  DISABLED_CHANNEL_GONE @map("disabled_channel_gone")
+  DISABLED_BOT_REMOVED  @map("disabled_bot_removed")
+
+  @@map("discord_public_report_access_status")
+}
+
 model SourceCategory {
   id              String                   @id @default(uuid()) @db.Uuid
   igrp            Int
@@ -315,23 +324,29 @@ model DiscordPublicPriceReportDelivery {
 }
 
 model DiscordPublicPriceReportSetting {
-  id                     String    @id @default(uuid()) @db.Uuid
-  discordGuildId         String    @unique(map: "discord_public_price_report_settings_guild_id_key") @map("discord_guild_id") @db.Text
-  channelId              String    @map("channel_id") @db.Text
-  maxItems               Int       @default(50) @map("max_items")
-  categoryIgrps          Int[]     @default([]) @map("category_igrps")
-  productKeyword         String?   @map("product_keyword") @db.Text
-  includePriceDrops      Boolean   @default(true) @map("include_price_drops")
-  includePriceRises      Boolean   @default(true) @map("include_price_rises")
-  includeNewProducts     Boolean   @default(false) @map("include_new_products")
-  enabled                Boolean   @default(true)
-  notificationCursorAt   DateTime? @map("notification_cursor_at") @db.Timestamptz(6)
-  createdByDiscordUserId String    @map("created_by_discord_user_id") @db.Text
-  updatedByDiscordUserId String    @map("updated_by_discord_user_id") @db.Text
-  createdAt              DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt              DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                        String                          @id @default(uuid()) @db.Uuid
+  discordGuildId            String                          @unique(map: "discord_public_price_report_settings_guild_id_key") @map("discord_guild_id") @db.Text
+  channelId                 String                          @map("channel_id") @db.Text
+  maxItems                  Int                             @default(50) @map("max_items")
+  categoryIgrps             Int[]                           @default([]) @map("category_igrps")
+  productKeyword            String?                         @map("product_keyword") @db.Text
+  includePriceDrops         Boolean                         @default(true) @map("include_price_drops")
+  includePriceRises         Boolean                         @default(true) @map("include_price_rises")
+  includeNewProducts        Boolean                         @default(false) @map("include_new_products")
+  enabled                   Boolean                         @default(true)
+  accessStatus              DiscordPublicReportAccessStatus @default(ACTIVE) @map("access_status")
+  disabledAt               DateTime?                       @map("disabled_at") @db.Timestamptz(6)
+  lastDiscordErrorCode      Int?                            @map("last_discord_error_code")
+  lastAccessCheckedAt       DateTime?                       @map("last_access_checked_at") @db.Timestamptz(6)
+  consecutiveAccessFailures Int                              @default(0) @map("consecutive_access_failures")
+  retryNotBefore            DateTime?                       @map("retry_not_before") @db.Timestamptz(6)
+  notificationCursorAt      DateTime?                       @map("notification_cursor_at") @db.Timestamptz(6)
+  createdByDiscordUserId    String                          @map("created_by_discord_user_id") @db.Text
+  updatedByDiscordUserId    String                          @map("updated_by_discord_user_id") @db.Text
+  createdAt                 DateTime                        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                 DateTime                        @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  @@index([enabled, channelId], map: "discord_public_price_report_settings_enabled_channel_idx")
+  @@index([enabled, accessStatus, retryNotBefore], map: "discord_public_report_settings_delivery_due_idx")
   @@map("discord_public_price_report_settings")
 }
 

@@ -20,10 +20,49 @@ export function createPublicReportClient({
   const publicDeliveryRows = [...publicPriceReportDeliveries];
   const publicSettingRows = [...publicPriceReportSettings];
   const publicSettingFindMany = vi.fn(
-    async (args: { where: { enabled?: boolean }; take?: number }) => {
+    async (args: {
+      where: {
+        enabled?: boolean;
+        accessStatus?: TestDiscordPublicPriceReportSetting["accessStatus"];
+        OR?: Array<{ retryNotBefore: null | { lte: Date } }>;
+        discordGuildId?: string | { notIn: string[] };
+        channelId?: string;
+      };
+      take?: number;
+    }) => {
       const rows = publicSettingRows
         .filter(
           (setting) => args.where.enabled === undefined || setting.enabled === args.where.enabled,
+        )
+        .filter(
+          (setting) =>
+            args.where.accessStatus === undefined ||
+            setting.accessStatus === args.where.accessStatus,
+        )
+        .filter(
+          (setting) =>
+            !args.where.OR ||
+            setting.retryNotBefore === null ||
+            args.where.OR.some(
+              (condition) =>
+                condition.retryNotBefore !== null &&
+                setting.retryNotBefore !== null &&
+                setting.retryNotBefore <= condition.retryNotBefore.lte,
+            ),
+        )
+        .filter(
+          (setting) =>
+            typeof args.where.discordGuildId !== "string" ||
+            setting.discordGuildId === args.where.discordGuildId,
+        )
+        .filter(
+          (setting) =>
+            typeof args.where.discordGuildId !== "object" ||
+            !args.where.discordGuildId.notIn.includes(setting.discordGuildId),
+        )
+        .filter(
+          (setting) =>
+            args.where.channelId === undefined || setting.channelId === args.where.channelId,
         )
         .sort((left, right) => {
           return (
@@ -114,6 +153,45 @@ export function createPublicReportClient({
       });
 
       return setting;
+    },
+  );
+  const publicSettingUpdateMany = vi.fn(
+    async (args: {
+      where: {
+        id?: string;
+        discordGuildId?: string;
+        channelId?: string;
+        enabled?: boolean;
+        accessStatus?: TestDiscordPublicPriceReportSetting["accessStatus"];
+      };
+      data: Omit<Partial<TestDiscordPublicPriceReportSetting>, "consecutiveAccessFailures"> & {
+        consecutiveAccessFailures?: number | { increment: number };
+      };
+    }) => {
+      let count = 0;
+
+      for (const setting of publicSettingRows) {
+        if (
+          (args.where.id && setting.id !== args.where.id) ||
+          (args.where.discordGuildId && setting.discordGuildId !== args.where.discordGuildId) ||
+          (args.where.channelId && setting.channelId !== args.where.channelId) ||
+          (args.where.enabled !== undefined && setting.enabled !== args.where.enabled) ||
+          (args.where.accessStatus && setting.accessStatus !== args.where.accessStatus)
+        ) {
+          continue;
+        }
+
+        const { consecutiveAccessFailures, ...data } = args.data;
+        Object.assign(setting, data);
+        if (typeof consecutiveAccessFailures === "number") {
+          setting.consecutiveAccessFailures = consecutiveAccessFailures;
+        } else if (consecutiveAccessFailures) {
+          setting.consecutiveAccessFailures += consecutiveAccessFailures.increment;
+        }
+        count += 1;
+      }
+
+      return { count };
     },
   );
   const publicSettingDeleteMany = vi.fn(async (args: { where: { discordGuildId: string } }) => {
@@ -261,6 +339,7 @@ export function createPublicReportClient({
       findMany: publicSettingFindMany,
       findUnique: publicSettingFindUnique,
       update: publicSettingUpdate,
+      updateMany: publicSettingUpdateMany,
       upsert: publicSettingUpsert,
     },
   };

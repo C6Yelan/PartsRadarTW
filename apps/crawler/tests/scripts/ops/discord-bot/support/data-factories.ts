@@ -250,6 +250,12 @@ export function publicPriceReportSetting({
   includePriceRises = true,
   includeNewProducts = false,
   enabled = true,
+  accessStatus = "ACTIVE",
+  disabledAt = null,
+  lastDiscordErrorCode = null,
+  lastAccessCheckedAt = null,
+  consecutiveAccessFailures = 0,
+  retryNotBefore = null,
   notificationCursorAt = new Date("2026-06-07T00:00:00.000Z"),
   createdByDiscordUserId = "111122223333444455",
   updatedByDiscordUserId = "111122223333444455",
@@ -266,6 +272,12 @@ export function publicPriceReportSetting({
   includePriceRises?: boolean;
   includeNewProducts?: boolean;
   enabled?: boolean;
+  accessStatus?: TestDiscordPublicPriceReportSetting["accessStatus"];
+  disabledAt?: Date | null;
+  lastDiscordErrorCode?: number | null;
+  lastAccessCheckedAt?: Date | null;
+  consecutiveAccessFailures?: number;
+  retryNotBefore?: Date | null;
   notificationCursorAt?: Date | null;
   createdByDiscordUserId?: string;
   updatedByDiscordUserId?: string;
@@ -283,6 +295,12 @@ export function publicPriceReportSetting({
     includePriceRises,
     includeNewProducts,
     enabled,
+    accessStatus,
+    disabledAt,
+    lastDiscordErrorCode,
+    lastAccessCheckedAt,
+    consecutiveAccessFailures,
+    retryNotBefore,
     notificationCursorAt,
     createdByDiscordUserId,
     updatedByDiscordUserId,

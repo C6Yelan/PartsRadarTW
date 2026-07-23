@@ -108,6 +108,7 @@ describe("public price report scheduler filters", () => {
         options: createDiscordBotOptions(),
         now: new Date("2026-06-07T05:00:00.000Z"),
         sendChannelMessages,
+        ...ACTIVE_ACCESS_DEPENDENCIES,
       }),
     ).resolves.toMatchObject({
       settingCount: 1,
@@ -141,6 +142,7 @@ describe("public price report scheduler filters", () => {
         options: createDiscordBotOptions(),
         now: new Date("2026-06-07T05:00:00.000Z"),
         sendChannelMessages,
+        ...ACTIVE_ACCESS_DEPENDENCIES,
       }),
     ).resolves.toEqual({
       settingCount: 0,
@@ -149,6 +151,9 @@ describe("public price report scheduler filters", () => {
       skippedCount: 0,
       rateLimitedCount: 0,
       failedCount: 0,
+      retryNotBefore: null,
+      globalRateLimited: false,
+      globalAuthFailed: false,
     });
 
     expect(client.crawlRun.findMany).not.toHaveBeenCalled();
@@ -176,6 +181,7 @@ describe("public price report scheduler filters", () => {
         options: createDiscordBotOptions(),
         now: new Date("2026-06-07T05:00:00.000Z"),
         sendChannelMessages,
+        ...ACTIVE_ACCESS_DEPENDENCIES,
       }),
     ).resolves.toEqual({
       settingCount: 1,
@@ -184,8 +190,16 @@ describe("public price report scheduler filters", () => {
       skippedCount: 0,
       rateLimitedCount: 0,
       failedCount: 0,
+      retryNotBefore: null,
+      globalRateLimited: false,
+      globalAuthFailed: false,
     });
 
     expect(sendChannelMessages).not.toHaveBeenCalled();
   });
 });
+
+const ACTIVE_ACCESS_DEPENDENCIES = {
+  probeAccess: async () => ({ status: "accessible" as const }),
+  onAccessDisabled: vi.fn(),
+};

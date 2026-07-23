@@ -56,6 +56,7 @@ describe("public price report scheduler delivery", () => {
         options: createDiscordBotOptions(),
         now: new Date("2026-06-07T05:00:00.000Z"),
         sendChannelMessages,
+        ...ACTIVE_ACCESS_DEPENDENCIES,
       }),
     ).resolves.toEqual({
       settingCount: 1,
@@ -64,6 +65,9 @@ describe("public price report scheduler delivery", () => {
       skippedCount: 0,
       rateLimitedCount: 0,
       failedCount: 0,
+      retryNotBefore: null,
+      globalRateLimited: false,
+      globalAuthFailed: false,
     });
 
     expect(sendChannelMessages).toHaveBeenCalledWith(
@@ -160,6 +164,7 @@ describe("public price report scheduler delivery", () => {
         options: createDiscordBotOptions(),
         now: new Date("2026-06-07T05:00:00.000Z"),
         sendChannelMessages,
+        ...ACTIVE_ACCESS_DEPENDENCIES,
       }),
     ).resolves.toMatchObject({
       processedCount: 1,
@@ -199,6 +204,20 @@ describe("public price report scheduler delivery", () => {
     expect(persisted).not.toContain("retryAfterMs");
     expect(persisted).not.toContain("global=yes");
     expect(persisted).not.toContain("private-token");
+    expect(client.discordPublicPriceReportSetting.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: "public-setting-rate-limit",
+        accessStatus: "ACTIVE",
+      },
+      data: {
+        lastDiscordErrorCode: null,
+        lastAccessCheckedAt: new Date("2026-06-07T05:00:00.000Z"),
+        consecutiveAccessFailures: {
+          increment: 1,
+        },
+        retryNotBefore: new Date("2026-06-07T05:00:02.500Z"),
+      },
+    });
   });
 
   it("sends pending public reports for new products when enabled", async () => {
@@ -240,6 +259,7 @@ describe("public price report scheduler delivery", () => {
         options: createDiscordBotOptions(),
         now: new Date("2026-06-07T05:00:00.000Z"),
         sendChannelMessages,
+        ...ACTIVE_ACCESS_DEPENDENCIES,
       }),
     ).resolves.toMatchObject({
       settingCount: 1,
@@ -301,6 +321,7 @@ describe("public price report scheduler delivery", () => {
         options: createDiscordBotOptions(),
         now: new Date("2026-06-07T05:00:00.000Z"),
         sendChannelMessages,
+        ...ACTIVE_ACCESS_DEPENDENCIES,
       }),
     ).resolves.toEqual({
       settingCount: 1,
@@ -309,9 +330,194 @@ describe("public price report scheduler delivery", () => {
       skippedCount: 0,
       rateLimitedCount: 0,
       failedCount: 0,
+      retryNotBefore: null,
+      globalRateLimited: false,
+      globalAuthFailed: false,
     });
 
     expect(sendChannelMessages).not.toHaveBeenCalled();
     expect(client.discordPublicPriceReportDelivery.upsert).not.toHaveBeenCalled();
   });
+
+  it("disables a setting after 50001 is confirmed as Unknown Guild and does not retry it", async () => {
+    const client = createDiscordBotClient({
+      snapshots: publicReportPriceChangeSnapshots("public-run-removed"),
+      crawlRuns: [crawlRun({ id: "public-run-removed" })],
+      publicPriceReportSettings: [publicPriceReportSetting({ id: "setting-removed" })],
+    });
+    const sendChannelMessages = vi.fn(async () => ({
+      status: "failed" as const,
+      messageCount: 1,
+      sentMessageCount: 0,
+      errorCategory: "PERMISSIONS" as const,
+      httpStatus: 403,
+      providerErrorCode: 50001,
+    }));
+    const probeAccess = vi.fn(async () => ({
+      status: "unavailable" as const,
+      resource: "guild" as const,
+      result: {
+        status: "failed" as const,
+        errorCategory: "PROVIDER" as const,
+        httpStatus: 404,
+        providerErrorCode: 10004,
+      },
+    }));
+    const onAccessDisabled = vi.fn();
+    const input = {
+      client,
+      options: createDiscordBotOptions(),
+      now: new Date("2026-07-23T10:00:00.000Z"),
+      sendChannelMessages,
+      probeAccess,
+      onAccessDisabled,
+    };
+
+    await sendPendingPublicPriceReports(input);
+    await sendPendingPublicPriceReports(input);
+
+    expect(sendChannelMessages).toHaveBeenCalledTimes(1);
+    expect(probeAccess).toHaveBeenCalledTimes(1);
+    expect(onAccessDisabled).toHaveBeenCalledTimes(1);
+    expect(onAccessDisabled).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accessStatus: "DISABLED_BOT_REMOVED",
+        providerErrorCode: 10004,
+      }),
+    );
+    expect(client.discordPublicPriceReportSetting.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: "setting-removed",
+        enabled: true,
+        accessStatus: "ACTIVE",
+      },
+      data: expect.objectContaining({
+        enabled: false,
+        accessStatus: "DISABLED_BOT_REMOVED",
+      }),
+    });
+  });
+
+  it("aborts remaining Guilds after a global authentication failure", async () => {
+    const client = createDiscordBotClient({
+      snapshots: publicReportPriceChangeSnapshots("public-run-auth"),
+      crawlRuns: [crawlRun({ id: "public-run-auth" })],
+      publicPriceReportSettings: [
+        publicPriceReportSetting({
+          id: "setting-a",
+          discordGuildId: "guild-a",
+          channelId: "channel-a",
+        }),
+        publicPriceReportSetting({
+          id: "setting-b",
+          discordGuildId: "guild-b",
+          channelId: "channel-b",
+        }),
+      ],
+    });
+    const sendChannelMessages = vi.fn(async () => ({
+      status: "failed" as const,
+      messageCount: 1,
+      sentMessageCount: 0,
+      errorCategory: "PROVIDER" as const,
+      httpStatus: 401,
+      providerErrorCode: 50014,
+    }));
+
+    await expect(
+      sendPendingPublicPriceReports({
+        client,
+        options: createDiscordBotOptions(),
+        now: new Date("2026-07-23T10:00:00.000Z"),
+        sendChannelMessages,
+        ...ACTIVE_ACCESS_DEPENDENCIES,
+      }),
+    ).resolves.toMatchObject({
+      settingCount: 2,
+      processedCount: 1,
+      failedCount: 1,
+      globalAuthFailed: true,
+    });
+
+    expect(sendChannelMessages).toHaveBeenCalledTimes(1);
+    expect(client.discordPublicPriceReportSetting.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("continues delivering other Guilds after one Channel is permanently gone", async () => {
+    const client = createDiscordBotClient({
+      snapshots: publicReportPriceChangeSnapshots("public-run-multi"),
+      crawlRuns: [crawlRun({ id: "public-run-multi" })],
+      publicPriceReportSettings: [
+        publicPriceReportSetting({
+          id: "setting-a",
+          discordGuildId: "guild-a",
+          channelId: "channel-a",
+        }),
+        publicPriceReportSetting({
+          id: "setting-b",
+          discordGuildId: "guild-b",
+          channelId: "channel-b",
+        }),
+      ],
+    });
+    const sendChannelMessages = vi
+      .fn()
+      .mockResolvedValueOnce({
+        status: "failed",
+        messageCount: 1,
+        sentMessageCount: 0,
+        errorCategory: "PROVIDER",
+        httpStatus: 404,
+        providerErrorCode: 10003,
+      })
+      .mockResolvedValueOnce({
+        status: "sent",
+        messageCount: 1,
+        httpStatuses: [200],
+      });
+
+    await expect(
+      sendPendingPublicPriceReports({
+        client,
+        options: createDiscordBotOptions(),
+        now: new Date("2026-07-23T10:00:00.000Z"),
+        sendChannelMessages,
+        ...ACTIVE_ACCESS_DEPENDENCIES,
+      }),
+    ).resolves.toMatchObject({
+      settingCount: 2,
+      processedCount: 2,
+      failedCount: 1,
+      sentCount: 1,
+    });
+
+    expect(sendChannelMessages).toHaveBeenNthCalledWith(1, "channel-a", expect.any(Array));
+    expect(sendChannelMessages).toHaveBeenNthCalledWith(2, "channel-b", expect.any(Array));
+  });
 });
+
+const ACTIVE_ACCESS_DEPENDENCIES = {
+  probeAccess: async () => ({ status: "accessible" as const }),
+  onAccessDisabled: vi.fn(),
+};
+
+function publicReportPriceChangeSnapshots(crawlRunId: string) {
+  return [
+    snapshot({
+      id: `${crawlRunId}-old`,
+      productId: `${crawlRunId}-product`,
+      productName: "公開報告測試商品",
+      crawlRunId: "old-run",
+      price: 12_000,
+      capturedAt: "2026-07-22T03:00:00.000Z",
+    }),
+    snapshot({
+      id: `${crawlRunId}-new`,
+      productId: `${crawlRunId}-product`,
+      productName: "公開報告測試商品",
+      crawlRunId,
+      price: 10_000,
+      capturedAt: "2026-07-23T03:00:00.000Z",
+    }),
+  ];
+}

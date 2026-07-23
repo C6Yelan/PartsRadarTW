@@ -18,6 +18,7 @@ export function createSmokeClient({
   discordDeliveryRecords,
   publicDiscordDeliveryCounts = {},
   publicDiscordDeliveryRecords,
+  publicDiscordReportSettings,
   historicalImageProducts = [],
   activeProductCount = 1000,
 }: {
@@ -49,6 +50,13 @@ export function createSmokeClient({
       updatedAt: Date;
     } & Partial<DiscordDeliveryErrorMetadata>
   >;
+  publicDiscordReportSettings?: Array<{
+    discordGuildId: string;
+    channelId: string;
+    notificationCursorAt: Date | null;
+    enabled: boolean;
+    accessStatus: "ACTIVE" | "PAUSED_PERMISSION" | "DISABLED_CHANNEL_GONE" | "DISABLED_BOT_REMOVED";
+  }>;
   historicalImageProducts?: Array<{ id: string }>;
   activeProductCount?: number;
 }) {
@@ -109,31 +117,32 @@ export function createSmokeClient({
 
         return 0;
       },
-      findMany: vi.fn(async () =>
-        discordDeliveryRecords ?? [
-          ...Array.from({ length: discordDeliveryCounts.failed ?? 0 }, (_, index) => ({
-            id: `discord-failed-${index + 1}`,
-            discordUserId: `discord-user-failed-${index + 1}`,
-            kind: "SCHEDULED_PRICE_REPORT" as const,
-            status: "FAILED" as const,
-            targetPriceWatchId: null,
-            errorCategory: "TRANSPORT" as const,
-            httpStatus: null,
-            providerErrorCode: null,
-            createdAt: new Date(`2026-06-02T11:${String(50 - index).padStart(2, "0")}:00.000Z`),
-          })),
-          ...Array.from({ length: discordDeliveryCounts.rateLimited ?? 0 }, (_, index) => ({
-            id: `discord-rate-limited-${index + 1}`,
-            discordUserId: `discord-user-rate-limited-${index + 1}`,
-            kind: "SCHEDULED_PRICE_REPORT" as const,
-            status: "RATE_LIMITED" as const,
-            targetPriceWatchId: null,
-            errorCategory: "RATE_LIMITED" as const,
-            httpStatus: 429,
-            providerErrorCode: null,
-            createdAt: new Date(`2026-06-02T11:${String(40 - index).padStart(2, "0")}:00.000Z`),
-          })),
-        ],
+      findMany: vi.fn(
+        async () =>
+          discordDeliveryRecords ?? [
+            ...Array.from({ length: discordDeliveryCounts.failed ?? 0 }, (_, index) => ({
+              id: `discord-failed-${index + 1}`,
+              discordUserId: `discord-user-failed-${index + 1}`,
+              kind: "SCHEDULED_PRICE_REPORT" as const,
+              status: "FAILED" as const,
+              targetPriceWatchId: null,
+              errorCategory: "TRANSPORT" as const,
+              httpStatus: null,
+              providerErrorCode: null,
+              createdAt: new Date(`2026-06-02T11:${String(50 - index).padStart(2, "0")}:00.000Z`),
+            })),
+            ...Array.from({ length: discordDeliveryCounts.rateLimited ?? 0 }, (_, index) => ({
+              id: `discord-rate-limited-${index + 1}`,
+              discordUserId: `discord-user-rate-limited-${index + 1}`,
+              kind: "SCHEDULED_PRICE_REPORT" as const,
+              status: "RATE_LIMITED" as const,
+              targetPriceWatchId: null,
+              errorCategory: "RATE_LIMITED" as const,
+              httpStatus: 429,
+              providerErrorCode: null,
+              createdAt: new Date(`2026-06-02T11:${String(40 - index).padStart(2, "0")}:00.000Z`),
+            })),
+          ],
       ),
     },
     discordPublicPriceReportDelivery: {
@@ -156,6 +165,34 @@ export function createSmokeClient({
             })),
           ],
       ),
+    },
+    discordPublicPriceReportSetting: {
+      findMany: vi.fn(async () => {
+        if (publicDiscordReportSettings) {
+          return publicDiscordReportSettings.filter(
+            (setting) => setting.enabled && setting.accessStatus === "ACTIVE",
+          );
+        }
+
+        const channels = new Set(
+          publicDiscordDeliveryRecords?.map((record) => record.channelId) ?? [
+            ...Array.from(
+              { length: publicDiscordDeliveryCounts.failed ?? 0 },
+              (_, index) => `discord-channel-failed-${index + 1}`,
+            ),
+            ...Array.from(
+              { length: publicDiscordDeliveryCounts.rateLimited ?? 0 },
+              (_, index) => `discord-channel-rate-limited-${index + 1}`,
+            ),
+          ],
+        );
+
+        return [...channels].map((channelId, index) => ({
+          discordGuildId: `discord-guild-${index + 1}`,
+          channelId,
+          notificationCursorAt: null,
+        }));
+      }),
     },
   } as unknown as Parameters<typeof runProductionSmoke>[0];
 }

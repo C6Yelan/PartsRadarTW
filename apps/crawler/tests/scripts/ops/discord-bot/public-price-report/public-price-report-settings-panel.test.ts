@@ -228,6 +228,53 @@ describe("public price report settings panel", () => {
     });
   });
 
+  it("shows an auto-disabled setting without promising another retry", async () => {
+    const client = createDiscordBotClient({
+      publicPriceReportDeliveries: [
+        publicPriceReportDelivery({
+          id: "delivery-disabled",
+          crawlRunId: "crawl-run-disabled",
+          channelId: "999988887777666655",
+          status: "FAILED",
+          providerErrorCode: 10004,
+          updatedAt: new Date("2026-06-07T02:00:00.000Z"),
+        }),
+      ],
+      publicPriceReportSettings: [
+        publicPriceReportSetting({
+          id: "public-setting-disabled",
+          enabled: false,
+          accessStatus: "DISABLED_BOT_REMOVED",
+          disabledAt: new Date("2026-06-07T02:00:00.000Z"),
+          lastDiscordErrorCode: 10004,
+        }),
+      ],
+    });
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ id: "message" }), { status: 200 }),
+    );
+
+    await handleDiscordInteraction({
+      client,
+      options: createDiscordBotOptions(),
+      cooldowns: new CommandCooldowns(60),
+      fetchImpl: fetchMock as typeof fetch,
+      interaction: createPublicReportInteraction({ subcommandName: "settings" }),
+    });
+
+    const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
+    const embed = readResponseEmbed(body.data);
+
+    expect(readEmbedFieldValue(embed, "狀態")).toBe("已停用（Bot 已離開伺服器）");
+    expect(readEmbedFieldValue(embed, "最近一次發送")).toBe(
+      "06/07 10:00，發送失敗，公開報告已停止。",
+    );
+    expect(readEmbedFieldValue(embed, "發送說明")).toBe(
+      "公開報告已停止；重新啟用或設定頻道後，會從下一個爬蟲輪次開始。",
+    );
+    expect(JSON.stringify(body.data.components)).toContain("public-report:enable");
+  });
+
   it("describes a rate-limited public delivery without operational terms", async () => {
     const client = createDiscordBotClient({
       publicPriceReportDeliveries: [
@@ -285,12 +332,22 @@ describe("public price report settings panel", () => {
         discordGuildId: "guild-1",
         channelId: "999988887777666655",
         enabled: true,
+        accessStatus: "ACTIVE",
+        disabledAt: null,
+        lastDiscordErrorCode: null,
+        consecutiveAccessFailures: 0,
+        retryNotBefore: null,
         createdByDiscordUserId: "111122223333444455",
         updatedByDiscordUserId: "111122223333444455",
       }),
       update: expect.objectContaining({
         channelId: "999988887777666655",
         enabled: true,
+        accessStatus: "ACTIVE",
+        disabledAt: null,
+        lastDiscordErrorCode: null,
+        consecutiveAccessFailures: 0,
+        retryNotBefore: null,
         updatedByDiscordUserId: "111122223333444455",
       }),
       select: expect.not.objectContaining({

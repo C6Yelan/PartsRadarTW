@@ -2,6 +2,7 @@
 // 解析 Discord bot CLI/env 設定，包含 token、API 端點、功能旗標與排程參數。
 
 import { parseBoundedIntegerOption } from "../../shared/script-utils";
+import { readDiscordWebhookUrl } from "../discord-webhook";
 import {
   DEFAULT_COMMAND_COOLDOWN_SECONDS,
   DEFAULT_DISCORD_API_BASE_URL,
@@ -57,6 +58,7 @@ export function parseDiscordBotOptions(
     ),
     apiBaseUrl,
     gatewayUrl,
+    adminWebhookUrl: readDiscordWebhookUrl(env, "DISCORD_ADMIN_WEBHOOK_URL"),
     registerCommandsOnStart: readBooleanEnv(env, "DISCORD_BOT_REGISTER_COMMANDS_ON_START", true),
     publicReportsEnabled: readBooleanEnv(env, "DISCORD_FEATURE_PUBLIC_REPORTS_ENABLED", true),
     personalReportsEnabled: readBooleanEnv(env, "DISCORD_FEATURE_PERSONAL_REPORTS_ENABLED", true),

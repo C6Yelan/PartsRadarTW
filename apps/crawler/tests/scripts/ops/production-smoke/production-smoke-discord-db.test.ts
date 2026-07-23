@@ -244,7 +244,7 @@ describe("production smoke Discord DB-backed checks", () => {
     expect(summary.checks.find((item) => item.name === "discord bot deliveries")).toMatchObject({
       status: "WARN",
       message:
-        "personalFailed=0 personalExpected403=0 personalRateLimited=0 publicFailed=1 publicRateLimited=0 in 24h",
+        "personalFailed=0 personalExpected403=0 personalRateLimited=0 publicFailed=1 publicRateLimited=0 in 24h details=[guild=...uild-1 channel=...nnel-1 providerCode=50013]",
     });
   });
 
@@ -358,6 +358,9 @@ describe("production smoke Discord DB-backed checks", () => {
     });
     expect(client.discordPublicPriceReportDelivery.findMany).toHaveBeenCalledWith({
       where: {
+        channelId: {
+          in: ["discord-channel-1"],
+        },
         updatedAt: {
           gte: new Date("2026-06-01T12:00:00.000Z"),
         },
@@ -366,10 +369,76 @@ describe("production smoke Discord DB-backed checks", () => {
         id: true,
         channelId: true,
         status: true,
+        providerErrorCode: true,
         updatedAt: true,
       },
       orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
       take: 500,
+    });
+  });
+
+  it("excludes an automatically disabled public report setting from ongoing WARN", async () => {
+    const { summary, client } = await runDiscordDeliverySmoke({
+      publicDiscordDeliveryRecords: [
+        {
+          id: "disabled-public-failure",
+          channelId: "discord-channel-disabled",
+          status: "FAILED",
+          errorCategory: "PERMISSIONS",
+          httpStatus: 403,
+          providerErrorCode: 10004,
+          createdAt: new Date("2026-06-02T11:30:00.000Z"),
+          updatedAt: new Date("2026-06-02T11:30:00.000Z"),
+        },
+      ],
+      publicDiscordReportSettings: [
+        {
+          discordGuildId: "discord-guild-disabled",
+          channelId: "discord-channel-disabled",
+          notificationCursorAt: null,
+          enabled: true,
+          accessStatus: "DISABLED_BOT_REMOVED",
+        },
+      ],
+    });
+
+    expect(summary.checks.find((item) => item.name === "discord bot deliveries")).toMatchObject({
+      status: "OK",
+      message:
+        "personalFailed=0 personalExpected403=0 personalRateLimited=0 publicFailed=0 publicRateLimited=0 in 24h",
+    });
+    expect(client.discordPublicPriceReportDelivery.findMany).not.toHaveBeenCalled();
+  });
+
+  it("ignores public delivery failures from before a reconfiguration cursor", async () => {
+    const { summary } = await runDiscordDeliverySmoke({
+      publicDiscordDeliveryRecords: [
+        {
+          id: "old-public-failure",
+          channelId: "discord-channel-reset",
+          status: "FAILED",
+          errorCategory: "PERMISSIONS",
+          httpStatus: 403,
+          providerErrorCode: 50013,
+          createdAt: new Date("2026-06-02T10:30:00.000Z"),
+          updatedAt: new Date("2026-06-02T10:30:00.000Z"),
+        },
+      ],
+      publicDiscordReportSettings: [
+        {
+          discordGuildId: "discord-guild-reset",
+          channelId: "discord-channel-reset",
+          notificationCursorAt: new Date("2026-06-02T11:00:00.000Z"),
+          enabled: true,
+          accessStatus: "ACTIVE",
+        },
+      ],
+    });
+
+    expect(summary.checks.find((item) => item.name === "discord bot deliveries")).toMatchObject({
+      status: "OK",
+      message:
+        "personalFailed=0 personalExpected403=0 personalRateLimited=0 publicFailed=0 publicRateLimited=0 in 24h",
     });
   });
 });
@@ -392,9 +461,7 @@ function personalDelivery(
   };
 }
 
-async function runDiscordDeliverySmoke(
-  overrides: Omit<SmokeClientOptions, "trueParseErrorCount">,
-) {
+async function runDiscordDeliverySmoke(overrides: Omit<SmokeClientOptions, "trueParseErrorCount">) {
   const { crawlerCwd, workspaceRoot } = await createWorkspace();
   const imageDir = join(workspaceRoot, "product-images");
   await mkdir(imageDir);

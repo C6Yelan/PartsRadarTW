@@ -112,6 +112,7 @@ export type ProductionSmokeClient = Pick<
   | "crawlRun"
   | "discordNotificationDelivery"
   | "discordPublicPriceReportDelivery"
+  | "discordPublicPriceReportSetting"
   | "parseError"
   | "product"
   | "rawSnapshot"

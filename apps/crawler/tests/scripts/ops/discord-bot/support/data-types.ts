@@ -115,6 +115,12 @@ export interface TestDiscordPublicPriceReportSetting {
   includePriceRises: boolean;
   includeNewProducts: boolean;
   enabled: boolean;
+  accessStatus: "ACTIVE" | "PAUSED_PERMISSION" | "DISABLED_CHANNEL_GONE" | "DISABLED_BOT_REMOVED";
+  disabledAt: Date | null;
+  lastDiscordErrorCode: number | null;
+  lastAccessCheckedAt: Date | null;
+  consecutiveAccessFailures: number;
+  retryNotBefore: Date | null;
   notificationCursorAt: Date | null;
   createdByDiscordUserId: string;
   updatedByDiscordUserId: string;

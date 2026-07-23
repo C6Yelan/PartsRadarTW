@@ -21,6 +21,16 @@ import type {
   DiscordBotOptions,
   DiscordMessageSendResult,
 } from "../types";
+import {
+  classifyPublicReportAccessFailure,
+  type DiscordPublicReportAccessProbeResult,
+  type PublicReportDisabledAccessStatus,
+} from "./access-policy";
+import {
+  deferPublicReportAccessRetry,
+  disablePublicReportAccess,
+  markPublicReportAccessSucceeded,
+} from "./access-state";
 import { type PublicPriceReportStatus, recordPublicPriceReportDelivery } from "./delivery";
 import { PUBLIC_PRICE_REPORT_SETTING_SELECT, type PublicPriceReportSetting } from "./settings";
 
@@ -32,6 +42,9 @@ export interface PublicPriceReportSummary {
   skippedCount: number;
   rateLimitedCount: number;
   failedCount: number;
+  retryNotBefore: Date | null;
+  globalRateLimited: boolean;
+  globalAuthFailed: boolean;
 }
 
 // 對所有啟用的公開報告設定處理待發 crawl run，並彙總本輪發送結果。
@@ -40,6 +53,9 @@ export async function sendPendingPublicPriceReports({
   options,
   now = new Date(),
   sendChannelMessages,
+  probeAccess,
+  unavailableGuildIds = new Set(),
+  onAccessDisabled,
 }: {
   client: DiscordBotClient;
   options: Pick<DiscordBotOptions, "publicBaseUrl">;
@@ -48,6 +64,15 @@ export async function sendPendingPublicPriceReports({
     channelId: string,
     messages: DiscordBotMessage[],
   ) => Promise<DiscordMessageSendResult>;
+  probeAccess: (
+    setting: PublicPriceReportSetting,
+  ) => Promise<DiscordPublicReportAccessProbeResult>;
+  unavailableGuildIds?: ReadonlySet<string>;
+  onAccessDisabled: (event: {
+    setting: PublicPriceReportSetting;
+    accessStatus: PublicReportDisabledAccessStatus;
+    providerErrorCode: number | null;
+  }) => void | Promise<void>;
 }): Promise<PublicPriceReportSummary> {
   const summary: PublicPriceReportSummary = {
     settingCount: 0,
@@ -56,11 +81,23 @@ export async function sendPendingPublicPriceReports({
     skippedCount: 0,
     rateLimitedCount: 0,
     failedCount: 0,
+    retryNotBefore: null,
+    globalRateLimited: false,
+    globalAuthFailed: false,
   };
 
   const settings = await client.discordPublicPriceReportSetting.findMany({
     where: {
       enabled: true,
+      accessStatus: "ACTIVE",
+      OR: [{ retryNotBefore: null }, { retryNotBefore: { lte: now } }],
+      ...(unavailableGuildIds.size > 0
+        ? {
+            discordGuildId: {
+              notIn: [...unavailableGuildIds],
+            },
+          }
+        : {}),
     },
     select: PUBLIC_PRICE_REPORT_SETTING_SELECT,
     orderBy: [{ updatedAt: "asc" }, { id: "asc" }],
@@ -76,6 +113,8 @@ export async function sendPendingPublicPriceReports({
       options,
       now,
       sendChannelMessages,
+      probeAccess,
+      onAccessDisabled,
     });
 
     summary.processedCount += settingSummary.processedCount;
@@ -83,6 +122,13 @@ export async function sendPendingPublicPriceReports({
     summary.skippedCount += settingSummary.skippedCount;
     summary.rateLimitedCount += settingSummary.rateLimitedCount;
     summary.failedCount += settingSummary.failedCount;
+    summary.retryNotBefore = earliestDate(summary.retryNotBefore, settingSummary.retryNotBefore);
+    summary.globalRateLimited ||= settingSummary.globalRateLimited;
+    summary.globalAuthFailed ||= settingSummary.globalAuthFailed;
+
+    if (summary.globalRateLimited || summary.globalAuthFailed) {
+      break;
+    }
   }
 
   return summary;
@@ -95,6 +141,8 @@ async function sendPendingPublicPriceReportsForSetting({
   options,
   now,
   sendChannelMessages,
+  probeAccess,
+  onAccessDisabled,
 }: {
   client: DiscordBotClient;
   setting: PublicPriceReportSetting;
@@ -104,13 +152,22 @@ async function sendPendingPublicPriceReportsForSetting({
     channelId: string,
     messages: DiscordBotMessage[],
   ) => Promise<DiscordMessageSendResult>;
+  probeAccess: (setting: PublicPriceReportSetting) => Promise<DiscordPublicReportAccessProbeResult>;
+  onAccessDisabled: (event: {
+    setting: PublicPriceReportSetting;
+    accessStatus: PublicReportDisabledAccessStatus;
+    providerErrorCode: number | null;
+  }) => void | Promise<void>;
 }): Promise<Omit<PublicPriceReportSummary, "settingCount">> {
-  const summary = {
+  const summary: Omit<PublicPriceReportSummary, "settingCount"> = {
     processedCount: 0,
     sentCount: 0,
     skippedCount: 0,
     rateLimitedCount: 0,
     failedCount: 0,
+    retryNotBefore: null,
+    globalRateLimited: false,
+    globalAuthFailed: false,
   };
   const cursorAt = setting.notificationCursorAt ?? setting.createdAt;
   const crawlRuns = await client.crawlRun.findMany({
@@ -160,16 +217,30 @@ async function sendPendingPublicPriceReportsForSetting({
       publicBaseUrl: options.publicBaseUrl,
       now,
       sendChannelMessages,
+      probeAccess,
+      onAccessDisabled,
     });
 
-    if (result === "SENT") {
+    if (result.status === "SENT") {
       summary.sentCount += 1;
-    } else if (result === "SKIPPED") {
+    } else if (result.status === "SKIPPED") {
       summary.skippedCount += 1;
-    } else if (result === "RATE_LIMITED") {
+    } else if (result.status === "RATE_LIMITED") {
       summary.rateLimitedCount += 1;
     } else {
       summary.failedCount += 1;
+    }
+
+    summary.retryNotBefore = earliestDate(summary.retryNotBefore, result.retryNotBefore);
+    summary.globalRateLimited ||= result.globalRateLimited;
+    summary.globalAuthFailed ||= result.globalAuthFailed;
+
+    if (
+      result.status === "FAILED" ||
+      result.status === "RATE_LIMITED" ||
+      result.globalAuthFailed
+    ) {
+      break;
     }
   }
 
@@ -184,6 +255,8 @@ async function sendPublicPriceReportForCrawlRun({
   publicBaseUrl,
   now,
   sendChannelMessages,
+  probeAccess,
+  onAccessDisabled,
 }: {
   client: DiscordBotClient;
   setting: PublicPriceReportSetting;
@@ -194,7 +267,18 @@ async function sendPublicPriceReportForCrawlRun({
     channelId: string,
     messages: DiscordBotMessage[],
   ) => Promise<DiscordMessageSendResult>;
-}): Promise<PublicPriceReportStatus> {
+  probeAccess: (setting: PublicPriceReportSetting) => Promise<DiscordPublicReportAccessProbeResult>;
+  onAccessDisabled: (event: {
+    setting: PublicPriceReportSetting;
+    accessStatus: PublicReportDisabledAccessStatus;
+    providerErrorCode: number | null;
+  }) => void | Promise<void>;
+}): Promise<{
+  status: PublicPriceReportStatus;
+  retryNotBefore: Date | null;
+  globalRateLimited: boolean;
+  globalAuthFailed: boolean;
+}> {
   const readResult = await readCrawlRunPriceChangeSummary(client, crawlRunId);
   const filters = toPriceReportFilters(setting);
   const changes = filterPriceChangesForReport(readResult.changes, filters);
@@ -213,7 +297,12 @@ async function sendPublicPriceReportForCrawlRun({
       ...NO_DISCORD_DELIVERY_ERROR,
     });
 
-    return "SKIPPED";
+    return {
+      status: "SKIPPED",
+      retryNotBefore: null,
+      globalRateLimited: false,
+      globalAuthFailed: false,
+    };
   }
 
   const messages = createPublicPriceReportMessages(
@@ -237,8 +326,14 @@ async function sendPublicPriceReportForCrawlRun({
       deliveredAt: now,
       ...toDiscordDeliveryErrorFields(result),
     });
+    await markPublicReportAccessSucceeded({ client, settingId: setting.id, now });
 
-    return "SENT";
+    return {
+      status: "SENT",
+      retryNotBefore: null,
+      globalRateLimited: false,
+      globalAuthFailed: false,
+    };
   }
 
   if (result.status === "rate_limited") {
@@ -253,7 +348,26 @@ async function sendPublicPriceReportForCrawlRun({
       ...toDiscordDeliveryErrorFields(result),
     });
 
-    return "RATE_LIMITED";
+    const decision = await classifyPublicReportAccessFailure({
+      result,
+      settingFailureCount: setting.consecutiveAccessFailures,
+      now,
+      probeAccess: () => probeAccess(setting),
+    });
+    await deferPublicReportAccessRetry({
+      client,
+      settingId: setting.id,
+      providerErrorCode: decision.providerErrorCode,
+      retryNotBefore: decision.kind === "retry" ? decision.retryNotBefore : now,
+      now,
+    });
+
+    return {
+      status: "RATE_LIMITED",
+      retryNotBefore: decision.kind === "retry" ? decision.retryNotBefore : now,
+      globalRateLimited: result.global,
+      globalAuthFailed: false,
+    };
   }
 
   await recordPublicPriceReportDelivery({
@@ -267,5 +381,67 @@ async function sendPublicPriceReportForCrawlRun({
     ...toDiscordDeliveryErrorFields(result),
   });
 
-  return "FAILED";
+  const decision = await classifyPublicReportAccessFailure({
+    result,
+    settingFailureCount: setting.consecutiveAccessFailures,
+    now,
+    probeAccess: () => probeAccess(setting),
+  });
+
+  if (decision.kind === "abort") {
+    return {
+      status: "FAILED",
+      retryNotBefore: null,
+      globalRateLimited: false,
+      globalAuthFailed: true,
+    };
+  }
+
+  if (decision.kind === "retry") {
+    await deferPublicReportAccessRetry({
+      client,
+      settingId: setting.id,
+      providerErrorCode: decision.providerErrorCode,
+      retryNotBefore: decision.retryNotBefore,
+      now,
+    });
+
+    return {
+      status: "FAILED",
+      retryNotBefore: decision.retryNotBefore,
+      globalRateLimited: false,
+      globalAuthFailed: false,
+    };
+  }
+
+  const transitionCount = await disablePublicReportAccess({
+    client,
+    where: { settingId: setting.id },
+    accessStatus: decision.accessStatus,
+    providerErrorCode: decision.providerErrorCode,
+    now,
+  });
+
+  if (transitionCount > 0) {
+    await onAccessDisabled({
+      setting,
+      accessStatus: decision.accessStatus,
+      providerErrorCode: decision.providerErrorCode,
+    });
+  }
+
+  return {
+    status: "FAILED",
+    retryNotBefore: null,
+    globalRateLimited: false,
+    globalAuthFailed: false,
+  };
+}
+
+function earliestDate(current: Date | null, candidate: Date | null): Date | null {
+  if (!candidate) {
+    return current;
+  }
+
+  return !current || candidate < current ? candidate : current;
 }

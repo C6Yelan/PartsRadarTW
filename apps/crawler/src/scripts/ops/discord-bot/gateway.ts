@@ -14,6 +14,12 @@ import {
 } from "./constants";
 import type { CommandCooldowns } from "./cooldowns";
 import { handleDiscordInteraction } from "./interactions";
+import type { PublicReportDisabledAccessStatus } from "./public-price-report/access-policy";
+import { disablePublicReportAccess } from "./public-price-report/access-state";
+import {
+  PUBLIC_PRICE_REPORT_SETTING_SELECT,
+  type PublicPriceReportSetting,
+} from "./public-price-report/settings";
 import type { DiscordBotSchedulerStatusReader } from "./scheduler-status";
 import type {
   DiscordBotClient,
@@ -36,6 +42,8 @@ export async function runGatewaySession({
   WebSocketCtor,
   logMessage,
   schedulerStatus,
+  unavailableGuildIds,
+  onPublicReportAccessDisabled,
 }: {
   client: DiscordBotClient;
   options: DiscordBotOptions;
@@ -45,6 +53,12 @@ export async function runGatewaySession({
   WebSocketCtor: MinimalWebSocketConstructor;
   logMessage: (message: string) => void;
   schedulerStatus?: DiscordBotSchedulerStatusReader;
+  unavailableGuildIds: Set<string>;
+  onPublicReportAccessDisabled: (event: {
+    setting: PublicPriceReportSetting;
+    accessStatus: PublicReportDisabledAccessStatus;
+    providerErrorCode: number | null;
+  }) => void | Promise<void>;
 }): Promise<void> {
   const socket = new WebSocketCtor(options.gatewayUrl);
   let sequence: number | null = null;
@@ -108,7 +122,25 @@ export async function runGatewaySession({
       }
 
       if (payload.t === "READY") {
+        reconcileDiscordGuildAvailability(payload.d, unavailableGuildIds);
         logMessage("Discord bot ready.");
+        return;
+      }
+
+      if (
+        payload.t === "GUILD_CREATE" ||
+        payload.t === "GUILD_DELETE" ||
+        payload.t === "CHANNEL_DELETE"
+      ) {
+        void handleDiscordGuildLifecycleEvent({
+          client,
+          eventType: payload.t,
+          data: payload.d,
+          unavailableGuildIds,
+          onPublicReportAccessDisabled,
+        }).catch((error) => {
+          logMessage(`Discord guild lifecycle handling failed: ${toSafeCliErrorMessage(error)}`);
+        });
         return;
       }
 
@@ -128,13 +160,13 @@ export async function runGatewaySession({
   });
 }
 
-// 向 Discord Gateway identify，目前不要求 gateway intents，只接收 interaction dispatch。
+// GUILDS 是標準 intent，用於接收 Guild/Channel lifecycle 事件以停止失效公開報告。
 function sendIdentifyPayload(socket: MinimalWebSocket, token: string): void {
   sendGatewayPayload(socket, {
     op: GATEWAY_OP_IDENTIFY,
     d: {
       token,
-      intents: 0,
+      intents: 1 << 0,
       properties: {
         os: process.platform,
         browser: "PartsRadarTW",
@@ -142,6 +174,110 @@ function sendIdentifyPayload(socket: MinimalWebSocket, token: string): void {
       },
     },
   });
+}
+
+export async function handleDiscordGuildLifecycleEvent({
+  client,
+  eventType,
+  data,
+  unavailableGuildIds,
+  onPublicReportAccessDisabled,
+  now = new Date(),
+}: {
+  client: DiscordBotClient;
+  eventType: "GUILD_CREATE" | "GUILD_DELETE" | "CHANNEL_DELETE";
+  data: unknown;
+  unavailableGuildIds: Set<string>;
+  onPublicReportAccessDisabled: (event: {
+    setting: PublicPriceReportSetting;
+    accessStatus: PublicReportDisabledAccessStatus;
+    providerErrorCode: number | null;
+  }) => void | Promise<void>;
+  now?: Date;
+}): Promise<void> {
+  const payload = readGatewayResourcePayload(data);
+
+  if (!payload) {
+    return;
+  }
+
+  if (eventType === "GUILD_CREATE") {
+    if (payload.unavailable === true) {
+      unavailableGuildIds.add(payload.id);
+    } else {
+      unavailableGuildIds.delete(payload.id);
+    }
+    return;
+  }
+
+  if (eventType === "GUILD_DELETE" && payload.unavailable === true) {
+    unavailableGuildIds.add(payload.id);
+    return;
+  }
+
+  const where =
+    eventType === "GUILD_DELETE" ? { discordGuildId: payload.id } : { channelId: payload.id };
+  if (eventType === "GUILD_DELETE") {
+    unavailableGuildIds.delete(payload.id);
+  }
+  const settings = await client.discordPublicPriceReportSetting.findMany({
+    where: {
+      ...where,
+      enabled: true,
+      accessStatus: "ACTIVE",
+    },
+    select: PUBLIC_PRICE_REPORT_SETTING_SELECT,
+  });
+  const accessStatus =
+    eventType === "GUILD_DELETE" ? "DISABLED_BOT_REMOVED" : "DISABLED_CHANNEL_GONE";
+
+  for (const setting of settings) {
+    const transitionCount = await disablePublicReportAccess({
+      client,
+      where: { settingId: setting.id },
+      accessStatus,
+      providerErrorCode: null,
+      now,
+    });
+
+    if (transitionCount > 0) {
+      await onPublicReportAccessDisabled({
+        setting,
+        accessStatus,
+        providerErrorCode: null,
+      });
+    }
+  }
+}
+
+export function reconcileDiscordGuildAvailability(
+  data: unknown,
+  unavailableGuildIds: Set<string>,
+): void {
+  if (!data || typeof data !== "object" || !("guilds" in data) || !Array.isArray(data.guilds)) {
+    return;
+  }
+
+  unavailableGuildIds.clear();
+  for (const guild of data.guilds) {
+    const payload = readGatewayResourcePayload(guild);
+    if (payload?.unavailable === true) {
+      unavailableGuildIds.add(payload.id);
+    }
+  }
+}
+
+function readGatewayResourcePayload(data: unknown): { id: string; unavailable?: boolean } | null {
+  if (!data || typeof data !== "object" || !("id" in data) || typeof data.id !== "string") {
+    return null;
+  }
+
+  return {
+    id: data.id,
+    ...("unavailable" in data && typeof data.unavailable === "boolean"
+      ? { unavailable: data.unavailable }
+      : {}),
+  };
 }
 
 // 只在 WebSocket 開啟時送出 payload，避免 shutdown 或 reconnect 期間丟出 send 例外。

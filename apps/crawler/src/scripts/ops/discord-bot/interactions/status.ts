@@ -121,7 +121,9 @@ export async function createStatusMessage({
       readCrawlerStatus(client),
       client.discordTargetPriceWatch.count({ where: { enabled: true } }),
       readPersonalReportDatabaseStatus(client, now),
-      client.discordPublicPriceReportSetting.count({ where: { enabled: true } }),
+      client.discordPublicPriceReportSetting.count({
+        where: { enabled: true, accessStatus: "ACTIVE" },
+      }),
     ],
   );
   const crawler = crawlerResult.status === "fulfilled" ? crawlerResult.value : null;

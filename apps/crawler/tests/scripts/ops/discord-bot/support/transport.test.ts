@@ -4,6 +4,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   formatDiscordRestFailure,
+  probeDiscordPublicReportAccess,
   sendDiscordChannelMessages,
   sendDiscordDirectMessages,
   sendDiscordInteractionMessages,
@@ -305,6 +306,67 @@ describe("sendDiscordChannelMessages", () => {
       providerErrorCode: null,
     });
     expect(streamCancelled).toBe(true);
+  });
+});
+
+describe("probeDiscordPublicReportAccess", () => {
+  it("stops after Unknown Guild without probing the Channel", async () => {
+    const fetchMock = vi.fn<typeof fetch>(
+      async () =>
+        new Response(JSON.stringify({ code: 10004, message: "Unknown Guild" }), { status: 404 }),
+    );
+
+    await expect(
+      probeDiscordPublicReportAccess({
+        token: TOKEN,
+        apiBaseUrl: API_BASE_URL,
+        guildId: "guild-1",
+        channelId: "channel-1",
+        fetchImpl: fetchMock,
+      }),
+    ).resolves.toEqual({
+      status: "unavailable",
+      resource: "guild",
+      result: {
+        status: "failed",
+        httpStatus: 404,
+        errorCategory: "PROVIDER",
+        providerErrorCode: 10004,
+        retryAfterMs: undefined,
+      },
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe(`${API_BASE_URL}/guilds/guild-1`);
+  });
+
+  it("probes the Channel after the Guild is readable", async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: "guild-1" }), { status: 200 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ code: 10003, message: "Unknown Channel" }), {
+          status: 404,
+        }),
+      );
+
+    await expect(
+      probeDiscordPublicReportAccess({
+        token: TOKEN,
+        apiBaseUrl: API_BASE_URL,
+        guildId: "guild-1",
+        channelId: "channel-1",
+        fetchImpl: fetchMock,
+      }),
+    ).resolves.toMatchObject({
+      status: "unavailable",
+      resource: "channel",
+      result: {
+        status: "failed",
+        providerErrorCode: 10003,
+      },
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(String(fetchMock.mock.calls[1]?.[0])).toBe(`${API_BASE_URL}/channels/channel-1`);
   });
 });
 

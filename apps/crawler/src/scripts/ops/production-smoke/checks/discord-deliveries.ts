@@ -15,7 +15,7 @@ export async function checkDiscordBotDeliveries(
   now: Date,
 ): Promise<SmokeCheckResult> {
   const since = new Date(now.getTime() - options.recentWindowHours * MILLISECONDS_PER_HOUR);
-  const [personalRecords, publicRecords] = await Promise.all([
+  const [personalRecords, activePublicSettings] = await Promise.all([
     client.discordNotificationDelivery.findMany({
       where: {
         createdAt: {
@@ -36,22 +36,48 @@ export async function checkDiscordBotDeliveries(
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take: DISCORD_DELIVERY_HEALTH_SCAN_LIMIT,
     }),
-    client.discordPublicPriceReportDelivery.findMany({
+    client.discordPublicPriceReportSetting.findMany({
       where: {
-        updatedAt: {
-          gte: since,
-        },
+        enabled: true,
+        accessStatus: "ACTIVE",
       },
       select: {
-        id: true,
+        discordGuildId: true,
         channelId: true,
-        status: true,
-        updatedAt: true,
+        notificationCursorAt: true,
       },
-      orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
-      take: DISCORD_DELIVERY_HEALTH_SCAN_LIMIT,
     }),
   ]);
+  const activeSettingByChannel = new Map(
+    activePublicSettings.map((setting) => [setting.channelId, setting]),
+  );
+  const publicRecords =
+    activeSettingByChannel.size === 0
+      ? []
+      : (
+          await client.discordPublicPriceReportDelivery.findMany({
+            where: {
+              channelId: {
+                in: [...activeSettingByChannel.keys()],
+              },
+              updatedAt: {
+                gte: since,
+              },
+            },
+            select: {
+              id: true,
+              channelId: true,
+              status: true,
+              providerErrorCode: true,
+              updatedAt: true,
+            },
+            orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+            take: DISCORD_DELIVERY_HEALTH_SCAN_LIMIT,
+          })
+        ).filter((record) => {
+          const cursorAt = activeSettingByChannel.get(record.channelId)?.notificationCursorAt;
+          return !cursorAt || record.updatedAt >= cursorAt;
+        });
   const personal = summarizeLatestDiscordDeliveryStatuses(
     personalRecords,
     toPersonalDiscordDeliveryStreamKey,
@@ -69,7 +95,8 @@ export async function checkDiscordBotDeliveries(
     `personalFailed=${personal.failed} personalExpected403=${personal.expected403} ` +
     `personalRateLimited=${personal.rateLimited} ` +
     `publicFailed=${publicReports.failed} publicRateLimited=${publicReports.rateLimited} ` +
-    `in ${options.recentWindowHours}h`;
+    `in ${options.recentWindowHours}h` +
+    formatPublicFailureDetails(publicRecords, activeSettingByChannel);
 
   return issueCount > 0
     ? warn("discord bot deliveries", message)
@@ -93,6 +120,7 @@ interface PersonalDiscordDeliveryHealthRecord extends DiscordDeliveryHealthRecor
 
 interface PublicDiscordDeliveryHealthRecord extends DiscordDeliveryHealthRecord {
   channelId: string;
+  providerErrorCode: number | null;
   updatedAt: Date;
 }
 
@@ -156,4 +184,44 @@ function toPersonalDiscordDeliveryStreamKey(record: PersonalDiscordDeliveryHealt
   }
 
   return `${record.kind}:${record.discordUserId}`;
+}
+
+function formatPublicFailureDetails(
+  records: PublicDiscordDeliveryHealthRecord[],
+  activeSettingByChannel: Map<
+    string,
+    { discordGuildId: string; channelId: string; notificationCursorAt: Date | null }
+  >,
+): string {
+  const latestIssues = new Map<string, PublicDiscordDeliveryHealthRecord>();
+  const seenChannels = new Set<string>();
+
+  for (const record of records) {
+    if (seenChannels.has(record.channelId)) {
+      continue;
+    }
+    seenChannels.add(record.channelId);
+
+    if (
+      (record.status === "FAILED" || record.status === "RATE_LIMITED") &&
+      typeof record.providerErrorCode === "number"
+    ) {
+      latestIssues.set(record.channelId, record);
+    }
+  }
+
+  const details = [...latestIssues.values()].slice(0, 3).map((record) => {
+    const setting = activeSettingByChannel.get(record.channelId);
+    return (
+      `guild=${safeDiscordIdSuffix(setting?.discordGuildId ?? "unknown")} ` +
+      `channel=${safeDiscordIdSuffix(record.channelId)} ` +
+      `providerCode=${record.providerErrorCode ?? "none"}`
+    );
+  });
+
+  return details.length > 0 ? ` details=[${details.join("; ")}]` : "";
+}
+
+function safeDiscordIdSuffix(id: string): string {
+  return `...${id.slice(-6)}`;
 }
