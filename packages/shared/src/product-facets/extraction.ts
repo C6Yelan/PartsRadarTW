@@ -523,7 +523,7 @@ const SSD_CAPACITY_BUCKETS: Readonly<Record<string, string>> = {
 
 function extractStorageCapacity(text: string, add: AddTag): string | null {
   const terabyteMatch = text.match(
-    /(?:^|[^\d])(1|2|3|4|5|6|8|10|12|14|16|18|20|22|24|26|28|30)\s*T(?:B)?\b/,
+    /(?:^|[^\d])(1|2|3|4|5|6|8|10|12|14|16|18|20|22|24|26|28|30|32)\s*T(?:B)?\b/,
   );
   if (terabyteMatch?.[1]) {
     const capacityGb = String(Number(terabyteMatch[1]) * 1000);

@@ -430,15 +430,17 @@ describe("product facets", () => {
       "4000",
       "8000",
     ]);
-    expect(ssdCapacities).not.toEqual(expect.arrayContaining(["32", "64", "3000", "10000"]));
+    expect(ssdCapacities).not.toEqual(
+      expect.arrayContaining(["32", "64", "3000", "10000", "32000"]),
+    );
     expect(hddCapacities).not.toEqual(
       expect.arrayContaining(["32", "64", "128", "256", "480", "512"]),
     );
-    expect(hddCapacities).toEqual(expect.arrayContaining(["500", "5000", "30000"]));
+    expect(hddCapacities).toEqual(expect.arrayContaining(["500", "5000", "30000", "32000"]));
     expect(externalCapacities).toEqual(
-      expect.arrayContaining(["480", "3000", "10000", "26000", "28000", "30000"]),
+      expect.arrayContaining(["480", "3000", "10000", "26000", "28000", "30000", "32000"]),
     );
-    expect(externalCapacities).toHaveLength(25);
+    expect(externalCapacities).toHaveLength(26);
   });
 
   it("publishes SSD buckets instead of exact capacities and can hide empty buckets", () => {

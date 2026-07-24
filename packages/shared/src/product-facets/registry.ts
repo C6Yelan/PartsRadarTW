@@ -47,6 +47,7 @@ const CAPACITY_OPTIONS = [
   option("26000", "26 TB", "10 TB 以上"),
   option("28000", "28 TB", "10 TB 以上"),
   option("30000", "30 TB", "10 TB 以上"),
+  option("32000", "32 TB", "10 TB 以上"),
 ] as const;
 
 const SSD_CAPACITY_OPTIONS = [
