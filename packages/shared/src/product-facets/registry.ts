@@ -88,10 +88,13 @@ const SOCKET_OPTIONS = [
   option("str5", "sTR5 / Threadripper"),
 ] as const;
 
+const CPU_SOCKET_OPTIONS = [option("lga4677", "LGA 4677"), ...SOCKET_OPTIONS] as const;
+
 const PRODUCT_FACETS_BY_IGRP: Readonly<Record<number, readonly ProductFacetDefinition[]>> = {
   4: [
-    facet("socket", "腳位", SOCKET_OPTIONS),
+    facet("socket", "腳位", CPU_SOCKET_OPTIONS),
     facet("cpu_family", "產品系列", [
+      option("xeon-w", "Intel Xeon W"),
       option("core-ultra", "Intel Core Ultra"),
       option("core-i3", "Intel Core i3"),
       option("core-i5", "Intel Core i5"),

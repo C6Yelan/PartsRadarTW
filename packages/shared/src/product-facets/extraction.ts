@@ -69,6 +69,13 @@ export function extractProductFilterTags(igrp: number, productName: string): str
 }
 
 function extractCpuTags(text: string, add: AddTag): void {
+  if (/\bXEON\s+W(?:5-2465X|7-3465X)\b/.test(text)) {
+    add("socket", "lga4677");
+    add("cpu_family", "xeon-w");
+    add("integrated_graphics", "no");
+    return;
+  }
+
   if (/THREADRIPPER|\bRYZEN\s+TR(?:\s+PRO)?\s+99\d{2}(?:WX|X)\b/.test(text)) {
     add("socket", "str5");
     add("cpu_family", "threadripper");
