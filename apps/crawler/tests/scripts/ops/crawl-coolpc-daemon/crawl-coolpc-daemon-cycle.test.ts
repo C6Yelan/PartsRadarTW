@@ -272,6 +272,47 @@ describe("CoolPC scheduled crawler daemon cycle", () => {
     expect(calls).toEqual(["release-lock", "release-mutation-lock"]);
   });
 
+  it("requests an early filter refresh when a category falls back from low join coverage", async () => {
+    const calls: string[] = [];
+    const failures: unknown[] = [];
+
+    await runScheduledCycle({} as never, createDaemonOptions(), {
+      acquireLock: async () => ({
+        lockDir: "/tmp/external-fetch.lock",
+        owner: "crawler-daemon",
+        async release() {
+          calls.push("release-lock");
+        },
+      }),
+      acquireMutationLock: async () => fakeMutationLock(calls),
+      refreshFilterSync: skipFilterSync,
+      markFilterSyncDegraded: async (_path, detected) => {
+        failures.push(...detected);
+        calls.push("mark-filter-sync-degraded");
+        return null;
+      },
+      crawlCategories: async () => ({
+        crawlRunId: "crawl-run-1",
+        status: CRAWL_RUN_STATUSES.SUCCESS_CHANGED,
+        stoppedBySuspectedBlock: false,
+        categoryResults: [
+          {
+            sourceCategoryId: "category-8",
+            igrp: 8,
+            status: CRAWL_RUN_CATEGORY_RESULT_STATUSES.SUCCESS_CHANGED,
+            rawSnapshotId: "raw-snapshot-1",
+            errorMessage: null,
+            productWriteSummary: null,
+            filterSyncJoinCoverage: { matchedCount: 0, totalCount: 86 },
+          },
+        ],
+      }),
+    });
+
+    expect(failures).toEqual([{ igrp: 8, matchedCount: 0, totalCount: 86 }]);
+    expect(calls).toEqual(["mark-filter-sync-degraded", "release-lock", "release-mutation-lock"]);
+  });
+
   it("retries sooner when every category failed during fetch", async () => {
     const calls: string[] = [];
     const fakeLock = {

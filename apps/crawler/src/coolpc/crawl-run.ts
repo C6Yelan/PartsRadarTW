@@ -99,6 +99,12 @@ export interface ProcessCrawlCategoryResult {
   rawSnapshotId?: string | null;
   errorMessage?: string | null;
   productWriteSummary?: CrawlRunCategoryProductWriteSummary | null;
+  filterSyncJoinCoverage?: FilterSyncJoinCoverage | null;
+}
+
+export interface FilterSyncJoinCoverage {
+  matchedCount: number;
+  totalCount: number;
 }
 
 export interface RunCoolpcCrawlOnceOptions {
@@ -136,6 +142,7 @@ export interface RecordedCrawlRunCategoryResult {
   rawSnapshotId: string | null;
   errorMessage: string | null;
   productWriteSummary: CrawlRunCategoryProductWriteSummary | null;
+  filterSyncJoinCoverage?: FilterSyncJoinCoverage | null;
 }
 
 export interface CrawlRunCategoryProductWriteSummary {
@@ -228,6 +235,9 @@ export async function runCoolpcCrawlOnce({
         rawSnapshotId: result.rawSnapshotId ?? null,
         errorMessage: result.errorMessage ?? null,
         productWriteSummary: result.productWriteSummary ?? null,
+        ...(result.filterSyncJoinCoverage
+          ? { filterSyncJoinCoverage: result.filterSyncJoinCoverage }
+          : {}),
       });
 
       // 只要該分類判定疑似封鎖，先停止後續循環，避免繼續抓取時誤判正常分類而寫入混淆資料。

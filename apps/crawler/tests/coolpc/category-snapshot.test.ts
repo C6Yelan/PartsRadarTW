@@ -2,8 +2,8 @@
 // 驗證 category snapshot 成功分支會落 raw snapshot、判斷解析結果變更，並呼叫商品寫入流程。
 
 import { afterEach, describe, expect, it } from "vitest";
-import { CRAWL_RUN_CATEGORY_RESULT_STATUSES } from "../../src/coolpc/crawl-run";
 import { processCoolpcCategorySnapshot } from "../../src/coolpc/category-snapshot";
+import { CRAWL_RUN_CATEGORY_RESULT_STATUSES } from "../../src/coolpc/crawl-run";
 import { RAW_SNAPSHOT_CONTENT_STATUSES } from "../../src/coolpc/raw-snapshot-writer";
 import { createCategorySnapshotTestEnvironment } from "./category-snapshot-support";
 import {
@@ -67,7 +67,7 @@ describe("CoolPC category snapshot processor", () => {
     ]);
   });
 
-  it("falls back to local tags and records an issue when source-name joins are mostly missing", async () => {
+  it("falls back to local tags without repeated parse errors when source-name joins are low", async () => {
     const client = new FakeCrawlerWriteClient([category({ id: "category-4", igrp: 4 })]);
     const storageDir = await testEnv.createStorageDir();
     const productWriter = createProductWriterSpy();
@@ -98,12 +98,25 @@ describe("CoolPC category snapshot processor", () => {
     expect(result.status).toBe(CRAWL_RUN_CATEGORY_RESULT_STATUSES.SUCCESS_CHANGED);
     expect(productWriter.calls[0]?.filterTags[0]).toContain("socket:am5");
     expect(productWriter.calls[0]?.filterTags[0]).not.toContain("socket:lga1851");
-    expect(client.parseErrors).toEqual([
-      expect.objectContaining({
-        errorType: "CONTENT_VALIDATION_FAILED",
-        message: "filter_sync_join_coverage_low; matched=1; total=3; source tags were not applied",
+    expect(result).toMatchObject({
+      filterSyncJoinCoverage: { matchedCount: 1, totalCount: 3 },
+    });
+
+    await processCoolpcCategorySnapshot({
+      client,
+      storageDir,
+      crawlRunId: "crawl-run-2",
+      category: category({ id: "category-4", igrp: 4 }),
+      snapshot: snapshot({
+        rawHtml,
+        fetchedAt: new Date("2026-05-27T11:30:00.000Z"),
       }),
-    ]);
+      sourceFilterTagsByProductName: {
+        "amd ryzen 5 7500f mpk【6核/12緒】3.7g": ["socket:lga1851"],
+      },
+      writeProducts: productWriter.writeProducts,
+    });
+    expect(client.parseErrors).toEqual([]);
   });
 
   it("returns success unchanged and still refreshes product presence when parsed result hash is unchanged", async () => {

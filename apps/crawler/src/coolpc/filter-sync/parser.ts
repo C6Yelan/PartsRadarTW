@@ -1,7 +1,7 @@
 // 解析 CoolPC 估價頁的既有篩選語意，產生可由 scheduled crawler 套用的站內 tags。
 
 import { getProductFacetDefinitions, isProductFilterTagSupported } from "@partsradar/shared";
-import { load, type CheerioAPI } from "cheerio";
+import { type CheerioAPI, load } from "cheerio";
 import {
   SOURCE_FILTER_SECTION_MAPPINGS,
   type SourceFilterGroupMapping,
@@ -155,7 +155,13 @@ export function parseCoolpcFilterSnapshot(html: string): ParsedCoolpcFilterSnaps
 }
 
 export function normalizeFilterSyncProductName(value: string): string {
-  return value.normalize("NFKC").replace(/\s+/g, " ").trim().toLocaleLowerCase("zh-TW");
+  return value
+    .normalize("NFKC")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/(?:(?:【限(?:組裝|搭機)】|~限(?:組裝|搭機)~)\s*)+$/g, "")
+    .trim()
+    .toLocaleLowerCase("zh-TW");
 }
 
 function readConditionGroups(dom: CheerioAPI, controlName: string): SourceConditionGroup[] {

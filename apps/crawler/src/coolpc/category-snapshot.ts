@@ -123,15 +123,16 @@ export async function processCoolpcCategorySnapshot(
   let parseResult = parseCoolpcCategoryPage(snapshot.rawHtml, context);
   const sourceTags = options.sourceFilterTagsByProductName;
   const sourceTagJoinCoverage = getSourceTagJoinCoverage(parseResult.items, sourceTags);
+  let degradedFilterSyncJoinCoverage: { matchedCount: number; totalCount: number } | null = null;
   if (sourceTagJoinCoverage && sourceTagJoinCoverage.ratio < 0.5) {
     parseResult = parseCoolpcCategoryPage(
       snapshot.rawHtml,
       createCategoryContext(category, snapshot.fetchedAt, url),
     );
-    parseResult.issues.push({
-      type: "content_validation_failed",
-      message: `filter_sync_join_coverage_low; matched=${sourceTagJoinCoverage.matchedCount}; total=${sourceTagJoinCoverage.totalCount}; source tags were not applied`,
-    });
+    degradedFilterSyncJoinCoverage = {
+      matchedCount: sourceTagJoinCoverage.matchedCount,
+      totalCount: sourceTagJoinCoverage.totalCount,
+    };
   }
   const parsedResultHash =
     parseResult.validation.status === "valid"
@@ -193,6 +194,9 @@ export async function processCoolpcCategorySnapshot(
         : CRAWL_RUN_CATEGORY_RESULT_STATUSES.SUCCESS_CHANGED,
     rawSnapshotId: rawSnapshot.id,
     productWriteSummary,
+    ...(degradedFilterSyncJoinCoverage
+      ? { filterSyncJoinCoverage: degradedFilterSyncJoinCoverage }
+      : {}),
   };
 }
 

@@ -19,6 +19,15 @@ export interface CoolpcFilterSyncState {
   taggedProductCount: number;
   ambiguousProductCount: number;
   tagsByIgrp: Record<string, Record<string, string[]>>;
+  refreshRequestedAt?: string | null;
+  joinCoverageFailures?: Record<string, CoolpcFilterSyncJoinCoverageFailure>;
+}
+
+export interface CoolpcFilterSyncJoinCoverageFailure {
+  matchedCount: number;
+  totalCount: number;
+  firstDetectedAt: string;
+  lastDetectedAt: string;
 }
 
 export async function readCoolpcFilterSyncState(
@@ -67,7 +76,9 @@ function validateState(value: unknown): CoolpcFilterSyncState {
     !isNonNegativeInteger(value.productCount) ||
     !isNonNegativeInteger(value.taggedProductCount) ||
     !isNonNegativeInteger(value.ambiguousProductCount) ||
-    !isRecord(value.tagsByIgrp)
+    !isRecord(value.tagsByIgrp) ||
+    !isOptionalNullableIsoDate(value.refreshRequestedAt) ||
+    !isOptionalJoinCoverageFailures(value.joinCoverageFailures)
   ) {
     throw new Error("Invalid CoolPC filter sync state file.");
   }
@@ -101,6 +112,31 @@ function isIsoDate(value: unknown): value is string {
 
 function isNullableIsoDate(value: unknown): value is string | null {
   return value === null || isIsoDate(value);
+}
+
+function isOptionalNullableIsoDate(value: unknown): value is string | null | undefined {
+  return value === undefined || isNullableIsoDate(value);
+}
+
+function isOptionalJoinCoverageFailures(
+  value: unknown,
+): value is Record<string, CoolpcFilterSyncJoinCoverageFailure> | undefined {
+  if (value === undefined) {
+    return true;
+  }
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return Object.entries(value).every(
+    ([igrp, failure]) =>
+      Number.isInteger(Number(igrp)) &&
+      isRecord(failure) &&
+      isNonNegativeInteger(failure.matchedCount) &&
+      isNonNegativeInteger(failure.totalCount) &&
+      isIsoDate(failure.firstDetectedAt) &&
+      isIsoDate(failure.lastDetectedAt),
+  );
 }
 
 function isNullableString(value: unknown): value is string | null {

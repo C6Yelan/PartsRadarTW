@@ -5,7 +5,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { encode } from "iconv-lite";
 import { afterEach, describe, expect, it } from "vitest";
-import { isFilterSyncDue, refreshCoolpcFilterSync } from "../../src/coolpc/filter-sync";
+import {
+  isFilterSyncDue,
+  markCoolpcFilterSyncJoinCoverageDegraded,
+  refreshCoolpcFilterSync,
+} from "../../src/coolpc/filter-sync";
 import { SOURCE_FILTER_SECTION_MAPPINGS } from "../../src/coolpc/filter-sync/mappings";
 import {
   normalizeFilterSyncProductName,
@@ -93,18 +97,39 @@ describe("CoolPC filter sync", () => {
 
   it("merges published source tags into the regular category parser output", () => {
     const name = "AMD Ryzen 5 7500F MPK【6核/12緒】3.7G";
-    const parsed = parseCoolpcCategoryPage(fixture("cpu-category.normal.html"), {
-      ...context,
-      sourceFilterTagsByProductName: {
-        [normalizeFilterSyncProductName(name)]: ["socket:lga1851", "integrated_graphics:yes"],
+    const parsed = parseCoolpcCategoryPage(
+      fixture("cpu-category.normal.html").replace(name, `${name}【限搭機】`),
+      {
+        ...context,
+        sourceFilterTagsByProductName: {
+          [normalizeFilterSyncProductName(`${name}【限組裝】`)]: [
+            "socket:lga1851",
+            "integrated_graphics:yes",
+          ],
+        },
       },
-    });
+    );
 
     expect(parsed.items[0]?.filterTags).toEqual([
       "socket:lga1851",
       "cpu_family:ryzen-5",
       "integrated_graphics:yes",
     ]);
+  });
+
+  it("ignores only known trailing marketing labels when building join keys", () => {
+    expect(normalizeFilterSyncProductName("Seagate ST8000VN004 8TB【限組裝】")).toBe(
+      normalizeFilterSyncProductName("Seagate ST8000VN004 8TB【限搭機】"),
+    );
+    expect(normalizeFilterSyncProductName("Seagate ST8000VN004 8TB~限組裝~")).toBe(
+      normalizeFilterSyncProductName("Seagate ST8000VN004 8TB"),
+    );
+    expect(normalizeFilterSyncProductName("Seagate ST8000VN004 8TB")).not.toBe(
+      normalizeFilterSyncProductName("Seagate ST8000VN006 8TB"),
+    );
+    expect(normalizeFilterSyncProductName("Seagate ST8000VN004 8TB")).not.toBe(
+      normalizeFilterSyncProductName("Seagate ST8000VN004 12TB"),
+    );
   });
 
   it("publishes valid Big5 source data and skips until the interval is due", async () => {
@@ -170,5 +195,76 @@ describe("CoolPC filter sync", () => {
     expect(failed.state?.sourceHash).toBe(first.state?.sourceHash);
     expect(failed.state?.tagsByIgrp).toEqual(first.state?.tagsByIgrp);
     expect(failed.state?.lastError).toContain("HTTP 503");
+  });
+
+  it("requests an early refresh after low join coverage and preserves backoff on failure", async () => {
+    const root = await mkdtemp(join(tmpdir(), "partsradar-filter-sync-"));
+    tempRoots.push(root);
+    const stateFilePath = join(root, "state.json");
+    const html = await readFile(FIXTURE_PATH, "utf8");
+    const first = await refreshCoolpcFilterSync({
+      stateFilePath,
+      intervalSeconds: 604800,
+      timeoutMs: 5000,
+      userAgent: "test",
+      now: new Date("2026-07-20T04:00:00.000Z"),
+      fetchImpl: (async () => new Response(encode(html, "big5"), { status: 200 })) as typeof fetch,
+    });
+
+    const degraded = await markCoolpcFilterSyncJoinCoverageDegraded(
+      stateFilePath,
+      [{ igrp: 8, matchedCount: 0, totalCount: 86 }],
+      new Date("2026-07-24T12:00:00.000Z"),
+    );
+    expect(degraded?.tagsByIgrp).toEqual(first.state?.tagsByIgrp);
+    expect(isFilterSyncDue(degraded, new Date("2026-07-24T12:00:01.000Z"), 604800)).toBe(true);
+
+    const failed = await refreshCoolpcFilterSync({
+      stateFilePath,
+      intervalSeconds: 604800,
+      timeoutMs: 5000,
+      userAgent: "test",
+      now: new Date("2026-07-24T12:00:01.000Z"),
+      fetchImpl: (async () => new Response("unavailable", { status: 503 })) as typeof fetch,
+    });
+    expect(failed.state?.tagsByIgrp).toEqual(first.state?.tagsByIgrp);
+    expect(failed.state?.joinCoverageFailures?.["8"]).toMatchObject({
+      matchedCount: 0,
+      totalCount: 86,
+    });
+    expect(isFilterSyncDue(failed.state, new Date("2026-07-24T13:00:00.000Z"), 604800)).toBe(false);
+    expect(isFilterSyncDue(failed.state, new Date("2026-07-24T18:00:02.000Z"), 604800)).toBe(true);
+  });
+
+  it("clears degraded join health after a successful early refresh", async () => {
+    const root = await mkdtemp(join(tmpdir(), "partsradar-filter-sync-"));
+    tempRoots.push(root);
+    const stateFilePath = join(root, "state.json");
+    const html = await readFile(FIXTURE_PATH, "utf8");
+    await refreshCoolpcFilterSync({
+      stateFilePath,
+      intervalSeconds: 604800,
+      timeoutMs: 5000,
+      userAgent: "test",
+      now: new Date("2026-07-20T04:00:00.000Z"),
+      fetchImpl: (async () => new Response(encode(html, "big5"), { status: 200 })) as typeof fetch,
+    });
+    await markCoolpcFilterSyncJoinCoverageDegraded(
+      stateFilePath,
+      [{ igrp: 8, matchedCount: 0, totalCount: 86 }],
+      new Date("2026-07-24T12:00:00.000Z"),
+    );
+
+    const recovered = await refreshCoolpcFilterSync({
+      stateFilePath,
+      intervalSeconds: 604800,
+      timeoutMs: 5000,
+      userAgent: "test",
+      now: new Date("2026-07-24T12:00:01.000Z"),
+      fetchImpl: (async () => new Response(encode(html, "big5"), { status: 200 })) as typeof fetch,
+    });
+    expect(recovered.outcome).toBe("published");
+    expect(recovered.state?.refreshRequestedAt).toBeNull();
+    expect(recovered.state?.joinCoverageFailures).toEqual({});
   });
 });

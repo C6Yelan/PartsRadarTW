@@ -35,6 +35,19 @@ export async function checkCoolpcFilterSync(
       `tagged=${state.taggedProductCount}`,
       `ambiguous=${state.ambiguousProductCount}`,
     ].join(" ");
+    const joinCoverageFailures = Object.entries(state.joinCoverageFailures ?? {});
+
+    if (joinCoverageFailures.length > 0) {
+      const coverage = joinCoverageFailures
+        .map(
+          ([igrp, failure]) => `igrp=${igrp} matched=${failure.matchedCount}/${failure.totalCount}`,
+        )
+        .join(", ");
+      return warn(
+        "CoolPC filter sync",
+        `${details} join coverage degraded: ${coverage}; refresh requested${state.lastError ? `; lastError=${state.lastError}` : ""}`,
+      );
+    }
 
     if (ageMinutes >= FAIL_AFTER_MINUTES) {
       return fail("CoolPC filter sync", details);

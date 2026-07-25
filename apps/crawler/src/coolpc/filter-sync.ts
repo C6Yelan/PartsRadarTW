@@ -1,8 +1,6 @@
 // 低頻抓取 CoolPC 估價頁篩選，驗證通過後發布成 scheduled crawler 可套用的本地 state。
 
 import { createHash } from "node:crypto";
-import { decodeCoolpcHtml } from "./parser";
-import { readResponseBodyWithLimit } from "./live-crawl/fetch";
 import { parseCoolpcFilterSnapshot } from "./filter-sync/parser";
 import {
   COOLPC_FILTER_SYNC_STATE_VERSION,
@@ -10,6 +8,8 @@ import {
   readCoolpcFilterSyncState,
   writeCoolpcFilterSyncState,
 } from "./filter-sync/state";
+import { readResponseBodyWithLimit } from "./live-crawl/fetch";
+import { decodeCoolpcHtml } from "./parser";
 
 const COOLPC_FILTER_SOURCE_URL = "https://www.coolpc.com.tw/evaluate.php";
 export const DEFAULT_FILTER_SYNC_INTERVAL_SECONDS = 7 * 24 * 60 * 60;
@@ -28,6 +28,12 @@ export interface RefreshCoolpcFilterSyncOptions {
 export interface RefreshCoolpcFilterSyncResult {
   outcome: "skipped" | "published" | "failed";
   state: CoolpcFilterSyncState | null;
+}
+
+export interface FilterSyncJoinCoverageFailure {
+  igrp: number;
+  matchedCount: number;
+  totalCount: number;
 }
 
 export async function refreshCoolpcFilterSync(
@@ -61,6 +67,8 @@ export async function refreshCoolpcFilterSync(
       taggedProductCount: snapshot.taggedProductCount,
       ambiguousProductCount: snapshot.ambiguousProductCount,
       tagsByIgrp: snapshot.tagsByIgrp,
+      refreshRequestedAt: null,
+      joinCoverageFailures: {},
     };
     await writeCoolpcFilterSyncState(options.stateFilePath, state);
     return { outcome: "published", state };
@@ -76,6 +84,8 @@ export async function refreshCoolpcFilterSync(
       taggedProductCount: previousState?.taggedProductCount ?? 0,
       ambiguousProductCount: previousState?.ambiguousProductCount ?? 0,
       tagsByIgrp: previousState?.tagsByIgrp ?? {},
+      refreshRequestedAt: previousState?.refreshRequestedAt ?? null,
+      joinCoverageFailures: previousState?.joinCoverageFailures ?? {},
     };
     await writeCoolpcFilterSyncState(options.stateFilePath, state);
     return { outcome: "failed", state };
@@ -113,10 +123,49 @@ export function isFilterSyncDue(
     return true;
   }
 
+  if (state.refreshRequestedAt && !state.lastError) {
+    return true;
+  }
+
   const retrySeconds = state.lastError
     ? Math.min(intervalSeconds, FILTER_SYNC_FAILURE_RETRY_SECONDS)
     : intervalSeconds;
   return now.getTime() - Date.parse(state.lastAttemptAt) >= retrySeconds * 1000;
+}
+
+export async function markCoolpcFilterSyncJoinCoverageDegraded(
+  stateFilePath: string,
+  failures: readonly FilterSyncJoinCoverageFailure[],
+  now = new Date(),
+): Promise<CoolpcFilterSyncState | null> {
+  if (failures.length === 0) {
+    return readCoolpcFilterSyncState(stateFilePath);
+  }
+
+  const state = await readCoolpcFilterSyncState(stateFilePath);
+  if (!state) {
+    return null;
+  }
+
+  const detectedAt = now.toISOString();
+  const joinCoverageFailures = { ...(state.joinCoverageFailures ?? {}) };
+  for (const failure of failures) {
+    const key = String(failure.igrp);
+    joinCoverageFailures[key] = {
+      matchedCount: failure.matchedCount,
+      totalCount: failure.totalCount,
+      firstDetectedAt: joinCoverageFailures[key]?.firstDetectedAt ?? detectedAt,
+      lastDetectedAt: detectedAt,
+    };
+  }
+
+  const degradedState: CoolpcFilterSyncState = {
+    ...state,
+    refreshRequestedAt: state.refreshRequestedAt ?? detectedAt,
+    joinCoverageFailures,
+  };
+  await writeCoolpcFilterSyncState(stateFilePath, degradedState);
+  return degradedState;
 }
 
 async function fetchFilterSource(options: RefreshCoolpcFilterSyncOptions): Promise<string> {

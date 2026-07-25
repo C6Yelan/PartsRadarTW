@@ -3,7 +3,10 @@
 
 import type { PrismaClient } from "@partsradar/db";
 import { CRAWL_TRIGGER_TYPES, type RunCoolpcCrawlOnceResult } from "../../coolpc/crawl-run";
-import { refreshCoolpcFilterSync } from "../../coolpc/filter-sync";
+import {
+  markCoolpcFilterSyncJoinCoverageDegraded,
+  refreshCoolpcFilterSync,
+} from "../../coolpc/filter-sync";
 import { assertSeededCategories, runCoolpcCategoryCrawl } from "../../coolpc/live-crawl";
 import {
   RawSnapshotStorageBusyError,
@@ -133,12 +136,15 @@ export async function runScheduledCycle(
     acquireMutationLock?: typeof tryAcquireRawSnapshotMutationLock;
     crawlCategories?: typeof runCoolpcCategoryCrawl;
     refreshFilterSync?: typeof refreshCoolpcFilterSync;
+    markFilterSyncDegraded?: typeof markCoolpcFilterSyncJoinCoverageDegraded;
   } = {},
 ): Promise<ScheduledCycleResult> {
   const acquireLock = dependencies.acquireLock ?? tryAcquireExternalFetchLock;
   const acquireMutationLock = dependencies.acquireMutationLock ?? tryAcquireRawSnapshotMutationLock;
   const crawlCategories = dependencies.crawlCategories ?? runCoolpcCategoryCrawl;
   const refreshFilterSync = dependencies.refreshFilterSync ?? refreshCoolpcFilterSync;
+  const markFilterSyncDegraded =
+    dependencies.markFilterSyncDegraded ?? markCoolpcFilterSyncJoinCoverageDegraded;
   const mutationLock = await acquireMutationLock({
     mutationRoot: options.mutationRoot,
     owner: "scheduled-crawler",
@@ -220,6 +226,29 @@ export async function runScheduledCycle(
         },
         { preAcquiredMutationLock: mutationLock },
       );
+      const degradedJoinCoverage = result.categoryResults.flatMap((category) =>
+        category.filterSyncJoinCoverage
+          ? [
+              {
+                igrp: category.igrp,
+                matchedCount: category.filterSyncJoinCoverage.matchedCount,
+                totalCount: category.filterSyncJoinCoverage.totalCount,
+              },
+            ]
+          : [],
+      );
+      if (degradedJoinCoverage.length > 0) {
+        try {
+          await markFilterSyncDegraded(options.filterSyncStateFilePath, degradedJoinCoverage);
+          log(
+            `CoolPC filter sync join coverage degraded; an early refresh was requested. categories=${degradedJoinCoverage.map((failure) => `${failure.igrp}:${failure.matchedCount}/${failure.totalCount}`).join(",")}`,
+          );
+        } catch (error) {
+          log(
+            `Could not persist CoolPC filter sync degraded state. error=${toSafeCliErrorMessage(error)}`,
+          );
+        }
+      }
 
       productWriteSummary = summarizeProductWrites(result);
       shouldBackoff = shouldBackoffAfter(result);

@@ -8,6 +8,7 @@ import {
   parseProductionSmokeOptions,
   runProductionSmoke,
 } from "../../../../src/scripts/ops/production-smoke";
+import { checkRecentParseErrors } from "../../../../src/scripts/ops/production-smoke/checks/parse-errors";
 import { createSmokeClient } from "./production-smoke-client-support";
 import { stubHealthyPublicApi } from "./production-smoke-public-api-support";
 import { createWorkspace } from "./production-smoke-workspace-support";
@@ -18,6 +19,33 @@ afterEach(() => {
 });
 
 describe("production smoke parse DB-backed checks", () => {
+  it("excludes historical filter-sync join fallback rows without hiding true parse errors", async () => {
+    const count = vi.fn(async () => 2);
+    const result = await checkRecentParseErrors(
+      { parseError: { count } } as never,
+      {
+        recentWindowHours: 24,
+        parseErrorWarnCount: 10,
+        parseErrorFailCount: 20,
+      } as never,
+      new Date("2026-07-25T04:00:00.000Z"),
+    );
+
+    expect(result.status).toBe("OK");
+    expect(count).toHaveBeenCalledWith({
+      where: {
+        NOT: [
+          { errorType: "INVALID_IMAGE_URL" },
+          {
+            errorType: "CONTENT_VALIDATION_FAILED",
+            message: { startsWith: "filter_sync_join_coverage_low;" },
+          },
+        ],
+        lastSeenAt: { gte: new Date("2026-07-24T04:00:00.000Z") },
+      },
+    });
+  });
+
   it("still fails when true parse errors exceed the configured threshold", async () => {
     const { crawlerCwd, workspaceRoot } = await createWorkspace();
     const imageDir = join(workspaceRoot, "product-images");

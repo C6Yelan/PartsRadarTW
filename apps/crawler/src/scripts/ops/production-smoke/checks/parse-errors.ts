@@ -14,9 +14,13 @@ export async function checkRecentParseErrors(
   const since = new Date(now.getTime() - options.recentWindowHours * MILLISECONDS_PER_HOUR);
   const count = await client.parseError.count({
     where: {
-      errorType: {
-        not: "INVALID_IMAGE_URL",
-      },
+      NOT: [
+        { errorType: "INVALID_IMAGE_URL" },
+        {
+          errorType: "CONTENT_VALIDATION_FAILED",
+          message: { startsWith: "filter_sync_join_coverage_low;" },
+        },
+      ],
       lastSeenAt: {
         gte: since,
       },
