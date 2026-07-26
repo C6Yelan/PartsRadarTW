@@ -104,7 +104,7 @@ jobs:
         run: pnpm test:db
 
   e2e-smoke:
-    name: DB-backed public smoke
+    name: Playwright browser gates
     runs-on: ubuntu-latest
     timeout-minutes: 20
     services:
@@ -154,6 +154,9 @@ jobs:
 
       - name: Build web
         run: pnpm build:web
+
+      - name: Run mocked and state browser tests
+        run: pnpm e2e:mocked
 
       - name: Run deterministic DB-backed smoke
         run: pnpm e2e:db-smoke

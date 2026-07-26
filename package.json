@@ -17,6 +17,7 @@
     "test:db": "node scripts/run-db-integration.mjs",
     "test:watch": "vitest",
     "e2e": "playwright test",
+    "e2e:mocked": "playwright test --grep-invert @db-smoke",
     "e2e:db-smoke": "node scripts/run-db-e2e-smoke.mjs",
     "e2e:install": "playwright install chromium",
     "check": "pnpm typecheck && pnpm lint && pnpm build",
