@@ -54,6 +54,10 @@ function parseSafeTestDatabaseUrl(name, value) {
     throw new Error(`${name} must be a valid PostgreSQL URL.`);
   }
 
+  if (url.searchParams.size > 0) {
+    throw new Error(`${name} must not include query parameters.`);
+  }
+
   if (!["postgres:", "postgresql:"].includes(url.protocol)) {
     throw new Error(`${name} must use the PostgreSQL protocol.`);
   }

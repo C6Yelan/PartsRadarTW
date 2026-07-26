@@ -96,6 +96,32 @@ describe("validateTestDatabaseEnvironment", () => {
     }
   });
 
+  it.each(["host", "port", "user", "password"])(
+    "rejects the %s query override without exposing URL credentials",
+    (parameter) => {
+      const password = "query-secret-do-not-print";
+      const databaseUrl = `${INTEGRATION_URL}?${parameter}=${password}`;
+
+      expect(() =>
+        validateTestDatabaseEnvironment({
+          ...ISOLATED,
+          DATABASE_URL: databaseUrl,
+        }),
+      ).toThrow("DATABASE_URL must not include query parameters");
+
+      try {
+        validateTestDatabaseEnvironment({
+          ...ISOLATED,
+          DATABASE_URL: databaseUrl,
+        });
+      } catch (error) {
+        expect(String(error)).not.toContain(password);
+        expect(String(error)).not.toContain(databaseUrl);
+        expect(String(error)).not.toContain("postgresql://");
+      }
+    },
+  );
+
   it("rejects a missing URL or isolation marker", () => {
     expect(() =>
       validateTestDatabaseEnvironment(ISOLATED, { requiredUrls: ["DATABASE_URL"] }),
