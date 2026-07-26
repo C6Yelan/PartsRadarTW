@@ -51,7 +51,7 @@ PartsRadarTW Discord bot 提供個人價格報告、目標價提醒與伺服器�
 bot applications.commands
 ```
 
-初始 invite 可以使用 `permissions=0`；Gateway 使用 `intents=0`。實際公開報告頻道需要 bot 的 Send Messages 與 Embed Links 權限。DM 功能另受使用者隱私設定與 Discord 狀態影響。
+初始 invite 可以使用 `permissions=0`。Gateway 使用非 privileged 的 `GUILDS` intent，不啟用 privileged intents。實際公開報告頻道仍需要 Bot 的 Send Messages 與 Embed Links 權限。DM 功能另受使用者隱私設定與 Discord 狀態影響。
 
 ## Runtime 設定
 
