@@ -4,6 +4,7 @@
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { createPrismaClient } from "../packages/db/src/client";
+import { validateTestDatabaseEnvironment } from "./test-database-safety.mjs";
 
 const CATEGORY_ID = "20000000-0000-4000-8000-000000000001";
 const PRODUCT_ID = "20000000-0000-4000-8000-000000000002";
@@ -18,12 +19,8 @@ const action = process.argv[2];
 const databaseUrl = process.env.DATABASE_URL;
 const storageDir = process.env.PRODUCT_IMAGE_STORAGE_DIR;
 
-if (process.env.PARTSRADAR_TEST_DATABASE_ISOLATED !== "1") {
-  throw new Error("PARTSRADAR_TEST_DATABASE_ISOLATED=1 is required.");
-}
-if (!databaseUrl) {
-  throw new Error("DATABASE_URL is required.");
-}
+validateTestDatabaseEnvironment(process.env, { requiredUrls: ["DATABASE_URL"] });
+if (!databaseUrl) throw new Error("DATABASE_URL is required.");
 if (!storageDir) {
   throw new Error("PRODUCT_IMAGE_STORAGE_DIR is required.");
 }

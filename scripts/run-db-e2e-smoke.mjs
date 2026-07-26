@@ -5,13 +5,9 @@ import { spawn } from "node:child_process";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { validateTestDatabaseEnvironment } from "./test-database-safety.mjs";
 
-if (process.env.PARTSRADAR_TEST_DATABASE_ISOLATED !== "1") {
-  throw new Error("PARTSRADAR_TEST_DATABASE_ISOLATED=1 is required.");
-}
-if (!process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL is required.");
-}
+validateTestDatabaseEnvironment(process.env, { requiredUrls: ["DATABASE_URL"] });
 
 const storageDir = await mkdtemp(join(tmpdir(), "partsradar-e2e-images-"));
 const env = {

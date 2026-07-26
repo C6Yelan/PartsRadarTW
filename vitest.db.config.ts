@@ -2,24 +2,9 @@
 // 僅執行需要 disposable PostgreSQL 的 integration tests，並拒絕未確認隔離的資料庫。
 
 import { defineConfig } from "vitest/config";
+import { validateTestDatabaseEnvironment } from "./scripts/test-database-safety.mjs";
 
-const testDatabaseUrl = process.env.TEST_DATABASE_URL?.trim();
-
-if (!testDatabaseUrl) {
-  throw new Error("TEST_DATABASE_URL is required for PostgreSQL integration tests.");
-}
-
-if (process.env.PARTSRADAR_TEST_DATABASE_ISOLATED !== "1") {
-  throw new Error(
-    "PARTSRADAR_TEST_DATABASE_ISOLATED=1 is required to confirm the database is disposable.",
-  );
-}
-
-const parsedDatabaseUrl = new URL(testDatabaseUrl);
-
-if (!["postgres:", "postgresql:"].includes(parsedDatabaseUrl.protocol)) {
-  throw new Error("TEST_DATABASE_URL must use the postgres or postgresql protocol.");
-}
+validateTestDatabaseEnvironment(process.env, { requiredUrls: ["TEST_DATABASE_URL"] });
 
 export default defineConfig({
   test: {

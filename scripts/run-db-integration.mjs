@@ -5,6 +5,9 @@ import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { validateTestDatabaseEnvironment } from "./test-database-safety.mjs";
+
+validateTestDatabaseEnvironment(process.env, { requiredUrls: ["TEST_DATABASE_URL"] });
 
 const reportDir = mkdtempSync(join(tmpdir(), "partsradar-db-integration-"));
 const reportPath = join(reportDir, "vitest.json");
