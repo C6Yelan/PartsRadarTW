@@ -223,7 +223,6 @@ export async function handleDiscordGuildLifecycleEvent({
   const settings = await client.discordPublicPriceReportSetting.findMany({
     where: {
       ...where,
-      enabled: true,
       accessStatus: "ACTIVE",
     },
     select: PUBLIC_PRICE_REPORT_SETTING_SELECT,
@@ -238,6 +237,7 @@ export async function handleDiscordGuildLifecycleEvent({
       accessStatus,
       providerErrorCode: null,
       now,
+      includePaused: true,
     });
 
     if (transitionCount > 0) {

@@ -21,6 +21,7 @@ export const PRICE_REPORT_SETTING_SELECT = {
   includePriceRises: true,
   includeNewProducts: true,
   enabled: true,
+  disabledAt: true,
   nextSendAt: true,
   lastSentAt: true,
   notificationCursorAt: true,
@@ -81,6 +82,7 @@ export async function enableDailyScheduledPriceReport({
       includePriceRises: filters.includePriceRises,
       includeNewProducts: filters.includeNewProducts,
       enabled: true,
+      disabledAt: null,
       nextSendAt,
       notificationCursorAt: now,
     },
@@ -95,6 +97,7 @@ export async function enableDailyScheduledPriceReport({
       includePriceRises: filters.includePriceRises,
       includeNewProducts: filters.includeNewProducts,
       enabled: true,
+      disabledAt: null,
       nextSendAt,
       notificationCursorAt: now,
     },
@@ -106,9 +109,11 @@ export async function enableDailyScheduledPriceReport({
 export async function disablePriceReport({
   client,
   discordUserId,
+  now = new Date(),
 }: {
   client: DiscordBotClient;
   discordUserId: string;
+  now?: Date;
 }): Promise<number> {
   const result = await client.discordPriceReportSetting.updateMany({
     where: {
@@ -117,6 +122,7 @@ export async function disablePriceReport({
     },
     data: {
       enabled: false,
+      disabledAt: now,
       nextSendAt: null,
     },
   });

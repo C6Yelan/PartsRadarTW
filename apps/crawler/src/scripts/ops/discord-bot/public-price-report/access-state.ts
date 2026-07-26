@@ -1,5 +1,6 @@
 // 更新公開報告設定的 Discord access 狀態，集中處理成功、暫時退避與永久停用。
 
+import { resolveDiscordPublicReportPurgeAfter } from "@partsradar/db/discord-privacy";
 import type { DiscordBotClient } from "../types";
 import type { PublicReportDisabledAccessStatus } from "./access-policy";
 
@@ -61,23 +62,29 @@ export async function disablePublicReportAccess({
   accessStatus,
   providerErrorCode,
   now,
+  includePaused = false,
 }: {
   client: DiscordBotClient;
   where: { settingId: string } | { discordGuildId: string } | { channelId: string };
   accessStatus: PublicReportDisabledAccessStatus;
   providerErrorCode: number | null;
   now: Date;
+  includePaused?: boolean;
 }): Promise<number> {
   const result = await client.discordPublicPriceReportSetting.updateMany({
     where: {
       ...toSettingWhere(where),
-      enabled: true,
+      ...(includePaused ? {} : { enabled: true }),
       accessStatus: "ACTIVE",
     },
     data: {
       enabled: false,
       accessStatus,
       disabledAt: now,
+      purgeAfter: resolveDiscordPublicReportPurgeAfter({
+        accessStatus,
+        disabledAt: now,
+      }),
       lastDiscordErrorCode: providerErrorCode,
       lastAccessCheckedAt: now,
       consecutiveAccessFailures: {

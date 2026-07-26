@@ -180,6 +180,7 @@ describe("handleDiscordInteraction watch edit and remove", () => {
       },
       data: {
         enabled: false,
+        disabledAt: expect.any(Date),
       },
     });
     const requestBody = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body));

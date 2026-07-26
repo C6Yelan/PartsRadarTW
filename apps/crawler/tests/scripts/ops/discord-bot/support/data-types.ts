@@ -31,6 +31,7 @@ export interface TestPriceReportSetting {
   includePriceRises: boolean;
   includeNewProducts: boolean;
   enabled: boolean;
+  disabledAt: Date | null;
   nextSendAt: Date | null;
   lastSentAt: Date | null;
   notificationCursorAt: Date | null;
@@ -63,6 +64,7 @@ export interface TestTargetPriceWatch {
   targetPrice: number;
   currency: string;
   enabled: boolean;
+  disabledAt: Date | null;
   lastNotifiedAt: Date | null;
   notificationClaimedAt: Date | null;
   notificationCursorAt: Date | null;
@@ -117,13 +119,14 @@ export interface TestDiscordPublicPriceReportSetting {
   enabled: boolean;
   accessStatus: "ACTIVE" | "PAUSED_PERMISSION" | "DISABLED_CHANNEL_GONE" | "DISABLED_BOT_REMOVED";
   disabledAt: Date | null;
+  purgeAfter: Date | null;
   lastDiscordErrorCode: number | null;
   lastAccessCheckedAt: Date | null;
   consecutiveAccessFailures: number;
   retryNotBefore: Date | null;
   notificationCursorAt: Date | null;
-  createdByDiscordUserId: string;
-  updatedByDiscordUserId: string;
+  createdByDiscordUserId: string | null;
+  updatedByDiscordUserId: string | null;
   createdAt: Date;
   updatedAt: Date;
 }

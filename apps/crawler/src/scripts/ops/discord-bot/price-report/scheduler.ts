@@ -70,8 +70,24 @@ export async function sendDueScheduledPriceReports({
         cursorAt: setting.notificationCursorAt ?? setting.createdAt,
       }),
       deliveryKind: "SCHEDULED_PRICE_REPORT",
+      priceReportSettingId: setting.id,
+      shouldSend: async () =>
+        Boolean(
+          await client.discordPriceReportSetting.findFirst({
+            where: {
+              id: setting.id,
+              discordUserId: setting.discordUserId,
+              enabled: true,
+            },
+            select: { id: true },
+          }),
+        ),
       sendReportMessages: (messages) => sendDirectMessages(setting.discordUserId, messages),
     });
+
+    if (result.status === "cancelled") {
+      continue;
+    }
 
     if (result.status === "sent") {
       summary.sentCount += 1;
@@ -81,9 +97,11 @@ export async function sendDueScheduledPriceReports({
       summary.failedCount += 1;
     }
 
-    await client.discordPriceReportSetting.update({
+    await client.discordPriceReportSetting.updateMany({
       where: {
         id: setting.id,
+        discordUserId: setting.discordUserId,
+        enabled: true,
       },
       data: {
         lastSentAt: result.status === "sent" ? now : setting.lastSentAt,

@@ -106,7 +106,24 @@ export async function sendDueTargetPriceNotifications({
       continue;
     }
 
-    const messages = createTargetPriceReachedMessages({ watches: claimedWatches, publicBaseUrl });
+    const activeClaims = await client.discordTargetPriceWatch.findMany({
+      where: {
+        id: { in: claimedWatches.map(({ id }) => id) },
+        discordUserId,
+        enabled: true,
+        lastNotifiedAt: null,
+        notificationClaimedAt: now,
+      },
+      select: { id: true },
+    });
+    const activeClaimIds = new Set(activeClaims.map(({ id }) => id));
+    const sendableWatches = claimedWatches.filter(({ id }) => activeClaimIds.has(id));
+
+    if (sendableWatches.length === 0) {
+      continue;
+    }
+
+    const messages = createTargetPriceReachedMessages({ watches: sendableWatches, publicBaseUrl });
     let sendResult: DiscordMessageSendResult;
 
     try {
@@ -122,11 +139,26 @@ export async function sendDueTargetPriceNotifications({
       };
     }
 
-    if (sendResult.status === "sent") {
-      summary.sentCount += claimedWatches.length;
+    const remainingClaims = await client.discordTargetPriceWatch.findMany({
+      where: {
+        id: { in: sendableWatches.map(({ id }) => id) },
+        discordUserId,
+        enabled: true,
+        lastNotifiedAt: null,
+        notificationClaimedAt: now,
+      },
+      select: { id: true },
+    });
+    const remainingClaimIds = new Set(remainingClaims.map(({ id }) => id));
+    const persistableWatches = sendableWatches.filter(({ id }) => remainingClaimIds.has(id));
 
-      for (const watch of claimedWatches) {
-        await client.discordTargetPriceWatch.updateMany({
+    if (persistableWatches.length === 0) {
+      continue;
+    }
+
+    if (sendResult.status === "sent") {
+      for (const watch of persistableWatches) {
+        const updated = await client.discordTargetPriceWatch.updateMany({
           where: {
             id: watch.id,
             enabled: true,
@@ -138,16 +170,22 @@ export async function sendDueTargetPriceNotifications({
             notificationClaimedAt: null,
           },
         });
+        if (updated.count === 0) {
+          continue;
+        }
+        const recorded = await recordTargetPriceNotificationDelivery({
+          client,
+          watch,
+          result: sendResult,
+          now,
+        });
+        if (recorded) {
+          summary.sentCount += 1;
+        }
       }
     } else {
-      if (sendResult.status === "rate_limited") {
-        summary.rateLimitedCount += claimedWatches.length;
-      } else {
-        summary.failedCount += claimedWatches.length;
-      }
-
-      for (const watch of claimedWatches) {
-        await client.discordTargetPriceWatch.updateMany({
+      for (const watch of persistableWatches) {
+        const updated = await client.discordTargetPriceWatch.updateMany({
           where: {
             id: watch.id,
             lastNotifiedAt: null,
@@ -157,16 +195,21 @@ export async function sendDueTargetPriceNotifications({
             notificationClaimedAt: null,
           },
         });
+        if (updated.count === 0) {
+          continue;
+        }
+        const recorded = await recordTargetPriceNotificationDelivery({
+          client,
+          watch,
+          result: sendResult,
+          now,
+        });
+        if (recorded && sendResult.status === "rate_limited") {
+          summary.rateLimitedCount += 1;
+        } else if (recorded) {
+          summary.failedCount += 1;
+        }
       }
-    }
-
-    for (const watch of claimedWatches) {
-      await recordTargetPriceNotificationDelivery({
-        client,
-        watch,
-        result: sendResult,
-        now,
-      });
     }
 
     if (sendResult.status === "rate_limited") {

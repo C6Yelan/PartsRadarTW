@@ -5,7 +5,7 @@ import type { TestSnapshot, TestTargetPriceWatch } from "./data-types";
 import { toPrismaWatchProduct } from "./snapshot-records";
 
 type WatchWhere = {
-  id?: string;
+  id?: string | { in: string[] };
   discordUserId?: string;
   productId?: string;
   enabled?: boolean;
@@ -64,7 +64,10 @@ export function createTargetPriceWatchClient(
   };
 
   const matchesWatchWhere = (watch: TestTargetPriceWatch, where: WatchWhere) => {
-    if (where.id !== undefined && watch.id !== where.id) {
+    if (
+      where.id !== undefined &&
+      (typeof where.id === "string" ? watch.id !== where.id : !where.id.in.includes(watch.id))
+    ) {
       return false;
     }
 
@@ -186,6 +189,7 @@ export function createTargetPriceWatchClient(
 
       const created = {
         id: "44444444-4444-4444-8444-444444444444",
+        disabledAt: null,
         lastNotifiedAt: null,
         notificationClaimedAt: null,
         createdAt: new Date("2026-06-07T00:00:00.000Z"),

@@ -68,6 +68,7 @@ export async function createTargetPriceWatch({
       discordUserId,
       productId,
       enabled: true,
+      disabledAt: null,
     },
     select: {
       id: true,
@@ -100,12 +101,14 @@ export async function createTargetPriceWatch({
       targetPrice,
       currency,
       enabled: true,
+      disabledAt: null,
       notificationCursorAt: now,
     },
     update: {
       targetPrice,
       currency,
       enabled: true,
+      disabledAt: null,
       lastNotifiedAt: null,
       notificationClaimedAt: null,
       notificationCursorAt: now,
@@ -271,10 +274,12 @@ async function disableTargetPriceWatchRecord({
   client,
   discordUserId,
   watch,
+  now = new Date(),
 }: {
   client: DiscordBotClient;
   discordUserId: string;
   watch: TargetPriceWatchListRecord;
+  now?: Date;
 }): Promise<DisableTargetPriceWatchResult> {
   const result = await client.discordTargetPriceWatch.updateMany({
     where: {
@@ -284,6 +289,7 @@ async function disableTargetPriceWatchRecord({
     },
     data: {
       enabled: false,
+      disabledAt: now,
     },
   });
 

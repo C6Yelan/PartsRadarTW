@@ -221,6 +221,10 @@ async function sendPendingPublicPriceReportsForSetting({
       onAccessDisabled,
     });
 
+    if (result.status === "CANCELLED") {
+      continue;
+    }
+
     if (result.status === "SENT") {
       summary.sentCount += 1;
     } else if (result.status === "SKIPPED") {
@@ -274,7 +278,7 @@ async function sendPublicPriceReportForCrawlRun({
     providerErrorCode: number | null;
   }) => void | Promise<void>;
 }): Promise<{
-  status: PublicPriceReportStatus;
+  status: PublicPriceReportStatus | "CANCELLED";
   retryNotBefore: Date | null;
   globalRateLimited: boolean;
   globalAuthFailed: boolean;
@@ -284,12 +288,23 @@ async function sendPublicPriceReportForCrawlRun({
   const changes = filterPriceChangesForReport(readResult.changes, filters);
   const newProducts = filterNewProductsForReport(readResult.newProducts, filters);
   const channelId = setting.channelId;
+  const settingStillActive = await readActivePublicReportSetting(client, setting);
+
+  if (!settingStillActive) {
+    return {
+      status: "CANCELLED",
+      retryNotBefore: null,
+      globalRateLimited: false,
+      globalAuthFailed: false,
+    };
+  }
 
   if (changes.length === 0 && newProducts.length === 0) {
-    await recordPublicPriceReportDelivery({
+    const recorded = await recordPublicPriceReportDelivery({
       client,
       crawlRunId,
       channelId,
+      publicPriceReportSettingId: setting.id,
       status: "SKIPPED",
       itemCount: 0,
       messageCount: 0,
@@ -298,7 +313,7 @@ async function sendPublicPriceReportForCrawlRun({
     });
 
     return {
-      status: "SKIPPED",
+      status: recorded ? "SKIPPED" : "CANCELLED",
       retryNotBefore: null,
       globalRateLimited: false,
       globalAuthFailed: false,
@@ -315,17 +330,35 @@ async function sendPublicPriceReportForCrawlRun({
   const result = await sendChannelMessages(channelId, messages);
   const itemCount = Math.min(changes.length + newProducts.length, MAX_PRICE_REPORT_ITEMS);
 
+  if (!(await readActivePublicReportSetting(client, setting))) {
+    return {
+      status: "CANCELLED",
+      retryNotBefore: null,
+      globalRateLimited: false,
+      globalAuthFailed: false,
+    };
+  }
+
   if (result.status === "sent") {
-    await recordPublicPriceReportDelivery({
+    const recorded = await recordPublicPriceReportDelivery({
       client,
       crawlRunId,
       channelId,
+      publicPriceReportSettingId: setting.id,
       status: "SENT",
       itemCount,
       messageCount: messages.length,
       deliveredAt: now,
       ...toDiscordDeliveryErrorFields(result),
     });
+    if (!recorded) {
+      return {
+        status: "CANCELLED",
+        retryNotBefore: null,
+        globalRateLimited: false,
+        globalAuthFailed: false,
+      };
+    }
     await markPublicReportAccessSucceeded({ client, settingId: setting.id, now });
 
     return {
@@ -337,16 +370,25 @@ async function sendPublicPriceReportForCrawlRun({
   }
 
   if (result.status === "rate_limited") {
-    await recordPublicPriceReportDelivery({
+    const recorded = await recordPublicPriceReportDelivery({
       client,
       crawlRunId,
       channelId,
+      publicPriceReportSettingId: setting.id,
       status: "RATE_LIMITED",
       itemCount,
       messageCount: messages.length,
       deliveredAt: null,
       ...toDiscordDeliveryErrorFields(result),
     });
+    if (!recorded) {
+      return {
+        status: "CANCELLED",
+        retryNotBefore: null,
+        globalRateLimited: false,
+        globalAuthFailed: false,
+      };
+    }
 
     const decision = await classifyPublicReportAccessFailure({
       result,
@@ -370,16 +412,25 @@ async function sendPublicPriceReportForCrawlRun({
     };
   }
 
-  await recordPublicPriceReportDelivery({
+  const recorded = await recordPublicPriceReportDelivery({
     client,
     crawlRunId,
     channelId,
+    publicPriceReportSettingId: setting.id,
     status: "FAILED",
     itemCount,
     messageCount: messages.length,
     deliveredAt: null,
     ...toDiscordDeliveryErrorFields(result),
   });
+  if (!recorded) {
+    return {
+      status: "CANCELLED",
+      retryNotBefore: null,
+      globalRateLimited: false,
+      globalAuthFailed: false,
+    };
+  }
 
   const decision = await classifyPublicReportAccessFailure({
     result,
@@ -436,6 +487,22 @@ async function sendPublicPriceReportForCrawlRun({
     globalRateLimited: false,
     globalAuthFailed: false,
   };
+}
+
+async function readActivePublicReportSetting(
+  client: DiscordBotClient,
+  setting: PublicPriceReportSetting,
+): Promise<{ id: string } | null> {
+  return client.discordPublicPriceReportSetting.findFirst({
+    where: {
+      id: setting.id,
+      discordGuildId: setting.discordGuildId,
+      channelId: setting.channelId,
+      enabled: true,
+      accessStatus: "ACTIVE",
+    },
+    select: { id: true },
+  });
 }
 
 function earliestDate(current: Date | null, candidate: Date | null): Date | null {

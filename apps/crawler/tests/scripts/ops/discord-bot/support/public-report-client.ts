@@ -78,6 +78,39 @@ export function createPublicReportClient({
       publicSettingRows.find((setting) => setting.discordGuildId === args.where.discordGuildId) ??
       null,
   );
+  const publicSettingFindFirst = vi.fn(
+    async (args: {
+      where: {
+        id?: string;
+        discordGuildId?: string;
+        channelId?: string;
+        enabled?: boolean;
+        accessStatus?: TestDiscordPublicPriceReportSetting["accessStatus"];
+      };
+      select?: Record<string, boolean>;
+    }) => {
+      const setting =
+        publicSettingRows.find(
+          (row) =>
+            (args.where.id === undefined || row.id === args.where.id) &&
+            (args.where.discordGuildId === undefined ||
+              row.discordGuildId === args.where.discordGuildId) &&
+            (args.where.channelId === undefined || row.channelId === args.where.channelId) &&
+            (args.where.enabled === undefined || row.enabled === args.where.enabled) &&
+            (args.where.accessStatus === undefined || row.accessStatus === args.where.accessStatus),
+        ) ?? null;
+
+      if (!setting || !args.select) {
+        return setting;
+      }
+
+      return Object.fromEntries(
+        Object.entries(args.select)
+          .filter(([, selected]) => selected)
+          .map(([key]) => [key, setting[key as keyof TestDiscordPublicPriceReportSetting]]),
+      );
+    },
+  );
   const publicSettingUpsert = vi.fn(
     async (args: {
       where: { discordGuildId: string };
@@ -338,6 +371,7 @@ export function createPublicReportClient({
     discordPublicPriceReportSetting: {
       deleteMany: publicSettingDeleteMany,
       findMany: publicSettingFindMany,
+      findFirst: publicSettingFindFirst,
       findUnique: publicSettingFindUnique,
       update: publicSettingUpdate,
       updateMany: publicSettingUpdateMany,
