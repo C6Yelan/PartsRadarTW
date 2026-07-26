@@ -77,9 +77,11 @@ describe("scheduled price report delivery", () => {
         status: "SENT",
       }),
     });
-    expect(client.discordPriceReportSetting.update).toHaveBeenCalledWith({
+    expect(client.discordPriceReportSetting.updateMany).toHaveBeenCalledWith({
       where: {
         id: "setting-1",
+        discordUserId: "111122223333444455",
+        enabled: true,
       },
       data: {
         lastSentAt: new Date("2026-06-07T05:00:00.000Z"),
@@ -151,9 +153,11 @@ describe("scheduled price report delivery", () => {
         itemCount: 0,
       }),
     });
-    expect(client.discordPriceReportSetting.update).toHaveBeenCalledWith({
+    expect(client.discordPriceReportSetting.updateMany).toHaveBeenCalledWith({
       where: {
         id: "setting-1",
+        discordUserId: "111122223333444455",
+        enabled: true,
       },
       data: {
         lastSentAt: new Date("2026-06-07T05:00:00.000Z"),
@@ -200,9 +204,11 @@ describe("scheduled price report delivery", () => {
       sendDirectMessages,
     });
 
-    expect(client.discordPriceReportSetting.update).toHaveBeenCalledWith({
+    expect(client.discordPriceReportSetting.updateMany).toHaveBeenCalledWith({
       where: {
         id: "setting-1",
+        discordUserId: "111122223333444455",
+        enabled: true,
       },
       data: {
         lastSentAt: new Date("2026-06-07T05:00:00.000Z"),
@@ -210,5 +216,39 @@ describe("scheduled price report delivery", () => {
         nextSendAt: new Date("2026-06-08T01:30:00.000Z"),
       },
     });
+  });
+
+  it("does not send or recreate delivery metadata when the setting disappears before transport", async () => {
+    const client = createDiscordBotClient({
+      snapshots: [
+        snapshot({
+          id: "new-race",
+          productId: "product-race",
+          productName: "Race product",
+          crawlRunId: "new-run",
+          price: 9_000,
+          capturedAt: "2026-06-07T03:00:00.000Z",
+        }),
+      ],
+      settings: [
+        priceReportSetting({
+          id: "setting-race",
+          discordUserId: "111122223333444455",
+          nextSendAt: new Date("2026-06-07T04:59:00.000Z"),
+        }),
+      ],
+    });
+    client.discordPriceReportSetting.findFirst.mockResolvedValueOnce(null);
+    const sendDirectMessages = vi.fn();
+
+    await sendDueScheduledPriceReports({
+      client,
+      options: { publicBaseUrl: PUBLIC_BASE_URL },
+      now: new Date("2026-06-07T05:00:00.000Z"),
+      sendDirectMessages,
+    });
+
+    expect(sendDirectMessages).not.toHaveBeenCalled();
+    expect(client.discordNotificationDelivery.create).not.toHaveBeenCalled();
   });
 });

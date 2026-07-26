@@ -139,6 +139,7 @@ describe("handleDiscordInteraction price report settings categories", () => {
       },
       data: {
         enabled: false,
+        disabledAt: expect.any(Date),
         nextSendAt: null,
       },
     });

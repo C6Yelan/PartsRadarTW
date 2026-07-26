@@ -494,6 +494,27 @@ describe("public price report scheduler delivery", () => {
     expect(sendChannelMessages).toHaveBeenNthCalledWith(1, "channel-a", expect.any(Array));
     expect(sendChannelMessages).toHaveBeenNthCalledWith(2, "channel-b", expect.any(Array));
   });
+
+  it("does not send or recreate metadata when the guild setting disappears before transport", async () => {
+    const client = createDiscordBotClient({
+      snapshots: publicReportPriceChangeSnapshots("public-run-race"),
+      crawlRuns: [crawlRun({ id: "public-run-race" })],
+      publicPriceReportSettings: [publicPriceReportSetting({ id: "setting-race" })],
+    });
+    client.discordPublicPriceReportSetting.findFirst.mockResolvedValueOnce(null);
+    const sendChannelMessages = vi.fn();
+
+    await sendPendingPublicPriceReports({
+      client,
+      options: createDiscordBotOptions(),
+      now: new Date("2026-07-23T10:00:00.000Z"),
+      sendChannelMessages,
+      ...ACTIVE_ACCESS_DEPENDENCIES,
+    });
+
+    expect(sendChannelMessages).not.toHaveBeenCalled();
+    expect(client.discordPublicPriceReportDelivery.upsert).not.toHaveBeenCalled();
+  });
 });
 
 const ACTIVE_ACCESS_DEPENDENCIES = {

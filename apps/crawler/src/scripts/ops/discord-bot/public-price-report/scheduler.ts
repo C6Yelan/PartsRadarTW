@@ -284,6 +284,25 @@ async function sendPublicPriceReportForCrawlRun({
   const changes = filterPriceChangesForReport(readResult.changes, filters);
   const newProducts = filterNewProductsForReport(readResult.newProducts, filters);
   const channelId = setting.channelId;
+  const settingStillActive = await client.discordPublicPriceReportSetting.findFirst({
+    where: {
+      id: setting.id,
+      discordGuildId: setting.discordGuildId,
+      channelId,
+      enabled: true,
+      accessStatus: "ACTIVE",
+    },
+    select: { id: true },
+  });
+
+  if (!settingStillActive) {
+    return {
+      status: "SKIPPED",
+      retryNotBefore: null,
+      globalRateLimited: false,
+      globalAuthFailed: false,
+    };
+  }
 
   if (changes.length === 0 && newProducts.length === 0) {
     await recordPublicPriceReportDelivery({

@@ -65,6 +65,7 @@ export function priceReportSetting({
   includePriceRises = true,
   includeNewProducts = true,
   enabled = true,
+  disabledAt = null,
 }: {
   id: string;
   discordUserId: string;
@@ -80,6 +81,7 @@ export function priceReportSetting({
   includePriceRises?: boolean;
   includeNewProducts?: boolean;
   enabled?: boolean;
+  disabledAt?: Date | null;
 }): TestPriceReportSetting {
   return {
     id,
@@ -95,6 +97,7 @@ export function priceReportSetting({
     includePriceRises,
     includeNewProducts,
     enabled,
+    disabledAt,
     nextSendAt,
     lastSentAt,
     notificationCursorAt,
@@ -110,6 +113,7 @@ export function targetPriceWatch({
   targetPrice,
   currency = "TWD",
   enabled = true,
+  disabledAt = null,
   lastNotifiedAt = null,
   notificationClaimedAt = null,
   notificationCursorAt = new Date("2026-06-07T00:00:00.000Z"),
@@ -121,6 +125,7 @@ export function targetPriceWatch({
   targetPrice: number;
   currency?: string;
   enabled?: boolean;
+  disabledAt?: Date | null;
   lastNotifiedAt?: Date | null;
   notificationClaimedAt?: Date | null;
   notificationCursorAt?: Date | null;
@@ -133,6 +138,7 @@ export function targetPriceWatch({
     targetPrice,
     currency,
     enabled,
+    disabledAt,
     lastNotifiedAt,
     notificationClaimedAt,
     notificationCursorAt,
@@ -252,6 +258,7 @@ export function publicPriceReportSetting({
   enabled = true,
   accessStatus = "ACTIVE",
   disabledAt = null,
+  purgeAfter = null,
   lastDiscordErrorCode = null,
   lastAccessCheckedAt = null,
   consecutiveAccessFailures = 0,
@@ -274,13 +281,14 @@ export function publicPriceReportSetting({
   enabled?: boolean;
   accessStatus?: TestDiscordPublicPriceReportSetting["accessStatus"];
   disabledAt?: Date | null;
+  purgeAfter?: Date | null;
   lastDiscordErrorCode?: number | null;
   lastAccessCheckedAt?: Date | null;
   consecutiveAccessFailures?: number;
   retryNotBefore?: Date | null;
   notificationCursorAt?: Date | null;
-  createdByDiscordUserId?: string;
-  updatedByDiscordUserId?: string;
+  createdByDiscordUserId?: string | null;
+  updatedByDiscordUserId?: string | null;
   createdAt?: Date;
   updatedAt?: Date;
 }): TestDiscordPublicPriceReportSetting {
@@ -297,6 +305,7 @@ export function publicPriceReportSetting({
     enabled,
     accessStatus,
     disabledAt,
+    purgeAfter,
     lastDiscordErrorCode,
     lastAccessCheckedAt,
     consecutiveAccessFailures,

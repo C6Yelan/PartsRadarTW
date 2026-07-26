@@ -59,9 +59,11 @@ describe("scheduled price report retry", () => {
       failedCount: 1,
     });
 
-    expect(client.discordPriceReportSetting.update).toHaveBeenCalledWith({
+    expect(client.discordPriceReportSetting.updateMany).toHaveBeenCalledWith({
       where: {
         id: "setting-1",
+        discordUserId: "111122223333444455",
+        enabled: true,
       },
       data: {
         lastSentAt,
@@ -119,9 +121,11 @@ describe("scheduled price report retry", () => {
       failedCount: 0,
     });
 
-    expect(client.discordPriceReportSetting.update).toHaveBeenCalledWith({
+    expect(client.discordPriceReportSetting.updateMany).toHaveBeenCalledWith({
       where: {
         id: "setting-1",
+        discordUserId: "111122223333444455",
+        enabled: true,
       },
       data: {
         lastSentAt: null,

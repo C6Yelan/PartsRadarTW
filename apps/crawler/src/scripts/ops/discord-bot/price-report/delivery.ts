@@ -75,6 +75,7 @@ export async function sendPriceReport({
   since,
   deliveryKind,
   priceReportSettingId,
+  shouldSend,
   sendReportMessages,
 }: {
   client: DiscordBotClient;
@@ -86,6 +87,7 @@ export async function sendPriceReport({
   since?: Date;
   deliveryKind: "PRICE_REPORT_NOW" | "SCHEDULED_PRICE_REPORT";
   priceReportSettingId?: string;
+  shouldSend?: () => Promise<boolean>;
   sendReportMessages: (messages: DiscordBotMessage[]) => Promise<DiscordMessageSendResult>;
 }): Promise<PersonalPriceReportDeliveryResult> {
   const reportSince = since ?? new Date(now.getTime() - windowHours * HOUR_MS);
@@ -105,6 +107,21 @@ export async function sendPriceReport({
     generatedAt: now,
     hasActiveFilters: hasActivePriceReportFilters(normalizedFilters),
   });
+
+  if (shouldSend && !(await shouldSend())) {
+    return {
+      status: "failed",
+      changeCount: report.priceChanges.length,
+      newProductCount: report.newProducts.length,
+      listedCount,
+      messageCount: messages.length,
+      sentMessageCount: 0,
+      httpStatus: null,
+      errorCategory: "PROVIDER",
+      providerErrorCode: null,
+    };
+  }
+
   const result = await sendReportMessages(messages);
 
   await recordPriceReportDelivery({

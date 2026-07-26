@@ -106,7 +106,24 @@ export async function sendDueTargetPriceNotifications({
       continue;
     }
 
-    const messages = createTargetPriceReachedMessages({ watches: claimedWatches, publicBaseUrl });
+    const activeClaims = await client.discordTargetPriceWatch.findMany({
+      where: {
+        id: { in: claimedWatches.map(({ id }) => id) },
+        discordUserId,
+        enabled: true,
+        lastNotifiedAt: null,
+        notificationClaimedAt: now,
+      },
+      select: { id: true },
+    });
+    const activeClaimIds = new Set(activeClaims.map(({ id }) => id));
+    const sendableWatches = claimedWatches.filter(({ id }) => activeClaimIds.has(id));
+
+    if (sendableWatches.length === 0) {
+      continue;
+    }
+
+    const messages = createTargetPriceReachedMessages({ watches: sendableWatches, publicBaseUrl });
     let sendResult: DiscordMessageSendResult;
 
     try {
@@ -123,9 +140,9 @@ export async function sendDueTargetPriceNotifications({
     }
 
     if (sendResult.status === "sent") {
-      summary.sentCount += claimedWatches.length;
+      summary.sentCount += sendableWatches.length;
 
-      for (const watch of claimedWatches) {
+      for (const watch of sendableWatches) {
         await client.discordTargetPriceWatch.updateMany({
           where: {
             id: watch.id,
@@ -141,12 +158,12 @@ export async function sendDueTargetPriceNotifications({
       }
     } else {
       if (sendResult.status === "rate_limited") {
-        summary.rateLimitedCount += claimedWatches.length;
+        summary.rateLimitedCount += sendableWatches.length;
       } else {
-        summary.failedCount += claimedWatches.length;
+        summary.failedCount += sendableWatches.length;
       }
 
-      for (const watch of claimedWatches) {
+      for (const watch of sendableWatches) {
         await client.discordTargetPriceWatch.updateMany({
           where: {
             id: watch.id,
@@ -160,7 +177,7 @@ export async function sendDueTargetPriceNotifications({
       }
     }
 
-    for (const watch of claimedWatches) {
+    for (const watch of sendableWatches) {
       await recordTargetPriceNotificationDelivery({
         client,
         watch,

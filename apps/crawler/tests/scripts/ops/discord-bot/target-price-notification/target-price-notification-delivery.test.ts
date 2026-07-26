@@ -265,4 +265,42 @@ describe("target price notification delivery", () => {
       `商品目標價達標 (${embedCount}/${embedCount})`,
     );
   });
+
+  it("does not send or write a delivery when an erased watch disappears after claim", async () => {
+    const client = createDiscordBotClient({
+      snapshots: [
+        snapshot({
+          id: "snapshot-race",
+          productId: "product-race",
+          productName: "Race product",
+          crawlRunId: "new-run",
+          price: 9_000,
+          capturedAt: "2026-06-07T04:55:00.000Z",
+        }),
+      ],
+      watches: [
+        targetPriceWatch({
+          id: "watch-race",
+          discordUserId: "111122223333444455",
+          productId: "product-race",
+          targetPrice: 10_000,
+        }),
+      ],
+    });
+    const originalFindMany = client.discordTargetPriceWatch.findMany.getMockImplementation();
+    client.discordTargetPriceWatch.findMany
+      .mockImplementationOnce(originalFindMany as never)
+      .mockResolvedValueOnce([]);
+    const sendDirectMessages = vi.fn();
+
+    await sendDueTargetPriceNotifications({
+      client,
+      publicBaseUrl: PUBLIC_BASE_URL,
+      now: new Date("2026-06-07T05:00:00.000Z"),
+      sendDirectMessages,
+    });
+
+    expect(sendDirectMessages).not.toHaveBeenCalled();
+    expect(client.discordNotificationDelivery.create).not.toHaveBeenCalled();
+  });
 });

@@ -62,6 +62,8 @@ describe("public price report gateway lifecycle", () => {
       data: expect.objectContaining({
         enabled: false,
         accessStatus: "DISABLED_BOT_REMOVED",
+        disabledAt: new Date("2026-07-23T10:00:00.000Z"),
+        purgeAfter: new Date("2026-09-21T10:00:00.000Z"),
       }),
     });
   });

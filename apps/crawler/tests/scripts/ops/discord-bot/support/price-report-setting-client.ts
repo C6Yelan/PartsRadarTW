@@ -7,9 +7,26 @@ import type { TestPriceReportSetting } from "./data-types";
 export function createPriceReportSettingClient(settings: TestPriceReportSetting[]) {
   const settingRows = [...settings];
   const settingFindFirst = vi.fn(
-    async (args: { where: { enabled?: boolean; nextSendAt?: { not: null } } }) => {
+    async (args: {
+      where: {
+        id?: string;
+        discordUserId?: string;
+        enabled?: boolean;
+        nextSendAt?: { not: null };
+      };
+      select?: Record<string, boolean>;
+    }) => {
       const rows = settingRows
         .filter((setting) => {
+          if (args.where.id !== undefined && setting.id !== args.where.id) {
+            return false;
+          }
+          if (
+            args.where.discordUserId !== undefined &&
+            setting.discordUserId !== args.where.discordUserId
+          ) {
+            return false;
+          }
           if (args.where.enabled !== undefined && setting.enabled !== args.where.enabled) {
             return false;
           }
@@ -26,7 +43,7 @@ export function createPriceReportSettingClient(settings: TestPriceReportSetting[
 
       const setting = rows[0];
 
-      return setting ? { nextSendAt: setting.nextSendAt } : null;
+      return setting ? selectSettingFields(setting, args.select) : null;
     },
   );
   const settingFindMany = vi.fn(
@@ -73,14 +90,16 @@ export function createPriceReportSettingClient(settings: TestPriceReportSetting[
   );
   const settingUpdateMany = vi.fn(
     async (args: {
-      where: { discordUserId: string; enabled?: boolean };
+      where: { id?: string; discordUserId?: string; enabled?: boolean };
       data: Partial<TestPriceReportSetting>;
     }) => {
       let count = 0;
 
       for (const setting of settingRows) {
         if (
-          setting.discordUserId === args.where.discordUserId &&
+          (args.where.id === undefined || setting.id === args.where.id) &&
+          (args.where.discordUserId === undefined ||
+            setting.discordUserId === args.where.discordUserId) &&
           (args.where.enabled === undefined || setting.enabled === args.where.enabled)
         ) {
           Object.assign(setting, args.data);
@@ -125,6 +144,7 @@ export function createPriceReportSettingClient(settings: TestPriceReportSetting[
       const created = {
         id: "setting-created",
         maxItems: 50,
+        disabledAt: null,
         lastSentAt: null,
         createdAt: new Date("2026-06-07T00:00:00.000Z"),
         updatedAt: new Date("2026-06-07T00:00:00.000Z"),
