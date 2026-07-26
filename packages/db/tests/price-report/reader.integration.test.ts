@@ -109,6 +109,40 @@ describe("price report readers PostgreSQL integration", () => {
     ]);
   });
 
+  it("selects the latest pre-window baseline by capturedAt and id descending", async () => {
+    const productId = await createProduct({
+      name: "Baseline ordering integration GPU",
+      categoryId: await createCategory(),
+    });
+    const olderRunId = await createCrawlRun("2030-01-01T20:00:00.000Z");
+    const tiedBaselineRunId = await createCrawlRun("2030-01-01T23:00:00.000Z");
+    const windowRunId = await createCrawlRun("2030-01-02T02:00:00.000Z");
+
+    await createSnapshot(productId, olderRunId, 12_000, "2030-01-01T20:00:00.000Z");
+    await createSnapshot(productId, tiedBaselineRunId, 11_000, "2030-01-01T23:00:00.000Z", {
+      id: "30000000-0000-4000-8000-000000000001",
+    });
+    await createSnapshot(productId, tiedBaselineRunId, 10_500, "2030-01-01T23:00:00.000Z", {
+      id: "30000000-0000-4000-8000-000000000002",
+    });
+    await createSnapshot(productId, windowRunId, 9_000, "2030-01-02T02:00:00.000Z");
+
+    const report = await readRecentPriceReport(client, {
+      since: new Date("2030-01-02T00:00:00.000Z"),
+      until: new Date("2030-01-03T00:00:00.000Z"),
+      filters: { includeNewProducts: false },
+    });
+
+    expect(report.priceChanges).toEqual([
+      expect.objectContaining({
+        productId,
+        previousPrice: 10_500,
+        currentPrice: 9_000,
+        delta: -1_500,
+      }),
+    ]);
+  });
+
   it("applies keyword token groups and category filters with PostgreSQL semantics", async () => {
     const baselineRunId = await createCrawlRun("2030-01-01T00:00:00.000Z");
     const changedRunId = await createCrawlRun("2030-01-02T12:00:00.000Z");
@@ -249,8 +283,13 @@ async function createCrawlRun(at: string) {
   return id;
 }
 
-async function createSnapshot(productId: string, crawlRunId: string, price: number, at: string) {
-  const id = randomUUID();
+async function createSnapshot(
+  productId: string,
+  crawlRunId: string,
+  price: number,
+  at: string,
+  { id = randomUUID() }: { id?: string } = {},
+) {
   snapshotIds.add(id);
   await client.priceSnapshot.create({
     data: {
