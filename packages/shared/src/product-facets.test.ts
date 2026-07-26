@@ -266,7 +266,7 @@ describe("product facets", () => {
   });
 
   it.each([
-    "Noctua 120mm VRM 水冷專用風扇",
+    "貓頭鷹 NL-ACF1 VRM 風扇 /NF-A8 風扇/Noctua NL-LC1 系列水冷專用/6年",
     "曜越 T1000 水冷液",
     "銀欣 IceMyst 120mm 水冷頭風扇",
   ])("keeps non-radiator liquid-cooling accessories out of AIO radiator tags: %s", (name) => {
@@ -311,14 +311,36 @@ describe("product facets", () => {
       "撼訊 AXR7 240 2GBD5",
       ["gpu_product_type:graphics-card", "gpu_chip:amd", "gpu_series:legacy-radeon", "vram_gb:2"],
     ],
-    ["麗臺 N730K", ["gpu_product_type:graphics-card", "gpu_chip:nvidia", "gpu_series:geforce-gt"]],
-    ["華碩 N710D3", ["gpu_product_type:graphics-card", "gpu_chip:nvidia", "gpu_series:geforce-gt"]],
     [
       "RTX5060Ti 16G冰魄白",
       ["gpu_product_type:graphics-card", "gpu_chip:nvidia", "gpu_series:rtx-50", "vram_gb:16"],
     ],
   ])("extracts only explicit GPU series and VRAM from confirmed live names: %s", (name, tags) => {
     expect(extractProductFilterTags(12, name)).toEqual(tags);
+  });
+
+  it("recognizes bounded N710/N730 model variants as GeForce GT", () => {
+    const liveName = "微星 N730-2GD3V3(700MHz/2G DDR3 128Bit/14.5cm/三年保)雪精靈系列";
+    expect(extractProductFilterTags(12, liveName)).toEqual([
+      "gpu_product_type:graphics-card",
+      "gpu_chip:nvidia",
+      "gpu_series:geforce-gt",
+      "vram_gb:2",
+    ]);
+
+    for (const name of [
+      "微星 N730-2GD3V3",
+      "微星 N730K-2GD3",
+      "技嘉 N710D3-2GL",
+      "GeForce GT 730",
+      "GeForce GT 710",
+    ]) {
+      expect(extractProductFilterTags(12, name), name).toContain("gpu_series:geforce-gt");
+    }
+
+    expect(extractProductFilterTags(12, "測試商品 730W 電源供應器")).not.toContain(
+      "gpu_series:geforce-gt",
+    );
   });
 
   it.each([

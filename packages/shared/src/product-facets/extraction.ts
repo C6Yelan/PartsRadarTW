@@ -160,7 +160,9 @@ function extractCoolerTags(text: string, add: AddTag): void {
 function extractLiquidCoolingTags(text: string, add: AddTag): void {
   const isCustom = /開放式/.test(text);
   const isComponent =
-    /水冷(?:頭|泵|排|箱|接頭|管|液)|水泵|冷排|水箱|止水栓|流量計|VRM.*水冷.*風扇/.test(text);
+    /\bNL-(?:ACF1|LC1)\b|水冷(?:頭|泵|排|箱|接頭|管|液)|水泵|冷排|水箱|止水栓|流量計|VRM.*水冷.*風扇/.test(
+      text,
+    );
   const isAio =
     !isCustom &&
     !isComponent &&
@@ -194,7 +196,7 @@ function extractGpuTags(text: string, add: AddTag): void {
   }
   add("gpu_product_type", "graphics-card");
 
-  if (/\b(?:RTX|GTX|GT)\s*\d|NVIDIA|\bN(?:210|710|730)/.test(text)) {
+  if (/\b(?:RTX|GTX|GT)\s*\d|NVIDIA|\b(?:N210|N(?:710|730)(?=$|[A-Z-])[A-Z0-9-]*)\b/.test(text)) {
     add("gpu_chip", "nvidia");
   } else if (/\bRX\s*\d|RADEON|(?:\bR7|AXR7)\s*240\b|AI\s+PRO\s+R\d/.test(text)) {
     add("gpu_chip", "amd");
@@ -206,7 +208,7 @@ function extractGpuTags(text: string, add: AddTag): void {
     ["rtx-50", /\bRTX\s*50\d{2}/],
     ["rtx-40", /\bRTX\s*40\d{2}/],
     ["rtx-30", /\bRTX\s*30\d{2}/],
-    ["geforce-gt", /\b(?:GT\s*(?:710|730|1030)|N210|N710D3|N730K)\b/],
+    ["geforce-gt", /\b(?:GT\s*(?:710|730|1030)|N210|N(?:710|730)(?=$|[A-Z-])[A-Z0-9-]*)\b/],
     ["rx-9000", /\bRX\s*9\d{3}/],
     ["rx-7000", /\bRX\s*7\d{3}/],
     ["rx-6000", /\bRX\s*6\d{3}/],
