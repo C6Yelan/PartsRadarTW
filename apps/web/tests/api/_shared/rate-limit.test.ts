@@ -25,33 +25,80 @@ const BASE_CONFIG: RateLimitConfig = {
 };
 
 describe("API rate limiter", () => {
-  it("prefers Cloudflare client IP over x-forwarded-for", () => {
+  it("uses one valid Cloudflare client IP in production and ignores forged XFF", () => {
     const request = new Request("https://partsradar.test/api/products", {
       headers: {
         "CF-Connecting-IP": "203.0.113.10",
-        "X-Forwarded-For": "198.51.100.1, 198.51.100.2",
+        "X-Forwarded-For": "198.51.100.1",
       },
     });
 
-    expect(getClientIdentifier(request)).toBe("203.0.113.10");
-    expect(getClientIdentifierInfo(request)).toEqual({
+    expect(getClientIdentifier(request, "production")).toBe("203.0.113.10");
+    expect(getClientIdentifierInfo(request, "production")).toEqual({
       source: "cf",
       value: "203.0.113.10",
     });
   });
 
-  it("uses the first x-forwarded-for value when Cloudflare IP is unavailable", () => {
+  it("does not trust XFF when the production Cloudflare header is missing", () => {
     const request = new Request("https://partsradar.test/api/products", {
       headers: {
-        "X-Forwarded-For": "198.51.100.1, 198.51.100.2",
+        "X-Forwarded-For": "198.51.100.1",
       },
     });
 
-    expect(getClientIdentifier(request)).toBe("198.51.100.1");
-    expect(getClientIdentifierInfo(request)).toEqual({
-      source: "xff",
-      value: "198.51.100.1",
+    expect(getClientIdentifier(request, "production")).toBe("unknown");
+    expect(getClientIdentifierInfo(request, "production")).toEqual({
+      source: "unknown",
+      value: "unknown",
     });
+  });
+
+  it("rejects malformed and multi-value Cloudflare client headers", () => {
+    for (const value of [
+      "not-an-ip",
+      "203.0.113.10, 198.51.100.1",
+      "203.0.113.10:443",
+      "127.0.0.1 trailing",
+    ]) {
+      const request = new Request("https://partsradar.test/api/products", {
+        headers: {
+          "CF-Connecting-IP": value,
+          "X-Forwarded-For": "198.51.100.1",
+        },
+      });
+
+      expect(getClientIdentifierInfo(request, "production")).toEqual({
+        source: "unknown",
+        value: "unknown",
+      });
+    }
+  });
+
+  it("uses a single valid local or E2E XFF only outside production", () => {
+    const localRequest = new Request("http://127.0.0.1:3000/api/products", {
+      headers: { "X-Forwarded-For": "127.0.0.1" },
+    });
+    const e2eRequest = new Request("http://127.0.0.1:3100/api/products", {
+      headers: { "X-Forwarded-For": "2001:db8::10" },
+    });
+
+    expect(getClientIdentifierInfo(localRequest, "development")).toEqual({
+      source: "xff",
+      value: "127.0.0.1",
+    });
+    expect(getClientIdentifierInfo(e2eRequest, "test")).toEqual({
+      source: "xff",
+      value: "2001:db8::10",
+    });
+    expect(
+      getClientIdentifierInfo(
+        new Request("http://127.0.0.1:3100/api/products", {
+          headers: { "X-Forwarded-For": "127.0.0.1, 10.0.0.2" },
+        }),
+        "test",
+      ),
+    ).toEqual({ source: "unknown", value: "unknown" });
   });
 
   it("falls back to an anonymous bucket when no client address is available", () => {

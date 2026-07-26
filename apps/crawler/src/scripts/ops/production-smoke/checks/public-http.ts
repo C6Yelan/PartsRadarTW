@@ -211,10 +211,10 @@ function checkRateLimitHeaders(
 
   const message = `clientSource=${snapshot.clientSource} limit=${snapshot.limit} remaining=${snapshot.remaining}`;
 
-  if (snapshot.clientSource === "unknown" && isPublicHttpsUrl(options.baseUrl)) {
+  if (snapshot.clientSource !== "cf" && isPublicHttpsUrl(options.baseUrl)) {
     return warn(
       "rate limit headers",
-      `${message}; public HTTPS smoke should expose client identity`,
+      `${message}; public HTTPS smoke should expose Cloudflare client identity`,
     );
   }
 

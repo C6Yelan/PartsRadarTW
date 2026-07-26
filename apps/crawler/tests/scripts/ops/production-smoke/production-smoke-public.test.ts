@@ -196,7 +196,33 @@ describe("production smoke public checks", () => {
           name: "rate limit headers",
           status: "WARN",
           message:
-            "clientSource=unknown limit=360 remaining=359; public HTTPS smoke should expose client identity",
+            "clientSource=unknown limit=360 remaining=359; public HTTPS smoke should expose Cloudflare client identity",
+        }),
+      ]),
+    );
+  });
+
+  it("warns when public HTTPS smoke observes XFF instead of Cloudflare identity", async () => {
+    const { crawlerCwd } = await createWorkspace();
+    stubHealthyPublicApi({ rateLimitClientSource: "xff" });
+    const options = parseProductionSmokeOptions(
+      ["--public-only", "--base-url", "https://partsradar.net"],
+      {},
+      crawlerCwd,
+    );
+
+    const summary = await runProductionPublicSmoke(
+      options,
+      new Date("2026-06-02T12:00:00.000Z"),
+    );
+
+    expect(summary.checks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "rate limit headers",
+          status: "WARN",
+          message:
+            "clientSource=xff limit=360 remaining=359; public HTTPS smoke should expose Cloudflare client identity",
         }),
       ]),
     );

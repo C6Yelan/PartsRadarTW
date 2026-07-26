@@ -2,6 +2,7 @@
 // 提供 public web API 共用的 in-memory rate limit，依 API scope 與 client identifier 控制請求量。
 
 import { createHash } from "node:crypto";
+import { isIP } from "node:net";
 import { LRUCache } from "lru-cache";
 
 import { internalErrorResponse, rateLimitedResponse } from "./responses";
@@ -173,16 +174,19 @@ export function resolveRateLimitConfig(env: RateLimitEnv = process.env): RateLim
 }
 
 // 解析目前 request 的 client identifier，供 rate limit 與 smoke 觀察來源判斷。
-export function getClientIdentifier(request: Request): string {
-  return getClientIdentifierInfo(request).value;
+export function getClientIdentifier(request: Request, nodeEnv = process.env.NODE_ENV): string {
+  return getClientIdentifierInfo(request, nodeEnv).value;
 }
 
-// 判斷 client identifier 來源；部署預期優先使用 Cloudflare header，再退回 X-Forwarded-For。
-export function getClientIdentifierInfo(request: Request): {
+// Production 只信任 Cloudflare client header；本機開發與測試才接受單一合法 XFF。
+export function getClientIdentifierInfo(
+  request: Request,
+  nodeEnv = process.env.NODE_ENV,
+): {
   source: ClientIdentifierSource;
   value: string;
 } {
-  const cloudflareIp = firstHeaderValue(request.headers.get("CF-Connecting-IP"));
+  const cloudflareIp = readSingleIpHeader(request.headers.get("CF-Connecting-IP"));
 
   if (cloudflareIp) {
     return {
@@ -191,7 +195,10 @@ export function getClientIdentifierInfo(request: Request): {
     };
   }
 
-  const forwardedForIp = firstHeaderValue(request.headers.get("X-Forwarded-For"));
+  const forwardedForIp =
+    nodeEnv === "production"
+      ? null
+      : readSingleIpHeader(request.headers.get("X-Forwarded-For"));
 
   if (forwardedForIp) {
     return {
@@ -245,10 +252,10 @@ function readPositiveInteger(value: string | undefined, fallback: number): numbe
   return Number.isSafeInteger(parsedValue) && parsedValue > 0 ? parsedValue : fallback;
 }
 
-function firstHeaderValue(value: string | null): string | null {
-  const firstValue = value?.split(",")[0]?.trim();
+function readSingleIpHeader(value: string | null): string | null {
+  const candidate = value?.trim();
 
-  return firstValue || null;
+  return candidate && !candidate.includes(",") && isIP(candidate) !== 0 ? candidate : null;
 }
 
 function hashClientIdentifier(value: string): string {
