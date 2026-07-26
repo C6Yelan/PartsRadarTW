@@ -123,6 +123,7 @@ jobs:
           --health-retries 10
     env:
       DATABASE_URL: postgresql://partsradar_e2e:partsradar_e2e@127.0.0.1:5432/partsradar_e2e
+      E2E_SKIP_BUILD: "1"
       PARTSRADAR_SKIP_DOTENV: "1"
       PARTSRADAR_TEST_DATABASE_ISOLATED: "1"
     steps:
