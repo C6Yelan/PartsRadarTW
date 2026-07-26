@@ -248,6 +248,7 @@ model DiscordPriceReportSetting {
   notificationCursorAt DateTime?                  @map("notification_cursor_at") @db.Timestamptz(6)
   createdAt            DateTime                   @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt            DateTime                   @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deliveries           DiscordNotificationDelivery[]
 
   @@index([enabled, nextSendAt], map: "discord_price_report_settings_enabled_next_send_at_idx")
   @@map("discord_price_report_settings")
@@ -283,7 +284,9 @@ model DiscordNotificationDelivery {
   productId          String?                       @map("product_id") @db.Uuid
   product            Product?                      @relation(fields: [productId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   targetPriceWatchId String?                       @map("target_price_watch_id") @db.Uuid
-  targetPriceWatch   DiscordTargetPriceWatch?      @relation(fields: [targetPriceWatchId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  targetPriceWatch   DiscordTargetPriceWatch?      @relation(fields: [targetPriceWatchId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  priceReportSettingId String?                      @map("price_report_setting_id") @db.Uuid
+  priceReportSetting   DiscordPriceReportSetting?   @relation(fields: [priceReportSettingId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   dedupeKey          String?                       @unique(map: "discord_notification_deliveries_dedupe_key_key") @map("dedupe_key") @db.Text
   itemCount          Int                           @default(0) @map("item_count")
   messageCount       Int                           @default(0) @map("message_count")
@@ -298,6 +301,7 @@ model DiscordNotificationDelivery {
   @@index([kind, status, createdAt], map: "discord_notification_deliveries_kind_status_created_at_idx")
   @@index([productId], map: "discord_notification_deliveries_product_id_idx")
   @@index([targetPriceWatchId], map: "discord_notification_deliveries_target_watch_id_idx")
+  @@index([priceReportSettingId], map: "discord_notification_deliveries_price_report_setting_id_idx")
   @@map("discord_notification_deliveries")
 }
 
@@ -306,6 +310,8 @@ model DiscordPublicPriceReportDelivery {
   crawlRunId        String                        @map("crawl_run_id") @db.Uuid
   crawlRun          CrawlRun                      @relation(fields: [crawlRunId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   channelId         String                        @map("channel_id") @db.Text
+  publicPriceReportSettingId String?               @map("public_price_report_setting_id") @db.Uuid
+  publicPriceReportSetting   DiscordPublicPriceReportSetting? @relation(fields: [publicPriceReportSettingId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   status            DiscordNotificationStatus
   itemCount         Int                           @default(0) @map("item_count")
   messageCount      Int                           @default(0) @map("message_count")
@@ -319,6 +325,7 @@ model DiscordPublicPriceReportDelivery {
 
   @@unique([crawlRunId, channelId], map: "discord_public_report_deliveries_run_channel_key")
   @@index([channelId, createdAt], map: "discord_public_price_report_deliveries_channel_created_at_idx")
+  @@index([publicPriceReportSettingId], map: "discord_public_price_report_deliveries_setting_id_idx")
   @@index([status, createdAt], map: "discord_public_price_report_deliveries_status_created_at_idx")
   @@map("discord_public_price_report_deliveries")
 }
@@ -341,10 +348,11 @@ model DiscordPublicPriceReportSetting {
   consecutiveAccessFailures Int                              @default(0) @map("consecutive_access_failures")
   retryNotBefore            DateTime?                       @map("retry_not_before") @db.Timestamptz(6)
   notificationCursorAt      DateTime?                       @map("notification_cursor_at") @db.Timestamptz(6)
-  createdByDiscordUserId    String                          @map("created_by_discord_user_id") @db.Text
-  updatedByDiscordUserId    String                          @map("updated_by_discord_user_id") @db.Text
+  createdByDiscordUserId    String?                         @map("created_by_discord_user_id") @db.Text
+  updatedByDiscordUserId    String?                         @map("updated_by_discord_user_id") @db.Text
   createdAt                 DateTime                        @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt                 DateTime                        @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deliveries               DiscordPublicPriceReportDelivery[]
 
   @@index([enabled, accessStatus, retryNotBefore], map: "discord_public_report_settings_delivery_due_idx")
   @@map("discord_public_price_report_settings")

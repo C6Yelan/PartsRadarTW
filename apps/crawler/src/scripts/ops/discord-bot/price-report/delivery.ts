@@ -74,6 +74,7 @@ export async function sendPriceReport({
   now,
   since,
   deliveryKind,
+  priceReportSettingId,
   sendReportMessages,
 }: {
   client: DiscordBotClient;
@@ -84,6 +85,7 @@ export async function sendPriceReport({
   now: Date;
   since?: Date;
   deliveryKind: "PRICE_REPORT_NOW" | "SCHEDULED_PRICE_REPORT";
+  priceReportSettingId?: string;
   sendReportMessages: (messages: DiscordBotMessage[]) => Promise<DiscordMessageSendResult>;
 }): Promise<PersonalPriceReportDeliveryResult> {
   const reportSince = since ?? new Date(now.getTime() - windowHours * HOUR_MS);
@@ -113,6 +115,7 @@ export async function sendPriceReport({
     itemCount: listedCount,
     messageCount: messages.length,
     deliveredAt: result.status === "sent" ? now : null,
+    priceReportSettingId,
     result,
   });
 
@@ -183,6 +186,7 @@ async function recordPriceReportDelivery({
   messageCount,
   deliveredAt,
   result,
+  priceReportSettingId,
 }: {
   client: DiscordBotClient;
   discordUserId: string;
@@ -192,6 +196,7 @@ async function recordPriceReportDelivery({
   messageCount: number;
   deliveredAt: Date | null;
   result: DiscordMessageSendResult;
+  priceReportSettingId?: string;
 }): Promise<void> {
   await client.discordNotificationDelivery.create({
     data: {
@@ -201,6 +206,7 @@ async function recordPriceReportDelivery({
       itemCount,
       messageCount,
       deliveredAt,
+      priceReportSettingId,
       ...toDiscordDeliveryErrorFields(result),
     },
   });

@@ -45,6 +45,7 @@ export async function recordPublicPriceReportDelivery({
   client,
   crawlRunId,
   channelId,
+  publicPriceReportSettingId,
   status,
   itemCount,
   messageCount,
@@ -57,6 +58,7 @@ export async function recordPublicPriceReportDelivery({
   client: DiscordBotClient;
   crawlRunId: string;
   channelId: string;
+  publicPriceReportSettingId: string;
   status: PublicPriceReportStatus;
   itemCount: number;
   messageCount: number;
@@ -80,8 +82,10 @@ export async function recordPublicPriceReportDelivery({
       errorMessage,
       httpStatus,
       providerErrorCode,
+      publicPriceReportSettingId,
     },
     update: {
+      publicPriceReportSettingId,
       status,
       itemCount,
       messageCount,

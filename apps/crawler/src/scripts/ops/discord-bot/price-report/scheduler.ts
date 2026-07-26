@@ -70,6 +70,7 @@ export async function sendDueScheduledPriceReports({
         cursorAt: setting.notificationCursorAt ?? setting.createdAt,
       }),
       deliveryKind: "SCHEDULED_PRICE_REPORT",
+      priceReportSettingId: setting.id,
       sendReportMessages: (messages) => sendDirectMessages(setting.discordUserId, messages),
     });
 

@@ -12,6 +12,10 @@
     "./price-report": {
       "types": "./src/price-report/index.ts",
       "default": "./src/price-report/index.ts"
+    },
+    "./discord-privacy": {
+      "types": "./src/discord-privacy/index.ts",
+      "default": "./src/discord-privacy/index.ts"
     }
   },
   "scripts": {
