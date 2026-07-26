@@ -139,6 +139,7 @@ export function createPublicReportClient({
     async (args: {
       where: { discordGuildId: string };
       data: Partial<TestDiscordPublicPriceReportSetting>;
+      select?: Record<string, boolean>;
     }) => {
       const setting = publicSettingRows.find(
         (row) => row.discordGuildId === args.where.discordGuildId,

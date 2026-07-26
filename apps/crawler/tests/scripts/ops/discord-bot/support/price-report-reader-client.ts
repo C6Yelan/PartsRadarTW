@@ -1,21 +1,8 @@
 // apps/crawler/tests/scripts/ops/discord-bot/support/price-report-reader-client.ts
 // 模擬個人價格報告 reader 需要的 product、priceSnapshot 與 sourceCategory delegate。
 import { vi } from "vitest";
-import type { PriceReportReaderClient } from "@partsradar/db/price-report";
-import {
-  compareCapturedAtAsc,
-  comparePreviousSnapshotOrder,
-  matchesProductWhere,
-  toPrismaSnapshotWithProduct,
-  toPrismaWatchProduct,
-} from "./client-mappers";
 import type { TestProductWhere, TestSnapshot, TestSourceCategory } from "./data-types";
-
-type TestPriceReportReaderClient = PriceReportReaderClient & {
-  product: { findFirst: ReturnType<typeof vi.fn> };
-  priceSnapshot: { findMany: ReturnType<typeof vi.fn> };
-  sourceCategory: { findMany: ReturnType<typeof vi.fn> };
-};
+import { toPrismaSnapshotWithProduct, toPrismaWatchProduct } from "./snapshot-records";
 
 // 依測試 snapshots 建立可查 crawl run、時間窗與前一筆價格的 in-memory reader client。
 export function createPriceReportReaderClient({
@@ -109,5 +96,44 @@ export function createPriceReportReaderClient({
     sourceCategory: {
       findMany: sourceCategoryFindMany,
     },
-  } as unknown as TestPriceReportReaderClient;
+  };
+}
+
+function matchesProductWhere(snapshot: TestSnapshot, where: TestProductWhere | undefined): boolean {
+  if (!where) {
+    return true;
+  }
+
+  const categoryIgrps = where.sourceCategory?.igrp?.in ?? [];
+
+  if (categoryIgrps.length > 0 && !categoryIgrps.includes(snapshot.categoryIgrp)) {
+    return false;
+  }
+
+  const nameContains = where.name?.contains;
+
+  if (
+    nameContains &&
+    !snapshot.productName.toLocaleLowerCase().includes(nameContains.toLocaleLowerCase())
+  ) {
+    return false;
+  }
+
+  if (!(where.AND ?? []).every((condition) => matchesProductWhere(snapshot, condition))) {
+    return false;
+  }
+
+  return !where.OR || where.OR.some((condition) => matchesProductWhere(snapshot, condition));
+}
+
+function compareCapturedAtAsc(left: TestSnapshot, right: TestSnapshot): number {
+  return left.capturedAt.getTime() - right.capturedAt.getTime() || left.id.localeCompare(right.id);
+}
+
+function comparePreviousSnapshotOrder(left: TestSnapshot, right: TestSnapshot): number {
+  return (
+    left.productId.localeCompare(right.productId) ||
+    right.capturedAt.getTime() - left.capturedAt.getTime() ||
+    right.id.localeCompare(left.id)
+  );
 }

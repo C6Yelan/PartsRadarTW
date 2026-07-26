@@ -1,8 +1,8 @@
 // apps/crawler/tests/scripts/ops/discord-bot/support/target-watch-client.ts
 // 模擬目標價 watch delegate，支援 watch 管理面板與達標通知流程。
 import { vi } from "vitest";
-import { toPrismaWatchListRecord } from "./client-mappers";
 import type { TestSnapshot, TestTargetPriceWatch } from "./data-types";
+import { toPrismaWatchProduct } from "./snapshot-records";
 
 type WatchWhere = {
   id?: string;
@@ -23,7 +23,30 @@ export function createTargetPriceWatchClient(
   snapshots: TestSnapshot[],
 ) {
   const watchRows = [...watches];
-  const toWatchRecord = (watch: TestTargetPriceWatch) => toPrismaWatchListRecord(watch, snapshots);
+  const toWatchRecord = (watch: TestTargetPriceWatch) => {
+    const latestSnapshot = snapshots
+      .filter((snapshot) => snapshot.productId === watch.productId)
+      .sort((left, right) => right.capturedAt.getTime() - left.capturedAt.getTime())[0];
+
+    return {
+      id: watch.id,
+      discordUserId: watch.discordUserId,
+      productId: watch.productId,
+      targetPrice: watch.targetPrice,
+      currency: watch.currency,
+      enabled: watch.enabled,
+      lastNotifiedAt: watch.lastNotifiedAt,
+      notificationCursorAt: watch.notificationCursorAt,
+      updatedAt: watch.updatedAt,
+      product: latestSnapshot
+        ? toPrismaWatchProduct(latestSnapshot)
+        : {
+            id: watch.productId,
+            name: "Unknown product",
+            currentPrice: null,
+          },
+    };
+  };
 
   const matchesClaim = (watch: TestTargetPriceWatch, condition: null | Date | { lte: Date }) => {
     if (condition === null) {
