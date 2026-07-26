@@ -9,7 +9,7 @@
     "typecheck": "pnpm typecheck:web && pnpm typecheck:db && pnpm typecheck:crawler",
     "lint": "biome lint .",
     "format": "biome format --write .",
-    "test": "pnpm test:core",
+    "test": "vitest run",
     "test:core": "vitest run --config vitest.core.config.ts",
     "test:ops": "vitest run --config vitest.ops.config.ts",
     "test:discord": "vitest run --config vitest.discord.config.ts",

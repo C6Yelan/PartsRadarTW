@@ -1,5 +1,5 @@
 // vitest.config.ts
-// 提供 repo-wide Vitest 預設設定，涵蓋 apps 與 packages 的一般單元 / 整合測試。
+// 提供 repo-wide Vitest 預設設定，涵蓋 apps 與 packages 的非資料庫測試。
 
 import { defineConfig } from "vitest/config";
 
@@ -14,6 +14,7 @@ export default defineConfig({
       "**/build/**",
       "**/coverage/**",
       "**/out/**",
+      "**/*.integration.test.{ts,tsx}",
       "apps/web/e2e/**",
     ],
   },

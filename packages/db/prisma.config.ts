@@ -7,7 +7,9 @@ import { defineConfig, env } from "prisma/config";
 
 const workspaceRoot = resolve(__dirname, "../..");
 
-loadDotenv({ path: resolve(workspaceRoot, ".env"), quiet: true });
+if (process.env.CI !== "true" && process.env.PARTSRADAR_SKIP_DOTENV !== "1") {
+  loadDotenv({ path: resolve(workspaceRoot, ".env"), quiet: true });
+}
 
 export default defineConfig({
   schema: "prisma/schema.prisma",
