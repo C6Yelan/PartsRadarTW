@@ -31,10 +31,37 @@ storage/
 temp/
 tmp/
 logs/
+backups/
+**/backups/
+backup/
+**/backup/
+secrets/
+**/secrets/
 apps/crawler/temp/
 data/
 *.log
 **/*.log
+
+# Deployment-side backups, archives, keys, and database exports
+*.sql
+*.dump
+*.backup
+*.bak
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+*.7z
+*.gz
+*.bz2
+*.xz
+*.zst
+*.pem
+*.key
+*.p12
+*.pfx
+*.age
+*.gpg
 
 # Deployment and repo-only files not needed in runtime images
 Dockerfile

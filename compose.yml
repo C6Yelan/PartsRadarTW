@@ -1,8 +1,14 @@
 name: partsradar-tw
 
-x-database-env: &database-env
+x-runtime-database-env: &runtime-database-env
   NODE_ENV: "production"
-  DATABASE_URL: "postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}?schema=public"
+  DATABASE_URL: "postgresql://${POSTGRES_RUNTIME_USER:?POSTGRES_RUNTIME_USER is required}:${POSTGRES_RUNTIME_PASSWORD:?POSTGRES_RUNTIME_PASSWORD is required}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}?schema=public"
+
+x-migration-database-env: &migration-database-env
+  NODE_ENV: "production"
+  MIGRATION_DATABASE_URL: "postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}?schema=public"
+  POSTGRES_RUNTIME_USER: "${POSTGRES_RUNTIME_USER:?POSTGRES_RUNTIME_USER is required}"
+  POSTGRES_RUNTIME_PASSWORD: "${POSTGRES_RUNTIME_PASSWORD:?POSTGRES_RUNTIME_PASSWORD is required}"
 
 services:
   postgres:
@@ -31,7 +37,7 @@ services:
       target: migrate
     restart: "no"
     environment:
-      <<: *database-env
+      <<: *migration-database-env
     depends_on:
       postgres:
         condition: service_healthy
@@ -44,7 +50,7 @@ services:
     restart: "no"
     command: ["pnpm", "db:seed"]
     environment:
-      <<: *database-env
+      <<: *runtime-database-env
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -76,7 +82,7 @@ services:
         CSP_REPORT_URI: "${CSP_REPORT_URI:-}"
     restart: unless-stopped
     environment:
-      <<: *database-env
+      <<: *runtime-database-env
       PORT: 3000
       HOSTNAME: 0.0.0.0
       PRODUCT_IMAGE_STORAGE_DIR: "/var/lib/partsradar/product-images"

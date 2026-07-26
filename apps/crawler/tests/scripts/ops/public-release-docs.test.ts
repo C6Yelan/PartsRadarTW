@@ -14,6 +14,7 @@ describe("public release trust-boundary documentation", () => {
     expect(operations).toContain("DISCORD_FEATURE_PERSONAL_REPORTS_ENABLED");
     expect(operations).toContain("DISCORD_FEATURE_TARGET_WATCHES_ENABLED");
     expect(operations).toContain("pnpm db:deploy");
+    expect(operations).toContain("pnpm db:configure-runtime-role");
     expect(operations).toContain("pnpm ops:discord-privacy -- cleanup");
     expect(operations).toContain("pending retry、target claim、notification cursor");
     expect(operations).toContain("才可逐一恢復 Discord feature flags");

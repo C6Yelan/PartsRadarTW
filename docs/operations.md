@@ -233,7 +233,7 @@ docker compose -f compose.yml -f compose.ops.yml logs --tail=100 discord-bot
 1. 還原到沒有 production ingress、Discord token 或外部來源網路權限的隔離環境。
 2. 在 restored DB 可被任何 scheduler 讀取前停止 `discord-bot`；同時將 `DISCORD_FEATURE_PUBLIC_REPORTS_ENABLED`、`DISCORD_FEATURE_PERSONAL_REPORTS_ENABLED` 與 `DISCORD_FEATURE_TARGET_WATCHES_ENABLED` 設為 `false`。這三個既有 flags 分別涵蓋公開報告、個人報告與 target-price delivery，不另建重複 kill switch。
 3. 停止 crawler、image recovery、snapshot cleanup 與其他 writers，再還原 PostgreSQL 及納入備份的 storage。
-4. 使用 restore 對應的 frozen release 執行 `pnpm db:deploy`，確認 `_prisma_migrations` 沒有 failed、checksum drift 或 unresolved migration。
+4. 使用 restore 對應的 frozen release與管理連線依序執行 `pnpm db:deploy`、`pnpm db:configure-runtime-role`，確認 `_prisma_migrations` 沒有 failed、checksum drift 或 unresolved migration，且 runtime role仍為非 superuser、非 database owner、沒有 role membership，只具有 application object所需權限。完成此步驟前不得讓 runtime services連線。
 5. 執行 `pnpm ops:discord-privacy -- cleanup` dry-run，審查後才使用 `--confirm-cleanup`。
 6. 從受保護的 Email／案件紀錄取得仍在最長備份保留期內、已完成驗證及刪除的案件清單，依事前核准的 maintenance replay 程序逐案呼叫既有 idempotent user／guild erase domain。不得只因資料來自舊備份就略過原案件授權，也不得臨時新增繞過驗證的 public／general-purpose CLI。
 7. 對每個案件執行 inspect，確認 personal setting、watch、delivery、actor metadata 與仍可連回 subject 的 verification request 都為零；另確認沒有 pending retry、target claim、notification cursor 或已排程 delivery。

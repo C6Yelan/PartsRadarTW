@@ -88,4 +88,4 @@ ENV NODE_ENV=production
 
 USER node
 
-CMD ["pnpm", "db:deploy"]
+CMD ["sh", "-c", "pnpm db:deploy && pnpm db:configure-runtime-role"]
