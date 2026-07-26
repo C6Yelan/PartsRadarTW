@@ -6,7 +6,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 const workspaceEnvFile = join(process.cwd(), ".env");
 
-if (existsSync(workspaceEnvFile)) {
+if (process.env.E2E_LOAD_ENV_FILE === "1" && existsSync(workspaceEnvFile)) {
   process.loadEnvFile(workspaceEnvFile);
 }
 
@@ -49,6 +49,7 @@ export default defineConfig({
   projects: [
     {
       name: "chromium-desktop",
+      grepInvert: /@mobile-only/,
       use: {
         ...devices["Desktop Chrome"],
         viewport: { width: 1440, height: 900 },
@@ -56,7 +57,7 @@ export default defineConfig({
     },
     {
       name: "chromium-tablet",
-      grepInvert: /@desktop-only|@desktop-mobile-only/,
+      grepInvert: /@desktop-only|@desktop-mobile-only|@mobile-only|@responsive-boundary/,
       use: {
         ...devices["Desktop Chrome"],
         viewport: { width: 1024, height: 768 },
@@ -64,7 +65,7 @@ export default defineConfig({
     },
     {
       name: "chromium-mobile",
-      grepInvert: /@desktop-only/,
+      grepInvert: /@desktop-only|@responsive-boundary/,
       use: {
         ...devices["Pixel 7"],
         viewport: { width: 390, height: 844 },

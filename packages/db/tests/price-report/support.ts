@@ -14,19 +14,8 @@ interface TestSnapshot {
   capturedAt: Date;
   categoryIgrp: number;
   categoryName: string;
-  categoryEnabled: boolean;
   vendorSlug: string | null;
   vendorName: string | null;
-}
-
-interface TestProductWhere {
-  sourceCategory?: {
-    enabled?: boolean;
-    igrp?: { in?: number[] };
-  };
-  name?: { contains?: string };
-  AND?: TestProductWhere[];
-  OR?: TestProductWhere[];
 }
 
 export function snapshot({
@@ -39,7 +28,6 @@ export function snapshot({
   currency = "TWD",
   categoryIgrp = 12,
   categoryName = "顯示卡",
-  categoryEnabled = true,
   vendorSlug = "asus",
   vendorName = "華碩",
 }: {
@@ -52,7 +40,6 @@ export function snapshot({
   currency?: string;
   categoryIgrp?: number;
   categoryName?: string;
-  categoryEnabled?: boolean;
   vendorSlug?: string | null;
   vendorName?: string | null;
 }): TestSnapshot {
@@ -66,7 +53,6 @@ export function snapshot({
     capturedAt: new Date(capturedAt),
     categoryIgrp,
     categoryName,
-    categoryEnabled,
     vendorSlug,
     vendorName,
   };
@@ -75,15 +61,9 @@ export function snapshot({
 export function createPriceReportReaderClient({ snapshots }: { snapshots: TestSnapshot[] }) {
   const priceSnapshotFindMany = vi.fn(async (args: { where: Record<string, unknown> }) => {
     const where = args.where;
-    const productFilter = where.product as TestProductWhere | undefined;
-
     if (typeof where.crawlRunId === "string") {
       return snapshots
-        .filter(
-          (item) =>
-            item.crawlRunId === where.crawlRunId && matchesProductWhere(item, productFilter),
-        )
-        .sort(compareCapturedAtAsc)
+        .filter((item) => item.crawlRunId === where.crawlRunId)
         .map(toPrismaSnapshotWithProduct);
     }
 
@@ -100,10 +80,8 @@ export function createPriceReportReaderClient({ snapshots }: { snapshots: TestSn
         .filter(
           (item) =>
             item.capturedAt.getTime() >= capturedAt.gte.getTime() &&
-            item.capturedAt.getTime() <= capturedAt.lte.getTime() &&
-            matchesProductWhere(item, productFilter),
+            item.capturedAt.getTime() <= capturedAt.lte.getTime(),
         )
-        .sort(compareCapturedAtAsc)
         .map(toPrismaSnapshotWithProduct);
     }
 
@@ -118,7 +96,6 @@ export function createPriceReportReaderClient({ snapshots }: { snapshots: TestSn
           (!crawlRunId || item.crawlRunId !== crawlRunId.not) &&
           item.capturedAt.getTime() < capturedAt.lt.getTime(),
       )
-      .sort(comparePreviousSnapshotOrder)
       .map(({ id, productId: itemProductId, price, currency, capturedAt: itemCapturedAt }) => ({
         id,
         productId: itemProductId,
@@ -131,32 +108,6 @@ export function createPriceReportReaderClient({ snapshots }: { snapshots: TestSn
   return {
     priceSnapshot: { findMany: priceSnapshotFindMany },
   } as unknown as PriceReportReaderClient;
-}
-
-function matchesProductWhere(snapshotItem: TestSnapshot, where: TestProductWhere | undefined) {
-  if (!where) {
-    return true;
-  }
-  if (where.sourceCategory?.enabled && !snapshotItem.categoryEnabled) {
-    return false;
-  }
-
-  const categoryIgrps = where.sourceCategory?.igrp?.in ?? [];
-  if (categoryIgrps.length > 0 && !categoryIgrps.includes(snapshotItem.categoryIgrp)) {
-    return false;
-  }
-
-  const nameContains = where.name?.contains;
-  if (
-    nameContains &&
-    !snapshotItem.productName.toLocaleLowerCase().includes(nameContains.toLocaleLowerCase())
-  ) {
-    return false;
-  }
-  if (!(where.AND ?? []).every((condition) => matchesProductWhere(snapshotItem, condition))) {
-    return false;
-  }
-  return !where.OR || where.OR.some((condition) => matchesProductWhere(snapshotItem, condition));
 }
 
 function toPrismaSnapshotWithProduct(snapshotItem: TestSnapshot) {
@@ -177,16 +128,4 @@ function toPrismaSnapshotWithProduct(snapshotItem: TestSnapshot) {
       },
     },
   };
-}
-
-function compareCapturedAtAsc(left: TestSnapshot, right: TestSnapshot) {
-  return left.capturedAt.getTime() - right.capturedAt.getTime() || left.id.localeCompare(right.id);
-}
-
-function comparePreviousSnapshotOrder(left: TestSnapshot, right: TestSnapshot) {
-  return (
-    left.productId.localeCompare(right.productId) ||
-    right.capturedAt.getTime() - left.capturedAt.getTime() ||
-    right.id.localeCompare(left.id)
-  );
 }
