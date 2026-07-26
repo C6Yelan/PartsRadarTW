@@ -24,6 +24,7 @@ export default defineConfig({
       "**/build/**",
       "**/coverage/**",
       "**/out/**",
+      "**/*.integration.test.{ts,tsx}",
       "apps/web/e2e/**",
     ],
   },

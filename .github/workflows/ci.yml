@@ -52,3 +52,53 @@ jobs:
 
       - name: Build web
         run: pnpm build:web
+
+  db-integration:
+    name: PostgreSQL integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: partsradar_test
+          POSTGRES_PASSWORD: partsradar_test
+          POSTGRES_USER: partsradar_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U partsradar_test -d partsradar_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://partsradar_test:partsradar_test@127.0.0.1:5432/partsradar_test
+      PARTSRADAR_SKIP_DOTENV: "1"
+      PARTSRADAR_TEST_DATABASE_ISOLATED: "1"
+      TEST_DATABASE_URL: postgresql://partsradar_test:partsradar_test@127.0.0.1:5432/partsradar_test
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 11.3.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm db:generate
+
+      - name: Deploy migrations
+        run: pnpm db:deploy
+
+      - name: Run PostgreSQL integration tests
+        run: pnpm test:db
