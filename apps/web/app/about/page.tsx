@@ -66,7 +66,7 @@ export default function AboutPage() {
         </p>
         <p>
           若想回報網站問題、內容錯誤或提供建議，請來信至
-          <a href="mailto:partsradartw@gmail.com">partsradartw@gmail.com</a>
+          <a href="mailto:contact@partsradar.net">contact@partsradar.net</a>
           {"。"}
         </p>
         <p>

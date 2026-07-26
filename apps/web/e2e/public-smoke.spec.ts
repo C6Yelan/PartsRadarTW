@@ -112,7 +112,7 @@ test.describe("public web smoke", () => {
     await expect(
       page.locator("main").getByText(/商品名稱、分類、價格與來源連結整理自原價屋公開頁面/),
     ).toBeVisible();
-    await expect(page.getByText("partsradartw@gmail.com")).toBeVisible();
+    await expect(page.getByText("contact@partsradar.net")).toBeVisible();
     await expect(page.getByText(/若想回報網站問題、內容錯誤或提供建議/)).toBeVisible();
     await expect(page.getByText(/請勿透過原價屋客服回報本站問題/)).toBeVisible();
     await expect(page.getByText(/敏感個人資訊/)).toBeVisible();

@@ -2,8 +2,6 @@
 
 PartsRadarTW 以 Docker Compose 支援單一主機部署。核心服務預設只綁定 loopback；public ingress、crawler、smoke 與 Discord 都由獨立 overlay／profile 啟用。
 
-本文件描述 release candidate 的部署流程，不代表任何特定主機已完成備份、edge hardening 或 migration。
-
 ## 前置需求
 
 - Docker Engine 與 Docker Compose plugin。

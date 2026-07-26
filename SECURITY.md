@@ -4,15 +4,11 @@ PartsRadarTW 會處理公開商品資料、部署 secrets、raw source snapshots
 
 ## 回報安全問題
 
-GitHub private vulnerability reporting 目前尚未啟用。若發現安全漏洞，請寄信至 `partsradartw@gmail.com`，主旨註明 `[Security]`，並提供受影響功能、可能影響與最小重現步驟。
+若發現安全漏洞，請寄信至 `contact@partsradar.net`，主旨註明 `[Security]`，並提供受影響功能、可能影響與最小重現步驟。
 
 請不要在公開 issue、Discussion 或 pull request 貼出 token、webhook、連線字串、個人資料、完整 exploit 或尚未修補的敏感細節；來信也請勿附上真實密碼、token 或不必要的個人資料。
 
-本專案沒有發布版本化的安全支援週期。安全修正以目前維護中的程式為準。
-
 ## 公開介面
-
-公開部署包含網站頁面與 [Public API](docs/api.md) 列出的 routes。
 
 網站沒有登入、管理後台、付款或下單介面。配單 refresh 不會保存 request body。
 
@@ -34,7 +30,7 @@ Web 會設定 CSP、`Referrer-Policy`、`X-Content-Type-Options`、`X-Frame-Opti
 - 商品來源圖片只接受固定原價屋 HTTPS host/path，經 crawler 下載並轉成站內 WebP；訪客圖片請求不會 proxy 外部 URL。
 - Raw snapshot 依內容狀態採不同保留期；實際部署必須依 [cleanup runbook](docs/operations.md#raw-snapshot-cleanup) 啟動並監控 cleanup。
 - 瀏覽器配單只保存商品 ID、數量、順序與時間戳於 localStorage；refresh 商品資料不持久化。
-- Discord 功能會保存 Discord user、guild、channel ID、價格報告偏好、目標價 watch 與 delivery audit metadata。程式目前沒有完整的 Discord 資料 retention／自助刪除 policy，因此不得宣稱沒有個人資料或保證固定刪除期限。
+- Discord 功能會保存 Discord user、guild、channel ID、價格報告偏好、目標價 watch 與 delivery audit metadata；目前未提供固定保留期限或自助刪除功能。
 
 ## Rate limiting
 

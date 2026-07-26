@@ -68,13 +68,4 @@ Command 註冊、Compose 啟動與維運檢查見 [operations.md](operations.md#
 
 ## 保存資料與限制
 
-資料庫會保存 Discord user、guild、channel ID、個人偏好、watch、notification claim 與安全化 delivery metadata。它不保存 Discord 原始 provider response body 或新寫入的 raw error message。
-
-目前沒有完整的 Discord 資料 retention／自助刪除 policy，也不保證：
-
-- DM 一定可送達。
-- 每日報告在指定分鐘準時送出。
-- Discord API、權限或 rate limit 永遠可用。
-- Public invite 一定已對外發布。
-
-部署前應確認資料處理方式符合實際營運需求，並在公開使用前補上適當的隱私與刪除流程。
+資料庫會保存 Discord user、guild、channel ID、個人偏好、watch、notification claim 與安全化 delivery metadata；保留與刪除限制見 [Security Policy](../SECURITY.md#資料界線)。

@@ -1,6 +1,6 @@
 # Public API
 
-PartsRadarTW 的公開 API 主要服務官方 web UI。它沒有版本化、SLA 或第三方穩定性承諾；整合方應預期 response contract 可能隨網站更新而調整。
+PartsRadarTW 的公開 API 主要服務官方 web UI，response contract 可能隨網站更新而調整。
 
 所有價格都是整數 TWD，時間為 ISO 8601。API 不需要登入。
 

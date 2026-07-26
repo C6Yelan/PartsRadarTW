@@ -56,7 +56,7 @@ export default function PrivacyPage() {
         <h2>聯絡、權利請求與政策更新</h2>
         <p>
           使用者可透過
-          <a href="mailto:partsradartw@gmail.com">partsradartw@gmail.com</a>
+          <a href="mailto:contact@partsradar.net">contact@partsradar.net</a>
           提出資料使用查詢、更正、停止使用、刪除、安全問題與網站錯誤回報。請勿在信件中附上密碼、付款資料或其他私人資訊。
         </p>
         <p>
