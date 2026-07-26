@@ -102,6 +102,10 @@ export function formatPriceReportPreviewDmNotice(
     return formatDiscordDirectMessageRateLimitForUser();
   }
 
+  if (result.status === "cancelled") {
+    return "預覽已取消。";
+  }
+
   return formatDiscordDirectMessageFailureForUser(result);
 }
 

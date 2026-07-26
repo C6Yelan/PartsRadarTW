@@ -303,4 +303,63 @@ describe("target price notification delivery", () => {
     expect(sendDirectMessages).not.toHaveBeenCalled();
     expect(client.discordNotificationDelivery.create).not.toHaveBeenCalled();
   });
+
+  it("allows an in-flight send to finish without recreating a claim, retry or delivery", async () => {
+    const client = createDiscordBotClient({
+      snapshots: [
+        snapshot({
+          id: "snapshot-in-flight",
+          productId: "product-in-flight",
+          productName: "In-flight product",
+          crawlRunId: "new-run",
+          price: 9_000,
+          capturedAt: "2026-06-07T04:55:00.000Z",
+        }),
+      ],
+      watches: [
+        targetPriceWatch({
+          id: "watch-in-flight",
+          discordUserId: "111122223333444455",
+          productId: "product-in-flight",
+          targetPrice: 10_000,
+        }),
+      ],
+    });
+    const sendDirectMessages = vi.fn(async () => {
+      client.discordTargetPriceWatch.findMany.mockResolvedValueOnce([]);
+      return {
+        status: "failed" as const,
+        messageCount: 1,
+        sentMessageCount: 0,
+        httpStatus: 500,
+        errorCategory: "PROVIDER" as const,
+        providerErrorCode: null,
+      };
+    });
+
+    await expect(
+      sendDueTargetPriceNotifications({
+        client,
+        publicBaseUrl: PUBLIC_BASE_URL,
+        now: new Date("2026-06-07T05:00:00.000Z"),
+        sendDirectMessages,
+      }),
+    ).resolves.toMatchObject({
+      processedCount: 1,
+      sentCount: 0,
+      rateLimitedCount: 0,
+      failedCount: 0,
+    });
+
+    client.discordTargetPriceWatch.findMany.mockResolvedValueOnce([]);
+    await sendDueTargetPriceNotifications({
+      client,
+      publicBaseUrl: PUBLIC_BASE_URL,
+      now: new Date("2026-06-07T05:01:00.000Z"),
+      sendDirectMessages,
+    });
+
+    expect(sendDirectMessages).toHaveBeenCalledTimes(1);
+    expect(client.discordNotificationDelivery.create).not.toHaveBeenCalled();
+  });
 });

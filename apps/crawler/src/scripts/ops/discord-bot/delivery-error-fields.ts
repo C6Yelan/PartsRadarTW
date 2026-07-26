@@ -32,3 +32,12 @@ export function toDiscordDeliveryErrorFields(
     providerErrorCode: result.providerErrorCode,
   };
 }
+
+export function isDiscordPrivacyParentDeleted(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    error.code === "P2003"
+  );
+}

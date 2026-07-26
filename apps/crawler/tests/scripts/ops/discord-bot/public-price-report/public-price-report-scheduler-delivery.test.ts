@@ -515,6 +515,56 @@ describe("public price report scheduler delivery", () => {
     expect(sendChannelMessages).not.toHaveBeenCalled();
     expect(client.discordPublicPriceReportDelivery.upsert).not.toHaveBeenCalled();
   });
+
+  it("allows an in-flight send to finish without recreating metadata, retry or alerts", async () => {
+    const client = createDiscordBotClient({
+      snapshots: publicReportPriceChangeSnapshots("public-run-in-flight"),
+      crawlRuns: [crawlRun({ id: "public-run-in-flight" })],
+      publicPriceReportSettings: [publicPriceReportSetting({ id: "setting-in-flight" })],
+    });
+    const sendChannelMessages = vi.fn(async () => {
+      client.discordPublicPriceReportSetting.findFirst.mockResolvedValueOnce(null);
+      return {
+        status: "failed" as const,
+        messageCount: 1,
+        sentMessageCount: 0,
+        httpStatus: 500,
+        errorCategory: "PROVIDER" as const,
+        providerErrorCode: null,
+      };
+    });
+    const onAccessDisabled = vi.fn();
+    const input = {
+      client,
+      options: createDiscordBotOptions(),
+      now: new Date("2026-07-23T10:00:00.000Z"),
+      sendChannelMessages,
+      probeAccess: vi.fn(async () => ({ status: "accessible" as const })),
+      onAccessDisabled,
+    };
+
+    await expect(sendPendingPublicPriceReports(input)).resolves.toMatchObject({
+      settingCount: 1,
+      processedCount: 1,
+      sentCount: 0,
+      skippedCount: 0,
+      rateLimitedCount: 0,
+      failedCount: 0,
+      retryNotBefore: null,
+    });
+
+    client.discordPublicPriceReportSetting.findMany.mockResolvedValueOnce([]);
+    await sendPendingPublicPriceReports({
+      ...input,
+      now: new Date("2026-07-23T10:01:00.000Z"),
+    });
+
+    expect(sendChannelMessages).toHaveBeenCalledTimes(1);
+    expect(client.discordPublicPriceReportDelivery.upsert).not.toHaveBeenCalled();
+    expect(client.discordPublicPriceReportSetting.updateMany).not.toHaveBeenCalled();
+    expect(input.probeAccess).not.toHaveBeenCalled();
+    expect(onAccessDisabled).not.toHaveBeenCalled();
+  });
 });
 
 const ACTIVE_ACCESS_DEPENDENCIES = {

@@ -85,6 +85,10 @@ export async function sendDueScheduledPriceReports({
       sendReportMessages: (messages) => sendDirectMessages(setting.discordUserId, messages),
     });
 
+    if (result.status === "cancelled") {
+      continue;
+    }
+
     if (result.status === "sent") {
       summary.sentCount += 1;
     } else if (result.status === "rate_limited") {

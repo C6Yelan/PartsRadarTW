@@ -4,7 +4,10 @@
 import type { Prisma } from "@partsradar/db";
 import { readRecentPriceReport } from "@partsradar/db/price-report";
 import { HOUR_MS, MAX_PRICE_REPORT_ITEMS } from "../constants";
-import { toDiscordDeliveryErrorFields } from "../delivery-error-fields";
+import {
+  isDiscordPrivacyParentDeleted,
+  toDiscordDeliveryErrorFields,
+} from "../delivery-error-fields";
 import type {
   DiscordBotClient,
   DiscordBotMessage,
@@ -110,21 +113,27 @@ export async function sendPriceReport({
 
   if (shouldSend && !(await shouldSend())) {
     return {
-      status: "failed",
+      status: "cancelled",
       changeCount: report.priceChanges.length,
       newProductCount: report.newProducts.length,
       listedCount,
       messageCount: messages.length,
-      sentMessageCount: 0,
-      httpStatus: null,
-      errorCategory: "PROVIDER",
-      providerErrorCode: null,
     };
   }
 
   const result = await sendReportMessages(messages);
 
-  await recordPriceReportDelivery({
+  if (shouldSend && !(await shouldSend())) {
+    return {
+      status: "cancelled",
+      changeCount: report.priceChanges.length,
+      newProductCount: report.newProducts.length,
+      listedCount,
+      messageCount: messages.length,
+    };
+  }
+
+  const recorded = await recordPriceReportDelivery({
     client,
     discordUserId,
     kind: deliveryKind,
@@ -135,6 +144,16 @@ export async function sendPriceReport({
     priceReportSettingId,
     result,
   });
+
+  if (!recorded) {
+    return {
+      status: "cancelled",
+      changeCount: report.priceChanges.length,
+      newProductCount: report.newProducts.length,
+      listedCount,
+      messageCount: messages.length,
+    };
+  }
 
   if (result.status === "sent") {
     return {
@@ -214,17 +233,25 @@ async function recordPriceReportDelivery({
   deliveredAt: Date | null;
   result: DiscordMessageSendResult;
   priceReportSettingId?: string;
-}): Promise<void> {
-  await client.discordNotificationDelivery.create({
-    data: {
-      discordUserId,
-      kind,
-      status: status === "sent" ? "SENT" : status === "rate_limited" ? "RATE_LIMITED" : "FAILED",
-      itemCount,
-      messageCount,
-      deliveredAt,
-      priceReportSettingId,
-      ...toDiscordDeliveryErrorFields(result),
-    },
-  });
+}): Promise<boolean> {
+  try {
+    await client.discordNotificationDelivery.create({
+      data: {
+        discordUserId,
+        kind,
+        status: status === "sent" ? "SENT" : status === "rate_limited" ? "RATE_LIMITED" : "FAILED",
+        itemCount,
+        messageCount,
+        deliveredAt,
+        priceReportSettingId,
+        ...toDiscordDeliveryErrorFields(result),
+      },
+    });
+    return true;
+  } catch (error) {
+    if (priceReportSettingId && isDiscordPrivacyParentDeleted(error)) {
+      return false;
+    }
+    throw error;
+  }
 }

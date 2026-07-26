@@ -2,7 +2,10 @@
 // 讀寫公開價格報告的 Discord 頻道發送紀錄，供排程去重與設定面板顯示狀態。
 
 import type { Prisma } from "@partsradar/db";
-import type { DiscordDeliveryErrorFields } from "../delivery-error-fields";
+import {
+  isDiscordPrivacyParentDeleted,
+  type DiscordDeliveryErrorFields,
+} from "../delivery-error-fields";
 import type { DiscordBotClient } from "../types";
 
 // 公開價格報告 delivery 的持久化狀態，對應成功、略過、失敗與 Discord rate limit。
@@ -63,37 +66,45 @@ export async function recordPublicPriceReportDelivery({
   itemCount: number;
   messageCount: number;
   deliveredAt: Date | null;
-} & DiscordDeliveryErrorFields): Promise<void> {
-  await client.discordPublicPriceReportDelivery.upsert({
-    where: {
-      crawlRunId_channelId: {
+} & DiscordDeliveryErrorFields): Promise<boolean> {
+  try {
+    await client.discordPublicPriceReportDelivery.upsert({
+      where: {
+        crawlRunId_channelId: {
+          crawlRunId,
+          channelId,
+        },
+      },
+      create: {
         crawlRunId,
         channelId,
+        status,
+        itemCount,
+        messageCount,
+        deliveredAt,
+        errorCategory,
+        errorMessage,
+        httpStatus,
+        providerErrorCode,
+        publicPriceReportSettingId,
       },
-    },
-    create: {
-      crawlRunId,
-      channelId,
-      status,
-      itemCount,
-      messageCount,
-      deliveredAt,
-      errorCategory,
-      errorMessage,
-      httpStatus,
-      providerErrorCode,
-      publicPriceReportSettingId,
-    },
-    update: {
-      publicPriceReportSettingId,
-      status,
-      itemCount,
-      messageCount,
-      deliveredAt,
-      errorCategory,
-      errorMessage,
-      httpStatus,
-      providerErrorCode,
-    },
-  });
+      update: {
+        publicPriceReportSettingId,
+        status,
+        itemCount,
+        messageCount,
+        deliveredAt,
+        errorCategory,
+        errorMessage,
+        httpStatus,
+        providerErrorCode,
+      },
+    });
+    return true;
+  } catch (error) {
+    if (isDiscordPrivacyParentDeleted(error)) {
+      return false;
+    }
+    throw error;
+  }
 }
