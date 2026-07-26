@@ -47,7 +47,7 @@ export const SOURCE_FILTER_SECTION_MAPPINGS: readonly SourceFilterSectionMapping
         "1851": ["socket:lga1851"],
         AM4: ["socket:am4"],
         AM5: ["socket:am5"],
-        Threadripper: ["socket:str5"],
+        Threadripper: null,
       }),
       group("product", {
         "E-ATX": ["form_factor:e-atx"],

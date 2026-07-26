@@ -64,7 +64,10 @@ const REQUIREMENTS: Readonly<Record<number, readonly CoverageRequirement[]>> = {
   8: [...required(["capacity_gb"], 1), ...required(["storage_usage"], 0.98)],
   9: required(["external_type", "capacity_gb"], 0.95),
   10: required(["cooler_type"], 0.95),
-  11: [...required(["liquid_type"], 0.95), ...required(["radiator_size_mm"], 0.98)],
+  11: [
+    ...required(["liquid_type"], 0.95),
+    ...required(["radiator_size_mm"], 0.98, (tags) => tags.get("liquid_type")?.has("aio") ?? false),
+  ],
   12: [
     ...required(["gpu_product_type"], 1),
     ...required(

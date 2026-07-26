@@ -147,7 +147,7 @@ function hasKnownCpuWithIntegratedGraphics(text: string): boolean {
 
 function extractMotherboardTags(text: string, add: AddTag): void {
   const chipsetRules: MatchRule[] = [
-    ["b650e", /\bB650E\b/],
+    ["b650e", /\bB650E(?=M?\b)/],
     ["x670e", /\bX670E\b/],
     ["x870e", /\bX870E\b/],
     ["h610", /\bH610(?:M|I)?\b/],
@@ -173,6 +173,7 @@ function extractMotherboardTags(text: string, add: AddTag): void {
     ["x670", /\bX670\b/],
     ["x870", /\bX870(?!E)/],
     ["trx50", /\bTRX50\b/],
+    ["wrx80", /\bWRX80(?:E)?\b/],
     ["wrx90", /\bWRX90(?:E)?\b/],
   ];
   addFirstMatch(add, "chipset", text, chipsetRules);
@@ -185,6 +186,8 @@ function extractMotherboardTags(text: string, add: AddTag): void {
     add("socket", "am4");
   } else if (/\b(?:A620|B650|B840|B850|X670|X870)/.test(text)) {
     add("socket", "am5");
+  } else if (/\bWRX80(?:E)?\b/.test(text)) {
+    add("socket", "swrx8");
   } else if (/\b(?:TRX50|WRX90)(?:E)?\b/.test(text)) {
     add("socket", "str5");
   }
@@ -195,6 +198,10 @@ function extractMotherboardTags(text: string, add: AddTag): void {
     ["ddr5", /\bDDR5\b|(?:^|[^A-Z0-9])D5(?=$|[^A-Z0-9])/],
   ]);
   if (/\b(?:A520|B550)/.test(text)) {
+    add("memory_type", "ddr4");
+  } else if (/\bH81M-K\b/.test(text)) {
+    add("memory_type", "ddr3");
+  } else if (/\b(?:H610M-H2\/M\.2|PRO\s+H610M-E)\b/.test(text)) {
     add("memory_type", "ddr4");
   } else if (
     /\b(?:A620|B650|B840|B850|X670|X870|H810|B860|Z890|W790|W880|W890|TRX50|WRX90)/.test(text)
@@ -277,6 +284,7 @@ function extractStorageTags(text: string, add: AddTag, includeCapacityBucket = f
     }
   }
   addAllMatches(add, "storage_usage", text, [
+    ["laptop", /\bMQ04ABD200\b/],
     ["nas", /\bNAS\b|NAS碟|那嘶狼|【紅標(?:PLUS|PRO)?】/],
     ["surveillance", /監控|【紫標(?:PRO)?】/],
     ["enterprise", /企業|ULTRASTAR|【金標】/],
@@ -330,19 +338,32 @@ function extractCoolerTags(text: string, add: AddTag): void {
 }
 
 function extractLiquidCoolingTags(text: string, add: AddTag): void {
-  if (/開放式/.test(text)) {
-    add("liquid_type", "custom");
-  } else if (/水冷(?:頭|泵|排|箱|接頭|管|液)|水泵|冷排|水箱|止水栓|流量計/.test(text)) {
-    add("liquid_type", "component");
-  } else if (
+  const isCustom = /開放式/.test(text);
+  const isComponent =
+    /水冷(?:頭|泵|排|箱|接頭|管|液)|水泵|冷排|水箱|止水栓|流量計|VRM.*水冷.*風扇/.test(text);
+  const isAio =
+    !isCustom &&
+    !isComponent &&
     /一體式|AIO|封閉式|水冷|\b(?:PANORAMA|HYPERFLOW|NANCOOL|TUF\s+GAMING\s+LC|ROG\s+(?:STRIX\s+(?:LC|SLC(?:\s+IV)?)|SLC(?:\s+IV)?|RYUO)|LC\s+III|CORELIQUID|AQUAFUSION|FROZEN\s+WARFRAME|GRAND\s+VISION|HYDROSHIFT|WATERFORCE)\b|ASETEK/.test(
       text,
-    )
-  ) {
+    );
+
+  if (isCustom) {
+    add("liquid_type", "custom");
+  } else if (isComponent) {
+    add("liquid_type", "component");
+  } else if (isAio) {
     add("liquid_type", "aio");
   }
 
-  addFirstNumberMatch(add, "radiator_size_mm", text, /(?:^|[^\d])(120|240|280|360|420)(?=[^\d]|$)/);
+  if (isAio || /水冷排|冷排/.test(text)) {
+    addFirstNumberMatch(
+      add,
+      "radiator_size_mm",
+      text,
+      /(?:^|[^\d])(120|240|280|360|420)(?=[^\d]|$)/,
+    );
+  }
   extractExplicitSockets(text, add);
 }
 
@@ -365,19 +386,19 @@ function extractGpuTags(text: string, add: AddTag): void {
     ["rtx-50", /\bRTX\s*50\d{2}/],
     ["rtx-40", /\bRTX\s*40\d{2}/],
     ["rtx-30", /\bRTX\s*30\d{2}/],
-    ["geforce-gt", /\b(?:GT\s*(?:710|730|1030)|N(?:210|710|730))\b/],
+    ["geforce-gt", /\b(?:GT\s*(?:710|730|1030)|N210|N710D3|N730K)\b/],
     ["rx-9000", /\bRX\s*9\d{3}/],
     ["rx-7000", /\bRX\s*7\d{3}/],
     ["rx-6000", /\bRX\s*6\d{3}/],
     ["arc", /\bARC\s*(?:PRO\s+)?[AB]?\d|INTEL\s+ARC/],
     ["professional", /\b(?:NVIDIA\s+RTX\s+(?:A\d|\d{4}\s+ADA)|RTX\s+PRO|AI\s+PRO\s+R\d)/],
-    ["legacy-radeon", /\bR7\s*240\b/],
+    ["legacy-radeon", /(?:\bR7|AXR7)\s*240\b/],
   ]);
   addFirstNumberMatch(
     add,
     "vram_gb",
     text,
-    /(?:^|[/\s(-])(?:O)?(1|2|4|6|8|10|12|16|20|24|32|48|72|96)\s*G(?:B|D[34567])?(?=$|[-/\s(),])/,
+    /(?:^|[/\s(-])(?:O)?(1|2|4|6|8|10|12|16|20|24|32|48|72|96)\s*G(?:B(?:D[34567])?|D[34567])?(?=$|[-/\s(),]|\p{Script=Han})/u,
   );
   if (/\bRTX\s*5050\b|\bRTX\s*5060(?!\s*TI)\b/.test(text)) {
     add("vram_gb", "8");
@@ -461,7 +482,9 @@ function extractFanAccessoryTags(text: string, add: AddTag): void {
   } else if (/支架|支撐架|轉接架|直立套件|BRACKET/.test(text)) {
     add("fan_product_type", "bracket");
   } else if (
-    /風扇|效能扇|反向扇|雙向扇|磁軌扇|薄扇|靜音扇|\bFAN\b|\bNF-[A-Z0-9]|\bPWM\b/.test(text)
+    /風扇|效能扇|反向扇|雙向扇|磁軌扇|薄扇|靜音扇|\bFAN\b|\bNF-[A-Z0-9]|\bPWM\b|WONDER\s+TORNADO|\bWT1225[A-Z0-9-]*\b/.test(
+      text,
+    )
   ) {
     add("fan_product_type", "fan");
   } else if (/燈效套件|擴充USB模組|LCD|螢幕|燈條/.test(text)) {
@@ -482,6 +505,7 @@ function extractFormFactors(text: string, add: AddTag, key: string): void {
     ["atx", /(?:^|[(/,\s])ATX(?=$|[^A-Z0-9-])/],
     ["m-atx", /(?:^|[(/,\s])(?:M-?ATX|MICRO\s*ATX)(?=$|[^A-Z0-9-])/],
     ["mini-itx", /(?:^|[^A-Z0-9])(?:MINI-?ITX|ITX)(?=$|[^A-Z0-9])/],
+    ["ceb", /(?:^|[(/,\s])CEB(?=$|[^A-Z0-9-])/],
     ["eeb", /(?:^|[(/,\s])EEB(?=$|[^A-Z0-9-])/],
   ]);
 }
@@ -502,6 +526,8 @@ function extractFanSize(text: string, add: AddTag): void {
     add("fan_size_mm", "120");
   } else if (/\b14\s*CM\b/.test(text)) {
     add("fan_size_mm", "140");
+  } else if (/WONDER\s+TORNADO\s+120|\bWT1225[A-Z0-9-]*\b/.test(text)) {
+    add("fan_size_mm", "120");
   }
 }
 

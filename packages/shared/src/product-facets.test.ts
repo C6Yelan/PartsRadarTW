@@ -56,12 +56,19 @@ describe("product facets", () => {
     expect(tags).not.toContain("chipset:b650");
   });
 
+  it("recognizes the B650E chipset in the confirmed B650EM model without matching B650M", () => {
+    expect(extractProductFilterTags(5, "技嘉 B650EM FORCE WIFI6E")).toContain("chipset:b650e");
+    expect(extractProductFilterTags(5, "技嘉 B650M FORCE WIFI")).toContain("chipset:b650");
+    expect(extractProductFilterTags(5, "技嘉 B650M FORCE WIFI")).not.toContain("chipset:b650e");
+  });
+
   it("removes the legacy motherboard socket catch-all while preserving chipset tags", () => {
     expect(getFacetOptions(5, "socket").map((option) => option.value)).toEqual([
       "lga1851",
       "lga1700",
       "am5",
       "am4",
+      "swrx8",
       "str5",
     ]);
     expect(isProductFilterTagSupported(5, "socket:other")).toBe(false);
@@ -85,6 +92,53 @@ describe("product facets", () => {
     ["PRO WS WRX90E-SAGE SE 主機板", "socket:str5"],
   ])("keeps supported motherboard socket parsing for %s", (name, expectedSocket) => {
     expect(extractProductFilterTags(5, name)).toContain(expectedSocket);
+  });
+
+  it("keeps WRX80 on sWRX8 when stale filter-sync data reports generic Threadripper", () => {
+    const localTags = extractProductFilterTags(5, "華碩 PRO WS WRX80E-SAGE SE WIFI II");
+
+    expect(localTags).toEqual(["socket:swrx8", "chipset:wrx80", "memory_type:ddr4", "wifi:yes"]);
+    expect(mergeProductFilterTags(5, localTags, ["socket:str5"])).toEqual(localTags);
+  });
+
+  it.each([
+    "華擎 H610M-H2/M.2",
+    "微星 PRO H610M-E",
+  ])("adds DDR4 only for the confirmed H610 motherboard models: %s", (name) => {
+    expect(extractProductFilterTags(5, name)).toContain("memory_type:ddr4");
+  });
+
+  it("does not infer a memory type for an unspecified H610 model", () => {
+    expect(extractProductFilterTags(5, "測試 H610M 主機板")).not.toContain("memory_type:ddr4");
+  });
+
+  it("supports the confirmed H81 DDR3 motherboard without inventing a newer memory type", () => {
+    expect(extractProductFilterTags(5, "華碩 H81M-K")).toEqual(["chipset:h81", "memory_type:ddr3"]);
+  });
+
+  it("exposes the new motherboard and HDD taxonomy with the requested UI labels", () => {
+    expect(getFacetOptions(5, "socket").find(({ value }) => value === "swrx8")?.label).toBe(
+      "sWRX8 / Threadripper Pro",
+    );
+    expect(getFacetOptions(5, "form_factor").find(({ value }) => value === "ceb")?.label).toBe(
+      "CEB",
+    );
+    expect(getFacetOptions(5, "memory_type").find(({ value }) => value === "ddr3")?.label).toBe(
+      "DDR3",
+    );
+    expect(getFacetOptions(8, "storage_usage").find(({ value }) => value === "laptop")?.label).toBe(
+      "筆電／行動裝置",
+    );
+  });
+
+  it.each([
+    "華碩 Pro WS W790-ACE CEB",
+    "華碩 PRO WS TRX50-SAGE WIFI CEB",
+    "華碩 Pro WS W890-SAGE CEB",
+  ])("extracts CEB without confusing it with EEB: %s", (name) => {
+    const tags = extractProductFilterTags(5, name);
+    expect(tags).toContain("form_factor:ceb");
+    expect(tags).not.toContain("form_factor:eeb");
   });
 
   it("extracts memory type, capacity, and speed", () => {
@@ -225,6 +279,14 @@ describe("product facets", () => {
     ]);
   });
 
+  it.each([
+    "Noctua 120mm VRM 水冷專用風扇",
+    "曜越 T1000 水冷液",
+    "銀欣 IceMyst 120mm 水冷頭風扇",
+  ])("keeps non-radiator liquid-cooling accessories out of AIO radiator tags: %s", (name) => {
+    expect(extractProductFilterTags(11, name)).toEqual(["liquid_type:component"]);
+  });
+
   it("extracts GPU chip, series, and VRAM", () => {
     expect(extractProductFilterTags(12, "NVIDIA GeForce RTX 5070 Ti 16GB")).toEqual([
       "gpu_product_type:graphics-card",
@@ -256,6 +318,31 @@ describe("product facets", () => {
       "gpu_series:arc",
       `vram_gb:${vramGb}`,
     ]);
+  });
+
+  it.each([
+    [
+      "撼訊 AXR7 240 2GBD5",
+      ["gpu_product_type:graphics-card", "gpu_chip:amd", "gpu_series:legacy-radeon", "vram_gb:2"],
+    ],
+    ["麗臺 N730K", ["gpu_product_type:graphics-card", "gpu_chip:nvidia", "gpu_series:geforce-gt"]],
+    ["華碩 N710D3", ["gpu_product_type:graphics-card", "gpu_chip:nvidia", "gpu_series:geforce-gt"]],
+    [
+      "RTX5060Ti 16G冰魄白",
+      ["gpu_product_type:graphics-card", "gpu_chip:nvidia", "gpu_series:rtx-50", "vram_gb:16"],
+    ],
+  ])("extracts only explicit GPU series and VRAM from confirmed live names: %s", (name, tags) => {
+    expect(extractProductFilterTags(12, name)).toEqual(tags);
+  });
+
+  it.each([
+    "RTX 3050",
+    "RTX 3060",
+    "外接顯示卡",
+  ])("does not infer VRAM when the GPU name omits capacity: %s", (name) => {
+    expect(extractProductFilterTags(12, name).some((tag) => tag.startsWith("vram_gb:"))).toBe(
+      false,
+    );
   });
 
   it("extracts multiple explicitly supported case form factors", () => {
@@ -383,6 +470,12 @@ describe("product facets", () => {
     ]);
   });
 
+  it("recognizes the confirmed Wonder Tornado model as a 120mm fan", () => {
+    expect(
+      extractProductFilterTags(16, "Scythe Wonder Tornado 120 ARGB WT1225FD25WARX3-P"),
+    ).toEqual(["fan_product_type:fan", "fan_size_mm:120", "lighting:argb"]);
+  });
+
   it("does not give an unknown fan accessory a catch-all type", () => {
     expect(extractProductFilterTags(16, "機殼專用磁吸飾板")).toEqual([]);
   });
@@ -408,6 +501,13 @@ describe("product facets", () => {
       "capacity_gb:3000",
       "storage_usage:desktop",
     ]);
+    const laptopTags = extractProductFilterTags(8, "Toshiba 2TB 2.5吋 5400轉 MQ04ABD200【限搭機】");
+    expect(laptopTags).toEqual([
+      "form_factor:2-5-inch",
+      "capacity_gb:2000",
+      "storage_usage:laptop",
+    ]);
+    expect(mergeProductFilterTags(8, laptopTags, ["storage_usage:desktop"])).toEqual(laptopTags);
   });
 
   it("keeps storage capacities scoped to each category without mutating the shared registry", () => {
@@ -506,7 +606,7 @@ describe("product facets", () => {
       ["Intel 舊平台／工作站", ["h81", "h110", "h310", "h510", "w680", "w790", "w880", "w890"]],
       ["AMD AM4", ["a520", "b550"]],
       ["AMD AM5", ["a620", "b650", "b650e", "b840", "b850", "x670", "x670e", "x870", "x870e"]],
-      ["Threadripper", ["trx50", "wrx90"]],
+      ["Threadripper", ["trx50", "wrx80", "wrx90"]],
     ]);
     expect(getFacetOptions(5, "chipset").find(({ value }) => value === "b650e")?.label).toBe(
       "B650E",

@@ -86,6 +86,7 @@ const SOCKET_OPTIONS = [
   option("lga1700", "LGA 1700"),
   option("am5", "AM5"),
   option("am4", "AM4"),
+  option("swrx8", "sWRX8 / Threadripper Pro"),
   option("str5", "sTR5 / Threadripper"),
 ] as const;
 
@@ -141,6 +142,7 @@ const PRODUCT_FACETS_BY_IGRP: Readonly<Record<number, readonly ProductFacetDefin
         option("x870", "X870", "AMD AM5"),
         option("x870e", "X870E", "AMD AM5"),
         option("trx50", "TRX50", "Threadripper"),
+        option("wrx80", "WRX80", "Threadripper"),
         option("wrx90", "WRX90", "Threadripper"),
       ],
       3,
@@ -150,9 +152,14 @@ const PRODUCT_FACETS_BY_IGRP: Readonly<Record<number, readonly ProductFacetDefin
       option("atx", "ATX"),
       option("m-atx", "M-ATX"),
       option("mini-itx", "Mini-ITX"),
+      option("ceb", "CEB"),
       option("eeb", "EEB"),
     ]),
-    facet("memory_type", "記憶體規格", [option("ddr4", "DDR4"), option("ddr5", "DDR5")]),
+    facet("memory_type", "記憶體規格", [
+      option("ddr3", "DDR3"),
+      option("ddr4", "DDR4"),
+      option("ddr5", "DDR5"),
+    ]),
     facet("wifi", "無線網路", [option("yes", "含 Wi-Fi")]),
   ],
   6: [
@@ -212,6 +219,7 @@ const PRODUCT_FACETS_BY_IGRP: Readonly<Record<number, readonly ProductFacetDefin
     facet("capacity_gb", "容量", getCapacityOptionsForIgrp(8)),
     facet("storage_usage", "硬碟用途", [
       option("desktop", "一般桌機"),
+      option("laptop", "筆電／行動裝置"),
       option("nas", "NAS"),
       option("surveillance", "監控"),
       option("enterprise", "企業"),
@@ -402,10 +410,20 @@ export function mergeProductFilterTags(
   localTags: readonly string[],
   sourceTags: readonly string[],
 ): string[] {
-  const sourceFacetKeys = new Set(sourceTags.map(readFacetKey));
+  const protectedLocalFacetKeys = new Set<string>();
+  if (igrp === 5 && localTags.includes("socket:swrx8")) {
+    protectedLocalFacetKeys.add("socket");
+  }
+  if (igrp === 8 && localTags.includes("storage_usage:laptop")) {
+    protectedLocalFacetKeys.add("storage_usage");
+  }
+  const effectiveSourceTags = sourceTags.filter(
+    (tag) => !protectedLocalFacetKeys.has(readFacetKey(tag)),
+  );
+  const sourceFacetKeys = new Set(effectiveSourceTags.map(readFacetKey));
   const selected = new Set([
     ...localTags.filter((tag) => !sourceFacetKeys.has(readFacetKey(tag))),
-    ...sourceTags,
+    ...effectiveSourceTags,
   ]);
 
   return getProductFacetDefinitions(igrp).flatMap((definition) =>

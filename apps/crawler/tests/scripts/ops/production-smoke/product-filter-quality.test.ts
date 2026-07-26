@@ -61,6 +61,18 @@ describe("product filter quality audit", () => {
     expect(audit.conflicts).toEqual([]);
   });
 
+  it("requires radiator size only for actual AIO liquid coolers", () => {
+    const audit = auditProductFilterQuality([
+      product("aio", 11, ["liquid_type:aio", "radiator_size_mm:360"]),
+      product("coolant", 11, ["liquid_type:component"]),
+      product("water-block-fan", 11, ["liquid_type:component"]),
+    ]);
+
+    expect(audit.coverage["11:liquid_type"]).toBe(1);
+    expect(audit.coverage["11:radiator_size_mm"]).toBe(1);
+    expect(audit.belowMinimum).toEqual([]);
+  });
+
   it("reports unsupported tags and mutually exclusive values", () => {
     const audit = auditProductFilterQuality([
       product("ram", 6, [
