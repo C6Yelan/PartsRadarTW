@@ -120,6 +120,13 @@ enum DiscordPublicReportAccessStatus {
   @@map("discord_public_report_access_status")
 }
 
+enum DiscordPrivacyRequestType {
+  INSPECT @map("inspect")
+  ERASE   @map("erase")
+
+  @@map("discord_privacy_request_type")
+}
+
 model SourceCategory {
   id              String                   @id @default(uuid()) @db.Uuid
   igrp            Int
@@ -243,6 +250,7 @@ model DiscordPriceReportSetting {
   includePriceRises    Boolean                    @default(true) @map("include_price_rises")
   includeNewProducts   Boolean                    @default(true) @map("include_new_products")
   enabled              Boolean                    @default(true)
+  disabledAt           DateTime?                  @map("disabled_at") @db.Timestamptz(6)
   nextSendAt           DateTime?                  @map("next_send_at") @db.Timestamptz(6)
   lastSentAt           DateTime?                  @map("last_sent_at") @db.Timestamptz(6)
   notificationCursorAt DateTime?                  @map("notification_cursor_at") @db.Timestamptz(6)
@@ -262,6 +270,7 @@ model DiscordTargetPriceWatch {
   targetPrice           Int                           @map("target_price")
   currency              Currency                      @default(TWD)
   enabled               Boolean                       @default(true)
+  disabledAt            DateTime?                     @map("disabled_at") @db.Timestamptz(6)
   lastNotifiedAt        DateTime?                     @map("last_notified_at") @db.Timestamptz(6)
   notificationClaimedAt DateTime?                     @map("notification_claimed_at") @db.Timestamptz(6)
   notificationCursorAt  DateTime?                     @map("notification_cursor_at") @db.Timestamptz(6)
@@ -343,6 +352,7 @@ model DiscordPublicPriceReportSetting {
   enabled                   Boolean                         @default(true)
   accessStatus              DiscordPublicReportAccessStatus @default(ACTIVE) @map("access_status")
   disabledAt               DateTime?                       @map("disabled_at") @db.Timestamptz(6)
+  purgeAfter               DateTime?                       @map("purge_after") @db.Timestamptz(6)
   lastDiscordErrorCode      Int?                            @map("last_discord_error_code")
   lastAccessCheckedAt       DateTime?                       @map("last_access_checked_at") @db.Timestamptz(6)
   consecutiveAccessFailures Int                              @default(0) @map("consecutive_access_failures")
@@ -355,7 +365,27 @@ model DiscordPublicPriceReportSetting {
   deliveries               DiscordPublicPriceReportDelivery[]
 
   @@index([enabled, accessStatus, retryNotBefore], map: "discord_public_report_settings_delivery_due_idx")
+  @@index([purgeAfter], map: "discord_public_report_settings_purge_after_idx")
   @@map("discord_public_price_report_settings")
+}
+
+model DiscordPrivacyVerificationRequest {
+  id             String                    @id @default(uuid()) @db.Uuid
+  requestType    DiscordPrivacyRequestType @map("request_type")
+  discordUserId  String                    @map("discord_user_id") @db.Text
+  codeDigest     String                    @map("code_digest") @db.Text
+  expiresAt      DateTime                  @map("expires_at") @db.Timestamptz(6)
+  attemptCount   Int                       @default(0) @map("attempt_count")
+  maxAttempts    Int                       @default(5) @map("max_attempts")
+  verifiedAt     DateTime?                 @map("verified_at") @db.Timestamptz(6)
+  consumedAt     DateTime?                 @map("consumed_at") @db.Timestamptz(6)
+  cancelledAt    DateTime?                 @map("cancelled_at") @db.Timestamptz(6)
+  createdAt      DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime                  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([discordUserId, createdAt], map: "discord_privacy_verification_user_created_at_idx")
+  @@index([expiresAt], map: "discord_privacy_verification_expires_at_idx")
+  @@map("discord_privacy_verification_requests")
 }
 
 model CrawlRun {

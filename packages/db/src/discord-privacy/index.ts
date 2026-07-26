@@ -28,6 +28,7 @@ type PrivacyClient = Pick<
   | "discordPublicPriceReportDelivery"
   | "discordPublicPriceReportSetting"
   | "discordTargetPriceWatch"
+  | "discordPrivacyVerificationRequest"
 >;
 
 type PrivacyTransactionClient = Pick<
@@ -37,6 +38,7 @@ type PrivacyTransactionClient = Pick<
   | "discordPublicPriceReportDelivery"
   | "discordPublicPriceReportSetting"
   | "discordTargetPriceWatch"
+  | "discordPrivacyVerificationRequest"
 >;
 
 export async function inspectDiscordUserData(
@@ -76,18 +78,7 @@ export async function eraseDiscordUserData(
 ): Promise<DiscordUserEraseResult> {
   return client.$transaction(async (transaction) => {
     const before = await inspectDiscordUserData(transaction, discordUserId);
-
-    await transaction.discordNotificationDelivery.deleteMany({ where: { discordUserId } });
-    await transaction.discordTargetPriceWatch.deleteMany({ where: { discordUserId } });
-    await transaction.discordPriceReportSetting.deleteMany({ where: { discordUserId } });
-    await transaction.discordPublicPriceReportSetting.updateMany({
-      where: { createdByDiscordUserId: discordUserId },
-      data: { createdByDiscordUserId: null },
-    });
-    await transaction.discordPublicPriceReportSetting.updateMany({
-      where: { updatedByDiscordUserId: discordUserId },
-      data: { updatedByDiscordUserId: null },
-    });
+    await eraseDiscordUserDataInTransaction(transaction, discordUserId);
 
     return before;
   });
@@ -154,3 +145,112 @@ export async function eraseDiscordGuildData(
     return before;
   });
 }
+
+export async function inspectVerifiedDiscordUserData({
+  client,
+  requestId,
+  now = new Date(),
+}: {
+  client: PrivacyClient;
+  requestId: string;
+  now?: Date;
+}): Promise<{ discordUserId: string; counts: DiscordUserDataSummary }> {
+  return client.$transaction(async (transaction) => {
+    const request = await readAuthorizedRequest(transaction, requestId, "INSPECT", now);
+    const counts = await inspectDiscordUserData(transaction, request.discordUserId);
+    await consumeAuthorizedRequest(transaction, request.id, now);
+    return { discordUserId: request.discordUserId, counts };
+  });
+}
+
+export async function eraseVerifiedDiscordUserData({
+  client,
+  requestId,
+  now = new Date(),
+}: {
+  client: PrivacyClient;
+  requestId: string;
+  now?: Date;
+}): Promise<{ discordUserId: string; counts: DiscordUserEraseResult }> {
+  return client.$transaction(async (transaction) => {
+    const request = await readAuthorizedRequest(transaction, requestId, "ERASE", now);
+    const counts = await inspectDiscordUserData(transaction, request.discordUserId);
+    await eraseDiscordUserDataInTransaction(transaction, request.discordUserId);
+    await consumeAuthorizedRequest(transaction, request.id, now);
+    return { discordUserId: request.discordUserId, counts };
+  });
+}
+
+async function readAuthorizedRequest(
+  transaction: PrivacyTransactionClient,
+  requestId: string,
+  requestType: "INSPECT" | "ERASE",
+  now: Date,
+) {
+  const request = await transaction.discordPrivacyVerificationRequest.findUnique({
+    where: { id: requestId },
+    select: {
+      id: true,
+      requestType: true,
+      discordUserId: true,
+      expiresAt: true,
+      verifiedAt: true,
+      consumedAt: true,
+      cancelledAt: true,
+    },
+  });
+
+  if (
+    !request ||
+    request.requestType !== requestType ||
+    !request.verifiedAt ||
+    request.consumedAt ||
+    request.cancelledAt ||
+    request.expiresAt.getTime() <= now.getTime()
+  ) {
+    throw new Error("A matching unexpired verified privacy request is required.");
+  }
+
+  return request;
+}
+
+async function consumeAuthorizedRequest(
+  transaction: PrivacyTransactionClient,
+  requestId: string,
+  now: Date,
+): Promise<void> {
+  const result = await transaction.discordPrivacyVerificationRequest.updateMany({
+    where: {
+      id: requestId,
+      verifiedAt: { not: null },
+      consumedAt: null,
+      cancelledAt: null,
+      expiresAt: { gt: now },
+    },
+    data: { consumedAt: now },
+  });
+
+  if (result.count !== 1) {
+    throw new Error("The verified privacy request could not be consumed.");
+  }
+}
+
+async function eraseDiscordUserDataInTransaction(
+  transaction: PrivacyTransactionClient,
+  discordUserId: string,
+): Promise<void> {
+  await transaction.discordNotificationDelivery.deleteMany({ where: { discordUserId } });
+  await transaction.discordTargetPriceWatch.deleteMany({ where: { discordUserId } });
+  await transaction.discordPriceReportSetting.deleteMany({ where: { discordUserId } });
+  await transaction.discordPublicPriceReportSetting.updateMany({
+    where: { createdByDiscordUserId: discordUserId },
+    data: { createdByDiscordUserId: null },
+  });
+  await transaction.discordPublicPriceReportSetting.updateMany({
+    where: { updatedByDiscordUserId: discordUserId },
+    data: { updatedByDiscordUserId: null },
+  });
+}
+
+export * from "./retention";
+export * from "./verification";
