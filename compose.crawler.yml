@@ -1,6 +1,6 @@
-x-database-env: &database-env
+x-runtime-database-env: &runtime-database-env
   NODE_ENV: "production"
-  DATABASE_URL: "postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}?schema=public"
+  DATABASE_URL: "postgresql://${POSTGRES_RUNTIME_USER:?POSTGRES_RUNTIME_USER is required}:${POSTGRES_RUNTIME_PASSWORD:?POSTGRES_RUNTIME_PASSWORD is required}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}?schema=public"
 
 x-snapshot-storage-env: &snapshot-storage-env
   SNAPSHOT_STORAGE_DIR: "/var/lib/partsradar/snapshots"
@@ -26,7 +26,7 @@ services:
       target: crawler
     restart: "no"
     environment:
-      <<: [*database-env, *snapshot-storage-env, *external-fetch-lock-env]
+      <<: [*runtime-database-env, *snapshot-storage-env, *external-fetch-lock-env]
     volumes:
       - snapshots:/var/lib/partsradar/snapshots
     depends_on:
@@ -57,7 +57,7 @@ services:
       target: crawler
     restart: "no"
     environment:
-      <<: [*database-env, *product-image-storage-env, *source-image-fetch-lock-env]
+      <<: [*runtime-database-env, *product-image-storage-env, *source-image-fetch-lock-env]
       LOG_LEVEL: "${LOG_LEVEL:-info}"
     volumes:
       - snapshots:/var/lib/partsradar/snapshots
@@ -81,7 +81,7 @@ services:
     restart: unless-stopped
     stop_grace_period: 15m
     environment:
-      <<: [*database-env, *snapshot-storage-env, *external-fetch-lock-env]
+      <<: [*runtime-database-env, *snapshot-storage-env, *external-fetch-lock-env]
       LOG_LEVEL: "${LOG_LEVEL:-info}"
       CRAWLER_INTERVAL_SECONDS: "${CRAWLER_INTERVAL_SECONDS:-1800}"
       CRAWLER_BACKOFF_SECONDS: "${CRAWLER_BACKOFF_SECONDS:-3600}"
@@ -121,7 +121,7 @@ services:
     restart: unless-stopped
     stop_grace_period: 2m
     environment:
-      <<: [*database-env, *snapshot-storage-env, *product-image-storage-env, *source-image-fetch-lock-env]
+      <<: [*runtime-database-env, *snapshot-storage-env, *product-image-storage-env, *source-image-fetch-lock-env]
       LOG_LEVEL: "${LOG_LEVEL:-info}"
       IMAGE_RECOVERY_INTERVAL_SECONDS: "${IMAGE_RECOVERY_INTERVAL_SECONDS:-300}"
       IMAGE_RECOVERY_BATCH_LIMIT: "${IMAGE_RECOVERY_BATCH_LIMIT:-25}"
@@ -161,7 +161,7 @@ services:
     restart: unless-stopped
     stop_grace_period: 15m
     environment:
-      <<: [*database-env, *snapshot-storage-env]
+      <<: [*runtime-database-env, *snapshot-storage-env]
       LOG_LEVEL: "${LOG_LEVEL:-info}"
       RAW_SNAPSHOT_CLEANUP_INTERVAL_SECONDS: "${RAW_SNAPSHOT_CLEANUP_INTERVAL_SECONDS:-86400}"
       RAW_SNAPSHOT_CLEANUP_INITIAL_DELAY_SECONDS: "${RAW_SNAPSHOT_CLEANUP_INITIAL_DELAY_SECONDS:-300}"

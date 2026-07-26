@@ -19,6 +19,7 @@ import {
 } from "../../src/discord-privacy";
 
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
+const migrationDatabaseUrl = process.env.MIGRATION_DATABASE_URL ?? testDatabaseUrl;
 
 if (!testDatabaseUrl) {
   throw new Error("TEST_DATABASE_URL is required for PostgreSQL integration tests.");
@@ -31,19 +32,25 @@ const GUILD_B = "820000000000000002";
 const CHANNEL_A = "830000000000000001";
 const CHANNEL_B = "830000000000000002";
 let client: PrismaClient;
+let migrationClient: PrismaClient;
 let categoryId: string;
 let productId: string;
 let crawlRunId: string;
 
 beforeAll(async () => {
   client = new PrismaClient({ adapter: new PrismaPg({ connectionString: testDatabaseUrl }) });
+  migrationClient = new PrismaClient({
+    adapter: new PrismaPg({ connectionString: migrationDatabaseUrl }),
+  });
 });
 
 afterEach(async () => {
-  await client.$executeRawUnsafe(
+  await migrationClient.$executeRawUnsafe(
     'DROP TRIGGER IF EXISTS "discord_privacy_rollback_test" ON "discord_price_report_settings"',
   );
-  await client.$executeRawUnsafe('DROP FUNCTION IF EXISTS "raise_discord_privacy_rollback_test"()');
+  await migrationClient.$executeRawUnsafe(
+    'DROP FUNCTION IF EXISTS "raise_discord_privacy_rollback_test"()',
+  );
   await client.discordNotificationDelivery.deleteMany({
     where: { discordUserId: { in: [USER_A, USER_B] } },
   });
@@ -77,6 +84,7 @@ afterEach(async () => {
 
 afterAll(async () => {
   await client.$disconnect();
+  await migrationClient.$disconnect();
 });
 
 describe("Discord privacy PostgreSQL domain", () => {
@@ -183,14 +191,14 @@ describe("Discord privacy PostgreSQL domain", () => {
   it("rolls back every earlier deletion when a later table delete fails", async () => {
     await seedSharedData();
     await seedUser(USER_A, productId);
-    await client.$executeRawUnsafe(`
+    await migrationClient.$executeRawUnsafe(`
       CREATE FUNCTION "raise_discord_privacy_rollback_test"() RETURNS trigger AS $$
       BEGIN
         RAISE EXCEPTION 'rollback test';
       END;
       $$ LANGUAGE plpgsql
     `);
-    await client.$executeRawUnsafe(`
+    await migrationClient.$executeRawUnsafe(`
       CREATE TRIGGER "discord_privacy_rollback_test"
       BEFORE DELETE ON "discord_price_report_settings"
       FOR EACH ROW

@@ -1,6 +1,6 @@
-x-database-env: &database-env
+x-runtime-database-env: &runtime-database-env
   NODE_ENV: "production"
-  DATABASE_URL: "postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}?schema=public"
+  DATABASE_URL: "postgresql://${POSTGRES_RUNTIME_USER:?POSTGRES_RUNTIME_USER is required}:${POSTGRES_RUNTIME_PASSWORD:?POSTGRES_RUNTIME_PASSWORD is required}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}?schema=public"
 
 services:
   smoke-daemon:
@@ -12,7 +12,7 @@ services:
       target: crawler
     restart: unless-stopped
     environment:
-      <<: *database-env
+      <<: *runtime-database-env
       PRODUCT_IMAGE_STORAGE_DIR: "/var/lib/partsradar/product-images"
       LOG_LEVEL: "${LOG_LEVEL:-info}"
       SMOKE_PUBLIC_BASE_URL: "${SMOKE_PUBLIC_BASE_URL:-http://web:3000}"
@@ -94,7 +94,7 @@ services:
       target: crawler
     restart: unless-stopped
     environment:
-      <<: *database-env
+      <<: *runtime-database-env
       PARTSRADAR_PUBLIC_BASE_URL: "${PARTSRADAR_PUBLIC_BASE_URL:-https://partsradar.net}"
       LOG_LEVEL: "${LOG_LEVEL:-info}"
       DISCORD_BOT_TOKEN: "${DISCORD_BOT_TOKEN:-replace_with_discord_bot_token}"

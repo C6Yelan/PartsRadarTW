@@ -62,20 +62,23 @@ jobs:
         image: postgres:18
         env:
           POSTGRES_DB: partsradar_test
-          POSTGRES_PASSWORD: partsradar_test
-          POSTGRES_USER: partsradar_test
+          POSTGRES_PASSWORD: partsradar_admin
+          POSTGRES_USER: partsradar_admin
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U partsradar_test -d partsradar_test"
+          --health-cmd "pg_isready -U partsradar_admin -d partsradar_test"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
     env:
-      DATABASE_URL: postgresql://partsradar_test:partsradar_test@127.0.0.1:5432/partsradar_test
+      DATABASE_URL: postgresql://partsradar_test:partsradar_runtime@127.0.0.1:5432/partsradar_test
+      MIGRATION_DATABASE_URL: postgresql://partsradar_admin:partsradar_admin@127.0.0.1:5432/partsradar_test
       PARTSRADAR_SKIP_DOTENV: "1"
       PARTSRADAR_TEST_DATABASE_ISOLATED: "1"
-      TEST_DATABASE_URL: postgresql://partsradar_test:partsradar_test@127.0.0.1:5432/partsradar_test
+      POSTGRES_RUNTIME_PASSWORD: partsradar_runtime
+      POSTGRES_RUNTIME_USER: partsradar_test
+      TEST_DATABASE_URL: postgresql://partsradar_test:partsradar_runtime@127.0.0.1:5432/partsradar_test
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
@@ -100,6 +103,9 @@ jobs:
       - name: Deploy migrations
         run: pnpm db:deploy
 
+      - name: Configure runtime database role
+        run: pnpm db:configure-runtime-role
+
       - name: Run PostgreSQL integration tests
         run: pnpm test:db
 
@@ -112,20 +118,23 @@ jobs:
         image: postgres:18
         env:
           POSTGRES_DB: partsradar_e2e
-          POSTGRES_PASSWORD: partsradar_e2e
-          POSTGRES_USER: partsradar_e2e
+          POSTGRES_PASSWORD: partsradar_admin
+          POSTGRES_USER: partsradar_admin
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U partsradar_e2e -d partsradar_e2e"
+          --health-cmd "pg_isready -U partsradar_admin -d partsradar_e2e"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
     env:
-      DATABASE_URL: postgresql://partsradar_e2e:partsradar_e2e@127.0.0.1:5432/partsradar_e2e
+      DATABASE_URL: postgresql://partsradar_e2e:partsradar_runtime@127.0.0.1:5432/partsradar_e2e
       E2E_SKIP_BUILD: "1"
+      MIGRATION_DATABASE_URL: postgresql://partsradar_admin:partsradar_admin@127.0.0.1:5432/partsradar_e2e
       PARTSRADAR_SKIP_DOTENV: "1"
       PARTSRADAR_TEST_DATABASE_ISOLATED: "1"
+      POSTGRES_RUNTIME_PASSWORD: partsradar_runtime
+      POSTGRES_RUNTIME_USER: partsradar_e2e
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
@@ -152,6 +161,9 @@ jobs:
 
       - name: Deploy migrations
         run: pnpm db:deploy
+
+      - name: Configure runtime database role
+        run: pnpm db:configure-runtime-role
 
       - name: Build web
         run: pnpm build:web
