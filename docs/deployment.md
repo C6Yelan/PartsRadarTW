@@ -136,6 +136,8 @@ scripts/ops/compose-production.sh up -d --no-build
 
 詳細指令與成功標準見 [operations.md](operations.md)。
 
+隔離還原必須另外通過 [privacy-aware restore gate](operations.md#backup-與-restore-責任)。在歷史 erase replay、privacy cleanup、pending delivery/claim/cursor 檢查與人工核准完成前，不得啟動 Discord outbound。
+
 ## Public ingress
 
 Web 與 PostgreSQL 預設綁定 `127.0.0.1`。若使用 Cloudflare Tunnel：
@@ -143,6 +145,8 @@ Web 與 PostgreSQL 預設綁定 `127.0.0.1`。若使用 Cloudflare Tunnel：
 - 必須在 `.env` 將 `CLOUDFLARED_IMAGE` 替換成明確 pinned version；預設 placeholder 不可部署。
 - `CLOUDFLARE_TUNNEL_TOKEN` 只放在部署 secret。
 - Edge TLS、HSTS、WAF、bot protection 與 access policy 需在實際 edge 設定驗證；repository 不會自動證明它們存在。
+- Production web 只信任單一合法 `CF-Connecting-IP`；缺少或非法 header 時 client identity 會是 `unknown`，不會退回 XFF。Public HTTPS smoke 必須觀察到 `X-RateLimit-Client-Source: cf`。
+- 必須從外部網路證明沒有旁路 origin DNS、WAN/NAT web port 或公開 PostgreSQL。這些是人工 launch gate，不會因 unit tests 通過而視為完成。
 
 ## Release validation
 

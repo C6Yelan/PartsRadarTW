@@ -3,6 +3,11 @@
 
 import type { CoolpcCategorySnapshotInput } from "../category-snapshot";
 import { decodeCoolpcHtml } from "../parser";
+import {
+  assertCoolpcHtmlContentType,
+  CoolpcSourceFetchError,
+  fetchCoolpcSource,
+} from "../source-fetch";
 
 /**
  * CoolPC live crawl 抓取契約
@@ -100,14 +105,21 @@ export async function fetchLiveCategorySnapshot(
 
   for (let attemptIndex = 0; attemptIndex < maxAttempts; attemptIndex += 1) {
     try {
-      const response = await fetchImpl(url, {
-        headers: {
-          accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-          "accept-language": "zh-TW,zh;q=0.9,en;q=0.8",
-          "user-agent": userAgent,
+      const response = await fetchCoolpcSource(url, {
+        kind: "category-html",
+        fetchImpl,
+        requestInit: {
+          headers: {
+            accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "accept-language": "zh-TW,zh;q=0.9,en;q=0.8",
+            "user-agent": userAgent,
+          },
+          signal: AbortSignal.timeout(timeoutMs),
         },
-        signal: AbortSignal.timeout(timeoutMs),
       });
+      if (response.ok) {
+        assertCoolpcHtmlContentType(response);
+      }
       const bytes = await readResponseBodyWithLimit(response);
       const rawHtml = decodeCoolpcHtml(bytes);
 
@@ -144,26 +156,31 @@ export async function fetchLiveCategorySnapshot(
 
 export function formatCoolpcFetchError(error: unknown): string {
   if (!(error instanceof Error)) {
-    return String(error);
+    return "name=Error message=CoolPC request failed";
   }
 
-  const parts = [`name=${error.name || "Error"}`, `message=${error.message || "(empty)"}`];
+  const safeName = /^[A-Za-z][A-Za-z0-9]*$/.test(error.name) ? error.name : "Error";
+  const safeMessage =
+    error instanceof CoolpcSourceFetchError ||
+    error.message.startsWith("CoolPC response body exceeds ")
+      ? error.message
+      : "CoolPC request failed";
+  const parts = [`name=${safeName}`, `message=${safeMessage}`];
   const cause = error.cause;
 
   if (isRecord(cause)) {
-    const code = cause.code;
-    const message = cause.message;
+    const nestedCause = isRecord(cause.cause) ? cause.cause : null;
+    const code = cause.code ?? nestedCause?.code;
 
-    if (typeof code === "string" || typeof code === "number") {
+    if (
+      (typeof code === "string" && /^[A-Za-z0-9_.-]{1,80}$/.test(code)) ||
+      typeof code === "number"
+    ) {
       parts.push(`cause.code=${String(code)}`);
-    }
-
-    if (typeof message === "string" && message.length > 0) {
-      parts.push(`cause.message=${message}`);
     }
   }
 
-  return parts.join(" ");
+  return parts.join(" ").slice(0, 512);
 }
 
 function parseContentLength(value: string | null): number | null {
@@ -191,6 +208,10 @@ async function cancelReader(reader: ReadableStreamDefaultReader<Uint8Array>): Pr
 function isRetryableCoolpcFetchError(error: unknown): boolean {
   if (!(error instanceof Error)) {
     return true;
+  }
+
+  if (error instanceof CoolpcSourceFetchError) {
+    return error.kind === "network";
   }
 
   return !error.message.startsWith("CoolPC response body exceeds ");

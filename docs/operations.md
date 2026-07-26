@@ -228,7 +228,42 @@ docker compose -f compose.yml -f compose.ops.yml logs --tail=100 discord-bot
 
 需要 DB 與 volumes 接近同一恢復點時，備份前應先暫停 crawler、image recovery、snapshot cleanup 與其他相關 writers。部署端必須在與 production 分離且 PostgreSQL major version 相容的環境完成還原驗證，確認備份完整性、DB 可還原、Prisma migration history 是 repository migration 的有效前綴、沒有 unresolved migration，且核心資料與納入備份的 storage 可讀取。
 
-還原驗證不得覆寫 production DB 或 storage；驗證失敗或無法清理隔離資源時，部署判定為 NO-GO。
+還原驗證不得覆寫 production DB 或 storage。Restore gate：
+
+1. 還原到沒有 production ingress、Discord token 或外部來源網路權限的隔離環境。
+2. 在 restored DB 可被任何 scheduler 讀取前停止 `discord-bot`；同時將 `DISCORD_FEATURE_PUBLIC_REPORTS_ENABLED`、`DISCORD_FEATURE_PERSONAL_REPORTS_ENABLED` 與 `DISCORD_FEATURE_TARGET_WATCHES_ENABLED` 設為 `false`。這三個既有 flags 分別涵蓋公開報告、個人報告與 target-price delivery，不另建重複 kill switch。
+3. 停止 crawler、image recovery、snapshot cleanup 與其他 writers，再還原 PostgreSQL 及納入備份的 storage。
+4. 使用 restore 對應的 frozen release 執行 `pnpm db:deploy`，確認 `_prisma_migrations` 沒有 failed、checksum drift 或 unresolved migration。
+5. 執行 `pnpm ops:discord-privacy -- cleanup` dry-run，審查後才使用 `--confirm-cleanup`。
+6. 從受保護的 Email／案件紀錄取得仍在最長備份保留期內、已完成驗證及刪除的案件清單，依事前核准的 maintenance replay 程序逐案呼叫既有 idempotent user／guild erase domain。不得只因資料來自舊備份就略過原案件授權，也不得臨時新增繞過驗證的 public／general-purpose CLI。
+7. 對每個案件執行 inspect，確認 personal setting、watch、delivery、actor metadata 與仍可連回 subject 的 verification request 都為零；另確認沒有 pending retry、target claim、notification cursor 或已排程 delivery。
+8. 執行 private full smoke；若準備 public cutover，再執行 browser gates 與 public-only smoke。
+9. 由指定操作人員審查 migration、privacy、資料與 smoke 證據後，才可逐一恢復 Discord feature flags、啟動 `discord-bot` 及其他 writers。
+
+Phase 1 不保存 tombstone，consumed verification request 也已去識別。現有 ops CLI 刻意不接受未驗證的 raw user ID，因此 repository 目前沒有可單獨從 restored DB 推導歷史 erase subject 的自動 replay。部署端必須在存取受控的案件系統保存可覆蓋最長備份 rotation 的完成案件清單，並在 restore drill 前核准實際 replay 程序；缺少清單或核准程序即為 NO-GO，不得先恢復 Discord outbound。
+
+驗證失敗、無法證明 privacy replay、或無法清理隔離資源時，部署判定為 NO-GO。
+
+## Logs 與診斷資料
+
+Application logs 最長保存 30 天。實際 rotation 由部署端使用 Docker logging driver 或 journald 統一設定與驗證，不在每個 Compose service 複製另一套 rotation。
+
+- 不記錄 Authorization、Bot／interaction token、URL credentials、database URL、驗證碼或 digest。
+- Discord delivery 以 category、HTTP status 與 provider code 為主要診斷欄位，不保存 provider response body。
+- CoolPC fetch error 只保存 bounded error class、安全 network code、HTTP status 或內部 policy 類別，不保存任意 cause message。
+- 診斷輸出若不需要 raw Discord user／guild／channel ID，使用既有 masked ID、count 或 aggregate。
+
+部署端需記錄 logging driver、實際 retention、存取權限與一次 redaction 抽查；repository tests 不能證明主機上的 rotation 已生效。
+
+## 公開前人工信任邊界
+
+下列項目不是 repository tests 的完成項，正式公開前必須保存有日期的人工證據：
+
+- Cloudflare／origin：Tunnel 是唯一入口、無旁路 DNS 或 WAN/NAT port、HSTS、WAF、edge rate limit 與 TLS 設定已確認。
+- TrueNAS／備份：dataset/SMB ACL、加密、snapshot 排程、最長 rotation、application-consistent PostgreSQL 備份與完整 restore drill。
+- GitHub：branch protection、required quality/DB/browser checks、secret scanning、push protection、security alerts 與管理帳號 MFA。
+- Discord Portal：owner MFA、token rotation、最小 OAuth permissions/intents，以及正確的 privacy/terms URL。
+- CoolPC 內容與圖片：由決策人記錄查核日期、擷取頻率、User-Agent、block/CAPTCHA 行為、圖片/cache/attribution、takedown 聯絡方式、選定策略及重新檢查日期。Robots 或測試結果不等同合法性判定。
 
 ## Cloudflare Tunnel
 

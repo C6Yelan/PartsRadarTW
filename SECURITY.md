@@ -27,18 +27,23 @@ Web 會設定 CSP、`Referrer-Policy`、`X-Content-Type-Options`、`X-Frame-Opti
 ## 資料界線
 
 - Raw HTML、parse errors、crawler stack trace、DB 欄位與內部識別不屬於 public API。
-- 商品來源圖片只接受固定原價屋 HTTPS host/path，經 crawler 下載並轉成站內 WebP；訪客圖片請求不會 proxy 外部 URL。
+- CoolPC HTML 與商品圖片 request 只接受各自固定的原價屋 HTTPS host/path；每一個 redirect 都會重新驗證，並保留 timeout、response size、Content-Type 與內容驗證。訪客圖片請求不會 proxy 外部 URL。
 - Raw snapshot 依內容狀態採不同保留期；實際部署必須依 [cleanup runbook](docs/operations.md#raw-snapshot-cleanup) 啟動並監控 cleanup。
 - 瀏覽器配單只保存商品 ID、數量、順序與時間戳於 localStorage；refresh 商品資料不持久化。
-- Discord 功能會保存 Discord user、guild、channel ID、價格報告偏好、目標價 watch 與 delivery audit metadata；目前未提供固定保留期限或自助刪除功能。
+- Discord 功能會保存 Discord user、guild、channel ID、價格報告偏好、目標價 watch 與 delivery audit metadata；保存期限及 Email／Bot DM 驗證的查詢與刪除流程以[隱私權政策](https://partsradar.net/privacy)為準。
 
 ## Rate limiting
 
-每個 web process 使用有界 LRU rate limiter，設定與預設值以 [`.env.example`](.env.example) 為準。它不是跨 replica 的分散式限流器；大量公開流量仍應在可信任的 reverse proxy 或 edge 層加入額外限制。
+每個 web process 使用有界 LRU rate limiter，設定與預設值以 [`.env.example`](.env.example) 為準。Production 只把單一合法 `CF-Connecting-IP` 視為 client identity，不信任 `X-Forwarded-For`；development／test 才允許單一合法 XFF。它不是跨 replica 的分散式限流器；大量公開流量仍應在 Cloudflare edge 設定額外限制。
 
 ## 維運安全
 
 - Live crawler、圖片下載、刪除與 DB backfill 必須使用各 CLI 的明確 confirmation flag。
 - Raw snapshot writer 與 cleanup 共用 mutation lock；外部來源抓取另有 overlap lock。
 - 部署 migration 前先備份並確認 migration history；不要重寫已套用的 migration。
-- Production log 與 Discord transport error 會套用共用 secret redaction，但仍不應輸入不必要的敏感內容。
+- Production log 與 Discord transport error 會套用 secret redaction；CoolPC network error 只保留 bounded 類別與安全錯誤碼。仍不應輸入不必要的敏感內容。
+- Restore 必須依 [Operations restore gate](docs/operations.md#backup-與-restore-責任) 在隔離環境、Discord outbound 關閉的狀態完成。
+
+## Repository 與部署端責任
+
+Repository tests 可以證明 request identity、redirect policy、資料庫 migration、privacy cleanup 與瀏覽器流程。Cloudflare HSTS／WAF／rate limit、origin exposure、TrueNAS ACL／snapshot、GitHub protection／secret scanning、Discord Portal 權限／MFA，以及 CoolPC 內容使用決策都必須由部署或專案負責人另行人工確認；本文件不宣稱這些外部設定已完成，也不判定 CoolPC 擷取或圖片使用是否合法。
