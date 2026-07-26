@@ -139,7 +139,7 @@ describe("CoolPC filter sync", () => {
     const stateFilePath = join(root, "state.json");
     const html = await readFile(FIXTURE_PATH, "utf8");
     const now = new Date("2026-07-13T04:00:00.000Z");
-    const fetchImpl = async () => new Response(encode(html, "big5"), { status: 200 });
+    const fetchImpl = async () => createHtmlResponse(html);
 
     const published = await refreshCoolpcFilterSync({
       stateFilePath,
@@ -181,7 +181,7 @@ describe("CoolPC filter sync", () => {
       timeoutMs: 5000,
       userAgent: "test",
       now: new Date("2026-07-13T04:00:00.000Z"),
-      fetchImpl: (async () => new Response(encode(html, "big5"), { status: 200 })) as typeof fetch,
+      fetchImpl: (async () => createHtmlResponse(html)) as typeof fetch,
     });
     const failed = await refreshCoolpcFilterSync({
       stateFilePath,
@@ -209,7 +209,7 @@ describe("CoolPC filter sync", () => {
       timeoutMs: 5000,
       userAgent: "test",
       now: new Date("2026-07-20T04:00:00.000Z"),
-      fetchImpl: (async () => new Response(encode(html, "big5"), { status: 200 })) as typeof fetch,
+      fetchImpl: (async () => createHtmlResponse(html)) as typeof fetch,
     });
 
     const degraded = await markCoolpcFilterSyncJoinCoverageDegraded(
@@ -248,7 +248,7 @@ describe("CoolPC filter sync", () => {
       timeoutMs: 5000,
       userAgent: "test",
       now: new Date("2026-07-20T04:00:00.000Z"),
-      fetchImpl: (async () => new Response(encode(html, "big5"), { status: 200 })) as typeof fetch,
+      fetchImpl: (async () => createHtmlResponse(html)) as typeof fetch,
     });
     await markCoolpcFilterSyncJoinCoverageDegraded(
       stateFilePath,
@@ -262,10 +262,17 @@ describe("CoolPC filter sync", () => {
       timeoutMs: 5000,
       userAgent: "test",
       now: new Date("2026-07-24T12:00:01.000Z"),
-      fetchImpl: (async () => new Response(encode(html, "big5"), { status: 200 })) as typeof fetch,
+      fetchImpl: (async () => createHtmlResponse(html)) as typeof fetch,
     });
     expect(recovered.outcome).toBe("published");
     expect(recovered.state?.refreshRequestedAt).toBeNull();
     expect(recovered.state?.joinCoverageFailures).toEqual({});
   });
 });
+
+function createHtmlResponse(html: string): Response {
+  return new Response(encode(html, "big5"), {
+    status: 200,
+    headers: { "content-type": "text/html; charset=big5" },
+  });
+}

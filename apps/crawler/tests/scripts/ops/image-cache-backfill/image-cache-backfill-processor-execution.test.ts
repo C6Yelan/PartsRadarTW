@@ -106,7 +106,7 @@ describe("image cache backfill live request accounting", () => {
       data: {
         imageCachedAt: null,
         imageCacheFailureCount: 1,
-        imageCacheLastError: "source unavailable",
+        imageCacheLastError: "CoolPC source request failed.",
         imageCacheLastErrorKind: "network",
       },
     });

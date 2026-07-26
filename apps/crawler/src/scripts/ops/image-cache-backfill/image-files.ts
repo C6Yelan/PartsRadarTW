@@ -4,6 +4,7 @@
 import { copyFile, mkdir, rename, stat, unlink, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import sharp from "sharp";
+import { CoolpcSourceFetchError, fetchCoolpcSource } from "../../../coolpc/source-fetch";
 import { tryAcquireExternalFetchLock } from "../external-fetch-lock";
 import type { ImageBackfillOptions } from "./options";
 
@@ -16,6 +17,7 @@ export type SourceImageFailureKind =
   | "http"
   | "lock_busy"
   | "network"
+  | "source_policy"
   | "too_large"
   | "timeout";
 
@@ -80,15 +82,17 @@ export async function fetchSourceImageBytes(
     let response: Response;
 
     try {
-      response = await fetch(url, {
-        headers: {
-          accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
-          "accept-language": "zh-TW,zh;q=0.9,en;q=0.8",
-          "user-agent":
-            "PartsRadarTW image cache recovery (+https://github.com/C6Yelan/PartsRadarTW)",
+      response = await fetchCoolpcSource(url, {
+        kind: "product-image",
+        requestInit: {
+          headers: {
+            accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+            "accept-language": "zh-TW,zh;q=0.9,en;q=0.8",
+            "user-agent":
+              "PartsRadarTW image cache recovery (+https://github.com/C6Yelan/PartsRadarTW)",
+          },
+          signal: controller.signal,
         },
-        redirect: "manual",
-        signal: controller.signal,
       });
     } catch (error) {
       if (controller.signal.aborted) {
@@ -98,17 +102,16 @@ export async function fetchSourceImageBytes(
         );
       }
 
+      if (error instanceof CoolpcSourceFetchError) {
+        throw new SourceImageFetchError(
+          error.message,
+          error.kind === "network" ? "network" : "source_policy",
+        );
+      }
+
       throw new SourceImageFetchError(
         error instanceof Error ? error.message : "Source image request failed",
         "network",
-      );
-    }
-
-    if (response.status >= 300 && response.status < 400) {
-      throw new SourceImageFetchError(
-        `Unexpected image redirect: HTTP ${response.status}`,
-        "http",
-        response.status,
       );
     }
 

@@ -74,7 +74,7 @@ describe("CoolPC live crawl safety guards", () => {
     error.cause = cause;
 
     expect(formatCoolpcFetchError(error)).toBe(
-      "name=TypeError message=fetch failed cause.code=ECONNRESET cause.message=connection reset by peer",
+      "name=TypeError message=CoolPC request failed cause.code=ECONNRESET",
     );
   });
 
@@ -87,14 +87,19 @@ describe("CoolPC live crawl safety guards", () => {
     const fetchMock = vi
       .fn<typeof fetch>()
       .mockRejectedValueOnce(error)
-      .mockResolvedValueOnce(new Response("<html>ok</html>", { status: 200 }));
+      .mockResolvedValueOnce(
+        new Response("<html>ok</html>", {
+          status: 200,
+          headers: { "content-type": "text/html" },
+        }),
+      );
     const sleepMock = vi.fn(async (_ms: number) => {});
     const logs: string[] = [];
 
     const snapshot = await fetchLiveCategorySnapshot(
       12,
       new Date("2026-06-16T00:00:00.000Z"),
-      "https://www.coolpc.com.tw/evaluate.php?ef=clear&gotop=1&genre=0&search=&Submit=%E6%9F%A5%E8%A9%A2&IGrp=12",
+      "https://www.coolpc.com.tw/eachview.php?IGrp=12",
       "test-user-agent",
       5000,
       (message) => logs.push(message),
@@ -114,5 +119,36 @@ describe("CoolPC live crawl safety guards", () => {
       fetchError: null,
     });
     expect(snapshot.rawHtml).toContain("ok");
+  });
+
+  it("stops a category request at the configured timeout without exposing raw errors", async () => {
+    const fetchMock = vi.fn<typeof fetch>(
+      async (_input, init) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => {
+            reject(new Error("secret.internal:8443 request aborted"));
+          });
+        }),
+    );
+
+    const snapshot = await fetchLiveCategorySnapshot(
+      12,
+      new Date("2026-06-16T00:00:00.000Z"),
+      "https://www.coolpc.com.tw/eachview.php?IGrp=12",
+      "test-user-agent",
+      5,
+      undefined,
+      {
+        fetchImpl: fetchMock,
+        retryDelaysMs: [],
+      },
+    );
+
+    expect(snapshot).toMatchObject({
+      httpStatus: null,
+      rawHtml: null,
+      fetchError: "name=CoolpcSourceFetchError message=CoolPC source request failed.",
+    });
+    expect(snapshot.fetchError).not.toContain("secret.internal");
   });
 });

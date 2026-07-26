@@ -10,6 +10,7 @@ import {
 } from "./filter-sync/state";
 import { readResponseBodyWithLimit } from "./live-crawl/fetch";
 import { decodeCoolpcHtml } from "./parser";
+import { assertCoolpcHtmlContentType, fetchCoolpcSource } from "./source-fetch";
 
 const COOLPC_FILTER_SOURCE_URL = "https://www.coolpc.com.tw/evaluate.php";
 export const DEFAULT_FILTER_SYNC_INTERVAL_SECONDS = 7 * 24 * 60 * 60;
@@ -169,18 +170,23 @@ export async function markCoolpcFilterSyncJoinCoverageDegraded(
 }
 
 async function fetchFilterSource(options: RefreshCoolpcFilterSyncOptions): Promise<string> {
-  const response = await (options.fetchImpl ?? fetch)(COOLPC_FILTER_SOURCE_URL, {
-    headers: {
-      accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      "accept-language": "zh-TW,zh;q=0.9,en;q=0.8",
-      "user-agent": options.userAgent,
+  const response = await fetchCoolpcSource(COOLPC_FILTER_SOURCE_URL, {
+    kind: "filter-html",
+    fetchImpl: options.fetchImpl,
+    requestInit: {
+      headers: {
+        accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "accept-language": "zh-TW,zh;q=0.9,en;q=0.8",
+        "user-agent": options.userAgent,
+      },
+      signal: AbortSignal.timeout(options.timeoutMs),
     },
-    signal: AbortSignal.timeout(options.timeoutMs),
   });
 
   if (!response.ok) {
     throw new Error(`CoolPC filter source returned HTTP ${response.status}.`);
   }
+  assertCoolpcHtmlContentType(response);
 
   return decodeCoolpcHtml(await readResponseBodyWithLimit(response));
 }
