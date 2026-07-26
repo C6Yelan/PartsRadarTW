@@ -56,7 +56,6 @@ describe("public price report gateway lifecycle", () => {
     expect(client.discordPublicPriceReportSetting.updateMany).toHaveBeenCalledWith({
       where: {
         id: "setting-1",
-        enabled: true,
         accessStatus: "ACTIVE",
       },
       data: expect.objectContaining({
@@ -78,7 +77,7 @@ describe("public price report gateway lifecycle", () => {
       client,
       eventType: "GUILD_DELETE",
       data: { id: "guild-1" },
-      unavailableGuildIds: new Set(),
+      unavailableGuildIds: new Set<string>(),
       onPublicReportAccessDisabled: onDisabled,
     });
 
@@ -106,7 +105,7 @@ describe("public price report gateway lifecycle", () => {
       client,
       eventType: "CHANNEL_DELETE",
       data: { id: "channel-1", guild_id: "guild-1" },
-      unavailableGuildIds: new Set(),
+      unavailableGuildIds: new Set<string>(),
       onPublicReportAccessDisabled: onDisabled,
     });
 
@@ -143,7 +142,7 @@ describe("public price report gateway lifecycle", () => {
     expect(client.discordPublicPriceReportSetting.updateMany).not.toHaveBeenCalled();
   });
 
-  it("does not change or alert for a manually paused setting", async () => {
+  it("moves a manually paused setting into definitive removal retention once", async () => {
     const client = createDiscordBotClient({
       publicPriceReportSettings: [
         publicPriceReportSetting({
@@ -154,24 +153,38 @@ describe("public price report gateway lifecycle", () => {
     });
     const onDisabled = vi.fn();
 
-    await handleDiscordGuildLifecycleEvent({
+    const input = {
       client,
-      eventType: "GUILD_DELETE",
+      eventType: "GUILD_DELETE" as const,
       data: { id: "guild-1", unavailable: false },
-      unavailableGuildIds: new Set(),
+      unavailableGuildIds: new Set<string>(),
       onPublicReportAccessDisabled: onDisabled,
-    });
+      now: new Date("2026-07-23T10:00:00.000Z"),
+    };
+
+    await handleDiscordGuildLifecycleEvent(input);
+    await handleDiscordGuildLifecycleEvent(input);
 
     expect(client.discordPublicPriceReportSetting.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          enabled: true,
           accessStatus: "ACTIVE",
         }),
       }),
     );
-    expect(client.discordPublicPriceReportSetting.updateMany).not.toHaveBeenCalled();
-    expect(onDisabled).not.toHaveBeenCalled();
+    expect(client.discordPublicPriceReportSetting.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: "setting-1",
+        accessStatus: "ACTIVE",
+      },
+      data: expect.objectContaining({
+        enabled: false,
+        accessStatus: "DISABLED_BOT_REMOVED",
+        disabledAt: new Date("2026-07-23T10:00:00.000Z"),
+        purgeAfter: new Date("2026-09-21T10:00:00.000Z"),
+      }),
+    });
+    expect(onDisabled).toHaveBeenCalledTimes(1);
   });
 
   it("rebuilds unavailable Guilds from each READY payload", () => {

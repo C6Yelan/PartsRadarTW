@@ -62,17 +62,19 @@ export async function disablePublicReportAccess({
   accessStatus,
   providerErrorCode,
   now,
+  includePaused = false,
 }: {
   client: DiscordBotClient;
   where: { settingId: string } | { discordGuildId: string } | { channelId: string };
   accessStatus: PublicReportDisabledAccessStatus;
   providerErrorCode: number | null;
   now: Date;
+  includePaused?: boolean;
 }): Promise<number> {
   const result = await client.discordPublicPriceReportSetting.updateMany({
     where: {
       ...toSettingWhere(where),
-      enabled: true,
+      ...(includePaused ? {} : { enabled: true }),
       accessStatus: "ACTIVE",
     },
     data: {

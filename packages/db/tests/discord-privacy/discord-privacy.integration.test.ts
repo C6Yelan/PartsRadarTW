@@ -440,9 +440,19 @@ describe("Discord privacy PostgreSQL domain", () => {
         createdByDiscordUserId: USER_A,
         updatedByDiscordUserId: USER_A,
         enabled: false,
-        accessStatus: "DISABLED_CHANNEL_GONE",
+        accessStatus: "DISABLED_BOT_REMOVED",
         disabledAt: new Date("2030-01-31T00:00:00.000Z"),
         purgeAfter: now,
+      },
+    });
+    await client.discordPublicPriceReportSetting.create({
+      data: {
+        discordGuildId: GUILD_B,
+        channelId: CHANNEL_B,
+        createdByDiscordUserId: USER_B,
+        updatedByDiscordUserId: USER_B,
+        enabled: false,
+        accessStatus: "ACTIVE",
       },
     });
     await client.discordNotificationDelivery.create({
@@ -495,6 +505,16 @@ describe("Discord privacy PostgreSQL domain", () => {
     expect(
       await client.discordPublicPriceReportSetting.count({ where: { discordGuildId: GUILD_A } }),
     ).toBe(0);
+    expect(
+      await client.discordPublicPriceReportSetting.findUnique({
+        where: { discordGuildId: GUILD_B },
+        select: { enabled: true, accessStatus: true, purgeAfter: true },
+      }),
+    ).toEqual({
+      enabled: false,
+      accessStatus: "ACTIVE",
+      purgeAfter: null,
+    });
     expect(
       await client.discordPublicPriceReportDelivery.count({ where: { channelId: CHANNEL_A } }),
     ).toBe(1);
