@@ -47,9 +47,7 @@ afterEach(async () => {
   await client.discordNotificationDelivery.deleteMany({
     where: { discordUserId: { in: [USER_A, USER_B] } },
   });
-  await client.discordPrivacyVerificationRequest.deleteMany({
-    where: { discordUserId: { in: [USER_A, USER_B] } },
-  });
+  await client.discordPrivacyVerificationRequest.deleteMany();
   await client.discordTargetPriceWatch.deleteMany({
     where: { discordUserId: { in: [USER_A, USER_B] } },
   });
@@ -102,6 +100,16 @@ describe("Discord privacy PostgreSQL domain", () => {
         status: "SENT",
       },
     });
+    const userARequest = await createDiscordPrivacyVerification({
+      client,
+      requestType: "ERASE",
+      discordUserId: USER_A,
+    });
+    const userBRequest = await createDiscordPrivacyVerification({
+      client,
+      requestType: "ERASE",
+      discordUserId: USER_B,
+    });
 
     const before = await inspectDiscordUserData(client, USER_A);
     const erased = await eraseDiscordUserData(client, USER_A);
@@ -113,6 +121,14 @@ describe("Discord privacy PostgreSQL domain", () => {
       notificationDeliveries: 0,
       publicSettingsCreatedByUser: 0,
       publicSettingsUpdatedByUser: 0,
+      verificationRequests: {
+        total: 0,
+        pending: 0,
+        verified: 0,
+        consumed: 0,
+        cancelled: 0,
+        expired: 0,
+      },
     });
     expect(await inspectDiscordUserData(client, USER_B)).toMatchObject({
       priceReportSettings: 1,
@@ -121,6 +137,26 @@ describe("Discord privacy PostgreSQL domain", () => {
     });
     expect(await client.product.count({ where: { id: productId } })).toBe(1);
     expect(await client.sourceCategory.count({ where: { id: categoryId } })).toBe(1);
+    expect(
+      await client.discordPrivacyVerificationRequest.findUniqueOrThrow({
+        where: { id: userARequest.requestId },
+        select: { discordUserId: true, codeDigest: true, cancelledAt: true },
+      }),
+    ).toMatchObject({
+      discordUserId: null,
+      codeDigest: null,
+      cancelledAt: expect.any(Date),
+    });
+    expect(
+      await client.discordPrivacyVerificationRequest.findUniqueOrThrow({
+        where: { id: userBRequest.requestId },
+        select: { discordUserId: true, codeDigest: true, cancelledAt: true },
+      }),
+    ).toEqual({
+      discordUserId: USER_B,
+      codeDigest: expect.any(String),
+      cancelledAt: null,
+    });
     expect(
       await client.discordPublicPriceReportSetting.findUnique({
         where: { discordGuildId: GUILD_A },
@@ -133,6 +169,14 @@ describe("Discord privacy PostgreSQL domain", () => {
       notificationDeliveries: 0,
       publicSettingsCreatedByUser: 0,
       publicSettingsUpdatedByUser: 0,
+      verificationRequests: {
+        total: 0,
+        pending: 0,
+        verified: 0,
+        consumed: 0,
+        cancelled: 0,
+        expired: 0,
+      },
     });
   });
 
@@ -264,7 +308,25 @@ describe("Discord privacy PostgreSQL domain", () => {
         priceReportSettings: 1,
         targetPriceWatches: 1,
         notificationDeliveries: 2,
+        verificationRequests: {
+          total: 1,
+          pending: 0,
+          verified: 1,
+          consumed: 0,
+          cancelled: 0,
+          expired: 0,
+        },
       },
+    });
+    expect(
+      await client.discordPrivacyVerificationRequest.findUniqueOrThrow({
+        where: { id: inspectRequest.requestId },
+        select: { discordUserId: true, codeDigest: true, consumedAt: true },
+      }),
+    ).toEqual({
+      discordUserId: null,
+      codeDigest: null,
+      consumedAt: new Date("2030-01-01T00:02:00.000Z"),
     });
     await expect(
       inspectVerifiedDiscordUserData({
@@ -306,6 +368,12 @@ describe("Discord privacy PostgreSQL domain", () => {
       }),
     ).toEqual({ status: "expired" });
     expect(
+      await client.discordPrivacyVerificationRequest.findUniqueOrThrow({
+        where: { id: requestA.requestId },
+        select: { discordUserId: true, codeDigest: true },
+      }),
+    ).toEqual({ discordUserId: null, codeDigest: null });
+    expect(
       await verifyDiscordPrivacyCode({
         client,
         requestId: requestB.requestId,
@@ -346,6 +414,13 @@ describe("Discord privacy PostgreSQL domain", () => {
         now: new Date("2030-01-01T00:06:00.000Z"),
       }),
     ).toEqual({ status: "cancelled" });
+
+    await cleanupDiscordRetention(client, new Date("2030-01-08T00:30:00.000Z"));
+    expect(
+      await client.discordPrivacyVerificationRequest.count({
+        where: { id: requestA.requestId },
+      }),
+    ).toBe(0);
   });
 
   it("authorizes erase only for an ERASE request and removes the subject atomically", async () => {
@@ -362,6 +437,39 @@ describe("Discord privacy PostgreSQL domain", () => {
       requestId: request.requestId,
       code: request.code,
       now: new Date("2030-01-01T00:01:00.000Z"),
+    });
+    const pendingRequest = await createDiscordPrivacyVerification({
+      client,
+      requestType: "INSPECT",
+      discordUserId: USER_A,
+      now: new Date("2030-01-01T00:00:00.000Z"),
+    });
+    const verifiedRequest = await createDiscordPrivacyVerification({
+      client,
+      requestType: "ERASE",
+      discordUserId: USER_A,
+      now: new Date("2030-01-01T00:00:00.000Z"),
+    });
+    await verifyDiscordPrivacyCode({
+      client,
+      requestId: verifiedRequest.requestId,
+      code: verifiedRequest.code,
+      now: new Date("2030-01-01T00:01:00.000Z"),
+    });
+    const otherUserRequest = await createDiscordPrivacyVerification({
+      client,
+      requestType: "ERASE",
+      discordUserId: USER_B,
+      now: new Date("2030-01-01T00:00:00.000Z"),
+    });
+    const expiredRequest = await client.discordPrivacyVerificationRequest.create({
+      data: {
+        requestType: "INSPECT",
+        discordUserId: USER_A,
+        codeDigest: "expired-request-digest",
+        expiresAt: new Date("2030-01-01T00:01:00.000Z"),
+      },
+      select: { id: true },
     });
 
     await expect(
@@ -383,13 +491,118 @@ describe("Discord privacy PostgreSQL domain", () => {
         priceReportSettings: 1,
         targetPriceWatches: 1,
         notificationDeliveries: 2,
+        verificationRequests: {
+          total: 4,
+          pending: 1,
+          verified: 2,
+          consumed: 0,
+          cancelled: 0,
+          expired: 1,
+        },
       },
     });
-    expect(await inspectDiscordUserData(client, USER_A)).toMatchObject({
+    expect(
+      await inspectDiscordUserData(client, USER_A, new Date("2030-01-01T00:03:00.000Z")),
+    ).toMatchObject({
       priceReportSettings: 0,
       targetPriceWatches: 0,
       notificationDeliveries: 0,
+      verificationRequests: {
+        total: 0,
+        pending: 0,
+        verified: 0,
+        consumed: 0,
+        cancelled: 0,
+        expired: 0,
+      },
     });
+    expect(
+      await client.discordPrivacyVerificationRequest.findMany({
+        where: {
+          id: {
+            in: [
+              request.requestId,
+              pendingRequest.requestId,
+              verifiedRequest.requestId,
+              expiredRequest.id,
+            ],
+          },
+        },
+        select: {
+          id: true,
+          discordUserId: true,
+          codeDigest: true,
+          consumedAt: true,
+          cancelledAt: true,
+        },
+        orderBy: { id: "asc" },
+      }),
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: request.requestId,
+          discordUserId: null,
+          codeDigest: null,
+          consumedAt: new Date("2030-01-01T00:02:00.000Z"),
+          cancelledAt: null,
+        }),
+        expect.objectContaining({
+          id: pendingRequest.requestId,
+          discordUserId: null,
+          codeDigest: null,
+          consumedAt: null,
+          cancelledAt: new Date("2030-01-01T00:02:00.000Z"),
+        }),
+        expect.objectContaining({
+          id: verifiedRequest.requestId,
+          discordUserId: null,
+          codeDigest: null,
+          consumedAt: null,
+          cancelledAt: new Date("2030-01-01T00:02:00.000Z"),
+        }),
+        expect.objectContaining({
+          id: expiredRequest.id,
+          discordUserId: null,
+          codeDigest: null,
+          consumedAt: null,
+          cancelledAt: new Date("2030-01-01T00:02:00.000Z"),
+        }),
+      ]),
+    );
+    expect(
+      await client.discordPrivacyVerificationRequest.findUniqueOrThrow({
+        where: { id: otherUserRequest.requestId },
+        select: { discordUserId: true, codeDigest: true, cancelledAt: true },
+      }),
+    ).toEqual({
+      discordUserId: USER_B,
+      codeDigest: expect.any(String),
+      cancelledAt: null,
+    });
+
+    expect(
+      await inspectDiscordRetentionCandidates(client, new Date("2030-01-08T00:02:00.000Z")),
+    ).toMatchObject({ verificationRequests: 4 });
+    await cleanupDiscordRetention(client, new Date("2030-01-08T00:02:00.000Z"));
+    expect(
+      await client.discordPrivacyVerificationRequest.count({
+        where: {
+          id: {
+            in: [
+              request.requestId,
+              pendingRequest.requestId,
+              verifiedRequest.requestId,
+              expiredRequest.id,
+            ],
+          },
+        },
+      }),
+    ).toBe(0);
+    expect(
+      await client.discordPrivacyVerificationRequest.count({
+        where: { id: otherUserRequest.requestId },
+      }),
+    ).toBe(1);
   });
 
   it("applies exact retention boundaries and leaves newer or active rows intact", async () => {

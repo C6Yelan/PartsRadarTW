@@ -9,6 +9,14 @@ export interface DiscordUserDataSummary {
   notificationDeliveries: number;
   publicSettingsCreatedByUser: number;
   publicSettingsUpdatedByUser: number;
+  verificationRequests: {
+    total: number;
+    pending: number;
+    verified: number;
+    consumed: number;
+    cancelled: number;
+    expired: number;
+  };
 }
 
 export interface DiscordGuildDataSummary {
@@ -44,6 +52,7 @@ type PrivacyTransactionClient = Pick<
 export async function inspectDiscordUserData(
   client: PrivacyClient | PrivacyTransactionClient,
   discordUserId: string,
+  now = new Date(),
 ): Promise<DiscordUserDataSummary> {
   const [
     priceReportSettings,
@@ -51,6 +60,7 @@ export async function inspectDiscordUserData(
     notificationDeliveries,
     publicSettingsCreatedByUser,
     publicSettingsUpdatedByUser,
+    verificationRows,
   ] = await Promise.all([
     client.discordPriceReportSetting.count({ where: { discordUserId } }),
     client.discordTargetPriceWatch.count({ where: { discordUserId } }),
@@ -61,24 +71,60 @@ export async function inspectDiscordUserData(
     client.discordPublicPriceReportSetting.count({
       where: { updatedByDiscordUserId: discordUserId },
     }),
+    client.discordPrivacyVerificationRequest.findMany({
+      where: { discordUserId },
+      select: {
+        expiresAt: true,
+        verifiedAt: true,
+        consumedAt: true,
+        cancelledAt: true,
+      },
+    }),
   ]);
 
+  const nowMs = now.getTime();
   return {
     priceReportSettings,
     targetPriceWatches,
     notificationDeliveries,
     publicSettingsCreatedByUser,
     publicSettingsUpdatedByUser,
+    verificationRequests: {
+      total: verificationRows.length,
+      pending: verificationRows.filter(
+        (request) =>
+          !request.verifiedAt &&
+          !request.consumedAt &&
+          !request.cancelledAt &&
+          request.expiresAt.getTime() > nowMs,
+      ).length,
+      verified: verificationRows.filter(
+        (request) =>
+          request.verifiedAt &&
+          !request.consumedAt &&
+          !request.cancelledAt &&
+          request.expiresAt.getTime() > nowMs,
+      ).length,
+      consumed: verificationRows.filter((request) => request.consumedAt).length,
+      cancelled: verificationRows.filter((request) => !request.consumedAt && request.cancelledAt)
+        .length,
+      expired: verificationRows.filter(
+        (request) =>
+          !request.consumedAt && !request.cancelledAt && request.expiresAt.getTime() <= nowMs,
+      ).length,
+    },
   };
 }
 
 export async function eraseDiscordUserData(
   client: PrivacyClient,
   discordUserId: string,
+  now = new Date(),
 ): Promise<DiscordUserEraseResult> {
   return client.$transaction(async (transaction) => {
-    const before = await inspectDiscordUserData(transaction, discordUserId);
+    const before = await inspectDiscordUserData(transaction, discordUserId, now);
     await eraseDiscordUserDataInTransaction(transaction, discordUserId);
+    await cancelUserVerificationRequests(transaction, discordUserId, now);
 
     return before;
   });
@@ -157,7 +203,7 @@ export async function inspectVerifiedDiscordUserData({
 }): Promise<{ discordUserId: string; counts: DiscordUserDataSummary }> {
   return client.$transaction(async (transaction) => {
     const request = await readAuthorizedRequest(transaction, requestId, "INSPECT", now);
-    const counts = await inspectDiscordUserData(transaction, request.discordUserId);
+    const counts = await inspectDiscordUserData(transaction, request.discordUserId, now);
     await consumeAuthorizedRequest(transaction, request.id, now);
     return { discordUserId: request.discordUserId, counts };
   });
@@ -174,8 +220,9 @@ export async function eraseVerifiedDiscordUserData({
 }): Promise<{ discordUserId: string; counts: DiscordUserEraseResult }> {
   return client.$transaction(async (transaction) => {
     const request = await readAuthorizedRequest(transaction, requestId, "ERASE", now);
-    const counts = await inspectDiscordUserData(transaction, request.discordUserId);
+    const counts = await inspectDiscordUserData(transaction, request.discordUserId, now);
     await eraseDiscordUserDataInTransaction(transaction, request.discordUserId);
+    await cancelUserVerificationRequests(transaction, request.discordUserId, now, request.id);
     await consumeAuthorizedRequest(transaction, request.id, now);
     return { discordUserId: request.discordUserId, counts };
   });
@@ -199,9 +246,11 @@ async function readAuthorizedRequest(
       cancelledAt: true,
     },
   });
+  const discordUserId = request?.discordUserId;
 
   if (
     !request ||
+    !discordUserId ||
     request.requestType !== requestType ||
     !request.verifiedAt ||
     request.consumedAt ||
@@ -211,7 +260,7 @@ async function readAuthorizedRequest(
     throw new Error("A matching unexpired verified privacy request is required.");
   }
 
-  return request;
+  return { ...request, discordUserId };
 }
 
 async function consumeAuthorizedRequest(
@@ -227,12 +276,35 @@ async function consumeAuthorizedRequest(
       cancelledAt: null,
       expiresAt: { gt: now },
     },
-    data: { consumedAt: now },
+    data: {
+      consumedAt: now,
+      discordUserId: null,
+      codeDigest: null,
+    },
   });
 
   if (result.count !== 1) {
     throw new Error("The verified privacy request could not be consumed.");
   }
+}
+
+async function cancelUserVerificationRequests(
+  transaction: PrivacyTransactionClient,
+  discordUserId: string,
+  now: Date,
+  exceptRequestId?: string,
+): Promise<void> {
+  await transaction.discordPrivacyVerificationRequest.updateMany({
+    where: {
+      discordUserId,
+      ...(exceptRequestId ? { id: { not: exceptRequestId } } : {}),
+    },
+    data: {
+      discordUserId: null,
+      codeDigest: null,
+      cancelledAt: now,
+    },
+  });
 }
 
 async function eraseDiscordUserDataInTransaction(

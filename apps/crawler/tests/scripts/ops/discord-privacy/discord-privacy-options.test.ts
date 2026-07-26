@@ -80,7 +80,11 @@ describe("Discord privacy CLI options", () => {
     expect(updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({ id: REQUEST_ID }),
-        data: { cancelledAt: new Date("2030-01-01T00:00:00.000Z") },
+        data: {
+          cancelledAt: new Date("2030-01-01T00:00:00.000Z"),
+          discordUserId: null,
+          codeDigest: null,
+        },
       }),
     );
     const storedDigest = create.mock.calls[0]?.[0]?.data?.codeDigest;

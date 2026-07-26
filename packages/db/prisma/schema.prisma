@@ -372,8 +372,8 @@ model DiscordPublicPriceReportSetting {
 model DiscordPrivacyVerificationRequest {
   id             String                    @id @default(uuid()) @db.Uuid
   requestType    DiscordPrivacyRequestType @map("request_type")
-  discordUserId  String                    @map("discord_user_id") @db.Text
-  codeDigest     String                    @map("code_digest") @db.Text
+  discordUserId  String?                   @map("discord_user_id") @db.Text
+  codeDigest     String?                   @map("code_digest") @db.Text
   expiresAt      DateTime                  @map("expires_at") @db.Timestamptz(6)
   attemptCount   Int                       @default(0) @map("attempt_count")
   maxAttempts    Int                       @default(5) @map("max_attempts")

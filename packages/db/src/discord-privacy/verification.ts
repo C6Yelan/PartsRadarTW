@@ -106,17 +106,30 @@ export async function verifyDiscordPrivacyCode({
         return { status: "attempts_exhausted" };
       }
       if (request.expiresAt.getTime() <= now.getTime()) {
+        await transaction.discordPrivacyVerificationRequest.update({
+          where: { id: request.id },
+          data: {
+            discordUserId: null,
+            codeDigest: null,
+          },
+        });
         return { status: "expired" };
       }
 
-      if (!verifyCodeDigest(code, request.codeDigest)) {
+      if (!request.codeDigest || !verifyCodeDigest(code, request.codeDigest)) {
         const nextAttemptCount = request.attemptCount + 1;
         const exhausted = nextAttemptCount >= request.maxAttempts;
         await transaction.discordPrivacyVerificationRequest.update({
           where: { id: request.id },
           data: {
             attemptCount: nextAttemptCount,
-            ...(exhausted ? { cancelledAt: now } : {}),
+            ...(exhausted
+              ? {
+                  cancelledAt: now,
+                  discordUserId: null,
+                  codeDigest: null,
+                }
+              : {}),
           },
         });
 
@@ -159,7 +172,11 @@ export async function cancelDiscordPrivacyVerification({
       consumedAt: null,
       cancelledAt: null,
     },
-    data: { cancelledAt: now },
+    data: {
+      cancelledAt: now,
+      discordUserId: null,
+      codeDigest: null,
+    },
   });
 
   return result.count > 0;
@@ -176,7 +193,7 @@ export async function readDiscordPrivacyVerificationStatus({
 }): Promise<{
   requestId: string;
   requestType: DiscordPrivacyRequestType;
-  discordUserId: string;
+  discordUserId: string | null;
   status: "pending" | "verified" | "consumed" | "cancelled" | "expired";
   expiresAt: Date;
   attemptsRemaining: number;

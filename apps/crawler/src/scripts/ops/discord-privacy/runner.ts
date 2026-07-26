@@ -129,7 +129,7 @@ export async function runDiscordPrivacyCommand({
           action: command.action,
           requestId: status.requestId,
           requestType: status.requestType.toLowerCase(),
-          subject: maskDiscordId(status.discordUserId),
+          ...(status.discordUserId ? { subject: maskDiscordId(status.discordUserId) } : {}),
           status: status.status,
           expiresAt: status.expiresAt,
           attemptsRemaining: status.attemptsRemaining,

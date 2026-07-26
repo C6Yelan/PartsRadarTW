@@ -88,6 +88,16 @@ export async function cleanupDiscordRetention(
   now = new Date(),
 ): Promise<DiscordRetentionSummary> {
   return client.$transaction(async (transaction) => {
+    await transaction.discordPrivacyVerificationRequest.updateMany({
+      where: {
+        expiresAt: { lte: now },
+        discordUserId: { not: null },
+      },
+      data: {
+        discordUserId: null,
+        codeDigest: null,
+      },
+    });
     const candidates = await inspectDiscordRetentionCandidates(transaction, now);
     const personalCutoff = new Date(
       now.getTime() - DISCORD_RETENTION_POLICY.disabledPersonalSettingMs,
