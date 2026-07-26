@@ -365,9 +365,9 @@ async function expectSingleLine(locator: Locator) {
 }
 
 test.describe("public API smoke", () => {
-  test("checks public data and rate-limit headers", { tag: "@desktop-only" }, async ({
-    request,
-  }) => {
+  test("checks public data and rate-limit headers", {
+    tag: ["@desktop-only", "@db-smoke"],
+  }, async ({ request }) => {
     const sourceStatus = await request.get("/api/source-status");
     expect(sourceStatus.status()).toBe(200);
     await expectJsonShape(sourceStatus, ["status"]);
@@ -391,13 +391,12 @@ test.describe("public API smoke", () => {
     await expectJsonShape(priceReport, ["data", "summary", "pagination", "meta"]);
   });
 
-  test("checks product detail, price history, and image API when a product exists", {
-    tag: "@desktop-only",
+  test("checks product detail, price history, and image API for the seeded product", {
+    tag: ["@desktop-only", "@db-smoke"],
   }, async ({ request }) => {
     const product = await fetchFirstProduct(request);
     if (!product) {
-      test.skip(true, "No product exists in this environment.");
-      return;
+      throw new Error("The deterministic E2E seed must provide a public product.");
     }
 
     const detail = await request.get(`/api/products/${product.id}`);
@@ -408,12 +407,11 @@ test.describe("public API smoke", () => {
     expect(priceHistory.status()).toBe(200);
     await expectJsonShape(priceHistory, ["range", "rangeDays", "points"]);
 
-    if (!product.image?.url) {
-      test.skip(true, "The first product has no cached image.");
-      return;
-    }
+    expect(product.image?.url, "The deterministic E2E seed must advertise a cached image.").toBe(
+      `/api/product-images/${product.id}.webp`,
+    );
 
-    const image = await request.get(product.image.url);
+    const image = await request.get(product.image?.url ?? "");
     expect(image.status()).toBe(200);
     expect(image.headers()["content-type"]).toContain("image/");
   });

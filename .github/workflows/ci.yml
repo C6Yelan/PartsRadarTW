@@ -102,3 +102,58 @@ jobs:
 
       - name: Run PostgreSQL integration tests
         run: pnpm test:db
+
+  e2e-smoke:
+    name: DB-backed public smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: partsradar_e2e
+          POSTGRES_PASSWORD: partsradar_e2e
+          POSTGRES_USER: partsradar_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U partsradar_e2e -d partsradar_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://partsradar_e2e:partsradar_e2e@127.0.0.1:5432/partsradar_e2e
+      PARTSRADAR_SKIP_DOTENV: "1"
+      PARTSRADAR_TEST_DATABASE_ISOLATED: "1"
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 11.3.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Generate Prisma client
+        run: pnpm db:generate
+
+      - name: Deploy migrations
+        run: pnpm db:deploy
+
+      - name: Build web
+        run: pnpm build:web
+
+      - name: Run deterministic DB-backed smoke
+        run: pnpm e2e:db-smoke
