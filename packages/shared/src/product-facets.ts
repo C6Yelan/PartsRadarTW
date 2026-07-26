@@ -2,6 +2,7 @@
 // 維持 product facets 的既有公共匯入路徑與符號集合。
 
 export { extractProductFilterTags } from "./product-facets/extraction";
+export { mergeProductFilterTags } from "./product-facets/merge";
 export type {
   ParsedProductFilterTag,
   ProductFacetDefinition,
@@ -11,7 +12,6 @@ export {
   getProductFacetDefinitions,
   getPublicProductFacetDefinitions,
   isProductFilterTagSupported,
-  mergeProductFilterTags,
   PRODUCT_FACET_IGRPS,
   parseProductFilterTag,
 } from "./product-facets/registry";

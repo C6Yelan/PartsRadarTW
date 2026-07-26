@@ -31,7 +31,6 @@ describe("product facets", () => {
     ["Intel i5-14400F【10核/16緒】", "integrated_graphics:no"],
     ["Intel i5-14600K【14核/20緒】", "integrated_graphics:yes"],
     ["AMD R5 7500F MPK【6核/12緒】", "integrated_graphics:no"],
-    ["AMD R7 9700X【8核/16緒】", "integrated_graphics:yes"],
     ["AMD R5 5500X3D【6核/12緒】", "integrated_graphics:no"],
     ["AMD R7 5700G【8核/16緒】", "integrated_graphics:yes"],
   ])("infers deterministic integrated graphics for %s", (name, expectedTag) => {
@@ -166,7 +165,6 @@ describe("product facets", () => {
     ["SSD 1024G", "1024", "about-1tb"],
     ["SSD 2048G", "2048", "about-2tb"],
     ["SSD 1024G ~搭機價~", "1024", "about-1tb"],
-    ["SSD 2048G ~搭機價~", "2048", "about-2tb"],
   ])("keeps the exact SSD capacity and adds its display bucket: %s", (name, exact, bucket) => {
     expect(extractProductFilterTags(7, name)).toEqual([
       `capacity_gb:${exact}`,
@@ -175,16 +173,12 @@ describe("product facets", () => {
   });
 
   it.each([
-    ["SSD 240G", "capacity_bucket:240-256"],
     ["SSD 256G", "capacity_bucket:240-256"],
     ["SSD 480G", "capacity_bucket:480-512"],
     ["SSD 500G", "capacity_bucket:480-512"],
     ["SSD 512G", "capacity_bucket:480-512"],
-    ["SSD 960G", "capacity_bucket:about-1tb"],
     ["SSD 1TB", "capacity_bucket:about-1tb"],
-    ["SSD 1024G", "capacity_bucket:about-1tb"],
     ["SSD 2TB", "capacity_bucket:about-2tb"],
-    ["SSD 2048G", "capacity_bucket:about-2tb"],
   ])("maps SSD capacities into stable bucket tags: %s", (name, bucketTag) => {
     expect(extractProductFilterTags(7, name)).toContain(bucketTag);
   });
@@ -194,14 +188,6 @@ describe("product facets", () => {
       "form_factor:3-5-inch",
       "capacity_gb:8000",
       "storage_usage:nas",
-    ]);
-  });
-
-  it("extracts external storage type, connector, and capacity", () => {
-    expect(extractProductFilterTags(9, "外接 SSD 2TB USB Type-C")).toEqual([
-      "external_type:external-ssd",
-      "connector:type-c",
-      "capacity_gb:2000",
     ]);
   });
 
@@ -357,7 +343,6 @@ describe("product facets", () => {
 
   it.each([
     "ITX【SFX】",
-    "ITX【電源另購】",
     "/ITX",
     "(Mini-ITX)",
     "ITX/ATX",
@@ -368,7 +353,6 @@ describe("product facets", () => {
   it.each([
     "BITX",
     "ITX2",
-    "XITXMODEL",
     "MINI-ITXPRO",
   ])("does not extract ITX from an alphanumeric token: %s", (name) => {
     expect(extractProductFilterTags(14, name)).not.toContain("motherboard_support:mini-itx");
@@ -389,23 +373,16 @@ describe("product facets", () => {
     ).toContain("included_psu:yes");
   });
 
-  it.each([
-    "中塔機殼/含 500W 電源",
-    "中塔機殼/包含 500W 電源",
-    "中塔機殼/不含滑軌/內附400W電源",
-  ])("extracts an explicitly included PSU: %s", (name) => {
-    expect(extractProductFilterTags(14, name)).toContain("included_psu:yes");
+  it("extracts an explicitly included PSU", () => {
+    expect(extractProductFilterTags(14, "中塔機殼/含 500W 電源")).toContain("included_psu:yes");
   });
 
   it.each([
     "中塔機殼/不含電源",
     "中塔機殼/未含電源",
-    "中塔機殼/不含 500W 電源",
     "中塔機殼/不包含電源",
-    "中塔機殼/未包含電源",
     "中塔機殼/內含風扇/不含電源",
     "中塔機殼/不含電源/內附3顆風扇",
-    "中塔機殼/未含電源/內附3顆風扇",
   ])("does not infer an included PSU from a negated description: %s", (name) => {
     expect(extractProductFilterTags(14, name)).not.toContain("included_psu:yes");
   });

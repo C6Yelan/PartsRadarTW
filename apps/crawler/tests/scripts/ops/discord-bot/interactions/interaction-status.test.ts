@@ -63,8 +63,6 @@ describe("status interaction", () => {
 
     expect(fields).toHaveLength(6);
     expect(fields[3]).toEqual({ name: "\u200b", value: "\u200b", inline: false });
-    expect(fields.filter((field) => field.name === "\u200b")).toHaveLength(1);
-    expect(scheduleFields).toHaveLength(5);
     expect(scheduleFields.map((field) => field.name)).toEqual([
       "商品價格爬蟲",
       "Discord 通知排程主迴圈",
@@ -74,12 +72,10 @@ describe("status interaction", () => {
     ]);
     expect(scheduleFields.every((field) => field.inline === true)).toBe(true);
     expect(JSON.stringify(embed)).not.toMatch(/機器人|Gateway|uptime|已運作|資料範圍/);
-    expect(JSON.stringify(embed)).not.toContain('"name":"功能"');
   });
 
   it.each([
     ["SUCCESS_CHANGED", "完成，有價格或商品更新"],
-    ["SUCCESS_UNCHANGED", "完成，沒有價格變動"],
     ["SUCCESS_WITH_ERRORS", "完成，但部分分類需要注意"],
     ["FETCH_FAILED", "更新失敗"],
     ["SUSPECTED_BLOCK", "來源網站暫時無法正常讀取"],

@@ -405,38 +405,6 @@ export function isProductFilterTagSupported(igrp: number, tag: string): boolean 
   );
 }
 
-export function mergeProductFilterTags(
-  igrp: number,
-  localTags: readonly string[],
-  sourceTags: readonly string[],
-): string[] {
-  const protectedLocalFacetKeys = new Set<string>();
-  if (igrp === 5 && localTags.includes("socket:swrx8")) {
-    protectedLocalFacetKeys.add("socket");
-  }
-  if (igrp === 8 && localTags.includes("storage_usage:laptop")) {
-    protectedLocalFacetKeys.add("storage_usage");
-  }
-  const effectiveSourceTags = sourceTags.filter(
-    (tag) => !protectedLocalFacetKeys.has(readFacetKey(tag)),
-  );
-  const sourceFacetKeys = new Set(effectiveSourceTags.map(readFacetKey));
-  const selected = new Set([
-    ...localTags.filter((tag) => !sourceFacetKeys.has(readFacetKey(tag))),
-    ...effectiveSourceTags,
-  ]);
-
-  return getProductFacetDefinitions(igrp).flatMap((definition) =>
-    definition.options
-      .map((candidate) => `${definition.key}:${candidate.value}`)
-      .filter((tag) => selected.has(tag)),
-  );
-}
-
-function readFacetKey(tag: string): string {
-  return tag.slice(0, tag.indexOf(":"));
-}
-
 function getCapacityOptionsForIgrp(igrp: number): readonly ProductFacetOption[] {
   const exclusions = CAPACITY_EXCLUSIONS_BY_IGRP[igrp] ?? new Set<string>();
   return CAPACITY_OPTIONS.filter((capacity) => !exclusions.has(capacity.value));
