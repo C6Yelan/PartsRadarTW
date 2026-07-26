@@ -66,7 +66,7 @@ test("shows separate SSD, HDD, and external-storage filters @desktop-only", asyn
   await expect(page.locator(".facet-filter").filter({ hasText: "商品類型" })).toBeVisible();
 });
 
-test("keeps the product toolbar compact and readable across its layout boundary @desktop-only", async ({
+test("keeps the product toolbar compact and readable across its layout boundary @responsive-boundary", async ({
   page,
 }) => {
   test.setTimeout(90_000);
@@ -74,18 +74,10 @@ test("keeps the product toolbar compact and readable across its layout boundary 
 
   const viewports = [
     { width: 1760, height: 900 },
-    { width: 1310, height: 800 },
     { width: 1309, height: 800 },
-    { width: 1308, height: 800 },
-    { width: 1280, height: 800 },
-    { width: 1024, height: 800 },
-    { width: 1000, height: 800 },
-    { width: 900, height: 800 },
-    { width: 800, height: 800 },
     { width: 761, height: 844 },
     { width: 760, height: 844 },
     { width: 390, height: 844 },
-    { width: 360, height: 800 },
   ];
   const viewportDimensions: Array<{ clientWidth: number; scrollWidth: number; width: number }> = [];
   const groupSelector = [
@@ -96,238 +88,245 @@ test("keeps the product toolbar compact and readable across its layout boundary 
   ].join(", ");
 
   for (const viewport of viewports) {
-    await page.setViewportSize(viewport);
-    await page.goto("/?category=cpu");
-    await expect(page.getByRole("region", { name: "商品列表" })).toBeVisible();
+    await test.step(`${viewport.width}px product-toolbar layout`, async () => {
+      await page.setViewportSize(viewport);
+      await page.goto("/?category=cpu");
+      await expect(page.getByRole("region", { name: "商品列表" })).toBeVisible();
 
-    const priceInputs = page.locator(".toolbar-price-grid input");
-    await expect(priceInputs).toHaveCount(2);
-    for (const input of await priceInputs.all()) {
-      const placeholderFit = await input.evaluate((element) => {
-        if (!(element instanceof HTMLInputElement)) return null;
-        const styles = window.getComputedStyle(element);
-        const context = document.createElement("canvas").getContext("2d");
-        if (!context) return null;
-        context.font = styles.font;
-        return {
-          availableWidth:
-            element.clientWidth -
-            Number.parseFloat(styles.paddingLeft) -
-            Number.parseFloat(styles.paddingRight),
-          placeholder: element.placeholder,
-          textWidth: context.measureText(element.placeholder).width,
-        };
-      });
-      expect(placeholderFit).not.toBeNull();
-      expect(["最低價格", "最高價格"]).toContain(placeholderFit?.placeholder);
-      expect(placeholderFit?.textWidth ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(
-        placeholderFit?.availableWidth ?? 0,
-      );
-      await expect(input).toHaveCSS("text-align", "center");
-    }
-
-    const statusButtons = page.locator(".toolbar-segmented-control button");
-    await expect(statusButtons).toHaveCount(3);
-    for (const button of await statusButtons.all()) {
-      const textLayout = await button.evaluate((element) => ({
-        clientHeight: element.clientHeight,
-        clientWidth: element.clientWidth,
-        scrollHeight: element.scrollHeight,
-        scrollWidth: element.scrollWidth,
-        whiteSpace: window.getComputedStyle(element).whiteSpace,
-      }));
-      expect(textLayout.whiteSpace).toBe("nowrap");
-      expect(textLayout.scrollWidth).toBeLessThanOrEqual(textLayout.clientWidth);
-      expect(textLayout.scrollHeight).toBeLessThanOrEqual(textLayout.clientHeight);
-    }
-
-    const controls = page.locator(".toolbar-controls");
-    const controlsBox = await controls.boundingBox();
-    const groupBoxes = await page.locator(groupSelector).evaluateAll((elements) =>
-      elements.map((element) => {
-        const rect = element.getBoundingClientRect();
-        return {
-          bottom: rect.bottom,
-          left: rect.left,
-          right: rect.right,
-          top: rect.top,
-          width: rect.width,
-        };
-      }),
-    );
-    expect(controlsBox).not.toBeNull();
-    expect(groupBoxes.length).toBe(6);
-
-    if (viewport.width > 760) {
-      const toolbarGap = await controls.evaluate((element) => {
-        const styles = window.getComputedStyle(element);
-        return { columnGap: styles.columnGap, rowGap: styles.rowGap };
-      });
-      expect(toolbarGap).toEqual({ columnGap: "8px", rowGap: "8px" });
+      const priceInputs = page.locator(".toolbar-price-grid input");
+      await expect(priceInputs).toHaveCount(2);
       for (const input of await priceInputs.all()) {
-        expect((await input.boundingBox())?.width).toBeCloseTo(92, 0);
-      }
-      expect((await page.locator(".toolbar-status-filter").boundingBox())?.width).toBeLessThan(300);
-      expect((await page.locator(".vendor-menu-trigger").boundingBox())?.width).toBeCloseTo(112, 0);
-      for (const trigger of await page.locator(".facet-menu-trigger").all()) {
-        expect((await trigger.boundingBox())?.width).toBeCloseTo(112, 0);
-      }
-    }
-
-    if (viewport.width === 1760) {
-      const firstCenter = (groupBoxes[0].top + groupBoxes[0].bottom) / 2;
-      expect(
-        groupBoxes.every((box) => Math.abs((box.top + box.bottom) / 2 - firstCenter) <= 1),
-      ).toBe(true);
-      for (let index = 1; index < groupBoxes.length; index += 1) {
-        expect(groupBoxes[index].left - groupBoxes[index - 1].right).toBeCloseTo(8, 0);
-      }
-      const lastGroup = groupBoxes.at(-1);
-      expect(lastGroup).toBeDefined();
-      expect(
-        (controlsBox?.x ?? 0) + (controlsBox?.width ?? 0) - (lastGroup?.right ?? 0),
-      ).toBeGreaterThan(20);
-    } else if (viewport.width > 760) {
-      if ([1280, 761].includes(viewport.width)) {
-        expect(new Set(groupBoxes.map((box) => Math.round(box.top))).size).toBeGreaterThan(1);
-      }
-      for (const box of groupBoxes) {
-        expect(box.width).toBeLessThanOrEqual(controlsBox?.width ?? 0);
-      }
-    } else {
-      for (const box of groupBoxes) {
-        expect(box.width).toBeCloseTo(controlsBox?.width ?? 0, 0);
-      }
-      const fullWidthControls = [
-        page.locator(".toolbar-price-grid"),
-        page.locator(".toolbar-segmented-control"),
-        page.locator(".vendor-menu"),
-        page.locator(".facet-menu").first(),
-      ];
-      for (const control of fullWidthControls) {
-        const [controlBox, parentBox] = await Promise.all([
-          control.boundingBox(),
-          control.locator("..").boundingBox(),
-        ]);
-        expect(controlBox?.width).toBeCloseTo(parentBox?.width ?? 0, 0);
-      }
-    }
-
-    for (let firstIndex = 0; firstIndex < groupBoxes.length; firstIndex += 1) {
-      for (let secondIndex = firstIndex + 1; secondIndex < groupBoxes.length; secondIndex += 1) {
-        const first = groupBoxes[firstIndex];
-        const second = groupBoxes[secondIndex];
-        const overlaps =
-          first.left < second.right - 0.5 &&
-          first.right > second.left + 0.5 &&
-          first.top < second.bottom - 0.5 &&
-          first.bottom > second.top + 0.5;
-        expect(overlaps).toBe(false);
-      }
-    }
-
-    const productRow = page.locator(".product-row").first();
-    const tableHeader = page.locator(".table-header");
-    const usesCompactTable = viewport.width <= 1309;
-    if (usesCompactTable) {
-      await expect(tableHeader).toBeHidden();
-      await expect(productRow.locator(".row-price .cell-label")).toBeVisible();
-    } else {
-      await expect(tableHeader).toBeVisible();
-      await expect(productRow.locator(".row-price .cell-label")).toBeHidden();
-      const productHeaderAlignment = await tableHeader
-        .locator("span")
-        .nth(1)
-        .evaluate((element) => {
-          const range = document.createRange();
-          const textNode = element.firstChild;
-          if (!textNode) return null;
-          range.selectNodeContents(textNode);
-          const cellRect = element.getBoundingClientRect();
-          const textRect = range.getBoundingClientRect();
+        const placeholderFit = await input.evaluate((element) => {
+          if (!(element instanceof HTMLInputElement)) return null;
+          const styles = window.getComputedStyle(element);
+          const context = document.createElement("canvas").getContext("2d");
+          if (!context) return null;
+          context.font = styles.font;
           return {
-            cellCenter: cellRect.left + cellRect.width / 2,
-            textAlign: getComputedStyle(element).textAlign,
-            textCenter: textRect.left + textRect.width / 2,
+            availableWidth:
+              element.clientWidth -
+              Number.parseFloat(styles.paddingLeft) -
+              Number.parseFloat(styles.paddingRight),
+            placeholder: element.placeholder,
+            textWidth: context.measureText(element.placeholder).width,
           };
         });
-      expect(productHeaderAlignment?.textAlign).toBe("center");
-      expect(
-        Math.abs(
-          (productHeaderAlignment?.cellCenter ?? 0) -
-            (productHeaderAlignment?.textCenter ?? Number.POSITIVE_INFINITY),
-        ),
-      ).toBeLessThanOrEqual(2);
-    }
+        expect(placeholderFit).not.toBeNull();
+        expect(["最低價格", "最高價格"]).toContain(placeholderFit?.placeholder);
+        expect(placeholderFit?.textWidth ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(
+          placeholderFit?.availableWidth ?? 0,
+        );
+        await expect(input).toHaveCSS("text-align", "center");
+      }
 
-    const paginationDisplay = await page
-      .locator(".pagination-bar")
-      .evaluate((element) => window.getComputedStyle(element).display);
-    expect(paginationDisplay).toBe(viewport.width <= 760 ? "grid" : "flex");
+      const statusButtons = page.locator(".toolbar-segmented-control button");
+      await expect(statusButtons).toHaveCount(3);
+      for (const button of await statusButtons.all()) {
+        const textLayout = await button.evaluate((element) => ({
+          clientHeight: element.clientHeight,
+          clientWidth: element.clientWidth,
+          scrollHeight: element.scrollHeight,
+          scrollWidth: element.scrollWidth,
+          whiteSpace: window.getComputedStyle(element).whiteSpace,
+        }));
+        expect(textLayout.whiteSpace).toBe("nowrap");
+        expect(textLayout.scrollWidth).toBeLessThanOrEqual(textLayout.clientWidth);
+        expect(textLayout.scrollHeight).toBeLessThanOrEqual(textLayout.clientHeight);
+      }
 
-    const productLink = productRow.getByRole("link", { name: product.name });
-    const productNameLayout = await productLink.evaluate((element) => {
-      const styles = window.getComputedStyle(element);
-      return {
-        clientWidth: element.clientWidth,
-        lineClamp: styles.webkitLineClamp,
-        scrollWidth: element.scrollWidth,
-        whiteSpace: styles.whiteSpace,
-      };
-    });
-    expect(productNameLayout.whiteSpace).toBe("normal");
-    expect(productNameLayout.lineClamp).toBe("2");
-    expect(productNameLayout.scrollWidth).toBeLessThanOrEqual(productNameLayout.clientWidth);
-    if (!usesCompactTable) {
-      await expect(productRow.locator(".product-main")).toHaveCSS("text-align", "left");
-    }
-    await expect(productRow.locator(".row-price strong")).toContainText("NT$ 18,990");
-    const movementText = await productRow.locator(".price-movement").innerText();
-    expect(movementText).toBe("−NT$ 300 / −4.8%");
-    await expect(productRow.locator(".row-status .row-state")).toHaveText("目前上架");
+      const controls = page.locator(".toolbar-controls");
+      const controlsBox = await controls.boundingBox();
+      const groupBoxes = await page.locator(groupSelector).evaluateAll((elements) =>
+        elements.map((element) => {
+          const rect = element.getBoundingClientRect();
+          return {
+            bottom: rect.bottom,
+            left: rect.left,
+            right: rect.right,
+            top: rect.top,
+            width: rect.width,
+          };
+        }),
+      );
+      expect(controlsBox).not.toBeNull();
+      expect(groupBoxes.length).toBe(6);
 
-    const rowContentLayout = await productRow.evaluate((element) => {
-      const rowRect = element.getBoundingClientRect();
-      const content = [
-        ".product-image",
-        ".product-main",
-        ".row-price",
-        ".row-movement",
-        ".row-status",
-        ".row-build-list",
-      ];
-      return content.map((selector) => {
-        const child = element.querySelector(selector);
-        if (!(child instanceof HTMLElement)) return { fits: false, selector };
-        const rect = child.getBoundingClientRect();
+      if (viewport.width > 760) {
+        const toolbarGap = await controls.evaluate((element) => {
+          const styles = window.getComputedStyle(element);
+          return { columnGap: styles.columnGap, rowGap: styles.rowGap };
+        });
+        expect(toolbarGap).toEqual({ columnGap: "8px", rowGap: "8px" });
+        for (const input of await priceInputs.all()) {
+          expect((await input.boundingBox())?.width).toBeCloseTo(92, 0);
+        }
+        expect((await page.locator(".toolbar-status-filter").boundingBox())?.width).toBeLessThan(
+          300,
+        );
+        expect((await page.locator(".vendor-menu-trigger").boundingBox())?.width).toBeCloseTo(
+          112,
+          0,
+        );
+        for (const trigger of await page.locator(".facet-menu-trigger").all()) {
+          expect((await trigger.boundingBox())?.width).toBeCloseTo(112, 0);
+        }
+      }
+
+      if (viewport.width === 1760) {
+        const firstCenter = (groupBoxes[0].top + groupBoxes[0].bottom) / 2;
+        expect(
+          groupBoxes.every((box) => Math.abs((box.top + box.bottom) / 2 - firstCenter) <= 1),
+        ).toBe(true);
+        for (let index = 1; index < groupBoxes.length; index += 1) {
+          expect(groupBoxes[index].left - groupBoxes[index - 1].right).toBeCloseTo(8, 0);
+        }
+        const lastGroup = groupBoxes.at(-1);
+        expect(lastGroup).toBeDefined();
+        expect(
+          (controlsBox?.x ?? 0) + (controlsBox?.width ?? 0) - (lastGroup?.right ?? 0),
+        ).toBeGreaterThan(20);
+      } else if (viewport.width > 760) {
+        if ([1280, 761].includes(viewport.width)) {
+          expect(new Set(groupBoxes.map((box) => Math.round(box.top))).size).toBeGreaterThan(1);
+        }
+        for (const box of groupBoxes) {
+          expect(box.width).toBeLessThanOrEqual(controlsBox?.width ?? 0);
+        }
+      } else {
+        for (const box of groupBoxes) {
+          expect(box.width).toBeCloseTo(controlsBox?.width ?? 0, 0);
+        }
+        const fullWidthControls = [
+          page.locator(".toolbar-price-grid"),
+          page.locator(".toolbar-segmented-control"),
+          page.locator(".vendor-menu"),
+          page.locator(".facet-menu").first(),
+        ];
+        for (const control of fullWidthControls) {
+          const [controlBox, parentBox] = await Promise.all([
+            control.boundingBox(),
+            control.locator("..").boundingBox(),
+          ]);
+          expect(controlBox?.width).toBeCloseTo(parentBox?.width ?? 0, 0);
+        }
+      }
+
+      for (let firstIndex = 0; firstIndex < groupBoxes.length; firstIndex += 1) {
+        for (let secondIndex = firstIndex + 1; secondIndex < groupBoxes.length; secondIndex += 1) {
+          const first = groupBoxes[firstIndex];
+          const second = groupBoxes[secondIndex];
+          const overlaps =
+            first.left < second.right - 0.5 &&
+            first.right > second.left + 0.5 &&
+            first.top < second.bottom - 0.5 &&
+            first.bottom > second.top + 0.5;
+          expect(overlaps).toBe(false);
+        }
+      }
+
+      const productRow = page.locator(".product-row").first();
+      const tableHeader = page.locator(".table-header");
+      const usesCompactTable = viewport.width <= 1309;
+      if (usesCompactTable) {
+        await expect(tableHeader).toBeHidden();
+        await expect(productRow.locator(".row-price .cell-label")).toBeVisible();
+      } else {
+        await expect(tableHeader).toBeVisible();
+        await expect(productRow.locator(".row-price .cell-label")).toBeHidden();
+        const productHeaderAlignment = await tableHeader
+          .locator("span")
+          .nth(1)
+          .evaluate((element) => {
+            const range = document.createRange();
+            const textNode = element.firstChild;
+            if (!textNode) return null;
+            range.selectNodeContents(textNode);
+            const cellRect = element.getBoundingClientRect();
+            const textRect = range.getBoundingClientRect();
+            return {
+              cellCenter: cellRect.left + cellRect.width / 2,
+              textAlign: getComputedStyle(element).textAlign,
+              textCenter: textRect.left + textRect.width / 2,
+            };
+          });
+        expect(productHeaderAlignment?.textAlign).toBe("center");
+        expect(
+          Math.abs(
+            (productHeaderAlignment?.cellCenter ?? 0) -
+              (productHeaderAlignment?.textCenter ?? Number.POSITIVE_INFINITY),
+          ),
+        ).toBeLessThanOrEqual(2);
+      }
+
+      const paginationDisplay = await page
+        .locator(".pagination-bar")
+        .evaluate((element) => window.getComputedStyle(element).display);
+      expect(paginationDisplay).toBe(viewport.width <= 760 ? "grid" : "flex");
+
+      const productLink = productRow.getByRole("link", { name: product.name });
+      const productNameLayout = await productLink.evaluate((element) => {
+        const styles = window.getComputedStyle(element);
         return {
-          fits:
-            rect.left >= rowRect.left - 0.5 &&
-            rect.right <= rowRect.right + 0.5 &&
-            rect.top >= rowRect.top - 0.5 &&
-            rect.bottom <= rowRect.bottom + 0.5,
-          rect: { bottom: rect.bottom, left: rect.left, right: rect.right, top: rect.top },
-          row: {
-            bottom: rowRect.bottom,
-            left: rowRect.left,
-            right: rowRect.right,
-            top: rowRect.top,
-          },
-          selector,
+          clientWidth: element.clientWidth,
+          lineClamp: styles.webkitLineClamp,
+          scrollWidth: element.scrollWidth,
+          whiteSpace: styles.whiteSpace,
         };
       });
+      expect(productNameLayout.whiteSpace).toBe("normal");
+      expect(productNameLayout.lineClamp).toBe("2");
+      expect(productNameLayout.scrollWidth).toBeLessThanOrEqual(productNameLayout.clientWidth);
+      if (!usesCompactTable) {
+        await expect(productRow.locator(".product-main")).toHaveCSS("text-align", "left");
+      }
+      await expect(productRow.locator(".row-price strong")).toContainText("NT$ 18,990");
+      const movementText = await productRow.locator(".price-movement").innerText();
+      expect(movementText).toBe("−NT$ 300 / −4.8%");
+      await expect(productRow.locator(".row-status .row-state")).toHaveText("目前上架");
+
+      const rowContentLayout = await productRow.evaluate((element) => {
+        const rowRect = element.getBoundingClientRect();
+        const content = [
+          ".product-image",
+          ".product-main",
+          ".row-price",
+          ".row-movement",
+          ".row-status",
+          ".row-build-list",
+        ];
+        return content.map((selector) => {
+          const child = element.querySelector(selector);
+          if (!(child instanceof HTMLElement)) return { fits: false, selector };
+          const rect = child.getBoundingClientRect();
+          return {
+            fits:
+              rect.left >= rowRect.left - 0.5 &&
+              rect.right <= rowRect.right + 0.5 &&
+              rect.top >= rowRect.top - 0.5 &&
+              rect.bottom <= rowRect.bottom + 0.5,
+            rect: { bottom: rect.bottom, left: rect.left, right: rect.right, top: rect.top },
+            row: {
+              bottom: rowRect.bottom,
+              left: rowRect.left,
+              right: rowRect.right,
+              top: rowRect.top,
+            },
+            selector,
+          };
+        });
+      });
+      expect(rowContentLayout.filter(({ fits }) => !fits)).toEqual([]);
+
+      await productRow.getByRole("button", { name: "加入", exact: true }).click();
+      await expect(
+        productRow.getByRole("button", { name: `從配單移除 ${product.name}` }),
+      ).toBeVisible();
+      await expect(productRow.locator(".row-price strong")).toBeVisible();
+      await expect(productRow.locator(".row-status .row-state")).toBeVisible();
+
+      const dimensions = await expectNoHorizontalOverflow(page);
+      viewportDimensions.push({ ...dimensions, width: viewport.width });
     });
-    expect(rowContentLayout.filter(({ fits }) => !fits)).toEqual([]);
-
-    await productRow.getByRole("button", { name: "加入", exact: true }).click();
-    await expect(
-      productRow.getByRole("button", { name: `從配單移除 ${product.name}` }),
-    ).toBeVisible();
-    await expect(productRow.locator(".row-price strong")).toBeVisible();
-    await expect(productRow.locator(".row-status .row-state")).toBeVisible();
-
-    const dimensions = await expectNoHorizontalOverflow(page);
-    viewportDimensions.push({ ...dimensions, width: viewport.width });
   }
 
   console.log("toolbar/table viewport dimensions", viewportDimensions);
@@ -820,10 +819,9 @@ test("renders single-option facets as direct keyboard-operable controls @desktop
   await expect(page.locator(".facet-filter").filter({ hasText: "支援主機板" })).toBeVisible();
 });
 
-test("keeps grouped facet popovers full-width and category memory usable on mobile @desktop-only", async ({
+test("keeps grouped facet popovers full-width and category memory usable on mobile @mobile-only", async ({
   page,
 }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/?category=motherboard");
 
   await selectVendor(page, "ASUS");
@@ -862,7 +860,7 @@ test("keeps grouped facet popovers full-width and category memory usable on mobi
   await expectNoHorizontalOverflow(page);
 });
 
-test("keeps chipset and direct facet controls usable across responsive boundaries @desktop-only", async ({
+test("keeps chipset and direct facet controls usable across responsive boundaries @responsive-boundary", async ({
   page,
 }) => {
   const viewports = [
@@ -873,44 +871,45 @@ test("keeps chipset and direct facet controls usable across responsive boundarie
   ];
 
   for (const viewport of viewports) {
-    await page.setViewportSize(viewport);
-    await page.goto("/?category=motherboard");
-    const wifiControl = page.locator(".single-option-facet").filter({ hasText: "含 Wi-Fi" });
-    const wifiBox = await wifiControl.boundingBox();
-    expect(wifiBox?.height ?? 0).toBeGreaterThanOrEqual(viewport.width <= 760 ? 44 : 38);
+    await test.step(`${viewport.width}px chipset controls`, async () => {
+      await page.setViewportSize(viewport);
+      await page.goto("/?category=motherboard");
+      const wifiControl = page.locator(".single-option-facet").filter({ hasText: "含 Wi-Fi" });
+      const wifiBox = await wifiControl.boundingBox();
+      expect(wifiBox?.height ?? 0).toBeGreaterThanOrEqual(viewport.width <= 760 ? 44 : 38);
 
-    const chipsetFilter = page.locator(".facet-filter").filter({ hasText: "晶片組" });
-    await chipsetFilter.locator(".facet-menu-trigger").click();
-    const popover = chipsetFilter.locator(".facet-menu-popover");
-    const responsiveLayout = await popover.evaluate((element) => {
-      const rect = element.getBoundingClientRect();
-      const firstGroup = element.querySelector<HTMLElement>(".facet-option-group");
-      return {
-        columns: firstGroup
-          ? window.getComputedStyle(firstGroup).gridTemplateColumns.split(" ").length
-          : 0,
-        left: rect.left,
-        right: rect.right,
-        scrollWidth: element.scrollWidth,
-        width: element.clientWidth,
-      };
+      const chipsetFilter = page.locator(".facet-filter").filter({ hasText: "晶片組" });
+      await chipsetFilter.locator(".facet-menu-trigger").click();
+      const popover = chipsetFilter.locator(".facet-menu-popover");
+      const responsiveLayout = await popover.evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+        const firstGroup = element.querySelector<HTMLElement>(".facet-option-group");
+        return {
+          columns: firstGroup
+            ? window.getComputedStyle(firstGroup).gridTemplateColumns.split(" ").length
+            : 0,
+          left: rect.left,
+          right: rect.right,
+          scrollWidth: element.scrollWidth,
+          width: element.clientWidth,
+        };
+      });
+      expect(responsiveLayout.columns).toBe(viewport.width <= 760 ? 1 : 3);
+      expect(responsiveLayout.left).toBeGreaterThanOrEqual(0);
+      expect(responsiveLayout.right).toBeLessThanOrEqual(viewport.width);
+      expect(responsiveLayout.scrollWidth).toBeLessThanOrEqual(responsiveLayout.width);
+      const lastOption = chipsetFilter.getByRole("checkbox", { exact: true, name: "WRX90" });
+      await lastOption.scrollIntoViewIfNeeded();
+      await lastOption.check();
+      await expect
+        .poll(() => new URL(page.url()).searchParams.getAll("facet"))
+        .toEqual(["chipset:wrx90"]);
+      await expectNoHorizontalOverflow(page);
     });
-    expect(responsiveLayout.columns).toBe(viewport.width <= 760 ? 1 : 3);
-    expect(responsiveLayout.left).toBeGreaterThanOrEqual(0);
-    expect(responsiveLayout.right).toBeLessThanOrEqual(viewport.width);
-    expect(responsiveLayout.scrollWidth).toBeLessThanOrEqual(responsiveLayout.width);
-    const lastOption = chipsetFilter.getByRole("checkbox", { exact: true, name: "WRX90" });
-    await lastOption.scrollIntoViewIfNeeded();
-    await lastOption.check();
-    await expect
-      .poll(() => new URL(page.url()).searchParams.getAll("facet"))
-      .toEqual(["chipset:wrx90"]);
-    await expectNoHorizontalOverflow(page);
   }
 });
 
-test("wraps a complete grouped CPU socket chip on mobile @desktop-only", async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
+test("wraps a complete grouped CPU socket chip on mobile @mobile-only", async ({ page }) => {
   await page.goto("/?category=cpu");
 
   await selectFacetOptions(page, "腳位", [

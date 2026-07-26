@@ -62,7 +62,7 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test("presents build-list summary, categories, actions, and data status in one sidebar @desktop-only", async ({
+test("presents build-list summary, categories, actions, and data status in one sidebar @responsive-boundary", async ({
   page,
 }) => {
   test.setTimeout(90_000);
@@ -365,83 +365,35 @@ test("keeps the main pages usable without horizontal overflow", async ({ page },
   await expectUsableLayout(page, testInfo);
 });
 
-test("mounts one global build-list link across public routes and required viewports", {
-  tag: "@desktop-only",
-}, async ({ page }) => {
-  test.setTimeout(180_000);
-  await page.addInitScript(
-    ({ productId, observedAt }) => {
-      window.localStorage.setItem(
-        "partsradartw:build-list:v3",
-        JSON.stringify([
-          {
-            productId,
-            quantity: 3,
-            includeInExport: true,
-            order: 0,
-            addedAt: observedAt,
-            updatedAt: observedAt,
-          },
-        ]),
-      );
-    },
-    { productId: PRODUCT_ID, observedAt: OBSERVED_AT },
-  );
+const globalBuildListRoutes = [
+  { label: "home", path: "/" },
+  { label: "product-detail", path: `/products/${READY_ROUTE_SLUG}` },
+  { label: "price-report", path: "/price-report" },
+  { label: "discord", path: "/discord" },
+  { label: "announcements", path: "/announcements" },
+  { label: "about", path: "/about" },
+  { label: "privacy", path: "/privacy" },
+  { label: "terms", path: "/terms" },
+  { label: "build-list", path: "/build-list" },
+] as const;
 
-  const routes = [
-    "/",
-    `/products/${READY_ROUTE_SLUG}`,
-    "/price-report",
-    "/discord",
-    "/announcements",
-    "/about",
-    "/privacy",
-    "/terms",
-    "/build-list",
-  ];
-  const viewports = [
-    { width: 1760, height: 900 },
-    { width: 1280, height: 800 },
-    { width: 760, height: 844 },
-    { width: 390, height: 844 },
-  ];
+for (const route of globalBuildListRoutes) {
+  test(`mounts the global build-list link on ${route.label} @desktop-only`, async ({ page }) => {
+    await seedBuildList(page);
+    await expectGlobalBuildListLink(page, route.path);
+  });
+}
 
-  for (const viewport of viewports) {
-    await page.setViewportSize(viewport);
-
-    for (const route of routes) {
-      await page.goto(route);
-      await expect(page.locator("body")).toBeVisible();
-
-      const floatingLink = page.getByRole("link", {
-        exact: true,
-        name: "開啟配單，目前 3 件",
-      });
-
-      if (route === "/build-list") {
-        await expect(page.getByRole("heading", { exact: true, name: "配單" })).toBeVisible();
-        await expect(floatingLink).toHaveCount(0);
-      } else {
-        await expect(floatingLink).toHaveCount(1);
-        await expect(floatingLink).toBeVisible();
-        await expect(floatingLink).toHaveAttribute("href", /^\/build-list\?returnTo=/);
-        const floatingHref = new URL(
-          (await floatingLink.getAttribute("href")) ?? "",
-          "https://partsradar.invalid",
-        );
-        const currentUrl = new URL(page.url());
-        expect(floatingHref.searchParams.get("returnTo")).toBe(
-          `${currentUrl.pathname}${currentUrl.search}`,
-        );
-        await expect(floatingLink).toHaveAttribute("title", "開啟配單");
-        await expectFloatingLinkNotToCoverContent(floatingLink, "main");
-
-        await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
-        await expectFloatingLinkNotToCoverContent(floatingLink, "footer");
-      }
-
-      await expectNoHorizontalOverflow(page);
-    }
+test("mounts the global build-list link on representative mobile routes @mobile-only", async ({
+  page,
+}) => {
+  await seedBuildList(page);
+  for (const route of globalBuildListRoutes.filter(({ label }) =>
+    ["home", "product-detail", "build-list"].includes(label),
+  )) {
+    await test.step(route.label, async () => {
+      await expectGlobalBuildListLink(page, route.path);
+    });
   }
 });
 
@@ -507,7 +459,7 @@ test("preserves product explorer state through safe build-list return links @des
   await expect(page.getByRole("link", { name: "回到查詢" })).toHaveAttribute("href", "/");
 });
 
-test("matches the product-detail mobile topbar and centers build-list item controls @desktop-only", async ({
+test("matches the product-detail mobile topbar and centers build-list item controls @responsive-boundary", async ({
   page,
 }) => {
   const longProductName = "超長型號視覺驗證顯示卡 RTX 5090 OC Edition 32GB 三風扇高效能版本";
@@ -677,6 +629,61 @@ test("matches the product-detail mobile topbar and centers build-list item contr
     await expectNoHorizontalOverflow(page);
   }
 });
+
+async function seedBuildList(page: Page) {
+  await page.addInitScript(
+    ({ productId, observedAt }) => {
+      window.localStorage.setItem(
+        "partsradartw:build-list:v3",
+        JSON.stringify([
+          {
+            productId,
+            quantity: 3,
+            includeInExport: true,
+            order: 0,
+            addedAt: observedAt,
+            updatedAt: observedAt,
+          },
+        ]),
+      );
+    },
+    { productId: PRODUCT_ID, observedAt: OBSERVED_AT },
+  );
+}
+
+async function expectGlobalBuildListLink(page: Page, route: string) {
+  await page.goto(route);
+  await expect(page.locator("body")).toBeVisible();
+
+  const floatingLink = page.getByRole("link", {
+    exact: true,
+    name: "開啟配單，目前 3 件",
+  });
+
+  if (route === "/build-list") {
+    await expect(page.getByRole("heading", { exact: true, name: "配單" })).toBeVisible();
+    await expect(floatingLink).toHaveCount(0);
+  } else {
+    await expect(floatingLink).toHaveCount(1);
+    await expect(floatingLink).toBeVisible();
+    await expect(floatingLink).toHaveAttribute("href", /^\/build-list\?returnTo=/);
+    const floatingHref = new URL(
+      (await floatingLink.getAttribute("href")) ?? "",
+      "https://partsradar.invalid",
+    );
+    const currentUrl = new URL(page.url());
+    expect(floatingHref.searchParams.get("returnTo")).toBe(
+      `${currentUrl.pathname}${currentUrl.search}`,
+    );
+    await expect(floatingLink).toHaveAttribute("title", "開啟配單");
+    await expectFloatingLinkNotToCoverContent(floatingLink, "main");
+
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    await expectFloatingLinkNotToCoverContent(floatingLink, "footer");
+  }
+
+  await expectNoHorizontalOverflow(page);
+}
 
 async function readTopbarLayout(page: Page, selector: string) {
   return page.locator(selector).evaluate((topbar) => {

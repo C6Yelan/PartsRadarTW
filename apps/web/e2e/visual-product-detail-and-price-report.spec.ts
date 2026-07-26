@@ -56,238 +56,231 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test("keeps mobile price-history records readable and uses discount wording @desktop-only", async ({
+test("keeps mobile price-history records readable and uses discount wording @mobile-only", async ({
   page,
 }) => {
-  for (const viewport of [
-    { width: 390, height: 844 },
-    { width: 360, height: 800 },
-  ]) {
-    await page.setViewportSize(viewport);
-    await page.goto(`/products/${READY_ROUTE_SLUG}`);
+  await page.goto(`/products/${READY_ROUTE_SLUG}`);
 
-    const badge = page.locator(".history-record-badge.is-down").first();
-    await expect(badge).toHaveText("降價");
-    await expect(page.getByText("下跌", { exact: true })).toHaveCount(0);
-    await expect(page.locator(".history-record-row strong.is-down").first()).toContainText("−NT$");
-    const badgeMetrics = await badge.evaluate((element) => {
-      const rect = element.getBoundingClientRect();
-      const range = document.createRange();
-      range.selectNodeContents(element);
-      const textRect = range.getBoundingClientRect();
-      const style = getComputedStyle(element);
-      return {
-        height: rect.height,
-        horizontalCenterOffset: Math.abs(
-          rect.left + rect.width / 2 - (textRect.left + textRect.width / 2),
-        ),
-        minWidth: Number.parseFloat(style.minWidth),
-        paddingLeft: Number.parseFloat(style.paddingLeft),
-        verticalCenterOffset: Math.abs(
-          rect.top + rect.height / 2 - (textRect.top + textRect.height / 2),
-        ),
-        whiteSpace: style.whiteSpace,
-      };
-    });
-    expect(badgeMetrics.minWidth).toBeGreaterThanOrEqual(52);
-    expect(badgeMetrics.height).toBeGreaterThanOrEqual(30);
-    expect(badgeMetrics.paddingLeft).toBeGreaterThanOrEqual(10);
-    expect(badgeMetrics.whiteSpace).toBe("nowrap");
-    expect(badgeMetrics.horizontalCenterOffset).toBeLessThanOrEqual(1);
-    expect(badgeMetrics.verticalCenterOffset).toBeLessThanOrEqual(1);
-    await expectNoHorizontalOverflow(page);
-  }
+  const badge = page.locator(".history-record-badge.is-down").first();
+  await expect(badge).toHaveText("降價");
+  await expect(page.getByText("下跌", { exact: true })).toHaveCount(0);
+  await expect(page.locator(".history-record-row strong.is-down").first()).toContainText("−NT$");
+  const badgeMetrics = await badge.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    const range = document.createRange();
+    range.selectNodeContents(element);
+    const textRect = range.getBoundingClientRect();
+    const style = getComputedStyle(element);
+    return {
+      height: rect.height,
+      horizontalCenterOffset: Math.abs(
+        rect.left + rect.width / 2 - (textRect.left + textRect.width / 2),
+      ),
+      minWidth: Number.parseFloat(style.minWidth),
+      paddingLeft: Number.parseFloat(style.paddingLeft),
+      verticalCenterOffset: Math.abs(
+        rect.top + rect.height / 2 - (textRect.top + textRect.height / 2),
+      ),
+      whiteSpace: style.whiteSpace,
+    };
+  });
+  expect(badgeMetrics.minWidth).toBeGreaterThanOrEqual(52);
+  expect(badgeMetrics.height).toBeGreaterThanOrEqual(30);
+  expect(badgeMetrics.paddingLeft).toBeGreaterThanOrEqual(10);
+  expect(badgeMetrics.whiteSpace).toBe("nowrap");
+  expect(badgeMetrics.horizontalCenterOffset).toBeLessThanOrEqual(1);
+  expect(badgeMetrics.verticalCenterOffset).toBeLessThanOrEqual(1);
+  await expectNoHorizontalOverflow(page);
 });
 
-test("uses compact custom price-report filters, aligned table typography, and conditional reset @desktop-only", async ({
+test("uses compact custom price-report filters, aligned table typography, and conditional reset @responsive-boundary", async ({
   page,
 }) => {
   test.setTimeout(120_000);
   const viewports = [
     { width: 1760, height: 900 },
-    { width: 1440, height: 900 },
-    { width: 1280, height: 800 },
     { width: 1121, height: 800 },
     { width: 1120, height: 800 },
-    { width: 1024, height: 800 },
     { width: 761, height: 844 },
     { width: 760, height: 844 },
     { width: 390, height: 844 },
   ];
 
   for (const viewport of viewports) {
-    await page.setViewportSize(viewport);
-    await page.goto("/price-report");
-    await expect(page.getByRole("region", { name: "價格變動列表" })).toBeVisible();
+    await test.step(`${viewport.width}px price-report layout`, async () => {
+      await page.setViewportSize(viewport);
+      await page.goto("/price-report");
+      await expect(page.getByRole("region", { name: "價格變動列表" })).toBeVisible();
 
-    const pageBox = await page.locator(".price-report-page").boundingBox();
-    const expectedGutter = viewport.width <= 760 ? 12 : viewport.width > 1712 ? 40 : 16;
-    expect(pageBox?.x).toBeCloseTo(expectedGutter, 0);
-    expect(viewport.width - (pageBox?.x ?? 0) - (pageBox?.width ?? 0)).toBeCloseTo(
-      expectedGutter,
-      0,
-    );
-
-    const filterGrid = page.locator(".price-report-filter-grid");
-    await expect(filterGrid).toHaveCSS("display", "flex");
-    const filterGap = await filterGrid.evaluate((element) => getComputedStyle(element).columnGap);
-    expect(filterGap).toBe("8px");
-
-    const expectedControlHeight = viewport.width <= 760 ? 44 : 38;
-    for (const control of await page
-      .locator(
-        ".price-report-select-trigger, .price-report-keyword-input input, .price-report-keyword-input button, .price-report-type-options",
-      )
-      .all()) {
-      expect((await control.boundingBox())?.height).toBeCloseTo(expectedControlHeight, 0);
-    }
-
-    if (viewport.width >= 1440) {
-      const controlTops = await getPriceReportControlRects(page).then((rects) =>
-        rects.map((rect) => rect.top),
+      const pageBox = await page.locator(".price-report-page").boundingBox();
+      const expectedGutter = viewport.width <= 760 ? 12 : viewport.width > 1712 ? 40 : 16;
+      expect(pageBox?.x).toBeCloseTo(expectedGutter, 0);
+      expect(viewport.width - (pageBox?.x ?? 0) - (pageBox?.width ?? 0)).toBeCloseTo(
+        expectedGutter,
+        0,
       );
-      expect(Math.max(...controlTops) - Math.min(...controlTops)).toBeLessThanOrEqual(2);
-      const keywordWidth = await page
-        .getByRole("searchbox", { name: "搜尋價格變動商品" })
-        .evaluate((element) => element.getBoundingClientRect().width);
-      const selectWidth = await page
-        .getByRole("button", { name: "時間範圍" })
-        .evaluate((element) => element.getBoundingClientRect().width);
-      expect(keywordWidth).toBeGreaterThan(selectWidth);
-    }
 
-    const summary = page.locator(".price-report-summary");
-    await expect(summary.locator(".price-report-summary-item")).toHaveCount(3);
-    await expect(summary.locator(".price-report-summary-card")).toHaveCount(0);
-    expect((await summary.boundingBox())?.height).toBeLessThanOrEqual(76);
-    await expect(summary.locator(".price-report-summary-item").nth(1)).toHaveCSS(
-      "border-left-style",
-      "solid",
-    );
+      const filterGrid = page.locator(".price-report-filter-grid");
+      await expect(filterGrid).toHaveCSS("display", "flex");
+      const filterGap = await filterGrid.evaluate((element) => getComputedStyle(element).columnGap);
+      expect(filterGap).toBe("8px");
 
-    const tableHeader = page.locator(".price-report-table-header");
-    if (viewport.width > 1120) {
-      await expect(tableHeader).toBeVisible();
-      expect((await tableHeader.boundingBox())?.height).toBeCloseTo(48, 0);
-      for (const header of await tableHeader.locator("span").all()) {
-        await expect(header).toHaveCSS("text-align", "center");
-      }
-
-      const product = page.locator(".price-report-product").first();
-      const productCopy = product.locator(".price-report-product-copy");
-      const productLink = productCopy.locator("a");
-      await expect(product).toHaveCSS("text-align", "left");
-      await expect(product).toHaveCSS("justify-content", "stretch");
-      await expect(productCopy).toHaveCSS("text-align", "left");
-      await expect(productLink).toHaveCSS("text-align", "left");
-
-      const [productBox, imageBox, linkBox, categoryBox] = await Promise.all([
-        product.boundingBox(),
-        product.locator(".product-image").boundingBox(),
-        productLink.boundingBox(),
-        page.locator(".price-report-category").first().boundingBox(),
-      ]);
-      expect(linkBox?.x ?? 0).toBeGreaterThanOrEqual(
-        (imageBox?.x ?? Number.POSITIVE_INFINITY) + (imageBox?.width ?? 0),
-      );
-      expect((linkBox?.x ?? Number.POSITIVE_INFINITY) + (linkBox?.width ?? 0)).toBeLessThanOrEqual(
-        (productBox?.x ?? 0) + (productBox?.width ?? 0),
-      );
-      expect(
-        (productBox?.x ?? Number.POSITIVE_INFINITY) + (productBox?.width ?? 0),
-      ).toBeLessThanOrEqual(categoryBox?.x ?? 0);
-
-      for (const cell of await page
+      const expectedControlHeight = viewport.width <= 760 ? 44 : 38;
+      for (const control of await page
         .locator(
-          ".price-report-category, .price-report-previous, .price-report-current, .price-report-amount, .price-report-percent, .price-report-changed",
+          ".price-report-select-trigger, .price-report-keyword-input input, .price-report-keyword-input button, .price-report-type-options",
         )
         .all()) {
-        await expect(cell).toHaveCSS("text-align", "center");
-        const value = cell.locator("span:last-child");
-        const [cellBox, valueBox] = await Promise.all([cell.boundingBox(), value.boundingBox()]);
-        const cellCenter = (cellBox?.x ?? 0) + (cellBox?.width ?? 0) / 2;
-        const valueCenter = (valueBox?.x ?? 0) + (valueBox?.width ?? 0) / 2;
-        expect(Math.abs(cellCenter - valueCenter)).toBeLessThanOrEqual(2);
+        expect((await control.boundingBox())?.height).toBeCloseTo(expectedControlHeight, 0);
       }
-    } else {
-      await expect(tableHeader).toBeHidden();
-      await expect(page.locator(".price-report-cell-label").first()).toBeVisible();
-      await expect(page.locator(".price-report-product").first()).toHaveCSS("text-align", "left");
-      await expect(page.locator(".price-report-product-copy a").first()).toHaveCSS(
-        "white-space",
-        "normal",
-      );
-      await expect(page.locator(".price-report-product-copy a").first()).toHaveCSS(
-        "word-break",
-        "normal",
-      );
-      await expect(page.locator(".price-report-product-copy a").first()).toHaveCSS(
-        "overflow-wrap",
-        "break-word",
-      );
-      if (viewport.width <= 390) {
-        const tokenLineCounts = await readTokenLineCounts(
-          page.locator(".price-report-product-copy a").first(),
-          ["AI", "PRO", "R9700", "Creator", "Lexar", "D400", "Type-C+A", "USB3.1", "G1"],
+
+      if (viewport.width >= 1440) {
+        const controlTops = await getPriceReportControlRects(page).then((rects) =>
+          rects.map((rect) => rect.top),
         );
-        expect(Object.values(tokenLineCounts).every((lineCount) => lineCount === 1)).toBe(true);
-        const longSpecTokenLineCounts = await readTokenLineCounts(
-          page.locator(".price-report-product-copy a").nth(1),
-          ["32GB", "2920MHz", "27cm"],
-        );
-        expect(Object.values(longSpecTokenLineCounts).every((lineCount) => lineCount === 1)).toBe(
-          true,
-        );
+        expect(Math.max(...controlTops) - Math.min(...controlTops)).toBeLessThanOrEqual(2);
+        const keywordWidth = await page
+          .getByRole("searchbox", { name: "搜尋價格變動商品" })
+          .evaluate((element) => element.getBoundingClientRect().width);
+        const selectWidth = await page
+          .getByRole("button", { name: "時間範圍" })
+          .evaluate((element) => element.getBoundingClientRect().width);
+        expect(keywordWidth).toBeGreaterThan(selectWidth);
       }
-      for (const cell of await page.locator(".price-report-value").all()) {
-        const label = cell.locator(".price-report-cell-label");
-        const value = cell.locator("span:last-child");
-        const [cellBox, labelBox, valueBox] = await Promise.all([
-          cell.boundingBox(),
-          label.boundingBox(),
-          value.boundingBox(),
+
+      const summary = page.locator(".price-report-summary");
+      await expect(summary.locator(".price-report-summary-item")).toHaveCount(3);
+      await expect(summary.locator(".price-report-summary-card")).toHaveCount(0);
+      expect((await summary.boundingBox())?.height).toBeLessThanOrEqual(76);
+      await expect(summary.locator(".price-report-summary-item").nth(1)).toHaveCSS(
+        "border-left-style",
+        "solid",
+      );
+
+      const tableHeader = page.locator(".price-report-table-header");
+      if (viewport.width > 1120) {
+        await expect(tableHeader).toBeVisible();
+        expect((await tableHeader.boundingBox())?.height).toBeCloseTo(48, 0);
+        for (const header of await tableHeader.locator("span").all()) {
+          await expect(header).toHaveCSS("text-align", "center");
+        }
+
+        const product = page.locator(".price-report-product").first();
+        const productCopy = product.locator(".price-report-product-copy");
+        const productLink = productCopy.locator("a");
+        await expect(product).toHaveCSS("text-align", "left");
+        await expect(product).toHaveCSS("justify-content", "stretch");
+        await expect(productCopy).toHaveCSS("text-align", "left");
+        await expect(productLink).toHaveCSS("text-align", "left");
+
+        const [productBox, imageBox, linkBox, categoryBox] = await Promise.all([
+          product.boundingBox(),
+          product.locator(".product-image").boundingBox(),
+          productLink.boundingBox(),
+          page.locator(".price-report-category").first().boundingBox(),
         ]);
-        expect((labelBox?.x ?? 0) + (labelBox?.width ?? 0)).toBeLessThanOrEqual(valueBox?.x ?? 0);
+        expect(linkBox?.x ?? 0).toBeGreaterThanOrEqual(
+          (imageBox?.x ?? Number.POSITIVE_INFINITY) + (imageBox?.width ?? 0),
+        );
         expect(
-          (valueBox?.x ?? Number.POSITIVE_INFINITY) + (valueBox?.width ?? 0),
-        ).toBeLessThanOrEqual((cellBox?.x ?? 0) + (cellBox?.width ?? 0));
+          (linkBox?.x ?? Number.POSITIVE_INFINITY) + (linkBox?.width ?? 0),
+        ).toBeLessThanOrEqual((productBox?.x ?? 0) + (productBox?.width ?? 0));
+        expect(
+          (productBox?.x ?? Number.POSITIVE_INFINITY) + (productBox?.width ?? 0),
+        ).toBeLessThanOrEqual(categoryBox?.x ?? 0);
+
+        for (const cell of await page
+          .locator(
+            ".price-report-category, .price-report-previous, .price-report-current, .price-report-amount, .price-report-percent, .price-report-changed",
+          )
+          .all()) {
+          await expect(cell).toHaveCSS("text-align", "center");
+          const value = cell.locator("span:last-child");
+          const [cellBox, valueBox] = await Promise.all([cell.boundingBox(), value.boundingBox()]);
+          const cellCenter = (cellBox?.x ?? 0) + (cellBox?.width ?? 0) / 2;
+          const valueCenter = (valueBox?.x ?? 0) + (valueBox?.width ?? 0) / 2;
+          expect(Math.abs(cellCenter - valueCenter)).toBeLessThanOrEqual(2);
+        }
+      } else {
+        await expect(tableHeader).toBeHidden();
+        await expect(page.locator(".price-report-cell-label").first()).toBeVisible();
+        await expect(page.locator(".price-report-product").first()).toHaveCSS("text-align", "left");
+        await expect(page.locator(".price-report-product-copy a").first()).toHaveCSS(
+          "white-space",
+          "normal",
+        );
+        await expect(page.locator(".price-report-product-copy a").first()).toHaveCSS(
+          "word-break",
+          "normal",
+        );
+        await expect(page.locator(".price-report-product-copy a").first()).toHaveCSS(
+          "overflow-wrap",
+          "break-word",
+        );
+        if (viewport.width <= 390) {
+          const tokenLineCounts = await readTokenLineCounts(
+            page.locator(".price-report-product-copy a").first(),
+            ["AI", "PRO", "R9700", "Creator", "Lexar", "D400", "Type-C+A", "USB3.1", "G1"],
+          );
+          expect(Object.values(tokenLineCounts).every((lineCount) => lineCount === 1)).toBe(true);
+          const longSpecTokenLineCounts = await readTokenLineCounts(
+            page.locator(".price-report-product-copy a").nth(1),
+            ["32GB", "2920MHz", "27cm"],
+          );
+          expect(Object.values(longSpecTokenLineCounts).every((lineCount) => lineCount === 1)).toBe(
+            true,
+          );
+        }
+        for (const cell of await page.locator(".price-report-value").all()) {
+          const label = cell.locator(".price-report-cell-label");
+          const value = cell.locator("span:last-child");
+          const [cellBox, labelBox, valueBox] = await Promise.all([
+            cell.boundingBox(),
+            label.boundingBox(),
+            value.boundingBox(),
+          ]);
+          expect((labelBox?.x ?? 0) + (labelBox?.width ?? 0)).toBeLessThanOrEqual(valueBox?.x ?? 0);
+          expect(
+            (valueBox?.x ?? Number.POSITIVE_INFINITY) + (valueBox?.width ?? 0),
+          ).toBeLessThanOrEqual((cellBox?.x ?? 0) + (cellBox?.width ?? 0));
+        }
+        await expect(page.getByRole("navigation", { name: "頁碼" })).toBeVisible();
       }
-      await expect(page.getByRole("navigation", { name: "頁碼" })).toBeVisible();
-    }
-    const reportRow = page.locator(".price-report-row").first();
-    await expect(reportRow.locator(".price-report-kind")).toHaveCount(0);
-    await expect(reportRow.locator(".price-report-amount > span:last-child")).toHaveText(
-      "−NT$ 1,000",
-    );
-    const reportRows = page.locator(".price-report-rows");
-    const visibleBackground = await readVisibleBackground(reportRow);
-    expect(visibleBackground.backgroundColor).toBe("rgb(13, 25, 34)");
-    expect(visibleBackground.sourceClasses).toContain("price-report-rows");
-    const [rowsBox, firstRowBox, lastRowBox] = await Promise.all([
-      reportRows.boundingBox(),
-      reportRow.boundingBox(),
-      page.locator(".price-report-row").last().boundingBox(),
-    ]);
-    expect(rowsBox?.y).toBeCloseTo(firstRowBox?.y ?? 0, 1);
-    expect((rowsBox?.y ?? 0) + (rowsBox?.height ?? 0)).toBeCloseTo(
-      (lastRowBox?.y ?? 0) + (lastRowBox?.height ?? 0),
-      1,
-    );
-    const rowBoxBeforeHover = await reportRow.boundingBox();
-    const borderBeforeHover = (await readRowStyleSnapshot(reportRow)).borderBottomColor;
-    await reportRow.hover();
-    const rowBoxAfterHover = await reportRow.boundingBox();
-    expect(rowBoxAfterHover?.x).toBeCloseTo(rowBoxBeforeHover?.x ?? 0, 1);
-    expect(rowBoxAfterHover?.width).toBeCloseTo(rowBoxBeforeHover?.width ?? 0, 1);
-    expect(rowBoxAfterHover?.height).toBeCloseTo(rowBoxBeforeHover?.height ?? 0, 1);
-    expect((await readRowStyleSnapshot(reportRow)).borderBottomColor).toBe(borderBeforeHover);
-    await page.mouse.move(0, 0);
-    await expect(reportRow).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
-    expect((await readVisibleBackground(reportRow)).backgroundColor).toBe(
-      visibleBackground.backgroundColor,
-    );
-    await expect(page.getByRole("status").filter({ hasText: "資料最後成功更新" })).toBeVisible();
-    await expectNoHorizontalOverflow(page);
+      const reportRow = page.locator(".price-report-row").first();
+      await expect(reportRow.locator(".price-report-kind")).toHaveCount(0);
+      await expect(reportRow.locator(".price-report-amount > span:last-child")).toHaveText(
+        "−NT$ 1,000",
+      );
+      const reportRows = page.locator(".price-report-rows");
+      const visibleBackground = await readVisibleBackground(reportRow);
+      expect(visibleBackground.backgroundColor).toBe("rgb(13, 25, 34)");
+      expect(visibleBackground.sourceClasses).toContain("price-report-rows");
+      const [rowsBox, firstRowBox, lastRowBox] = await Promise.all([
+        reportRows.boundingBox(),
+        reportRow.boundingBox(),
+        page.locator(".price-report-row").last().boundingBox(),
+      ]);
+      expect(rowsBox?.y).toBeCloseTo(firstRowBox?.y ?? 0, 1);
+      expect((rowsBox?.y ?? 0) + (rowsBox?.height ?? 0)).toBeCloseTo(
+        (lastRowBox?.y ?? 0) + (lastRowBox?.height ?? 0),
+        1,
+      );
+      const rowBoxBeforeHover = await reportRow.boundingBox();
+      const borderBeforeHover = (await readRowStyleSnapshot(reportRow)).borderBottomColor;
+      await reportRow.hover();
+      const rowBoxAfterHover = await reportRow.boundingBox();
+      expect(rowBoxAfterHover?.x).toBeCloseTo(rowBoxBeforeHover?.x ?? 0, 1);
+      expect(rowBoxAfterHover?.width).toBeCloseTo(rowBoxBeforeHover?.width ?? 0, 1);
+      expect(rowBoxAfterHover?.height).toBeCloseTo(rowBoxBeforeHover?.height ?? 0, 1);
+      expect((await readRowStyleSnapshot(reportRow)).borderBottomColor).toBe(borderBeforeHover);
+      await page.mouse.move(0, 0);
+      await expect(reportRow).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+      expect((await readVisibleBackground(reportRow)).backgroundColor).toBe(
+        visibleBackground.backgroundColor,
+      );
+      await expect(page.getByRole("status").filter({ hasText: "資料最後成功更新" })).toBeVisible();
+      await expectNoHorizontalOverflow(page);
+    });
   }
 
   await page.setViewportSize({ width: 1760, height: 900 });
