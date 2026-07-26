@@ -18,6 +18,8 @@ export interface RuntimeRoleConfigurationResult {
   sequenceCount: number;
 }
 
+class RuntimeRoleOwnershipError extends Error {}
+
 export async function configureRuntimeRole({
   migrationDatabaseUrl,
   runtimeRole,
@@ -44,9 +46,33 @@ export async function configureRuntimeRole({
 
     const roleIdentifier = escapeIdentifier(runtimeRole);
     const databaseIdentifier = escapeIdentifier(databaseName);
-    const existingRole = await client.query("SELECT 1 FROM pg_roles WHERE rolname = $1", [
-      runtimeRole,
+    const [existingRole, membership, databaseOwner] = await Promise.all([
+      client.query("SELECT 1 FROM pg_roles WHERE rolname = $1", [runtimeRole]),
+      client.query(
+        `SELECT 1
+         FROM pg_auth_members AS membership
+         JOIN pg_roles AS member ON member.oid = membership.member
+         WHERE member.rolname = $1
+         LIMIT 1`,
+        [runtimeRole],
+      ),
+      client.query(
+        `SELECT 1
+         FROM pg_database AS database
+         JOIN pg_roles AS owner ON owner.oid = database.datdba
+         WHERE database.datname = current_database()
+           AND owner.rolname = $1`,
+        [runtimeRole],
+      ),
     ]);
+
+    if ((membership.rowCount ?? 0) > 0) {
+      throw new Error("The runtime role must not inherit privileges from another role.");
+    }
+    if ((databaseOwner.rowCount ?? 0) > 0) {
+      throw new Error("The runtime role must not own the application database.");
+    }
+    await assertRuntimeRoleOwnsNoApplicationObjects(client, runtimeRole);
 
     if (existingRole.rowCount === 0) {
       await client.query(
@@ -74,32 +100,6 @@ export async function configureRuntimeRole({
       END
       $runtime_role_password$
     `);
-
-    const [membership, databaseOwner] = await Promise.all([
-      client.query(
-        `SELECT 1
-         FROM pg_auth_members AS membership
-         JOIN pg_roles AS member ON member.oid = membership.member
-         WHERE member.rolname = $1
-         LIMIT 1`,
-        [runtimeRole],
-      ),
-      client.query(
-        `SELECT 1
-         FROM pg_database AS database
-         JOIN pg_roles AS owner ON owner.oid = database.datdba
-         WHERE database.datname = current_database()
-           AND owner.rolname = $1`,
-        [runtimeRole],
-      ),
-    ]);
-
-    if ((membership.rowCount ?? 0) > 0) {
-      throw new Error("The runtime role must not inherit privileges from another role.");
-    }
-    if ((databaseOwner.rowCount ?? 0) > 0) {
-      throw new Error("The runtime role must not own the application database.");
-    }
 
     await client.query(`REVOKE CREATE ON SCHEMA public FROM PUBLIC`);
     await client.query(
@@ -159,6 +159,61 @@ export async function configureRuntimeRole({
   }
 }
 
+async function assertRuntimeRoleOwnsNoApplicationObjects(
+  client: Client,
+  runtimeRole: string,
+): Promise<void> {
+  const ownership = await client.query<{
+    owns_migration_metadata: boolean;
+    owns_public_relation: boolean;
+    owns_public_schema: boolean;
+  }>(
+    `SELECT
+       EXISTS (
+         SELECT 1
+         FROM pg_namespace AS namespace
+         JOIN pg_roles AS owner ON owner.oid = namespace.nspowner
+         WHERE namespace.nspname = 'public'
+           AND owner.rolname = $1
+       ) AS owns_public_schema,
+       EXISTS (
+         SELECT 1
+         FROM pg_class AS class
+         JOIN pg_namespace AS namespace ON namespace.oid = class.relnamespace
+         JOIN pg_roles AS owner ON owner.oid = class.relowner
+         WHERE namespace.nspname = 'public'
+           AND owner.rolname = $1
+       ) AS owns_public_relation,
+       EXISTS (
+         SELECT 1
+         FROM pg_class AS class
+         JOIN pg_namespace AS namespace ON namespace.oid = class.relnamespace
+         JOIN pg_roles AS owner ON owner.oid = class.relowner
+         WHERE namespace.nspname = 'public'
+           AND class.relname = '_prisma_migrations'
+           AND owner.rolname = $1
+       ) AS owns_migration_metadata`,
+    [runtimeRole],
+  );
+  const result = ownership.rows[0];
+
+  if (result?.owns_public_schema) {
+    throw new RuntimeRoleOwnershipError(
+      "Runtime role ownership preflight failed: the role owns the public schema.",
+    );
+  }
+  if (result?.owns_migration_metadata) {
+    throw new RuntimeRoleOwnershipError(
+      "Runtime role ownership preflight failed: the role owns migration metadata.",
+    );
+  }
+  if (result?.owns_public_relation) {
+    throw new RuntimeRoleOwnershipError(
+      "Runtime role ownership preflight failed: the role owns one or more public relations.",
+    );
+  }
+}
+
 async function main(): Promise<void> {
   if (process.env.CI !== "true" && process.env.PARTSRADAR_SKIP_DOTENV !== "1") {
     loadDotenv({ path: resolve(__dirname, "../../..", ".env"), quiet: true });
@@ -187,8 +242,12 @@ function requireEnvironment(name: string): string {
 }
 
 if (require.main === module) {
-  void main().catch(() => {
-    console.error("Runtime database role configuration failed.");
+  void main().catch((error: unknown) => {
+    console.error(
+      error instanceof RuntimeRoleOwnershipError
+        ? error.message
+        : "Runtime database role configuration failed.",
+    );
     process.exitCode = 1;
   });
 }
