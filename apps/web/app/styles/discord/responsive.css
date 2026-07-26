@@ -1,19 +1,4 @@
 /* apps/web/app/styles/discord/responsive.css */
-@media (max-width: 900px) {
-  .discord-hero,
-  .discord-guide-content {
-    grid-template-columns: 1fr;
-  }
-
-  .discord-visual-panel {
-    max-width: 380px;
-  }
-
-  .discord-guide-frame {
-    justify-self: start;
-  }
-}
-
 @media (max-width: 760px) {
   .discord-topbar {
     grid-template-columns: minmax(0, 1fr) auto;
@@ -38,11 +23,6 @@
     padding: 18px;
   }
 
-  .discord-audience-grid,
-  .discord-step-list {
-    grid-template-columns: 1fr;
-  }
-
   .discord-actions {
     display: grid;
     grid-template-columns: 1fr;
@@ -57,32 +37,8 @@
     gap: 7px;
   }
 
-  .discord-command-guide-sequence {
-    display: grid;
-    gap: 10px;
-    min-width: 0;
-  }
-
-  .discord-command-details summary {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 7px;
-    padding-block: 12px;
-  }
-
   .discord-permission-notice {
     grid-template-columns: 1fr;
     gap: 6px;
-  }
-}
-
-@media (max-width: 520px) {
-  .discord-visual-panel {
-    padding-top: 12px;
-    border-top: 1px solid rgba(33, 51, 64, 0.78);
-  }
-
-  .discord-visual-frame {
-    display: none;
   }
 }

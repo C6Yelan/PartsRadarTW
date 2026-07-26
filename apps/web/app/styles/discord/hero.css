@@ -1,15 +1,13 @@
 /* apps/web/app/styles/discord/hero.css */
 .discord-hero {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 380px);
-  gap: 24px;
-  align-items: center;
   padding: clamp(20px, 3vw, 30px);
 }
 
 .discord-hero-copy {
   display: grid;
   gap: 14px;
+  max-width: 760px;
 }
 
 .discord-hero-copy h2 {
@@ -46,34 +44,4 @@
   color: var(--faint);
   cursor: not-allowed;
   opacity: 0.82;
-}
-
-.discord-visual-panel {
-  display: grid;
-  gap: 10px;
-  align-content: start;
-}
-
-.discord-visual-frame {
-  box-sizing: border-box;
-  display: grid;
-  width: 100%;
-  min-width: 0;
-  max-width: 100%;
-  place-items: center;
-}
-
-.discord-visual-panel p {
-  margin: 0;
-  color: var(--muted);
-  font-size: 13px;
-  line-height: 1.7;
-}
-
-.discord-visual-image {
-  display: block;
-  width: 100%;
-  height: auto;
-  max-width: 100%;
-  object-fit: contain;
 }

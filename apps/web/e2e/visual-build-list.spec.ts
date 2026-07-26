@@ -356,12 +356,12 @@ test("keeps the main pages usable without horizontal overflow", async ({ page },
   await expectUsableLayout(page, testInfo);
 
   await page.goto("/discord");
-  await expect(page.getByRole("heading", { name: "快速開始" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "提醒與個人價格報告" })).toBeVisible();
   const discordBackLinkWidth = await page
     .getByRole("link", { name: "返回查詢" })
     .evaluate((element) => element.getBoundingClientRect().width);
   expect(discordBackLinkWidth).toBeLessThan(180);
-  await page.getByRole("link", { name: "查看一般使用者教學" }).focus();
+  await page.locator(".discord-faq-item summary").first().focus();
   await expectUsableLayout(page, testInfo);
 });
 

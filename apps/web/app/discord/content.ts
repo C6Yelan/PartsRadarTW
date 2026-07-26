@@ -1,159 +1,39 @@
 // apps/web/app/discord/content.ts
-// 依一般使用者與伺服器管理員分組 Discord 教學文案與截圖 metadata。
+// 依一般使用者與伺服器管理員分組 Discord 指令摘要。
 
-export const screenshotFreshnessNotice =
-  "文字說明反映目前功能；操作截圖為較早版本介面示意，部分欄位與指令文字可能不同。";
-
-export const userQuickStartSteps = [
-  {
-    title: "邀請機器人",
-    command: "邀請連結",
-    description: "將 PartsRadarTW bot 加入伺服器，或在已安裝 bot 的伺服器開始使用。",
-  },
-  {
-    title: "選擇立即功能",
-    command: "/watch 或 /price-report now",
-    description: "設定商品目標價提醒，或立即取得近期價格變動。",
-  },
-  {
-    title: "設定每日報告",
-    command: "/price-report settings",
-    description: "需要每日報告時，設定台北發送時間、分類、關鍵字與內容。",
-  },
-] as const;
-
-export const adminQuickStartSteps = [
-  {
-    title: "確認權限",
-    command: "管理伺服器 + 頻道權限",
-    description: "使用者需有「管理伺服器」權限；bot 在目標頻道需能傳送訊息與嵌入連結。",
-  },
-  {
-    title: "設定公開報告",
-    command: "/public-report settings",
-    description: "選擇公開報告頻道、分類、關鍵字與啟用狀態。",
-  },
-  {
-    title: "發送測試",
-    command: "設定面板 → 發送測試",
-    description: "在設定面板按「發送測試」，確認 bot 能在目標頻道傳送訊息。",
-  },
-  {
-    title: "查看排程狀態",
-    command: "/status",
-    description: "查看爬蟲、通知與價格報告排程狀態。",
-  },
-] as const;
-
-export const userCommandGuides = [
+export const userCommands = [
   {
     command: "/watch",
     purpose: "目標價提醒",
     result: "價格達標時嘗試傳送 DM",
-    title: "追蹤商品目標價",
-    sections: [
-      {
-        description: "查看追蹤清單，新增、修改或移除單一商品的目標價。",
-        image: {
-          alt: "/watch 目標價提醒面板截圖",
-          height: 530,
-          orientation: "square",
-          src: "/images/discord/watch-command-setting.png",
-          width: 534,
-        },
-        title: "管理目標價提醒",
-      },
-      {
-        description: "貼上商品頁網址並填入目標價；達標時 bot 會嘗試透過 DM 傳送提醒。",
-        image: {
-          alt: "新增追蹤視窗截圖",
-          height: 456,
-          orientation: "square",
-          src: "/images/discord/watch-add-new-product.png",
-          width: 477,
-        },
-        title: "新增目標價提醒",
-      },
-    ],
   },
   {
     command: "/price-report now",
     purpose: "立即取得近期價格變動",
     result: "回覆在目前頻道或 DM",
-    title: "查看即時價格報告",
-    sections: [
-      {
-        description: "在目前伺服器頻道或 DM 立即取得一次 6、12 或 24 小時價格變動。",
-        image: {
-          alt: "即時價格報告預覽截圖",
-          height: 760,
-          orientation: "portrait",
-          src: "/images/discord/price-report-now.png",
-          width: 532,
-        },
-        title: "查看即時價格報告",
-      },
-    ],
   },
   {
     command: "/price-report settings",
     purpose: "每日私訊價格報告",
     result: "依設定時間傳送 DM",
-    title: "設定每日私訊報告",
-    sections: [
-      {
-        description: "設定每日台北發送時間、分類、關鍵字與內容；報告與預覽會傳到你的 DM。",
-        image: {
-          alt: "每日私訊價格報告設定截圖",
-          height: 580,
-          orientation: "portrait",
-          src: "/images/discord/price-report-settings.png",
-          width: 463,
-        },
-        title: "設定每日私訊價格報告",
-      },
-    ],
   },
   {
     command: "/bot help",
     purpose: "查看指令使用說明",
     result: "顯示只有自己看得到的說明面板",
-    title: "查看 Bot 使用說明",
-    sections: [
-      {
-        description: "依照想完成的事情查看對應指令，並可前往網站閱讀完整教學。",
-        title: "查看完整指令說明",
-      },
-    ],
   },
 ] as const;
 
-export const adminCommandGuides = [
+export const adminCommands = [
   {
     command: "/public-report settings",
     purpose: "設定公開價格報告",
     result: "指定頻道、篩選條件、測試與啟用狀態",
-    title: "設定公開價格報告",
-    sections: [
-      {
-        description:
-          "具備「管理伺服器」權限的成員可設定頻道、分類、關鍵字與啟用狀態，並在同一面板發送測試。",
-        title: "設定公開價格報告",
-      },
-    ],
   },
   {
     command: "/status",
     purpose: "查看排程與背景工作狀態",
     result: "顯示最近執行、下次執行與處理摘要",
-    title: "查看排程狀態",
-    sections: [
-      {
-        description:
-          "具備「管理伺服器」權限的成員可查看商品爬蟲、通知掃描與價格報告排程摘要。",
-        title: "查看排程狀態",
-      },
-    ],
   },
 ] as const;
 

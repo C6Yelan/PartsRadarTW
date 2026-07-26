@@ -99,14 +99,11 @@
   background: var(--surface-muted);
 }
 
-.discord-command-details summary:focus-visible,
-.discord-faq-item summary:focus-visible,
-.discord-audience-card a:focus-visible {
+.discord-faq-item summary:focus-visible {
   outline: 2px solid var(--accent-strong);
   outline-offset: 2px;
 }
 
-#quick-start,
 #discord-user-guide,
 #discord-admin-guide,
 #discord-faq {

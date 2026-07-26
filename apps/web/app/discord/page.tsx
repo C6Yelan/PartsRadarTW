@@ -1,20 +1,12 @@
 // apps/web/app/discord/page.tsx
-// 依一般使用者與伺服器管理員分流 Discord bot 邀請、快速開始與指令教學。
+// 依一般使用者與伺服器管理員分流 Discord bot 邀請、指令摘要與常見問題。
 
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeftIcon, ExternalLinkIcon } from "../_shared/icons";
 import SiteDisclaimer from "../site-disclaimer";
 import TopbarBrandNavigation from "../TopbarBrandNavigation";
-import {
-  adminCommandGuides,
-  adminQuickStartSteps,
-  discordFaqItems,
-  screenshotFreshnessNotice,
-  userCommandGuides,
-  userQuickStartSteps,
-} from "./content";
+import { adminCommands, discordFaqItems, userCommands } from "./content";
 
 export const metadata: Metadata = {
   alternates: {
@@ -72,52 +64,6 @@ export default function DiscordPage() {
               )}
             </div>
           </div>
-
-          <aside className="discord-visual-panel" aria-label="Discord 指令操作摘要">
-            <div className="discord-visual-frame discord-visual-command-list">
-              <code>/watch</code>
-              <code>/price-report now</code>
-              <code>/price-report settings</code>
-              <code>/public-report settings</code>
-              <code>/bot help</code>
-              <code>/status</code>
-            </div>
-            <p>在 Discord 指令選單中選擇提醒、個人報告或管理員功能。</p>
-          </aside>
-        </section>
-
-        <section className="discord-section" aria-labelledby="audience-title">
-          <div className="discord-section-heading">
-            <h2 id="audience-title">選擇使用方式</h2>
-            <p>依你的使用情境前往對應教學；一般提醒與個人報告不需要管理員權限。</p>
-          </div>
-          <div className="discord-audience-grid">
-            <article className="discord-audience-card">
-              <div>
-                <span className="discord-audience-label">一般使用者</span>
-                <h3>管理自己的提醒與報告</h3>
-                <p>追蹤商品目標價、立即查看價格變動，並設定每日私訊報告。</p>
-              </div>
-              <a href="#quick-start">查看一般使用者教學</a>
-            </article>
-            <article className="discord-audience-card">
-              <div>
-                <span className="discord-audience-label">伺服器管理員</span>
-                <h3>設定伺服器公開報告</h3>
-                <p>設定公開報告頻道、測試 bot 權限，並查看系統與商品資料狀態。</p>
-              </div>
-              <strong>需要「管理伺服器」權限</strong>
-              <a href="#discord-admin-guide">查看管理員教學</a>
-            </article>
-          </div>
-        </section>
-
-        <section className="discord-section" id="quick-start" aria-labelledby="quick-start-title">
-          <div className="discord-section-heading">
-            <h2 id="quick-start-title">快速開始</h2>
-            <p>一般使用者只需要三步即可開始設定目標價提醒、即時報告或每日私訊報告。</p>
-          </div>
-          <QuickStartSteps items={userQuickStartSteps} />
         </section>
 
         <section
@@ -126,15 +72,10 @@ export default function DiscordPage() {
           aria-labelledby="discord-user-guide-title"
         >
           <div className="discord-section-heading">
-            <span className="discord-section-eyebrow">一般使用者</span>
             <h2 id="discord-user-guide-title">提醒與個人價格報告</h2>
-            <p>先從指令摘要確認用途，需要操作畫面時再展開完整教學。</p>
+            <p>在 Discord 輸入指令後，依畫面欄位完成設定；一般使用者不需要管理員權限。</p>
           </div>
-          <div className="discord-command-guide-sequence">
-            <CommandSummary guides={userCommandGuides} />
-            <p className="discord-screenshot-notice">{screenshotFreshnessNotice}</p>
-            <CommandDetails guides={userCommandGuides} firstOpen />
-          </div>
+          <CommandSummary commands={userCommands} />
         </section>
 
         <section
@@ -143,31 +84,17 @@ export default function DiscordPage() {
           aria-labelledby="discord-admin-guide-title"
         >
           <div className="discord-section-heading">
-            <span className="discord-section-eyebrow">伺服器管理員</span>
             <h2 id="discord-admin-guide-title">公開價格報告設定</h2>
-            <p>依序確認權限、設定公開報告、發送測試，再查看系統狀態。</p>
+            <p>管理員可設定公開報告頻道、發送測試，並查看排程與資料狀態。</p>
           </div>
           <aside className="discord-permission-notice" aria-label="公開報告必要權限">
             <strong>必要權限</strong>
-            <p>
-              使用者需要「管理伺服器」權限；bot 在目標頻道需要「傳送訊息」與「嵌入連結」權限。
-            </p>
+            <p>使用者需要「管理伺服器」權限；bot 在目標頻道需要「傳送訊息」與「嵌入連結」權限。</p>
           </aside>
-          <div className="discord-admin-quick-start">
-            <h3>管理員四步設定</h3>
-            <QuickStartSteps items={adminQuickStartSteps} />
-          </div>
-          <div className="discord-command-guide-sequence">
-            <CommandSummary guides={adminCommandGuides} />
-            <CommandDetails guides={adminCommandGuides} />
-          </div>
+          <CommandSummary commands={adminCommands} />
         </section>
 
-        <section
-          className="discord-section"
-          id="discord-faq"
-          aria-labelledby="discord-faq-title"
-        >
+        <section className="discord-section" id="discord-faq" aria-labelledby="discord-faq-title">
           <div className="discord-section-heading">
             <h2 id="discord-faq-title">常見問題</h2>
             <p>遇到指令權限或私訊問題時，展開對應項目確認必要設定。</p>
@@ -188,78 +115,18 @@ export default function DiscordPage() {
   );
 }
 
-function QuickStartSteps({ items }: { items: readonly QuickStartStep[] }) {
-  return (
-    <ol className="discord-step-list">
-      {items.map((item, index) => (
-        <li key={item.title}>
-          <span className="discord-step-number">{index + 1}</span>
-          <div>
-            <h3>{item.title}</h3>
-            <code>{item.command}</code>
-            <p>{item.description}</p>
-          </div>
-        </li>
-      ))}
-    </ol>
-  );
-}
-
-function CommandSummary({ guides }: { guides: readonly CommandGuide[] }) {
+function CommandSummary({ commands }: { commands: readonly CommandItem[] }) {
   return (
     <ul className="discord-command-summary-list" aria-label="指令摘要">
-      {guides.map((guide) => (
-        <li key={guide.command}>
-          <code>{guide.command}</code>
-          <span>{guide.purpose}</span>
-          <span>{guide.result}</span>
+      {commands.map((item) => (
+        <li key={item.command}>
+          <code>{item.command}</code>
+          <span>{item.purpose}</span>
+          <span>{item.result}</span>
         </li>
       ))}
     </ul>
   );
 }
 
-function CommandDetails({
-  firstOpen = false,
-  guides,
-}: {
-  firstOpen?: boolean;
-  guides: readonly CommandGuide[];
-}) {
-  return (
-    <div className="discord-command-details-list">
-      {guides.map((guide, index) => (
-        <details className="discord-command-details" key={guide.command} open={firstOpen && index === 0}>
-          <summary>
-            <code>{guide.command}</code>
-            <span>{guide.title}</span>
-          </summary>
-          <div className="discord-command-details-body">
-            {guide.sections.map((section) => (
-              <article className="discord-guide-content" key={section.title}>
-                <div className="discord-guide-copy">
-                  <h3>{section.title}</h3>
-                  <p>{section.description}</p>
-                </div>
-                {"image" in section ? (
-                  <div className={`discord-guide-frame is-${section.image.orientation}`}>
-                    <Image
-                      alt={section.image.alt}
-                      className="discord-guide-image"
-                      height={section.image.height}
-                      src={section.image.src}
-                      width={section.image.width}
-                    />
-                  </div>
-                ) : null}
-              </article>
-            ))}
-          </div>
-        </details>
-      ))}
-    </div>
-  );
-}
-
-type QuickStartStep = (typeof userQuickStartSteps)[number] | (typeof adminQuickStartSteps)[number];
-type CommandGuide = (typeof userCommandGuides)[number] | (typeof adminCommandGuides)[number];
+type CommandItem = (typeof userCommands)[number] | (typeof adminCommands)[number];

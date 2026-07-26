@@ -3,7 +3,6 @@
 
 import { type APIRequestContext, expect, type Locator, type Page, test } from "@playwright/test";
 import { resolvePublicSiteUrl } from "../app/_shared/public-site";
-import { expectImagesLoaded } from "./support/images";
 
 interface ProductListResponse {
   data: Array<{
@@ -101,7 +100,6 @@ test.describe("public web smoke", () => {
         page.getByRole("link", { name: "邀請 PartsRadarTW Discord bot，開新分頁" }),
       ).toHaveCount(0);
     }
-    await expectImagesLoaded(page.locator(".discord-guide-image:visible"));
     await expectTopbarLinks(page);
     await expectPublicFooterLinks(page);
   });
