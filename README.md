@@ -30,8 +30,8 @@ PartsRadarTW 只整理原價屋公開資料，與原價屋沒有隸屬或商業�
 | 系統組成與資料流 | [docs/architecture.md](docs/architecture.md) |
 | 公開 API | [docs/api.md](docs/api.md) |
 | Discord bot | [docs/discord.md](docs/discord.md) |
-| 部署 | [docs/deployment.md](docs/deployment.md) |
-| 維運操作 | [docs/operations.md](docs/operations.md) |
+| 部署 | [docs/deployment/](docs/deployment/) |
+| 維運操作 | [docs/operations/](docs/operations/) |
 
 ## License
 

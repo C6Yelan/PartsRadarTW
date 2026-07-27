@@ -69,7 +69,7 @@ bot applications.commands
 
 功能 flag 只停用對應行為，不刪除 commands、settings 或 delivery history。
 
-Command 註冊、Compose 啟動與維運檢查見 [operations.md](operations.md#discord-bot)；部署順序見 [deployment.md](deployment.md)。
+Command 註冊、Compose 啟動與維運檢查見 [Discord operations](operations/discord.md#discord-bot)；部署順序見 [Deployment](deployment/)。
 
 ## 保存資料與限制
 

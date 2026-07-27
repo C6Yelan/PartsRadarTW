@@ -2,12 +2,6 @@
 
 本文件說明如何私下回報影響 PartsRadarTW 網站、Discord bot 或本 repository 程式碼的安全漏洞。
 
-## 適用範圍
-
-本專案目前沒有同時維護多個發布版本；安全修正以目前公開服務與 repository 的現行程式碼為準。
-
-第三方網站、平台、非官方 fork 或自行修改的部署不在本政策的處理範圍，除非問題是由 PartsRadarTW 的程式碼或整合方式造成。
-
 ## 回報安全問題
 
 若發現安全漏洞，請寄信至 `contact@partsradar.net`，主旨註明 `[Security]`。請盡可能提供：

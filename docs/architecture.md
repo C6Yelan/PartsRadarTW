@@ -73,7 +73,7 @@ Fetch、validation 或 parse 失敗不得覆寫最後一份有效商品與價格
 
 ## Runtime topology
 
-Compose files、profiles 與啟動入口由 [Deployment](deployment.md#compose-files) 統一維護。
+Compose files、profiles 與啟動入口由 [Deployment](deployment/README.md#compose-files) 統一維護。
 
 ## Storage ownership
 
@@ -95,4 +95,4 @@ Compose files、profiles 與啟動入口由 [Deployment](deployment.md#compose-f
 - Runtime configuration template: `.env.example`
 - Shared package boundary: `packages/shared/README.md`
 
-維運與部署步驟分別見 [operations.md](operations.md) 與 [deployment.md](deployment.md)。
+維運與部署步驟分別見 [Operations](operations/) 與 [Deployment](deployment/)。
