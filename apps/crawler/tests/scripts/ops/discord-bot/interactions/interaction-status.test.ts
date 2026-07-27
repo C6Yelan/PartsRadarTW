@@ -1,4 +1,4 @@
-// 驗證 guild 管理員限定 /status 的排程摘要、查詢隔離與 ephemeral 回覆。
+// 驗證 owner-only /status 的授權、排程摘要、查詢隔離與 ephemeral 回覆。
 
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -13,16 +13,34 @@ import type {
 import { createDiscordBotOptions } from "../support/options";
 
 const NOW = new Date("2026-07-15T04:48:00.000Z");
+const STATUS_GUILD_ID = "234567890123456789";
+const STATUS_OWNER_USER_ID = "345678901234567890";
 
 describe("status interaction", () => {
-  it("requires Manage Guild at runtime and does not query schedule data when denied", async () => {
+  it.each([
+    {
+      name: "private access is disabled",
+      interaction: statusInteraction(STATUS_GUILD_ID, STATUS_OWNER_USER_ID),
+      options: createDiscordBotOptions(),
+    },
+    {
+      name: "the guild does not match",
+      interaction: statusInteraction("456789012345678901", STATUS_OWNER_USER_ID),
+      options: statusOptions(),
+    },
+    {
+      name: "the user does not match",
+      interaction: statusInteraction(STATUS_GUILD_ID, "456789012345678901"),
+      options: statusOptions(),
+    },
+  ])("does not query schedule data when $name", async ({ interaction, options }) => {
     const client = createStatusClient();
     const fetchMock = interactionFetch();
 
     await handleStatusInteraction({
       client,
-      interaction: statusInteraction("0"),
-      options: createDiscordBotOptions(),
+      interaction,
+      options,
       fetchImpl: fetchMock,
       schedulerStatus: populatedSchedulerStatus(),
       now: NOW,
@@ -42,8 +60,8 @@ describe("status interaction", () => {
 
     await handleStatusInteraction({
       client,
-      interaction: statusInteraction("32"),
-      options: createDiscordBotOptions(),
+      interaction: statusInteraction(STATUS_GUILD_ID, STATUS_OWNER_USER_ID),
+      options: statusOptions(),
       fetchImpl: fetchMock,
       schedulerStatus: populatedSchedulerStatus(),
       now: NOW,
@@ -491,16 +509,23 @@ function fieldValue(
   return message.embeds?.[0]?.fields?.find((field) => field.name === name)?.value ?? "";
 }
 
-function statusInteraction(permissions: string): DiscordInteraction {
+function statusInteraction(guildId: string, userId: string): DiscordInteraction {
   return {
     id: "status-interaction",
     token: "interaction-token",
     type: 2,
-    guild_id: "guild-1",
+    guild_id: guildId,
     channel_id: "channel-1",
     data: { name: "status" },
-    member: { permissions, user: { id: "admin-user" } },
+    member: { permissions: "0", user: { id: userId } },
   };
+}
+
+function statusOptions() {
+  return createDiscordBotOptions({
+    statusGuildId: STATUS_GUILD_ID,
+    statusOwnerUserId: STATUS_OWNER_USER_ID,
+  });
 }
 
 function interactionFetch() {

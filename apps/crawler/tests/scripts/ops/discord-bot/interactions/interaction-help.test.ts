@@ -44,13 +44,13 @@ describe("handleDiscordInteraction bot help", () => {
       title: "PartsRadarTW 使用說明",
       description: "選擇你想完成的事情，再使用對應指令。所有設定面板只會顯示給操作者。",
     });
-    expect(embed.fields).toHaveLength(6);
+    expect(embed.fields).toHaveLength(5);
     const helpText = JSON.stringify(embed.fields);
     expect(helpText).toContain("/watch");
     expect(helpText).toContain("/price-report now");
     expect(helpText).toContain("/price-report settings");
     expect(helpText).toContain("/public-report settings");
-    expect(helpText).toContain("/status");
+    expect(helpText).not.toContain("/status");
     expect(helpText).not.toContain("/public-report manage");
     expect(helpText).not.toContain("/public-report test");
     expect(requestBody.data.components).toEqual([

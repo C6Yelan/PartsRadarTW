@@ -36,12 +36,20 @@ async function main(): Promise<void> {
   if (registerCommands) {
     // 一次性註冊 slash commands 後結束，不啟動 gateway 或背景通知 loop。
     const result = await registerDiscordBotCommands(options);
+    const failure =
+      result.global.status !== "ok"
+        ? result.global
+        : result.statusGuild?.status !== "ok"
+          ? result.statusGuild
+          : null;
 
-    if (result.status !== "ok") {
-      throw new Error(`Discord command registration failed: ${formatDiscordRestFailure(result)}`);
+    if (failure) {
+      throw new Error(`Discord command registration failed: ${formatDiscordRestFailure(failure)}`);
     }
 
-    log(`Discord bot commands registered. scope=global httpStatus=${result.httpStatus}`);
+    log(
+      `Discord bot commands registered. scope=global httpStatus=${result.global.httpStatus} privateStatus=${result.statusGuild ? "registered" : "disabled"}`,
+    );
     return;
   }
 

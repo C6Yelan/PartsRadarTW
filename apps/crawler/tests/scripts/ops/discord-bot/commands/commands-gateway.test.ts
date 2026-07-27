@@ -10,8 +10,10 @@ import { registerDiscordBotCommands } from "../../../../../src/scripts/ops/disco
 import { createDiscordBotClient } from "../support/client";
 import { API_BASE_URL, APPLICATION_ID, createDiscordBotOptions, TOKEN } from "../support/options";
 
+const STATUS_GUILD_ID = "234567890123456789";
+
 describe("registerDiscordBotCommands", () => {
-  it("registers the final global command tree with guild-only administrator commands", async () => {
+  it("registers public commands globally and status only in the configured guild", async () => {
     const fetchMock = vi.fn<typeof fetch>(
       async () => new Response(JSON.stringify([{ id: "command-1" }]), { status: 200 }),
     );
@@ -21,14 +23,15 @@ describe("registerDiscordBotCommands", () => {
         token: TOKEN,
         applicationId: APPLICATION_ID,
         apiBaseUrl: API_BASE_URL,
+        statusGuildId: STATUS_GUILD_ID,
         fetchImpl: fetchMock as typeof fetch,
       }),
     ).resolves.toMatchObject({
-      status: "ok",
-      httpStatus: 200,
+      global: { status: "ok", httpStatus: 200 },
+      statusGuild: { status: "ok", httpStatus: 200 },
     });
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
     const [globalUrl, globalRequestInit] = fetchMock.mock.calls[0] as [
       Parameters<typeof fetch>[0],
       RequestInit,
@@ -71,12 +74,6 @@ describe("registerDiscordBotCommands", () => {
         dm_permission: true,
         options: [expect.objectContaining({ name: "help" })],
       }),
-      expect.objectContaining({
-        name: "status",
-        contexts: [0],
-        dm_permission: false,
-        default_member_permissions: "32",
-      }),
     ]);
     const registeredCommands = JSON.parse(String(globalRequestInit.body));
     const priceReportCommand = registeredCommands.find(
@@ -91,10 +88,9 @@ describe("registerDiscordBotCommands", () => {
       "watch",
       "public-report",
       "bot",
-      "status",
     ]);
     for (const command of registeredCommands.filter(
-      (command: { name: string }) => !["public-report", "status"].includes(command.name),
+      (command: { name: string }) => command.name !== "public-report",
     )) {
       expect(command).not.toHaveProperty("default_member_permissions");
       expect(command).not.toHaveProperty("permissions");
@@ -104,6 +100,45 @@ describe("registerDiscordBotCommands", () => {
     expect(String(globalRequestInit.body)).not.toContain('"manage"');
     expect(String(globalRequestInit.body)).not.toContain('"test"');
     expect(String(globalRequestInit.body).toLowerCase()).not.toContain("administrator");
+
+    const [guildUrl, guildRequestInit] = fetchMock.mock.calls[1] as [
+      Parameters<typeof fetch>[0],
+      RequestInit,
+    ];
+    expect(String(guildUrl)).toBe(
+      `${API_BASE_URL}/applications/${APPLICATION_ID}/guilds/${STATUS_GUILD_ID}/commands`,
+    );
+    expect(JSON.parse(String(guildRequestInit.body))).toEqual([
+      expect.objectContaining({
+        name: "status",
+        contexts: [0],
+        dm_permission: false,
+      }),
+    ]);
+    expect(JSON.parse(String(guildRequestInit.body))[0]).not.toHaveProperty(
+      "default_member_permissions",
+    );
+  });
+
+  it("removes status from global registration when private access is disabled", async () => {
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify([{ id: "command-1" }]), { status: 200 }),
+    );
+
+    await expect(
+      registerDiscordBotCommands({
+        token: TOKEN,
+        applicationId: APPLICATION_ID,
+        apiBaseUrl: API_BASE_URL,
+        fetchImpl: fetchMock as typeof fetch,
+      }),
+    ).resolves.toMatchObject({
+      global: { status: "ok", httpStatus: 200 },
+      statusGuild: null,
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(String(fetchMock.mock.calls[0]?.[1]?.body)).not.toContain('"status"');
   });
 
   it.each([

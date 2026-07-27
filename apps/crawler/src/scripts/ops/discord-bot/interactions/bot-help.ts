@@ -16,8 +16,7 @@ export function createBotHelpMessage(publicBaseUrl: string): DiscordBotMessage {
       {
         title: "PartsRadarTW 使用說明",
         color: DISCORD_EMBED_COLOR,
-        description:
-          "選擇你想完成的事情，再使用對應指令。所有設定面板只會顯示給操作者。",
+        description: "選擇你想完成的事情，再使用對應指令。所有設定面板只會顯示給操作者。",
         fields: [
           {
             name: "追蹤商品目標價",
@@ -25,13 +24,11 @@ export function createBotHelpMessage(publicBaseUrl: string): DiscordBotMessage {
           },
           {
             name: "查看價格變動",
-            value:
-              "`/price-report now`\n立即查看最近 6、12 或 24 小時的降價、漲價與新增商品。",
+            value: "`/price-report now`\n立即查看最近 6、12 或 24 小時的降價、漲價與新增商品。",
           },
           {
             name: "設定每日私訊",
-            value:
-              "`/price-report settings`\n設定每天的發送時間、分類、內容與商品名稱關鍵字。",
+            value: "`/price-report settings`\n設定每天的發送時間、分類、內容與商品名稱關鍵字。",
           },
           {
             name: "伺服器公開報告",
@@ -39,14 +36,9 @@ export function createBotHelpMessage(publicBaseUrl: string): DiscordBotMessage {
               "`/public-report settings`\n需要「管理伺服器」權限。設定公開頻道、分類、內容與測試發送。",
           },
           {
-            name: "排程狀態",
-            value:
-              "`/status`\n需要「管理伺服器」權限。查看排程與背景工作的執行狀態。",
-          },
-          {
             name: "可使用的位置",
             value:
-              "`/watch` 與 `/price-report` 可在私訊或伺服器使用。`/public-report settings` 與 `/status` 只在伺服器使用。",
+              "`/watch` 與 `/price-report` 可在私訊或伺服器使用。`/public-report settings` 只在伺服器使用。",
           },
         ],
       },

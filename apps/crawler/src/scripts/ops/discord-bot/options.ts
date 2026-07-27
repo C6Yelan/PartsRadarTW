@@ -49,6 +49,8 @@ export function parseDiscordBotOptions(
     }
   }
 
+  const statusAccess = readStatusAccess(env);
+
   return {
     token: readRequiredSecret(env, "DISCORD_BOT_TOKEN"),
     applicationId: readRequiredSnowflake(env, "DISCORD_APPLICATION_ID"),
@@ -59,6 +61,7 @@ export function parseDiscordBotOptions(
     apiBaseUrl,
     gatewayUrl,
     adminWebhookUrl: readDiscordWebhookUrl(env, "DISCORD_ADMIN_WEBHOOK_URL"),
+    ...statusAccess,
     registerCommandsOnStart: readBooleanEnv(env, "DISCORD_BOT_REGISTER_COMMANDS_ON_START", true),
     publicReportsEnabled: readBooleanEnv(env, "DISCORD_FEATURE_PUBLIC_REPORTS_ENABLED", true),
     personalReportsEnabled: readBooleanEnv(env, "DISCORD_FEATURE_PERSONAL_REPORTS_ENABLED", true),
@@ -82,6 +85,34 @@ export function parseDiscordBotOptions(
       max: 3600,
     }),
   };
+}
+
+function readStatusAccess(
+  env: NodeJS.ProcessEnv,
+): Pick<DiscordBotOptions, "statusGuildId" | "statusOwnerUserId"> {
+  const guildId = env.DISCORD_STATUS_GUILD_ID?.trim();
+  const ownerUserId = env.DISCORD_STATUS_OWNER_USER_ID?.trim();
+
+  if (!guildId && !ownerUserId) {
+    return { statusGuildId: null, statusOwnerUserId: null };
+  }
+
+  if (!guildId || !ownerUserId) {
+    throw new Error(
+      "DISCORD_STATUS_GUILD_ID and DISCORD_STATUS_OWNER_USER_ID must be configured together.",
+    );
+  }
+
+  for (const [key, value] of [
+    ["DISCORD_STATUS_GUILD_ID", guildId],
+    ["DISCORD_STATUS_OWNER_USER_ID", ownerUserId],
+  ] as const) {
+    if (!DISCORD_SNOWFLAKE_PATTERN.test(value)) {
+      throw new Error(`${key} must be a Discord snowflake id.`);
+    }
+  }
+
+  return { statusGuildId: guildId, statusOwnerUserId: ownerUserId };
 }
 
 // 讀取必要 secret/env；placeholder 視為未設定，避免用範例值啟動 bot。
