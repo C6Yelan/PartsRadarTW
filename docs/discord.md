@@ -68,4 +68,4 @@ Command 註冊、Compose 啟動與維運檢查見 [operations.md](operations.md#
 
 ## 保存資料與限制
 
-資料庫會保存 Discord user、guild、channel ID、個人偏好、watch、notification claim 與安全化 delivery metadata；保留與刪除限制見 [Security Policy](../SECURITY.md#資料界線)。
+Discord 功能會保存使用者、伺服器與頻道識別碼、個人偏好、目標價提醒及必要的通知紀錄；詳細資料類型、保存期限與權利申請方式見[隱私權政策](https://partsradar.net/privacy)。
