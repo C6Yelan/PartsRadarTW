@@ -94,7 +94,7 @@ export function createBotCommand(): Record<string, unknown> {
   };
 }
 
-// 建立 guild-only /status，並在 command picker 層級限制 Manage Guild。
+// 建立只註冊到維運 guild 的 /status；使用者授權仍由 interaction handler 核對。
 export function createStatusCommand(): Record<string, unknown> {
   return {
     name: "status",
@@ -102,6 +102,5 @@ export function createStatusCommand(): Record<string, unknown> {
     type: DISCORD_COMMAND_TYPE_CHAT_INPUT,
     contexts: [DISCORD_APPLICATION_CONTEXT_GUILD],
     dm_permission: false,
-    default_member_permissions: DISCORD_PERMISSION_MANAGE_GUILD.toString(),
   };
 }

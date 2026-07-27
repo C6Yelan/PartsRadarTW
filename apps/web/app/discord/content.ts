@@ -30,18 +30,13 @@ export const adminCommands = [
     purpose: "設定公開價格報告",
     result: "指定頻道、篩選條件、測試與啟用狀態",
   },
-  {
-    command: "/status",
-    purpose: "查看排程與背景工作狀態",
-    result: "顯示最近執行、下次執行與處理摘要",
-  },
 ] as const;
 
 export const discordFaqItems = [
   {
     question: "一般成員能用哪些指令？",
     answer:
-      "一般成員可使用 /watch、/price-report 與 /bot help；/public-report settings 與 /status 只限伺服器，且需要「管理伺服器」權限。",
+      "一般成員可使用 /watch、/price-report 與 /bot help；/public-report settings 只限伺服器，且需要「管理伺服器」權限。",
   },
   {
     question: "看不到 /public-report 怎麼辦？",

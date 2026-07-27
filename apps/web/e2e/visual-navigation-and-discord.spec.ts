@@ -93,10 +93,11 @@ test("keeps Discord guidance concise and readable @desktop-only", async ({ page 
     ).toHaveCount(4);
     await expect(
       page.locator("#discord-admin-guide .discord-command-summary-list > li"),
-    ).toHaveCount(2);
+    ).toHaveCount(1);
     await expect(page.getByLabel("公開報告必要權限")).toBeVisible();
     await expect(page.getByText("/watch", { exact: true })).toBeVisible();
     await expect(page.getByText("/public-report settings", { exact: true })).toBeVisible();
+    await expect(page.getByText("/status", { exact: true })).toHaveCount(0);
     await expect(page.locator("#discord-user-guide img")).toHaveCount(0);
     await expectNoHorizontalOverflow(page);
   }

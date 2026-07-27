@@ -21,6 +21,8 @@ describe("Discord bot options", () => {
       applicationId: APPLICATION_ID,
       publicBaseUrl: "https://partsradar.test/base",
       apiBaseUrl: "https://discord.com/api/v10",
+      statusGuildId: null,
+      statusOwnerUserId: null,
       registerCommandsOnStart: true,
       publicReportsEnabled: true,
       personalReportsEnabled: true,
@@ -28,6 +30,39 @@ describe("Discord bot options", () => {
       commandCooldownSeconds: 60,
       priceReportScheduleIntervalSeconds: 300,
     });
+  });
+
+  it("enables private status only when both Discord ids are valid", () => {
+    expect(
+      parseDiscordBotOptions([], {
+        DISCORD_BOT_TOKEN: TOKEN,
+        DISCORD_APPLICATION_ID: APPLICATION_ID,
+        DISCORD_STATUS_GUILD_ID: "234567890123456789",
+        DISCORD_STATUS_OWNER_USER_ID: "345678901234567890",
+      }),
+    ).toMatchObject({
+      statusGuildId: "234567890123456789",
+      statusOwnerUserId: "345678901234567890",
+    });
+
+    expect(() =>
+      parseDiscordBotOptions([], {
+        DISCORD_BOT_TOKEN: TOKEN,
+        DISCORD_APPLICATION_ID: APPLICATION_ID,
+        DISCORD_STATUS_GUILD_ID: "234567890123456789",
+      }),
+    ).toThrow(
+      "DISCORD_STATUS_GUILD_ID and DISCORD_STATUS_OWNER_USER_ID must be configured together",
+    );
+
+    expect(() =>
+      parseDiscordBotOptions([], {
+        DISCORD_BOT_TOKEN: TOKEN,
+        DISCORD_APPLICATION_ID: APPLICATION_ID,
+        DISCORD_STATUS_GUILD_ID: "not-an-id",
+        DISCORD_STATUS_OWNER_USER_ID: "345678901234567890",
+      }),
+    ).toThrow("DISCORD_STATUS_GUILD_ID must be a Discord snowflake id");
   });
 
   it("parses Discord feature flags with safe enabled defaults", () => {

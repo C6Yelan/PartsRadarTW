@@ -12,6 +12,8 @@ export interface DiscordBotOptions {
   apiBaseUrl: string;
   gatewayUrl: string;
   adminWebhookUrl: string | null;
+  statusGuildId: string | null;
+  statusOwnerUserId: string | null;
   registerCommandsOnStart: boolean;
   publicReportsEnabled: boolean;
   personalReportsEnabled: boolean;

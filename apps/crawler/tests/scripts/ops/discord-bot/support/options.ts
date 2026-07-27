@@ -27,6 +27,8 @@ export function createDiscordBotOptions(
     apiBaseUrl: API_BASE_URL,
     gatewayUrl: "wss://discord.test/gateway",
     adminWebhookUrl: null,
+    statusGuildId: null,
+    statusOwnerUserId: null,
     registerCommandsOnStart: true,
     publicReportsEnabled: true,
     personalReportsEnabled: true,

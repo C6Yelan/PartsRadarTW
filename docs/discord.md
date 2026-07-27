@@ -13,9 +13,8 @@ PartsRadarTW Discord bot 提供個人價格報告、目標價提醒與伺服器�
 | `/price-report settings` | Guild、DM | 管理每日 DM 報告。 |
 | `/watch` | Guild、DM | 建立、編輯、查看與移除目標價 watch。 |
 | `/public-report settings` | Guild | 設定頻道、分類、內容、啟用狀態與測試發送。 |
-| `/status` | Guild | 查看爬蟲、通知與價格報告排程狀態。 |
 
-`/public-report settings` 與 `/status` 預設要求使用者具備 Manage Guild 權限，回覆只會顯示給操作者。
+`/public-report settings` 預設要求使用者具備 Manage Guild 權限，回覆只會顯示給操作者。
 
 ## 個人報告
 
@@ -59,6 +58,9 @@ bot applications.commands
 
 - `DISCORD_BOT_TOKEN`
 - `DISCORD_APPLICATION_ID`
+
+私有維運用 `/status` 預設停用。只有同時設定 `DISCORD_STATUS_GUILD_ID` 與
+`DISCORD_STATUS_OWNER_USER_ID` 時，指令才會註冊到該 Guild，且只接受指定使用者操作。
 
 選用設定與預設值以 [`.env.example`](../.env.example) 為準。
 

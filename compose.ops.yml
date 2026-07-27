@@ -100,6 +100,8 @@ services:
       DISCORD_BOT_TOKEN: "${DISCORD_BOT_TOKEN:-replace_with_discord_bot_token}"
       DISCORD_ADMIN_WEBHOOK_URL: "${DISCORD_ADMIN_WEBHOOK_URL:-replace_with_discord_admin_webhook_url}"
       DISCORD_APPLICATION_ID: "${DISCORD_APPLICATION_ID:-replace_with_discord_application_id}"
+      DISCORD_STATUS_GUILD_ID: "${DISCORD_STATUS_GUILD_ID:-}"
+      DISCORD_STATUS_OWNER_USER_ID: "${DISCORD_STATUS_OWNER_USER_ID:-}"
       DISCORD_API_BASE_URL: "${DISCORD_API_BASE_URL:-https://discord.com/api/v10}"
       DISCORD_GATEWAY_URL: "${DISCORD_GATEWAY_URL:-wss://gateway.discord.gg/?v=10&encoding=json}"
       DISCORD_BOT_REGISTER_COMMANDS_ON_START: "${DISCORD_BOT_REGISTER_COMMANDS_ON_START:-true}"

@@ -56,14 +56,23 @@ export async function runDiscordBotDaemon({
       token: options.token,
       applicationId: options.applicationId,
       apiBaseUrl: options.apiBaseUrl,
+      statusGuildId: options.statusGuildId,
       fetchImpl,
     });
+    const failure =
+      result.global.status !== "ok"
+        ? result.global
+        : result.statusGuild?.status !== "ok"
+          ? result.statusGuild
+          : null;
 
-    if (result.status !== "ok") {
-      throw new Error(`Discord command registration failed: ${formatDiscordRestFailure(result)}`);
+    if (failure) {
+      throw new Error(`Discord command registration failed: ${formatDiscordRestFailure(failure)}`);
     }
 
-    logMessage(`Discord bot commands registered. scope=global httpStatus=${result.httpStatus}`);
+    logMessage(
+      `Discord bot commands registered. scope=global httpStatus=${result.global.httpStatus} privateStatus=${result.statusGuild ? "registered" : "disabled"}`,
+    );
   }
 
   const shutdown = createShutdownController(logMessage);
