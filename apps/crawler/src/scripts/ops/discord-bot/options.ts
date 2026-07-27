@@ -11,7 +11,15 @@ import {
   DEFAULT_PUBLIC_BASE_URL,
   DISCORD_SNOWFLAKE_PATTERN,
 } from "./constants";
-import type { DiscordBotOptions } from "./types";
+import type { DiscordBotOptions, DiscordBotPresenceStatus } from "./types";
+
+const DISCORD_BOT_PRESENCE_STATUSES = [
+  "online",
+  "idle",
+  "dnd",
+  "invisible",
+  "offline",
+] as const satisfies readonly DiscordBotPresenceStatus[];
 
 // 建立 Discord bot runtime options；CLI 只覆寫少數維運參數，其餘以 env/default 為主。
 export function parseDiscordBotOptions(
@@ -62,6 +70,8 @@ export function parseDiscordBotOptions(
     gatewayUrl,
     adminWebhookUrl: readDiscordWebhookUrl(env, "DISCORD_ADMIN_WEBHOOK_URL"),
     ...statusAccess,
+    activityText: env.DISCORD_BOT_ACTIVITY_TEXT?.trim() || null,
+    presenceStatus: readPresenceStatus(env),
     registerCommandsOnStart: readBooleanEnv(env, "DISCORD_BOT_REGISTER_COMMANDS_ON_START", true),
     publicReportsEnabled: readBooleanEnv(env, "DISCORD_FEATURE_PUBLIC_REPORTS_ENABLED", true),
     personalReportsEnabled: readBooleanEnv(env, "DISCORD_FEATURE_PERSONAL_REPORTS_ENABLED", true),
@@ -85,6 +95,18 @@ export function parseDiscordBotOptions(
       max: 3600,
     }),
   };
+}
+
+function readPresenceStatus(env: NodeJS.ProcessEnv): DiscordBotPresenceStatus {
+  const value = env.DISCORD_BOT_PRESENCE_STATUS?.trim().toLowerCase() || "online";
+
+  if (!DISCORD_BOT_PRESENCE_STATUSES.includes(value as DiscordBotPresenceStatus)) {
+    throw new Error(
+      `DISCORD_BOT_PRESENCE_STATUS must be one of: ${DISCORD_BOT_PRESENCE_STATUSES.join(", ")}.`,
+    );
+  }
+
+  return value as DiscordBotPresenceStatus;
 }
 
 function readStatusAccess(

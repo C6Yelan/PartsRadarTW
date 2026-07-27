@@ -4,6 +4,8 @@
 import type { PrismaClient } from "@partsradar/db";
 import type { PriceReportReaderClient } from "@partsradar/db/price-report";
 
+export type DiscordBotPresenceStatus = "online" | "idle" | "dnd" | "invisible" | "offline";
+
 // Discord bot 啟動後傳遞給 gateway、互動 handler、排程與註冊流程的完整設定。
 export interface DiscordBotOptions {
   token: string;
@@ -14,6 +16,8 @@ export interface DiscordBotOptions {
   adminWebhookUrl: string | null;
   statusGuildId: string | null;
   statusOwnerUserId: string | null;
+  activityText: string | null;
+  presenceStatus: DiscordBotPresenceStatus;
   registerCommandsOnStart: boolean;
   publicReportsEnabled: boolean;
   personalReportsEnabled: boolean;

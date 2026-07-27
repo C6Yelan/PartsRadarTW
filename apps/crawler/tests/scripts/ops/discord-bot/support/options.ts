@@ -29,6 +29,8 @@ export function createDiscordBotOptions(
     adminWebhookUrl: null,
     statusGuildId: null,
     statusOwnerUserId: null,
+    activityText: null,
+    presenceStatus: "online",
     registerCommandsOnStart: true,
     publicReportsEnabled: true,
     personalReportsEnabled: true,

@@ -23,6 +23,8 @@ describe("Discord bot options", () => {
       apiBaseUrl: "https://discord.com/api/v10",
       statusGuildId: null,
       statusOwnerUserId: null,
+      activityText: null,
+      presenceStatus: "online",
       registerCommandsOnStart: true,
       publicReportsEnabled: true,
       personalReportsEnabled: true,
@@ -30,6 +32,28 @@ describe("Discord bot options", () => {
       commandCooldownSeconds: 60,
       priceReportScheduleIntervalSeconds: 300,
     });
+  });
+
+  it("parses optional bot presence settings and rejects unsupported statuses", () => {
+    expect(
+      parseDiscordBotOptions([], {
+        DISCORD_BOT_TOKEN: TOKEN,
+        DISCORD_APPLICATION_ID: APPLICATION_ID,
+        DISCORD_BOT_ACTIVITY_TEXT: "  partsradar.net  ",
+        DISCORD_BOT_PRESENCE_STATUS: " DND ",
+      }),
+    ).toMatchObject({
+      activityText: "partsradar.net",
+      presenceStatus: "dnd",
+    });
+
+    expect(() =>
+      parseDiscordBotOptions([], {
+        DISCORD_BOT_TOKEN: TOKEN,
+        DISCORD_APPLICATION_ID: APPLICATION_ID,
+        DISCORD_BOT_PRESENCE_STATUS: "busy",
+      }),
+    ).toThrow("DISCORD_BOT_PRESENCE_STATUS must be one of");
   });
 
   it("enables private status only when both Discord ids are valid", () => {

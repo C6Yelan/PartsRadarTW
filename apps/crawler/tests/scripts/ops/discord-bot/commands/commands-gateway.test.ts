@@ -158,7 +158,7 @@ describe("registerDiscordBotCommands", () => {
 });
 
 describe("runGatewaySession", () => {
-  it("identifies with the standard GUILDS gateway intent", async () => {
+  it("identifies with the standard GUILDS intent and configured presence", async () => {
     class TestWebSocket {
       static instance: TestWebSocket | null = null;
 
@@ -189,7 +189,10 @@ describe("runGatewaySession", () => {
 
     const run = runGatewaySession({
       client: createDiscordBotClient(),
-      options: createDiscordBotOptions(),
+      options: createDiscordBotOptions({
+        activityText: "partsradar.net",
+        presenceStatus: "idle",
+      }),
       shutdown: {
         requested: false,
         onStop: vi.fn(),
@@ -219,6 +222,12 @@ describe("runGatewaySession", () => {
       d: {
         token: TOKEN,
         intents: 1,
+        presence: {
+          activities: [{ name: "partsradar.net", type: 3 }],
+          status: "idle",
+          since: null,
+          afk: false,
+        },
       },
     });
 

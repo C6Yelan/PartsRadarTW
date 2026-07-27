@@ -4,6 +4,7 @@
 import { toSafeCliErrorMessage } from "../../shared/script-utils";
 import { createInterruptibleShutdownController } from "../shared/shutdown";
 import {
+  DISCORD_ACTIVITY_TYPE_WATCHING,
   GATEWAY_OP_DISPATCH,
   GATEWAY_OP_HEARTBEAT,
   GATEWAY_OP_HELLO,
@@ -108,7 +109,7 @@ export async function runGatewaySession({
             d: sequence,
           });
         }, heartbeatIntervalMs);
-        sendIdentifyPayload(socket, options.token);
+        sendIdentifyPayload(socket, options);
         return;
       }
 
@@ -161,12 +162,20 @@ export async function runGatewaySession({
 }
 
 // GUILDS 是標準 intent，用於接收 Guild/Channel lifecycle 事件以停止失效公開報告。
-function sendIdentifyPayload(socket: MinimalWebSocket, token: string): void {
+function sendIdentifyPayload(socket: MinimalWebSocket, options: DiscordBotOptions): void {
   sendGatewayPayload(socket, {
     op: GATEWAY_OP_IDENTIFY,
     d: {
-      token,
+      token: options.token,
       intents: 1 << 0,
+      presence: {
+        activities: options.activityText
+          ? [{ name: options.activityText, type: DISCORD_ACTIVITY_TYPE_WATCHING }]
+          : [],
+        status: options.presenceStatus,
+        since: null,
+        afk: false,
+      },
       properties: {
         os: process.platform,
         browser: "PartsRadarTW",

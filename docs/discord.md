@@ -62,6 +62,9 @@ bot applications.commands
 私有維運用 `/status` 預設停用。只有同時設定 `DISCORD_STATUS_GUILD_ID` 與
 `DISCORD_STATUS_OWNER_USER_ID` 時，指令才會註冊到該 Guild，且只接受指定使用者操作。
 
+`DISCORD_BOT_ACTIVITY_TEXT` 可設定 Bot 顯示的「正在觀賞」文字；
+`DISCORD_BOT_PRESENCE_STATUS` 可設定 `online`、`idle`、`dnd`、`invisible` 或 `offline`。
+
 選用設定與預設值以 [`.env.example`](../.env.example) 為準。
 
 功能 flag 只停用對應行為，不刪除 commands、settings 或 delivery history。

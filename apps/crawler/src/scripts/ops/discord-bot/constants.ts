@@ -73,5 +73,8 @@ export const GATEWAY_OP_INVALID_SESSION = 9;
 export const GATEWAY_OP_HELLO = 10;
 export const GATEWAY_READY_STATE_OPEN = 1;
 
+// Discord activity type 3 會在 Bot 狀態顯示為 Watching／正在觀賞。
+export const DISCORD_ACTIVITY_TYPE_WATCHING = 3;
+
 // Discord snowflake id 只接受數字字串，避免把明顯錯誤的 app/guild id 帶進 API 呼叫。
 export const DISCORD_SNOWFLAKE_PATTERN = /^[0-9]{8,32}$/;
