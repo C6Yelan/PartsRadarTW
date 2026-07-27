@@ -22,17 +22,29 @@ describe("public release trust-boundary documentation", () => {
     expect(operations).not.toContain("DiscordErasureTombstone");
   });
 
-  it("distinguishes repository controls from external manual launch gates", async () => {
-    const [operations, security] = await Promise.all([
+  it("keeps public policy responsibilities separated from operations", async () => {
+    const [operations, security, discord, readme] = await Promise.all([
       readFile(join(WORKSPACE_ROOT, "docs/operations.md"), "utf8"),
       readFile(join(WORKSPACE_ROOT, "SECURITY.md"), "utf8"),
+      readFile(join(WORKSPACE_ROOT, "docs/discord.md"), "utf8"),
+      readFile(join(WORKSPACE_ROOT, "README.md"), "utf8"),
     ]);
 
     for (const externalOwner of ["Cloudflare", "TrueNAS", "GitHub", "Discord Portal", "CoolPC"]) {
       expect(operations).toContain(externalOwner);
     }
-    expect(security).toContain("Repository tests 可以證明");
-    expect(security).toContain("必須由部署或專案負責人另行人工確認");
-    expect(security).toContain("不判定 CoolPC 擷取或圖片使用是否合法");
+    expect(security).toContain("contact@partsradar.net");
+    expect(security).toContain("https://partsradar.net/privacy");
+    for (const operationalDetail of [
+      "Repository 與部署端責任",
+      "TrueNAS",
+      "Compose",
+      "migration",
+    ]) {
+      expect(security).not.toContain(operationalDetail);
+    }
+    expect(discord).toContain("[隱私權政策](https://partsradar.net/privacy)");
+    expect(discord).not.toContain("[Security Policy]");
+    expect(readme).toContain("| 安全漏洞回報 | [SECURITY.md](SECURITY.md) |");
   });
 });

@@ -26,7 +26,7 @@ PartsRadarTW 只整理原價屋公開資料，與原價屋沒有隸屬或商業�
 | 想了解的內容 | 文件 |
 | --- | --- |
 | 參與開發與本機啟動 | [CONTRIBUTING.md](CONTRIBUTING.md) |
-| 安全與資料處理界線 | [SECURITY.md](SECURITY.md) |
+| 安全漏洞回報 | [SECURITY.md](SECURITY.md) |
 | 系統組成與資料流 | [docs/architecture.md](docs/architecture.md) |
 | 公開 API | [docs/api.md](docs/api.md) |
 | Discord bot | [docs/discord.md](docs/discord.md) |

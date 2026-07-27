@@ -125,12 +125,13 @@ test.describe("public web smoke", () => {
     await page.goto("/privacy");
     await expect(page.getByRole("heading", { exact: true, name: "隱私權政策" })).toBeVisible();
     await expect(page.getByText(/配單中的商品 ID、數量、順序與更新時間/)).toBeVisible();
-    await expect(page.getByText(/Discord user、guild 與 channel ID/)).toBeVisible();
+    await expect(page.getByText(/使用者、伺服器及頻道識別碼/)).toBeVisible();
+    await expect(page.getByText(/申請查詢或閱覽個人資料、取得複製本/)).toBeVisible();
     await expect(page.getByText(/Bot 會向該 Discord 帳號私訊 30/)).toBeVisible();
-    await expect(page.getByText(/未完成驗證時不會查詢或刪除個人資料/)).toBeVisible();
-    await expect(page.getByText(/Application logs：最長 30 天/)).toBeVisible();
-    await expect(page.getByText(/還原期間必須先停止 Discord outbound/)).toBeVisible();
-    await expect(page.getByText(/不宣稱所有備份副本會瞬間消失/)).toBeVisible();
+    await expect(page.getByText(/未完成驗證時，將無法確認資料歸屬及處理申請/)).toBeVisible();
+    await expect(page.getByText(/通知發送與系統安全紀錄：最長 30 天/)).toBeVisible();
+    await expect(page.getByText(/重新套用已完成的刪除要求/)).toBeVisible();
+    await expect(page.getByText(/備份中的副本不一定會同時消失/)).toBeVisible();
     await expect(page.locator(".public-legal-toc, .public-legal-page")).toHaveCount(0);
     await expect(page.locator("main h1")).toHaveCount(0);
     await expect(page.locator("main h2")).toHaveCount(8);

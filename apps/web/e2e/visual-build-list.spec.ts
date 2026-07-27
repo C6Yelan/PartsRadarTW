@@ -311,7 +311,7 @@ test("keeps the main pages usable without horizontal overflow", async ({ page },
   await page.goto("/privacy");
   await expect(page.getByRole("heading", { exact: true, name: "隱私權政策" })).toBeVisible();
   await expect(
-    page.getByText(/配單中的商品 ID、數量、順序與更新時間儲存在目前瀏覽器/),
+    page.getByText(/配單中的商品 ID、數量、順序與更新時間只儲存在目前瀏覽器的本機儲存空間/),
   ).toBeVisible();
   await page.getByRole("link", { name: "返回查詢" }).focus();
   await expectUsableLayout(page, testInfo);
