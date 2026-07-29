@@ -28,27 +28,11 @@ interface CategoryFindManyArgs {
   };
 }
 
-interface SsdFacetProductFindManyArgs {
-  where: {
-    isActive: true;
-    isExcluded: false;
-    currentPrice: { isNot: null };
-    sourceCategory: { enabled: true; igrp: 7 };
-  };
-  select: { filterTags: true };
-}
-
-interface SsdFacetProductRecord {
-  filterTags: string[];
-}
-
 export interface CategoriesReadClient {
   sourceCategory: {
     findMany(args: CategoryFindManyArgs): Promise<CategoryRecord[]>;
   };
-  product: {
-    findMany(args: SsdFacetProductFindManyArgs): Promise<SsdFacetProductRecord[]>;
-  };
+  readAvailableProductFacetTags(igrp: number): Promise<readonly string[]>;
 }
 
 interface CategoryResponseItem {
@@ -78,19 +62,7 @@ export function createGetCategoriesHandler(client: CategoriesReadClient): () => 
         },
       });
       const ssdFacetTags = categories.some((category) => category.igrp === 7)
-        ? new Set(
-            (
-              await client.product.findMany({
-                where: {
-                  isActive: true,
-                  isExcluded: false,
-                  currentPrice: { isNot: null },
-                  sourceCategory: { enabled: true, igrp: 7 },
-                },
-                select: { filterTags: true },
-              })
-            ).flatMap((product) => product.filterTags),
-          )
+        ? new Set(await client.readAvailableProductFacetTags(7))
         : undefined;
 
       return jsonOk<CategoriesResponseBody>({

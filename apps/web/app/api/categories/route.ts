@@ -6,8 +6,14 @@ import { createGetCategoriesHandler } from "./handler";
 
 export async function GET(request: Request): Promise<Response> {
   return withRateLimit(request, "api:read", async () => {
-    const { prisma } = await import("@partsradar/db");
+    const [{ prisma }, { readAvailableProductFacetTags }] = await Promise.all([
+      import("@partsradar/db"),
+      import("@partsradar/db/product-facets"),
+    ]);
 
-    return createGetCategoriesHandler(prisma)();
+    return createGetCategoriesHandler({
+      sourceCategory: prisma.sourceCategory,
+      readAvailableProductFacetTags: (igrp) => readAvailableProductFacetTags(prisma, igrp),
+    })();
   });
 }
