@@ -226,7 +226,7 @@ async function assertPriceHistoryIndex(transaction: PriceHistoryRawQueryClient):
         index_state."indnatts" AS "totalAttributeCount",
         index_state."indpred" IS NULL AS "hasNoPredicate",
         ARRAY(
-          SELECT attribute."attname"
+          SELECT attribute."attname"::text
           FROM pg_catalog.unnest(index_state."indkey"::smallint[]) WITH ORDINALITY
             AS index_key("attributeNumber", "position")
           JOIN pg_catalog."pg_attribute" AS attribute

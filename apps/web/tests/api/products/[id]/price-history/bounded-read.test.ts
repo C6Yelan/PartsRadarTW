@@ -14,6 +14,24 @@ import {
 import { fakePriceHistoryClient, NOW, PRODUCT_ID, productRecord, snapshot } from "./support";
 
 describe("GET /api/products/{id}/price-history bounded read", () => {
+  it("casts catalog index names to the adapter-supported text array type", async () => {
+    const client = fakePriceHistoryClient({
+      productResult: productRecord(),
+      snapshots: [],
+    });
+
+    const response = await createGetProductPriceHistoryHandler(client, { now: NOW })(
+      PRODUCT_ID,
+      `https://partsradar.test/api/products/${PRODUCT_ID}/price-history`,
+    );
+    const indexGuardQuery = client.queryRawTexts.find((sql) =>
+      sql.includes('FROM pg_catalog."pg_class" AS index_relation'),
+    );
+
+    expect(response.status).toBe(200);
+    expect(indexGuardQuery).toContain('attribute."attname"::text');
+  });
+
   it.each([
     0,
     1,
