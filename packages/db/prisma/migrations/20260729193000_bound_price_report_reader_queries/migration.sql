@@ -1,3 +1,6 @@
+CREATE INDEX "price_snapshots_captured_at_id_idx"
+ON "price_snapshots"("captured_at", "id");
+
 CREATE INDEX "price_snapshots_product_id_captured_at_id_idx"
 ON "price_snapshots"("product_id", "captured_at" DESC, "id" DESC);
 

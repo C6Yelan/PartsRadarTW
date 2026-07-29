@@ -216,6 +216,7 @@ model PriceSnapshot {
   currentPrice  CurrentPrice? @relation("CurrentPriceSnapshot")
 
   @@unique([id, productId], map: "price_snapshots_id_product_id_key")
+  @@index([capturedAt, id], map: "price_snapshots_captured_at_id_idx")
   @@index([productId, capturedAt(sort: Desc), id(sort: Desc)], map: "price_snapshots_product_id_captured_at_id_idx")
   @@index([crawlRunId, capturedAt, id], map: "price_snapshots_crawl_run_id_captured_at_id_idx")
   @@index([rawSnapshotId], map: "price_snapshots_raw_snapshot_id_idx")

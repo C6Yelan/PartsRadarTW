@@ -2,6 +2,7 @@
 // 讀取 price snapshot 並整理成 Discord 與網站共用的價格變動與新增商品資料。
 
 import { Prisma } from "@prisma/client";
+import { tokenizePriceReportKeywordGroups } from "@partsradar/shared";
 import {
   assertPriceReportWorkBudget,
   PRICE_REPORT_CURRENT_SNAPSHOT_LIMIT,
@@ -38,6 +39,21 @@ interface RawPriceReportQueryClient {
 
 interface PreviousSnapshotForCurrent extends PreviousPriceSnapshot {
   currentSnapshotId: string;
+}
+
+interface RawRecentCurrentSnapshot {
+  id: string;
+  productId: string;
+  price: number;
+  currency: string;
+  capturedAt: Date;
+  productName: string;
+  vendorSlug: string | null;
+  vendorName: string | null;
+  productIsExcluded: boolean;
+  categoryIgrp: number;
+  categoryDisplayName: string;
+  categoryEnabled: boolean;
 }
 
 // 讀取指定 crawl run 的價格變動、新增商品與比對統計，供公開報告排程判斷與記錄。
@@ -183,24 +199,12 @@ export async function readRecentPriceReport(
     };
   }
 
-  const currentSnapshots = assertPriceReportWorkBudget(
-    (await client.priceSnapshot.findMany({
-      where: {
-        capturedAt: {
-          gte: since,
-          lte: until,
-        },
-        product: {
-          isExcluded: false,
-          ...productFilter,
-        },
-      },
-      select: PRICE_SNAPSHOT_WITH_PRODUCT_SELECT,
-      orderBy: CURRENT_PRICE_SNAPSHOT_ORDER_BY,
-      take: PRICE_REPORT_CURRENT_SNAPSHOT_LIMIT + 1,
-    })) as unknown as CrawlRunPriceSnapshot[],
-    "recent_current",
-    PRICE_REPORT_CURRENT_SNAPSHOT_LIMIT,
+  const currentSnapshots = await readRecentCurrentSnapshots(
+    client,
+    since,
+    until,
+    normalizedFilters,
+    productFilter,
   );
 
   if (currentSnapshots.length === 0) {
@@ -297,6 +301,112 @@ export async function readRecentPriceReport(
       .sort(comparePriceChanges),
     newProducts: [...newProductByProduct.values()].sort(compareNewProducts),
   };
+}
+
+async function readRecentCurrentSnapshots(
+  client: PriceReportReaderClient,
+  since: Date,
+  until: Date,
+  filters: ReturnType<typeof normalizeRecentPriceReportFilters>,
+  productFilter: ReturnType<typeof createRecentPriceReportProductFilter>,
+): Promise<CrawlRunPriceSnapshot[]> {
+  if (supportsRawQueries(client)) {
+    const boundedRows = assertPriceReportWorkBudget(
+      await client.$queryRaw<RawRecentCurrentSnapshot[]>(
+        Prisma.sql`
+          WITH bounded_current_snapshots AS MATERIALIZED (
+            SELECT snapshot.id, snapshot.product_id, snapshot.price, snapshot.currency, snapshot.captured_at
+            FROM price_snapshots AS snapshot
+            WHERE snapshot.captured_at >= ${since}
+              AND snapshot.captured_at <= ${until}
+            ORDER BY snapshot.captured_at ASC, snapshot.id ASC
+            LIMIT ${PRICE_REPORT_CURRENT_SNAPSHOT_LIMIT + 1}
+          )
+          SELECT
+            snapshot.id::text AS id,
+            snapshot.product_id::text AS "productId",
+            snapshot.price,
+            snapshot.currency::text AS currency,
+            snapshot.captured_at AS "capturedAt",
+            product.name AS "productName",
+            product.vendor_slug AS "vendorSlug",
+            product.vendor_name AS "vendorName",
+            product.is_excluded AS "productIsExcluded",
+            category.igrp AS "categoryIgrp",
+            category.display_name AS "categoryDisplayName",
+            category.enabled AS "categoryEnabled"
+          FROM bounded_current_snapshots AS snapshot
+          JOIN products AS product ON product.id = snapshot.product_id
+          JOIN source_categories AS category ON category.id = product.source_category_id
+          ORDER BY snapshot.captured_at ASC, snapshot.id ASC
+        `,
+      ),
+      "recent_current",
+      PRICE_REPORT_CURRENT_SNAPSHOT_LIMIT,
+    );
+
+    return boundedRows
+      .filter((row) => matchesRecentProduct(row, filters))
+      .map((row) => ({
+        id: row.id,
+        productId: row.productId,
+        price: row.price,
+        currency: row.currency,
+        capturedAt: row.capturedAt,
+        product: {
+          id: row.productId,
+          name: row.productName,
+          vendorSlug: row.vendorSlug,
+          vendorName: row.vendorName,
+          sourceCategory: {
+            igrp: row.categoryIgrp,
+            displayName: row.categoryDisplayName,
+          },
+        },
+      }));
+  }
+
+  return assertPriceReportWorkBudget(
+    (await client.priceSnapshot.findMany({
+      where: {
+        capturedAt: {
+          gte: since,
+          lte: until,
+        },
+        product: {
+          isExcluded: false,
+          ...productFilter,
+        },
+      },
+      select: PRICE_SNAPSHOT_WITH_PRODUCT_SELECT,
+      orderBy: CURRENT_PRICE_SNAPSHOT_ORDER_BY,
+      take: PRICE_REPORT_CURRENT_SNAPSHOT_LIMIT + 1,
+    })) as unknown as CrawlRunPriceSnapshot[],
+    "recent_current",
+    PRICE_REPORT_CURRENT_SNAPSHOT_LIMIT,
+  );
+}
+
+function matchesRecentProduct(
+  row: RawRecentCurrentSnapshot,
+  filters: ReturnType<typeof normalizeRecentPriceReportFilters>,
+): boolean {
+  if (
+    row.productIsExcluded ||
+    !row.categoryEnabled ||
+    (filters.categoryIgrps.length > 0 && !filters.categoryIgrps.includes(row.categoryIgrp))
+  ) {
+    return false;
+  }
+
+  if (!filters.productKeyword) {
+    return true;
+  }
+
+  const normalizedName = row.productName.toLocaleLowerCase();
+  return tokenizePriceReportKeywordGroups(filters.productKeyword).some((tokens) =>
+    tokens.every((token) => normalizedName.includes(token.toLocaleLowerCase())),
+  );
 }
 
 async function readLatestBaselines(
