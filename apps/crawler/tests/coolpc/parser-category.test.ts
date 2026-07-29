@@ -1,6 +1,7 @@
 // apps/crawler/tests/coolpc/parser-category.test.ts
 // 驗證 CoolPC 分類頁 parser 會組裝商品欄位、parse issue、去重結果與可匯入狀態。
 
+import { MAX_PRODUCT_NAME_LENGTH } from "@partsradar/shared";
 import { describe, expect, it } from "vitest";
 import { parseCoolpcCategoryPage } from "../../src/coolpc/parser";
 import { categoryHtml, context, contextForCategory, fixture } from "./parser-support";
@@ -286,6 +287,114 @@ describe("CoolPC category parser", () => {
     ]);
   });
 
+  it.each([
+    MAX_PRODUCT_NAME_LENGTH - 1,
+    MAX_PRODUCT_NAME_LENGTH,
+  ])("accepts a normalized product name at the %i-code-unit boundary", (length) => {
+    const prefix = "AMD ";
+    const name = `${prefix}${"X".repeat(length - prefix.length)}`;
+    const result = parseCoolpcCategoryPage(
+      categoryProductsHtml(4, [{ token: `BOUNDARY-${length}`, name }]),
+      context,
+    );
+
+    expect(result.canImport).toBe(true);
+    expect(result.issues).toEqual([]);
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]?.name).toBe(name);
+  });
+
+  it("rejects a product name above the normalized boundary without retaining its payload", () => {
+    const name = "X".repeat(MAX_PRODUCT_NAME_LENGTH + 1);
+    const result = parseCoolpcCategoryPage(
+      categoryProductsHtml(4, [{ token: "OVER-LIMIT", name }]),
+      context,
+    );
+
+    expect(result.canImport).toBe(false);
+    expect(result.items).toEqual([]);
+    expect(result.issues).toEqual([
+      {
+        type: "content_validation_failed",
+        message: `Product candidate name exceeds ${MAX_PRODUCT_NAME_LENGTH} normalized code units.`,
+      },
+    ]);
+    expect(JSON.stringify(result.issues)).not.toContain(name);
+  });
+
+  it("applies the boundary after whitespace normalization and NFKC expansion", () => {
+    const whitespaceHeavyName = `AMD${" ".repeat(MAX_PRODUCT_NAME_LENGTH * 2)}R7 9700X`;
+    const nfkcExpandingName = "㍿".repeat(Math.floor(MAX_PRODUCT_NAME_LENGTH / 4) + 1);
+    const result = parseCoolpcCategoryPage(
+      categoryProductsHtml(4, [
+        { token: "WHITESPACE-NORMALIZED", name: whitespaceHeavyName },
+        { token: "NFKC-OVER-LIMIT", name: nfkcExpandingName },
+      ]),
+      context,
+    );
+
+    expect(result.canImport).toBe(true);
+    expect(result.items.map((item) => item.name)).toEqual(["AMD R7 9700X"]);
+    expect(result.issues).toEqual([
+      {
+        type: "content_validation_failed",
+        message: `Product candidate name exceeds ${MAX_PRODUCT_NAME_LENGTH} normalized code units.`,
+      },
+    ]);
+  });
+
+  it("rejects an overlong name before processing adjacent invalid price and image fields", () => {
+    const name = `AMD ${"X".repeat(MAX_PRODUCT_NAME_LENGTH)}`;
+    const result = parseCoolpcCategoryPage(
+      categoryProductsHtml(4, [
+        { token: "VALID-NEIGHBOR", name: "AMD R7 9700X" },
+        {
+          token: "OVER-LIMIT-INVALID-NEIGHBORS",
+          name,
+          rawPriceText: "not-a-price",
+          rawImageUrl: "https://example.com/untrusted.jpg",
+        },
+      ]),
+      context,
+    );
+
+    expect(result.canImport).toBe(true);
+    expect(result.items.map((item) => item.ibuyToken)).toEqual(["VALID-NEIGHBOR"]);
+    expect(result.issues).toEqual([
+      {
+        type: "content_validation_failed",
+        message: `Product candidate name exceeds ${MAX_PRODUCT_NAME_LENGTH} normalized code units.`,
+      },
+    ]);
+    expect(result.issues[0]).not.toHaveProperty("rawName");
+    expect(result.issues[0]).not.toHaveProperty("rawPriceText");
+    expect(result.issues[0]).not.toHaveProperty("rawImageUrl");
+  });
+
+  it("scans long case-bundle labels deterministically while preserving exclusion semantics", () => {
+    const validBundleLabel = `【限搭購${"X".repeat(400)}機殼】`;
+    const missingCaseTokenLabel = `【${"限搭購".repeat(120)}】`;
+    const result = parseCoolpcCategoryPage(
+      categoryProductsHtml(14, [
+        {
+          token: "LONG-BUNDLE-LABEL",
+          name: `${validBundleLabel} 全漢 650W 金牌 全模`,
+        },
+        {
+          token: "MISSING-CASE-TOKEN",
+          name: `${missingCaseTokenLabel} 全漢 650W 金牌 全模`,
+        },
+      ]),
+      contextForCategory(14),
+    );
+
+    expect(result.canImport).toBe(true);
+    expect(result.excludedProducts).toEqual([
+      { ibuyToken: "LONG-BUNDLE-LABEL", reason: "misclassified_bundle_product" },
+    ]);
+    expect(result.items.map((item) => item.ibuyToken)).toEqual(["MISSING-CASE-TOKEN"]);
+  });
+
   it("parses products with invalid image URLs and records nonfatal issues", () => {
     const result = parseCoolpcCategoryPage(fixture("cpu-category.invalid-image.html"), context);
 
@@ -379,17 +488,22 @@ describe("CoolPC category parser", () => {
 
 function categoryProductsHtml(
   igrp: number,
-  products: readonly { token: string; name: string }[],
+  products: readonly {
+    token: string;
+    name: string;
+    rawPriceText?: string;
+    rawImageUrl?: string;
+  }[],
 ): string {
   const category = contextForCategory(igrp);
   const rows = products
     .map(
-      ({ token, name }) => `<div class="item">
+      ({ token, name, rawPriceText, rawImageUrl }) => `<div class="item">
         <div class="w">${token}</div>
         <span>
-          <img alt="" src="/eval/${igrp}/product.jpg">
+          <img alt="" src="${rawImageUrl ?? `/eval/${igrp}/product.jpg`}">
           <div class="t">${name}</div>
-          <div class="x">含稅：NT4,190</div>
+          <div class="x">${rawPriceText ?? "含稅：NT4,190"}</div>
         </span>
       </div>`,
     )

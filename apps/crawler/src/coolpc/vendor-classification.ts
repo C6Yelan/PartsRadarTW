@@ -309,7 +309,27 @@ function normalizeIgrp(igrp: number | string | null | undefined): number | null 
 
 function stripLeadingSourceLabels(value: string): string {
   // 移除商品名稱前綴的來源標籤（如 [活動]、【門市限定】），避免前綴干擾品牌判斷。
-  return value.replace(/^(\s*(?:\[[^\]]+\]|【[^】]+】)\s*)+/u, "").trim();
+  let offset = 0;
+
+  while (offset < value.length) {
+    while (offset < value.length && /\s/u.test(value[offset])) {
+      offset += 1;
+    }
+
+    const closingBracket = value[offset] === "[" ? "]" : value[offset] === "【" ? "】" : null;
+    if (closingBracket === null) {
+      break;
+    }
+
+    const closingBracketIndex = value.indexOf(closingBracket, offset + 1);
+    if (closingBracketIndex <= offset + 1) {
+      break;
+    }
+
+    offset = closingBracketIndex + 1;
+  }
+
+  return value.slice(offset).trim();
 }
 
 function normalizeProductVendorText(value: string): string {

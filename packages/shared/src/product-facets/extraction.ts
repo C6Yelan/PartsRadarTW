@@ -8,17 +8,20 @@ import {
   addFirstMatch,
   addFirstNumberMatch,
   extractFormFactors,
+  hasTokensInOrder,
 } from "./helpers";
 import { getProductFacetDefinitions, isProductFilterTagSupported } from "./registry";
+import { normalizeBoundedProductName } from "../product-name";
 
 export function extractProductFilterTags(igrp: number, productName: string): string[] {
   const definitions = getProductFacetDefinitions(igrp);
+  const normalizedName = normalizeBoundedProductName(productName);
 
-  if (definitions.length === 0 || productName.trim().length === 0) {
+  if (definitions.length === 0 || normalizedName === null || normalizedName.trim().length === 0) {
     return [];
   }
 
-  const text = productName.normalize("NFKC").toUpperCase();
+  const text = normalizedName.toUpperCase();
   const matches = new Set<string>();
   const add: AddTag = (key, value) => {
     const tag = `${key}:${value}`;
@@ -136,7 +139,14 @@ function extractExternalStorageTags(text: string, add: AddTag): void {
 }
 
 function extractCoolerTags(text: string, add: AddTag): void {
-  if (/(?:M\.?2|SSD).*散熱|散熱.*(?:M\.?2|SSD)/.test(text)) {
+  if (
+    hasTokensInOrder(text, ["M.2", "散熱"]) ||
+    hasTokensInOrder(text, ["M2", "散熱"]) ||
+    hasTokensInOrder(text, ["SSD", "散熱"]) ||
+    hasTokensInOrder(text, ["散熱", "M.2"]) ||
+    hasTokensInOrder(text, ["散熱", "M2"]) ||
+    hasTokensInOrder(text, ["散熱", "SSD"])
+  ) {
     add("cooler_type", "ssd-heatsink");
   } else if (/扣具/.test(text)) {
     add("cooler_type", "mounting-kit");
@@ -144,13 +154,22 @@ function extractCoolerTags(text: string, add: AddTag): void {
     add("cooler_type", "thermal-paste");
   } else if (/散熱墊|導熱墊|導熱片|THERMAL\s+PAD/.test(text)) {
     add("cooler_type", "thermal-pad");
-  } else if (/筆電.*散熱|散熱.*筆電|NOTEPAL|風扇.*筆電支架/.test(text)) {
+  } else if (
+    hasTokensInOrder(text, ["筆電", "散熱"]) ||
+    hasTokensInOrder(text, ["散熱", "筆電"]) ||
+    /NOTEPAL/.test(text) ||
+    hasTokensInOrder(text, ["風扇", "筆電支架"])
+  ) {
     add("cooler_type", "laptop-cooler");
   } else if (/下吹/.test(text)) {
     add("cooler_type", "top-down");
-  } else if (/塔散|塔式|單塔|雙塔|(?:\d+導管.*(?:TDP|高|高度|風扇))|FROZN\s+A\d+/.test(text)) {
+  } else if (/塔散|塔式|單塔|雙塔|FROZN\s+A\d+/.test(text) || hasNumberedHeatpipeFeature(text)) {
     add("cooler_type", "air-tower");
-  } else if (/散熱器|CPU.*風扇|網通設備.*散熱架/.test(text)) {
+  } else if (
+    /散熱器/.test(text) ||
+    hasTokensInOrder(text, ["CPU", "風扇"]) ||
+    hasTokensInOrder(text, ["網通設備", "散熱架"])
+  ) {
     add("cooler_type", "other-air");
   }
 
@@ -160,9 +179,8 @@ function extractCoolerTags(text: string, add: AddTag): void {
 function extractLiquidCoolingTags(text: string, add: AddTag): void {
   const isCustom = /開放式/.test(text);
   const isComponent =
-    /\bNL-(?:ACF1|LC1)\b|水冷(?:頭|泵|排|箱|接頭|管|液)|水泵|冷排|水箱|止水栓|流量計|VRM.*水冷.*風扇/.test(
-      text,
-    );
+    /\bNL-(?:ACF1|LC1)\b|水冷(?:頭|泵|排|箱|接頭|管|液)|水泵|冷排|水箱|止水栓|流量計/.test(text) ||
+    hasTokensInOrder(text, ["VRM", "水冷", "風扇"]);
   const isAio =
     !isCustom &&
     !isComponent &&
@@ -249,15 +267,108 @@ function extractCaseTags(text: string, add: AddTag): void {
   if (/背插/.test(text)) {
     add("back_connect", "yes");
   }
-  const hasNegatedIncludedPsu = /(?:不|未)(?:包)?含[^/]*(?:電源(?!倉)|POWER)/.test(text);
-  if (
-    !hasNegatedIncludedPsu &&
-    /含[^/]*(?:電源(?!倉)|POWER)|內附[^/]*\d{3,4}\s*W[^/]*(?:電源(?!倉)|POWER)|(?:電源(?!倉)|POWER)[^/]*內附/.test(
-      text,
-    )
-  ) {
+  const segments = text.split("/");
+  const hasNegatedIncludedPsu = segments.some(hasNegatedIncludedPsuInSegment);
+  if (!hasNegatedIncludedPsu && segments.some(hasIncludedPsuInSegment)) {
     add("included_psu", "yes");
   }
+}
+
+function hasNumberedHeatpipeFeature(text: string): boolean {
+  const lastFeatureIndex = Math.max(
+    text.lastIndexOf("TDP"),
+    text.lastIndexOf("高"),
+    text.lastIndexOf("風扇"),
+  );
+  if (lastFeatureIndex < 0) {
+    return false;
+  }
+
+  let heatpipeIndex = text.indexOf("導管");
+
+  while (heatpipeIndex >= 0 && heatpipeIndex < lastFeatureIndex) {
+    if (heatpipeIndex > 0 && isAsciiDigit(text[heatpipeIndex - 1])) {
+      return true;
+    }
+
+    heatpipeIndex = text.indexOf("導管", heatpipeIndex + 2);
+  }
+
+  return false;
+}
+
+function hasNegatedIncludedPsuInSegment(segment: string): boolean {
+  return ["不含", "未含", "不包含", "未包含"].some((token) => {
+    const tokenIndex = segment.indexOf(token);
+    return tokenIndex >= 0 && findPowerSupplyTerm(segment, tokenIndex + token.length) >= 0;
+  });
+}
+
+function hasIncludedPsuInSegment(segment: string): boolean {
+  const powerSupplyIndex = findPowerSupplyTerm(segment);
+  if (powerSupplyIndex < 0) {
+    return false;
+  }
+
+  const includedIndex = segment.indexOf("含");
+  if (includedIndex >= 0 && findPowerSupplyTerm(segment, includedIndex + "含".length) >= 0) {
+    return true;
+  }
+
+  const attachedIndex = segment.indexOf("內附");
+  if (attachedIndex >= 0) {
+    const wattageEndIndex = findWattageEnd(segment, attachedIndex + "內附".length);
+    if (wattageEndIndex >= 0 && findPowerSupplyTerm(segment, wattageEndIndex) >= 0) {
+      return true;
+    }
+  }
+
+  return segment.indexOf("內附", powerSupplyIndex + 1) >= 0;
+}
+
+function findPowerSupplyTerm(text: string, startIndex = 0): number {
+  const englishIndex = text.indexOf("POWER", startIndex);
+  let chineseIndex = text.indexOf("電源", startIndex);
+
+  while (chineseIndex >= 0 && text.startsWith("電源倉", chineseIndex)) {
+    chineseIndex = text.indexOf("電源", chineseIndex + "電源".length);
+  }
+
+  if (englishIndex < 0) {
+    return chineseIndex;
+  }
+  if (chineseIndex < 0) {
+    return englishIndex;
+  }
+  return Math.min(englishIndex, chineseIndex);
+}
+
+function findWattageEnd(text: string, startIndex: number): number {
+  for (let index = startIndex; index < text.length; index += 1) {
+    for (const digitCount of [4, 3]) {
+      const digitsEnd = index + digitCount;
+      if (
+        digitsEnd > text.length ||
+        !Array.from(text.slice(index, digitsEnd)).every(isAsciiDigit)
+      ) {
+        continue;
+      }
+
+      let wattageEnd = digitsEnd;
+      while (wattageEnd < text.length && /\s/u.test(text[wattageEnd])) {
+        wattageEnd += 1;
+      }
+      if (text[wattageEnd] === "W") {
+        return wattageEnd + 1;
+      }
+    }
+  }
+
+  return -1;
+}
+
+function isAsciiDigit(value: string | undefined): boolean {
+  return value !== undefined && value >= "0" && value <= "9";
 }
 
 function extractPowerSupplyTags(text: string, add: AddTag): void {

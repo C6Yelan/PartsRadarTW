@@ -45,3 +45,17 @@ export function addFirstNumberMatch(add: AddTag, key: string, text: string, patt
     add(key, match[1]);
   }
 }
+
+export function hasTokensInOrder(text: string, tokens: readonly string[], startIndex = 0): boolean {
+  let searchIndex = startIndex;
+
+  for (const token of tokens) {
+    const tokenIndex = text.indexOf(token, searchIndex);
+    if (tokenIndex < 0) {
+      return false;
+    }
+    searchIndex = tokenIndex + token.length;
+  }
+
+  return true;
+}
