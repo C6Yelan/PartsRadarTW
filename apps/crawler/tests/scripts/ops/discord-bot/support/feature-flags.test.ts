@@ -134,6 +134,7 @@ function createPublicReportInteraction(subcommandName: string): DiscordInteracti
       ],
     },
     member: {
+      permissions: "32",
       user: {
         id: "111122223333444455",
       },
