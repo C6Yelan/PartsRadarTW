@@ -3,7 +3,7 @@
 
 import { createHash, randomUUID } from "node:crypto";
 import type { Stats } from "node:fs";
-import { lstat, mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 
 interface FilesystemLockMetadata {
@@ -213,14 +213,30 @@ async function refreshLockHeartbeat(
     }
 
     await heartbeatGuard.assertOwned();
-    await writeFile(
-      getMetadataPath(lockDir),
-      `${JSON.stringify({ ...metadata, heartbeatAt: now().toISOString() }, null, 2)}\n`,
-      "utf8",
-    );
+    await writeLockMetadataAtomically(lockDir, {
+      ...metadata,
+      heartbeatAt: now().toISOString(),
+    });
     return true;
   } finally {
     await heartbeatGuard.release();
+  }
+}
+
+async function writeLockMetadataAtomically(
+  lockDir: string,
+  metadata: FilesystemLockMetadata,
+): Promise<void> {
+  const temporaryPath = join(lockDir, `.${LOCK_METADATA_FILE}.${process.pid}.${randomUUID()}.tmp`);
+
+  try {
+    await writeFile(temporaryPath, `${JSON.stringify(metadata, null, 2)}\n`, {
+      encoding: "utf8",
+      flag: "wx",
+    });
+    await rename(temporaryPath, getMetadataPath(lockDir));
+  } finally {
+    await rm(temporaryPath, { force: true });
   }
 }
 
