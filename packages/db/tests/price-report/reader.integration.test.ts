@@ -5,7 +5,12 @@ import { randomUUID } from "node:crypto";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import { readCrawlRunPriceChangeSummary, readRecentPriceReport } from "../../src/price-report";
+import {
+  PRICE_REPORT_CURRENT_SNAPSHOT_LIMIT,
+  type PriceReportWorkBudgetExceededError,
+  readCrawlRunPriceChangeSummary,
+  readRecentPriceReport,
+} from "../../src/price-report";
 
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 
@@ -192,6 +197,84 @@ describe("price report readers PostgreSQL integration", () => {
       [rtx5090Id, ddr5Id].sort(),
     );
     expect(gpuOnlyReport.priceChanges.map(({ productId }) => productId)).toEqual([rtx5090Id]);
+  });
+
+  it("fails closed at budget plus one with the real PostgreSQL query", async () => {
+    const categoryId = await createCategory();
+    const productId = await createProduct({
+      name: "Budget overflow integration GPU",
+      categoryId,
+    });
+    const crawlRunId = await createCrawlRun("2030-01-02T02:00:00.000Z");
+    const rows = Array.from({ length: PRICE_REPORT_CURRENT_SNAPSHOT_LIMIT + 1 }, (_, index) => {
+      const id = randomUUID();
+      snapshotIds.add(id);
+      return {
+        id,
+        productId,
+        price: 10_000 + index,
+        capturedAt: new Date(1_893_542_400_000 + index),
+        crawlRunId,
+      };
+    });
+    await client.priceSnapshot.createMany({ data: rows });
+    const plan = await client.$queryRaw<Array<{ "QUERY PLAN": unknown }>>`
+      EXPLAIN (COSTS, FORMAT JSON)
+      SELECT snapshot.id
+      FROM price_snapshots AS snapshot
+      JOIN products AS product ON product.id = snapshot.product_id
+      JOIN source_categories AS category ON category.id = product.source_category_id
+      WHERE snapshot.captured_at >= ${new Date("2030-01-02T00:00:00.000Z")}
+        AND snapshot.captured_at <= ${new Date("2030-01-03T00:00:00.000Z")}
+        AND product.is_excluded = false
+        AND category.enabled = true
+      ORDER BY snapshot.captured_at ASC, snapshot.id ASC
+      LIMIT ${PRICE_REPORT_CURRENT_SNAPSHOT_LIMIT + 1}
+    `;
+    const planText = JSON.stringify(plan);
+
+    await expect(
+      readRecentPriceReport(client, {
+        since: new Date("2030-01-02T00:00:00.000Z"),
+        until: new Date("2030-01-03T00:00:00.000Z"),
+      }),
+    ).rejects.toMatchObject({
+      name: "PriceReportWorkBudgetExceededError",
+      scope: "recent_current",
+      limit: PRICE_REPORT_CURRENT_SNAPSHOT_LIMIT,
+      observedRows: PRICE_REPORT_CURRENT_SNAPSHOT_LIMIT + 1,
+    } satisfies Partial<PriceReportWorkBudgetExceededError>);
+    expect(planText).toContain("Limit");
+    expect(planText).toMatch(/price_snapshots_(captured_at_id|product_id_captured_at_id)_idx/);
+  });
+
+  it("installs indexes matching both bounded stable query orders", async () => {
+    const indexes = await client.$queryRaw<Array<{ indexname: string; indexdef: string }>>`
+      SELECT indexname, indexdef
+      FROM pg_indexes
+      WHERE schemaname = current_schema()
+        AND indexname IN (
+          'price_snapshots_captured_at_id_idx',
+          'price_snapshots_crawl_run_id_captured_at_id_idx',
+          'price_snapshots_product_id_captured_at_id_idx'
+        )
+      ORDER BY indexname
+    `;
+
+    expect(indexes).toEqual([
+      expect.objectContaining({
+        indexname: "price_snapshots_captured_at_id_idx",
+        indexdef: expect.stringContaining("(captured_at, id)"),
+      }),
+      expect.objectContaining({
+        indexname: "price_snapshots_crawl_run_id_captured_at_id_idx",
+        indexdef: expect.stringContaining("(crawl_run_id, captured_at, id)"),
+      }),
+      expect.objectContaining({
+        indexname: "price_snapshots_product_id_captured_at_id_idx",
+        indexdef: expect.stringContaining("(product_id, captured_at DESC, id DESC)"),
+      }),
+    ]);
   });
 });
 

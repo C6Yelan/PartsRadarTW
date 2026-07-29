@@ -76,6 +76,9 @@ API 不公開 standalone `ibuyToken`；原價屋連結在 response 組裝時重�
 - `pagination`：目前頁、page size、總筆數與總頁數。
 - `meta`：`window`、`since`、`until`、`sourceStatus` 與 `lastSuccessAt`。
 
+若單次受保護讀取超出價格報告工作量上限，API 回傳 `503 temporarily_unavailable`
+與 `Retry-After`，不會回傳看似完整的部分報告。
+
 ## 商品詳細與價格歷史
 
 商品 ID 必須是 UUID。不存在、來源分類停用或沒有目前價格時回傳 `404`。
@@ -145,6 +148,7 @@ Response：
 | 400 | `invalid_request` | Body、content type 或 request shape 不合法。 |
 | 404 | `not_found` | 資源不存在或不可公開。 |
 | 429 | `rate_limited` | 超過目前 process 的 rate limit。 |
+| 503 | `temporarily_unavailable` | 受保護查詢暫時無法在單次工作量上限內完成。 |
 | 500 | `internal_error` | 泛用錯誤，不公開內部原因。 |
 
 成功與錯誤 response 都可能包含 `X-RateLimit-Limit`、`X-RateLimit-Remaining`、`X-RateLimit-Reset`；429 另包含 `Retry-After`。

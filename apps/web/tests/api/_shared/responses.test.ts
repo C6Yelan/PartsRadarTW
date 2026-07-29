@@ -11,6 +11,7 @@ import {
   jsonOk,
   notFoundResponse,
   rateLimitedResponse,
+  temporarilyUnavailableResponse,
 } from "../../../app/api/_shared/responses";
 
 describe("API response helpers", () => {
@@ -82,6 +83,19 @@ describe("API response helpers", () => {
       error: {
         code: "rate_limited",
         message: API_ERROR_MESSAGES.rateLimited,
+      },
+    });
+  });
+
+  it("returns a distinct public-safe temporary-unavailable error", async () => {
+    const response = temporarilyUnavailableResponse();
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get("Retry-After")).toBe("60");
+    expect(await response.json()).toEqual({
+      error: {
+        code: "temporarily_unavailable",
+        message: API_ERROR_MESSAGES.temporarilyUnavailable,
       },
     });
   });

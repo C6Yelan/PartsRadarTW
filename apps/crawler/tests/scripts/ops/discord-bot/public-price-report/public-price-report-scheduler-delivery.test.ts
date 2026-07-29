@@ -1,6 +1,7 @@
 // apps/crawler/tests/scripts/ops/discord-bot/public-price-report/public-price-report-scheduler-delivery.test.ts
 // 驗證公開價格報告排程會發送待處理 crawl run、記錄 delivery，並遵守設定 cursor。
 
+import { PRICE_REPORT_CURRENT_SNAPSHOT_LIMIT } from "@partsradar/db/price-report";
 import { describe, expect, it, vi } from "vitest";
 import { sendPendingPublicPriceReports } from "../../../../../src/scripts/ops/discord-bot/public-price-report";
 import type { DiscordBotMessage } from "../../../../../src/scripts/ops/discord-bot/types";
@@ -105,6 +106,73 @@ describe("public price report scheduler delivery", () => {
         deliveredAt: new Date("2026-06-07T05:00:00.000Z"),
       }),
     });
+  });
+
+  it("records a bounded failure and sends no partial report when the reader overflows", async () => {
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const crawlRunId = "public-run-overflow";
+    const client = createDiscordBotClient({
+      snapshots: Array.from({ length: PRICE_REPORT_CURRENT_SNAPSHOT_LIMIT + 1 }, (_, index) =>
+        snapshot({
+          id: `overflow-${index}`,
+          productId: `overflow-product-${index}`,
+          productName: `Overflow product ${index}`,
+          crawlRunId,
+          price: 10_000 + index,
+          capturedAt: "2026-06-07T03:00:00.000Z",
+        }),
+      ),
+      crawlRuns: [
+        crawlRun({
+          id: crawlRunId,
+          finishedAt: new Date("2026-06-07T03:05:00.000Z"),
+        }),
+      ],
+      publicPriceReportSettings: [publicPriceReportSetting({ id: "public-setting-overflow" })],
+    });
+    const sendChannelMessages = vi.fn();
+
+    try {
+      await expect(
+        sendPendingPublicPriceReports({
+          client,
+          options: createDiscordBotOptions(),
+          now: new Date("2026-06-07T05:00:00.000Z"),
+          sendChannelMessages,
+          ...ACTIVE_ACCESS_DEPENDENCIES,
+        }),
+      ).resolves.toMatchObject({
+        processedCount: 1,
+        sentCount: 0,
+        failedCount: 1,
+      });
+
+      expect(sendChannelMessages).not.toHaveBeenCalled();
+      expect(client.discordPublicPriceReportDelivery.upsert).toHaveBeenCalledWith({
+        where: {
+          crawlRunId_channelId: {
+            crawlRunId,
+            channelId: "999988887777666655",
+          },
+        },
+        create: expect.objectContaining({
+          status: "FAILED",
+          itemCount: 0,
+          messageCount: 0,
+          errorCategory: null,
+          errorMessage: null,
+        }),
+        update: expect.objectContaining({
+          status: "FAILED",
+          itemCount: 0,
+          messageCount: 0,
+          errorCategory: null,
+          errorMessage: null,
+        }),
+      });
+    } finally {
+      stderr.mockRestore();
+    }
   });
 
   it("stores public rate limits as structured fields without concatenated technical details", async () => {

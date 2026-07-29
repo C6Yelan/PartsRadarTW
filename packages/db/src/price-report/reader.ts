@@ -2,6 +2,11 @@
 // 讀取 price snapshot 並整理成 Discord 與網站共用的價格變動與新增商品資料。
 
 import {
+  assertPriceReportWorkBudget,
+  PRICE_REPORT_CURRENT_SNAPSHOT_LIMIT,
+  PRICE_REPORT_PREVIOUS_SNAPSHOT_LIMIT,
+} from "./limits";
+import {
   CURRENT_PRICE_SNAPSHOT_ORDER_BY,
   PREVIOUS_PRICE_SNAPSHOT_ORDER_BY,
   PREVIOUS_PRICE_SNAPSHOT_SELECT,
@@ -31,19 +36,24 @@ export async function readCrawlRunPriceChangeSummary(
   client: PriceReportReaderClient,
   crawlRunId: string,
 ): Promise<CrawlRunPriceChangeReadResult> {
-  const currentSnapshots = (await client.priceSnapshot.findMany({
-    where: {
-      crawlRunId,
-      product: {
-        isExcluded: false,
-        sourceCategory: {
-          enabled: true,
+  const currentSnapshots = assertPriceReportWorkBudget(
+    (await client.priceSnapshot.findMany({
+      where: {
+        crawlRunId,
+        product: {
+          isExcluded: false,
+          sourceCategory: {
+            enabled: true,
+          },
         },
       },
-    },
-    select: PRICE_SNAPSHOT_WITH_PRODUCT_SELECT,
-    orderBy: CURRENT_PRICE_SNAPSHOT_ORDER_BY,
-  })) as unknown as CrawlRunPriceSnapshot[];
+      select: PRICE_SNAPSHOT_WITH_PRODUCT_SELECT,
+      orderBy: CURRENT_PRICE_SNAPSHOT_ORDER_BY,
+      take: PRICE_REPORT_CURRENT_SNAPSHOT_LIMIT + 1,
+    })) as unknown as CrawlRunPriceSnapshot[],
+    "crawl_run_current",
+    PRICE_REPORT_CURRENT_SNAPSHOT_LIMIT,
+  );
 
   if (currentSnapshots.length === 0) {
     return {
@@ -60,15 +70,20 @@ export async function readCrawlRunPriceChangeSummary(
   const latestCapturedAt = new Date(
     Math.max(...currentSnapshots.map((snapshot) => snapshot.capturedAt.getTime())),
   );
-  const previousSnapshots = (await client.priceSnapshot.findMany({
-    where: {
-      productId: { in: productIds },
-      crawlRunId: { not: crawlRunId },
-      capturedAt: { lt: latestCapturedAt },
-    },
-    select: PREVIOUS_PRICE_SNAPSHOT_SELECT,
-    orderBy: PREVIOUS_PRICE_SNAPSHOT_ORDER_BY,
-  })) as PreviousPriceSnapshot[];
+  const previousSnapshots = assertPriceReportWorkBudget(
+    (await client.priceSnapshot.findMany({
+      where: {
+        productId: { in: productIds },
+        crawlRunId: { not: crawlRunId },
+        capturedAt: { lt: latestCapturedAt },
+      },
+      select: PREVIOUS_PRICE_SNAPSHOT_SELECT,
+      orderBy: PREVIOUS_PRICE_SNAPSHOT_ORDER_BY,
+      take: PRICE_REPORT_PREVIOUS_SNAPSHOT_LIMIT + 1,
+    })) as PreviousPriceSnapshot[],
+    "crawl_run_previous",
+    PRICE_REPORT_PREVIOUS_SNAPSHOT_LIMIT,
+  );
   const previousByProduct = groupPreviousSnapshots(previousSnapshots);
   const changes: PriceReportPriceChangeItem[] = [];
   const newProductByProduct = new Map<string, PriceReportNewProductItem>();
@@ -167,20 +182,25 @@ export async function readRecentPriceReport(
     };
   }
 
-  const currentSnapshots = (await client.priceSnapshot.findMany({
-    where: {
-      capturedAt: {
-        gte: since,
-        lte: until,
+  const currentSnapshots = assertPriceReportWorkBudget(
+    (await client.priceSnapshot.findMany({
+      where: {
+        capturedAt: {
+          gte: since,
+          lte: until,
+        },
+        product: {
+          isExcluded: false,
+          ...productFilter,
+        },
       },
-      product: {
-        isExcluded: false,
-        ...productFilter,
-      },
-    },
-    select: PRICE_SNAPSHOT_WITH_PRODUCT_SELECT,
-    orderBy: CURRENT_PRICE_SNAPSHOT_ORDER_BY,
-  })) as unknown as CrawlRunPriceSnapshot[];
+      select: PRICE_SNAPSHOT_WITH_PRODUCT_SELECT,
+      orderBy: CURRENT_PRICE_SNAPSHOT_ORDER_BY,
+      take: PRICE_REPORT_CURRENT_SNAPSHOT_LIMIT + 1,
+    })) as unknown as CrawlRunPriceSnapshot[],
+    "recent_current",
+    PRICE_REPORT_CURRENT_SNAPSHOT_LIMIT,
+  );
 
   if (currentSnapshots.length === 0) {
     return {
@@ -190,15 +210,19 @@ export async function readRecentPriceReport(
   }
 
   const productIds = [...new Set(currentSnapshots.map((snapshot) => snapshot.productId))];
-  const baselineSnapshots = (await client.priceSnapshot.findMany({
-    where: {
-      productId: { in: productIds },
-      capturedAt: { lt: since },
-    },
-    select: PREVIOUS_PRICE_SNAPSHOT_SELECT,
-    orderBy: PREVIOUS_PRICE_SNAPSHOT_ORDER_BY,
-    distinct: ["productId"],
-  })) as PreviousPriceSnapshot[];
+  const baselineSnapshots = assertPriceReportWorkBudget(
+    (await client.priceSnapshot.findMany({
+      where: {
+        productId: { in: productIds },
+        capturedAt: { lt: since },
+      },
+      select: PREVIOUS_PRICE_SNAPSHOT_SELECT,
+      orderBy: PREVIOUS_PRICE_SNAPSHOT_ORDER_BY,
+      take: PRICE_REPORT_PREVIOUS_SNAPSHOT_LIMIT + 1,
+    })) as PreviousPriceSnapshot[],
+    "recent_baseline",
+    PRICE_REPORT_PREVIOUS_SNAPSHOT_LIMIT,
+  );
   const previousSnapshots = [
     ...baselineSnapshots,
     ...currentSnapshots.map(({ id, productId, price, currency, capturedAt }) => ({
@@ -279,9 +303,7 @@ export async function readRecentPriceReport(
   return {
     priceChanges: [...latestChangeByProduct.values()]
       .filter((item) =>
-        item.delta < 0
-          ? normalizedFilters.includePriceDrops
-          : normalizedFilters.includePriceRises,
+        item.delta < 0 ? normalizedFilters.includePriceDrops : normalizedFilters.includePriceRises,
       )
       .sort(comparePriceChanges),
     newProducts: [...newProductByProduct.values()].sort(compareNewProducts),

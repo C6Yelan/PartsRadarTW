@@ -8,6 +8,7 @@ export type PublicApiErrorCode =
   | "invalid_request"
   | "not_found"
   | "rate_limited"
+  | "temporarily_unavailable"
   | "internal_error";
 
 const PUBLIC_API_ERROR_CODES = new Set<PublicApiErrorCode>([
@@ -15,6 +16,7 @@ const PUBLIC_API_ERROR_CODES = new Set<PublicApiErrorCode>([
   "invalid_request",
   "not_found",
   "rate_limited",
+  "temporarily_unavailable",
   "internal_error",
 ]);
 
