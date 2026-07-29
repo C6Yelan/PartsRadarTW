@@ -11,7 +11,13 @@ import type { PriceChangeRecord } from "./types";
 const HISTORY_RECORD_PAGE_SIZE = 5;
 
 // 呈現價格變動紀錄列表，將分頁狀態保留在價格歷史面板內部。
-export function HistoryRecordList({ records }: { records: PriceChangeRecord[] }) {
+export function HistoryRecordList({
+  downsampled = false,
+  records,
+}: {
+  downsampled?: boolean;
+  records: PriceChangeRecord[];
+}) {
   const [pageIndex, setPageIndex] = useState(0);
   const pageCount = Math.ceil(records.length / HISTORY_RECORD_PAGE_SIZE);
   const safePageIndex = Math.min(pageIndex, Math.max(pageCount - 1, 0));
@@ -27,7 +33,7 @@ export function HistoryRecordList({ records }: { records: PriceChangeRecord[] })
   return (
     <div className="history-records">
       <div className="history-record-heading">
-        <h3>變價紀錄</h3>
+        <h3>{downsampled ? "代表觀測變價紀錄" : "變價紀錄"}</h3>
         {pageCount > 1 ? <span>{`${records.length} 筆`}</span> : null}
       </div>
       <div className="history-record-list">

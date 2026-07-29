@@ -88,7 +88,22 @@ API 不公開 standalone `ibuyToken`；原價屋連結在 response 組裝時重�
 - `range=7d|30d|90d|all`，預設 `90d`。
 - 相容 query `days=7|30|90`。
 
-Response 包含 `range`、`rangeDays` 與 `points`。每個 point 提供 `amount`、UTC ISO 格式的 `observedAt`，以及 `price_snapshot` 或 `current_price_confirmation` observation type。`range=all` 仍受資料庫實際保留資料限制。
+Response 包含 `range`、`rangeDays` 與 `points`。每個 point 提供 `amount`、UTC ISO 格式的 `observedAt`，以及 `price_snapshot` 或 `current_price_confirmation` observation type。`range=all` 仍涵蓋資料庫實際保留資料的完整時間跨度。
+
+單次回應最多 256 個 points（包含預留的 current confirmation），JSON 最多 64 KiB。端點先以穩定的 `(captured_at, id)` 順序讀取最多 256 筆作 bounded probe；不超過 255 筆時維持精確逐筆回應。超過時，資料庫以固定 126 個 half-open time buckets 分別選出真實首筆／末筆觀測，並保留全域最早與最新觀測；不會插值，也不會先讀取全部歷史到 Node.js。
+
+壓縮回應會新增向後相容的 `sampling`：
+
+```json
+{
+  "downsampled": true,
+  "strategy": "time_bucket_first_last",
+  "bucketCount": 126,
+  "pointLimit": 256
+}
+```
+
+未壓縮回應省略 `sampling`。前端與其他 consumer 不應將壓縮後 points 推導的最低、最高、平均或相鄰變化稱為完整歷史的精確統計；它們只代表 time-bucket 首／末真實觀測。成功回應另提供不含商品識別或 raw row count 的 `X-Price-History-Range`、`X-Price-History-Returned-Points`、`X-Price-History-Downsampled` 與 `X-Price-History-Duration-Ms` headers。DB guard、query budget、point 或 byte cap 失敗時回傳泛用 `503`。
 
 ## 配單 refresh
 
