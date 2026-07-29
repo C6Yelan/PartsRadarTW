@@ -81,12 +81,8 @@ if [[ -z "$cloudflared_image" ]]; then
 fi
 cloudflared_image="${cloudflared_image:-$default_image}"
 
-if [[ "$cloudflared_image" == *"replace_with"* || "$cloudflared_image" == *":latest" ]]; then
-  fail "CLOUDFLARED_IMAGE must use an exact version or digest."
-fi
-if [[ ! "$cloudflared_image" =~ ^[^[:space:]@]+:[0-9]{4}\.[0-9]+\.[0-9]+$ &&
-  ! "$cloudflared_image" =~ ^[^[:space:]@]+(:[^[:space:]@]+)?@sha256:[0-9a-fA-F]{64}$ ]]; then
-  fail "CLOUDFLARED_IMAGE must use an exact version or sha256 digest."
+if [[ ! "$cloudflared_image" =~ ^[^[:space:]@]+(:[^[:space:]@]+)?@sha256:[0-9a-fA-F]{64}$ ]]; then
+  fail "CLOUDFLARED_IMAGE must include an immutable sha256 digest."
 fi
 
 secret_file="${CLOUDFLARE_TUNNEL_TOKEN_FILE:-}"

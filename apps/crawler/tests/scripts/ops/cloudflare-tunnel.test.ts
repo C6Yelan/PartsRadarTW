@@ -137,6 +137,7 @@ describe("Cloudflare Tunnel production preflight", () => {
     "cloudflare/cloudflared:latest",
     "cloudflare/cloudflared:replace_with_pinned_version",
     "cloudflare/cloudflared:2026.7",
+    "cloudflare/cloudflared:2026.7.2",
   ])("rejects a mutable or placeholder image reference: %s", (image) => {
     const root = createTempWorkspace();
     const tokenFile = join(root, "tunnel-token");
