@@ -1,7 +1,10 @@
 // apps/crawler/src/scripts/ops/discord-bot/public-price-report/delivery-flow.ts
 // 產生單一 crawl run 的公開價格報告、送出 Discord 訊息，並持久化 delivery 結果。
 
-import { readCrawlRunPriceChangeSummary } from "@partsradar/db/price-report";
+import {
+  PriceReportWorkBudgetExceededError,
+  readCrawlRunPriceChangeSummary,
+} from "@partsradar/db/price-report";
 import { MAX_PRICE_REPORT_ITEMS } from "../constants";
 import { NO_DISCORD_DELIVERY_ERROR, toDiscordDeliveryErrorFields } from "../delivery-error-fields";
 import {
@@ -55,7 +58,54 @@ export async function sendPublicPriceReportForCrawlRun({
   globalRateLimited: boolean;
   globalAuthFailed: boolean;
 }> {
-  const readResult = await readCrawlRunPriceChangeSummary(client, crawlRunId);
+  let readResult: Awaited<ReturnType<typeof readCrawlRunPriceChangeSummary>>;
+
+  try {
+    readResult = await readCrawlRunPriceChangeSummary(client, crawlRunId);
+  } catch (error) {
+    if (!(error instanceof PriceReportWorkBudgetExceededError)) {
+      throw error;
+    }
+
+    process.stderr.write(
+      `${JSON.stringify({
+        level: "warn",
+        event: "price_report_work_budget_exceeded",
+        scope: error.scope,
+        limit: error.limit,
+        observedRows: error.observedRows,
+      })}\n`,
+    );
+
+    if (!(await readActivePublicReportSetting(client, setting))) {
+      return {
+        status: "CANCELLED",
+        retryNotBefore: null,
+        globalRateLimited: false,
+        globalAuthFailed: false,
+      };
+    }
+
+    const recorded = await recordPublicPriceReportDelivery({
+      client,
+      crawlRunId,
+      channelId: setting.channelId,
+      publicPriceReportSettingId: setting.id,
+      status: "FAILED",
+      itemCount: 0,
+      messageCount: 0,
+      deliveredAt: null,
+      ...NO_DISCORD_DELIVERY_ERROR,
+    });
+
+    return {
+      status: recorded ? "FAILED" : "CANCELLED",
+      retryNotBefore: null,
+      globalRateLimited: false,
+      globalAuthFailed: false,
+    };
+  }
+
   const filters = toPriceReportFilters(setting);
   const changes = filterPriceChangesForReport(readResult.changes, filters);
   const newProducts = filterNewProductsForReport(readResult.newProducts, filters);

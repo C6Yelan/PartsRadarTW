@@ -1,10 +1,19 @@
 // apps/web/app/api/price-report/handler.ts
 // 處理公開價格報告 query、共用 reader、來源狀態與安全 JSON response。
 
-import { readRecentPriceReport, type PriceReportReaderClient } from "@partsradar/db/price-report";
+import {
+  type PriceReportReaderClient,
+  PriceReportWorkBudgetExceededError,
+  readRecentPriceReport,
+} from "@partsradar/db/price-report";
 
 import { InvalidQueryError } from "../_shared/query";
-import { internalErrorResponse, invalidQueryResponse, jsonOk } from "../_shared/responses";
+import {
+  internalErrorResponse,
+  invalidQueryResponse,
+  jsonOk,
+  temporarilyUnavailableResponse,
+} from "../_shared/responses";
 import { SOURCE_STATUS_CATEGORY_QUERY, type SourceStatusReadClient } from "../source-status/data";
 import { buildSourceStatusResponse } from "../source-status/response";
 import { getPriceReportSince, parsePriceReportQuery, toRecentPriceReportFilters } from "./query";
@@ -71,6 +80,19 @@ export function createGetPriceReportHandler(
     } catch (error) {
       if (error instanceof InvalidQueryError) {
         return invalidQueryResponse();
+      }
+
+      if (error instanceof PriceReportWorkBudgetExceededError) {
+        process.stderr.write(
+          `${JSON.stringify({
+            level: "warn",
+            event: "price_report_work_budget_exceeded",
+            scope: error.scope,
+            limit: error.limit,
+            observedRows: error.observedRows,
+          })}\n`,
+        );
+        return temporarilyUnavailableResponse();
       }
 
       return internalErrorResponse();

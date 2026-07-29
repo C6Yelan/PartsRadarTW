@@ -1,7 +1,11 @@
 // apps/web/tests/api/price-report/handler.test.ts
 // 驗證價格報告 handler 的安全錯誤、來源狀態與驗證前零資料庫讀取。
 
-import { describe, expect, it } from "vitest";
+import {
+  PRICE_REPORT_CURRENT_SNAPSHOT_LIMIT,
+  PriceReportWorkBudgetExceededError,
+} from "@partsradar/db/price-report";
+import { describe, expect, it, vi } from "vitest";
 
 import { API_ERROR_MESSAGES } from "../../../app/api/_shared/responses";
 import {
@@ -64,9 +68,7 @@ describe("GET /api/price-report handler", () => {
       sourceCategory(16, new Date("2026-07-10T07:45:00.000Z"), true),
     ]);
     const response = await createGetPriceReportHandler(fake.client, { now: () => NOW })(
-      new Request(
-        "https://parts.example/api/price-report?category=gpu&category=cpu",
-      ),
+      new Request("https://parts.example/api/price-report?category=gpu&category=cpu"),
     );
 
     expect(response.status).toBe(200);
@@ -96,6 +98,36 @@ describe("GET /api/price-report handler", () => {
         message: API_ERROR_MESSAGES.internalError,
       },
     });
+  });
+
+  it("returns a stable 503 when the reader work budget is exceeded", async () => {
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const fake = createFakeClient(
+      new PriceReportWorkBudgetExceededError(
+        "recent_current",
+        PRICE_REPORT_CURRENT_SNAPSHOT_LIMIT,
+        PRICE_REPORT_CURRENT_SNAPSHOT_LIMIT + 1,
+      ),
+    );
+
+    try {
+      const response = await createGetPriceReportHandler(fake.client)(
+        new Request("https://parts.example/api/price-report"),
+      );
+
+      expect(response.status).toBe(503);
+      expect(response.headers.get("Retry-After")).toBe("60");
+      expect(await response.json()).toEqual({
+        error: {
+          code: "temporarily_unavailable",
+          message: API_ERROR_MESSAGES.temporarilyUnavailable,
+        },
+      });
+      expect(fake.productReadCount()).toBe(0);
+      expect(JSON.stringify(stderr.mock.calls)).not.toContain("DATABASE_URL");
+    } finally {
+      stderr.mockRestore();
+    }
   });
 });
 

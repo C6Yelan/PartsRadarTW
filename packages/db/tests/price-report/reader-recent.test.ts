@@ -1,8 +1,12 @@
 // packages/db/tests/price-report/reader-recent.test.ts
 // 驗證近期時間窗價格報告 reader 會彙整最新變價、新商品與商品關鍵字篩選結果。
 
-import { describe, expect, it } from "vitest";
-import { readRecentPriceReport } from "../../src/price-report";
+import { describe, expect, it, vi } from "vitest";
+import {
+  PRICE_REPORT_CURRENT_SNAPSHOT_LIMIT,
+  PriceReportWorkBudgetExceededError,
+  readRecentPriceReport,
+} from "../../src/price-report";
 import { createPriceReportReaderClient, snapshot } from "./support";
 
 describe("readRecentPriceReport price changes", () => {
@@ -263,5 +267,139 @@ describe("readRecentPriceReport", () => {
         },
       ],
     });
+  });
+
+  it("bounds current rows and reads at most one baseline per product", async () => {
+    const client = createPriceReportReaderClient({
+      snapshots: [
+        snapshot({
+          id: "baseline",
+          productId: "product-1",
+          productName: "Bounded GPU",
+          crawlRunId: "old-run",
+          price: 100,
+          capturedAt: "2026-06-07T01:00:00.000Z",
+        }),
+        snapshot({
+          id: "current",
+          productId: "product-1",
+          productName: "Bounded GPU",
+          crawlRunId: "new-run",
+          price: 90,
+          capturedAt: "2026-06-07T03:00:00.000Z",
+        }),
+      ],
+    });
+
+    await readRecentPriceReport(client, {
+      since: new Date("2026-06-07T02:00:00.000Z"),
+      until: new Date("2026-06-07T05:00:00.000Z"),
+    });
+
+    expect(client.priceSnapshot.findMany).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        take: PRICE_REPORT_CURRENT_SNAPSHOT_LIMIT + 1,
+      }),
+    );
+    expect(client.priceSnapshot.findMany).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        take: 1,
+      }),
+    );
+  });
+
+  it("accepts exactly the current-row budget and fails closed at budget plus one", async () => {
+    const atBudget = createPriceReportReaderClient({
+      snapshots: Array.from({ length: PRICE_REPORT_CURRENT_SNAPSHOT_LIMIT }, (_, index) =>
+        snapshot({
+          id: `current-${index}`,
+          productId: `product-${index}`,
+          productName: `Product ${index}`,
+          crawlRunId: "new-run",
+          price: 1_000 + index,
+          capturedAt: "2026-06-07T03:00:00.000Z",
+        }),
+      ),
+    });
+    const overBudget = createPriceReportReaderClient({
+      snapshots: Array.from({ length: PRICE_REPORT_CURRENT_SNAPSHOT_LIMIT + 1 }, (_, index) =>
+        snapshot({
+          id: `overflow-${index}`,
+          productId: `overflow-product-${index}`,
+          productName: `Overflow ${index}`,
+          crawlRunId: "new-run",
+          price: 1_000 + index,
+          capturedAt: "2026-06-07T03:00:00.000Z",
+        }),
+      ),
+    });
+    const range = {
+      since: new Date("2026-06-07T02:00:00.000Z"),
+      until: new Date("2026-06-07T05:00:00.000Z"),
+    };
+
+    await expect(readRecentPriceReport(atBudget, range)).resolves.toMatchObject({
+      newProducts: { length: PRICE_REPORT_CURRENT_SNAPSHOT_LIMIT },
+    });
+    await expect(readRecentPriceReport(overBudget, range)).rejects.toEqual(
+      new PriceReportWorkBudgetExceededError(
+        "recent_current",
+        PRICE_REPORT_CURRENT_SNAPSHOT_LIMIT,
+        PRICE_REPORT_CURRENT_SNAPSHOT_LIMIT + 1,
+      ),
+    );
+    expect(overBudget.priceSnapshot.findMany).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not materialize one product's high-cardinality baseline history", async () => {
+    const baseline = {
+      id: "latest-baseline",
+      productId: "product-1",
+      price: 100,
+      currency: "TWD",
+      capturedAt: new Date("2026-06-07T01:00:00.000Z"),
+    };
+    const findMany = vi.fn(async (args: { where: { productId?: unknown }; take?: number }) =>
+      args.where.productId
+        ? [baseline]
+        : [
+            {
+              id: "current",
+              productId: "product-1",
+              price: 90,
+              currency: "TWD",
+              capturedAt: new Date("2026-06-07T03:00:00.000Z"),
+              product: {
+                id: "product-1",
+                name: "High-cardinality GPU",
+                vendorSlug: null,
+                vendorName: null,
+                sourceCategory: { igrp: 12, displayName: "顯示卡" },
+              },
+            },
+          ],
+    );
+    const client = {
+      priceSnapshot: {
+        findMany,
+      },
+    };
+
+    await expect(
+      readRecentPriceReport(client as never, {
+        since: new Date("2026-06-07T02:00:00.000Z"),
+        until: new Date("2026-06-07T05:00:00.000Z"),
+      }),
+    ).resolves.toMatchObject({
+      priceChanges: [
+        expect.objectContaining({
+          previousPrice: 100,
+          currentPrice: 90,
+        }),
+      ],
+    });
+    expect(findMany).toHaveBeenNthCalledWith(2, expect.objectContaining({ take: 1 }));
   });
 });

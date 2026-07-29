@@ -1,7 +1,7 @@
 // packages/db/src/price-report/types.ts
 // 定義價格報告 reader 對資料庫、訊息組裝與篩選流程輸出的共用資料契約。
 
-import type { PrismaClient } from "@prisma/client";
+import type { Prisma, PrismaClient } from "@prisma/client";
 
 // 單筆價格變動項目，供 Discord 與網站價格報告共用。
 export interface PriceReportPriceChangeItem {
@@ -54,8 +54,10 @@ export interface RecentPriceReportFilters {
   includeNewProducts?: boolean;
 }
 
-// 價格報告 reader 只依賴 priceSnapshot delegate，不綁定完整 PrismaClient。
-export type PriceReportReaderClient = Pick<PrismaClient, "priceSnapshot">;
+// 價格報告 reader 保留 delegate fallback，正式 caller 可提供 parameterized raw query 以走 set-based 路徑。
+export type PriceReportReaderClient = Pick<PrismaClient, "priceSnapshot"> & {
+  $queryRaw?<T>(query: Prisma.Sql): Promise<T>;
+};
 
 // 本次報告期間的 price snapshot 查詢結果，包含組裝報告需要的商品欄位。
 export interface CrawlRunPriceSnapshot {

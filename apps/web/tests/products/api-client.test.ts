@@ -18,6 +18,7 @@ const SAFE_CODES: PublicApiErrorCode[] = [
   "invalid_request",
   "not_found",
   "rate_limited",
+  "temporarily_unavailable",
   "internal_error",
 ];
 

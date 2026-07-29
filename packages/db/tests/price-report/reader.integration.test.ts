@@ -3,9 +3,14 @@
 
 import { randomUUID } from "node:crypto";
 import { PrismaPg } from "@prisma/adapter-pg";
-import { PrismaClient } from "@prisma/client";
+import { type Prisma, PrismaClient } from "@prisma/client";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import { readCrawlRunPriceChangeSummary, readRecentPriceReport } from "../../src/price-report";
+import {
+  PRICE_REPORT_CURRENT_SNAPSHOT_LIMIT,
+  type PriceReportWorkBudgetExceededError,
+  readCrawlRunPriceChangeSummary,
+  readRecentPriceReport,
+} from "../../src/price-report";
 
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 
@@ -62,19 +67,37 @@ describe("price report readers PostgreSQL integration", () => {
       changedRunId,
       isExcluded: true,
     });
+    const rawQueries: Prisma.Sql[] = [];
+    const readerClient = {
+      priceSnapshot: client.priceSnapshot,
+      $queryRaw: async <T>(query: Prisma.Sql) => {
+        rawQueries.push(query);
+        return client.$queryRaw<T>(query);
+      },
+    };
 
-    const recent = await readRecentPriceReport(client, {
+    const recent = await readRecentPriceReport(readerClient, {
       since: new Date("2030-01-02T00:00:00.000Z"),
       until: new Date("2030-01-03T00:00:00.000Z"),
       filters: { includeNewProducts: false },
     });
-    const crawlRun = await readCrawlRunPriceChangeSummary(client, changedRunId);
+    const crawlRun = await readCrawlRunPriceChangeSummary(readerClient, changedRunId);
 
     expect(recent.priceChanges.map(({ productId }) => productId)).toEqual([enabledProductId]);
     expect(recent.newProducts).toEqual([]);
     expect(crawlRun.changes.map(({ productId }) => productId)).toEqual([enabledProductId]);
     expect(crawlRun.newProducts).toEqual([]);
     expect(crawlRun.snapshotCount).toBe(1);
+    expect(rawQueries).toHaveLength(3);
+    expect(rawQueries[0]?.sql).toContain("bounded_current_snapshots AS MATERIALIZED");
+    for (const query of rawQueries.slice(1)) {
+      expect(query.sql).toContain("JOIN LATERAL");
+      expect(query.sql).toContain("LIMIT 1");
+    }
+    for (const query of rawQueries) {
+      expect(query.sql).not.toContain(enabledProductId);
+      expect(query.values.length).toBeGreaterThan(0);
+    }
   });
 
   it("uses the latest baseline and latest in-window snapshot for one product", async () => {
@@ -192,6 +215,123 @@ describe("price report readers PostgreSQL integration", () => {
       [rtx5090Id, ddr5Id].sort(),
     );
     expect(gpuOnlyReport.priceChanges.map(({ productId }) => productId)).toEqual([rtx5090Id]);
+  });
+
+  it("fails closed at budget plus one with the real PostgreSQL query", async () => {
+    const categoryId = await createCategory();
+    const productId = await createProduct({
+      name: "Budget overflow integration GPU",
+      categoryId,
+    });
+    const crawlRunId = await createCrawlRun("2030-01-02T02:00:00.000Z");
+    const rows = Array.from({ length: PRICE_REPORT_CURRENT_SNAPSHOT_LIMIT + 1 }, (_, index) => {
+      const id = randomUUID();
+      snapshotIds.add(id);
+      return {
+        id,
+        productId,
+        price: 10_000 + index,
+        capturedAt: new Date(1_893_542_400_000 + index),
+        crawlRunId,
+      };
+    });
+    await client.priceSnapshot.createMany({ data: rows });
+    const historicalRunId = await createCrawlRun("2029-01-01T00:00:00.000Z");
+    const historicalRows = Array.from({ length: 16_384 }, (_, index) => {
+      const id = randomUUID();
+      snapshotIds.add(id);
+      return {
+        id,
+        productId,
+        price: 8_000 + index,
+        capturedAt: new Date(1_735_689_600_000 + index),
+        crawlRunId: historicalRunId,
+      };
+    });
+    await client.priceSnapshot.createMany({ data: historicalRows });
+    await client.$executeRaw`ANALYZE price_snapshots`;
+
+    const plan = await client.$queryRaw<Array<{ "QUERY PLAN": unknown }>>`
+      EXPLAIN (ANALYZE, BUFFERS, COSTS, FORMAT JSON)
+      WITH bounded_current_snapshots AS MATERIALIZED (
+        SELECT snapshot.id, snapshot.product_id, snapshot.price, snapshot.currency, snapshot.captured_at
+        FROM price_snapshots AS snapshot
+        WHERE snapshot.captured_at >= ${new Date("2030-01-02T00:00:00.000Z")}
+          AND snapshot.captured_at <= ${new Date("2030-01-03T00:00:00.000Z")}
+        ORDER BY snapshot.captured_at ASC, snapshot.id ASC
+        LIMIT ${PRICE_REPORT_CURRENT_SNAPSHOT_LIMIT + 1}
+      )
+      SELECT snapshot.id
+      FROM bounded_current_snapshots AS snapshot
+      JOIN products AS product ON product.id = snapshot.product_id
+      JOIN source_categories AS category ON category.id = product.source_category_id
+      ORDER BY snapshot.captured_at ASC, snapshot.id ASC
+    `;
+    const crawlRunPlan = await client.$queryRaw<Array<{ "QUERY PLAN": unknown }>>`
+      EXPLAIN (COSTS, FORMAT JSON)
+      SELECT snapshot.id
+      FROM price_snapshots AS snapshot
+      WHERE snapshot.crawl_run_id = ${crawlRunId}::uuid
+      ORDER BY snapshot.captured_at ASC, snapshot.id ASC
+      LIMIT ${PRICE_REPORT_CURRENT_SNAPSHOT_LIMIT + 1}
+    `;
+    const predecessorPlan = await client.$queryRaw<Array<{ "QUERY PLAN": unknown }>>`
+      EXPLAIN (COSTS, FORMAT JSON)
+      SELECT snapshot.id
+      FROM price_snapshots AS snapshot
+      WHERE snapshot.product_id = ${productId}::uuid
+        AND snapshot.captured_at < ${new Date("2030-01-03T00:00:00.000Z")}
+      ORDER BY snapshot.captured_at DESC, snapshot.id DESC
+      LIMIT 1
+    `;
+    const planText = JSON.stringify(plan);
+    const crawlRunPlanText = JSON.stringify(crawlRunPlan);
+    const predecessorPlanText = JSON.stringify(predecessorPlan);
+
+    await expect(
+      readRecentPriceReport(client, {
+        since: new Date("2030-01-02T00:00:00.000Z"),
+        until: new Date("2030-01-03T00:00:00.000Z"),
+      }),
+    ).rejects.toMatchObject({
+      name: "PriceReportWorkBudgetExceededError",
+      scope: "recent_current",
+      limit: PRICE_REPORT_CURRENT_SNAPSHOT_LIMIT,
+      observedRows: PRICE_REPORT_CURRENT_SNAPSHOT_LIMIT + 1,
+    } satisfies Partial<PriceReportWorkBudgetExceededError>);
+    expect(planText).toContain("price_snapshots_captured_at_id_idx");
+    expect(planText).toContain(`"Actual Rows":${PRICE_REPORT_CURRENT_SNAPSHOT_LIMIT + 1}`);
+    expect(crawlRunPlanText).toContain("price_snapshots_crawl_run_id_captured_at_id_idx");
+    expect(predecessorPlanText).toContain("price_snapshots_product_id_captured_at_id_idx");
+  });
+
+  it("installs only the indexes proven by the final bounded query plans", async () => {
+    const indexes = await client.$queryRaw<Array<{ indexname: string; indexdef: string }>>`
+      SELECT indexname, indexdef
+      FROM pg_indexes
+      WHERE schemaname = current_schema()
+        AND indexname IN (
+          'price_snapshots_captured_at_id_idx',
+          'price_snapshots_crawl_run_id_captured_at_id_idx',
+          'price_snapshots_product_id_captured_at_id_idx'
+        )
+      ORDER BY indexname
+    `;
+
+    expect(indexes).toEqual([
+      expect.objectContaining({
+        indexname: "price_snapshots_captured_at_id_idx",
+        indexdef: expect.stringContaining("(captured_at, id)"),
+      }),
+      expect.objectContaining({
+        indexname: "price_snapshots_crawl_run_id_captured_at_id_idx",
+        indexdef: expect.stringContaining("(crawl_run_id, captured_at, id)"),
+      }),
+      expect.objectContaining({
+        indexname: "price_snapshots_product_id_captured_at_id_idx",
+        indexdef: expect.stringContaining("(product_id, captured_at DESC, id DESC)"),
+      }),
+    ]);
   });
 });
 

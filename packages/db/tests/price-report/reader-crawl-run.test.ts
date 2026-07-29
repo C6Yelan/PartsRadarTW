@@ -1,8 +1,12 @@
 // packages/db/tests/price-report/reader-crawl-run.test.ts
 // 驗證指定 crawl run 的價格報告 reader 會區分變價、新商品、未變價並排序變動幅度。
 
-import { describe, expect, it } from "vitest";
-import { readCrawlRunPriceChangeSummary } from "../../src/price-report";
+import { describe, expect, it, vi } from "vitest";
+import {
+  PRICE_REPORT_CURRENT_SNAPSHOT_LIMIT,
+  PriceReportWorkBudgetExceededError,
+  readCrawlRunPriceChangeSummary,
+} from "../../src/price-report";
 import { createPriceReportReaderClient, snapshot } from "./support";
 
 describe("readCrawlRunPriceChangeSummary changes", () => {
@@ -73,7 +77,7 @@ describe("readCrawlRunPriceChangeSummary changes", () => {
         delta: -500,
       },
     ]);
-    expect(client.priceSnapshot.findMany).toHaveBeenCalledTimes(2);
+    expect(client.priceSnapshot.findMany).toHaveBeenCalledTimes(4);
   });
 
   it("orders larger absolute price moves first", async () => {
@@ -118,6 +122,68 @@ describe("readCrawlRunPriceChangeSummary changes", () => {
 
     expect(changes.map((change) => change.productId)).toEqual(["large", "small"]);
   });
+
+  it("uses the latest eligible previous snapshot for each current snapshot", async () => {
+    const client = createPriceReportReaderClient({
+      snapshots: [
+        snapshot({
+          id: "old-twd",
+          productId: "product-1",
+          productName: "Multi snapshot GPU",
+          crawlRunId: "old-run",
+          price: 100,
+          capturedAt: "2026-06-07T01:00:00.000Z",
+        }),
+        snapshot({
+          id: "current-drop",
+          productId: "product-1",
+          productName: "Multi snapshot GPU",
+          crawlRunId: "target-run",
+          price: 90,
+          capturedAt: "2026-06-07T02:00:00.000Z",
+        }),
+        snapshot({
+          id: "current-rise",
+          productId: "product-1",
+          productName: "Multi snapshot GPU",
+          crawlRunId: "target-run",
+          price: 95,
+          capturedAt: "2026-06-07T03:00:00.000Z",
+        }),
+        snapshot({
+          id: "old-usd",
+          productId: "product-2",
+          productName: "Currency mismatch GPU",
+          crawlRunId: "old-run",
+          price: 100,
+          currency: "USD",
+          capturedAt: "2026-06-07T01:00:00.000Z",
+        }),
+        snapshot({
+          id: "current-twd",
+          productId: "product-2",
+          productName: "Currency mismatch GPU",
+          crawlRunId: "target-run",
+          price: 90,
+          currency: "TWD",
+          capturedAt: "2026-06-07T02:00:00.000Z",
+        }),
+      ],
+    });
+
+    const result = await readCrawlRunPriceChangeSummary(client, "target-run");
+
+    expect(
+      result.changes.map(({ currentPrice, previousPrice }) => ({
+        currentPrice,
+        previousPrice,
+      })),
+    ).toEqual([
+      { currentPrice: 90, previousPrice: 100 },
+      { currentPrice: 95, previousPrice: 100 },
+    ]);
+    expect(result.currencyMismatchCount).toBe(1);
+  });
 });
 
 describe("readCrawlRunPriceChangeSummary", () => {
@@ -159,5 +225,114 @@ describe("readCrawlRunPriceChangeSummary", () => {
       unchangedSnapshotCount: 0,
       currencyMismatchCount: 0,
     });
+  });
+
+  it("bounds current rows and reads at most one predecessor per current snapshot", async () => {
+    const client = createPriceReportReaderClient({
+      snapshots: [
+        snapshot({
+          id: "old",
+          productId: "product-1",
+          productName: "Bounded GPU",
+          crawlRunId: "old-run",
+          price: 100,
+          capturedAt: "2026-06-07T01:00:00.000Z",
+        }),
+        snapshot({
+          id: "current",
+          productId: "product-1",
+          productName: "Bounded GPU",
+          crawlRunId: "target-run",
+          price: 90,
+          capturedAt: "2026-06-07T02:00:00.000Z",
+        }),
+      ],
+    });
+
+    await readCrawlRunPriceChangeSummary(client, "target-run");
+
+    expect(client.priceSnapshot.findMany).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        take: PRICE_REPORT_CURRENT_SNAPSHOT_LIMIT + 1,
+      }),
+    );
+    expect(client.priceSnapshot.findMany).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        take: 1,
+      }),
+    );
+  });
+
+  it("fails closed before reading history when the current run exceeds its budget", async () => {
+    const client = createPriceReportReaderClient({
+      snapshots: Array.from({ length: PRICE_REPORT_CURRENT_SNAPSHOT_LIMIT + 1 }, (_, index) =>
+        snapshot({
+          id: `current-${index}`,
+          productId: `product-${index}`,
+          productName: `Product ${index}`,
+          crawlRunId: "target-run",
+          price: 1_000 + index,
+          capturedAt: "2026-06-07T02:00:00.000Z",
+        }),
+      ),
+    });
+
+    await expect(readCrawlRunPriceChangeSummary(client, "target-run")).rejects.toEqual(
+      new PriceReportWorkBudgetExceededError(
+        "crawl_run_current",
+        PRICE_REPORT_CURRENT_SNAPSHOT_LIMIT,
+        PRICE_REPORT_CURRENT_SNAPSHOT_LIMIT + 1,
+      ),
+    );
+    expect(client.priceSnapshot.findMany).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not materialize one product's high-cardinality previous history", async () => {
+    const previous = {
+      id: "latest-previous",
+      productId: "product-1",
+      price: 100,
+      currency: "TWD",
+      capturedAt: new Date("2026-06-07T01:00:00.000Z"),
+    };
+    const findMany = vi.fn(async (args: { where: { crawlRunId?: unknown }; take?: number }) =>
+      typeof args.where.crawlRunId === "string"
+        ? [
+            {
+              id: "current",
+              productId: "product-1",
+              price: 90,
+              currency: "TWD",
+              capturedAt: new Date("2026-06-07T02:00:00.000Z"),
+              product: {
+                id: "product-1",
+                name: "High-cardinality GPU",
+                vendorSlug: null,
+                vendorName: null,
+                sourceCategory: { igrp: 12, displayName: "顯示卡" },
+              },
+            },
+          ]
+        : [previous],
+    );
+    const client = {
+      priceSnapshot: {
+        findMany,
+      },
+    };
+
+    await expect(
+      readCrawlRunPriceChangeSummary(client as never, "target-run"),
+    ).resolves.toMatchObject({
+      changes: [
+        expect.objectContaining({
+          previousPrice: 100,
+          currentPrice: 90,
+        }),
+      ],
+    });
+    expect(findMany).toHaveBeenNthCalledWith(2, expect.objectContaining({ take: 1 }));
   });
 });

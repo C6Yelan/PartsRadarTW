@@ -6,6 +6,7 @@ export const API_ERROR_MESSAGES = {
   invalidRequest: "Invalid request.",
   notFound: "Resource not found.",
   rateLimited: "Too many requests. Please try again later.",
+  temporarilyUnavailable: "Service temporarily unavailable. Please try again later.",
   internalError: "Internal server error.",
 } as const;
 
@@ -14,6 +15,7 @@ export type ApiErrorCode =
   | "invalid_request"
   | "not_found"
   | "rate_limited"
+  | "temporarily_unavailable"
   | "internal_error";
 
 export interface ApiErrorResponseBody {
@@ -39,7 +41,7 @@ export function jsonOk<TBody>(body: TBody, init?: ResponseInit): Response {
 }
 
 function jsonError(
-  status: 400 | 404 | 429 | 500,
+  status: 400 | 404 | 429 | 500 | 503,
   code: ApiErrorCode,
   message: string,
   init?: ResponseInit,
@@ -81,6 +83,15 @@ export function rateLimitedResponse(options: RateLimitedResponseOptions): Respon
       "X-RateLimit-Limit": String(options.limit),
       "X-RateLimit-Remaining": String(options.remaining),
       "X-RateLimit-Reset": String(options.resetEpochSeconds),
+    },
+  });
+}
+
+// 回應受保護查詢超出單次工作量上限；不公開上限、資料量或內部查詢細節。
+export function temporarilyUnavailableResponse(): Response {
+  return jsonError(503, "temporarily_unavailable", API_ERROR_MESSAGES.temporarilyUnavailable, {
+    headers: {
+      "Retry-After": "60",
     },
   });
 }
