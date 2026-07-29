@@ -11,6 +11,8 @@ price.png
 .env
 .env.*
 !.env.example
+secrets/
+**/secrets/
 
 # Dependencies
 node_modules/

@@ -89,11 +89,40 @@ Repository tests 無法證明 edge、備份系統、GitHub、Discord Portal 或�
 
 使用時機：Private smoke 通過且 edge 設定已準備完成。
 
+Token 由主機 secret provisioning 寫入，不得放在 command argument、shell environment、`.env`、ticket 或一般 backup。預設 source path 為 `/etc/partsradar/secrets/cloudflare-tunnel-token`；若由受保護的 provisioning 流程寫入其他絕對路徑，只把該非機密路徑設為 `CLOUDFLARE_TUNNEL_TOKEN_FILE`。
+
+Pinned `cloudflare/cloudflared:2026.7.2` 以 UID/GID `65532:65532` 執行。Provisioning 完成後只調整 metadata，不在 console 讀回內容：
+
 ```bash
-docker compose -f compose.yml -f compose.tunnel.yml --profile public-tunnel up -d cloudflared
-docker compose -f compose.yml -f compose.tunnel.yml logs --tail=100 cloudflared
+sudo chown root:65532 /etc/partsradar/secrets/cloudflare-tunnel-token
+sudo chmod 0440 /etc/partsradar/secrets/cloudflare-tunnel-token
+scripts/ops/compose-production.sh config --quiet
+```
+
+cloudflared 2025.4.0 起支援 `TUNNEL_TOKEN_FILE`；本 repository 已以 2026.7.2 的 `version`／`tunnel run --help` 驗證。部署時仍須記錄 pulled image digest，且不得改用 mutable `latest`。
+
+Maintenance cutover：
+
+1. Private full smoke 通過後停止 public tunnel，web 與 PostgreSQL維持 loopback。
+2. 由 secret provisioning 更新 file；不要在 shell history、trace 或 log 傳遞 token 值。
+3. 以 `scripts/ops/compose-production.sh up -d --no-build cloudflared` 建立新 connector。
+4. 只記錄 connector count／health，執行 public-only smoke並確認 origin 無旁路。
+5. 有任何實際曝露證據時立即 rotate 並清除舊 connections；沒有曝露證據時仍排定受控輪替，不宣稱現有 token 已外洩。
+
+```bash
+scripts/ops/compose-production.sh up -d --no-build cloudflared
+scripts/ops/compose-production.sh logs --tail=100 cloudflared
 ```
 
 成功標準：使用 pinned image 與有效 token，public HTTPS 路由指向 web，public-only smoke 通過。
 
-失敗處理：停止 cloudflared 並維持 loopback web；不要把 web port 直接綁定 public interface 作為臨時繞過。
+Sanitized 驗證只能輸出布林結果，不能回顯完整 command 或 environment：
+
+```bash
+container_id="$(scripts/ops/compose-production.sh ps -q cloudflared)"
+if docker inspect "$container_id" --format '{{json .Path}} {{json .Args}}' | grep -q -- '"--token"'; then echo 'argv_token=true'; else echo 'argv_token=false'; fi
+if docker inspect "$container_id" --format '{{range .Config.Env}}{{println .}}{{end}}' | grep -Eq '^(TUNNEL_TOKEN|CLOUDFLARE_TUNNEL_TOKEN)='; then echo 'token_env=true'; else echo 'token_env=false'; fi
+if docker inspect "$container_id" --format '{{range .Mounts}}{{println .Destination}}{{end}}' | grep -qx '/run/secrets/cloudflare_tunnel_token'; then echo 'token_file_path=true'; else echo 'token_file_path=false'; fi
+```
+
+失敗處理：執行 `scripts/ops/compose-production.sh stop cloudflared`，維持 loopback web並調查 image／file metadata。Rollback 只能使用前一個已知可用的 pinned image與受控 file secret；若舊 token 已 rotate，不得恢復舊值，也不得改用 argv／environment。不要把 web port直接綁定 public interface作為臨時繞過。

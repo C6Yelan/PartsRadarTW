@@ -21,5 +21,11 @@ compose=(
   --profile public-tunnel
 )
 
+case "${1:-}" in
+  config | create | restart | run | start | up)
+    scripts/ops/validate-cloudflare-tunnel.sh
+    ;;
+esac
+
 "${compose[@]}" config --quiet
 exec "${compose[@]}" "$@"

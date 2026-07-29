@@ -15,6 +15,7 @@ describe("Docker build context", () => {
       "backups/",
       "**/backups/",
       "secrets/",
+      "**/secrets/",
       "*.sql",
       "*.dump",
       "*.backup",

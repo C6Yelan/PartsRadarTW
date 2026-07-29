@@ -12,6 +12,8 @@ Compose 將 runtime 固定到三個可覆寫的 image reference：
 
 預設的 `:local` tag 只供本機驗證。正式部署必須設定不重複使用的 release tag 或 registry digest，並記錄實際 image ID／digest。
 
+Public ingress 另使用 `CLOUDFLARED_IMAGE`。Compose 預設為已驗證且支援 token-file 的 `cloudflare/cloudflared:2026.7.2` multi-platform digest；正式 release 仍應記錄實際 pulled image ID／platform digest。覆寫時只接受明確版本或 `sha256` digest，不接受 `latest`。
+
 在部署主機建置時：
 
 ```bash
@@ -56,6 +58,7 @@ docker compose exec -T postgres sh -c \
 - Playwright desktop／mobile 關鍵流程
 - PostgreSQL 18 disposable migration matrix
 - 所有啟用 Compose profiles 的 config
+- Cloudflare token source file 的 owner／mode preflight，以及 cloudflared container argv、environment、secret mount 的 sanitized inspect
 - `web`、`crawler`、`migrate` image build
 - Build-context sentinel 與 image 內容檢查
 - Runtime role attributes、object grants、application 讀寫與 DDL 拒絕測試
