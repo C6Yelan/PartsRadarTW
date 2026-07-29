@@ -111,7 +111,9 @@ scripts/ops/compose-production.sh up -d --no-build
 
 Web 與 PostgreSQL 預設綁定 `127.0.0.1`。若使用 Cloudflare Tunnel：
 
-- 在 `.env` 將 `CLOUDFLARED_IMAGE` 替換成明確 pinned version，並只在部署 secret 保存 `CLOUDFLARE_TUNNEL_TOKEN`。
+- Compose 預設使用已驗證的 `cloudflare/cloudflared:2026.7.2@sha256:4f6655284ab3d252b7f28fedb19fe6c8fc82ee5b1295c20ac74d475e5398a52d`。`CLOUDFLARED_IMAGE` 必須包含 `@sha256:<64-hex-digest>`；任何 tag-only reference均拒絕。Token-file 最低需要 cloudflared 2025.4.0。
+- Token 只存於部署主機的 `/etc/partsradar/secrets/cloudflare-tunnel-token`（或 `.env` 中非機密的 `CLOUDFLARE_TUNNEL_TOKEN_FILE` 絕對路徑），實際解析位置必須在 repository／Docker build context外且不得使用symlink。不得把 token 值放進 `.env`、shell environment或Compose command。
+- Host file 建議為 `root:65532`、mode `0440`；`65532` 是 pinned image 的 runtime group。`scripts/ops/compose-production.sh` 只在 create／start／restart／up／run／scale 可能操作 cloudflared時執行preflight；其他service操作不依賴tunnel secret，production `watch` 則直接拒絕。手動驗證使用 `scripts/ops/validate-cloudflare-tunnel.sh`。
 - Edge TLS、HSTS、WAF、bot protection 與 access policy 必須在實際 edge 驗證。
 - Production web 只信任單一合法 `CF-Connecting-IP`；缺少或非法 header 時 client identity 為 `unknown`，不會退回 XFF。
 - Public HTTPS smoke 必須觀察到 `X-RateLimit-Client-Source: cf`，並從外部網路確認沒有旁路 origin DNS、WAN/NAT web port 或公開 PostgreSQL。

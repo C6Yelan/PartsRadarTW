@@ -35,6 +35,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Prepare pinned cloudflared image
+        run: docker pull cloudflare/cloudflared:2026.7.2@sha256:4f6655284ab3d252b7f28fedb19fe6c8fc82ee5b1295c20ac74d475e5398a52d
+
       - name: Generate Prisma client
         run: pnpm db:generate
 
@@ -48,6 +51,8 @@ jobs:
         run: pnpm lint
 
       - name: Run non-integration tests
+        env:
+          PARTSRADAR_REQUIRE_CLOUDFLARED_CONTAINER_TEST: "1"
         run: pnpm test
 
       - name: Build web

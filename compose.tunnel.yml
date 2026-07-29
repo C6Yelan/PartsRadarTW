@@ -2,16 +2,18 @@ services:
   cloudflared:
     profiles:
       - public-tunnel
-    image: ${CLOUDFLARED_IMAGE:-cloudflare/cloudflared:replace_with_pinned_version}
+    image: ${CLOUDFLARED_IMAGE:-cloudflare/cloudflared:2026.7.2@sha256:4f6655284ab3d252b7f28fedb19fe6c8fc82ee5b1295c20ac74d475e5398a52d}
     restart: unless-stopped
     depends_on:
       web:
         condition: service_healthy
-    command:
-      [
-        "tunnel",
-        "--no-autoupdate",
-        "run",
-        "--token",
-        "${CLOUDFLARE_TUNNEL_TOKEN:-replace_with_cloudflare_tunnel_token}",
-      ]
+    environment:
+      TUNNEL_TOKEN_FILE: /run/secrets/cloudflare_tunnel_token
+    secrets:
+      - source: cloudflare_tunnel_token
+        target: cloudflare_tunnel_token
+    command: ["tunnel", "--no-autoupdate", "run"]
+
+secrets:
+  cloudflare_tunnel_token:
+    file: ${CLOUDFLARE_TUNNEL_TOKEN_FILE:-/etc/partsradar/secrets/cloudflare-tunnel-token}
