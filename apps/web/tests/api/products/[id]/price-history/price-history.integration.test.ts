@@ -350,16 +350,13 @@ describe("price history PostgreSQL bounded read", () => {
         (node) => node["Node Type"] === "Seq Scan" || node["Node Type"] === "Bitmap Heap Scan",
       ),
     ).toBe(false);
-    expect(
-      sampledSnapshotScans.every(
-        (node) =>
-          (node["Node Type"] === "Index Scan" || node["Node Type"] === "Index Only Scan") &&
-          node["Index Name"] === "price_snapshots_product_id_captured_at_id_idx" &&
-          typeof node["Index Cond"] === "string" &&
-          String(node["Index Cond"]).includes("product_id") &&
-          examinedRows(node) <= Math.max(1, Number(node["Actual Loops"])),
-      ),
-    ).toBe(true);
+    for (const node of sampledSnapshotScans) {
+      expect(["Index Scan", "Index Only Scan"]).toContain(node["Node Type"]);
+      expect(node["Index Name"]).toBe("price_snapshots_product_id_captured_at_id_idx");
+      expect(typeof node["Index Cond"]).toBe("string");
+      expect(String(node["Index Cond"])).toContain("product_id");
+      expect(examinedRows(node)).toBeLessThanOrEqual(Math.max(1, Number(node["Actual Loops"])));
+    }
     expect(
       sampledSnapshotScans.reduce((total, node) => total + examinedRows(node), 0),
     ).toBeLessThanOrEqual(2 + 2 * PRICE_HISTORY_BUCKET_COUNT);
