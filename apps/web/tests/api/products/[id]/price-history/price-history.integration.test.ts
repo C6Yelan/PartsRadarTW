@@ -228,16 +228,16 @@ describe("price history PostgreSQL bounded read", () => {
       SELECT
         pg_catalog.gen_random_uuid(),
         CASE
-          WHEN sequence_number % 2 = 0 THEN ${productId}::uuid
+          WHEN sequence_number % 4 = 0 THEN ${productId}::uuid
           ELSE ${distractorProductId}::uuid
         END,
         10_000 + (sequence_number % 101),
         'TWD'::public.currency,
         ${new Date("2031-01-03T00:00:00.000Z")}::timestamptz
-          + (sequence_number / 2) * interval '1 millisecond',
+          + (sequence_number / 4) * interval '1 millisecond',
         ${crawlRunId}::uuid,
         pg_catalog.now()
-      FROM pg_catalog.generate_series(0, 199_999) AS sequence_number
+      FROM pg_catalog.generate_series(0, 399_999) AS sequence_number
     `;
     await adminClient.$executeRaw`ANALYZE public.price_snapshots`;
     const endpoints = await client.priceSnapshot.findMany({
