@@ -1,10 +1,9 @@
 // packages/db/tests/price-report/reader-recent.test.ts
 // 驗證近期時間窗價格報告 reader 會彙整最新變價、新商品與商品關鍵字篩選結果。
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   PRICE_REPORT_CURRENT_SNAPSHOT_LIMIT,
-  PRICE_REPORT_PREVIOUS_SNAPSHOT_LIMIT,
   PriceReportWorkBudgetExceededError,
   readRecentPriceReport,
 } from "../../src/price-report";
@@ -270,7 +269,7 @@ describe("readRecentPriceReport", () => {
     });
   });
 
-  it("bounds both current and baseline queries independently from display pagination", async () => {
+  it("bounds current rows and reads at most one baseline per product", async () => {
     const client = createPriceReportReaderClient({
       snapshots: [
         snapshot({
@@ -306,7 +305,7 @@ describe("readRecentPriceReport", () => {
     expect(client.priceSnapshot.findMany).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({
-        take: PRICE_REPORT_PREVIOUS_SNAPSHOT_LIMIT + 1,
+        take: 1,
       }),
     );
   });
@@ -354,38 +353,37 @@ describe("readRecentPriceReport", () => {
     expect(overBudget.priceSnapshot.findMany).toHaveBeenCalledTimes(1);
   });
 
-  it("fails closed for one product with over-budget baseline history", async () => {
-    const baselineRows = Array.from(
-      { length: PRICE_REPORT_PREVIOUS_SNAPSHOT_LIMIT + 1 },
-      (_, index) => ({
-        id: `baseline-${index}`,
-        productId: "product-1",
-        price: index,
-        currency: "TWD",
-        capturedAt: new Date("2026-06-07T01:00:00.000Z"),
-      }),
+  it("does not materialize one product's high-cardinality baseline history", async () => {
+    const baseline = {
+      id: "latest-baseline",
+      productId: "product-1",
+      price: 100,
+      currency: "TWD",
+      capturedAt: new Date("2026-06-07T01:00:00.000Z"),
+    };
+    const findMany = vi.fn(async (args: { where: { productId?: unknown }; take?: number }) =>
+      args.where.productId
+        ? [baseline]
+        : [
+            {
+              id: "current",
+              productId: "product-1",
+              price: 90,
+              currency: "TWD",
+              capturedAt: new Date("2026-06-07T03:00:00.000Z"),
+              product: {
+                id: "product-1",
+                name: "High-cardinality GPU",
+                vendorSlug: null,
+                vendorName: null,
+                sourceCategory: { igrp: 12, displayName: "顯示卡" },
+              },
+            },
+          ],
     );
     const client = {
       priceSnapshot: {
-        findMany: async (args: { where: { productId?: unknown } }) =>
-          args.where.productId
-            ? baselineRows
-            : [
-                {
-                  id: "current",
-                  productId: "product-1",
-                  price: 90,
-                  currency: "TWD",
-                  capturedAt: new Date("2026-06-07T03:00:00.000Z"),
-                  product: {
-                    id: "product-1",
-                    name: "High-cardinality GPU",
-                    vendorSlug: null,
-                    vendorName: null,
-                    sourceCategory: { igrp: 12, displayName: "顯示卡" },
-                  },
-                },
-              ],
+        findMany,
       },
     };
 
@@ -394,10 +392,14 @@ describe("readRecentPriceReport", () => {
         since: new Date("2026-06-07T02:00:00.000Z"),
         until: new Date("2026-06-07T05:00:00.000Z"),
       }),
-    ).rejects.toMatchObject({
-      scope: "recent_baseline",
-      limit: PRICE_REPORT_PREVIOUS_SNAPSHOT_LIMIT,
-      observedRows: PRICE_REPORT_PREVIOUS_SNAPSHOT_LIMIT + 1,
+    ).resolves.toMatchObject({
+      priceChanges: [
+        expect.objectContaining({
+          previousPrice: 100,
+          currentPrice: 90,
+        }),
+      ],
     });
+    expect(findMany).toHaveBeenNthCalledWith(2, expect.objectContaining({ take: 1 }));
   });
 });

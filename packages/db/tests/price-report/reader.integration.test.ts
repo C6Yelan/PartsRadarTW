@@ -3,7 +3,7 @@
 
 import { randomUUID } from "node:crypto";
 import { PrismaPg } from "@prisma/adapter-pg";
-import { PrismaClient } from "@prisma/client";
+import { type Prisma, PrismaClient } from "@prisma/client";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import {
   PRICE_REPORT_CURRENT_SNAPSHOT_LIMIT,
@@ -67,19 +67,34 @@ describe("price report readers PostgreSQL integration", () => {
       changedRunId,
       isExcluded: true,
     });
+    const rawQueries: Prisma.Sql[] = [];
+    const readerClient = {
+      priceSnapshot: client.priceSnapshot,
+      $queryRaw: async <T>(query: Prisma.Sql) => {
+        rawQueries.push(query);
+        return client.$queryRaw<T>(query);
+      },
+    };
 
-    const recent = await readRecentPriceReport(client, {
+    const recent = await readRecentPriceReport(readerClient, {
       since: new Date("2030-01-02T00:00:00.000Z"),
       until: new Date("2030-01-03T00:00:00.000Z"),
       filters: { includeNewProducts: false },
     });
-    const crawlRun = await readCrawlRunPriceChangeSummary(client, changedRunId);
+    const crawlRun = await readCrawlRunPriceChangeSummary(readerClient, changedRunId);
 
     expect(recent.priceChanges.map(({ productId }) => productId)).toEqual([enabledProductId]);
     expect(recent.newProducts).toEqual([]);
     expect(crawlRun.changes.map(({ productId }) => productId)).toEqual([enabledProductId]);
     expect(crawlRun.newProducts).toEqual([]);
     expect(crawlRun.snapshotCount).toBe(1);
+    expect(rawQueries).toHaveLength(2);
+    for (const query of rawQueries) {
+      expect(query.sql).toContain("JOIN LATERAL");
+      expect(query.sql).toContain("LIMIT 1");
+      expect(query.sql).not.toContain(enabledProductId);
+      expect(query.values.length).toBeGreaterThan(0);
+    }
   });
 
   it("uses the latest baseline and latest in-window snapshot for one product", async () => {
@@ -231,7 +246,26 @@ describe("price report readers PostgreSQL integration", () => {
       ORDER BY snapshot.captured_at ASC, snapshot.id ASC
       LIMIT ${PRICE_REPORT_CURRENT_SNAPSHOT_LIMIT + 1}
     `;
+    const crawlRunPlan = await client.$queryRaw<Array<{ "QUERY PLAN": unknown }>>`
+      EXPLAIN (COSTS, FORMAT JSON)
+      SELECT snapshot.id
+      FROM price_snapshots AS snapshot
+      WHERE snapshot.crawl_run_id = ${crawlRunId}::uuid
+      ORDER BY snapshot.captured_at ASC, snapshot.id ASC
+      LIMIT ${PRICE_REPORT_CURRENT_SNAPSHOT_LIMIT + 1}
+    `;
+    const predecessorPlan = await client.$queryRaw<Array<{ "QUERY PLAN": unknown }>>`
+      EXPLAIN (COSTS, FORMAT JSON)
+      SELECT snapshot.id
+      FROM price_snapshots AS snapshot
+      WHERE snapshot.product_id = ${productId}::uuid
+        AND snapshot.captured_at < ${new Date("2030-01-03T00:00:00.000Z")}
+      ORDER BY snapshot.captured_at DESC, snapshot.id DESC
+      LIMIT 1
+    `;
     const planText = JSON.stringify(plan);
+    const crawlRunPlanText = JSON.stringify(crawlRunPlan);
+    const predecessorPlanText = JSON.stringify(predecessorPlan);
 
     await expect(
       readRecentPriceReport(client, {
@@ -245,10 +279,11 @@ describe("price report readers PostgreSQL integration", () => {
       observedRows: PRICE_REPORT_CURRENT_SNAPSHOT_LIMIT + 1,
     } satisfies Partial<PriceReportWorkBudgetExceededError>);
     expect(planText).toContain("Limit");
-    expect(planText).toMatch(/price_snapshots_(captured_at_id|product_id_captured_at_id)_idx/);
+    expect(crawlRunPlanText).toContain("price_snapshots_crawl_run_id_captured_at_id_idx");
+    expect(predecessorPlanText).toContain("price_snapshots_product_id_captured_at_id_idx");
   });
 
-  it("installs indexes matching both bounded stable query orders", async () => {
+  it("installs only the indexes proven by the final bounded query plans", async () => {
     const indexes = await client.$queryRaw<Array<{ indexname: string; indexdef: string }>>`
       SELECT indexname, indexdef
       FROM pg_indexes
@@ -262,10 +297,6 @@ describe("price report readers PostgreSQL integration", () => {
     `;
 
     expect(indexes).toEqual([
-      expect.objectContaining({
-        indexname: "price_snapshots_captured_at_id_idx",
-        indexdef: expect.stringContaining("(captured_at, id)"),
-      }),
       expect.objectContaining({
         indexname: "price_snapshots_crawl_run_id_captured_at_id_idx",
         indexdef: expect.stringContaining("(crawl_run_id, captured_at, id)"),

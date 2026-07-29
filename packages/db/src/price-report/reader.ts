@@ -1,10 +1,11 @@
 // packages/db/src/price-report/reader.ts
 // 讀取 price snapshot 並整理成 Discord 與網站共用的價格變動與新增商品資料。
 
+import { Prisma } from "@prisma/client";
 import {
   assertPriceReportWorkBudget,
   PRICE_REPORT_CURRENT_SNAPSHOT_LIMIT,
-  PRICE_REPORT_PREVIOUS_SNAPSHOT_LIMIT,
+  PRICE_REPORT_PREDECESSOR_LOOKUP_BATCH_SIZE,
 } from "./limits";
 import {
   CURRENT_PRICE_SNAPSHOT_ORDER_BY,
@@ -30,6 +31,14 @@ import {
   normalizeRecentPriceReportFilters,
   toProductSubcategory,
 } from "./utils";
+
+interface RawPriceReportQueryClient {
+  $queryRaw<T>(query: Prisma.Sql): Promise<T>;
+}
+
+interface PreviousSnapshotForCurrent extends PreviousPriceSnapshot {
+  currentSnapshotId: string;
+}
 
 // 讀取指定 crawl run 的價格變動、新增商品與比對統計，供公開報告排程判斷與記錄。
 export async function readCrawlRunPriceChangeSummary(
@@ -66,25 +75,19 @@ export async function readCrawlRunPriceChangeSummary(
     };
   }
 
-  const productIds = [...new Set(currentSnapshots.map((snapshot) => snapshot.productId))];
-  const latestCapturedAt = new Date(
-    Math.max(...currentSnapshots.map((snapshot) => snapshot.capturedAt.getTime())),
+  const previousByCurrentSnapshot = new Map(
+    (
+      await readPreviousSnapshotsForCurrent(
+        client,
+        currentSnapshots.map(({ id, productId, capturedAt }) => ({
+          id,
+          productId,
+          capturedAt,
+        })),
+        crawlRunId,
+      )
+    ).map((snapshot) => [snapshot.currentSnapshotId, snapshot]),
   );
-  const previousSnapshots = assertPriceReportWorkBudget(
-    (await client.priceSnapshot.findMany({
-      where: {
-        productId: { in: productIds },
-        crawlRunId: { not: crawlRunId },
-        capturedAt: { lt: latestCapturedAt },
-      },
-      select: PREVIOUS_PRICE_SNAPSHOT_SELECT,
-      orderBy: PREVIOUS_PRICE_SNAPSHOT_ORDER_BY,
-      take: PRICE_REPORT_PREVIOUS_SNAPSHOT_LIMIT + 1,
-    })) as PreviousPriceSnapshot[],
-    "crawl_run_previous",
-    PRICE_REPORT_PREVIOUS_SNAPSHOT_LIMIT,
-  );
-  const previousByProduct = groupPreviousSnapshots(previousSnapshots);
   const changes: PriceReportPriceChangeItem[] = [];
   const newProductByProduct = new Map<string, PriceReportNewProductItem>();
   let unmatchedSnapshotCount = 0;
@@ -92,9 +95,7 @@ export async function readCrawlRunPriceChangeSummary(
   let currencyMismatchCount = 0;
 
   for (const current of currentSnapshots) {
-    const previous = previousByProduct
-      .get(current.productId)
-      ?.find((snapshot) => snapshot.capturedAt.getTime() < current.capturedAt.getTime());
+    const previous = previousByCurrentSnapshot.get(current.id);
 
     if (!previous) {
       unmatchedSnapshotCount += 1;
@@ -210,19 +211,7 @@ export async function readRecentPriceReport(
   }
 
   const productIds = [...new Set(currentSnapshots.map((snapshot) => snapshot.productId))];
-  const baselineSnapshots = assertPriceReportWorkBudget(
-    (await client.priceSnapshot.findMany({
-      where: {
-        productId: { in: productIds },
-        capturedAt: { lt: since },
-      },
-      select: PREVIOUS_PRICE_SNAPSHOT_SELECT,
-      orderBy: PREVIOUS_PRICE_SNAPSHOT_ORDER_BY,
-      take: PRICE_REPORT_PREVIOUS_SNAPSHOT_LIMIT + 1,
-    })) as PreviousPriceSnapshot[],
-    "recent_baseline",
-    PRICE_REPORT_PREVIOUS_SNAPSHOT_LIMIT,
-  );
+  const baselineSnapshots = await readLatestBaselines(client, productIds, since);
   const previousSnapshots = [
     ...baselineSnapshots,
     ...currentSnapshots.map(({ id, productId, price, currency, capturedAt }) => ({
@@ -308,6 +297,139 @@ export async function readRecentPriceReport(
       .sort(comparePriceChanges),
     newProducts: [...newProductByProduct.values()].sort(compareNewProducts),
   };
+}
+
+async function readLatestBaselines(
+  client: PriceReportReaderClient,
+  productIds: string[],
+  before: Date,
+): Promise<PreviousPriceSnapshot[]> {
+  if (supportsRawQueries(client)) {
+    return client.$queryRaw<PreviousPriceSnapshot[]>(
+      Prisma.sql`
+        WITH requested_products (product_id) AS (
+          VALUES ${Prisma.join(productIds.map((productId) => Prisma.sql`(${productId}::uuid)`))}
+        )
+        SELECT
+          previous.id::text AS id,
+          previous.product_id::text AS "productId",
+          previous.price,
+          previous.currency::text AS currency,
+          previous.captured_at AS "capturedAt"
+        FROM requested_products AS requested
+        JOIN LATERAL (
+          SELECT snapshot.id, snapshot.product_id, snapshot.price, snapshot.currency, snapshot.captured_at
+          FROM price_snapshots AS snapshot
+          WHERE snapshot.product_id = requested.product_id
+            AND snapshot.captured_at < ${before}
+          ORDER BY snapshot.captured_at DESC, snapshot.id DESC
+          LIMIT 1
+        ) AS previous ON TRUE
+        ORDER BY previous.product_id ASC
+      `,
+    );
+  }
+
+  const baselines = await readInFixedBatches(productIds, async (productId) => {
+    const rows = (await client.priceSnapshot.findMany({
+      where: {
+        productId: { in: [productId] },
+        capturedAt: { lt: before },
+      },
+      select: PREVIOUS_PRICE_SNAPSHOT_SELECT,
+      orderBy: PREVIOUS_PRICE_SNAPSHOT_ORDER_BY,
+      take: 1,
+    })) as PreviousPriceSnapshot[];
+    return rows[0] ?? null;
+  });
+
+  return baselines.filter((snapshot): snapshot is PreviousPriceSnapshot => snapshot !== null);
+}
+
+async function readPreviousSnapshotsForCurrent(
+  client: PriceReportReaderClient,
+  currentSnapshots: Array<Pick<PreviousPriceSnapshot, "id" | "productId" | "capturedAt">>,
+  crawlRunId: string,
+): Promise<PreviousSnapshotForCurrent[]> {
+  if (supportsRawQueries(client)) {
+    return client.$queryRaw<PreviousSnapshotForCurrent[]>(
+      Prisma.sql`
+        WITH requested_snapshots (current_snapshot_id, product_id, captured_at) AS (
+          VALUES ${Prisma.join(
+            currentSnapshots.map(
+              (snapshot) =>
+                Prisma.sql`(${snapshot.id}::uuid, ${snapshot.productId}::uuid, ${snapshot.capturedAt}::timestamptz)`,
+            ),
+          )}
+        )
+        SELECT
+          requested.current_snapshot_id::text AS "currentSnapshotId",
+          previous.id::text AS id,
+          previous.product_id::text AS "productId",
+          previous.price,
+          previous.currency::text AS currency,
+          previous.captured_at AS "capturedAt"
+        FROM requested_snapshots AS requested
+        JOIN LATERAL (
+          SELECT snapshot.id, snapshot.product_id, snapshot.price, snapshot.currency, snapshot.captured_at
+          FROM price_snapshots AS snapshot
+          WHERE snapshot.product_id = requested.product_id
+            AND snapshot.crawl_run_id <> ${crawlRunId}::uuid
+            AND snapshot.captured_at < requested.captured_at
+          ORDER BY snapshot.captured_at DESC, snapshot.id DESC
+          LIMIT 1
+        ) AS previous ON TRUE
+        ORDER BY requested.current_snapshot_id ASC
+      `,
+    );
+  }
+
+  const previousSnapshots = await readInFixedBatches(currentSnapshots, async (current) => {
+    const rows = (await client.priceSnapshot.findMany({
+      where: {
+        productId: { in: [current.productId] },
+        crawlRunId: { not: crawlRunId },
+        capturedAt: { lt: current.capturedAt },
+      },
+      select: PREVIOUS_PRICE_SNAPSHOT_SELECT,
+      orderBy: PREVIOUS_PRICE_SNAPSHOT_ORDER_BY,
+      take: 1,
+    })) as PreviousPriceSnapshot[];
+    const previous = rows[0];
+
+    return previous ? { ...previous, currentSnapshotId: current.id } : null;
+  });
+
+  return previousSnapshots.filter(
+    (snapshot): snapshot is PreviousSnapshotForCurrent => snapshot !== null,
+  );
+}
+
+async function readInFixedBatches<TItem, TResult>(
+  items: TItem[],
+  readItem: (item: TItem) => Promise<TResult>,
+): Promise<TResult[]> {
+  const results: TResult[] = [];
+
+  for (
+    let offset = 0;
+    offset < items.length;
+    offset += PRICE_REPORT_PREDECESSOR_LOOKUP_BATCH_SIZE
+  ) {
+    results.push(
+      ...(await Promise.all(
+        items.slice(offset, offset + PRICE_REPORT_PREDECESSOR_LOOKUP_BATCH_SIZE).map(readItem),
+      )),
+    );
+  }
+
+  return results;
+}
+
+function supportsRawQueries(
+  client: PriceReportReaderClient,
+): client is PriceReportReaderClient & RawPriceReportQueryClient {
+  return "$queryRaw" in client && typeof client.$queryRaw === "function";
 }
 
 function comparePreviousSnapshots(

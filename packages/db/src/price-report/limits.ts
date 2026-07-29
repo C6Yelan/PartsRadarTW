@@ -5,14 +5,11 @@
 // and the representative product relation estimate was 4,044 rows.
 export const PRICE_REPORT_CURRENT_SNAPSHOT_LIMIT = 4_096;
 
-// The same baseline observed at most six snapshots per product all-time.
-export const PRICE_REPORT_PREVIOUS_SNAPSHOT_LIMIT = PRICE_REPORT_CURRENT_SNAPSHOT_LIMIT * 8;
+// Narrow clients without parameterized raw-query support use fixed-size lookup batches.
+// The current-row limit also fixes the maximum number of batches and predecessor rows.
+export const PRICE_REPORT_PREDECESSOR_LOOKUP_BATCH_SIZE = 32;
 
-export type PriceReportWorkBudgetScope =
-  | "recent_current"
-  | "recent_baseline"
-  | "crawl_run_current"
-  | "crawl_run_previous";
+export type PriceReportWorkBudgetScope = "recent_current" | "crawl_run_current";
 
 export class PriceReportWorkBudgetExceededError extends Error {
   readonly name = "PriceReportWorkBudgetExceededError";
