@@ -12,7 +12,7 @@ Compose 將 runtime 固定到三個可覆寫的 image reference：
 
 預設的 `:local` tag 只供本機驗證。正式部署必須設定不重複使用的 release tag 或 registry digest，並記錄實際 image ID／digest。
 
-Public ingress 另使用 `CLOUDFLARED_IMAGE`。Compose 預設為已驗證且支援 token-file 的 `cloudflare/cloudflared:2026.7.2` multi-platform digest；正式 release 仍應記錄實際 pulled image ID／platform digest。覆寫時只接受明確版本或 `sha256` digest，不接受 `latest`。
+Public ingress 另使用 `CLOUDFLARED_IMAGE`。Compose 預設為已驗證且支援token-file的 `cloudflare/cloudflared:2026.7.2@sha256:4f6655284ab3d252b7f28fedb19fe6c8fc82ee5b1295c20ac74d475e5398a52d`。所有override必須包含 `@sha256:<64-hex-digest>`；tag-only reference一律拒絕。正式release仍應記錄實際pulled image ID／platform digest。
 
 在部署主機建置時：
 

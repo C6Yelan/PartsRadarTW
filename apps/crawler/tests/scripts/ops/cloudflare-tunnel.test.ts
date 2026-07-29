@@ -5,10 +5,12 @@ import { execFileSync, spawnSync } from "node:child_process";
 import {
   chmodSync,
   cpSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -17,6 +19,7 @@ import { afterAll, describe, expect, it } from "vitest";
 
 const WORKSPACE_ROOT = join(__dirname, "../../../../..");
 const COMPOSE_FILE = join(WORKSPACE_ROOT, "compose.tunnel.yml");
+const PRODUCTION_WRAPPER = join(WORKSPACE_ROOT, "scripts/ops/compose-production.sh");
 const VALIDATOR = join(WORKSPACE_ROOT, "scripts/ops/validate-cloudflare-tunnel.sh");
 const PINNED_IMAGE =
   "cloudflare/cloudflared:2026.7.2@sha256:4f6655284ab3d252b7f28fedb19fe6c8fc82ee5b1295c20ac74d475e5398a52d";
@@ -31,6 +34,16 @@ function createTempWorkspace(): string {
   cpSync(VALIDATOR, target);
   chmodSync(target, 0o755);
   return root;
+}
+
+function createExternalTokenFile(content?: string): string {
+  const root = mkdtempSync(join(tmpdir(), "partsradar-cloudflare-secret-"));
+  tempRoots.push(root);
+  const tokenFile = join(root, "tunnel-token");
+  if (content !== undefined) {
+    writeFileSync(tokenFile, content);
+  }
+  return tokenFile;
 }
 
 function runValidator(root: string, env: NodeJS.ProcessEnv = {}, pathPrefix?: string) {
@@ -51,6 +64,65 @@ function writeFakeStat(root: string): string {
   writeFileSync(stat, "#!/usr/bin/env sh\nprintf '0 65532 440 32\\n'\n");
   chmodSync(stat, 0o755);
   return bin;
+}
+
+function createWrapperWorkspace(): {
+  dockerLog: string;
+  preflightLog: string;
+  root: string;
+} {
+  const root = mkdtempSync(join(tmpdir(), "partsradar-compose-wrapper-"));
+  tempRoots.push(root);
+  const scriptsDirectory = join(root, "scripts/ops");
+  const binDirectory = join(root, "bin");
+  mkdirSync(scriptsDirectory, { recursive: true });
+  mkdirSync(binDirectory);
+  cpSync(PRODUCTION_WRAPPER, join(scriptsDirectory, "compose-production.sh"));
+  chmodSync(join(scriptsDirectory, "compose-production.sh"), 0o755);
+
+  const preflight = join(scriptsDirectory, "validate-cloudflare-tunnel.sh");
+  writeFileSync(
+    preflight,
+    [
+      "#!/usr/bin/env sh",
+      'printf "preflight\\n" >> "$PARTSRADAR_PREFLIGHT_LOG"',
+      'exit "$' + '{PARTSRADAR_PREFLIGHT_EXIT:-0}"',
+      "",
+    ].join("\n"),
+  );
+  chmodSync(preflight, 0o755);
+
+  const docker = join(binDirectory, "docker");
+  writeFileSync(
+    docker,
+    ["#!/usr/bin/env sh", 'printf "%s\\n" "$*" >> "$PARTSRADAR_DOCKER_LOG"', "exit 0", ""].join(
+      "\n",
+    ),
+  );
+  chmodSync(docker, 0o755);
+
+  return {
+    dockerLog: join(root, "docker.log"),
+    preflightLog: join(root, "preflight.log"),
+    root,
+  };
+}
+
+function runProductionWrapper(
+  workspace: ReturnType<typeof createWrapperWorkspace>,
+  args: string[],
+  preflightExit = 0,
+) {
+  return spawnSync(join(workspace.root, "scripts/ops/compose-production.sh"), args, {
+    cwd: workspace.root,
+    env: {
+      PATH: `${join(workspace.root, "bin")}:${process.env.PATH}`,
+      PARTSRADAR_DOCKER_LOG: workspace.dockerLog,
+      PARTSRADAR_PREFLIGHT_EXIT: String(preflightExit),
+      PARTSRADAR_PREFLIGHT_LOG: workspace.preflightLog,
+    },
+    encoding: "utf8",
+  });
 }
 
 afterAll(() => {
@@ -88,13 +160,103 @@ describe("Cloudflare Tunnel Compose contract", () => {
       expect(dockerignore).toContain(pattern);
     }
   });
+
+  it("keeps the documentation and CI on the digest-only image contract", () => {
+    const envExample = readFileSync(join(WORKSPACE_ROOT, ".env.example"), "utf8");
+    const deployment = readFileSync(join(WORKSPACE_ROOT, "docs/deployment/README.md"), "utf8");
+    const release = readFileSync(join(WORKSPACE_ROOT, "docs/deployment/release.md"), "utf8");
+    const operations = readFileSync(join(WORKSPACE_ROOT, "docs/operations/README.md"), "utf8");
+    const ci = readFileSync(join(WORKSPACE_ROOT, ".github/workflows/ci.yml"), "utf8");
+
+    expect(envExample).toContain("`@sha256:<64-hex-digest>`");
+    expect(envExample).toContain("tag-only references are rejected");
+    expect(deployment).toContain("必須包含 `@sha256:<64-hex-digest>`");
+    expect(release).toContain("必須包含 `@sha256:<64-hex-digest>`");
+    expect(operations).toContain(PINNED_IMAGE);
+    expect(`${deployment}\n${release}`).not.toContain("明確版本或");
+    expect(ci).toContain(`docker pull ${PINNED_IMAGE}`);
+    expect(ci).toContain('PARTSRADAR_REQUIRE_CLOUDFLARED_CONTAINER_TEST: "1"');
+  });
+});
+
+describe("Production Compose wrapper", () => {
+  it.each([
+    ["separate value", ["--ansi", "never", "up", "-d", "cloudflared"]],
+    ["equals value", ["--ansi=never", "restart", "cloudflared"]],
+  ])("runs tunnel preflight with a supported global option using %s", (_case, args) => {
+    const workspace = createWrapperWorkspace();
+    const result = runProductionWrapper(workspace, args, 73);
+
+    expect(result.status).toBe(73);
+    expect(readFileSync(workspace.preflightLog, "utf8")).toBe("preflight\n");
+    expect(existsSync(workspace.dockerLog)).toBe(false);
+  });
+
+  it.each([
+    ["--env-file", ["--env-file", "alternate.env", "up", "cloudflared"]],
+    ["-f", ["-f", "alternate.yml", "up", "cloudflared"]],
+    ["--file", ["--file=alternate.yml", "up", "cloudflared"]],
+    ["--profile", ["--profile", "public-tunnel", "up", "cloudflared"]],
+    ["--project-directory", ["--project-directory", "/tmp", "up", "cloudflared"]],
+  ])("rejects wrapper-managed global option %s", (option, args) => {
+    const workspace = createWrapperWorkspace();
+    const result = runProductionWrapper(workspace, args);
+
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain(`${option} is managed by this production wrapper.`);
+    expect(existsSync(workspace.preflightLog)).toBe(false);
+    expect(existsSync(workspace.dockerLog)).toBe(false);
+  });
+
+  it.each([
+    ["restart postgres", ["restart", "postgres"]],
+    ["restart postgres with a global option", ["--ansi", "never", "restart", "postgres"]],
+    ["run storage-init", ["run", "--rm", "storage-init"]],
+    ["run migration", ["run", "--rm", "migrate", "pnpm", "db:deploy"]],
+    ["up web", ["up", "-d", "web"]],
+    ["scale postgres", ["scale", "postgres=1"]],
+  ])("does not require tunnel preflight for %s", (_case, args) => {
+    const workspace = createWrapperWorkspace();
+    const result = runProductionWrapper(workspace, args, 73);
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(existsSync(workspace.preflightLog)).toBe(false);
+    expect(readFileSync(workspace.dockerLog, "utf8")).toContain("config --quiet");
+  });
+
+  it("requires tunnel preflight when up does not limit services", () => {
+    const workspace = createWrapperWorkspace();
+    const result = runProductionWrapper(workspace, ["up", "-d"], 73);
+
+    expect(result.status).toBe(73);
+    expect(readFileSync(workspace.preflightLog, "utf8")).toBe("preflight\n");
+    expect(existsSync(workspace.dockerLog)).toBe(false);
+  });
+
+  it("requires tunnel preflight when scaling cloudflared", () => {
+    const workspace = createWrapperWorkspace();
+    const result = runProductionWrapper(workspace, ["scale", "cloudflared=1"], 73);
+
+    expect(result.status).toBe(73);
+    expect(readFileSync(workspace.preflightLog, "utf8")).toBe("preflight\n");
+    expect(existsSync(workspace.dockerLog)).toBe(false);
+  });
+
+  it("rejects production watch because it can start or recreate services", () => {
+    const workspace = createWrapperWorkspace();
+    const result = runProductionWrapper(workspace, ["watch", "cloudflared"]);
+
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain("watch is not supported");
+    expect(existsSync(workspace.preflightLog)).toBe(false);
+    expect(existsSync(workspace.dockerLog)).toBe(false);
+  });
 });
 
 describe("Cloudflare Tunnel production preflight", () => {
   it("accepts a non-empty restricted file readable by the cloudflared runtime group", () => {
     const root = createTempWorkspace();
-    const tokenFile = join(root, "tunnel-token");
-    writeFileSync(tokenFile, "sentinel-value");
+    const tokenFile = createExternalTokenFile("sentinel-value");
     const fakeBin = writeFakeStat(root);
 
     const result = runValidator(
@@ -117,9 +279,8 @@ describe("Cloudflare Tunnel production preflight", () => {
     ["world-readable", "sentinel-value", 0o444],
   ])("rejects a %s token file without printing its content", (_case, content, mode) => {
     const root = createTempWorkspace();
-    const tokenFile = join(root, "tunnel-token");
+    const tokenFile = createExternalTokenFile(content);
     if (content !== undefined) {
-      writeFileSync(tokenFile, content);
       chmodSync(tokenFile, mode as number);
     }
 
@@ -130,6 +291,55 @@ describe("Cloudflare Tunnel production preflight", () => {
 
     expect(result.status).toBe(1);
     expect(result.stderr).toContain("Cloudflare Tunnel preflight failed:");
+    expect(`${result.stdout}${result.stderr}`).not.toContain("sentinel-value");
+  });
+
+  it("rejects a token file located anywhere inside the repository", () => {
+    const root = createTempWorkspace();
+    const tokenFile = join(root, "arbitrary-name");
+    writeFileSync(tokenFile, "sentinel-value");
+
+    const result = runValidator(root, {
+      CLOUDFLARED_IMAGE: PINNED_IMAGE,
+      CLOUDFLARE_TUNNEL_TOKEN_FILE: tokenFile,
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("outside the repository and Docker build context");
+    expect(`${result.stdout}${result.stderr}`).not.toContain("sentinel-value");
+  });
+
+  it("rejects an external path whose parent symlink resolves into the repository", () => {
+    const root = createTempWorkspace();
+    const repositoryToken = join(root, "arbitrary-name");
+    writeFileSync(repositoryToken, "sentinel-value");
+    const externalRoot = dirname(createExternalTokenFile());
+    const linkedRepository = join(externalRoot, "linked-repository");
+    symlinkSync(root, linkedRepository, "dir");
+
+    const result = runValidator(root, {
+      CLOUDFLARED_IMAGE: PINNED_IMAGE,
+      CLOUDFLARE_TUNNEL_TOKEN_FILE: join(linkedRepository, "arbitrary-name"),
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("outside the repository and Docker build context");
+    expect(`${result.stdout}${result.stderr}`).not.toContain("sentinel-value");
+  });
+
+  it("rejects a token file symlink even when its target is outside the repository", () => {
+    const root = createTempWorkspace();
+    const target = createExternalTokenFile("sentinel-value");
+    const symlinkPath = join(dirname(createExternalTokenFile()), "token-link");
+    symlinkSync(target, symlinkPath, "file");
+
+    const result = runValidator(root, {
+      CLOUDFLARED_IMAGE: PINNED_IMAGE,
+      CLOUDFLARE_TUNNEL_TOKEN_FILE: symlinkPath,
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("must not be a symbolic link");
     expect(`${result.stdout}${result.stderr}`).not.toContain("sentinel-value");
   });
 
@@ -189,9 +399,29 @@ describe("Cloudflare Tunnel production preflight", () => {
 const dockerAvailable =
   spawnSync("docker", ["info"], { stdio: "ignore" }).status === 0 &&
   spawnSync("docker", ["image", "inspect", PINNED_IMAGE], { stdio: "ignore" }).status === 0;
+const containerTestRequired = process.env.PARTSRADAR_REQUIRE_CLOUDFLARED_CONTAINER_TEST === "1";
 
-describe.skipIf(!dockerAvailable)("Cloudflare Tunnel container config", () => {
+function shouldRunContainerTest(required: boolean, available: boolean): boolean {
+  return required || available;
+}
+
+describe("Cloudflare Tunnel container gate", () => {
+  it("cannot skip the container test when the gate is required", () => {
+    expect(shouldRunContainerTest(true, false)).toBe(true);
+  });
+});
+
+const containerDescribe = shouldRunContainerTest(containerTestRequired, dockerAvailable)
+  ? describe
+  : describe.skip;
+
+containerDescribe("Cloudflare Tunnel container config", () => {
   it("keeps the sentinel out of expanded config, argv, and environment", () => {
+    expect(
+      dockerAvailable,
+      "Docker and the pinned cloudflared image are required for this container security gate.",
+    ).toBe(true);
+
     const root = mkdtempSync(join(tmpdir(), "partsradar-cloudflare-compose-"));
     tempRoots.push(root);
     const tokenFile = join(root, "tunnel-token");

@@ -96,9 +96,22 @@ if [[ "$secret_file" != /* || "$secret_file" == *"replace_with"* ]]; then
 fi
 [[ -f "$secret_file" ]] || fail "the token file is missing or is not a regular file."
 [[ -s "$secret_file" ]] || fail "the token file is empty."
+[[ ! -L "$secret_file" ]] || fail "the token file must not be a symbolic link."
+
+resolved_workspace_root="$(realpath -e -- "$workspace_root" 2>/dev/null)" ||
+  fail "the repository path cannot be resolved."
+resolved_secret_file="$(realpath -e -- "$secret_file" 2>/dev/null)" ||
+  fail "the token file path cannot be resolved."
+
+if [[ "$secret_file" == "$resolved_workspace_root" ||
+  "$secret_file" == "$resolved_workspace_root/"* ||
+  "$resolved_secret_file" == "$resolved_workspace_root" ||
+  "$resolved_secret_file" == "$resolved_workspace_root/"* ]]; then
+  fail "the token file must resolve outside the repository and Docker build context."
+fi
 
 read -r secret_uid secret_gid secret_mode secret_size < <(
-  stat -Lc '%u %g %a %s' -- "$secret_file"
+  stat -Lc '%u %g %a %s' -- "$resolved_secret_file"
 ) || fail "the token file metadata is unreadable."
 
 [[ "$secret_size" -gt 0 ]] || fail "the token file is empty."

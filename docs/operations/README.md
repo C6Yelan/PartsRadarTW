@@ -89,32 +89,77 @@ Repository tests 無法證明 edge、備份系統、GitHub、Discord Portal 或�
 
 使用時機：Private smoke 通過且 edge 設定已準備完成。
 
-Token 由主機 secret provisioning 寫入，不得放在 command argument、shell environment、`.env`、ticket 或一般 backup。預設 source path 為 `/etc/partsradar/secrets/cloudflare-tunnel-token`；若由受保護的 provisioning 流程寫入其他絕對路徑，只把該非機密路徑設為 `CLOUDFLARE_TUNNEL_TOKEN_FILE`。
+Token 由主機secret provisioning寫入，不得放在command argument、shell environment、`.env`、ticket或一般backup。預設source path為 `/etc/partsradar/secrets/cloudflare-tunnel-token`；若使用其他絕對路徑，只把該非機密路徑設為 `CLOUDFLARE_TUNNEL_TOKEN_FILE`。路徑與canonical target都必須位於repository／Docker build context外，且secret file不得為symlink。
 
-Pinned `cloudflare/cloudflared:2026.7.2` 以 UID/GID `65532:65532` 執行。Provisioning 完成後只調整 metadata，不在 console 讀回內容：
+唯一允許的預設image reference為：
+
+```text
+cloudflare/cloudflared:2026.7.2@sha256:4f6655284ab3d252b7f28fedb19fe6c8fc82ee5b1295c20ac74d475e5398a52d
+```
+
+所有 `CLOUDFLARED_IMAGE` override都必須包含 `@sha256:<64-hex-digest>`；tag-only reference一律拒絕。此image以UID/GID `65532:65532` 執行。Provisioning完成後只調整metadata，不在console讀回內容：
 
 ```bash
 sudo chown root:65532 /etc/partsradar/secrets/cloudflare-tunnel-token
 sudo chmod 0440 /etc/partsradar/secrets/cloudflare-tunnel-token
-scripts/ops/compose-production.sh config --quiet
+scripts/ops/validate-cloudflare-tunnel.sh
 ```
 
-cloudflared 2025.4.0 起支援 `TUNNEL_TOKEN_FILE`；本 repository 已以 2026.7.2 的 `version`／`tunnel run --help` 驗證。部署時仍須記錄 pulled image digest，且不得改用 mutable `latest`。
+cloudflared 2025.4.0起支援 `TUNNEL_TOKEN_FILE`；本repository已以pinned digest的 `version`／`tunnel run --help`驗證2026.7.2。Production wrapper拒絕額外的 `--env-file`、`-f`／`--file`、`--profile`、`--project-directory`與project-name override，避免改變受審查topology或env來源。
 
-Maintenance cutover：
+### 初次 cutover
 
 1. Private full smoke 通過後停止 public tunnel，web 與 PostgreSQL維持 loopback。
-2. 由 secret provisioning 更新 file；不要在 shell history、trace 或 log 傳遞 token 值。
-3. 以 `scripts/ops/compose-production.sh up -d --no-build cloudflared` 建立新 connector。
-4. 只記錄 connector count／health，執行 public-only smoke並確認 origin 無旁路。
-5. 有任何實際曝露證據時立即 rotate 並清除舊 connections；沒有曝露證據時仍排定受控輪替，不宣稱現有 token 已外洩。
+2. 由secret provisioning寫入token file並套用 `root:65532`／`0440`；不要在shell history、trace或log傳遞token值。
+3. 執行preflight並pull不可變image：
 
 ```bash
-scripts/ops/compose-production.sh up -d --no-build cloudflared
-scripts/ops/compose-production.sh logs --tail=100 cloudflared
+scripts/ops/validate-cloudflare-tunnel.sh
+docker pull cloudflare/cloudflared:2026.7.2@sha256:4f6655284ab3d252b7f28fedb19fe6c8fc82ee5b1295c20ac74d475e5398a52d
+scripts/ops/compose-production.sh up -d --no-build --force-recreate cloudflared
 ```
 
-成功標準：使用 pinned image 與有效 token，public HTTPS 路由指向 web，public-only smoke 通過。
+4. 只記錄connector count／health；完成下方sanitized inspect、public-only smoke並確認origin無旁路。
+
+### 正常 rotation
+
+以下rotation與compromise處置遵循[Cloudflare Tunnel token程序](https://developers.cloudflare.com/tunnel/advanced/tunnel-tokens/)。
+
+1. 在maintenance window停止public tunnel；單replica topology會有預期短暫中斷：
+
+```bash
+scripts/ops/compose-production.sh stop cloudflared
+```
+
+2. 在Cloudflare Dashboard的Networking → Tunnels →該tunnel執行Rotate token。舊token此後不能建立新connection。
+3. 由secret provisioning以atomic replace更新host token file，重新套用 `root:65532`／`0440`，再執行：
+
+```bash
+scripts/ops/validate-cloudflare-tunnel.sh
+scripts/ops/compose-production.sh up -d --no-build --force-recreate cloudflared
+```
+
+4. 確認connector healthy、執行sanitized inspect、public-only smoke與origin-bypass檢查。失敗時不要恢復已失效的舊token。
+
+### Suspected compromise／force-disconnect
+
+1. 立即停止local connector，並在Cloudflare Dashboard先Rotate token：
+
+```bash
+scripts/ops/compose-production.sh stop cloudflared
+```
+
+2. 使用具Cloudflare One Connector `cloudflared Write`（或等價Tunnel Write）最小權限的短效API token，呼叫官方connections DELETE endpoint強制中斷所有既有connections。API bearer header必須由secret provisioning放在repository外、mode `0400`的curl config；不得放入command argument或shell environment：
+
+```bash
+curl --fail-with-body --silent --show-error \
+  --config /etc/partsradar/secrets/cloudflare-api.curl \
+  --request DELETE \
+  "https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID:?ACCOUNT_ID is required}/cfd_tunnel/${TUNNEL_ID:?TUNNEL_ID is required}/connections"
+```
+
+3. 撤銷短效API token／移除其curl config，再以新tunnel token atomic replace host file。
+4. 執行preflight、啟動cloudflared並完成與正常rotation相同的驗證。不得重用suspected-compromised token。
 
 Sanitized 驗證只能輸出布林結果，不能回顯完整 command 或 environment：
 
@@ -125,4 +170,16 @@ if docker inspect "$container_id" --format '{{range .Config.Env}}{{println .}}{{
 if docker inspect "$container_id" --format '{{range .Mounts}}{{println .Destination}}{{end}}' | grep -qx '/run/secrets/cloudflare_tunnel_token'; then echo 'token_file_path=true'; else echo 'token_file_path=false'; fi
 ```
 
-失敗處理：執行 `scripts/ops/compose-production.sh stop cloudflared`，維持 loopback web並調查 image／file metadata。Rollback 只能使用前一個已知可用的 pinned image與受控 file secret；若舊 token 已 rotate，不得恢復舊值，也不得改用 argv／environment。不要把 web port直接綁定 public interface作為臨時繞過。
+成功標準：argv token=false、token env=false、token file path=true、connector healthy、public HTTPS路由指向web、public-only smoke通過且origin無旁路。
+
+### Rollback
+
+1. 任何preflight、connector health或public smoke失敗都先停止cloudflared，維持loopback web：
+
+```bash
+scripts/ops/compose-production.sh stop cloudflared
+```
+
+2. 若尚未rotate，可由configuration management恢復前一個已知可用的image digest與既有file secret；若已rotate，舊token已不能建立新connection，rollback只能使用新token file搭配前一個已知可用的image digest。
+3. 重新執行 `scripts/ops/validate-cloudflare-tunnel.sh`，再以 `up -d --no-build --force-recreate cloudflared`恢復並重跑sanitized inspect／public smoke。
+4. Suspected compromise時絕不恢復舊token或既有connections。新token／前一image仍失敗時保持public ingress停止並重新provision，不得改用argv／environment或公開web port繞過。
