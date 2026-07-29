@@ -2,13 +2,45 @@
 // 驗證外部來源抓取鎖的互斥取得與釋放流程。
 
 import { createHash } from "node:crypto";
-import { lstat, mkdir, readFile, rename, rm, utimes, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readdir, readFile, rename, rm, utimes, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { tryAcquireExternalFetchLock } from "../../../src/scripts/ops/external-fetch-lock";
 import { createDaemonTestEnvironment } from "./crawl-coolpc-daemon/crawl-coolpc-daemon-support";
 
 const testEnv = createDaemonTestEnvironment();
+
+async function pollUntil<T>(
+  read: () => Promise<T>,
+  predicate: (value: T) => boolean,
+  timeoutMs = 1_000,
+): Promise<T> {
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    const value = await read();
+    if (predicate(value)) {
+      return value;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+
+  throw new Error(`Condition was not met within ${timeoutMs}ms.`);
+}
+
+async function readLockMetadata(lockDir: string): Promise<{
+  acquiredAt: string;
+  heartbeatAt: string;
+  owner: string;
+  token: string;
+}> {
+  return JSON.parse(await readFile(join(lockDir, "lock.json"), "utf8")) as {
+    acquiredAt: string;
+    heartbeatAt: string;
+    owner: string;
+    token: string;
+  };
+}
 
 afterEach(async () => {
   vi.useRealTimers();
@@ -21,14 +53,19 @@ describe("external fetch lock", () => {
     const lockDir = join(workspaceRoot, "external-fetch.lock");
     const firstLock = await tryAcquireExternalFetchLock({ lockDir, owner: "first" });
 
-    expect(firstLock).not.toBeNull();
-    await expect(tryAcquireExternalFetchLock({ lockDir, owner: "second" })).resolves.toBeNull();
-
-    await firstLock?.release();
+    try {
+      expect(firstLock).not.toBeNull();
+      await expect(tryAcquireExternalFetchLock({ lockDir, owner: "second" })).resolves.toBeNull();
+    } finally {
+      await firstLock?.release();
+    }
     const secondLock = await tryAcquireExternalFetchLock({ lockDir, owner: "second" });
 
-    expect(secondLock).not.toBeNull();
-    await secondLock?.release();
+    try {
+      expect(secondLock).not.toBeNull();
+    } finally {
+      await secondLock?.release();
+    }
   });
 
   it("uses the latest heartbeat when deciding whether a lock is stale", async () => {
@@ -69,13 +106,54 @@ describe("external fetch lock", () => {
     });
 
     currentTime = new Date("2026-07-13T02:00:00.020Z");
-    await new Promise((resolve) => setTimeout(resolve, 25));
-    const metadata = JSON.parse(await readFile(join(lockDir, "lock.json"), "utf8")) as {
-      heartbeatAt: string;
-    };
+    try {
+      const metadata = await pollUntil(
+        () => readLockMetadata(lockDir),
+        (value) => value.heartbeatAt === "2026-07-13T02:00:00.020Z",
+      );
 
-    expect(metadata.heartbeatAt).toBe("2026-07-13T02:00:00.020Z");
-    await lock?.release();
+      expect(metadata.heartbeatAt).toBe("2026-07-13T02:00:00.020Z");
+    } finally {
+      await lock?.release();
+    }
+  });
+
+  it("keeps metadata complete for concurrent readers across heartbeat replacements", async () => {
+    const { workspaceRoot } = await testEnv.createWorkspace();
+    const lockDir = join(workspaceRoot, "external-fetch.lock");
+    const owner = `active-holder-${"x".repeat(64 * 1024)}`;
+    const startedAt = Date.now();
+    let clockTick = 0;
+    const lock = await tryAcquireExternalFetchLock({
+      lockDir,
+      owner,
+      staleSeconds: 0.03,
+      now: () => new Date(startedAt + clockTick++ * 10),
+    });
+
+    expect(lock).not.toBeNull();
+    const observedHeartbeats = new Set<string>();
+    const deadline = Date.now() + 2_000;
+
+    try {
+      await Promise.all(
+        Array.from({ length: 16 }, async () => {
+          while (observedHeartbeats.size < 6 && Date.now() < deadline) {
+            const metadata = await readLockMetadata(lockDir);
+            expect(metadata.owner).toBe(owner);
+            expect(metadata.token).toBeTypeOf("string");
+            expect(metadata.acquiredAt).toBeTypeOf("string");
+            expect(metadata.heartbeatAt).toBeTypeOf("string");
+            observedHeartbeats.add(metadata.heartbeatAt);
+          }
+        }),
+      );
+
+      expect(observedHeartbeats.size).toBeGreaterThanOrEqual(6);
+      expect(await readdir(lockDir)).toEqual(["lock.json"]);
+    } finally {
+      await lock?.release();
+    }
   });
 
   it("reclaims a lock after its heartbeat lease expires", async () => {
@@ -101,8 +179,11 @@ describe("external fetch lock", () => {
       now: () => new Date("2026-07-13T02:00:00.000Z"),
     });
 
-    expect(replacement).not.toBeNull();
-    await replacement?.release();
+    try {
+      expect(replacement).not.toBeNull();
+    } finally {
+      await replacement?.release();
+    }
   });
 
   it("recovers an orphaned state guard without allowing multiple holders", async () => {
@@ -127,9 +208,12 @@ describe("external fetch lock", () => {
     );
     const acquiredLocks = locks.filter((lock) => lock !== null);
 
-    expect(acquiredLocks).toHaveLength(1);
-    await expect(lstat(guardDir)).rejects.toMatchObject({ code: "ENOENT" });
-    await acquiredLocks[0]?.release();
+    try {
+      expect(acquiredLocks).toHaveLength(1);
+      await expect(lstat(guardDir)).rejects.toMatchObject({ code: "ENOENT" });
+    } finally {
+      await Promise.all(acquiredLocks.map((lock) => lock.release()));
+    }
   });
 
   it("fails closed while a matching corrupt retired tombstone is occupied", async () => {
@@ -162,9 +246,12 @@ describe("external fetch lock", () => {
     const locks = await Promise.all(acquisitions);
     const acquiredLocks = locks.filter((lock) => lock !== null);
 
-    expect(settledBeforeUnblock).toBe(0);
-    expect(acquiredLocks).toHaveLength(1);
-    await acquiredLocks[0]?.release();
+    try {
+      expect(settledBeforeUnblock).toBe(0);
+      expect(acquiredLocks).toHaveLength(1);
+    } finally {
+      await Promise.all(acquiredLocks.map((lock) => lock.release()));
+    }
   });
 
   it("waits for a fresh legacy guard instead of reclaiming it", async () => {
@@ -184,7 +271,10 @@ describe("external fetch lock", () => {
     await rm(guardDir, { recursive: true });
     const lock = await acquisition;
 
-    expect(lock).not.toBeNull();
-    await lock?.release();
+    try {
+      expect(lock).not.toBeNull();
+    } finally {
+      await lock?.release();
+    }
   });
 });
