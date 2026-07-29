@@ -5,6 +5,7 @@ import { type CheerioAPI, load } from "cheerio";
 import {
   SOURCE_FILTER_SECTION_MAPPINGS,
   type SourceFilterGroupMapping,
+  type SourceFilterMatcher,
   type SourceFilterTarget,
 } from "./mappings";
 
@@ -14,18 +15,34 @@ export interface ParsedCoolpcFilterSnapshot {
   productCount: number;
   taggedProductCount: number;
   ambiguousProductCount: number;
+  sourceValueDriftCount: number;
 }
 
 interface SourceCondition {
   label: string;
-  pattern: RegExp;
+  rawValue: string | null;
   target: SourceFilterTarget;
+}
+
+interface MappedSourceCondition extends SourceCondition {
+  tags: readonly string[];
+  matcher: SourceFilterMatcher;
 }
 
 interface SourceConditionGroup {
   target: SourceFilterTarget;
   conditions: SourceCondition[];
 }
+
+export const COOLPC_FILTER_SYNC_SOURCE_LIMITS = {
+  htmlBytes: 5 * 1024 * 1024,
+  conditionsPerControl: 256,
+  optionsPerSection: 2_000,
+  conditionLabelCharacters: 128,
+  conditionValueCharacters: 512,
+  optionTextCharacters: 1_024,
+  optgroupLabelCharacters: 256,
+} as const;
 
 const EXCLUSIVE_FACET_KEYS = new Set([
   "socket",
@@ -37,17 +54,28 @@ const EXCLUSIVE_FACET_KEYS = new Set([
 ]);
 
 export function parseCoolpcFilterSnapshot(html: string): ParsedCoolpcFilterSnapshot {
+  if (Buffer.byteLength(html, "utf8") > COOLPC_FILTER_SYNC_SOURCE_LIMITS.htmlBytes) {
+    throw new Error("CoolPC filter source exceeds the HTML size limit.");
+  }
+
   const dom = load(html);
   const tagsByIgrp: Record<string, Record<string, string[]>> = {};
   let conditionCount = 0;
   let productCount = 0;
   let ambiguousProductCount = 0;
+  let sourceValueDriftCount = 0;
 
   for (const section of SOURCE_FILTER_SECTION_MAPPINGS) {
-    const select = dom(`select[name="${section.selectName}"]`).first();
-    if (select.length === 0) {
+    const selects = dom(`select[name="${section.selectName}"]`);
+    if (selects.length === 0) {
       throw new Error(`CoolPC filter source is missing select ${section.selectName}.`);
     }
+    if (selects.length !== 1) {
+      throw new Error(
+        `CoolPC filter select count changed for ${section.selectName}: expected 1, got ${selects.length}.`,
+      );
+    }
+    const select = selects.first();
 
     const sourceGroups = readConditionGroups(dom, section.controlName);
     if (sourceGroups.length !== section.groups.length) {
@@ -62,26 +90,43 @@ export function parseCoolpcFilterSnapshot(html: string): ParsedCoolpcFilterSnaps
         return null;
       }
 
-      validateManagedGroup(section.controlName, sourceGroup, mapping);
+      sourceValueDriftCount += validateManagedGroup(section.controlName, sourceGroup, mapping);
       conditionCount += sourceGroup.conditions.length;
       return mapConditions(sourceGroup, mapping);
     });
     let sectionProductCount = 0;
 
-    select.find("option").each((_, element) => {
+    const options = select.find("option").toArray();
+    if (options.length > COOLPC_FILTER_SYNC_SOURCE_LIMITS.optionsPerSection) {
+      throw new Error(`CoolPC filter source has too many options in ${section.selectName}.`);
+    }
+
+    for (const element of options) {
       const option = dom(element);
       if (option.is(":disabled")) {
-        return;
+        continue;
       }
 
-      const optionText = option.text().trim();
+      const rawOptionText = option.text();
+      assertTextLength(
+        rawOptionText,
+        COOLPC_FILTER_SYNC_SOURCE_LIMITS.optionTextCharacters,
+        `CoolPC filter option text is too long in ${section.selectName}.`,
+      );
+      const optionText = rawOptionText.trim();
       const productName = readProductName(optionText);
       if (!productName) {
-        return;
+        continue;
       }
       sectionProductCount += 1;
 
-      const optgroupLabel = option.parent("optgroup").attr("label")?.trim() ?? "";
+      const rawOptgroupLabel = option.parent("optgroup").attr("label") ?? "";
+      assertTextLength(
+        rawOptgroupLabel,
+        COOLPC_FILTER_SYNC_SOURCE_LIMITS.optgroupLabelCharacters,
+        `CoolPC filter optgroup label is too long in ${section.selectName}.`,
+      );
+      const optgroupLabel = rawOptgroupLabel.trim();
       const tags = new Set<string>();
 
       for (const conditions of mappedGroups) {
@@ -91,7 +136,7 @@ export function parseCoolpcFilterSnapshot(html: string): ParsedCoolpcFilterSnaps
 
         for (const condition of conditions) {
           const targetText = condition.target === "optgroup" ? optgroupLabel : optionText;
-          if (condition.pattern.test(targetText)) {
+          if (matchesSourceFilterText(targetText, condition.matcher)) {
             for (const tag of condition.tags) {
               tags.add(tag);
             }
@@ -102,11 +147,11 @@ export function parseCoolpcFilterSnapshot(html: string): ParsedCoolpcFilterSnaps
       const orderedTags = orderAndValidateTags(section.igrp, tags);
       if (hasExclusiveFacetConflict(orderedTags)) {
         ambiguousProductCount += 1;
-        return;
+        continue;
       }
       const normalizedName = normalizeFilterSyncProductName(productName);
       if (!normalizedName) {
-        return;
+        continue;
       }
 
       const categoryKey = String(section.igrp);
@@ -122,14 +167,14 @@ export function parseCoolpcFilterSnapshot(html: string): ParsedCoolpcFilterSnaps
           ambiguousProductCount += 1;
           delete categoryTags[normalizedName];
           productCount -= 1;
-          return;
+          continue;
         }
         categoryTags[normalizedName] = mergedTags;
       } else {
         categoryTags[normalizedName] = orderedTags;
         productCount += 1;
       }
-    });
+    }
 
     if (sectionProductCount === 0) {
       throw new Error(`CoolPC filter source has no priced products in ${section.selectName}.`);
@@ -151,6 +196,7 @@ export function parseCoolpcFilterSnapshot(html: string): ParsedCoolpcFilterSnaps
     productCount,
     taggedProductCount,
     ambiguousProductCount,
+    sourceValueDriftCount,
   };
 }
 
@@ -169,31 +215,43 @@ function readConditionGroups(dom: CheerioAPI, controlName: string): SourceCondit
   if (inputs.length === 0) {
     throw new Error(`CoolPC filter source is missing checkbox control ${controlName}.`);
   }
+  if (inputs.length > COOLPC_FILTER_SYNC_SOURCE_LIMITS.conditionsPerControl) {
+    throw new Error(`CoolPC filter source has too many conditions for ${controlName}.`);
+  }
 
   const groups: SourceConditionGroup[] = [];
   let pending: Array<Omit<SourceCondition, "target">> = [];
 
   for (const element of inputs) {
     const input = dom(element);
-    const label = readConditionLabel(input, element);
-    const rawPattern = input.attr("value");
-    const patternText = !rawPattern || rawPattern === "on" ? label : rawPattern;
+    const label = readConditionLabel(input, element, controlName);
+    const rawValue = input.attr("value") ?? null;
+    if (rawValue !== null) {
+      assertTextLength(
+        rawValue,
+        COOLPC_FILTER_SYNC_SOURCE_LIMITS.conditionValueCharacters,
+        `CoolPC filter condition value is too long for ${controlName}.`,
+      );
+    }
 
-    pending.push({ label, pattern: compilePattern(patternText, controlName, label) });
+    pending.push({ label, rawValue });
 
     const boundary = input.attr("alt");
     if (!boundary) {
       continue;
     }
 
-    const target = boundary === "1" ? "optgroup" : boundary === "2" ? "product" : null;
+    const target: SourceFilterTarget | null =
+      boundary === "1" ? "optgroup" : boundary === "2" ? "product" : null;
     if (!target) {
-      throw new Error(`CoolPC filter source has unsupported alt=${boundary} for ${controlName}.`);
+      throw new Error(`CoolPC filter source has an unsupported group boundary for ${controlName}.`);
     }
 
+    const conditions = pending.map((condition) => ({ ...condition, target }));
+    assertUniqueConditionLabels(controlName, conditions);
     groups.push({
       target,
-      conditions: pending.map((condition) => ({ ...condition, target })),
+      conditions,
     });
     pending = [];
   }
@@ -205,22 +263,38 @@ function readConditionGroups(dom: CheerioAPI, controlName: string): SourceCondit
   return groups;
 }
 
-function readConditionLabel(input: ReturnType<CheerioAPI>, element: unknown): string {
-  const parent = input.parent();
-  const parentLabel = parent.text().replace(/\s+/g, " ").trim();
-  if (parent.find('input[type="checkbox"]').length === 1) {
-    return parentLabel;
+function readConditionLabel(
+  input: ReturnType<CheerioAPI>,
+  element: unknown,
+  controlName: string,
+): string {
+  const nextSibling = (element as { nextSibling?: { type?: string; data?: string } }).nextSibling;
+  let rawLabel = nextSibling?.type === "text" ? (nextSibling.data ?? "") : "";
+
+  if (!rawLabel.trim()) {
+    rawLabel = input.next().first().text();
+  }
+  if (!rawLabel.trim() && input.parent().is("label")) {
+    rawLabel = input.parent().text();
   }
 
-  const nextSibling = (element as { nextSibling?: { type?: string; data?: string } }).nextSibling;
-  return nextSibling?.type === "text" ? (nextSibling.data ?? "").replace(/\s+/g, " ").trim() : "";
+  assertTextLength(
+    rawLabel,
+    COOLPC_FILTER_SYNC_SOURCE_LIMITS.conditionLabelCharacters,
+    `CoolPC filter condition label is too long for ${controlName}.`,
+  );
+  const label = rawLabel.replace(/\s+/g, " ").trim();
+  if (!label) {
+    throw new Error(`CoolPC filter source is missing a condition label for ${controlName}.`);
+  }
+  return label;
 }
 
 function validateManagedGroup(
   controlName: string,
   source: SourceConditionGroup,
   mapping: SourceFilterGroupMapping,
-): void {
+): number {
   if (source.target !== mapping.target) {
     throw new Error(
       `CoolPC filter target changed for ${controlName}: expected ${mapping.target}, got ${source.target}.`,
@@ -234,15 +308,25 @@ function validateManagedGroup(
 
   if (unknownLabels.length > 0 || missingLabels.length > 0) {
     throw new Error(
-      `CoolPC filter conditions changed for ${controlName}: unknown=${unknownLabels.join("|") || "none"} missing=${missingLabels.join("|") || "none"}.`,
+      `CoolPC filter conditions changed for ${controlName}: unknown=${unknownLabels.length} missing=${missingLabels.length}.`,
     );
   }
+
+  return source.conditions.filter((condition) => {
+    const expectedValues = mapping.conditions[condition.label]?.expectedSourceValues ?? [];
+    return !expectedValues.includes(condition.rawValue);
+  }).length;
 }
 
-function mapConditions(source: SourceConditionGroup, mapping: SourceFilterGroupMapping) {
+function mapConditions(
+  source: SourceConditionGroup,
+  mapping: SourceFilterGroupMapping,
+): MappedSourceCondition[] {
   return source.conditions.flatMap((condition) => {
-    const tags = mapping.conditions[condition.label];
-    return tags ? [{ ...condition, tags }] : [];
+    const conditionMapping = mapping.conditions[condition.label];
+    return conditionMapping?.tags
+      ? [{ ...condition, tags: conditionMapping.tags, matcher: conditionMapping.matcher }]
+      : [];
   });
 }
 
@@ -251,11 +335,74 @@ function readProductName(optionText: string): string | null {
   return match?.[1]?.trim() || null;
 }
 
-function compilePattern(pattern: string, controlName: string, label: string): RegExp {
-  try {
-    return new RegExp(pattern, "i");
-  } catch {
-    throw new Error(`CoolPC filter regex is invalid for ${controlName}/${label}.`);
+function matchesSourceFilterText(targetText: string, matcher: SourceFilterMatcher): boolean {
+  if (matcher.kind === "includes") {
+    const foldedTarget = targetText.toLowerCase();
+    return matcher.needles.some((needle) => foldedTarget.includes(needle));
+  }
+
+  return containsWattageInRange(targetText, matcher);
+}
+
+function containsWattageInRange(
+  targetText: string,
+  matcher: Extract<SourceFilterMatcher, { kind: "wattage-range" }>,
+): boolean {
+  for (let index = 0; index < targetText.length; index += 1) {
+    const firstDigit = decimalDigitValue(targetText.charCodeAt(index));
+    if (firstDigit === null) {
+      continue;
+    }
+
+    let value = firstDigit;
+    let cursor = index + 1;
+    while (cursor < targetText.length) {
+      const digit = decimalDigitValue(targetText.charCodeAt(cursor));
+      if (digit === null) {
+        break;
+      }
+      value = Math.min(Number.MAX_SAFE_INTEGER, value * 10 + digit);
+      cursor += 1;
+    }
+
+    const digitCount = cursor - index;
+    const isWattage = targetText[cursor] === "W" || targetText[cursor] === "w";
+    const hasAllowedDigits =
+      digitCount >= matcher.minDigits &&
+      (matcher.maxDigits === null || digitCount <= matcher.maxDigits);
+    const isInRange =
+      value >= matcher.minInclusive &&
+      (matcher.maxExclusive === null || value < matcher.maxExclusive);
+    if (isWattage && hasAllowedDigits && isInRange) {
+      return true;
+    }
+
+    index = cursor - 1;
+  }
+
+  return false;
+}
+
+function decimalDigitValue(codePoint: number): number | null {
+  return codePoint >= 48 && codePoint <= 57 ? codePoint - 48 : null;
+}
+
+function assertUniqueConditionLabels(
+  controlName: string,
+  conditions: readonly SourceCondition[],
+): void {
+  const labels = new Set<string>();
+  for (const condition of conditions) {
+    if (labels.has(condition.label)) {
+      throw new Error(`CoolPC filter source has duplicate conditions for ${controlName}.`);
+    }
+    labels.add(condition.label);
+  }
+}
+
+function assertTextLength(value: string, maxCharacters: number, message: string): void {
+  if (value.length > maxCharacters) {
+    throw new Error(message);
   }
 }
 
