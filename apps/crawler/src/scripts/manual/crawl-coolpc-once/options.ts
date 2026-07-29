@@ -2,18 +2,19 @@
 // 手動執行 CoolPC 爬蟲一次的參數解析工具。
 // 負責解讀命令列引數，並組合 live crawl 的 workspace、快照輸出與延遲設定。
 
+import { join } from "node:path";
 import { DEFAULT_COOLPC_CATEGORY_DELAY_MS } from "../../../coolpc/live-crawl";
 import {
   DEFAULT_RAW_SNAPSHOT_STORAGE_DIR,
   resolveAllowlistedRawSnapshotStorage,
 } from "../../../coolpc/raw-snapshot-storage";
+import { parseExternalFetchLockStaleSeconds } from "../../ops/external-fetch-lock";
 import {
   getNumberArg,
   getStringArg,
   resolveWorkspacePathArgument,
   resolveWorkspaceRoot,
 } from "../../shared/script-utils";
-import { parseExternalFetchLockStaleSeconds } from "../../ops/external-fetch-lock";
 
 // 要求使用者顯式加上此旗標，避免誤執行 live 網站抓取。
 const CONFIRM_LIVE_FETCH_FLAG = "--confirm-live-fetch";
@@ -24,6 +25,7 @@ export interface CrawlOptions {
   delayMs: number;
   externalFetchLockDir: string;
   externalFetchLockStaleSeconds: number;
+  filterSyncStateFilePath: string;
 }
 
 // 解析命令列引數，並回傳手動流程所需參數。
@@ -75,6 +77,7 @@ export function parseOptions(
     externalFetchLockStaleSeconds: parseExternalFetchLockStaleSeconds(
       env.EXTERNAL_FETCH_LOCK_STALE_SECONDS,
     ),
+    filterSyncStateFilePath: join(mutationRoot, "ops", "coolpc-filter-sync-state.json"),
   };
 }
 

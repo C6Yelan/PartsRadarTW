@@ -4,6 +4,10 @@
 import { relative } from "node:path";
 import type { PrismaClient } from "@partsradar/db";
 import { CRAWL_TRIGGER_TYPES, type RunCoolpcCrawlOnceResult } from "../../coolpc/crawl-run";
+import {
+  DEFAULT_FILTER_SYNC_INTERVAL_SECONDS,
+  refreshCoolpcFilterSync,
+} from "../../coolpc/filter-sync";
 import { assertSeededCategories, runCoolpcCategoryCrawl } from "../../coolpc/live-crawl";
 import { tryAcquireExternalFetchLock } from "../ops/external-fetch-lock";
 import {
@@ -15,6 +19,7 @@ import { type CrawlOptions, parseOptions } from "./crawl-coolpc-once/options";
 
 const MANUAL_CRAWL_USER_AGENT =
   "PartsRadarTW manual crawler smoke (+https://github.com/C6Yelan/PartsRadarTW)";
+const MANUAL_FILTER_SYNC_TIMEOUT_MS = 30_000;
 
 // DB 計數用欄位（爬蟲前後比對用）。
 interface DbCounts {
@@ -66,10 +71,12 @@ export async function runManualCrawl(
   dependencies: {
     acquireLock?: typeof tryAcquireExternalFetchLock;
     crawlCategories?: typeof runCoolpcCategoryCrawl;
+    refreshFilterSync?: typeof refreshCoolpcFilterSync;
   } = {},
 ): Promise<RunCoolpcCrawlOnceResult> {
   const acquireLock = dependencies.acquireLock ?? tryAcquireExternalFetchLock;
   const crawlCategories = dependencies.crawlCategories ?? runCoolpcCategoryCrawl;
+  const refreshFilterSync = dependencies.refreshFilterSync ?? refreshCoolpcFilterSync;
   const externalFetchLock = await acquireLock({
     lockDir: options.externalFetchLockDir,
     owner: "manual-crawler",
@@ -81,6 +88,17 @@ export async function runManualCrawl(
   }
 
   try {
+    const filterSync = await refreshFilterSync({
+      stateFilePath: options.filterSyncStateFilePath,
+      intervalSeconds: DEFAULT_FILTER_SYNC_INTERVAL_SECONDS,
+      timeoutMs: MANUAL_FILTER_SYNC_TIMEOUT_MS,
+      userAgent: MANUAL_CRAWL_USER_AGENT,
+    });
+
+    if (!filterSync.state?.lastSuccessAt) {
+      throw new Error("Refusing manual CoolPC crawl without an accepted filter sync state.");
+    }
+
     return await crawlCategories({
       client,
       workspaceRoot: options.workspaceRoot,
@@ -89,6 +107,7 @@ export async function runManualCrawl(
       triggerType: CRAWL_TRIGGER_TYPES.MANUAL,
       fetchUserAgent: MANUAL_CRAWL_USER_AGENT,
       log: console.log,
+      sourceFilterTagsByIgrp: filterSync.state.tagsByIgrp,
     });
   } finally {
     await externalFetchLock.release();

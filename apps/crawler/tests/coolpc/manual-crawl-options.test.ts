@@ -47,6 +47,14 @@ describe("manual CoolPC crawl snapshot storage options", () => {
         "external-fetch",
       ),
       externalFetchLockStaleSeconds: 300,
+      filterSyncStateFilePath: join(
+        workspaceRoot,
+        "temp",
+        "coolpc-daemon",
+        "snapshots",
+        "ops",
+        "coolpc-filter-sync-state.json",
+      ),
     });
   });
 
@@ -63,6 +71,7 @@ describe("manual CoolPC crawl snapshot storage options", () => {
     ).toMatchObject({
       storageDir: configuredChild,
       externalFetchLockDir: join(configuredRoot, ".locks", "external-fetch"),
+      filterSyncStateFilePath: join(configuredRoot, "ops", "coolpc-filter-sync-state.json"),
     });
     expect(() =>
       parseOptions(["--confirm-live-fetch", "--storage-dir", "temp/unrelated"], crawlerCwd, {}),
@@ -71,6 +80,105 @@ describe("manual CoolPC crawl snapshot storage options", () => {
 });
 
 describe("manual CoolPC crawl execution", () => {
+  it("passes accepted source filter mappings to preserve source-backed facet coverage", async () => {
+    const sourceFilterTagsByIgrp = {
+      "9": {
+        外接盒商品: ["external_type:enclosure"],
+      },
+      "14": {
+        "銀欣 SETA H1 機殼": ["motherboard_support:atx"],
+      },
+    };
+    const release = vi.fn(async () => {});
+    const acquireLock = vi.fn(async () => ({
+      lockDir: "/tmp/external-fetch",
+      owner: "manual-crawler",
+      release,
+    }));
+    const refreshFilterSync = vi.fn(async () => ({
+      outcome: "skipped" as const,
+      state: acceptedFilterSyncState(sourceFilterTagsByIgrp),
+    }));
+    const crawlResult = {
+      crawlRunId: "manual-filter-sync",
+      status: "SUCCESS_UNCHANGED" as const,
+      stoppedBySuspectedBlock: false,
+      categoryResults: [],
+    };
+    const crawlCategories = vi.fn(async () => crawlResult);
+
+    await expect(
+      runManualCrawl({} as never, manualCrawlOptions(), {
+        acquireLock,
+        crawlCategories,
+        refreshFilterSync,
+      }),
+    ).resolves.toBe(crawlResult);
+
+    expect(refreshFilterSync).toHaveBeenCalledWith({
+      stateFilePath: "/repo/storage/snapshots/ops/coolpc-filter-sync-state.json",
+      intervalSeconds: 7 * 24 * 60 * 60,
+      timeoutMs: 30_000,
+      userAgent: "PartsRadarTW manual crawler smoke (+https://github.com/C6Yelan/PartsRadarTW)",
+    });
+    expect(crawlCategories).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sourceFilterTagsByIgrp,
+      }),
+    );
+    expect(release).toHaveBeenCalledOnce();
+  });
+
+  it("fails closed before category crawling without an accepted filter sync state", async () => {
+    const release = vi.fn(async () => {});
+    const acquireLock = vi.fn(async () => ({
+      lockDir: "/tmp/external-fetch",
+      owner: "manual-crawler",
+      release,
+    }));
+    const refreshFilterSync = vi.fn(async () => ({
+      outcome: "failed" as const,
+      state: null,
+    }));
+    const crawlCategories = vi.fn();
+
+    await expect(
+      runManualCrawl({} as never, manualCrawlOptions(), {
+        acquireLock,
+        crawlCategories,
+        refreshFilterSync,
+      }),
+    ).rejects.toThrow("without an accepted filter sync state");
+
+    expect(crawlCategories).not.toHaveBeenCalled();
+    expect(release).toHaveBeenCalledOnce();
+  });
+
+  it("fails closed and releases the lock when filter sync state recovery throws", async () => {
+    const stateError = new Error("filter sync state is unreadable");
+    const release = vi.fn(async () => {});
+    const acquireLock = vi.fn(async () => ({
+      lockDir: "/tmp/external-fetch",
+      owner: "manual-crawler",
+      release,
+    }));
+    const refreshFilterSync = vi.fn(async () => {
+      throw stateError;
+    });
+    const crawlCategories = vi.fn();
+
+    await expect(
+      runManualCrawl({} as never, manualCrawlOptions(), {
+        acquireLock,
+        crawlCategories,
+        refreshFilterSync,
+      }),
+    ).rejects.toBe(stateError);
+
+    expect(crawlCategories).not.toHaveBeenCalled();
+    expect(release).toHaveBeenCalledOnce();
+  });
+
   it("releases the external lock and propagates reconciliation failure", async () => {
     const reconciliationError = new Error("crawl-run reconciliation failed");
     const release = vi.fn(async () => {});
@@ -82,10 +190,15 @@ describe("manual CoolPC crawl execution", () => {
     const crawlCategories = vi.fn(async () => {
       throw reconciliationError;
     });
+    const refreshFilterSync = vi.fn(async () => ({
+      outcome: "skipped" as const,
+      state: acceptedFilterSyncState({}),
+    }));
 
     const result = runManualCrawl({} as never, manualCrawlOptions(), {
       acquireLock,
       crawlCategories,
+      refreshFilterSync,
     });
 
     await expect(result).rejects.toBe(reconciliationError);
@@ -185,5 +298,23 @@ function manualCrawlOptions(): CrawlOptions {
     delayMs: 8000,
     externalFetchLockDir: "/repo/storage/snapshots/.locks/external-fetch",
     externalFetchLockStaleSeconds: 300,
+    filterSyncStateFilePath: "/repo/storage/snapshots/ops/coolpc-filter-sync-state.json",
+  };
+}
+
+function acceptedFilterSyncState(tagsByIgrp: Record<string, Record<string, string[]>>) {
+  return {
+    version: 2 as const,
+    lastAttemptAt: "2026-07-29T05:00:00.000Z",
+    lastSuccessAt: "2026-07-29T05:00:00.000Z",
+    lastError: null,
+    sourceHash: "accepted-filter-sync-state",
+    conditionCount: 2,
+    productCount: 2,
+    taggedProductCount: 2,
+    ambiguousProductCount: 0,
+    tagsByIgrp,
+    refreshRequestedAt: null,
+    joinCoverageFailures: {},
   };
 }
