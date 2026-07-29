@@ -105,7 +105,7 @@ describe("target price notification claims", () => {
         now: new Date("2026-06-07T05:00:00.000Z"),
         sendDirectMessages,
       }),
-    ).resolves.toMatchObject({ scannedCount: 0, processedCount: 0 });
+    ).resolves.toMatchObject({ scannedCount: 1, processedCount: 0 });
     expect(sendDirectMessages).not.toHaveBeenCalled();
   });
 });

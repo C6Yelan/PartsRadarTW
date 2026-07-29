@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["partialIndexes"]
 }
 
 datasource db {
@@ -282,8 +283,19 @@ model DiscordTargetPriceWatch {
   @@unique([discordUserId, productId], map: "discord_target_price_watches_discord_user_id_product_id_key")
   @@index([discordUserId, enabled], map: "discord_target_price_watches_user_enabled_idx")
   @@index([productId, enabled], map: "discord_target_price_watches_product_enabled_idx")
-  @@index([enabled, lastNotifiedAt, notificationClaimedAt], map: "discord_target_price_watches_notification_due_idx")
+  @@index([updatedAt, id], map: "discord_target_price_watches_pending_scan_idx", where: { enabled: true, lastNotifiedAt: null })
   @@map("discord_target_price_watches")
+}
+
+model DiscordTargetPriceNotificationScanState {
+  id                  Int       @id @default(1)
+  cursorUpdatedAt     DateTime? @map("cursor_updated_at") @db.Timestamptz(6)
+  cursorWatchId       String?   @map("cursor_watch_id") @db.Uuid
+  roundUpperUpdatedAt DateTime? @map("round_upper_updated_at") @db.Timestamptz(6)
+  roundUpperWatchId   String?   @map("round_upper_watch_id") @db.Uuid
+  updatedAt           DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("discord_target_price_notification_scan_state")
 }
 
 model DiscordNotificationDelivery {
