@@ -7,13 +7,19 @@ import { LRUCache } from "lru-cache";
 
 import { internalErrorResponse, rateLimitedResponse } from "./responses";
 
-export type RateLimitScope = "api:read" | "api:list" | "api:image" | "api:build-list";
+export type RateLimitScope =
+  | "api:read"
+  | "api:list"
+  | "api:image"
+  | "api:build-list"
+  | "metadata:image";
 export type ClientIdentifierSource = "cf" | "xff" | "unknown";
 
 export const RATE_LIMIT_DEFAULTS = {
   readMax: 120,
   listMax: 360,
   imageMax: 1200,
+  metadataImageMax: 60,
   windowSeconds: 60,
   cacheSize: 5000,
 } as const;
@@ -45,8 +51,12 @@ export interface RateLimiterOptions {
   nowMs?: () => number;
 }
 
+export interface RateLimitRequest {
+  headers: Pick<Headers, "get">;
+}
+
 export interface RateLimiter {
-  check(request: Request, scope: RateLimitScope): RateLimitDecision;
+  check(request: RateLimitRequest, scope: RateLimitScope): RateLimitDecision;
 }
 
 export interface RateLimitCheck {
@@ -76,7 +86,7 @@ export async function withRateLimit(
 }
 
 // 執行單次 rate limit 判斷；被擋時直接產生 429 response 並記錄 sanitized log。
-function checkRateLimit(request: Request, scope: RateLimitScope): RateLimitCheck {
+export function checkRateLimit(request: RateLimitRequest, scope: RateLimitScope): RateLimitCheck {
   const decision = getGlobalRateLimiter().check(request, scope);
 
   if (decision.allowed) {
@@ -152,6 +162,10 @@ export function resolveRateLimitConfig(env: RateLimitEnv = process.env): RateLim
   const readMax = readPositiveInteger(env.API_READ_RATE_LIMIT_MAX, RATE_LIMIT_DEFAULTS.readMax);
   const listMax = readPositiveInteger(env.API_LIST_RATE_LIMIT_MAX, RATE_LIMIT_DEFAULTS.listMax);
   const imageMax = readPositiveInteger(env.API_IMAGE_RATE_LIMIT_MAX, RATE_LIMIT_DEFAULTS.imageMax);
+  const metadataImageMax = readPositiveInteger(
+    env.SHARE_IMAGE_RATE_LIMIT_MAX,
+    RATE_LIMIT_DEFAULTS.metadataImageMax,
+  );
   const windowSeconds = readPositiveInteger(
     env.API_RATE_LIMIT_WINDOW_SECONDS,
     RATE_LIMIT_DEFAULTS.windowSeconds,
@@ -168,19 +182,23 @@ export function resolveRateLimitConfig(env: RateLimitEnv = process.env): RateLim
       "api:list": listMax,
       "api:image": imageMax,
       "api:build-list": readMax,
+      "metadata:image": metadataImageMax,
     },
     windowMs: windowSeconds * 1000,
   };
 }
 
 // 解析目前 request 的 client identifier，供 rate limit 與 smoke 觀察來源判斷。
-export function getClientIdentifier(request: Request, nodeEnv = process.env.NODE_ENV): string {
+export function getClientIdentifier(
+  request: RateLimitRequest,
+  nodeEnv = process.env.NODE_ENV,
+): string {
   return getClientIdentifierInfo(request, nodeEnv).value;
 }
 
 // Production 只信任 Cloudflare client header；本機開發與測試才接受單一合法 XFF。
 export function getClientIdentifierInfo(
-  request: Request,
+  request: RateLimitRequest,
   nodeEnv = process.env.NODE_ENV,
 ): {
   source: ClientIdentifierSource;
@@ -196,9 +214,7 @@ export function getClientIdentifierInfo(
   }
 
   const forwardedForIp =
-    nodeEnv === "production"
-      ? null
-      : readSingleIpHeader(request.headers.get("X-Forwarded-For"));
+    nodeEnv === "production" ? null : readSingleIpHeader(request.headers.get("X-Forwarded-For"));
 
   if (forwardedForIp) {
     return {

@@ -20,6 +20,7 @@ const BASE_CONFIG: RateLimitConfig = {
     "api:list": 3,
     "api:image": 4,
     "api:build-list": 2,
+    "metadata:image": 1,
   },
   windowMs: 1000,
 };
@@ -169,6 +170,16 @@ describe("API rate limiter", () => {
       limit: 2,
       remaining: 1,
     });
+    expect(limiter.check(request, "metadata:image")).toMatchObject({
+      allowed: true,
+      limit: 1,
+      remaining: 0,
+    });
+    expect(limiter.check(request, "metadata:image")).toMatchObject({
+      allowed: false,
+      limit: 1,
+      remaining: 0,
+    });
   });
 
   it("allows normal pageSize 50 browsing bursts with independent list and image budgets", () => {
@@ -213,6 +224,7 @@ describe("API rate limiter", () => {
         API_READ_RATE_LIMIT_MAX: "250",
         API_LIST_RATE_LIMIT_MAX: "500",
         API_IMAGE_RATE_LIMIT_MAX: "900",
+        SHARE_IMAGE_RATE_LIMIT_MAX: "45",
         API_RATE_LIMIT_WINDOW_SECONDS: "120",
         API_RATE_LIMIT_CACHE_SIZE: "7000",
       }),
@@ -223,6 +235,7 @@ describe("API rate limiter", () => {
         "api:list": 500,
         "api:image": 900,
         "api:build-list": 250,
+        "metadata:image": 45,
       },
       windowMs: 120_000,
     });
@@ -232,6 +245,7 @@ describe("API rate limiter", () => {
         API_READ_RATE_LIMIT_MAX: "0",
         API_LIST_RATE_LIMIT_MAX: "bad",
         API_IMAGE_RATE_LIMIT_MAX: "not-a-number",
+        SHARE_IMAGE_RATE_LIMIT_MAX: "0",
         API_RATE_LIMIT_WINDOW_SECONDS: "-1",
         API_RATE_LIMIT_CACHE_SIZE: "",
       }),
@@ -242,6 +256,7 @@ describe("API rate limiter", () => {
         "api:list": RATE_LIMIT_DEFAULTS.listMax,
         "api:image": RATE_LIMIT_DEFAULTS.imageMax,
         "api:build-list": RATE_LIMIT_DEFAULTS.readMax,
+        "metadata:image": RATE_LIMIT_DEFAULTS.metadataImageMax,
       },
       windowMs: RATE_LIMIT_DEFAULTS.windowSeconds * 1000,
     });

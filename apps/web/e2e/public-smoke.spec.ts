@@ -369,6 +369,22 @@ async function expectSingleLine(locator: Locator) {
 }
 
 test.describe("public API smoke", () => {
+  test("cheaply rejects invalid share-image ids without a database", {
+    tag: "@desktop-only",
+  }, async ({ request }) => {
+    for (const routeName of ["opengraph-image", "twitter-image"]) {
+      const response = await request.get(`/products/not-a-uuid/${routeName}`);
+
+      expect(response.status()).toBe(404);
+      expect(response.headers()["cache-control"]).toContain("s-maxage=3600");
+      expect(response.headers()["content-length"]).toBe("0");
+      expect(response.headers()["content-type"]).toContain("image/png");
+      expect(response.headers()["x-ratelimit-limit"]).toBeTruthy();
+      expect(response.headers()["x-ratelimit-client-source"]).toBeTruthy();
+      expect(response.headers()["x-share-image-outcome"]).toBe("invalid");
+    }
+  });
+
   test("checks public data and rate-limit headers", {
     tag: ["@desktop-only", "@db-smoke"],
   }, async ({ request }) => {
@@ -395,7 +411,7 @@ test.describe("public API smoke", () => {
     await expectJsonShape(priceReport, ["data", "summary", "pagination", "meta"]);
   });
 
-  test("checks product detail, price history, and image API for the seeded product", {
+  test("checks product detail, price history, cached images, and share-image bounds", {
     tag: ["@desktop-only", "@db-smoke"],
   }, async ({ request }) => {
     const product = await fetchFirstProduct(request);
@@ -418,6 +434,26 @@ test.describe("public API smoke", () => {
     const image = await request.get(product.image?.url ?? "");
     expect(image.status()).toBe(200);
     expect(image.headers()["content-type"]).toContain("image/");
+
+    for (const routeName of ["opengraph-image", "twitter-image"]) {
+      const shareImage = await request.get(`/products/${product.id}/${routeName}`);
+
+      expect(shareImage.status()).toBe(200);
+      expect(shareImage.headers()["content-type"]).toContain("image/png");
+      expect(shareImage.headers()["cache-control"]).toContain("max-age=300");
+      expect(shareImage.headers()["x-ratelimit-limit"]).toBeTruthy();
+      expect(shareImage.headers()["x-ratelimit-client-source"]).toBeTruthy();
+      expect(shareImage.headers()["x-share-image-outcome"]).toBe("valid");
+      expect((await shareImage.body()).byteLength).toBeGreaterThan(0);
+    }
+
+    const missingShareImage = await request.get(
+      "/products/20000000-0000-4000-8000-000000000099/twitter-image",
+    );
+    expect(missingShareImage.status()).toBe(404);
+    expect(missingShareImage.headers()["cache-control"]).toContain("s-maxage=60");
+    expect(missingShareImage.headers()["content-length"]).toBe("0");
+    expect(missingShareImage.headers()["x-share-image-outcome"]).toBe("missing");
   });
 });
 
