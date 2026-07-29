@@ -77,6 +77,7 @@ afterEach(async () => {
       },
     },
   });
+  await adminClient.$executeRaw`ANALYZE public.price_snapshots`;
   productIds.clear();
 }, 60_000);
 
@@ -213,6 +214,7 @@ describe("price history PostgreSQL bounded read", () => {
 
   it("bounds a synthetic high-cardinality result and uses only the required named index", async () => {
     const productId = await createProduct("Synthetic high cardinality");
+    const distractorProductId = await createProduct("Synthetic high cardinality distractor");
     await adminClient.$executeRaw`
       INSERT INTO public.price_snapshots (
         id,
@@ -225,14 +227,17 @@ describe("price history PostgreSQL bounded read", () => {
       )
       SELECT
         pg_catalog.gen_random_uuid(),
-        ${productId}::uuid,
+        CASE
+          WHEN sequence_number % 2 = 0 THEN ${productId}::uuid
+          ELSE ${distractorProductId}::uuid
+        END,
         10_000 + (sequence_number % 101),
         'TWD'::public.currency,
         ${new Date("2031-01-03T00:00:00.000Z")}::timestamptz
-          + sequence_number * interval '1 millisecond',
+          + (sequence_number / 2) * interval '1 millisecond',
         ${crawlRunId}::uuid,
         pg_catalog.now()
-      FROM pg_catalog.generate_series(0, 99_999) AS sequence_number
+      FROM pg_catalog.generate_series(0, 199_999) AS sequence_number
     `;
     await adminClient.$executeRaw`ANALYZE public.price_snapshots`;
     const endpoints = await client.priceSnapshot.findMany({
