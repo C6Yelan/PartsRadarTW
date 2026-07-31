@@ -3,9 +3,11 @@
 // 同時重用 parser helpers 做頁面驗證、候選擷取、欄位正規化與 vendor 分類判斷。
 
 import {
+  MAX_PRODUCT_NAME_LENGTH,
   createCoolpcCategoryUrl,
   extractProductFilterTags,
   mergeProductFilterTags,
+  normalizeBoundedProductName,
 } from "@partsradar/shared";
 import { load } from "cheerio";
 import { decode } from "iconv-lite";
@@ -84,14 +86,21 @@ export function parseCoolpcCategoryPage(
   for (const candidate of candidates) {
     const ibuyToken = candidate.rawToken.trim();
     const name = normalizeProductName(candidate.rawName);
-    const price = parsePriceText(candidate.rawPriceText);
-    const primaryImageUrl = normalizeCoolpcProductImageUrl(candidate.rawImageUrl, context.igrp);
+    const matchingName = normalizeBoundedProductName(name);
+
+    if (matchingName === null) {
+      issues.push({
+        type: "content_validation_failed",
+        message: `Product candidate name exceeds ${MAX_PRODUCT_NAME_LENGTH} normalized code units.`,
+      });
+      continue;
+    }
 
     if (ibuyToken.length === 0) {
       issues.push({
         type: "missing_ibuy_token",
         message: "Product candidate is missing iBuy token.",
-        rawName: candidate.rawName,
+        rawName: name,
         rawPriceText: candidate.rawPriceText,
         rawToken: candidate.rawToken,
       });
@@ -113,12 +122,13 @@ export function parseCoolpcCategoryPage(
       continue;
     }
 
-    const exclusionReason = getProductExclusionReason(context.igrp, name);
+    const exclusionReason = getProductExclusionReason(context.igrp, matchingName);
     if (exclusionReason) {
       excludedProducts.push({ ibuyToken, reason: exclusionReason });
       continue;
     }
 
+    const price = parsePriceText(candidate.rawPriceText);
     if (price === null) {
       issues.push({
         type: "price_parse_failed",
@@ -130,6 +140,7 @@ export function parseCoolpcCategoryPage(
       continue;
     }
 
+    const primaryImageUrl = normalizeCoolpcProductImageUrl(candidate.rawImageUrl, context.igrp);
     if (
       primaryImageUrl === null &&
       shouldReportInvalidCoolpcProductImageUrl(candidate.rawImageUrl)
@@ -167,10 +178,10 @@ export function parseCoolpcCategoryPage(
       continue;
     }
 
-    const vendor = classifyProductVendor(context.igrp, name);
+    const vendor = classifyProductVendor(context.igrp, matchingName);
     const filterTags = mergeProductFilterTags(
       context.igrp,
-      extractProductFilterTags(context.igrp, name),
+      extractProductFilterTags(context.igrp, matchingName),
       context.sourceFilterTagsByProductName?.[normalizeFilterSyncProductName(name)] ?? [],
     );
     const item: ParsedCoolpcProduct = {
@@ -222,10 +233,7 @@ function getProductExclusionReason(igrp: number, name: string): ProductExclusion
     return "misclassified_bundle_product";
   }
 
-  if (
-    igrp !== 14 ||
-    !/^(?:【[^】]*限搭購[^】]*機殼[^】]*】|\[[^\]]*限搭購[^\]]*機殼[^\]]*\])/i.test(name)
-  ) {
+  if (igrp !== 14 || !hasCaseBundlePrefix(name)) {
     return null;
   }
 
@@ -242,4 +250,20 @@ function getProductExclusionReason(igrp: number, name: string): ProductExclusion
   ].filter((pattern) => pattern.test(name)).length;
 
   return powerSupplyFeatureCount >= 2 ? "misclassified_bundle_product" : null;
+}
+
+function hasCaseBundlePrefix(name: string): boolean {
+  const closingBracket = name.startsWith("【") ? "】" : name.startsWith("[") ? "]" : null;
+  if (closingBracket === null) {
+    return false;
+  }
+
+  const closingBracketIndex = name.indexOf(closingBracket, 1);
+  if (closingBracketIndex < 0) {
+    return false;
+  }
+
+  const label = name.slice(1, closingBracketIndex);
+  const purchaseIndex = label.indexOf("限搭購");
+  return purchaseIndex >= 0 && label.indexOf("機殼", purchaseIndex + "限搭購".length) >= 0;
 }

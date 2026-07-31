@@ -19,6 +19,7 @@ import {
 } from "../rest";
 import type { DiscordBotSchedulerStatusReader } from "../scheduler-status";
 import type { DiscordBotClient, DiscordBotOptions, DiscordInteraction, FetchImpl } from "../types";
+import { canManagePublicReport } from "../public-price-report/authorization";
 import { createBotHelpMessage } from "./bot-help";
 import {
   createPriceReportSettingsPanelMessage,
@@ -32,6 +33,7 @@ import {
 import {
   sendFeatureDisabledResponse,
   sendMissingUserResponse,
+  sendPublicReportAuthorizationDeniedResponse,
   sendUnsupportedInteractionResponse,
 } from "./responses";
 import {
@@ -68,6 +70,11 @@ export async function handleApplicationCommandInteraction({
 
   if (!botCommand && !command && !watchCommand && !publicReportCommand && !statusCommand) {
     await sendUnsupportedInteractionResponse({ interaction, options, fetchImpl });
+    return;
+  }
+
+  if (publicReportCommand && !canManagePublicReport(interaction)) {
+    await sendPublicReportAuthorizationDeniedResponse({ interaction, options, fetchImpl });
     return;
   }
 
