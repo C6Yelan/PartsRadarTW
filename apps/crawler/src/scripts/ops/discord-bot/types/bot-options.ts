@@ -3,7 +3,6 @@
 
 import type { PrismaClient } from "@partsradar/db";
 import type { PriceReportReaderClient } from "@partsradar/db/price-report";
-import type { TargetPriceNotificationClaimClient } from "@partsradar/db/target-price-notification";
 
 export type DiscordBotPresenceStatus = "online" | "idle" | "dnd" | "invisible" | "offline";
 
@@ -29,7 +28,6 @@ export interface DiscordBotOptions {
 
 // Discord bot 流程需要的最小資料存取介面，不直接依賴完整 PrismaClient。
 export type DiscordBotClient = PriceReportReaderClient &
-  TargetPriceNotificationClaimClient &
   Pick<
     PrismaClient,
     | "discordNotificationDelivery"
@@ -37,6 +35,7 @@ export type DiscordBotClient = PriceReportReaderClient &
     | "discordPublicPriceReportDelivery"
     | "discordPublicPriceReportSetting"
     | "discordTargetPriceWatch"
+    | "$transaction"
     | "crawlRun"
     | "product"
     | "sourceCategory"

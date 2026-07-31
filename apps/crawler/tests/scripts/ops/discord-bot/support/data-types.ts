@@ -31,6 +31,13 @@ export interface TestPriceReportSetting {
   includePriceRises: boolean;
   includeNewProducts: boolean;
   enabled: boolean;
+  deliveryState:
+    | "ACTIVE"
+    | "PAUSED_PERMANENT_FAILURE"
+    | "PAUSED_RETRY_EXHAUSTED"
+    | "PAUSED_PARTIAL_DELIVERY";
+  consecutiveDeliveryFailures: number;
+  deliveryClaimedAt: Date | null;
   disabledAt: Date | null;
   nextSendAt: Date | null;
   lastSentAt: Date | null;

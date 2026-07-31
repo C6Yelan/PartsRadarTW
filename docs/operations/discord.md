@@ -22,6 +22,16 @@ docker compose -f compose.yml -f compose.ops.yml logs --tail=100 discord-bot
 
 失敗處理：確認 token、application ID、Discord API 狀態與最小權限。不要記錄 raw token、provider response body 或使用者私訊內容。
 
+### 個人排程報告 retry 狀態
+
+個人排程報告每次最多由一個 daemon claim 15 分鐘。可恢復的 transport／provider 錯誤與 Discord rate limit 共用最多 5 次的持久 retry budget；前四次重試依序退避 5、10、20、40 分鐘，另加最多 1 分鐘 jitter，第五次失敗停止重試。Discord `retry-after` 獨立作為最早重試時間，輸入上限為 24 小時。daemon 重啟不會重設次數；有效 claim 會等到 lease 到期才重新喚醒，不會因已到期的原排程時間每秒輪詢。
+
+DM 關閉、權限、認證或其他永久 4xx 會進入 `paused_permanent_failure`；第五次可恢復失敗進入 `paused_retry_exhausted`；部分訊息已送出後失敗則進入 `paused_partial_delivery`，避免自動重送造成重複。三種 paused 狀態都會停用設定並清空 `next_send_at`，沿用停用個人設定的 30 天 retention。使用者重新啟用排程時會重設 retry／claim 狀態並建立新的正常排程。
+
+daemon 每輪 aggregate log 會顯示 retry 與各 paused count，但不包含 Discord user ID。若 paused count 非零，先依 delivery 的結構化 category、HTTP status 與 provider code 判斷 Discord 權限或服務狀態；不要從 provider message 字串推測，也不要手動改動 retry 欄位。`paused_partial_delivery` 代表可能已有部分內容送達，恢復前應先評估重複通知風險。
+
+部署時先以 migration role 執行 append-only migration，再重新執行 runtime-role 收斂，最後重建／重啟 `discord-bot`。舊版 application 不使用新增欄位；application rollback 不需要刪除 enum、欄位或 index，且已 paused 的設定因 `enabled=false`、`next_send_at=NULL` 不會被舊版自動重送。
+
 ## 個人資料申請
 
 使用時機：收到寄至隱私權政策聯絡信箱的 Discord 個人資料查詢或刪除申請。這是部署端管理流程，不提供 public API 或一般使用者 CLI。

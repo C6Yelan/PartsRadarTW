@@ -84,6 +84,15 @@ enum DiscordPriceReportScope {
   @@map("discord_price_report_scope")
 }
 
+enum DiscordPriceReportDeliveryState {
+  ACTIVE                   @map("active")
+  PAUSED_PERMANENT_FAILURE @map("paused_permanent_failure")
+  PAUSED_RETRY_EXHAUSTED   @map("paused_retry_exhausted")
+  PAUSED_PARTIAL_DELIVERY  @map("paused_partial_delivery")
+
+  @@map("discord_price_report_delivery_state")
+}
+
 enum DiscordNotificationKind {
   PRICE_REPORT_NOW       @map("price_report_now")
   SCHEDULED_PRICE_REPORT @map("scheduled_price_report")
@@ -264,6 +273,9 @@ model DiscordPriceReportSetting {
   includePriceRises    Boolean                    @default(true) @map("include_price_rises")
   includeNewProducts   Boolean                    @default(true) @map("include_new_products")
   enabled              Boolean                    @default(true)
+  deliveryState        DiscordPriceReportDeliveryState @default(ACTIVE) @map("delivery_state")
+  consecutiveDeliveryFailures Int                 @default(0) @map("consecutive_delivery_failures")
+  deliveryClaimedAt    DateTime?                  @map("delivery_claimed_at") @db.Timestamptz(6)
   disabledAt           DateTime?                  @map("disabled_at") @db.Timestamptz(6)
   nextSendAt           DateTime?                  @map("next_send_at") @db.Timestamptz(6)
   lastSentAt           DateTime?                  @map("last_sent_at") @db.Timestamptz(6)
@@ -273,6 +285,7 @@ model DiscordPriceReportSetting {
   deliveries           DiscordNotificationDelivery[]
 
   @@index([enabled, nextSendAt], map: "discord_price_report_settings_enabled_next_send_at_idx")
+  @@index([enabled, deliveryState, nextSendAt, deliveryClaimedAt], map: "discord_price_report_settings_delivery_due_idx")
   @@map("discord_price_report_settings")
 }
 

@@ -7,31 +7,10 @@ import type { TestPriceReportSetting } from "./data-types";
 export function createPriceReportSettingClient(settings: TestPriceReportSetting[]) {
   const settingRows = [...settings];
   const settingFindFirst = vi.fn(
-    async (args: {
-      where: {
-        id?: string;
-        discordUserId?: string;
-        enabled?: boolean;
-        nextSendAt?: { not: null };
-      };
-      select?: Record<string, boolean>;
-    }) => {
+    async (args: { where: TestSettingWhere; select?: Record<string, boolean> }) => {
       const rows = settingRows
         .filter((setting) => {
-          if (args.where.id !== undefined && setting.id !== args.where.id) {
-            return false;
-          }
-          if (
-            args.where.discordUserId !== undefined &&
-            setting.discordUserId !== args.where.discordUserId
-          ) {
-            return false;
-          }
-          if (args.where.enabled !== undefined && setting.enabled !== args.where.enabled) {
-            return false;
-          }
-
-          return !args.where.nextSendAt || setting.nextSendAt !== null;
+          return matchesSettingWhere(setting, args.where);
         })
         .sort((left, right) => {
           return (
@@ -47,22 +26,10 @@ export function createPriceReportSettingClient(settings: TestPriceReportSetting[
     },
   );
   const settingFindMany = vi.fn(
-    async (args: {
-      where: { nextSendAt?: { lte: Date }; enabled?: boolean };
-      select?: Record<string, boolean>;
-    }) => {
-      const nextSendAtLte = args.where.nextSendAt?.lte;
-
+    async (args: { where: TestSettingWhere; select?: Record<string, boolean> }) => {
       return settingRows
         .filter((setting) => {
-          if (args.where.enabled !== undefined && setting.enabled !== args.where.enabled) {
-            return false;
-          }
-
-          return (
-            !nextSendAtLte ||
-            (setting.nextSendAt !== null && setting.nextSendAt.getTime() <= nextSendAtLte.getTime())
-          );
+          return matchesSettingWhere(setting, args.where);
         })
         .map((setting) => selectSettingFields(setting, args.select));
     },
@@ -89,19 +56,11 @@ export function createPriceReportSettingClient(settings: TestPriceReportSetting[
     },
   );
   const settingUpdateMany = vi.fn(
-    async (args: {
-      where: { id?: string; discordUserId?: string; enabled?: boolean };
-      data: Partial<TestPriceReportSetting>;
-    }) => {
+    async (args: { where: TestSettingWhere; data: Partial<TestPriceReportSetting> }) => {
       let count = 0;
 
       for (const setting of settingRows) {
-        if (
-          (args.where.id === undefined || setting.id === args.where.id) &&
-          (args.where.discordUserId === undefined ||
-            setting.discordUserId === args.where.discordUserId) &&
-          (args.where.enabled === undefined || setting.enabled === args.where.enabled)
-        ) {
+        if (matchesSettingWhere(setting, args.where)) {
           Object.assign(setting, args.data);
           count += 1;
         }
@@ -126,6 +85,9 @@ export function createPriceReportSettingClient(settings: TestPriceReportSetting[
         | "includePriceRises"
         | "includeNewProducts"
         | "enabled"
+        | "deliveryState"
+        | "consecutiveDeliveryFailures"
+        | "deliveryClaimedAt"
         | "nextSendAt"
         | "notificationCursorAt"
       >;
@@ -164,6 +126,69 @@ export function createPriceReportSettingClient(settings: TestPriceReportSetting[
     updateMany: settingUpdateMany,
     upsert: settingUpsert,
   };
+}
+
+interface TestSettingWhere {
+  id?: string;
+  discordUserId?: string;
+  enabled?: boolean;
+  deliveryState?: TestPriceReportSetting["deliveryState"];
+  deliveryClaimedAt?: Date | null | { gt?: Date; lte?: Date };
+  nextSendAt?: { lte?: Date; not?: null };
+  OR?: TestSettingWhere[];
+}
+
+function matchesSettingWhere(setting: TestPriceReportSetting, where: TestSettingWhere): boolean {
+  if (where.id !== undefined && setting.id !== where.id) {
+    return false;
+  }
+  if (where.discordUserId !== undefined && setting.discordUserId !== where.discordUserId) {
+    return false;
+  }
+  if (where.enabled !== undefined && setting.enabled !== where.enabled) {
+    return false;
+  }
+  if (where.deliveryState !== undefined && setting.deliveryState !== where.deliveryState) {
+    return false;
+  }
+  if (!matchesDateCondition(setting.deliveryClaimedAt, where.deliveryClaimedAt)) {
+    return false;
+  }
+  if (where.nextSendAt?.not === null && setting.nextSendAt === null) {
+    return false;
+  }
+  if (
+    where.nextSendAt?.lte &&
+    (setting.nextSendAt === null || setting.nextSendAt.getTime() > where.nextSendAt.lte.getTime())
+  ) {
+    return false;
+  }
+
+  return !where.OR || where.OR.some((condition) => matchesSettingWhere(setting, condition));
+}
+
+function matchesDateCondition(
+  value: Date | null,
+  condition: Date | null | { gt?: Date; lte?: Date } | undefined,
+): boolean {
+  if (condition === undefined) {
+    return true;
+  }
+  if (condition === null) {
+    return value === null;
+  }
+  if (condition instanceof Date) {
+    return value?.getTime() === condition.getTime();
+  }
+
+  if (value === null) {
+    return false;
+  }
+  if (condition.lte && value.getTime() > condition.lte.getTime()) {
+    return false;
+  }
+
+  return !condition.gt || value.getTime() > condition.gt.getTime();
 }
 
 function selectSettingFields(

@@ -1,6 +1,7 @@
 // apps/crawler/tests/scripts/ops/discord-bot/support/client.ts
 // 組合 Discord bot 測試用 fake Prisma client，讓互動、報告與 watch 測試共用資料入口。
 import type { DiscordBotClient } from "../../../../../src/scripts/ops/discord-bot/types";
+import { vi } from "vitest";
 import type {
   TestCrawlRun,
   TestDiscordNotificationDelivery,
@@ -51,18 +52,30 @@ export function createDiscordBotClient({
   });
 
   const targetPriceWatchClient = createTargetPriceWatchClient(watches, snapshots);
+  const discordNotificationDelivery = createNotificationDeliveryClient(deliveries);
+  const discordPriceReportSetting = createPriceReportSettingClient(settings);
+  const transaction = vi.fn(
+    async <T>(callback: (transactionClient: Record<string, unknown>) => Promise<T>): Promise<T> =>
+      (await targetPriceWatchClient.transaction(async (queryClient) =>
+        callback({
+          ...queryClient,
+          discordNotificationDelivery,
+          discordPriceReportSetting,
+        }),
+      )) as T,
+  );
 
   return asDiscordBotClient({
     crawlRun: publicReportClient.crawlRun,
     sourceCategory: priceReportReaderClient.sourceCategory,
     product: priceReportReaderClient.product,
     priceSnapshot: priceReportReaderClient.priceSnapshot,
-    discordNotificationDelivery: createNotificationDeliveryClient(deliveries),
+    discordNotificationDelivery,
     discordPublicPriceReportDelivery: publicReportClient.discordPublicPriceReportDelivery,
     discordPublicPriceReportSetting: publicReportClient.discordPublicPriceReportSetting,
-    discordPriceReportSetting: createPriceReportSettingClient(settings),
+    discordPriceReportSetting,
     discordTargetPriceWatch: targetPriceWatchClient.delegate,
-    $transaction: targetPriceWatchClient.transaction,
+    $transaction: transaction,
   });
 }
 
