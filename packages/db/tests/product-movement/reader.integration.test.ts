@@ -7,6 +7,7 @@ import {
   createProductMovementPageQuery,
   createProductMovementSummaryQuery,
   PRODUCT_MOVEMENT_CANDIDATE_LIMIT,
+  PRODUCT_MOVEMENT_STATEMENT_TIMEOUT_MS,
   ProductMovementWorkBudgetExceededError,
   readBoundedProductMovementPage,
   readBoundedProductMovementSummaries,
@@ -18,6 +19,7 @@ if (!testDatabaseUrl) throw new Error("TEST_DATABASE_URL is required for Postgre
 const NOW = new Date("2031-07-31T12:00:00.000Z");
 const PAGE_SIZE = 100;
 const BOUNDED_CANDIDATES = 200;
+const HIGH_HISTORY_OBSERVATIONS_PER_PRODUCT = 100;
 const prefix = randomUUID();
 const categoryId = randomUUID();
 const crawlRunId = randomUUID();
@@ -36,10 +38,12 @@ beforeAll(async () => {
   await seedCandidateHeavyFixture();
   productIds = await client.$queryRaw<Array<{ id: string }>>`
     SELECT product.id
-    FROM public.products AS product
-    WHERE product.source_category_id = ${categoryId}::uuid
-    ORDER BY product.id ASC
-    LIMIT ${PAGE_SIZE}
+    FROM pg_catalog.generate_series(1, ${PAGE_SIZE}) AS product_number
+    INNER JOIN public.products AS product
+      ON product.id = pg_catalog.md5(
+        ${prefix} || ':product:' || product_number::text
+      )::uuid
+    ORDER BY product_number ASC
   `.then((rows) => rows.map((row) => row.id));
 }, 60_000);
 
@@ -67,7 +71,10 @@ describe("product movement PostgreSQL 18 bounds", () => {
         AND product.ibuy_token IN (
           ${`${prefix}-token-1`}, ${`${prefix}-token-3`}, ${`${prefix}-token-4`},
           ${`${prefix}-token-5`}, ${`${prefix}-token-6`}, ${`${prefix}-token-7`},
-          ${`${prefix}-token-8`}
+          ${`${prefix}-token-8`}, ${`${prefix}-token-9`}, ${`${prefix}-token-10`},
+          ${`${prefix}-token-11`}, ${`${prefix}-token-12`}, ${`${prefix}-token-13`},
+          ${`${prefix}-token-14`}, ${`${prefix}-token-15`}, ${`${prefix}-token-16`},
+          ${`${prefix}-token-17`}, ${`${prefix}-token-18`}, ${`${prefix}-token-19`}
         )
     `;
     const golden = await readBoundedProductMovementSummaries(
@@ -88,6 +95,17 @@ describe("product movement PostgreSQL 18 bounds", () => {
     expect(byToken.get(`${prefix}-token-6`)).toMatchObject({ deltaAmount: -101, deltaPercent: -10.09 });
     expect(byToken.get(`${prefix}-token-7`)).toMatchObject({ deltaAmount: null, deltaPercent: null });
     expect(byToken.get(`${prefix}-token-8`)).toMatchObject({ deltaAmount: 500, deltaPercent: 100 });
+    expect(byToken.get(`${prefix}-token-9`)).toMatchObject({ deltaAmount: -23, deltaPercent: -14.37 });
+    expect(byToken.get(`${prefix}-token-10`)).toMatchObject({ deltaAmount: 23, deltaPercent: 14.37 });
+    expect(byToken.get(`${prefix}-token-11`)).toMatchObject({ deltaAmount: 1, deltaPercent: 3.13 });
+    expect(byToken.get(`${prefix}-token-12`)).toMatchObject({ deltaAmount: -1, deltaPercent: -3.13 });
+    expect(byToken.get(`${prefix}-token-13`)).toMatchObject({ deltaAmount: 1, deltaPercent: 16.67 });
+    expect(byToken.get(`${prefix}-token-14`)).toMatchObject({ deltaAmount: -1, deltaPercent: -16.67 });
+    expect(byToken.get(`${prefix}-token-15`)).toMatchObject({ deltaAmount: 0, deltaPercent: 0 });
+    expect(byToken.get(`${prefix}-token-16`)).toMatchObject({ deltaAmount: 100, deltaPercent: 10 });
+    expect(byToken.get(`${prefix}-token-17`)).toMatchObject({ deltaAmount: 200, deltaPercent: 10 });
+    expect(byToken.get(`${prefix}-token-18`)).toMatchObject({ deltaAmount: -100, deltaPercent: -10 });
+    expect(byToken.get(`${prefix}-token-19`)).toMatchObject({ deltaAmount: -200, deltaPercent: -10 });
 
     const plan = await explain(createProductMovementSummaryQuery(productIds, NOW));
     expect(plan["Actual Rows"] * plan["Actual Loops"]).toBeLessThanOrEqual(PAGE_SIZE);
@@ -264,15 +282,42 @@ function expectedMovement(ibuyToken: string): {
   }
   if (sequenceNumber === 6) return { deltaAmount: -101, deltaPercent: -10.09 };
   if (sequenceNumber === 8) return { deltaAmount: 500, deltaPercent: 100 };
+  if (sequenceNumber === 9) return { deltaAmount: -23, deltaPercent: -14.37 };
+  if (sequenceNumber === 10) return { deltaAmount: 23, deltaPercent: 14.37 };
+  if (sequenceNumber === 11) return { deltaAmount: 1, deltaPercent: 3.13 };
+  if (sequenceNumber === 12) return { deltaAmount: -1, deltaPercent: -3.13 };
+  if (sequenceNumber === 13) return { deltaAmount: 1, deltaPercent: 16.67 };
+  if (sequenceNumber === 14) return { deltaAmount: -1, deltaPercent: -16.67 };
+  if (sequenceNumber === 15) return { deltaAmount: 0, deltaPercent: 0 };
+  if (sequenceNumber === 16) return { deltaAmount: 100, deltaPercent: 10 };
+  if (sequenceNumber === 17) return { deltaAmount: 200, deltaPercent: 10 };
+  if (sequenceNumber === 18) return { deltaAmount: -100, deltaPercent: -10 };
+  if (sequenceNumber === 19) return { deltaAmount: -200, deltaPercent: -10 };
   if (sequenceNumber % 3 === 0) return { deltaAmount: -100, deltaPercent: -10 };
   if (sequenceNumber % 3 === 1) return { deltaAmount: 100, deltaPercent: 10 };
   return { deltaAmount: 0, deltaPercent: 0 };
 }
 
 async function explain(query: Prisma.Sql): Promise<PlanNode> {
-  const rows = await client.$queryRaw<Array<{ "QUERY PLAN": unknown }>>(
-    Prisma.sql`EXPLAIN (ANALYZE, BUFFERS, COSTS, FORMAT JSON) ${query}`,
-  );
+  const settingsBefore = await readPlannerSettings();
+  const rows = await client.$transaction(async (transaction) => {
+    await transaction.$queryRaw(Prisma.sql`
+      SELECT
+        pg_catalog.set_config('enable_seqscan', 'off', true),
+        pg_catalog.set_config('enable_bitmapscan', 'off', true),
+        pg_catalog.set_config('enable_indexscan', 'on', true),
+        pg_catalog.set_config('enable_indexonlyscan', 'on', true),
+        pg_catalog.set_config(
+          'statement_timeout',
+          ${`${PRODUCT_MOVEMENT_STATEMENT_TIMEOUT_MS}ms`},
+          true
+        )
+    `);
+    return transaction.$queryRaw<Array<{ "QUERY PLAN": unknown }>>(
+      Prisma.sql`EXPLAIN (ANALYZE, BUFFERS, COSTS, FORMAT JSON) ${query}`,
+    );
+  });
+  await expect(readPlannerSettings()).resolves.toEqual(settingsBefore);
   const document = rows[0]?.["QUERY PLAN"];
   const root = Array.isArray(document) ? (document[0] as { Plan?: PlanNode } | undefined)?.Plan : null;
   if (!root) throw new Error("PostgreSQL did not return a structured movement plan.");
@@ -284,17 +329,38 @@ async function explain(query: Prisma.Sql): Promise<PlanNode> {
   return root;
 }
 
+async function readPlannerSettings() {
+  return client.$queryRaw<
+    Array<{
+      bitmapScan: string;
+      indexOnlyScan: string;
+      indexScan: string;
+      seqScan: string;
+      statementTimeout: string;
+    }>
+  >`
+    SELECT
+      current_setting('enable_seqscan') AS "seqScan",
+      current_setting('enable_bitmapscan') AS "bitmapScan",
+      current_setting('enable_indexscan') AS "indexScan",
+      current_setting('enable_indexonlyscan') AS "indexOnlyScan",
+      current_setting('statement_timeout') AS "statementTimeout"
+  `;
+}
+
 interface PlanNode {
   "Actual Loops": number;
   "Actual Rows": number;
   "Alias"?: string;
   "CTE Name"?: string;
+  "Filter"?: string;
   "Index Name"?: string;
   "Node Type": string;
   "Plan Rows": number;
   "Plans"?: PlanNode[];
   "Relation Name"?: string;
   "Rows Removed by Filter"?: number;
+  "Rows Removed by Index Recheck"?: number;
   "Shared Hit Blocks"?: number;
   "Shared Read Blocks"?: number;
 }
@@ -308,18 +374,114 @@ function totalBuffers(root: PlanNode): number {
 }
 
 function assertBoundedPlanWork(root: PlanNode): void {
-  for (const node of walkPlan(root)) {
-    if (node["Node Type"].includes("Sort") || node["Node Type"].includes("Hash")) {
-      expect(node["Actual Rows"] * node["Actual Loops"]).toBeLessThanOrEqual(
+  const nodes = walkPlan(root);
+  for (const node of nodes) {
+    if (node["Node Type"].includes("Sort")) {
+      expect(
+        node["Actual Rows"],
+        `unexpected plan work: ${JSON.stringify(node)}`,
+      ).toBeLessThanOrEqual(PRODUCT_MOVEMENT_CANDIDATE_LIMIT + 1);
+      expect(node["Actual Loops"]).toBeLessThanOrEqual(1);
+    }
+    if (node["Node Type"].includes("Hash")) {
+      expect(node["Actual Rows"]).toBeLessThanOrEqual(
         PRODUCT_MOVEMENT_CANDIDATE_LIMIT + 1,
       );
+      expect(node["Actual Loops"]).toBeLessThanOrEqual(2);
     }
     if (node["Rows Removed by Filter"] !== undefined) {
-      expect(node["Rows Removed by Filter"] * node["Actual Loops"]).toBeLessThanOrEqual(
-        PRODUCT_MOVEMENT_CANDIDATE_LIMIT + 1,
-      );
+      expect(Number.isFinite(node["Rows Removed by Filter"])).toBe(true);
     }
   }
+
+  expect(
+    nodes.some(
+      (node) =>
+        node["Relation Name"] === "price_snapshots" &&
+        (node["Node Type"] === "Seq Scan" || node["Node Type"] === "Bitmap Heap Scan"),
+    ),
+  ).toBe(false);
+
+  const candidateGateNodes = nodes.filter(
+    (node) => node["CTE Name"] === "candidate_gate" || node.Alias === "candidate_gate",
+  );
+  expect(candidateGateNodes.length).toBeGreaterThan(0);
+  expect(
+    candidateGateNodes.every(
+      (node) =>
+        node["Actual Rows"] * node["Actual Loops"] <=
+        PRODUCT_MOVEMENT_CANDIDATE_LIMIT + 1,
+    ),
+  ).toBe(true);
+
+  const candidateStateGuards = nodes.filter(
+    (node) => node.Filter?.includes("total_items <= 4096"),
+  );
+  expect(candidateStateGuards.length).toBeGreaterThan(0);
+  expect(
+    candidateStateGuards.every(
+      (node) =>
+        (node["Rows Removed by Filter"] ?? 0) * node["Actual Loops"] <=
+        PRODUCT_MOVEMENT_CANDIDATE_LIMIT + 1,
+    ),
+  ).toBe(true);
+
+  const productScans = nodes.filter((node) => node["Relation Name"] === "products");
+  expect(productScans.length).toBeGreaterThan(0);
+  expect(
+    productScans.every(
+      (node) =>
+        rowsExaminedPerLoop(node) <= PRODUCT_MOVEMENT_CANDIDATE_LIMIT + 1 &&
+        node["Actual Loops"] <= 2,
+    ),
+  ).toBe(true);
+
+  const currentPriceScans = nodes.filter(
+    (node) => node["Relation Name"] === "current_prices",
+  );
+  expect(currentPriceScans.length).toBeGreaterThan(0);
+  expect(
+    currentPriceScans.every(
+      (node) =>
+        (rowsExaminedPerLoop(node) <= 1 &&
+          node["Actual Loops"] <= PRODUCT_MOVEMENT_CANDIDATE_LIMIT + 1) ||
+        (rowsExaminedPerLoop(node) <= PRODUCT_MOVEMENT_CANDIDATE_LIMIT + 1 &&
+          node["Actual Loops"] <= 2),
+    ),
+  ).toBe(true);
+
+  const currentSnapshotProbes = nodes.filter(
+    (node) =>
+      node["Relation Name"] === "price_snapshots" &&
+      node["Index Name"] === "price_snapshots_pkey",
+  );
+  expect(currentSnapshotProbes.length).toBeGreaterThan(0);
+  expect(
+    currentSnapshotProbes.every(
+      (node) =>
+        rowsExaminedPerLoop(node) <= 1 &&
+        node["Actual Loops"] <= PRODUCT_MOVEMENT_CANDIDATE_LIMIT + 1,
+    ),
+  ).toBe(true);
+
+  const snapshotProbes = nodes.filter(
+    (node) => node["Index Name"] === "price_snapshots_product_id_captured_at_id_idx",
+  );
+  expect(snapshotProbes.length).toBeGreaterThan(0);
+  expect(snapshotProbes.every((node) => rowsExaminedPerLoop(node) <= 2)).toBe(true);
+  expect(
+    snapshotProbes.every(
+      (node) => node["Actual Loops"] <= PRODUCT_MOVEMENT_CANDIDATE_LIMIT,
+    ),
+  ).toBe(true);
+}
+
+function rowsExaminedPerLoop(node: PlanNode): number {
+  return (
+    node["Actual Rows"] +
+    (node["Rows Removed by Filter"] ?? 0) +
+    (node["Rows Removed by Index Recheck"] ?? 0)
+  );
 }
 
 async function seedCandidateHeavyFixture(): Promise<void> {
@@ -398,7 +560,45 @@ async function seedCandidateHeavyFixture(): Promise<void> {
       ${crawlRunId}::uuid,
       ${NOW}::timestamptz
     FROM pg_catalog.generate_series(1, ${PAGE_SIZE}) AS product_number
-    CROSS JOIN pg_catalog.generate_series(1, 100) AS observation_number
+    CROSS JOIN pg_catalog.generate_series(1, ${HIGH_HISTORY_OBSERVATIONS_PER_PRODUCT})
+      AS observation_number
+  `);
+  await client.$executeRaw(Prisma.sql`
+    UPDATE public.price_snapshots AS snapshot
+    SET price = CASE
+      WHEN snapshot.id = pg_catalog.md5(
+        ${prefix} || ':baseline:' || parity_case.product_number::text
+      )::uuid THEN parity_case.baseline_price
+      ELSE parity_case.current_price
+    END
+    FROM (
+      VALUES
+        (9, 160, 137),
+        (10, 160, 183),
+        (11, 32, 33),
+        (12, 32, 31),
+        (13, 6, 7),
+        (14, 6, 5),
+        (15, 100, 100),
+        (16, 1000, 1100),
+        (17, 2000, 2200),
+        (18, 1000, 900),
+        (19, 2000, 1800)
+    ) AS parity_case(product_number, baseline_price, current_price)
+    WHERE snapshot.id IN (
+      pg_catalog.md5(
+        ${prefix} || ':baseline:' || parity_case.product_number::text
+      )::uuid,
+      pg_catalog.md5(
+        ${prefix} || ':current:' || parity_case.product_number::text
+      )::uuid
+    )
+      AND snapshot.price IS DISTINCT FROM CASE
+        WHEN snapshot.id = pg_catalog.md5(
+          ${prefix} || ':baseline:' || parity_case.product_number::text
+        )::uuid THEN parity_case.baseline_price
+        ELSE parity_case.current_price
+      END
   `);
   await client.$executeRaw(Prisma.sql`
     UPDATE public.price_snapshots

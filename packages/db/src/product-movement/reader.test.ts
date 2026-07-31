@@ -19,6 +19,19 @@ const IDS = [
   "11111111-1111-1111-1111-111111111111",
   "22222222-2222-2222-2222-222222222222",
 ] as const;
+const VALID_INDEX_STATE = {
+  accessMethod: "btree",
+  hasNoPredicate: true,
+  isLive: true,
+  isReady: true,
+  isValid: true,
+  keyAttributeCount: 3,
+  keyNames: ["product_id", "captured_at", "id"],
+  keyOptions: [0, 3, 3],
+  tableName: "price_snapshots",
+  tableSchema: "public",
+  totalAttributeCount: 3,
+};
 
 describe("bounded product movement reader", () => {
   it("uses one bounded summary query and returns at most one row per page product", async () => {
@@ -37,6 +50,7 @@ describe("bounded product movement reader", () => {
     });
     expect(client.queries).toHaveLength(3);
     expect(client.queries[0]?.sql).toContain("statement_timeout");
+    expect(client.queries[0]?.sql).toContain("enable_seqscan");
     expect(client.queries[0]?.values).toContain(`${PRODUCT_MOVEMENT_STATEMENT_TIMEOUT_MS}ms`);
     expect(client.queries[1]?.values).toContain("price_snapshots_product_id_captured_at_id_idx");
     expect(client.queries[2]?.sql).toContain("LIMIT 1");
@@ -124,10 +138,48 @@ describe("bounded product movement reader", () => {
       ProductMovementReadUnavailableError,
     );
 
-    const missingIndex = fakeClient([], { indexReady: false });
+    const missingIndex = fakeClient([], { indexRows: [] });
     await expect(readBoundedProductMovementSummaries(missingIndex, IDS, NOW)).rejects.toBeInstanceOf(
       ProductMovementReadUnavailableError,
     );
+  });
+
+  it("fails closed when the snapshot index is partial or not the exact key contract", async () => {
+    for (const indexState of [
+      { hasNoPredicate: false },
+      { keyAttributeCount: 2 },
+      { totalAttributeCount: 4 },
+      { keyNames: ["product_id", "id", "captured_at"] },
+      { keyOptions: [0, 0, 3] },
+      { isValid: false },
+    ]) {
+      const client = fakeClient([], { indexRows: [{ ...VALID_INDEX_STATE, ...indexState }] });
+      await expect(readBoundedProductMovementSummaries(client, IDS, NOW)).rejects.toBeInstanceOf(
+        ProductMovementReadUnavailableError,
+      );
+      expect(client.queries).toHaveLength(2);
+    }
+
+    const catalogFailure = fakeClient([], { indexError: new Error("catalog unavailable") });
+    await expect(
+      readBoundedProductMovementSummaries(catalogFailure, IDS, NOW),
+    ).rejects.toBeInstanceOf(ProductMovementReadUnavailableError);
+  });
+
+  it("fails closed when the transaction work guard cannot be applied exactly", async () => {
+    const configFailure = fakeClient([], { configError: new Error("set_config unavailable") });
+    await expect(
+      readBoundedProductMovementSummaries(configFailure, IDS, NOW),
+    ).rejects.toBeInstanceOf(ProductMovementReadUnavailableError);
+    expect(configFailure.queries).toHaveLength(1);
+
+    const invalidSeqScan = fakeClient([], {
+      configRows: [validConfigState({ seqScan: "on" })],
+    });
+    await expect(
+      readBoundedProductMovementSummaries(invalidSeqScan, IDS, NOW),
+    ).rejects.toBeInstanceOf(ProductMovementReadUnavailableError);
+    expect(invalidSeqScan.queries).toHaveLength(1);
   });
 
   it("builds only allowlisted movement ordering and parameterized values", () => {
@@ -156,7 +208,13 @@ describe("bounded product movement reader", () => {
 
 function fakeClient(
   finalRows: unknown[],
-  options: { finalError?: unknown; indexReady?: boolean } = {},
+  options: {
+    configError?: unknown;
+    configRows?: unknown[];
+    finalError?: unknown;
+    indexError?: unknown;
+    indexRows?: unknown[];
+  } = {},
 ): ProductMovementReadClient & {
   options?: { isolationLevel?: "RepeatableRead"; timeout?: number };
   queries: Prisma.Sql[];
@@ -176,16 +234,13 @@ function fakeClient(
           queries.push(query);
           call += 1;
           if (call === 1) {
-            return [
-              {
-                bitmapScan: "off",
-                indexOnlyScan: "on",
-                indexScan: "on",
-                statementTimeout: `${PRODUCT_MOVEMENT_STATEMENT_TIMEOUT_MS}ms`,
-              },
-            ] as R;
+            if (options.configError) throw options.configError;
+            return (options.configRows ?? [validConfigState()]) as R;
           }
-          if (call === 2) return [{ ready: options.indexReady ?? true }] as R;
+          if (call === 2) {
+            if (options.indexError) throw options.indexError;
+            return (options.indexRows ?? [VALID_INDEX_STATE]) as R;
+          }
           if (options.finalError) throw options.finalError;
           return finalRows as R;
         },
@@ -193,6 +248,17 @@ function fakeClient(
     },
   };
   return client;
+}
+
+function validConfigState(overrides: { seqScan?: string } = {}) {
+  return {
+    bitmapScan: "off",
+    indexOnlyScan: "on",
+    indexScan: "on",
+    seqScan: "off",
+    statementTimeout: `${PRODUCT_MOVEMENT_STATEMENT_TIMEOUT_MS}ms`,
+    ...overrides,
+  };
 }
 
 function finalRow(

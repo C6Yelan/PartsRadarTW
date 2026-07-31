@@ -50,6 +50,20 @@ interface RawProductMovementSummary {
   totalItems: number;
 }
 
+interface SnapshotIndexState {
+  accessMethod: string;
+  hasNoPredicate: boolean;
+  isLive: boolean;
+  isReady: boolean;
+  isValid: boolean;
+  keyAttributeCount: number;
+  keyNames: string[];
+  keyOptions: number[];
+  tableName: string;
+  tableSchema: string;
+  totalAttributeCount: number;
+}
+
 export class ProductMovementWorkBudgetExceededError extends Error {
   override readonly name = "ProductMovementWorkBudgetExceededError";
 
@@ -160,29 +174,35 @@ async function runBoundedTransaction<T>(
 }
 
 async function configureTransaction(transaction: ProductMovementTransactionClient): Promise<void> {
-  const rows = await transaction.$queryRaw<
-    Array<{
-      bitmapScan: string;
-      indexOnlyScan: string;
-      indexScan: string;
-      statementTimeout: string;
-    }>
-  >(Prisma.sql`
-    SELECT
-      pg_catalog.set_config('enable_bitmapscan', 'off', true) AS "bitmapScan",
-      pg_catalog.set_config('enable_indexscan', 'on', true) AS "indexScan",
-      pg_catalog.set_config('enable_indexonlyscan', 'on', true) AS "indexOnlyScan",
-      pg_catalog.set_config(
-        'statement_timeout',
-        ${`${PRODUCT_MOVEMENT_STATEMENT_TIMEOUT_MS}ms`},
-        true
-      ) AS "statementTimeout"
-  `);
+  let rows: Array<{
+    bitmapScan: string;
+    indexOnlyScan: string;
+    indexScan: string;
+    seqScan: string;
+    statementTimeout: string;
+  }>;
+  try {
+    rows = await transaction.$queryRaw(Prisma.sql`
+      SELECT
+        pg_catalog.set_config('enable_seqscan', 'off', true) AS "seqScan",
+        pg_catalog.set_config('enable_bitmapscan', 'off', true) AS "bitmapScan",
+        pg_catalog.set_config('enable_indexscan', 'on', true) AS "indexScan",
+        pg_catalog.set_config('enable_indexonlyscan', 'on', true) AS "indexOnlyScan",
+        pg_catalog.set_config(
+          'statement_timeout',
+          ${`${PRODUCT_MOVEMENT_STATEMENT_TIMEOUT_MS}ms`},
+          true
+        ) AS "statementTimeout"
+    `);
+  } catch {
+    throw new ProductMovementReadUnavailableError();
+  }
   const guard = rows[0];
 
   if (
     rows.length !== 1 ||
     !guard ||
+    guard.seqScan !== "off" ||
     guard.bitmapScan !== "off" ||
     guard.indexScan !== "on" ||
     guard.indexOnlyScan !== "on" ||
@@ -193,31 +213,66 @@ async function configureTransaction(transaction: ProductMovementTransactionClien
 }
 
 async function assertSnapshotIndex(transaction: ProductMovementTransactionClient): Promise<void> {
-  const rows = await transaction.$queryRaw<Array<{ ready: boolean }>>(Prisma.sql`
-    SELECT EXISTS (
-      SELECT 1
-      FROM pg_catalog.pg_index AS index_metadata
-      INNER JOIN pg_catalog.pg_class AS index_relation
-        ON index_relation.oid = index_metadata.indexrelid
+  let rows: SnapshotIndexState[];
+  try {
+    rows = await transaction.$queryRaw<SnapshotIndexState[]>(Prisma.sql`
+      SELECT
+        table_namespace.nspname AS "tableSchema",
+        table_relation.relname AS "tableName",
+        index_method.amname AS "accessMethod",
+        index_metadata.indisvalid AS "isValid",
+        index_metadata.indisready AS "isReady",
+        index_metadata.indislive AS "isLive",
+        index_metadata.indnkeyatts AS "keyAttributeCount",
+        index_metadata.indnatts AS "totalAttributeCount",
+        index_metadata.indpred IS NULL AS "hasNoPredicate",
+        ARRAY(
+          SELECT attribute.attname::text
+          FROM pg_catalog.unnest(index_metadata.indkey::smallint[]) WITH ORDINALITY
+            AS index_key(attribute_number, position)
+          INNER JOIN pg_catalog.pg_attribute AS attribute
+            ON attribute.attrelid = index_metadata.indrelid
+            AND attribute.attnum = index_key.attribute_number
+          ORDER BY index_key.position
+        ) AS "keyNames",
+        index_metadata.indoption::smallint[] AS "keyOptions"
+      FROM pg_catalog.pg_class AS index_relation
+      INNER JOIN pg_catalog.pg_namespace AS index_namespace
+        ON index_namespace.oid = index_relation.relnamespace
+      INNER JOIN pg_catalog.pg_index AS index_metadata
+        ON index_metadata.indexrelid = index_relation.oid
       INNER JOIN pg_catalog.pg_class AS table_relation
         ON table_relation.oid = index_metadata.indrelid
-      INNER JOIN pg_catalog.pg_namespace AS relation_namespace
-        ON relation_namespace.oid = index_relation.relnamespace
+      INNER JOIN pg_catalog.pg_namespace AS table_namespace
+        ON table_namespace.oid = table_relation.relnamespace
       INNER JOIN pg_catalog.pg_am AS index_method
         ON index_method.oid = index_relation.relam
-      WHERE relation_namespace.nspname = current_schema()
-        AND table_relation.relname = 'price_snapshots'
+      WHERE index_namespace.nspname = 'public'
         AND index_relation.relname = ${PRODUCT_MOVEMENT_INDEX_NAME}
-        AND index_method.amname = 'btree'
-        AND index_metadata.indisvalid = TRUE
-        AND index_metadata.indisready = TRUE
-        AND index_metadata.indislive = TRUE
-        AND pg_catalog.pg_get_indexdef(index_metadata.indexrelid)
-          LIKE '%(product_id, captured_at DESC, id DESC)%'
-    ) AS ready
-  `);
+    `);
+  } catch {
+    throw new ProductMovementReadUnavailableError();
+  }
 
-  if (rows.length !== 1 || rows[0]?.ready !== true) {
+  const index = rows[0];
+  if (
+    rows.length !== 1 ||
+    !index ||
+    index.tableSchema !== "public" ||
+    index.tableName !== "price_snapshots" ||
+    index.accessMethod !== "btree" ||
+    !index.isValid ||
+    !index.isReady ||
+    !index.isLive ||
+    index.keyAttributeCount !== 3 ||
+    index.totalAttributeCount !== 3 ||
+    !index.hasNoPredicate ||
+    index.keyNames.join(",") !== "product_id,captured_at,id" ||
+    index.keyOptions.length !== 3 ||
+    ((index.keyOptions[0] ?? 0) & 1) !== 0 ||
+    ((index.keyOptions[1] ?? 0) & 1) !== 1 ||
+    ((index.keyOptions[2] ?? 0) & 1) !== 1
+  ) {
     throw new ProductMovementReadUnavailableError();
   }
 }
@@ -339,12 +394,20 @@ function createMovementQuery(
   const pageClause = pagination
     ? Prisma.sql`LIMIT ${pagination.pageSize} OFFSET ${pagination.offset}`
     : Prisma.empty;
+  const deltaAmount = Prisma.sql`current_snapshot.price - baseline.price`;
+  const deltaPercent = createLegacyDeltaPercentExpression(deltaAmount, Prisma.sql`baseline.price`);
 
   return Prisma.sql`
     WITH candidates AS MATERIALIZED (${candidateQuery}),
     candidate_state AS (
       SELECT pg_catalog.count(*)::integer AS total_items
       FROM candidates
+    ),
+    candidate_gate AS MATERIALIZED (
+      SELECT candidate.product_id, candidate.ordinal
+      FROM candidates AS candidate
+      CROSS JOIN candidate_state
+      WHERE candidate_state.total_items <= ${PRODUCT_MOVEMENT_CANDIDATE_LIMIT}
     ),
     movement AS (
       SELECT
@@ -355,7 +418,7 @@ function createMovementQuery(
           WHEN baseline.before_range IS FALSE
             AND range_observations.observation_count = 1
             AND range_observations.first_captured_at = current_price.last_seen_at THEN NULL
-          ELSE current_snapshot.price - baseline.price
+          ELSE ${deltaAmount}
         END AS delta_amount,
         CASE
           WHEN current_price.last_seen_at < ${since}::timestamptz
@@ -364,13 +427,9 @@ function createMovementQuery(
           WHEN baseline.before_range IS FALSE
             AND range_observations.observation_count = 1
             AND range_observations.first_captured_at = current_price.last_seen_at THEN NULL
-          ELSE pg_catalog.round(
-            ((current_snapshot.price - baseline.price)::numeric / baseline.price::numeric) * 100,
-            2
-          )
+          ELSE ${deltaPercent}
         END AS delta_percent
-      FROM candidates AS candidate
-      CROSS JOIN candidate_state
+      FROM candidate_gate AS candidate
       INNER JOIN public.current_prices AS current_price
         ON current_price.product_id = candidate.product_id
       INNER JOIN public.price_snapshots AS current_snapshot
@@ -406,7 +465,6 @@ function createMovementQuery(
           coalesce(before_range.price, range_observations.first_price) AS price,
           (before_range.price IS NOT NULL) AS before_range
       ) AS baseline ON TRUE
-      WHERE candidate_state.total_items <= ${PRODUCT_MOVEMENT_CANDIDATE_LIMIT}
     ),
     page AS MATERIALIZED (
       SELECT ordered.*, pg_catalog.row_number() OVER () AS page_order
@@ -437,6 +495,48 @@ function createMovementQuery(
     FROM candidate_state
     WHERE NOT EXISTS (SELECT 1 FROM page)
     ORDER BY "pageOrder" ASC
+  `;
+}
+
+function createLegacyDeltaPercentExpression(
+  deltaAmount: Prisma.Sql,
+  baselinePrice: Prisma.Sql,
+): Prisma.Sql {
+  // Preserve legacy Number(...toFixed(2)) by rounding the exact final IEEE-754 value.
+  return Prisma.sql`
+    (
+      SELECT pg_catalog.round(
+        (CASE substring(ieee.bits FROM 1 FOR 1)::integer WHEN 1 THEN -1 ELSE 1 END)::numeric
+          * (
+            CASE substring(ieee.bits FROM 2 FOR 11)::integer
+              WHEN 0 THEN 0::numeric
+              ELSE 4503599627370496::numeric
+            END
+            + substring(ieee.bits FROM 13 FOR 52)::bigint::numeric
+          )
+          / pg_catalog.power(
+            2::numeric,
+            CASE substring(ieee.bits FROM 2 FOR 11)::integer
+              WHEN 0 THEN 1074
+              ELSE 1075 - substring(ieee.bits FROM 2 FOR 11)::integer
+            END
+          )
+          * 100::numeric,
+        0
+      ) / 100::numeric
+      FROM (
+        SELECT (
+          'x' || pg_catalog.encode(
+            pg_catalog.float8send(
+              (${deltaAmount})::double precision
+                / (${baselinePrice})::double precision
+                * 100::double precision
+            ),
+            'hex'
+          )
+        )::bit(64) AS bits
+      ) AS ieee
+    )
   `;
 }
 
