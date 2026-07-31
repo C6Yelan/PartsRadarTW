@@ -266,6 +266,89 @@ describe("target price notification delivery", () => {
     );
   });
 
+  it("stops on a global rate limit and releases claims for users not yet attempted", async () => {
+    const firstProductId = "70000000-0000-4000-8000-000000000001";
+    const secondProductId = "70000000-0000-4000-8000-000000000002";
+    const firstWatchId = "71000000-0000-4000-8000-000000000001";
+    const secondWatchId = "71000000-0000-4000-8000-000000000002";
+    const now = new Date("2026-06-07T05:00:00.000Z");
+    const client = createDiscordBotClient({
+      snapshots: [
+        snapshot({
+          id: "snapshot-rate-limit-1",
+          productId: firstProductId,
+          productName: "First rate-limited product",
+          crawlRunId: "new-run",
+          price: 9_000,
+          capturedAt: "2026-06-07T04:55:00.000Z",
+        }),
+        snapshot({
+          id: "snapshot-rate-limit-2",
+          productId: secondProductId,
+          productName: "Second deferred product",
+          crawlRunId: "new-run",
+          price: 9_000,
+          capturedAt: "2026-06-07T04:55:00.000Z",
+        }),
+      ],
+      watches: [
+        targetPriceWatch({
+          id: firstWatchId,
+          discordUserId: "test-rate-limit-user-a",
+          productId: firstProductId,
+          targetPrice: 10_000,
+          updatedAt: new Date("2026-06-07T00:00:00.000Z"),
+        }),
+        targetPriceWatch({
+          id: secondWatchId,
+          discordUserId: "test-rate-limit-user-b",
+          productId: secondProductId,
+          targetPrice: 10_000,
+          updatedAt: new Date("2026-06-07T00:00:01.000Z"),
+        }),
+      ],
+    });
+    const sendDirectMessages = vi.fn(
+      async (_discordUserId: string, _messages: DiscordBotMessage[]) => ({
+        status: "rate_limited" as const,
+        messageCount: 1,
+        sentMessageCount: 0,
+        retryAfterMs: 30_000,
+        global: true,
+        httpStatus: 429,
+        errorCategory: "RATE_LIMITED" as const,
+        providerErrorCode: null,
+      }),
+    );
+
+    await expect(
+      sendDueTargetPriceNotifications({
+        client,
+        publicBaseUrl: PUBLIC_BASE_URL,
+        now,
+        sendDirectMessages,
+      }),
+    ).resolves.toMatchObject({
+      scannedCount: 2,
+      dueCount: 2,
+      processedCount: 1,
+      rateLimitedCount: 1,
+      sentCount: 0,
+    });
+    expect(sendDirectMessages).toHaveBeenCalledTimes(1);
+    expect(sendDirectMessages.mock.calls[0]?.[0]).toBe("test-rate-limit-user-a");
+    expect(client.discordTargetPriceWatch.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: { in: [secondWatchId] },
+        lastNotifiedAt: null,
+        notificationClaimedAt: now,
+      },
+      data: {
+        notificationClaimedAt: null,
+      },
+    });
+  });
+
   it("does not send or write a delivery when an erased watch disappears after claim", async () => {
     const client = createDiscordBotClient({
       snapshots: [
@@ -287,10 +370,7 @@ describe("target price notification delivery", () => {
         }),
       ],
     });
-    const originalFindMany = client.discordTargetPriceWatch.findMany.getMockImplementation();
-    client.discordTargetPriceWatch.findMany
-      .mockImplementationOnce(originalFindMany as never)
-      .mockResolvedValueOnce([]);
+    client.discordTargetPriceWatch.findMany.mockResolvedValueOnce([]);
     const sendDirectMessages = vi.fn();
 
     await sendDueTargetPriceNotifications({
