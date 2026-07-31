@@ -28,6 +28,7 @@ export const RATE_LIMIT_DEFAULTS = {
 
 export const RATE_LIMIT_LOG_DEFAULTS = {
   individualDenialsPerWindow: 1,
+  saturationSummaryIntervalMs: 60_000,
   stateCapacity: 256,
 } as const;
 
@@ -107,6 +108,7 @@ interface RateLimitDenialLogState {
 }
 
 interface RateLimitLogSaturationState {
+  nextSummaryAtMs: number;
   suppressedByScope: Record<RateLimitScope, number>;
   untilMs: number;
 }
@@ -160,8 +162,8 @@ export function checkRateLimit(
 }
 
 // 每個 client/scope/window 只輸出固定數量的個別 denial，其餘在 state rollover 時彙整成
-// 一筆 exact count；unique-key churn 達容量後切到全域 aggregation，
-// 直到所有已觀察 window 結束，避免 LRU eviction 重新取得個別 log budget。
+// 一筆 exact count；unique-key churn 達容量後切到固定週期的全域 aggregation，並持續到
+// 所有已觀察 window 結束，避免 LRU eviction 重新取得個別 log budget。
 export function createRateLimitDenialLogger(
   options: RateLimitDenialLoggerOptions = {},
 ): RateLimitDenialLogger {
@@ -223,9 +225,11 @@ export function createRateLimitDenialLogger(
         });
       }
     }
+
+    state.suppressedByScope = emptySuppressedCounts();
   }
 
-  function enterSaturation(decision: RateLimitDecision): void {
+  function enterSaturation(decision: RateLimitDecision, now: number): void {
     const suppressedByScope = emptySuppressedCounts();
     let untilMs = decision.resetEpochSeconds * 1000;
 
@@ -236,7 +240,11 @@ export function createRateLimitDenialLogger(
 
     incrementSuppressedCount(suppressedByScope, decision.scope);
     states.clear();
-    saturation = { suppressedByScope, untilMs };
+    saturation = {
+      nextSummaryAtMs: now + RATE_LIMIT_LOG_DEFAULTS.saturationSummaryIntervalMs,
+      suppressedByScope,
+      untilMs,
+    };
   }
 
   return {
@@ -246,6 +254,9 @@ export function createRateLimitDenialLogger(
       if (saturation && now >= saturation.untilMs) {
         flushSaturation(saturation);
         saturation = null;
+      } else if (saturation && now >= saturation.nextSummaryAtMs) {
+        flushSaturation(saturation);
+        saturation.nextSummaryAtMs = now + RATE_LIMIT_LOG_DEFAULTS.saturationSummaryIntervalMs;
       }
 
       if (saturation) {
@@ -273,7 +284,7 @@ export function createRateLimitDenialLogger(
 
       if (!state) {
         if (states.size >= stateCapacity) {
-          enterSaturation(decision);
+          enterSaturation(decision, now);
           return;
         }
 

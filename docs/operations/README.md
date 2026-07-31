@@ -76,8 +76,8 @@ Web API rate-limit denial logging 以每個 process 最多 256 個 LRU state 控
 scope／sanitized client hash／window 只輸出第一筆 `api_rate_limited`，其餘事件在 window
 切換時以一筆 `api_rate_limit_suppressed` 和 `suppressedCount` 彙整。Unique-key churn 達
 容量時改為全域 suppression，直到已觀察的 limiter windows 結束，再依 scope 輸出固定最多
-六筆 `api_rate_limit_saturated` 摘要（安靜後由下一次 request 觸發）；這避免 LRU eviction
-重新取得個別 log budget。Log
+六筆 `api_rate_limit_saturated` 摘要；持續流量期間也由跨過每個固定 60 秒邊界後的第一次
+request 被動輸出同樣有界的摘要。這避免 LRU eviction 重新取得個別 log budget。Log
 只包含既有 16 字元 hash、client source、scope 與配額欄位，不包含 raw IP、headers、body
 或 query。Process restart 會清空這項純 observability state，但不影響 rate-limit decision
 與 HTTP contract。

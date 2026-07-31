@@ -416,6 +416,38 @@ describe("API rate limiter", () => {
     expect(saturationLogger.stateSize()).toBe(1);
   });
 
+  it("emits bounded periodic summaries during continuous unique-key churn", () => {
+    let nowMs = 2_000_000;
+    const entries: RateLimitLogEntry[] = [];
+    const logger = createRateLimitDenialLogger({
+      nowMs: () => nowMs,
+      stateCapacity: 2,
+      write: (entry) => entries.push(entry),
+    });
+    const resetEpochSeconds = () => (nowMs + 60_000) / 1000;
+
+    logger.observe(deniedDecision("initial-a", resetEpochSeconds()));
+    logger.observe(deniedDecision("initial-b", resetEpochSeconds()));
+    logger.observe(deniedDecision("initial-c", resetEpochSeconds()));
+
+    for (let second = 1; second <= 180; second += 1) {
+      nowMs = 2_000_000 + second * 1000;
+      const entryCountBefore = entries.length;
+
+      logger.observe(deniedDecision(`continuous-${second}`, resetEpochSeconds()));
+
+      expect(entries.length - entryCountBefore).toBeLessThanOrEqual(1);
+      expect(logger.stateSize()).toBe(1);
+    }
+
+    expect(
+      entries
+        .filter((entry) => entry.event === "api_rate_limit_saturated")
+        .map((entry) => entry.suppressedCount),
+    ).toEqual([60, 60, 60]);
+    expect(entries.filter((entry) => entry.event === "api_rate_limited")).toHaveLength(2);
+  });
+
   it("starts a fresh fixed log budget after each limiter window", () => {
     const entries: RateLimitLogEntry[] = [];
     const logger = createRateLimitDenialLogger({ write: (entry) => entries.push(entry) });
