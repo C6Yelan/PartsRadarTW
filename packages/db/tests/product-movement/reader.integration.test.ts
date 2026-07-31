@@ -12,6 +12,13 @@ import {
   readBoundedProductMovementPage,
   readBoundedProductMovementSummaries,
 } from "../../src/product-movement";
+import {
+  type ExplainPlanNode,
+  rowsExaminedPerLoop,
+  totalSharedBuffers,
+  walkPlan,
+} from "../support/explain-plan";
+import { seedCandidateHeavyFixture } from "./candidate-heavy-fixture";
 
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 if (!testDatabaseUrl) throw new Error("TEST_DATABASE_URL is required for PostgreSQL integration tests.");
@@ -35,7 +42,17 @@ beforeAll(async () => {
   await client.crawlRun.create({
     data: { id: crawlRunId, triggerType: "MANUAL", startedAt: NOW },
   });
-  await seedCandidateHeavyFixture();
+  await seedCandidateHeavyFixture({
+    boundedCandidates: BOUNDED_CANDIDATES,
+    candidateLimit: PRODUCT_MOVEMENT_CANDIDATE_LIMIT,
+    categoryId,
+    client,
+    crawlRunId,
+    highHistoryObservationsPerProduct: HIGH_HISTORY_OBSERVATIONS_PER_PRODUCT,
+    now: NOW,
+    pageSize: PAGE_SIZE,
+    prefix,
+  });
   productIds = await client.$queryRaw<Array<{ id: string }>>`
     SELECT product.id
     FROM pg_catalog.generate_series(1, ${PAGE_SIZE}) AS product_number
@@ -115,7 +132,7 @@ describe("product movement PostgreSQL 18 bounds", () => {
     expect(snapshotProbes.length).toBeGreaterThan(0);
     expect(snapshotProbes.every((node) => node["Actual Rows"] <= 2)).toBe(true);
     expect(snapshotProbes.every((node) => node["Actual Loops"] <= PAGE_SIZE)).toBe(true);
-    expect(totalBuffers(plan)).toBeLessThan(50_000);
+    expect(totalSharedBuffers(plan)).toBeLessThan(50_000);
     expect(
       walkPlan(plan).some(
         (node) =>
@@ -181,7 +198,7 @@ describe("product movement PostgreSQL 18 bounds", () => {
           (node) => node["Actual Rows"] * node["Actual Loops"] <= BOUNDED_CANDIDATES,
         ),
       ).toBe(true);
-      expect(totalBuffers(plan)).toBeLessThan(100_000);
+      expect(totalSharedBuffers(plan)).toBeLessThan(100_000);
       assertBoundedPlanWork(plan);
     }
   });
@@ -223,7 +240,9 @@ describe("product movement PostgreSQL 18 bounds", () => {
     );
     expect(historyProbes.length).toBeGreaterThan(0);
     expect(historyProbes.every((node) => node["Actual Loops"] === 0)).toBe(true);
-    const candidateNodes = walkPlan(plan).filter((node) => node["CTE Name"] === "candidates");
+    const candidateNodes = walkPlan(plan).filter(
+      (node) => node["CTE Name"] === "candidates",
+    );
     expect(candidateNodes.some((node) => node["Actual Rows"] === PRODUCT_MOVEMENT_CANDIDATE_LIMIT + 1))
       .toBe(true);
     expect(plan["Actual Rows"] * plan["Actual Loops"]).toBe(1);
@@ -298,7 +317,7 @@ function expectedMovement(ibuyToken: string): {
   return { deltaAmount: 0, deltaPercent: 0 };
 }
 
-async function explain(query: Prisma.Sql): Promise<PlanNode> {
+async function explain(query: Prisma.Sql): Promise<ExplainPlanNode> {
   const settingsBefore = await readPlannerSettings();
   const rows = await client.$transaction(async (transaction) => {
     await transaction.$queryRaw(Prisma.sql`
@@ -319,7 +338,9 @@ async function explain(query: Prisma.Sql): Promise<PlanNode> {
   });
   await expect(readPlannerSettings()).resolves.toEqual(settingsBefore);
   const document = rows[0]?.["QUERY PLAN"];
-  const root = Array.isArray(document) ? (document[0] as { Plan?: PlanNode } | undefined)?.Plan : null;
+  const root = Array.isArray(document)
+    ? (document[0] as { Plan?: ExplainPlanNode } | undefined)?.Plan
+    : null;
   if (!root) throw new Error("PostgreSQL did not return a structured movement plan.");
   for (const node of walkPlan(root)) {
     expect(Number.isFinite(node["Plan Rows"])).toBe(true);
@@ -348,32 +369,7 @@ async function readPlannerSettings() {
   `;
 }
 
-interface PlanNode {
-  "Actual Loops": number;
-  "Actual Rows": number;
-  "Alias"?: string;
-  "CTE Name"?: string;
-  "Filter"?: string;
-  "Index Name"?: string;
-  "Node Type": string;
-  "Plan Rows": number;
-  "Plans"?: PlanNode[];
-  "Relation Name"?: string;
-  "Rows Removed by Filter"?: number;
-  "Rows Removed by Index Recheck"?: number;
-  "Shared Hit Blocks"?: number;
-  "Shared Read Blocks"?: number;
-}
-
-function walkPlan(root: PlanNode): PlanNode[] {
-  return [root, ...(root.Plans ?? []).flatMap(walkPlan)];
-}
-
-function totalBuffers(root: PlanNode): number {
-  return (root["Shared Hit Blocks"] ?? 0) + (root["Shared Read Blocks"] ?? 0);
-}
-
-function assertBoundedPlanWork(root: PlanNode): void {
+function assertBoundedPlanWork(root: ExplainPlanNode): void {
   const nodes = walkPlan(root);
   for (const node of nodes) {
     if (node["Node Type"].includes("Sort")) {
@@ -474,181 +470,4 @@ function assertBoundedPlanWork(root: PlanNode): void {
       (node) => node["Actual Loops"] <= PRODUCT_MOVEMENT_CANDIDATE_LIMIT,
     ),
   ).toBe(true);
-}
-
-function rowsExaminedPerLoop(node: PlanNode): number {
-  return (
-    node["Actual Rows"] +
-    (node["Rows Removed by Filter"] ?? 0) +
-    (node["Rows Removed by Index Recheck"] ?? 0)
-  );
-}
-
-async function seedCandidateHeavyFixture(): Promise<void> {
-  const candidateCount = PRODUCT_MOVEMENT_CANDIDATE_LIMIT + 1;
-  await client.$executeRaw(Prisma.sql`
-    INSERT INTO public.products (
-      id, source_category_id, ibuy_token, name, normalized_name, vendor_slug, vendor_name,
-      filter_tags, source_url, is_active, is_excluded, first_seen_at, last_seen_at, created_at, updated_at
-    )
-    SELECT
-      pg_catalog.md5(${prefix} || ':product:' || sequence_number::text)::uuid,
-      ${categoryId}::uuid,
-      ${prefix} || '-token-' || sequence_number::text,
-      'Movement product ' || sequence_number::text,
-      'movement product ' || sequence_number::text,
-      CASE WHEN sequence_number <= ${BOUNDED_CANDIDATES} THEN 'bounded' ELSE 'overflow' END,
-      'Movement vendor',
-      ARRAY['gpu_chip:nvidia', CASE WHEN sequence_number % 2 = 0 THEN 'vram:12gb' ELSE 'vram:8gb' END]::text[],
-      'https://example.invalid/' || sequence_number::text,
-      sequence_number < ${candidateCount},
-      FALSE,
-      ${NOW}::timestamptz - interval '60 days',
-      ${NOW}::timestamptz,
-      ${NOW}::timestamptz,
-      ${NOW}::timestamptz
-    FROM pg_catalog.generate_series(1, ${candidateCount}) AS sequence_number
-  `);
-  await client.$executeRaw(Prisma.sql`
-    INSERT INTO public.price_snapshots (
-      id, product_id, price, currency, captured_at, crawl_run_id, created_at
-    )
-    SELECT
-      pg_catalog.md5(${prefix} || ':baseline:' || sequence_number::text)::uuid,
-      pg_catalog.md5(${prefix} || ':product:' || sequence_number::text)::uuid,
-      1000,
-      'TWD'::public.currency,
-      ${NOW}::timestamptz - interval '40 days',
-      ${crawlRunId}::uuid,
-      ${NOW}::timestamptz
-    FROM pg_catalog.generate_series(1, ${candidateCount}) AS sequence_number
-    UNION ALL
-    SELECT
-      pg_catalog.md5(${prefix} || ':current:' || sequence_number::text)::uuid,
-      pg_catalog.md5(${prefix} || ':product:' || sequence_number::text)::uuid,
-      1000 + CASE WHEN sequence_number % 3 = 0 THEN -100 WHEN sequence_number % 3 = 1 THEN 100 ELSE 0 END,
-      'TWD'::public.currency,
-      ${NOW}::timestamptz - interval '1 hour',
-      ${crawlRunId}::uuid,
-      ${NOW}::timestamptz
-    FROM pg_catalog.generate_series(1, ${candidateCount}) AS sequence_number
-  `);
-  await client.$executeRaw(Prisma.sql`
-    INSERT INTO public.current_prices (
-      product_id, price_snapshot_id, last_seen_at, price_changed_at, updated_at
-    )
-    SELECT
-      pg_catalog.md5(${prefix} || ':product:' || sequence_number::text)::uuid,
-      pg_catalog.md5(${prefix} || ':current:' || sequence_number::text)::uuid,
-      ${NOW}::timestamptz - interval '30 minutes',
-      ${NOW}::timestamptz - interval '1 hour',
-      ${NOW}::timestamptz
-    FROM pg_catalog.generate_series(1, ${candidateCount}) AS sequence_number
-  `);
-  await client.$executeRaw(Prisma.sql`
-    INSERT INTO public.price_snapshots (
-      id, product_id, price, currency, captured_at, crawl_run_id, created_at
-    )
-    SELECT
-      pg_catalog.md5(
-        ${prefix} || ':history:' || product_number::text || ':' || observation_number::text
-      )::uuid,
-      pg_catalog.md5(${prefix} || ':product:' || product_number::text)::uuid,
-      1000 + observation_number,
-      'TWD'::public.currency,
-      ${NOW}::timestamptz - interval '29 days' + observation_number * interval '1 minute',
-      ${crawlRunId}::uuid,
-      ${NOW}::timestamptz
-    FROM pg_catalog.generate_series(1, ${PAGE_SIZE}) AS product_number
-    CROSS JOIN pg_catalog.generate_series(1, ${HIGH_HISTORY_OBSERVATIONS_PER_PRODUCT})
-      AS observation_number
-  `);
-  await client.$executeRaw(Prisma.sql`
-    UPDATE public.price_snapshots AS snapshot
-    SET price = CASE
-      WHEN snapshot.id = pg_catalog.md5(
-        ${prefix} || ':baseline:' || parity_case.product_number::text
-      )::uuid THEN parity_case.baseline_price
-      ELSE parity_case.current_price
-    END
-    FROM (
-      VALUES
-        (9, 160, 137),
-        (10, 160, 183),
-        (11, 32, 33),
-        (12, 32, 31),
-        (13, 6, 7),
-        (14, 6, 5),
-        (15, 100, 100),
-        (16, 1000, 1100),
-        (17, 2000, 2200),
-        (18, 1000, 900),
-        (19, 2000, 1800)
-    ) AS parity_case(product_number, baseline_price, current_price)
-    WHERE snapshot.id IN (
-      pg_catalog.md5(
-        ${prefix} || ':baseline:' || parity_case.product_number::text
-      )::uuid,
-      pg_catalog.md5(
-        ${prefix} || ':current:' || parity_case.product_number::text
-      )::uuid
-    )
-      AND snapshot.price IS DISTINCT FROM CASE
-        WHEN snapshot.id = pg_catalog.md5(
-          ${prefix} || ':baseline:' || parity_case.product_number::text
-        )::uuid THEN parity_case.baseline_price
-        ELSE parity_case.current_price
-      END
-  `);
-  await client.$executeRaw(Prisma.sql`
-    UPDATE public.price_snapshots
-    SET price = 0
-    WHERE id = pg_catalog.md5(${prefix} || ':baseline:4')::uuid
-  `);
-  await client.$executeRaw(Prisma.sql`
-    DELETE FROM public.price_snapshots
-    WHERE product_id = pg_catalog.md5(${prefix} || ':product:5')::uuid
-      AND id <> pg_catalog.md5(${prefix} || ':current:5')::uuid
-  `);
-  await client.$executeRaw(Prisma.sql`
-    UPDATE public.current_prices
-    SET last_seen_at = ${NOW}::timestamptz - interval '1 hour'
-    WHERE product_id = pg_catalog.md5(${prefix} || ':product:5')::uuid
-  `);
-  await client.$executeRaw(Prisma.sql`
-    DELETE FROM public.price_snapshots
-    WHERE id = pg_catalog.md5(${prefix} || ':baseline:6')::uuid
-  `);
-  await client.$executeRaw(Prisma.sql`
-    UPDATE public.current_prices
-    SET last_seen_at = ${NOW}::timestamptz - interval '31 days'
-    WHERE product_id = pg_catalog.md5(${prefix} || ':product:7')::uuid
-  `);
-  await client.$executeRaw(Prisma.sql`
-    DELETE FROM public.price_snapshots
-    WHERE id = pg_catalog.md5(${prefix} || ':baseline:8')::uuid
-  `);
-  await client.$executeRaw(Prisma.sql`
-    INSERT INTO public.price_snapshots (
-      id, product_id, price, currency, captured_at, crawl_run_id, created_at
-    ) VALUES
-      (
-        '00000000-0000-4000-8000-000000000008'::uuid,
-        pg_catalog.md5(${prefix} || ':product:8')::uuid,
-        800,
-        'TWD'::public.currency,
-        ${NOW}::timestamptz - interval '40 days',
-        ${crawlRunId}::uuid,
-        ${NOW}::timestamptz
-      ),
-      (
-        'ffffffff-ffff-4fff-bfff-ffffffffff08'::uuid,
-        pg_catalog.md5(${prefix} || ':product:8')::uuid,
-        500,
-        'TWD'::public.currency,
-        ${NOW}::timestamptz - interval '40 days',
-        ${crawlRunId}::uuid,
-        ${NOW}::timestamptz
-      )
-  `);
 }
