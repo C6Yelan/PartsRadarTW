@@ -72,6 +72,7 @@ describe("scheduled price report timing", () => {
     expect(client.discordPriceReportSetting.findFirst).toHaveBeenCalledWith({
       where: {
         enabled: true,
+        deliveryState: "ACTIVE",
         nextSendAt: {
           not: null,
         },

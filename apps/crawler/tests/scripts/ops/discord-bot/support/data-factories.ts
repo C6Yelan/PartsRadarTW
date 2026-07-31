@@ -65,6 +65,9 @@ export function priceReportSetting({
   includePriceRises = true,
   includeNewProducts = true,
   enabled = true,
+  deliveryState = "ACTIVE",
+  consecutiveDeliveryFailures = 0,
+  deliveryClaimedAt = null,
   disabledAt = null,
 }: {
   id: string;
@@ -81,6 +84,9 @@ export function priceReportSetting({
   includePriceRises?: boolean;
   includeNewProducts?: boolean;
   enabled?: boolean;
+  deliveryState?: TestPriceReportSetting["deliveryState"];
+  consecutiveDeliveryFailures?: number;
+  deliveryClaimedAt?: Date | null;
   disabledAt?: Date | null;
 }): TestPriceReportSetting {
   return {
@@ -97,6 +103,9 @@ export function priceReportSetting({
     includePriceRises,
     includeNewProducts,
     enabled,
+    deliveryState,
+    consecutiveDeliveryFailures,
+    deliveryClaimedAt,
     disabledAt,
     nextSendAt,
     lastSentAt,

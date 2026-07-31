@@ -301,8 +301,7 @@ export async function runDiscordBotNotificationCycle({
           Math.max(1000, publicSummary.retryNotBefore.getTime() - now.getTime()),
         );
       }
-      globalDiscordUnavailable =
-        publicSummary.globalRateLimited || publicSummary.globalAuthFailed;
+      globalDiscordUnavailable = publicSummary.globalRateLimited || publicSummary.globalAuthFailed;
     } catch (error) {
       cycleFailed = true;
       logMessage(`Public price report scan failed: ${toSafeCliErrorMessage(error)}`);
@@ -340,7 +339,7 @@ export async function runDiscordBotNotificationCycle({
 
       if (summary.processedCount > 0) {
         logMessage(
-          `Scheduled price reports processed. processed=${summary.processedCount} sent=${summary.sentCount} rateLimited=${summary.rateLimitedCount} failed=${summary.failedCount}`,
+          `Scheduled price reports processed. processed=${summary.processedCount} sent=${summary.sentCount} rateLimited=${summary.rateLimitedCount} failed=${summary.failedCount} retryScheduled=${summary.retryScheduledCount} pausedPermanent=${summary.pausedPermanentCount} pausedRetryExhausted=${summary.pausedRetryExhaustedCount} pausedPartial=${summary.pausedPartialDeliveryCount}`,
         );
       }
 

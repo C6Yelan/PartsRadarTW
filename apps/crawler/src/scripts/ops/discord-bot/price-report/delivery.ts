@@ -4,13 +4,11 @@
 import type { Prisma } from "@partsradar/db";
 import { readRecentPriceReport } from "@partsradar/db/price-report";
 import { HOUR_MS, MAX_PRICE_REPORT_ITEMS } from "../constants";
-import {
-  isDiscordPrivacyParentDeleted,
-  toDiscordDeliveryErrorFields,
-} from "../delivery-error-fields";
+import { isDiscordPrivacyParentDeleted } from "../delivery-error-fields";
 import type {
   DiscordBotClient,
   DiscordBotMessage,
+  DiscordDeliveryFailureMetadata,
   DiscordMessageSendResult,
   PersonalPriceReportDeliveryResult,
 } from "../types";
@@ -80,6 +78,7 @@ export async function sendPriceReport({
   priceReportSettingId,
   shouldSend,
   sendReportMessages,
+  recordDelivery = true,
 }: {
   client: DiscordBotClient;
   discordUserId: string;
@@ -92,6 +91,7 @@ export async function sendPriceReport({
   priceReportSettingId?: string;
   shouldSend?: () => Promise<boolean>;
   sendReportMessages: (messages: DiscordBotMessage[]) => Promise<DiscordMessageSendResult>;
+  recordDelivery?: boolean;
 }): Promise<PersonalPriceReportDeliveryResult> {
   const reportSince = since ?? new Date(now.getTime() - windowHours * HOUR_MS);
   const normalizedFilters = normalizePriceReportFilters(filters);
@@ -133,26 +133,28 @@ export async function sendPriceReport({
     };
   }
 
-  const recorded = await recordPriceReportDelivery({
-    client,
-    discordUserId,
-    kind: deliveryKind,
-    status: result.status,
-    itemCount: listedCount,
-    messageCount: messages.length,
-    deliveredAt: result.status === "sent" ? now : null,
-    priceReportSettingId,
-    result,
-  });
-
-  if (!recorded) {
-    return {
-      status: "cancelled",
-      changeCount: report.priceChanges.length,
-      newProductCount: report.newProducts.length,
-      listedCount,
+  if (recordDelivery) {
+    const recorded = await recordPriceReportDelivery({
+      client,
+      discordUserId,
+      kind: deliveryKind,
+      status: result.status,
+      itemCount: listedCount,
       messageCount: messages.length,
-    };
+      deliveredAt: result.status === "sent" ? now : null,
+      priceReportSettingId,
+      result,
+    });
+
+    if (!recorded) {
+      return {
+        status: "cancelled",
+        changeCount: report.priceChanges.length,
+        newProductCount: report.newProducts.length,
+        listedCount,
+        messageCount: messages.length,
+      };
+    }
   }
 
   if (result.status === "sent") {
@@ -213,7 +215,7 @@ export async function readLatestScheduledPriceReportDelivery({
 }
 
 // 寫入個人價格報告 delivery 紀錄，保留成功、限流與失敗狀態供後續 UI 與重試判讀。
-async function recordPriceReportDelivery({
+export async function recordPriceReportDelivery({
   client,
   discordUserId,
   kind,
@@ -224,14 +226,16 @@ async function recordPriceReportDelivery({
   result,
   priceReportSettingId,
 }: {
-  client: DiscordBotClient;
+  client: Pick<DiscordBotClient, "discordNotificationDelivery">;
   discordUserId: string;
   kind: "PRICE_REPORT_NOW" | "SCHEDULED_PRICE_REPORT";
   status: DiscordMessageSendResult["status"];
   itemCount: number;
   messageCount: number;
   deliveredAt: Date | null;
-  result: DiscordMessageSendResult;
+  result:
+    | { status: "sent" }
+    | ({ status: "rate_limited" | "failed" } & DiscordDeliveryFailureMetadata);
   priceReportSettingId?: string;
 }): Promise<boolean> {
   try {
@@ -244,7 +248,10 @@ async function recordPriceReportDelivery({
         messageCount,
         deliveredAt,
         priceReportSettingId,
-        ...toDiscordDeliveryErrorFields(result),
+        errorCategory: result.status === "sent" ? null : result.errorCategory,
+        errorMessage: null,
+        httpStatus: result.status === "sent" ? null : result.httpStatus,
+        providerErrorCode: result.status === "sent" ? null : result.providerErrorCode,
       },
     });
     return true;

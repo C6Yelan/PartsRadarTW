@@ -60,6 +60,10 @@ describe("scheduled price report delivery", () => {
       sentCount: 1,
       rateLimitedCount: 0,
       failedCount: 0,
+      retryScheduledCount: 0,
+      pausedPermanentCount: 0,
+      pausedRetryExhaustedCount: 0,
+      pausedPartialDeliveryCount: 0,
     });
 
     expect(sendDirectMessages).toHaveBeenCalledWith(
@@ -77,16 +81,22 @@ describe("scheduled price report delivery", () => {
         status: "SENT",
       }),
     });
-    expect(client.discordPriceReportSetting.updateMany).toHaveBeenCalledWith({
+    expect(client.$transaction).toHaveBeenCalledTimes(1);
+    expect(client.discordPriceReportSetting.updateMany).toHaveBeenLastCalledWith({
       where: {
         id: "setting-1",
         discordUserId: "111122223333444455",
         enabled: true,
+        deliveryState: "ACTIVE",
+        deliveryClaimedAt: new Date("2026-06-07T05:00:00.000Z"),
       },
       data: {
         lastSentAt: new Date("2026-06-07T05:00:00.000Z"),
         notificationCursorAt: new Date("2026-06-07T05:00:00.000Z"),
         nextSendAt: new Date("2026-06-08T04:59:00.000Z"),
+        deliveryState: "ACTIVE",
+        consecutiveDeliveryFailures: 0,
+        deliveryClaimedAt: null,
       },
     });
   });
@@ -142,6 +152,10 @@ describe("scheduled price report delivery", () => {
       sentCount: 1,
       rateLimitedCount: 0,
       failedCount: 0,
+      retryScheduledCount: 0,
+      pausedPermanentCount: 0,
+      pausedRetryExhaustedCount: 0,
+      pausedPartialDeliveryCount: 0,
     });
 
     expect(JSON.stringify(sendDirectMessages.mock.calls[0]?.[1])).not.toContain("GPU A");
@@ -153,16 +167,21 @@ describe("scheduled price report delivery", () => {
         itemCount: 0,
       }),
     });
-    expect(client.discordPriceReportSetting.updateMany).toHaveBeenCalledWith({
+    expect(client.discordPriceReportSetting.updateMany).toHaveBeenLastCalledWith({
       where: {
         id: "setting-1",
         discordUserId: "111122223333444455",
         enabled: true,
+        deliveryState: "ACTIVE",
+        deliveryClaimedAt: new Date("2026-06-07T05:00:00.000Z"),
       },
       data: {
         lastSentAt: new Date("2026-06-07T05:00:00.000Z"),
         notificationCursorAt: new Date("2026-06-07T05:00:00.000Z"),
         nextSendAt: new Date("2026-06-08T04:59:00.000Z"),
+        deliveryState: "ACTIVE",
+        consecutiveDeliveryFailures: 0,
+        deliveryClaimedAt: null,
       },
     });
   });
@@ -204,16 +223,21 @@ describe("scheduled price report delivery", () => {
       sendDirectMessages,
     });
 
-    expect(client.discordPriceReportSetting.updateMany).toHaveBeenCalledWith({
+    expect(client.discordPriceReportSetting.updateMany).toHaveBeenLastCalledWith({
       where: {
         id: "setting-1",
         discordUserId: "111122223333444455",
         enabled: true,
+        deliveryState: "ACTIVE",
+        deliveryClaimedAt: new Date("2026-06-07T05:00:00.000Z"),
       },
       data: {
         lastSentAt: new Date("2026-06-07T05:00:00.000Z"),
         notificationCursorAt: new Date("2026-06-07T05:00:00.000Z"),
         nextSendAt: new Date("2026-06-08T01:30:00.000Z"),
+        deliveryState: "ACTIVE",
+        consecutiveDeliveryFailures: 0,
+        deliveryClaimedAt: null,
       },
     });
   });
@@ -293,6 +317,10 @@ describe("scheduled price report delivery", () => {
       sentCount: 0,
       rateLimitedCount: 0,
       failedCount: 0,
+      retryScheduledCount: 0,
+      pausedPermanentCount: 0,
+      pausedRetryExhaustedCount: 0,
+      pausedPartialDeliveryCount: 0,
     });
 
     client.discordPriceReportSetting.findMany.mockResolvedValueOnce([]);
@@ -305,6 +333,16 @@ describe("scheduled price report delivery", () => {
 
     expect(sendDirectMessages).toHaveBeenCalledTimes(1);
     expect(client.discordNotificationDelivery.create).not.toHaveBeenCalled();
-    expect(client.discordPriceReportSetting.updateMany).not.toHaveBeenCalled();
+    expect(client.discordPriceReportSetting.updateMany).toHaveBeenLastCalledWith({
+      where: {
+        id: "setting-in-flight",
+        enabled: true,
+        deliveryState: "ACTIVE",
+        deliveryClaimedAt: new Date("2026-06-07T05:00:00.000Z"),
+      },
+      data: {
+        deliveryClaimedAt: null,
+      },
+    });
   });
 });

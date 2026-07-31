@@ -2,7 +2,7 @@
 // 處理個人價格報告的排程時間、報告時間窗與台北時間顯示格式。
 
 import type { DiscordPriceReportSetting } from "@partsradar/db";
-import { DAY_MS, HOUR_MS, SCHEDULED_PRICE_REPORT_RETRY_DELAY_MS } from "../constants";
+import { DAY_MS, HOUR_MS } from "../constants";
 import { formatTaipeiMinute as formatDiscordTaipeiMinute } from "../message-text";
 import type { PriceReportTimeOfDay } from "../types";
 
@@ -24,24 +24,8 @@ export function calculateNextSendAt(
   return new Date(now.getTime() + intervalMs);
 }
 
-// 發送成功時推進到下一個排程時間，發送失敗時使用短 retry delay。
-export function calculateNextScheduledPriceReportSendAtAfterDelivery({
-  now,
-  setting,
-  delivered,
-}: {
-  now: Date;
-  setting: Pick<DiscordPriceReportSetting, "interval" | "nextSendAt">;
-  delivered: boolean;
-}): Date {
-  if (delivered) {
-    return calculateNextSendAtAfterScheduledRun(now, setting);
-  }
-
-  return new Date(now.getTime() + SCHEDULED_PRICE_REPORT_RETRY_DELAY_MS);
-}
-
-function calculateNextSendAtAfterScheduledRun(
+// 成功送達後從原排程錨點推進，避免 retry 改變使用者既有的每日發送時間。
+export function calculateNextSendAtAfterScheduledRun(
   now: Date,
   setting: Pick<DiscordPriceReportSetting, "interval" | "nextSendAt">,
 ): Date {
