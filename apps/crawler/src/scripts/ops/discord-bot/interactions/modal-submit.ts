@@ -14,6 +14,7 @@ import {
 } from "../price-report";
 import { toWindowHours } from "../price-report/schedule";
 import { updatePublicPriceReportFilters } from "../public-price-report";
+import { canManagePublicReport } from "../public-price-report/authorization";
 import { sendInteractionResponse } from "../rest";
 import type { DiscordBotClient, DiscordBotOptions, DiscordInteraction, FetchImpl } from "../types";
 import { handleTargetPriceWatchModalSubmit } from "./modal-submit/watch";
@@ -32,6 +33,7 @@ import {
 import {
   sendFeatureDisabledResponse,
   sendMissingUserResponse,
+  sendPublicReportAuthorizationDeniedResponse,
   sendUnsupportedInteractionResponse,
 } from "./responses";
 
@@ -54,6 +56,11 @@ export async function handleModalSubmitInteraction({
 
   if (!modal && !targetPriceWatchModal && !publicReportModal) {
     await sendUnsupportedInteractionResponse({ interaction, options, fetchImpl });
+    return;
+  }
+
+  if (publicReportModal && !canManagePublicReport(interaction)) {
+    await sendPublicReportAuthorizationDeniedResponse({ interaction, options, fetchImpl });
     return;
   }
 

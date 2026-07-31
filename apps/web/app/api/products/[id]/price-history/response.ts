@@ -2,6 +2,7 @@
 // 組裝商品價格歷史 API 回應，包含觀測點與目前價格確認點。
 
 import type { PriceHistoryProductRecord, PriceHistorySnapshotRecord } from "./data";
+import { PRICE_HISTORY_BUCKET_COUNT, PRICE_HISTORY_MAX_RESPONSE_POINTS } from "./limits";
 import type { PriceHistoryRange } from "./query";
 
 type PriceHistoryObservationType = "price_snapshot" | "current_price_confirmation";
@@ -16,6 +17,12 @@ export interface ProductPriceHistoryResponseBody {
   range: "7d" | "30d" | "90d" | "all";
   rangeDays: 7 | 30 | 90 | null;
   points: PriceHistoryPointResponse[];
+  sampling?: {
+    downsampled: true;
+    strategy: "time_bucket_first_last";
+    bucketCount: number;
+    pointLimit: number;
+  };
 }
 
 // 將 DB snapshot 與目前價格確認資料轉成 public response，維持 API 的 UTC ISO 時間格式。
@@ -24,6 +31,7 @@ export function toPriceHistoryResponse(
   snapshots: PriceHistorySnapshotRecord[],
   product: PriceHistoryProductRecord,
   since: Date | null,
+  downsampled = false,
 ): ProductPriceHistoryResponseBody {
   const points = toPriceHistoryPoints(snapshots, product.currentPrice, since);
 
@@ -31,6 +39,16 @@ export function toPriceHistoryResponse(
     range: range.key,
     rangeDays: range.days,
     points,
+    ...(downsampled
+      ? {
+          sampling: {
+            downsampled: true as const,
+            strategy: "time_bucket_first_last" as const,
+            bucketCount: PRICE_HISTORY_BUCKET_COUNT,
+            pointLimit: PRICE_HISTORY_MAX_RESPONSE_POINTS,
+          },
+        }
+      : {}),
   };
 }
 

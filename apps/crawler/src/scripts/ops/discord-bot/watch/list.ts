@@ -3,7 +3,7 @@
 
 import { MAX_TARGET_PRICE_WATCHES_PER_USER } from "../constants";
 import type { DiscordBotClient } from "../types";
-import { WATCH_MANAGER_PAGE_SIZE } from "./list-limits";
+import { clampWatchManagerPage, WATCH_MANAGER_PAGE_SIZE } from "./list-limits";
 import { TARGET_PRICE_WATCH_LIST_SELECT, type TargetPriceWatchlistResult } from "./records";
 
 // 建立 watch 管理面板需要的清單結果，回傳當頁資料與分頁狀態。
@@ -16,7 +16,6 @@ export async function readTargetPriceWatchlist({
   discordUserId: string;
   page?: number;
 }): Promise<TargetPriceWatchlistResult> {
-  const boundedPage = Number.isSafeInteger(page) && page > 0 ? page : 0;
   // 固定最近更新優先，id 作穩定 tie-breaker，避免分頁之間順序跳動。
   const watches = await client.discordTargetPriceWatch.findMany({
     where: {
@@ -27,6 +26,7 @@ export async function readTargetPriceWatchlist({
     take: MAX_TARGET_PRICE_WATCHES_PER_USER,
     select: TARGET_PRICE_WATCH_LIST_SELECT,
   });
+  const boundedPage = clampWatchManagerPage(page, watches.length);
   const pageStart = boundedPage * WATCH_MANAGER_PAGE_SIZE;
   const listedWatches = watches.slice(pageStart, pageStart + WATCH_MANAGER_PAGE_SIZE);
 

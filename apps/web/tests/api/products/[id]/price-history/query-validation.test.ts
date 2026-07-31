@@ -27,7 +27,7 @@ describe("GET /api/products/{id}/price-history query validation", () => {
       },
     });
     expect(client.productFindFirstCallCount).toBe(0);
-    expect(client.priceSnapshotFindManyCallCount).toBe(0);
+    expect(client.transactionCallCount).toBe(0);
   });
 
   it("returns 400 for unsupported range values", async () => {
@@ -49,7 +49,7 @@ describe("GET /api/products/{id}/price-history query validation", () => {
       },
     });
     expect(client.productFindFirstCallCount).toBe(0);
-    expect(client.priceSnapshotFindManyCallCount).toBe(0);
+    expect(client.transactionCallCount).toBe(0);
   });
 
   it("returns 404 when the product id is malformed without reading data", async () => {
@@ -71,7 +71,7 @@ describe("GET /api/products/{id}/price-history query validation", () => {
       },
     });
     expect(client.productFindFirstCallCount).toBe(0);
-    expect(client.priceSnapshotFindManyCallCount).toBe(0);
+    expect(client.transactionCallCount).toBe(0);
   });
 
   it("returns 404 when the product does not exist", async () => {
@@ -86,7 +86,7 @@ describe("GET /api/products/{id}/price-history query validation", () => {
     );
 
     expect(response.status).toBe(404);
-    expect(client.priceSnapshotFindManyCallCount).toBe(0);
+    expect(client.transactionCallCount).toBe(0);
   });
 
   it("returns a generic 500 response when lookup fails", async () => {
@@ -97,9 +97,10 @@ describe("GET /api/products/{id}/price-history query validation", () => {
             throw new Error("Prisma stack with DATABASE_URL and iBuyToken");
           },
         },
-        priceSnapshot: {
-          findMany: async () => [],
-        },
+        $transaction: async (callback) =>
+          callback({
+            $queryRaw: async <T>() => [] as T,
+          }),
       },
       { now: NOW },
     )(

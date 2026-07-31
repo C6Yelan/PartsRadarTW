@@ -1,6 +1,7 @@
 // apps/crawler/tests/coolpc/category-snapshot-errors.test.ts
 // 驗證 category snapshot 錯誤分支會正確落 raw snapshot、parse error，並避免寫入商品資料。
 
+import { MAX_PRODUCT_NAME_LENGTH } from "@partsradar/shared";
 import { afterEach, describe, expect, it } from "vitest";
 import { CRAWL_RUN_CATEGORY_RESULT_STATUSES } from "../../src/coolpc/crawl-run";
 import { processCoolpcCategorySnapshot } from "../../src/coolpc/category-snapshot";
@@ -116,6 +117,40 @@ describe("CoolPC category snapshot error handling", () => {
 
     expect(client.parseErrors).toHaveLength(1);
     expect(client.parseErrors[0]?.occurrenceCount).toBe(2);
+  });
+
+  it("persists an overlong-name issue without retaining the upstream name", async () => {
+    const client = new FakeCrawlerWriteClient([category({ id: "category-4", igrp: 4 })]);
+    const storageDir = await testEnv.createStorageDir();
+    const productWriter = createProductWriterSpy();
+    const overlongName = "X".repeat(MAX_PRODUCT_NAME_LENGTH + 1);
+    const rawHtml = (await testEnv.fixture("cpu-category.normal.html")).replace(
+      "AMD Ryzen 5 7500F MPK【6核/12緒】3.7G",
+      overlongName,
+    );
+
+    const result = await processCoolpcCategorySnapshot({
+      client,
+      storageDir,
+      crawlRunId: "crawl-run-1",
+      category: category({ id: "category-4", igrp: 4 }),
+      snapshot: snapshot({ rawHtml }),
+      writeProducts: productWriter.writeProducts,
+    });
+
+    expect(result.status).toBe(CRAWL_RUN_CATEGORY_RESULT_STATUSES.SUCCESS_CHANGED);
+    expect(client.parseErrors).toEqual([
+      expect.objectContaining({
+        errorType: "CONTENT_VALIDATION_FAILED",
+        message: `Product candidate name exceeds ${MAX_PRODUCT_NAME_LENGTH} normalized code units.`,
+        rawName: null,
+        rawPriceText: null,
+        rawToken: null,
+        rawImageUrl: null,
+      }),
+    ]);
+    expect(JSON.stringify(client.parseErrors)).not.toContain(overlongName);
+    expect(productWriter.calls[0]?.sourceItemKeys).toEqual(["coolpc:igrp:4:ibuy:CPU-TOKEN-002"]);
   });
 
   it("records non-product content as suspected block", async () => {

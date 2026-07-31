@@ -20,6 +20,12 @@ export interface ProductPriceHistoryBody {
   range: PriceHistoryRangeKey;
   rangeDays: PriceHistoryRangeDays | null;
   points: PriceHistoryPoint[];
+  sampling?: {
+    downsampled: true;
+    strategy: "time_bucket_first_last";
+    bucketCount: number;
+    pointLimit: number;
+  };
 }
 
 // 價格歷史圖使用的單一觀測點。

@@ -38,17 +38,11 @@ describe("GET /api/products/{id}/price-history response", () => {
         },
       },
     });
-    expect(client.lastPriceSnapshotFindManyArgs).toMatchObject({
-      where: {
-        productId: PRODUCT_ID,
-        capturedAt: {
-          gte: new Date("2026-05-02T12:00:00.000Z"),
-        },
-      },
-      orderBy: {
-        capturedAt: "asc",
-      },
-    });
+    expect(client.transactionCallCount).toBe(1);
+    expect(client.queryRawTexts).toHaveLength(3);
+    expect(client.queryRawTexts[2]).toContain('ORDER BY snapshot."captured_at" ASC');
+    expect(client.queryRawValues[2]).toContain(PRODUCT_ID);
+    expect(client.queryRawValues[2]).toContainEqual(new Date("2026-05-02T12:00:00.000Z"));
     expect(client.lastProductFindFirstArgs?.select).toEqual({
       currentPrice: {
         select: {
@@ -60,10 +54,6 @@ describe("GET /api/products/{id}/price-history response", () => {
           },
         },
       },
-    });
-    expect(client.lastPriceSnapshotFindManyArgs?.select).toEqual({
-      price: true,
-      capturedAt: true,
     });
     expect(body).toEqual({
       range: "30d",
@@ -103,6 +93,10 @@ describe("GET /api/products/{id}/price-history response", () => {
     );
 
     expect(response.status).toBe(200);
+    expect(response.headers.get("X-Price-History-Range")).toBe("90d");
+    expect(response.headers.get("X-Price-History-Returned-Points")).toBe("2");
+    expect(response.headers.get("X-Price-History-Downsampled")).toBe("false");
+    expect(response.headers.get("X-Price-History-Duration-Ms")).toMatch(/^\d+$/);
     const body = await response.json();
     expect(body).toEqual({
       range: "90d",
@@ -136,13 +130,7 @@ describe("GET /api/products/{id}/price-history response", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(client.lastPriceSnapshotFindManyArgs).toMatchObject({
-      where: {
-        capturedAt: {
-          gte: new Date("2026-03-03T12:00:00.000Z"),
-        },
-      },
-    });
+    expect(client.queryRawValues.at(-1)).toContainEqual(new Date("2026-03-03T12:00:00.000Z"));
     expect(await response.json()).toEqual({
       range: "90d",
       rangeDays: 90,
@@ -170,15 +158,7 @@ describe("GET /api/products/{id}/price-history response", () => {
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(client.lastPriceSnapshotFindManyArgs).toMatchObject({
-      where: {
-        productId: PRODUCT_ID,
-      },
-      orderBy: {
-        capturedAt: "asc",
-      },
-    });
-    expect(client.lastPriceSnapshotFindManyArgs?.where).not.toHaveProperty("capturedAt");
+    expect(client.queryRawTexts.at(-1)).not.toContain('snapshot."captured_at" >=');
     expect(body).toEqual({
       range: "all",
       rangeDays: null,

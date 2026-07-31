@@ -7,6 +7,7 @@ import type {
   ParsedTargetPriceWatchComponent,
   ParsedTargetPriceWatchModal,
 } from "../types";
+import { WATCH_MANAGER_MAX_PAGE } from "../watch/list-limits";
 import {
   WATCH_ADD_CUSTOM_ID,
   WATCH_CREATE_MODAL_CUSTOM_ID,
@@ -180,9 +181,18 @@ function parsePage(value: unknown): number {
     return 0;
   }
 
-  const page = Number(pageValue);
+  const normalizedPageValue = pageValue.replace(/^0+(?=[0-9])/, "");
+  const maxPageDigits = WATCH_MANAGER_MAX_PAGE.toString().length;
 
-  return Number.isSafeInteger(page) && page >= 0 ? page : 0;
+  if (normalizedPageValue.length > maxPageDigits) {
+    return WATCH_MANAGER_MAX_PAGE;
+  }
+
+  const page = Number(normalizedPageValue);
+
+  return Number.isSafeInteger(page) && page >= 0
+    ? Math.min(page, WATCH_MANAGER_MAX_PAGE)
+    : WATCH_MANAGER_MAX_PAGE;
 }
 
 // 驗證目標價輸入必須是允許範圍內的新台幣整數，避免不合法金額進入 watch 寫入流程。
