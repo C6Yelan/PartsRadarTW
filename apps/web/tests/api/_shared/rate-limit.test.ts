@@ -18,6 +18,7 @@ const BASE_CONFIG: RateLimitConfig = {
   limits: {
     "api:read": 2,
     "api:list": 3,
+    "api:list:movement": 1,
     "api:image": 4,
     "api:build-list": 2,
     "metadata:image": 1,
@@ -160,6 +161,12 @@ describe("API rate limiter", () => {
       limit: 3,
       remaining: 2,
     });
+    expect(limiter.check(request, "api:list:movement")).toMatchObject({
+      allowed: true,
+      limit: 1,
+      remaining: 0,
+    });
+    expect(limiter.check(request, "api:list:movement")).toMatchObject({ allowed: false });
     expect(limiter.check(request, "api:image")).toMatchObject({
       allowed: true,
       limit: 4,
@@ -192,6 +199,7 @@ describe("API rate limiter", () => {
     const imagesPerPage = 50;
 
     expect(RATE_LIMIT_DEFAULTS.listMax).toBeGreaterThan(listPageChanges);
+    expect(RATE_LIMIT_DEFAULTS.movementListMax).toBeLessThan(RATE_LIMIT_DEFAULTS.listMax);
     expect(RATE_LIMIT_DEFAULTS.imageMax).toBeGreaterThan(listPageChanges * imagesPerPage);
     expect(limiter.check(request, "api:list")).toMatchObject({
       allowed: true,
@@ -223,6 +231,7 @@ describe("API rate limiter", () => {
       resolveRateLimitConfig({
         API_READ_RATE_LIMIT_MAX: "250",
         API_LIST_RATE_LIMIT_MAX: "500",
+        API_PRODUCT_MOVEMENT_RATE_LIMIT_MAX: "25",
         API_IMAGE_RATE_LIMIT_MAX: "900",
         SHARE_IMAGE_RATE_LIMIT_MAX: "45",
         API_RATE_LIMIT_WINDOW_SECONDS: "120",
@@ -233,6 +242,7 @@ describe("API rate limiter", () => {
       limits: {
         "api:read": 250,
         "api:list": 500,
+        "api:list:movement": 25,
         "api:image": 900,
         "api:build-list": 250,
         "metadata:image": 45,
@@ -254,6 +264,7 @@ describe("API rate limiter", () => {
       limits: {
         "api:read": RATE_LIMIT_DEFAULTS.readMax,
         "api:list": RATE_LIMIT_DEFAULTS.listMax,
+        "api:list:movement": RATE_LIMIT_DEFAULTS.movementListMax,
         "api:image": RATE_LIMIT_DEFAULTS.imageMax,
         "api:build-list": RATE_LIMIT_DEFAULTS.readMax,
         "metadata:image": RATE_LIMIT_DEFAULTS.metadataImageMax,

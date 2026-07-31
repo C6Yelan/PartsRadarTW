@@ -21,6 +21,10 @@
       "types": "./src/product-facets/index.ts",
       "default": "./src/product-facets/index.ts"
     },
+    "./product-movement": {
+      "types": "./src/product-movement/index.ts",
+      "default": "./src/product-movement/index.ts"
+    },
     "./discord-privacy": {
       "types": "./src/discord-privacy/index.ts",
       "default": "./src/discord-privacy/index.ts"

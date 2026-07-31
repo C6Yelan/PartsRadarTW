@@ -1,181 +1,104 @@
 // apps/web/app/api/products/price-movement.ts
-// 協調商品列表的價格變動查詢與排序，處理需要先計算 movement 才能分頁的排序模式。
+// 協調一般列表的逐頁 movement 摘要，以及由 DB 排序的 bounded movement pages。
+
+import { ProductMovementReadUnavailableError } from "@partsradar/db/product-movement";
 
 import {
-  PRODUCT_PRICE_MOVEMENT_SNAPSHOT_SELECT,
+  PRODUCT_PRICE_MOVEMENT_RANGE_DAYS,
   PRODUCT_SELECT,
   type ProductRecord,
   type ProductsReadClient,
 } from "./data";
 import { buildProductOrderBy, isPriceMovementSort, type ProductListQuery } from "./query";
-import {
-  buildProductPriceMovementMap,
-  type ProductPriceMovement,
-} from "./response";
+import type { ProductPriceMovement } from "./response";
 
 type ProductWhere = Parameters<ProductsReadClient["product"]["findProducts"]>[0]["where"];
 
-// 讀取商品列表並補上價格變動資料；價格變動排序需先取全量候選再依計算結果分頁。
 export async function findProductsWithMovement(
   client: ProductsReadClient,
   where: ProductWhere,
   query: ProductListQuery,
   now: Date,
-) {
+): Promise<{
+  priceMovementByProductId: Map<string, ProductPriceMovement>;
+  products: ProductRecord[];
+  totalItems: number | null;
+}> {
   if (isPriceMovementSort(query.sort)) {
-    const allProducts = await client.product.findProducts({
-      where,
-      orderBy: buildProductOrderBy(query.sort),
-      select: PRODUCT_SELECT,
-    });
-    const movementSnapshots = await findPriceMovementSnapshots(client, allProducts, now);
-    const priceMovementByProductId = buildProductPriceMovementMap(
-      allProducts,
-      movementSnapshots,
+    const movementPage = await client.movement.findPage({
+      filters: {
+        facetTags: query.facetTags,
+        igrp: query.igrp,
+        maxPrice: query.maxPrice,
+        minPrice: query.minPrice,
+        q: query.q,
+        status: query.status,
+        vendors: query.vendors,
+      },
       now,
-    );
-    const sortedProducts = [...allProducts].sort((left, right) =>
-      compareByPriceMovement(query.sort, left, right, priceMovementByProductId),
-    );
-    const pageStart = (query.page - 1) * query.pageSize;
+      page: query.page,
+      pageSize: query.pageSize,
+      sort: query.sort,
+    });
+    const products =
+      movementPage.productIds.length === 0
+        ? []
+        : await client.product.findProducts({
+            where: { AND: [where ?? {}, { id: { in: movementPage.productIds } }] },
+            select: PRODUCT_SELECT,
+          });
+    const productById = new Map(products.map((product) => [product.id, product]));
+    const orderedProducts = movementPage.productIds.map((productId) => productById.get(productId));
+
+    if (orderedProducts.some((product) => product === undefined)) {
+      throw new ProductMovementReadUnavailableError();
+    }
 
     return {
-      products: sortedProducts.slice(pageStart, pageStart + query.pageSize),
-      priceMovementByProductId,
+      products: orderedProducts as ProductRecord[],
+      priceMovementByProductId: toMovementMap(movementPage.summaries),
+      totalItems: movementPage.totalItems,
     };
   }
 
-  const products = await client.product.findProducts({
-    where,
-    orderBy: buildProductOrderBy(query.sort),
-    skip: (query.page - 1) * query.pageSize,
-    take: query.pageSize,
-    select: PRODUCT_SELECT,
-  });
-  const movementSnapshots = await findPriceMovementSnapshots(client, products, now);
+  const requestedOffset = (query.page - 1) * query.pageSize;
+  const products =
+    !Number.isSafeInteger(requestedOffset)
+      ? []
+      : await client.product.findProducts({
+          where,
+          orderBy: buildProductOrderBy(query.sort),
+          skip: requestedOffset,
+          take: query.pageSize,
+          select: PRODUCT_SELECT,
+        });
+  const summaries = await client.movement.findSummaries(
+    products.map((product) => product.id),
+    now,
+  );
 
   return {
     products,
-    priceMovementByProductId: buildProductPriceMovementMap(products, movementSnapshots, now),
+    priceMovementByProductId: toMovementMap(summaries),
+    totalItems: null,
   };
 }
 
-async function findPriceMovementSnapshots(
-  client: ProductsReadClient,
-  products: ProductRecord[],
-  now: Date,
-) {
-  const productIds = products.map((product) => product.id);
-
-  return productIds.length === 0
-    ? []
-    : client.priceSnapshot.findMany({
-        where: {
-          productId: {
-            in: productIds,
-          },
-          capturedAt: {
-            lte: now,
-          },
-        },
-        orderBy: [{ productId: "asc" }, { capturedAt: "asc" }],
-        select: PRODUCT_PRICE_MOVEMENT_SNAPSHOT_SELECT,
-      });
-}
-
-function compareByPriceMovement(
-  sort: ProductListQuery["sort"],
-  left: ProductRecord,
-  right: ProductRecord,
-  priceMovementByProductId: Map<string, ProductPriceMovement>,
-) {
-  if (sort === "price_rise_desc") {
-    return compareByPriceRise(left, right, priceMovementByProductId);
-  }
-
-  return compareByPriceDrop(left, right, priceMovementByProductId);
-}
-
-function compareByPriceDrop(
-  left: ProductRecord,
-  right: ProductRecord,
-  priceMovementByProductId: Map<string, ProductPriceMovement>,
-) {
-  const leftMovement = priceMovementByProductId.get(left.id);
-  const rightMovement = priceMovementByProductId.get(right.id);
-  const leftHasDrop = hasPriceDrop(leftMovement);
-  const rightHasDrop = hasPriceDrop(rightMovement);
-
-  if (leftHasDrop !== rightHasDrop) {
-    return leftHasDrop ? -1 : 1;
-  }
-
-  if (leftHasDrop && rightHasDrop && leftMovement && rightMovement) {
-    const percentOrder = (leftMovement.deltaPercent ?? 0) - (rightMovement.deltaPercent ?? 0);
-
-    if (percentOrder !== 0) {
-      return percentOrder;
-    }
-
-    const amountOrder = (leftMovement.deltaAmount ?? 0) - (rightMovement.deltaAmount ?? 0);
-
-    if (amountOrder !== 0) {
-      return amountOrder;
-    }
-  }
-
-  return left.id.localeCompare(right.id);
-}
-
-function compareByPriceRise(
-  left: ProductRecord,
-  right: ProductRecord,
-  priceMovementByProductId: Map<string, ProductPriceMovement>,
-) {
-  const leftMovement = priceMovementByProductId.get(left.id);
-  const rightMovement = priceMovementByProductId.get(right.id);
-  const leftHasRise = hasPriceRise(leftMovement);
-  const rightHasRise = hasPriceRise(rightMovement);
-
-  if (leftHasRise !== rightHasRise) {
-    return leftHasRise ? -1 : 1;
-  }
-
-  if (leftHasRise && rightHasRise && leftMovement && rightMovement) {
-    const percentOrder = (rightMovement.deltaPercent ?? 0) - (leftMovement.deltaPercent ?? 0);
-
-    if (percentOrder !== 0) {
-      return percentOrder;
-    }
-
-    const amountOrder = (rightMovement.deltaAmount ?? 0) - (leftMovement.deltaAmount ?? 0);
-
-    if (amountOrder !== 0) {
-      return amountOrder;
-    }
-  }
-
-  return left.id.localeCompare(right.id);
-}
-
-function hasPriceDrop(movement: ProductPriceMovement | undefined) {
-  return (
-    movement?.deltaAmount !== null &&
-    movement?.deltaAmount !== undefined &&
-    movement.deltaAmount < 0 &&
-    movement.deltaPercent !== null &&
-    movement.deltaPercent !== undefined &&
-    movement.deltaPercent < 0
-  );
-}
-
-function hasPriceRise(movement: ProductPriceMovement | undefined) {
-  return (
-    movement?.deltaAmount !== null &&
-    movement?.deltaAmount !== undefined &&
-    movement.deltaAmount > 0 &&
-    movement.deltaPercent !== null &&
-    movement.deltaPercent !== undefined &&
-    movement.deltaPercent > 0
+function toMovementMap(
+  summaries: ReadonlyArray<{
+    deltaAmount: number | null;
+    deltaPercent: number | null;
+    productId: string;
+  }>,
+): Map<string, ProductPriceMovement> {
+  return new Map(
+    summaries.map((summary) => [
+      summary.productId,
+      {
+        rangeDays: PRODUCT_PRICE_MOVEMENT_RANGE_DAYS,
+        deltaAmount: summary.deltaAmount,
+        deltaPercent: summary.deltaPercent,
+      },
+    ]),
   );
 }

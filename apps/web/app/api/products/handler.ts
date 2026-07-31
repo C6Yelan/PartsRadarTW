@@ -1,8 +1,17 @@
 // apps/web/app/api/products/handler.ts
 // 處理商品列表 API 的 query 解析、品牌選項、價格變動排序、來源狀態與分頁回應。
 
+import {
+  ProductMovementReadUnavailableError,
+  ProductMovementWorkBudgetExceededError,
+} from "@partsradar/db/product-movement";
 import { InvalidQueryError } from "../_shared/query";
-import { internalErrorResponse, invalidQueryResponse, jsonOk } from "../_shared/responses";
+import {
+  internalErrorResponse,
+  invalidQueryResponse,
+  jsonOk,
+  temporarilyUnavailableResponse,
+} from "../_shared/responses";
 import { SOURCE_STATUS_CATEGORY_QUERY } from "../source-status/data";
 import {
   PRODUCT_PRICE_MOVEMENT_RANGE_DAYS,
@@ -14,6 +23,7 @@ import {
   buildProductVendorOptionsWhere,
   buildProductWhere,
   parseProductListQuery,
+  isPriceMovementSort,
   toProductVendorOptions,
   validateVendorValues,
 } from "./query";
@@ -50,11 +60,15 @@ export function createGetProductsHandler(
       const vendorOptions = toProductVendorOptions(vendorRecords);
       validateVendorValues(query.vendors, vendorOptions);
       const where = buildProductWhere(query, { includeVendors: true });
-      const [totalItems, productsWithMovement] = await Promise.all([
-        client.product.count({ where }),
+      const [countedTotalItems, productsWithMovement] = await Promise.all([
+        isPriceMovementSort(query.sort) ? Promise.resolve(null) : client.product.count({ where }),
         findProductsWithMovement(client, where, query, now),
       ]);
       const { priceMovementByProductId, products } = productsWithMovement;
+      const totalItems = productsWithMovement.totalItems ?? countedTotalItems;
+      if (totalItems === null) {
+        throw new ProductMovementReadUnavailableError();
+      }
       const sourceStatus = buildProductSourceStatus(sourceStatusCategories, query.igrp, now);
 
       return jsonOk<ProductsResponseBody>({
@@ -83,6 +97,13 @@ export function createGetProductsHandler(
     } catch (error) {
       if (error instanceof InvalidQueryError) {
         return invalidQueryResponse();
+      }
+
+      if (
+        error instanceof ProductMovementReadUnavailableError ||
+        error instanceof ProductMovementWorkBudgetExceededError
+      ) {
+        return temporarilyUnavailableResponse();
       }
 
       return internalErrorResponse();

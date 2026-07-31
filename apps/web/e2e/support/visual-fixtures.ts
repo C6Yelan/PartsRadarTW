@@ -230,7 +230,7 @@ export function buildSourceStatusResponse(fixture: string | null) {
 export function buildProductListResponse(requestUrl: URL) {
   const product = buildVisualProduct();
   const pageNumber = Number(requestUrl.searchParams.get("page") ?? "1");
-  const showsPriceRise = requestUrl.searchParams.get("q") === "rise";
+  const showsPriceRise = requestUrl.searchParams.get("sort") === "price_rise_desc";
   const vendorsByCategory = {
     cpu: [
       { slug: "intel", name: "Intel" },

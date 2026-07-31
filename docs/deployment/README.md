@@ -117,5 +117,6 @@ Web 與 PostgreSQL 預設綁定 `127.0.0.1`。若使用 Cloudflare Tunnel：
 - Edge TLS、HSTS、WAF、bot protection 與 access policy 必須在實際 edge 驗證。
 - Production web 只信任單一合法 `CF-Connecting-IP`；缺少或非法 header 時 client identity 為 `unknown`，不會退回 XFF。
 - Public HTTPS smoke 必須觀察到 `X-RateLimit-Client-Source: cf`，並從外部網路確認沒有旁路 origin DNS、WAN/NAT web port 或公開 PostgreSQL。
+- Edge 應將 `/api/products` 的 allowlisted `price_drop_desc`／`price_rise_desc` 查詢設為獨立 heavy rule，預設值與 application 的 `API_PRODUCT_MOVEMENT_RATE_LIMIT_MAX=30`、`API_RATE_LIMIT_WINDOW_SECONDS=60`（每 60 秒 30 次）對齊；若調整任一 env，edge 的 max 與 window 必須一起對齊。普通列表不得套用此較低上限。上線前以 aggregate candidate count、隔離環境 query plan 與 latency 校準並記錄原值；若誤傷正常 movement 瀏覽，回復該 edge rule 與 env 的前一值，不可藉此提高單次 query work budget。
 
 Tunnel 啟動與診斷指令見 [Operations](../operations/README.md#cloudflare-tunnel)。

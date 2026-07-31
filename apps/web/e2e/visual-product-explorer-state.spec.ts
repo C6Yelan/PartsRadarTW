@@ -35,6 +35,48 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
+test("switches both movement sorts with stable filters and resets pagination @desktop-only", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1760, height: 900 });
+  const requests: URL[] = [];
+  page.on("request", (request) => {
+    if (/\/api\/products(?:\?|$)/.test(request.url())) requests.push(new URL(request.url()));
+  });
+  await page.goto("/?category=gpu&q=rise&status=all&page=3");
+  await expect
+    .poll(() => {
+      const request = requests.at(-1);
+      return request
+        ? {
+            page: request.searchParams.get("page"),
+            q: request.searchParams.get("q"),
+            status: request.searchParams.get("status"),
+          }
+        : null;
+    })
+    .toEqual({ page: "3", q: "rise", status: "all" });
+
+  const sort = page.getByRole("combobox", { name: "排序" });
+  await sort.selectOption("price_drop_desc");
+  await expect.poll(() => new URL(page.url()).searchParams.get("sort")).toBe("price_drop_desc");
+  await expect.poll(() => new URL(page.url()).searchParams.get("page")).toBeNull();
+  await expect
+    .poll(() => requests.at(-1)?.searchParams.get("sort"))
+    .toBe("price_drop_desc");
+  await expectQueryFilters(page, { category: "gpu", facets: [], vendors: null });
+  await expect(page.locator(".price-movement").first()).toContainText("−NT$ 300 / −4.8%");
+
+  await sort.selectOption("price_rise_desc");
+  await expect.poll(() => new URL(page.url()).searchParams.get("sort")).toBe("price_rise_desc");
+  await expect
+    .poll(() => requests.at(-1)?.searchParams.get("sort"))
+    .toBe("price_rise_desc");
+  await expect.poll(() => new URL(page.url()).searchParams.get("q")).toBe("rise");
+  await expect.poll(() => new URL(page.url()).searchParams.get("status")).toBe("all");
+  await expect(page.locator(".price-movement").first()).toContainText("+NT$ 300 / +4.8%");
+});
+
 test("resets vendor, grouped facets, status, and page together @desktop-only", async ({ page }) => {
   await page.setViewportSize({ width: 1760, height: 900 });
   await page.goto("/?category=cpu");

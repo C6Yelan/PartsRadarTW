@@ -72,22 +72,7 @@ describe("GET /api/products response", () => {
     expect(client.lastProductFindProductsArgs?.select).not.toHaveProperty("primaryImageCheckedAt");
     expect(client.lastProductFindProductsArgs?.select).not.toHaveProperty("missingSince");
     expect(client.lastProductCountArgs?.where).toEqual(client.lastProductFindProductsArgs?.where);
-    expect(client.lastPriceSnapshotFindManyArgs).toMatchObject({
-      where: {
-        productId: {
-          in: [PRODUCT_ID],
-        },
-        capturedAt: {
-          lte: NOW,
-        },
-      },
-      orderBy: [{ productId: "asc" }, { capturedAt: "asc" }],
-    });
-    expect(client.lastPriceSnapshotFindManyArgs?.select).toEqual({
-      productId: true,
-      price: true,
-      capturedAt: true,
-    });
+    expect(client.movementFindSummariesCallCount).toBe(1);
     expect(client.lastSourceCategoryFindManyArgs).toEqual(SOURCE_STATUS_CATEGORY_QUERY);
     expect(body).toEqual({
       data: [
@@ -153,7 +138,7 @@ describe("GET /api/products response", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(client.priceSnapshotFindManyCallCount).toBe(0);
+    expect(client.movementFindSummariesCallCount).toBe(1);
     expect(client.lastProductFindProductsArgs).toMatchObject({
       where: {
         isActive: true,
