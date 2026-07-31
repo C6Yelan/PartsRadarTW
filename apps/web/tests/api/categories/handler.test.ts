@@ -150,6 +150,27 @@ describe("GET /api/categories handler", () => {
       },
     });
   });
+
+  it("returns a generic 500 response instead of partial SSD facets when availability fails", async () => {
+    const response = await createGetCategoriesHandler({
+      sourceCategory: {
+        findMany: async () => [
+          category({ id: "category-7", igrp: 7, displayName: "SSD", sourceName: "SSD" }),
+        ],
+      },
+      readAvailableProductFacetTags: async () => {
+        throw new Error("statement timeout");
+      },
+    })();
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({
+      error: {
+        code: "internal_error",
+        message: API_ERROR_MESSAGES.internalError,
+      },
+    });
+  });
 });
 
 type FindManyArgs = Parameters<CategoriesReadClient["sourceCategory"]["findMany"]>[0];

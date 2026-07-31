@@ -182,6 +182,7 @@ model Product {
   priceSnapshots           PriceSnapshot[]
   discordTargetWatches     DiscordTargetPriceWatch[]
   discordDeliveries        DiscordNotificationDelivery[]
+  facetEligibleTags        ProductFacetEligibleProduct[]
 
   @@unique([sourceCategoryId, ibuyToken], map: "products_source_category_id_ibuy_token_key")
   @@index([sourceCategoryId], map: "products_source_category_id_idx")
@@ -194,6 +195,17 @@ model Product {
   @@index([imageCacheCheckedAt], map: "products_image_cache_checked_at_idx")
   @@index([imageCacheNextRetryAt], map: "products_image_cache_next_retry_at_idx")
   @@map("products")
+}
+
+model ProductFacetEligibleProduct {
+  igrp      Int
+  tag       String  @db.Text
+  productId String  @map("product_id") @db.Uuid
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@id([igrp, tag, productId], map: "product_facet_eligible_products_pkey")
+  @@index([productId], map: "product_facet_eligible_products_product_id_idx")
+  @@map("product_facet_eligible_products")
 }
 
 enum ProductExclusionReason {
