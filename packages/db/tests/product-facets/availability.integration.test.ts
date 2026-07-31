@@ -11,6 +11,11 @@ import {
   PRODUCT_FACET_AVAILABILITY_STATEMENT_TIMEOUT_MS,
   readAvailableProductFacetTags,
 } from "../../src/product-facets/availability";
+import {
+  type ExplainPlanNode,
+  totalSharedBuffers,
+  walkPlan,
+} from "../support/explain-plan";
 
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 const migrationDatabaseUrl = process.env.MIGRATION_DATABASE_URL;
@@ -247,7 +252,7 @@ describe("product facet availability PostgreSQL integration", () => {
       FROM product_facet_eligible_products
       WHERE product_id = ${projectedProduct.productId}::uuid
     `;
-    const maintenanceProbe = flattenPlan(readExplainRoot(maintenancePlanRows)).find(
+    const maintenanceProbe = walkPlan(readExplainRoot(maintenancePlanRows)).find(
       (node) => node["Index Name"] === "product_facet_eligible_products_product_id_idx",
     );
 
@@ -365,18 +370,8 @@ describe("product facet availability PostgreSQL integration", () => {
   });
 });
 
-interface ExplainPlanNode {
-  "Node Type": string;
-  "Actual Rows": number;
-  "Actual Loops": number;
-  "Shared Hit Blocks": number;
-  "Shared Read Blocks": number;
-  "Index Name"?: string;
-  Plans?: ExplainPlanNode[];
-}
-
 function assertFixedAvailabilityPlan(root: ExplainPlanNode): void {
-  const nodes = flattenPlan(root);
+  const nodes = walkPlan(root);
   const limit = nodes.find(
     (node) => node["Node Type"] === "Limit" && node["Actual Loops"] === candidateTags.length,
   );
@@ -385,9 +380,7 @@ function assertFixedAvailabilityPlan(root: ExplainPlanNode): void {
   );
 
   expect(root["Actual Rows"] * root["Actual Loops"]).toBe(candidateTags.length);
-  expect(root["Shared Hit Blocks"] + root["Shared Read Blocks"]).toBeLessThanOrEqual(
-    MAX_PUBLIC_PLAN_SHARED_BLOCKS,
-  );
+  expect(totalSharedBuffers(root)).toBeLessThanOrEqual(MAX_PUBLIC_PLAN_SHARED_BLOCKS);
   expect(limit).toMatchObject({
     "Actual Loops": candidateTags.length,
     "Actual Rows": 1,
@@ -426,10 +419,6 @@ function readExplainRoot(rows: Array<{ "QUERY PLAN": unknown }>): ExplainPlanNod
     throw new Error("Expected PostgreSQL JSON query plan root.");
   }
   return root;
-}
-
-function flattenPlan(root: ExplainPlanNode): ExplainPlanNode[] {
-  return [root, ...(root.Plans ?? []).flatMap(flattenPlan)];
 }
 
 async function createCategory({ igrp = 7 }: { igrp?: number } = {}): Promise<string> {

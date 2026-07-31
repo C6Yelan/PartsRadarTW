@@ -15,6 +15,7 @@ import {
   enforceTargetPriceNotificationBoundedPlan,
 } from "../../src/target-price-notification/claim";
 import type { TargetPriceNotificationClaimQueryClient } from "../../src/target-price-notification/types";
+import { collectPlanNodes, totalRowsExamined } from "../support/explain-plan";
 
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 const migrationDatabaseUrl = process.env.MIGRATION_DATABASE_URL;
@@ -511,12 +512,12 @@ describe("target price notification PostgreSQL claim", () => {
       (node) =>
         String(node["Node Type"]).includes("Scan") &&
         node["Relation Name"] === "discord_target_price_watches" &&
-        planNodeExaminedRows(node) > 1,
+        totalRowsExamined(node) > 1,
     );
 
     expect(highWaterIndexNodes).toHaveLength(1);
     expect(highWaterIndexNodes[0]?.["Scan Direction"]).toBe("Backward");
-    expect(planNodeExaminedRows(highWaterIndexNodes[0] ?? {})).toBe(1);
+    expect(totalRowsExamined(highWaterIndexNodes[0] ?? {})).toBe(1);
     expect(unboundedHighWaterScans).toEqual([]);
 
     const claimQuery = createTargetPriceNotificationClaimQuery(
@@ -555,7 +556,7 @@ describe("target price notification PostgreSQL claim", () => {
         ["discord_target_price_watches", "products", "current_prices", "price_snapshots"].includes(
           String(node["Relation Name"]),
         ) &&
-        planNodeExaminedRows(node) > scanLimit * 2,
+        totalRowsExamined(node) > scanLimit * 2,
     );
     const oversizedSortOrHashNodes = planNodes.filter(
       (node) =>
@@ -594,29 +595,6 @@ describe("target price notification PostgreSQL claim", () => {
     );
   });
 });
-
-function collectPlanNodes(value: unknown): Array<Record<string, unknown>> {
-  if (Array.isArray(value)) {
-    return value.flatMap(collectPlanNodes);
-  }
-  if (typeof value !== "object" || value === null) {
-    return [];
-  }
-
-  const record = value as Record<string, unknown>;
-  const nested = Object.values(record).flatMap(collectPlanNodes);
-
-  return typeof record["Node Type"] === "string" ? [record, ...nested] : nested;
-}
-
-function planNodeExaminedRows(node: Record<string, unknown>): number {
-  return (
-    (Number(node["Actual Rows"]) +
-      Number(node["Rows Removed by Filter"] ?? 0) +
-      Number(node["Rows Removed by Index Recheck"] ?? 0)) *
-    Number(node["Actual Loops"])
-  );
-}
 
 async function readPlannerSettings(client: {
   $queryRaw<T>(query: Prisma.Sql): Promise<T>;
