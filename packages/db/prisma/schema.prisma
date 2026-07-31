@@ -283,6 +283,7 @@ model DiscordTargetPriceWatch {
   @@unique([discordUserId, productId], map: "discord_target_price_watches_discord_user_id_product_id_key")
   @@index([discordUserId, enabled], map: "discord_target_price_watches_user_enabled_idx")
   @@index([productId, enabled], map: "discord_target_price_watches_product_enabled_idx")
+  @@index([enabled, lastNotifiedAt, notificationClaimedAt], map: "discord_target_price_watches_notification_due_idx")
   @@index([updatedAt, id], map: "discord_target_price_watches_pending_scan_idx", where: { enabled: true, lastNotifiedAt: null })
   @@map("discord_target_price_watches")
 }

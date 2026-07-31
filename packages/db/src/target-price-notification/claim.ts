@@ -181,41 +181,57 @@ export function createTargetPriceNotificationClaimQuery(
     ),
     due_candidates AS MATERIALIZED (
       SELECT
-        watch.id,
-        watch.discord_user_id,
-        watch.product_id,
-        watch.target_price,
-        watch.currency,
-        watch.notification_cursor_at,
-        watch.updated_at,
-        product.name AS product_name,
-        snapshot.price AS current_price,
-        snapshot.currency AS current_currency,
-        snapshot.captured_at AS current_captured_at
+        due.id,
+        due.discord_user_id,
+        due.product_id,
+        due.target_price,
+        due.currency,
+        due.notification_cursor_at,
+        due.updated_at,
+        due.product_name,
+        due.current_price,
+        due.current_currency,
+        due.current_captured_at
       FROM scan_candidates AS candidate
-      JOIN discord_target_price_watches AS watch ON watch.id = candidate.id
-      JOIN products AS product ON product.id = watch.product_id
-      JOIN current_prices AS current_price ON current_price.product_id = product.id
-      JOIN price_snapshots AS snapshot
-        ON snapshot.id = current_price.price_snapshot_id
-       AND snapshot.product_id = current_price.product_id
-      WHERE watch.enabled = true
-        AND watch.last_notified_at IS NULL
-        AND (
-          watch.notification_claimed_at IS NULL
-          OR watch.notification_claimed_at <= ${staleClaimBefore}
-        )
-        AND product.is_active = true
-        AND product.is_excluded = false
-        AND snapshot.currency = watch.currency
-        AND (
-          watch.notification_cursor_at IS NULL
-          OR snapshot.captured_at > watch.notification_cursor_at
-        )
-        AND snapshot.price <= watch.target_price
-      ORDER BY candidate.updated_at ASC, watch.id ASC
+      CROSS JOIN LATERAL (
+        SELECT
+          watch.id,
+          watch.discord_user_id,
+          watch.product_id,
+          watch.target_price,
+          watch.currency,
+          watch.notification_cursor_at,
+          watch.updated_at,
+          product.name AS product_name,
+          snapshot.price AS current_price,
+          snapshot.currency AS current_currency,
+          snapshot.captured_at AS current_captured_at
+        FROM discord_target_price_watches AS watch
+        JOIN products AS product ON product.id = watch.product_id
+        JOIN current_prices AS current_price ON current_price.product_id = product.id
+        JOIN price_snapshots AS snapshot
+          ON snapshot.id = current_price.price_snapshot_id
+         AND snapshot.product_id = current_price.product_id
+        WHERE watch.id = candidate.id
+          AND watch.enabled = true
+          AND watch.last_notified_at IS NULL
+          AND (
+            watch.notification_claimed_at IS NULL
+            OR watch.notification_claimed_at <= ${staleClaimBefore}
+          )
+          AND product.is_active = true
+          AND product.is_excluded = false
+          AND snapshot.currency = watch.currency
+          AND (
+            watch.notification_cursor_at IS NULL
+            OR snapshot.captured_at > watch.notification_cursor_at
+          )
+          AND snapshot.price <= watch.target_price
+        LIMIT 1
+        FOR UPDATE OF watch SKIP LOCKED
+      ) AS due
+      ORDER BY candidate.updated_at ASC, due.id ASC
       LIMIT ${claimLimit}
-      FOR UPDATE OF watch SKIP LOCKED
     ),
     claimed AS (
       UPDATE discord_target_price_watches AS watch

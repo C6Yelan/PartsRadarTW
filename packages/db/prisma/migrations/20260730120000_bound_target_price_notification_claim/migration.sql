@@ -27,8 +27,6 @@ CREATE TABLE "discord_target_price_notification_scan_state" (
 INSERT INTO "discord_target_price_notification_scan_state" ("id", "updated_at")
 VALUES (1, CURRENT_TIMESTAMP);
 
-DROP INDEX "discord_target_price_watches_notification_due_idx";
-
 CREATE INDEX "discord_target_price_watches_pending_scan_idx"
 ON "discord_target_price_watches"("updated_at", "id")
 WHERE "enabled" = true AND "last_notified_at" IS NULL;

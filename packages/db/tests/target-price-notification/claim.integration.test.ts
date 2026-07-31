@@ -580,6 +580,7 @@ describe("target price notification PostgreSQL claim", () => {
     expect(unboundedRelationScans).toEqual([]);
     expect(oversizedSortOrHashNodes).toEqual([]);
     expect(claimQuery.sql).toContain("scan_candidates AS MATERIALIZED");
+    expect(claimQuery.sql).toContain("CROSS JOIN LATERAL");
     expect(claimQuery.sql).toContain("FOR UPDATE OF watch SKIP LOCKED");
     expect(claimQuery.sql).not.toContain(products[0]?.productId);
     expect(indexes).toEqual([

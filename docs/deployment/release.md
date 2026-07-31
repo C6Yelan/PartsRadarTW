@@ -48,6 +48,8 @@ docker compose exec -T postgres sh -c \
 
 `db:configure-runtime-role` 必須確認 runtime login 不是 superuser、database owner，也沒有其他 role membership，只具有 application schema 所需的 connect、usage、DML、view read 與 sequence usage；`_prisma_migrations` 不授權給 runtime role。
 
+RC-09 target-watch bounded claim的migration與application rollback另須依[Target-watch claim migration](target-watch-claim.md)執行expand／contract、index validity、failure matrix與writer cutover gate。
+
 ## Release validation
 
 部署前至少需要：
