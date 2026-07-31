@@ -78,4 +78,45 @@ describe("target price notification skips", () => {
     expect(client.discordTargetPriceWatch.updateMany).not.toHaveBeenCalled();
     expect(client.discordNotificationDelivery.create).not.toHaveBeenCalled();
   });
+
+  it("does not claim a reached price when the current currency differs from the watch", async () => {
+    const client = createDiscordBotClient({
+      snapshots: [
+        snapshot({
+          id: "snapshot-currency-mismatch",
+          productId: WATCH_PRODUCT_ID,
+          productName: "Currency mismatch product",
+          crawlRunId: "new-run",
+          price: 15_000,
+          currency: "USD",
+          capturedAt: "2026-06-07T04:55:00.000Z",
+        }),
+      ],
+      watches: [
+        targetPriceWatch({
+          id: WATCH_ROW_ID,
+          discordUserId: "test-currency-user",
+          productId: WATCH_PRODUCT_ID,
+          targetPrice: 17_500,
+          currency: "TWD",
+        }),
+      ],
+    });
+    const sendDirectMessages = vi.fn();
+
+    await expect(
+      sendDueTargetPriceNotifications({
+        client,
+        publicBaseUrl: PUBLIC_BASE_URL,
+        now: new Date("2026-06-07T05:00:00.000Z"),
+        sendDirectMessages,
+      }),
+    ).resolves.toMatchObject({
+      scannedCount: 1,
+      dueCount: 0,
+      processedCount: 0,
+    });
+    expect(sendDirectMessages).not.toHaveBeenCalled();
+    expect(client.discordTargetPriceWatch.updateMany).not.toHaveBeenCalled();
+  });
 });

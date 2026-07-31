@@ -62,13 +62,13 @@ describe("CoolPC filter sync", () => {
       return;
     }
 
-    expect(socketGroup.conditions["1150"]).toBeNull();
-    expect(socketGroup.conditions["1151"]).toBeNull();
-    expect(socketGroup.conditions["1200"]).toBeNull();
-    expect(socketGroup.conditions.Threadripper).toBeNull();
+    expect(socketGroup.conditions["1150"]?.tags).toBeNull();
+    expect(socketGroup.conditions["1151"]?.tags).toBeNull();
+    expect(socketGroup.conditions["1200"]?.tags).toBeNull();
+    expect(socketGroup.conditions.Threadripper?.tags).toBeNull();
     const mappedTags = SOURCE_FILTER_SECTION_MAPPINGS.flatMap((section) =>
       section.groups.flatMap((group) =>
-        group ? Object.values(group.conditions).flatMap((tags) => tags ?? []) : [],
+        group ? Object.values(group.conditions).flatMap((condition) => condition.tags ?? []) : [],
       ),
     );
     expect(mappedTags).not.toContain("socket:other");

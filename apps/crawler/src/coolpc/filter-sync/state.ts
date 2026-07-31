@@ -18,6 +18,7 @@ export interface CoolpcFilterSyncState {
   productCount: number;
   taggedProductCount: number;
   ambiguousProductCount: number;
+  sourceValueDriftCount?: number;
   tagsByIgrp: Record<string, Record<string, string[]>>;
   refreshRequestedAt?: string | null;
   joinCoverageFailures?: Record<string, CoolpcFilterSyncJoinCoverageFailure>;
@@ -76,6 +77,7 @@ function validateState(value: unknown): CoolpcFilterSyncState {
     !isNonNegativeInteger(value.productCount) ||
     !isNonNegativeInteger(value.taggedProductCount) ||
     !isNonNegativeInteger(value.ambiguousProductCount) ||
+    !isOptionalNonNegativeInteger(value.sourceValueDriftCount) ||
     !isRecord(value.tagsByIgrp) ||
     !isOptionalNullableIsoDate(value.refreshRequestedAt) ||
     !isOptionalJoinCoverageFailures(value.joinCoverageFailures)
@@ -145,6 +147,10 @@ function isNullableString(value: unknown): value is string | null {
 
 function isNonNegativeInteger(value: unknown): value is number {
   return Number.isInteger(value) && Number(value) >= 0;
+}
+
+function isOptionalNonNegativeInteger(value: unknown): value is number | undefined {
+  return value === undefined || isNonNegativeInteger(value);
 }
 
 function isNodeError(error: unknown): error is NodeJS.ErrnoException {

@@ -85,6 +85,35 @@ Repository tests 無法證明 edge、備份系統、GitHub、Discord Portal 或�
 
 缺少這些外部證據時，不得把單元測試或 smoke 成功視為完整 launch approval。
 
+### 分享圖 route work control
+
+`/products/*/opengraph-image` 與 `/products/*/twitter-image` 共用每個 web process 的
+`SHARE_IMAGE_RATE_LIMIT_MAX`，window 使用 `API_RATE_LIMIT_WINDOW_SECONDS`（預設 60 秒）；
+production 只接受合法
+`CF-Connecting-IP` 作 client identity；direct-origin 或缺少 trusted header 的流量共用
+`unknown` bucket。一般商品頁與其他 API scope 不使用此 limit。
+
+Origin contract 固定如下：
+
+- invalid ID：不載入 Prisma、檔案或 renderer，回傳可 edge cache 1 小時的空 404。
+- missing／disabled／無現價 UUID：最多一筆窄查詢，回傳可 edge cache 60 秒的空 404；
+  process-local negative cache 最多 1024 entries、TTL 60 秒。
+- valid product：PNG 可 cache 5 分鐘，render cache 最多 128 entries／16 MiB，
+  source WebP 最多 2 MiB、response 最多 1 MiB；同 key coalesce，單 process 同時最多
+  16 個 lookup 與 2 個 render。名稱、價格、更新時間、分類或 image file version 改變會建立
+  新 key，因此 CDN 最長 staleness 為 5 分鐘。
+
+這些 process-local bounds 不取代 edge control。上線前由 operator 對兩條精確 route 設定
+可回復的 WAF／rate rule，排除普通 `/products/*` 頁面，並記錄原 action、threshold、
+window 與 rollback 值；不得把 Cloudflare credential 放進 web runtime。先以單一合法商品、
+單一 missing UUID 與 invalid path 低頻驗證 status、`Cache-Control`、`Age`、
+`CF-Cache-Status`、app rate headers 及 sanitized aggregate render count，不批量產生
+random IDs。
+
+若 edge rule 誤傷正常 social crawler，先恢復該 rule 的前一組值並保留 app bounds；若回退
+到仍會動態 render invalid／missing fallback 的舊 web image，必須維持或暫時收緊兩條
+metadata route 的 edge rule，不可關閉全站限流或公開 origin。
+
 ## Cloudflare Tunnel
 
 使用時機：Private smoke 通過且 edge 設定已準備完成。

@@ -93,6 +93,50 @@ test("keeps mobile price-history records readable and uses discount wording @mob
   await expectNoHorizontalOverflow(page);
 });
 
+test("labels sampled price history as representative and restores exact labels on range switch", async ({
+  page,
+}) => {
+  await page.route(
+    new RegExp(`/api/products/${PRODUCT_ID}/price-history(?:\\?.*)?$`),
+    async (route) => {
+      const requestUrl = new URL(route.request().url());
+      const exact = requestUrl.searchParams.get("days") === "30";
+      await route.fulfill(
+        buildJsonResponse({
+          ...buildPriceHistoryResponse(),
+          range: exact ? "30d" : "90d",
+          rangeDays: exact ? 30 : 90,
+          ...(exact
+            ? {}
+            : {
+                sampling: {
+                  downsampled: true,
+                  strategy: "time_bucket_first_last",
+                  bucketCount: 126,
+                  pointLimit: 256,
+                },
+              }),
+        }),
+      );
+    },
+  );
+
+  await page.goto(`/products/${READY_ROUTE_SLUG}`);
+
+  await expect(page.getByText(/每個時間分桶顯示首筆與末筆代表觀測/)).toBeVisible();
+  await expect(page.getByText("代表觀測期間變動", { exact: true })).toBeVisible();
+  await expect(page.getByText("代表觀測最低", { exact: true })).toBeVisible();
+  await expect(page.getByText("代表觀測均價", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "代表觀測變價紀錄" })).toBeVisible();
+
+  await page.getByRole("button", { name: "30 天" }).click();
+
+  await expect(page.getByText(/每個時間分桶顯示首筆與末筆代表觀測/)).toHaveCount(0);
+  await expect(page.getByText("期間變動", { exact: true })).toBeVisible();
+  await expect(page.getByText("區間平均", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "變價紀錄", exact: true })).toBeVisible();
+});
+
 test("uses compact custom price-report filters, aligned table typography, and conditional reset @responsive-boundary", async ({
   page,
 }) => {

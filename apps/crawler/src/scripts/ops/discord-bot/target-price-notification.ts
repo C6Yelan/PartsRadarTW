@@ -1,19 +1,17 @@
 // apps/crawler/src/scripts/ops/discord-bot/target-price-notification.ts
 // 掃描達標的目標價 watch，負責 claim、分組發送 Discord DM，並記錄通知 delivery 結果。
 
+import { claimDueTargetPriceNotifications } from "@partsradar/db/target-price-notification";
 import {
   MAX_TARGET_PRICE_NOTIFICATIONS_PER_CYCLE,
   TARGET_PRICE_NOTIFICATION_CLAIM_LEASE_MS,
 } from "./constants";
 import { recordTargetPriceNotificationDelivery } from "./target-price-notification/delivery";
 import { createTargetPriceReachedMessages } from "./target-price-notification/messages";
-import {
-  groupTargetPriceWatchesByUser,
-  isTargetPriceReached,
-  TARGET_PRICE_NOTIFICATION_SELECT,
-  type TargetPriceNotificationWatch,
-} from "./target-price-notification/records";
+import { groupTargetPriceWatchesByUser } from "./target-price-notification/records";
 import type { DiscordBotClient, DiscordBotMessage, DiscordMessageSendResult } from "./types";
+
+const TARGET_PRICE_NOTIFICATION_SCAN_LIMIT = 256;
 
 // 單輪目標價通知掃描結果，供 daemon log 與維運觀察本輪處理狀態。
 export interface TargetPriceNotificationSummary {
@@ -41,27 +39,16 @@ export async function sendDueTargetPriceNotifications({
   ) => Promise<DiscordMessageSendResult>;
 }): Promise<TargetPriceNotificationSummary> {
   const staleClaimBefore = new Date(now.getTime() - TARGET_PRICE_NOTIFICATION_CLAIM_LEASE_MS);
-  const candidates = await client.discordTargetPriceWatch.findMany({
-    where: {
-      enabled: true,
-      lastNotifiedAt: null,
-      OR: [{ notificationClaimedAt: null }, { notificationClaimedAt: { lte: staleClaimBefore } }],
-      product: {
-        isActive: true,
-        isExcluded: false,
-        currentPrice: {
-          isNot: null,
-        },
-      },
-    },
-    orderBy: [{ updatedAt: "asc" }, { id: "asc" }],
-    select: TARGET_PRICE_NOTIFICATION_SELECT,
+  const claimBatch = await claimDueTargetPriceNotifications(client, {
+    claimedAt: now,
+    staleClaimBefore,
+    scanLimit: TARGET_PRICE_NOTIFICATION_SCAN_LIMIT,
+    claimLimit: MAX_TARGET_PRICE_NOTIFICATIONS_PER_CYCLE,
   });
-  const dueWatches = candidates
-    .filter(isTargetPriceReached)
-    .slice(0, MAX_TARGET_PRICE_NOTIFICATIONS_PER_CYCLE);
+  const dueWatches = claimBatch.watches;
+  const unprocessedClaimIds = new Set(dueWatches.map(({ id }) => id));
   const summary: TargetPriceNotificationSummary = {
-    scannedCount: candidates.length,
+    scannedCount: claimBatch.scannedCount,
     dueCount: dueWatches.length,
     processedCount: 0,
     sentCount: 0,
@@ -70,37 +57,13 @@ export async function sendDueTargetPriceNotifications({
   };
 
   for (const watches of groupTargetPriceWatchesByUser(dueWatches)) {
-    const claimedWatches: TargetPriceNotificationWatch[] = [];
+    summary.processedCount += watches.length;
 
     for (const watch of watches) {
-      const claimed = await client.discordTargetPriceWatch.updateMany({
-        where: {
-          id: watch.id,
-          enabled: true,
-          lastNotifiedAt: null,
-          OR: [
-            { notificationClaimedAt: null },
-            { notificationClaimedAt: { lte: staleClaimBefore } },
-          ],
-        },
-        data: {
-          notificationClaimedAt: now,
-        },
-      });
-
-      if (claimed.count === 0) {
-        continue;
-      }
-
-      summary.processedCount += 1;
-      claimedWatches.push(watch);
+      unprocessedClaimIds.delete(watch.id);
     }
 
-    if (claimedWatches.length === 0) {
-      continue;
-    }
-
-    const discordUserId = claimedWatches[0]?.discordUserId;
+    const discordUserId = watches[0]?.discordUserId;
 
     if (!discordUserId) {
       continue;
@@ -108,7 +71,7 @@ export async function sendDueTargetPriceNotifications({
 
     const activeClaims = await client.discordTargetPriceWatch.findMany({
       where: {
-        id: { in: claimedWatches.map(({ id }) => id) },
+        id: { in: watches.map(({ id }) => id) },
         discordUserId,
         enabled: true,
         lastNotifiedAt: null,
@@ -117,7 +80,7 @@ export async function sendDueTargetPriceNotifications({
       select: { id: true },
     });
     const activeClaimIds = new Set(activeClaims.map(({ id }) => id));
-    const sendableWatches = claimedWatches.filter(({ id }) => activeClaimIds.has(id));
+    const sendableWatches = watches.filter(({ id }) => activeClaimIds.has(id));
 
     if (sendableWatches.length === 0) {
       continue;
@@ -153,6 +116,10 @@ export async function sendDueTargetPriceNotifications({
     const persistableWatches = sendableWatches.filter(({ id }) => remainingClaimIds.has(id));
 
     if (persistableWatches.length === 0) {
+      if (sendResult.status === "rate_limited") {
+        await releaseUnprocessedClaims(client, unprocessedClaimIds, now);
+        break;
+      }
       continue;
     }
 
@@ -213,9 +180,30 @@ export async function sendDueTargetPriceNotifications({
     }
 
     if (sendResult.status === "rate_limited") {
+      await releaseUnprocessedClaims(client, unprocessedClaimIds, now);
       break;
     }
   }
 
   return summary;
+}
+
+async function releaseUnprocessedClaims(
+  client: DiscordBotClient,
+  claimIds: Set<string>,
+  claimedAt: Date,
+): Promise<void> {
+  if (claimIds.size === 0) {
+    return;
+  }
+  await client.discordTargetPriceWatch.updateMany({
+    where: {
+      id: { in: [...claimIds] },
+      lastNotifiedAt: null,
+      notificationClaimedAt: claimedAt,
+    },
+    data: {
+      notificationClaimedAt: null,
+    },
+  });
 }

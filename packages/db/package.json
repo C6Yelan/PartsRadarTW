@@ -9,6 +9,10 @@
       "types": "./src/client.ts",
       "default": "./src/client.ts"
     },
+    "./target-price-notification": {
+      "types": "./src/target-price-notification/index.ts",
+      "default": "./src/target-price-notification/index.ts"
+    },
     "./price-report": {
       "types": "./src/price-report/index.ts",
       "default": "./src/price-report/index.ts"

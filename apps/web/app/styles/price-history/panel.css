@@ -75,6 +75,15 @@
   color: var(--muted);
 }
 
+.history-sampling-notice {
+  padding: 10px 12px;
+  margin: 0;
+  border-left: 3px solid var(--history-gold);
+  background: rgba(192, 165, 110, 0.08);
+  color: var(--muted);
+  line-height: 1.6;
+}
+
 .history-loading {
   display: grid;
 }

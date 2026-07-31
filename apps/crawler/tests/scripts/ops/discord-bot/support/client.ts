@@ -50,6 +50,8 @@ export function createDiscordBotClient({
     publicPriceReportSettings,
   });
 
+  const targetPriceWatchClient = createTargetPriceWatchClient(watches, snapshots);
+
   return asDiscordBotClient({
     crawlRun: publicReportClient.crawlRun,
     sourceCategory: priceReportReaderClient.sourceCategory,
@@ -59,7 +61,8 @@ export function createDiscordBotClient({
     discordPublicPriceReportDelivery: publicReportClient.discordPublicPriceReportDelivery,
     discordPublicPriceReportSetting: publicReportClient.discordPublicPriceReportSetting,
     discordPriceReportSetting: createPriceReportSettingClient(settings),
-    discordTargetPriceWatch: createTargetPriceWatchClient(watches, snapshots),
+    discordTargetPriceWatch: targetPriceWatchClient.delegate,
+    $transaction: targetPriceWatchClient.transaction,
   });
 }
 

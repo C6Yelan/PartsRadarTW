@@ -11,10 +11,16 @@ import { formatHistoryPointCount } from "./format";
 import type { HistoryViewSummary, PriceHistoryRangeDays, PriceHistoryRangeKey } from "./types";
 
 // 顯示選定期間首尾價格差與價格訊號，提供價格趨勢的快速判讀。
-export function PeriodDeltaCard({ summary }: { summary: HistoryViewSummary }) {
+export function PeriodDeltaCard({
+  downsampled = false,
+  summary,
+}: {
+  downsampled?: boolean;
+  summary: HistoryViewSummary;
+}) {
   return (
     <div className={`history-period-card is-${summary.signal.tone}`}>
-      <span>期間變動</span>
+      <span>{downsampled ? "代表觀測期間變動" : "期間變動"}</span>
       <strong>{`${formatSignedTwdPrice(summary.deltaAmount, "資料不足")} / ${formatSignedPercent(
         summary.deltaPercent,
         2,
@@ -30,10 +36,12 @@ export function HistoryRangeCard({
   range,
   rangeDays,
   summary,
+  downsampled = false,
 }: {
   range: PriceHistoryRangeKey;
   rangeDays: PriceHistoryRangeDays | null;
   summary: HistoryViewSummary;
+  downsampled?: boolean;
 }) {
   if (!summary.lowest || !summary.highest) {
     return null;
@@ -49,11 +57,11 @@ export function HistoryRangeCard({
         <span className="history-range-caption">價格區間</span>
         <div className="history-range-endpoints">
           <span className="history-range-endpoint is-low">
-            <span>最低</span>
+            <span>{downsampled ? "代表最低" : "最低"}</span>
             <strong>{formatTwdPrice(summary.lowest.amount)}</strong>
           </span>
           <span className="history-range-endpoint is-high">
-            <span>最高</span>
+            <span>{downsampled ? "代表最高" : "最高"}</span>
             <strong>{formatTwdPrice(summary.highest.amount)}</strong>
           </span>
         </div>
@@ -66,21 +74,21 @@ export function HistoryRangeCard({
       </div>
       <div className="history-range-stats">
         <div className="history-range-stat is-low">
-          <span>最低</span>
+          <span>{downsampled ? "代表觀測最低" : "最低"}</span>
           <strong>{formatTwdPrice(summary.lowest.amount)}</strong>
           <small>{formatTaipeiMonthDay(summary.lowest.observedAt)}</small>
         </div>
         <div className="history-range-stat is-high">
-          <span>最高</span>
+          <span>{downsampled ? "代表觀測最高" : "最高"}</span>
           <strong>{formatTwdPrice(summary.highest.amount)}</strong>
           <small>{formatTaipeiMonthDay(summary.highest.observedAt)}</small>
         </div>
         <div className="history-range-stat is-average">
-          <span>均價</span>
+          <span>{downsampled ? "代表觀測均價" : "均價"}</span>
           <strong>
             {summary.averageAmount === null ? "-" : formatTwdPrice(summary.averageAmount)}
           </strong>
-          <small>區間平均</small>
+          <small>{downsampled ? "取樣點平均" : "區間平均"}</small>
         </div>
       </div>
     </div>

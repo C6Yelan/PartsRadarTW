@@ -43,11 +43,35 @@ try {
   const report = existsSync(reportPath) ? JSON.parse(readFileSync(reportPath, "utf8")) : null;
 
   if (result.status !== 0) {
+    const failureMessages = new Set();
+
     for (const testResult of report?.testResults ?? []) {
-      if (testResult.message) {
-        process.stderr.write(`${testResult.message}\n`);
+      const candidates = [
+        testResult.message,
+        ...(testResult.assertionResults ?? [])
+          .filter((assertionResult) => assertionResult.status === "failed")
+          .flatMap((assertionResult) => assertionResult.failureMessages ?? []),
+      ];
+
+      for (const candidate of candidates) {
+        if (typeof candidate !== "string") {
+          continue;
+        }
+
+        const message = candidate
+          .trim()
+          .replace(/\bpostgres(?:ql)?:\/\/[^\s"'`]+/gi, "[redacted database URL]");
+
+        if (message) {
+          failureMessages.add(message);
+        }
       }
     }
+
+    for (const message of failureMessages) {
+      process.stderr.write(`${message}\n`);
+    }
+
     process.exitCode = result.status ?? 1;
   } else {
     if (!report) {

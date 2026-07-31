@@ -3,6 +3,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { runDiscordBotNotificationCycle } from "../../../../../src/scripts/ops/discord-bot/daemon";
 import { createDiscordBotSchedulerStatusStore } from "../../../../../src/scripts/ops/discord-bot/scheduler-status";
+import { createDiscordBotClient } from "./client";
 import { createDiscordBotOptions } from "./options";
 
 describe("Discord bot scheduler status store", () => {
@@ -61,9 +62,7 @@ describe("Discord bot scheduler status store", () => {
     const now = new Date("2026-07-15T04:00:00.000Z");
 
     await runDiscordBotNotificationCycle({
-      client: {
-        discordTargetPriceWatch: { findMany: vi.fn(async () => []) },
-      } as never,
+      client: createDiscordBotClient(),
       options: createDiscordBotOptions({
         targetWatchesEnabled: true,
         personalReportsEnabled: false,
@@ -90,15 +89,11 @@ describe("Discord bot scheduler status store", () => {
 
   it("records only a safe error kind when a target-price scan throws", async () => {
     const store = createDiscordBotSchedulerStatusStore();
+    const client = createDiscordBotClient();
+    client.$transaction.mockRejectedValueOnce(new Error("DATABASE_URL=private raw stack"));
 
     await runDiscordBotNotificationCycle({
-      client: {
-        discordTargetPriceWatch: {
-          findMany: vi.fn(async () => {
-            throw new Error("DATABASE_URL=private raw stack");
-          }),
-        },
-      } as never,
+      client,
       options: createDiscordBotOptions({
         targetWatchesEnabled: true,
         personalReportsEnabled: false,
