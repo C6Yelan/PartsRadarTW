@@ -31,6 +31,7 @@ export function createPublicReportInteraction({
       ],
     },
     member: {
+      permissions: "32",
       user: {
         id: "111122223333444455",
       },
@@ -63,6 +64,7 @@ export function createPublicReportButtonInteraction(
       component_type: 2,
     },
     member: {
+      permissions: "32",
       user: {
         id: "111122223333444455",
       },
@@ -97,6 +99,7 @@ export function createPublicReportSelectInteraction(
       values,
     },
     member: {
+      permissions: "32",
       user: {
         id: "111122223333444455",
       },
@@ -140,6 +143,7 @@ export function createPublicReportKeywordModalSubmitInteraction({
       })),
     },
     member: {
+      permissions: "32",
       user: {
         id: "111122223333444455",
       },

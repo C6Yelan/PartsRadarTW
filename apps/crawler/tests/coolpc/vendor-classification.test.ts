@@ -85,6 +85,16 @@ describe("product vendor classification", () => {
     });
   });
 
+  it("scans repeated source labels without nested-regex backtracking", () => {
+    expect(classifyProductVendor(14, `${"【來源標籤】".repeat(80)}華碩 ProArt PA602 機殼`)).toEqual(
+      {
+        slug: "asus",
+        name: "華碩",
+      },
+    );
+    expect(classifyProductVendor(14, `${"【".repeat(10_000)}華碩 ProArt PA602 機殼`)).toBeNull();
+  });
+
   it.each([
     ["金士頓 DT Exodia M 64G 推蓋式 / Type-A / USB3.2 G1", { slug: "kingston", name: "金士頓" }],
     ["GIGASTONE 64G 格紋碟 / Type-A / USB3.2 G1", { slug: "gigastone", name: "GIGASTONE" }],

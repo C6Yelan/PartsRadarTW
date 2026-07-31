@@ -26,7 +26,7 @@ export function formatTargetPriceWatchModalValidationMessage(
   return messages.join("\n");
 }
 
-// 讀取 watch 管理面板頁面；刪除後若目前頁變空，會自動退回前一頁。
+// 讀取 watch 管理面板頁面；list 會在單次 bounded read 後將任意頁碼收斂到合法頁。
 export async function readTargetPriceWatchManagerPage({
   client,
   discordUserId,
@@ -36,21 +36,11 @@ export async function readTargetPriceWatchManagerPage({
   discordUserId: string;
   page: number;
 }) {
-  const result = await readTargetPriceWatchlist({
+  return readTargetPriceWatchlist({
     client,
     discordUserId,
     page,
   });
-
-  if (result.watches.length === 0 && result.hasPreviousPage) {
-    return readTargetPriceWatchManagerPage({
-      client,
-      discordUserId,
-      page: page - 1,
-    });
-  }
-
-  return result;
 }
 
 // 建立 watch 管理面板訊息，並在選取商品時附上最近一次目標價通知狀態。

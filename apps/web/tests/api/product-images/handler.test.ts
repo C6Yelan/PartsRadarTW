@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { readCachedProductImageMetadata } from "../../../app/_shared/product-image-storage";
 import { API_ERROR_MESSAGES } from "../../../app/api/_shared/responses";
 import { createGetProductImageHandler } from "../../../app/api/product-images/handler";
 
@@ -20,6 +21,18 @@ afterEach(async () => {
 });
 
 describe("product image API helpers", () => {
+  it("reads fixed-size file metadata for share-image cache versioning", async () => {
+    const storageDir = await createTempDir();
+    await writeFile(join(storageDir, `${PRODUCT_ID}.webp`), IMAGE_BYTES);
+
+    const metadata = await readCachedProductImageMetadata(PRODUCT_ID, { storageDir });
+
+    expect(metadata).toMatchObject({
+      byteLength: IMAGE_BYTES.byteLength,
+    });
+    expect(metadata?.version).toMatch(/^\d+:\d+:\d+$/);
+  });
+
   it("returns a cached webp image from the configured storage directory", async () => {
     const storageDir = await createTempDir();
     await writeFile(join(storageDir, `${PRODUCT_ID}.webp`), IMAGE_BYTES);

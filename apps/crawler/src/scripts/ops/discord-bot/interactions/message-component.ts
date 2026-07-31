@@ -7,12 +7,14 @@ import {
   parseTargetPriceWatchComponentInteraction,
 } from "../commands";
 import type { CommandCooldowns } from "../cooldowns";
+import { canManagePublicReport } from "../public-price-report/authorization";
 import type { DiscordBotClient, DiscordBotOptions, DiscordInteraction, FetchImpl } from "../types";
 import { handlePriceReportComponentInteraction } from "./price-report-handler";
 import { handlePublicReportComponentInteraction } from "./public-report-handler";
 import {
   sendFeatureDisabledResponse,
   sendMissingUserResponse,
+  sendPublicReportAuthorizationDeniedResponse,
   sendUnsupportedInteractionResponse,
 } from "./responses";
 import { handleTargetPriceWatchComponentInteraction } from "./watch-handler";
@@ -42,6 +44,11 @@ export async function handleMessageComponentInteraction({
 
   if (!component && !publicReportComponent && !watchComponent) {
     await sendUnsupportedInteractionResponse({ interaction, options, fetchImpl });
+    return;
+  }
+
+  if (publicReportComponent && !canManagePublicReport(interaction)) {
+    await sendPublicReportAuthorizationDeniedResponse({ interaction, options, fetchImpl });
     return;
   }
 

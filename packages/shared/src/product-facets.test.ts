@@ -10,6 +10,7 @@ import {
   mergeProductFilterTags,
   PRODUCT_FACET_IGRPS,
 } from "./product-facets";
+import { MAX_PRODUCT_NAME_LENGTH } from "./product-name";
 
 describe("product facets", () => {
   it("defines facets for the existing categories", () => {
@@ -240,6 +241,17 @@ describe("product facets", () => {
     ]);
   });
 
+  it.each([
+    ["SSD 配件 散熱", "cooler_type:ssd-heatsink"],
+    ["散熱 配件 M.2", "cooler_type:ssd-heatsink"],
+    ["筆電專用強力散熱架", "cooler_type:laptop-cooler"],
+    ["散熱底座適用筆電", "cooler_type:laptop-cooler"],
+    ["6導管雙風扇", "cooler_type:air-tower"],
+    ["CPU 靜音風扇", "cooler_type:other-air"],
+  ])("preserves ordered cooler matching without wildcard regex: %s", (name, expectedTag) => {
+    expect(extractProductFilterTags(10, name)).toContain(expectedTag);
+  });
+
   it("extracts liquid cooling type and radiator size", () => {
     expect(extractProductFilterTags(11, "360mm 一體式水冷 支援 LGA1700")).toEqual([
       "liquid_type:aio",
@@ -271,6 +283,19 @@ describe("product facets", () => {
     "銀欣 IceMyst 120mm 水冷頭風扇",
   ])("keeps non-radiator liquid-cooling accessories out of AIO radiator tags: %s", (name) => {
     expect(extractProductFilterTags(11, name)).toEqual(["liquid_type:component"]);
+  });
+
+  it("matches the VRM-water-cooling-fan sequence deterministically", () => {
+    expect(extractProductFilterTags(11, "VRM 專用 水冷 輔助 風扇")).toEqual([
+      "liquid_type:component",
+    ]);
+  });
+
+  it("does not invent the component tag when an adversarial ordered sequence lacks its tail", () => {
+    const name = `${"VRM".repeat(120)}水冷${"X".repeat(100)}`;
+
+    expect(name.length).toBeLessThanOrEqual(MAX_PRODUCT_NAME_LENGTH);
+    expect(extractProductFilterTags(11, name)).not.toContain("liquid_type:component");
   });
 
   it("extracts GPU chip, series, and VRAM", () => {
@@ -400,6 +425,13 @@ describe("product facets", () => {
   });
 
   it.each([
+    "中塔機殼/POWER 內附",
+    "中塔機殼/電源規格/含 500W 電源",
+  ])("preserves included PSU ordering across deterministic segment scans: %s", (name) => {
+    expect(extractProductFilterTags(14, name)).toContain("included_psu:yes");
+  });
+
+  it.each([
     "中塔機殼/不含電源",
     "中塔機殼/未含電源",
     "中塔機殼/不包含電源",
@@ -413,6 +445,13 @@ describe("product facets", () => {
     expect(extractProductFilterTags(14, "中塔機殼/內附3顆風扇/下置電源倉")).not.toContain(
       "included_psu:yes",
     );
+  });
+
+  it("handles repeated separators and mixed text without inventing an included PSU", () => {
+    const name = `中塔機殼${"/".repeat(400)}未包含${"X".repeat(50)}`;
+
+    expect(name.length).toBeLessThanOrEqual(MAX_PRODUCT_NAME_LENGTH);
+    expect(extractProductFilterTags(14, name)).not.toContain("included_psu:yes");
   });
 
   it("recognizes the confirmed ATX support of a GT502 Horizon fan bundle", () => {
@@ -645,6 +684,23 @@ describe("product facets", () => {
       "capacity_gb:192",
       "speed_mhz:6000",
     ]);
+  });
+
+  it("enforces the shared normalized product-name boundary before facet rules", () => {
+    const suffix = "VRM 水冷 風扇";
+    const atLimit = `${"X".repeat(MAX_PRODUCT_NAME_LENGTH - suffix.length)}${suffix}`;
+    const belowLimit = atLimit.slice(1);
+    const aboveLimit = `X${atLimit}`;
+    const nfkcExpandingName = "㍿".repeat(Math.floor(MAX_PRODUCT_NAME_LENGTH / 4) + 1);
+
+    expect(belowLimit.length).toBe(MAX_PRODUCT_NAME_LENGTH - 1);
+    expect(atLimit.length).toBe(MAX_PRODUCT_NAME_LENGTH);
+    expect(extractProductFilterTags(11, belowLimit)).toContain("liquid_type:component");
+    expect(extractProductFilterTags(11, atLimit)).toContain("liquid_type:component");
+    expect(extractProductFilterTags(11, aboveLimit)).toEqual([]);
+    expect(nfkcExpandingName.length).toBeLessThan(MAX_PRODUCT_NAME_LENGTH);
+    expect(nfkcExpandingName.normalize("NFKC").length).toBeGreaterThan(MAX_PRODUCT_NAME_LENGTH);
+    expect(extractProductFilterTags(11, nfkcExpandingName)).toEqual([]);
   });
 
   it("rejects malformed, unknown, and cross-category tags", () => {
