@@ -34,6 +34,7 @@ export async function checkCoolpcFilterSync(
       `products=${state.productCount}`,
       `tagged=${state.taggedProductCount}`,
       `ambiguous=${state.ambiguousProductCount}`,
+      `sourceValueDrift=${state.sourceValueDriftCount ?? 0}`,
     ].join(" ");
     const joinCoverageFailures = Object.entries(state.joinCoverageFailures ?? {});
 
@@ -55,6 +56,10 @@ export async function checkCoolpcFilterSync(
 
     if (state.lastError) {
       return warn("CoolPC filter sync", `${details} lastError=${state.lastError}`);
+    }
+
+    if ((state.sourceValueDriftCount ?? 0) > 0) {
+      return warn("CoolPC filter sync", `${details} upstream values differ from local inventory`);
     }
 
     if (ageMinutes >= WARN_AFTER_MINUTES) {
