@@ -26,6 +26,11 @@ export const RATE_LIMIT_DEFAULTS = {
   cacheSize: 5000,
 } as const;
 
+export const RATE_LIMIT_LOG_DEFAULTS = {
+  individualDenialsPerWindow: 10,
+  windowMs: 60_000,
+} as const;
+
 interface RateLimitBucket {
   count: number;
   resetAtMs: number;
@@ -53,6 +58,27 @@ export interface RateLimiterOptions {
   nowMs?: () => number;
 }
 
+export interface RateLimitDenialLoggerOptions {
+  nowMs?: () => number;
+  write?: (entry: RateLimitLogEntry) => void;
+}
+
+export interface RateLimitDenialLogger {
+  observe(decision: RateLimitDecision): void;
+}
+
+export interface RateLimitLogEntry {
+  clientIdentifierHash?: string;
+  clientIdentifierSource?: ClientIdentifierSource;
+  event: "api_rate_limited" | "api_rate_limit_suppressed";
+  limit?: number;
+  remaining?: number;
+  resetEpochSeconds?: number;
+  retryAfterSeconds?: number;
+  scope: RateLimitScope;
+  suppressedCount?: number;
+}
+
 export interface RateLimitRequest {
   headers: Pick<Headers, "get">;
 }
@@ -64,6 +90,11 @@ export interface RateLimiter {
 export interface RateLimitCheck {
   decision: RateLimitDecision;
   response: Response | null;
+}
+
+interface RateLimitCheckDependencies {
+  denialLogger?: RateLimitDenialLogger;
+  limiter?: RateLimiter;
 }
 
 type RateLimitEnv = Partial<Record<string, string>>;
@@ -88,8 +119,18 @@ export async function withRateLimit(
 }
 
 // 執行單次 rate limit 判斷；被擋時直接產生 429 response 並記錄 sanitized log。
-export function checkRateLimit(request: RateLimitRequest, scope: RateLimitScope): RateLimitCheck {
-  const decision = getGlobalRateLimiter().check(request, scope);
+export function checkRateLimit(
+  request: RateLimitRequest,
+  scope: RateLimitScope,
+  dependencies: RateLimitCheckDependencies = {},
+): RateLimitCheck {
+  const decision = (dependencies.limiter ?? getGlobalRateLimiter()).check(request, scope);
+
+  try {
+    (dependencies.denialLogger ?? getGlobalRateLimitDenialLogger()).observe(decision);
+  } catch {
+    // The limiter response contract must not depend on observability state or sink health.
+  }
 
   if (decision.allowed) {
     return {
@@ -98,11 +139,73 @@ export function checkRateLimit(request: RateLimitRequest, scope: RateLimitScope)
     };
   }
 
-  logRateLimitedDecision(decision);
-
   return {
     decision,
     response: withRateLimitHeaders(rateLimitedResponse(decision), decision),
+  };
+}
+
+// 每個 process window 只輸出固定數量的個別 denial，其餘依六個固定 scope 累計；下一個
+// request 跨過 window 時最多輸出六筆摘要，再重設固定 budget，不建立 per-client log state。
+export function createRateLimitDenialLogger(
+  options: RateLimitDenialLoggerOptions = {},
+): RateLimitDenialLogger {
+  const nowMs = options.nowMs ?? Date.now;
+  const write = options.write ?? writeRateLimitLogEntry;
+  let windowStartedAtMs = nowMs();
+  let individualLogs = 0;
+  let suppressedByScope = emptySuppressedCounts();
+
+  function safeWrite(entry: RateLimitLogEntry): void {
+    try {
+      write(entry);
+    } catch {
+      // Observability failures must never change the public API response.
+    }
+  }
+
+  function flushSuppressed(): void {
+    for (const scope of RATE_LIMIT_SCOPES) {
+      const suppressedCount = suppressedByScope[scope];
+
+      if (suppressedCount > 0) {
+        safeWrite({
+          event: "api_rate_limit_suppressed",
+          scope,
+          suppressedCount,
+        });
+      }
+    }
+  }
+
+  return {
+    observe(decision) {
+      const now = nowMs();
+
+      if (now - windowStartedAtMs >= RATE_LIMIT_LOG_DEFAULTS.windowMs) {
+        flushSuppressed();
+        windowStartedAtMs = now;
+        individualLogs = 0;
+        suppressedByScope = emptySuppressedCounts();
+      }
+
+      if (decision.allowed) {
+        return;
+      }
+
+      if (individualLogs < RATE_LIMIT_LOG_DEFAULTS.individualDenialsPerWindow) {
+        safeWrite({
+          ...rateLimitLogEntry(decision),
+          event: "api_rate_limited",
+        });
+        individualLogs += 1;
+      } else {
+        suppressedByScope[decision.scope] = Math.min(
+          Number.MAX_SAFE_INTEGER,
+          suppressedByScope[decision.scope] + 1,
+        );
+      }
+    },
   };
 }
 
@@ -256,11 +359,18 @@ export function withRateLimitHeaders(response: Response, decision: RateLimitDeci
 }
 
 let globalRateLimiter: RateLimiter | null = null;
+let globalRateLimitDenialLogger: RateLimitDenialLogger | null = null;
 
 function getGlobalRateLimiter(): RateLimiter {
   globalRateLimiter ??= createRateLimiter();
 
   return globalRateLimiter;
+}
+
+function getGlobalRateLimitDenialLogger(): RateLimitDenialLogger {
+  globalRateLimitDenialLogger ??= createRateLimitDenialLogger();
+
+  return globalRateLimitDenialLogger;
 }
 
 function readPositiveInteger(value: string | undefined, fallback: number): number {
@@ -285,17 +395,38 @@ function hashClientIdentifier(value: string): string {
   return createHash("sha256").update(value).digest("hex").slice(0, 16);
 }
 
-function logRateLimitedDecision(decision: RateLimitDecision): void {
-  process.stderr.write(
-    `${JSON.stringify({
-      event: "api_rate_limited",
-      scope: decision.scope,
-      limit: decision.limit,
-      remaining: decision.remaining,
-      resetEpochSeconds: decision.resetEpochSeconds,
-      retryAfterSeconds: decision.retryAfterSeconds,
-      clientIdentifierSource: decision.clientIdentifierSource,
-      clientIdentifierHash: decision.clientIdentifierHash,
-    })}\n`,
-  );
+function rateLimitLogEntry(decision: RateLimitDecision): Omit<RateLimitLogEntry, "event"> {
+  return {
+    scope: decision.scope,
+    limit: decision.limit,
+    remaining: decision.remaining,
+    resetEpochSeconds: decision.resetEpochSeconds,
+    retryAfterSeconds: decision.retryAfterSeconds,
+    clientIdentifierSource: decision.clientIdentifierSource,
+    clientIdentifierHash: decision.clientIdentifierHash,
+  };
+}
+
+const RATE_LIMIT_SCOPES: readonly RateLimitScope[] = [
+  "api:read",
+  "api:list",
+  "api:list:movement",
+  "api:image",
+  "api:build-list",
+  "metadata:image",
+];
+
+function emptySuppressedCounts(): Record<RateLimitScope, number> {
+  return {
+    "api:read": 0,
+    "api:list": 0,
+    "api:list:movement": 0,
+    "api:image": 0,
+    "api:build-list": 0,
+    "metadata:image": 0,
+  };
+}
+
+function writeRateLimitLogEntry(entry: RateLimitLogEntry): void {
+  process.stderr.write(`${JSON.stringify(entry)}\n`);
 }

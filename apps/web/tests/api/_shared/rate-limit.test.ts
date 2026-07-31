@@ -4,11 +4,17 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  checkRateLimit,
+  createRateLimitDenialLogger,
   createRateLimiter,
   getClientIdentifier,
   getClientIdentifierInfo,
   RATE_LIMIT_DEFAULTS,
+  RATE_LIMIT_LOG_DEFAULTS,
   type RateLimitConfig,
+  type RateLimitDecision,
+  type RateLimitLogEntry,
+  type RateLimitScope,
   resolveRateLimitConfig,
   withRateLimitHeaders,
 } from "../../../app/api/_shared/rate-limit";
@@ -283,6 +289,134 @@ describe("API rate limiter", () => {
     expect(response.headers.get("X-RateLimit-Remaining")).toBe("3");
     expect(response.headers.get("X-RateLimit-Reset")).toBe("1001");
   });
+
+  it("bounds repeated denials without changing the 429 contract or logging raw IPs", async () => {
+    let nowMs = 1_000_000;
+    const limiter = createRateLimiter({
+      config: {
+        ...BASE_CONFIG,
+        limits: { ...BASE_CONFIG.limits, "api:read": 1 },
+      },
+      nowMs: () => nowMs,
+    });
+    const entries: RateLimitLogEntry[] = [];
+    const logger = createRateLimitDenialLogger({
+      nowMs: () => nowMs,
+      write: (entry) => entries.push(entry),
+    });
+    const request = requestFromIp("203.0.113.50");
+
+    expect(
+      checkRateLimit(request, "api:read", { limiter, denialLogger: logger }).response,
+    ).toBeNull();
+
+    let deniedResponse: Response | null = null;
+
+    for (let index = 0; index < 1000; index += 1) {
+      deniedResponse = checkRateLimit(request, "api:read", {
+        limiter,
+        denialLogger: logger,
+      }).response;
+    }
+
+    expect(entries).toHaveLength(RATE_LIMIT_LOG_DEFAULTS.individualDenialsPerWindow);
+    expect(entries.every((entry) => entry.event === "api_rate_limited")).toBe(true);
+    expect(JSON.stringify(entries)).not.toContain("203.0.113.50");
+    expect(deniedResponse?.status).toBe(429);
+    expect(deniedResponse?.headers.get("Retry-After")).toBe("1");
+    expect(deniedResponse?.headers.get("X-RateLimit-Client-Source")).toBe("cf");
+    expect(deniedResponse?.headers.get("X-RateLimit-Limit")).toBe("1");
+    expect(deniedResponse?.headers.get("X-RateLimit-Remaining")).toBe("0");
+    expect(deniedResponse?.headers.get("X-RateLimit-Reset")).toBe("1001");
+    await expect(deniedResponse?.json()).resolves.toEqual({
+      error: {
+        code: "rate_limited",
+        message: "Too many requests. Please try again later.",
+      },
+    });
+
+    nowMs += RATE_LIMIT_LOG_DEFAULTS.windowMs;
+    logger.observe(allowedDecision("rollover", 1061));
+
+    expect(entries.at(-1)).toMatchObject({
+      event: "api_rate_limit_suppressed",
+      scope: "api:read",
+      suppressedCount: 1000 - RATE_LIMIT_LOG_DEFAULTS.individualDenialsPerWindow,
+    });
+    logger.observe(deniedDecision("new-window", 1061));
+    expect(entries.at(-1)).toMatchObject({
+      event: "api_rate_limited",
+      clientIdentifierHash: "new-window",
+    });
+  });
+
+  it("bounds unique churn and emits one exact summary for each fixed scope", () => {
+    let nowMs = 2_000_000;
+    const entries: RateLimitLogEntry[] = [];
+    const logger = createRateLimitDenialLogger({
+      nowMs: () => nowMs,
+      write: (entry) => entries.push(entry),
+    });
+    const scopes = Object.keys(BASE_CONFIG.limits) as RateLimitScope[];
+
+    for (let index = 0; index < RATE_LIMIT_LOG_DEFAULTS.individualDenialsPerWindow; index += 1) {
+      logger.observe(deniedDecision(`budget-${index}`, 2060));
+    }
+    for (const scope of scopes) {
+      for (let index = 0; index < 100; index += 1) {
+        logger.observe(deniedDecision(`${scope}-${index}`, 2060, scope));
+      }
+    }
+
+    expect(entries).toHaveLength(RATE_LIMIT_LOG_DEFAULTS.individualDenialsPerWindow);
+    nowMs += RATE_LIMIT_LOG_DEFAULTS.windowMs;
+    const entryCountBeforeRollover = entries.length;
+    logger.observe(allowedDecision("rollover", 2120));
+
+    expect(entries.length - entryCountBeforeRollover).toBe(6);
+    expect(entries.slice(-6)).toEqual(
+      scopes.map((scope) =>
+        expect.objectContaining({
+          event: "api_rate_limit_suppressed",
+          scope,
+          suppressedCount: 100,
+        }),
+      ),
+    );
+  });
+
+  it("isolates sink and logger failures from a denied response", async () => {
+    const decision = deniedDecision("safe-hash", 1001);
+    const request = requestFromIp("203.0.113.60");
+    const response = checkRateLimit(request, "api:read", {
+      limiter: { check: () => decision },
+      denialLogger: {
+        observe() {
+          throw new Error("logger unavailable");
+        },
+      },
+    }).response;
+
+    expect(() =>
+      createRateLimitDenialLogger({
+        write: () => {
+          throw new Error("sink unavailable");
+        },
+      }).observe(decision),
+    ).not.toThrow();
+    expect(response?.status).toBe(429);
+    expect(response?.headers.get("Retry-After")).toBe("1");
+    expect(response?.headers.get("X-RateLimit-Client-Source")).toBe("cf");
+    expect(response?.headers.get("X-RateLimit-Limit")).toBe("1");
+    expect(response?.headers.get("X-RateLimit-Remaining")).toBe("0");
+    expect(response?.headers.get("X-RateLimit-Reset")).toBe("1001");
+    await expect(response?.json()).resolves.toEqual({
+      error: {
+        code: "rate_limited",
+        message: "Too many requests. Please try again later.",
+      },
+    });
+  });
 });
 
 function requestFromIp(ip: string): Request {
@@ -291,4 +425,32 @@ function requestFromIp(ip: string): Request {
       "CF-Connecting-IP": ip,
     },
   });
+}
+
+function deniedDecision(
+  clientIdentifierHash: string,
+  resetEpochSeconds: number,
+  scope: RateLimitScope = "api:read",
+): RateLimitDecision {
+  return {
+    allowed: false,
+    clientIdentifierHash,
+    clientIdentifierSource: "cf",
+    limit: 1,
+    remaining: 0,
+    resetEpochSeconds,
+    retryAfterSeconds: 1,
+    scope,
+  };
+}
+
+function allowedDecision(
+  clientIdentifierHash: string,
+  resetEpochSeconds: number,
+): RateLimitDecision {
+  return {
+    ...deniedDecision(clientIdentifierHash, resetEpochSeconds),
+    allowed: true,
+    remaining: 1,
+  };
 }

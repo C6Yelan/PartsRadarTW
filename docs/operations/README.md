@@ -72,6 +72,13 @@ Application logs 最長保存 30 天；實際 rotation 由部署端透過 Docker
 - CoolPC fetch error 只保存 bounded error class、安全 network code、HTTP status 或內部 policy 類別。
 - 不需要 raw Discord user／guild／channel ID 時，使用 masked ID、count 或 aggregate。
 
+Web API rate-limit denial logging 每個 process 使用固定 60 秒 window；每個 window 最多
+輸出 10 筆 `api_rate_limited`，其餘事件只累計在六個固定 scope counters。跨過 window 後的
+第一次 request 最多輸出六筆 `api_rate_limit_suppressed` 與各自 `suppressedCount`，再重設
+固定 budget。Logging state 不依 client 數量成長；個別 log 只包含既有 16 字元 hash、client
+source、scope 與配額欄位，不包含 raw IP、headers、body 或 query。Process restart 會清空
+這項純 observability state，但不影響 rate-limit decision 與 HTTP contract。
+
 部署端需記錄 logging driver、retention、存取權限與 redaction 抽查；repository tests 不能證明主機 rotation 已生效。
 
 ## 外部 production gate
