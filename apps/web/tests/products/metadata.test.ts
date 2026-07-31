@@ -1,7 +1,7 @@
 // apps/web/tests/products/metadata.test.ts
 // 驗證商品詳細頁 metadata 的公開欄位、canonical URL、分享預覽與安全 fallback。
 
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   buildProductDetailMetadata,
   createProductDetailMetadata,
@@ -10,8 +10,8 @@ import {
   type ProductMetadataRecord,
 } from "../../app/products/[id]/metadata";
 import {
-  createProductShareImageResponse,
-  type ProductShareImageClient,
+  type ProductShareImageData,
+  renderProductShareImageResponse,
 } from "../../app/products/[id]/share-image";
 
 const PRODUCT_ID = "11111111-1111-1111-1111-111111111111";
@@ -159,78 +159,56 @@ describe("product detail metadata", () => {
 
 describe("product share image", () => {
   it("renders a 1200 by 630 PNG using only the cached product WebP", async () => {
-    const client = fakeShareImageClient(product());
-    const readImageFile = vi.fn(async () =>
-      Buffer.from(
+    const response = await renderProductShareImageResponse({
+      product: shareImageProduct(),
+      imageBytes: Buffer.from(
         "UklGRlIAAABXRUJQVlA4WAoAAAAQAAAAAAAAAAAAQUxQSAIAAAAAAFZQOCAqAAAAMAEAnQEqAQABAAFAJiWkAANwAP7+//8AAA==",
         "base64",
       ),
-    );
+    });
+    const bytes = new Uint8Array(await response.arrayBuffer());
 
-    const response = await createProductShareImageResponse({
-      client,
-      productId: PRODUCT_ID,
-      imageOptions: { storageDir: "/cached-products", readImageFile },
+    expect(response.headers.get("content-type")).toBe("image/png");
+    expect(bytes.byteLength).toBeGreaterThan(0);
+    expect(new TextDecoder().decode(bytes.slice(1, 4))).toBe("PNG");
+  });
+
+  it("renders the branded product fallback when the cached image is missing", async () => {
+    const response = await renderProductShareImageResponse({
+      product: shareImageProduct(),
+      imageBytes: null,
     });
 
     expect(response.headers.get("content-type")).toBe("image/png");
-    expect(client.product.findFirst).toHaveBeenCalledTimes(1);
-    expect(readImageFile).toHaveBeenCalledWith(
-      expect.stringMatching(/\/cached-products\/11111111-1111-1111-1111-111111111111\.webp$/),
-    );
-    expect((await response.arrayBuffer()).byteLength).toBeGreaterThan(0);
-  });
-
-  it("renders the branded fallback when the cached image is missing", async () => {
-    const client = fakeShareImageClient(product());
-    const response = await createProductShareImageResponse({
-      client,
-      productId: PRODUCT_ID,
-      imageOptions: {
-        storageDir: "/cached-products",
-        readImageFile: async () => {
-          throw Object.assign(new Error("missing"), { code: "ENOENT" });
-        },
-      },
-    });
-
-    expect(response.headers.get("content-type")).toBe("image/png");
-    expect((await response.arrayBuffer()).byteLength).toBeGreaterThan(0);
-  });
-
-  it("does not query the database or storage for an invalid product id", async () => {
-    const client = fakeShareImageClient(product());
-    const readImageFile = vi.fn(async () => new Uint8Array());
-    const response = await createProductShareImageResponse({
-      client,
-      productId: "../source-product",
-      imageOptions: { storageDir: "/cached-products", readImageFile },
-    });
-
-    expect(client.product.findFirst).not.toHaveBeenCalled();
-    expect(readImageFile).not.toHaveBeenCalled();
     expect((await response.arrayBuffer()).byteLength).toBeGreaterThan(0);
   });
 
   it("safely renders a long product name without any source request", async () => {
-    const client = fakeShareImageClient(product({ name: "超長商品名稱 ".repeat(80) }));
-    const readImageFile = vi.fn(async () => {
-      throw Object.assign(new Error("missing"), { code: "ENOENT" });
-    });
-    const response = await createProductShareImageResponse({
-      client,
-      productId: PRODUCT_ID,
-      imageOptions: { storageDir: "/cached-products", readImageFile },
+    const response = await renderProductShareImageResponse({
+      product: shareImageProduct({ name: "超長商品名稱 ".repeat(80) }),
+      imageBytes: null,
     });
 
     expect((await response.arrayBuffer()).byteLength).toBeGreaterThan(0);
-    expect(client.product.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({
-        select: expect.not.objectContaining({ primaryImageUrl: true, ibuyToken: true }),
-      }),
-    );
   });
 });
+
+function shareImageProduct(overrides: Partial<ProductShareImageData> = {}): ProductShareImageData {
+  return {
+    id: PRODUCT_ID,
+    name: "GPU RTX 4070",
+    currentPrice: {
+      lastSeenAt: new Date("2026-05-28T11:55:00.000Z"),
+      priceSnapshot: {
+        price: 6990,
+      },
+    },
+    sourceCategory: {
+      displayName: "顯示卡",
+    },
+    ...overrides,
+  };
+}
 
 function fakeProductMetadataClient(productResult: ProductMetadataRecord | null) {
   const client = {
@@ -260,16 +238,6 @@ function throwingProductMetadataClient() {
       },
     },
   } satisfies ProductMetadataReadClient;
-}
-
-function fakeShareImageClient(productResult: ProductMetadataRecord | null) {
-  return {
-    product: {
-      findFirst: vi.fn(async () => productResult),
-    },
-  } as unknown as ProductShareImageClient & {
-    product: { findFirst: ReturnType<typeof vi.fn> };
-  };
 }
 
 function product(overrides: Partial<ProductMetadataRecord> = {}): ProductMetadataRecord {

@@ -1,74 +1,43 @@
 // apps/web/app/products/[id]/share-image.tsx
 // 使用站內快取圖與公開商品欄位產生品牌化橫式分享卡。
 
-import type { Prisma } from "@partsradar/db";
 import { ImageResponse } from "next/og";
+import sharp from "sharp";
 import { formatTwdPrice } from "../../_shared/formatting";
-import { normalizeProductId } from "../../_shared/product-id";
-import {
-  type ProductImageStorageOptions,
-  readCachedProductImage,
-} from "../../_shared/product-image-storage";
 import { formatTaipeiDateTime } from "../../_shared/time";
 import { PRODUCT_SHARE_IMAGE_SIZE } from "./metadata";
 
-const SHARE_PRODUCT_SELECT = {
-  id: true,
-  name: true,
-  currentPrice: { select: { lastSeenAt: true, priceSnapshot: { select: { price: true } } } },
-  sourceCategory: { select: { displayName: true } },
-} as const satisfies Prisma.ProductSelect;
+const EMBEDDED_IMAGE_MAX_DIMENSION = 310;
+const EMBEDDED_IMAGE_MAX_PIXELS = 512 * 512;
 
-type ShareProduct = Prisma.ProductGetPayload<{ select: typeof SHARE_PRODUCT_SELECT }>;
-
-export interface ProductShareImageClient {
-  product: {
-    findFirst(args: {
-      where: { id: string; sourceCategory: { enabled: true }; currentPrice: { isNot: null } };
-      select: typeof SHARE_PRODUCT_SELECT;
-    }): Promise<ShareProduct | null>;
+export interface ProductShareImageData {
+  id: string;
+  name: string;
+  currentPrice: {
+    lastSeenAt: Date;
+    priceSnapshot: {
+      price: number;
+    };
+  };
+  sourceCategory: {
+    displayName: string;
   };
 }
 
-export async function createProductShareImageResponse({
-  client,
-  productId,
-  imageOptions,
+export async function renderProductShareImageResponse({
+  product,
+  imageBytes,
 }: {
-  client: ProductShareImageClient;
-  productId: string;
-  imageOptions?: ProductImageStorageOptions;
+  product: ProductShareImageData;
+  imageBytes: Uint8Array | null;
 }): Promise<ImageResponse> {
-  const normalizedId = normalizeProductId(productId);
-  let product: ShareProduct | null = null;
-  let imageBytes: Uint8Array | null = null;
-
-  if (normalizedId) {
-    try {
-      product = await client.product.findFirst({
-        where: {
-          id: normalizedId,
-          sourceCategory: { enabled: true },
-          currentPrice: { isNot: null },
-        },
-        select: SHARE_PRODUCT_SELECT,
-      });
-      const cachedWebp = product ? await readCachedProductImage(normalizedId, imageOptions) : null;
-      imageBytes = cachedWebp ? await convertCachedWebpForImageResponse(cachedWebp) : null;
-    } catch {
-      imageBytes = null;
-    }
-  }
-
-  const currentPrice = product?.currentPrice;
-  const productName = truncateShareText(product?.name ?? "原價屋零件價格查詢", 126);
-  const category = product?.sourceCategory.displayName ?? "PartsRadarTW";
-  const price = currentPrice
-    ? formatTwdPrice(currentPrice.priceSnapshot.price)
-    : "查詢電腦零件價格";
-  const updatedAt = currentPrice
-    ? `更新 ${formatTaipeiDateTime(currentPrice.lastSeenAt)}（台北時間）`
-    : "隨時掌握商品價格變動";
+  const embeddedImageBytes = imageBytes
+    ? await convertCachedWebpForImageResponse(imageBytes).catch(() => null)
+    : null;
+  const productName = truncateShareText(product.name, 126);
+  const category = truncateShareText(product.sourceCategory.displayName, 36);
+  const price = formatTwdPrice(product.currentPrice.priceSnapshot.price);
+  const updatedAt = `更新 ${formatTaipeiDateTime(product.currentPrice.lastSeenAt)}（台北時間）`;
 
   return new ImageResponse(
     <div
@@ -113,10 +82,10 @@ export async function createProductShareImageResponse({
               overflow: "hidden",
             }}
           >
-            {imageBytes ? (
+            {embeddedImageBytes ? (
               // biome-ignore lint/performance/noImgElement: ImageResponse requires an in-memory img source.
               <img
-                src={imageBytes as unknown as string}
+                src={embeddedImageBytes as unknown as string}
                 alt=""
                 width={310}
                 height={310}
@@ -190,14 +159,18 @@ function truncateShareText(value: string, maxLength: number): string {
     : `${normalized.slice(0, maxLength - 1).trimEnd()}…`;
 }
 
-// ImageResponse 不直接解碼 WebP；沿用 Next 內建 image optimizer 將站內快取轉成可嵌入的 PNG。
+// ImageResponse 不直接解碼 WebP；使用公開 sharp API 轉為受尺寸限制的 PNG。
 async function convertCachedWebpForImageResponse(bytes: Uint8Array): Promise<Uint8Array> {
-  const { optimizeImage } = await import("next/dist/server/image-optimizer");
-  return optimizeImage({
-    buffer: Buffer.from(bytes),
-    contentType: "image/png",
-    width: 310,
-    height: 310,
-    quality: 90,
-  });
+  return sharp(bytes, {
+    failOn: "error",
+    limitInputPixels: EMBEDDED_IMAGE_MAX_PIXELS,
+  })
+    .resize({
+      width: EMBEDDED_IMAGE_MAX_DIMENSION,
+      height: EMBEDDED_IMAGE_MAX_DIMENSION,
+      fit: "inside",
+      withoutEnlargement: true,
+    })
+    .png()
+    .toBuffer();
 }
