@@ -44,43 +44,49 @@ describe("scheduled price report timing", () => {
     ).toBe(300_000);
   });
 
-  it("reads the earliest enabled scheduled price report due time", async () => {
+  it.each([
+    {
+      caseName: "unclaimed due work",
+      deliveryClaimedAt: null,
+      expectedWakeAt: "2026-06-07T04:59:00.000Z",
+      expectedSleepMs: 1000,
+    },
+    {
+      caseName: "fresh claim",
+      deliveryClaimedAt: "2026-06-07T04:50:00.000Z",
+      expectedWakeAt: "2026-06-07T05:05:00.000Z",
+      expectedSleepMs: 5 * 60_000,
+    },
+    {
+      caseName: "claim at the exact stale boundary",
+      deliveryClaimedAt: "2026-06-07T04:45:00.000Z",
+      expectedWakeAt: "2026-06-07T04:59:00.000Z",
+      expectedSleepMs: 1000,
+    },
+  ])("calculates the next wake for $caseName", async (testCase) => {
+    const now = new Date("2026-06-07T05:00:00.000Z");
     const client = createDiscordBotClient({
       settings: [
         priceReportSetting({
-          id: "setting-later",
-          discordUserId: "222233334444555566",
-          nextSendAt: new Date("2026-06-07T06:00:00.000Z"),
-        }),
-        priceReportSetting({
-          id: "setting-disabled",
-          discordUserId: "333344445555666677",
-          nextSendAt: new Date("2026-06-07T04:00:00.000Z"),
-          enabled: false,
-        }),
-        priceReportSetting({
-          id: "setting-earlier",
+          id: "setting-1",
           discordUserId: "111122223333444455",
-          nextSendAt: new Date("2026-06-07T05:00:00.000Z"),
+          nextSendAt: new Date("2026-06-07T04:59:00.000Z"),
+          deliveryClaimedAt: testCase.deliveryClaimedAt
+            ? new Date(testCase.deliveryClaimedAt)
+            : null,
         }),
       ],
     });
 
-    await expect(readNextScheduledPriceReportDueAt({ client })).resolves.toEqual(
-      new Date("2026-06-07T05:00:00.000Z"),
-    );
-    expect(client.discordPriceReportSetting.findFirst).toHaveBeenCalledWith({
-      where: {
-        enabled: true,
-        deliveryState: "ACTIVE",
-        nextSendAt: {
-          not: null,
-        },
-      },
-      select: {
-        nextSendAt: true,
-      },
-      orderBy: [{ nextSendAt: "asc" }, { id: "asc" }],
-    });
+    const nextWakeAt = await readNextScheduledPriceReportDueAt({ client, now });
+
+    expect(nextWakeAt).toEqual(new Date(testCase.expectedWakeAt));
+    expect(
+      calculateScheduledPriceReportSleepMs({
+        now,
+        nextDueAt: nextWakeAt,
+        maxSleepMs: 10 * 60_000,
+      }),
+    ).toBe(testCase.expectedSleepMs);
   });
 });

@@ -133,7 +133,7 @@ interface TestSettingWhere {
   discordUserId?: string;
   enabled?: boolean;
   deliveryState?: TestPriceReportSetting["deliveryState"];
-  deliveryClaimedAt?: Date | null | { lte: Date };
+  deliveryClaimedAt?: Date | null | { gt?: Date; lte?: Date };
   nextSendAt?: { lte?: Date; not?: null };
   OR?: TestSettingWhere[];
 }
@@ -169,7 +169,7 @@ function matchesSettingWhere(setting: TestPriceReportSetting, where: TestSetting
 
 function matchesDateCondition(
   value: Date | null,
-  condition: Date | null | { lte: Date } | undefined,
+  condition: Date | null | { gt?: Date; lte?: Date } | undefined,
 ): boolean {
   if (condition === undefined) {
     return true;
@@ -181,7 +181,14 @@ function matchesDateCondition(
     return value?.getTime() === condition.getTime();
   }
 
-  return value !== null && value.getTime() <= condition.lte.getTime();
+  if (value === null) {
+    return false;
+  }
+  if (condition.lte && value.getTime() > condition.lte.getTime()) {
+    return false;
+  }
+
+  return !condition.gt || value.getTime() > condition.gt.getTime();
 }
 
 function selectSettingFields(

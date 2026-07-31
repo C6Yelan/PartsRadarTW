@@ -24,7 +24,7 @@ docker compose -f compose.yml -f compose.ops.yml logs --tail=100 discord-bot
 
 ### 個人排程報告 retry 狀態
 
-個人排程報告每次最多由一個 daemon claim 15 分鐘。可恢復的 transport／provider 錯誤與 Discord rate limit 共用最多 5 次的持久 retry budget；退避從 5 分鐘指數增加、上限 6 小時，另加最多 1 分鐘 jitter。Discord `retry-after` 優先作為最早重試時間，輸入上限為 24 小時。daemon 重啟不會重設次數。
+個人排程報告每次最多由一個 daemon claim 15 分鐘。可恢復的 transport／provider 錯誤與 Discord rate limit 共用最多 5 次的持久 retry budget；前四次重試依序退避 5、10、20、40 分鐘，另加最多 1 分鐘 jitter，第五次失敗停止重試。Discord `retry-after` 獨立作為最早重試時間，輸入上限為 24 小時。daemon 重啟不會重設次數；有效 claim 會等到 lease 到期才重新喚醒，不會因已到期的原排程時間每秒輪詢。
 
 DM 關閉、權限、認證或其他永久 4xx 會進入 `paused_permanent_failure`；第五次可恢復失敗進入 `paused_retry_exhausted`；部分訊息已送出後失敗則進入 `paused_partial_delivery`，避免自動重送造成重複。三種 paused 狀態都會停用設定並清空 `next_send_at`，沿用停用個人設定的 30 天 retention。使用者重新啟用排程時會重設 retry／claim 狀態並建立新的正常排程。
 

@@ -33,22 +33,40 @@ describe("scheduled price report retry policy", () => {
     ).toBe("paused_permanent");
   });
 
-  it("uses capped exponential backoff and bounded jitter for transient failures", () => {
-    const disposition = resolveScheduledPriceReportFailure({
+  it.each([
+    { previousFailureCount: 0, expectedFailureCount: 1, expectedMinutes: 5 },
+    { previousFailureCount: 1, expectedFailureCount: 2, expectedMinutes: 10 },
+    { previousFailureCount: 2, expectedFailureCount: 3, expectedMinutes: 20 },
+    { previousFailureCount: 3, expectedFailureCount: 4, expectedMinutes: 40 },
+  ])("backs off attempt $expectedFailureCount by $expectedMinutes minutes plus bounded jitter", ({
+    previousFailureCount,
+    expectedFailureCount,
+    expectedMinutes,
+  }) => {
+    const withoutJitter = resolveScheduledPriceReportFailure({
       result: failed({ errorCategory: "TRANSPORT", httpStatus: null }),
-      previousFailureCount: 3,
+      previousFailureCount,
+      now: NOW,
+      random: () => 0,
+    });
+    const withMaximumJitter = resolveScheduledPriceReportFailure({
+      result: failed({ errorCategory: "TRANSPORT", httpStatus: null }),
+      previousFailureCount,
       now: NOW,
       random: () => 1,
     });
 
-    expect(disposition).toEqual({
+    expect(withoutJitter).toEqual({
       outcome: "retry_scheduled",
       deliveryState: "ACTIVE",
-      consecutiveDeliveryFailures: 4,
-      nextSendAt: new Date(
-        NOW.getTime() + 40 * 60_000 + SCHEDULED_PRICE_REPORT_RETRY_MAX_JITTER_MS,
-      ),
+      consecutiveDeliveryFailures: expectedFailureCount,
+      nextSendAt: new Date(NOW.getTime() + expectedMinutes * 60_000),
     });
+    expect(withMaximumJitter.nextSendAt).toEqual(
+      new Date(
+        NOW.getTime() + expectedMinutes * 60_000 + SCHEDULED_PRICE_REPORT_RETRY_MAX_JITTER_MS,
+      ),
+    );
   });
 
   it("honors retry-after while bounding untrusted provider values", () => {

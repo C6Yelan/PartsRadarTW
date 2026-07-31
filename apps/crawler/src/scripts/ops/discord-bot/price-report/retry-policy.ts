@@ -5,7 +5,6 @@ import {
   SCHEDULED_PRICE_REPORT_MAX_RETRY_ATTEMPTS,
   SCHEDULED_PRICE_REPORT_RETRY_AFTER_MAX_MS,
   SCHEDULED_PRICE_REPORT_RETRY_BASE_DELAY_MS,
-  SCHEDULED_PRICE_REPORT_RETRY_MAX_DELAY_MS,
   SCHEDULED_PRICE_REPORT_RETRY_MAX_JITTER_MS,
 } from "../constants";
 import type { PersonalPriceReportDeliveryResult } from "../types";
@@ -57,10 +56,8 @@ export function resolveScheduledPriceReportFailure({
     return paused("paused_retry_exhausted", "PAUSED_RETRY_EXHAUSTED", nextFailureCount);
   }
 
-  const exponentialDelayMs = Math.min(
-    SCHEDULED_PRICE_REPORT_RETRY_MAX_DELAY_MS,
-    SCHEDULED_PRICE_REPORT_RETRY_BASE_DELAY_MS * 2 ** (nextFailureCount - 1),
-  );
+  const exponentialDelayMs =
+    SCHEDULED_PRICE_REPORT_RETRY_BASE_DELAY_MS * 2 ** (nextFailureCount - 1);
   const jitterMs = Math.min(
     SCHEDULED_PRICE_REPORT_RETRY_MAX_JITTER_MS,
     Math.floor(normalizeRandom(random()) * (SCHEDULED_PRICE_REPORT_RETRY_MAX_JITTER_MS + 1)),

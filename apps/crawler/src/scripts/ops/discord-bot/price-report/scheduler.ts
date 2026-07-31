@@ -249,27 +249,60 @@ async function persistScheduledPriceReportOutcome({
 
 class ScheduledPriceReportClaimLostError extends Error {}
 
-// 讀取目前最早到期的個人價格報告時間，供 daemon 決定 sleep 間隔。
+// 讀取最早可處理排程或有效 claim 的 lease 到期時間，供 daemon 決定 sleep 間隔。
 export async function readNextScheduledPriceReportDueAt({
   client,
+  now = new Date(),
 }: {
   client: DiscordBotClient;
+  now?: Date;
 }): Promise<Date | null> {
-  const setting = await client.discordPriceReportSetting.findFirst({
-    where: {
-      enabled: true,
-      deliveryState: "ACTIVE",
-      nextSendAt: {
-        not: null,
+  const staleClaimBefore = new Date(now.getTime() - SCHEDULED_PRICE_REPORT_CLAIM_LEASE_MS);
+  const [eligibleSetting, claimedSetting] = await Promise.all([
+    client.discordPriceReportSetting.findFirst({
+      where: {
+        enabled: true,
+        deliveryState: "ACTIVE",
+        nextSendAt: {
+          not: null,
+        },
+        OR: [{ deliveryClaimedAt: null }, { deliveryClaimedAt: { lte: staleClaimBefore } }],
       },
-    },
-    select: {
-      nextSendAt: true,
-    },
-    orderBy: [{ nextSendAt: "asc" }, { id: "asc" }],
-  });
+      select: {
+        nextSendAt: true,
+      },
+      orderBy: [{ nextSendAt: "asc" }, { id: "asc" }],
+    }),
+    client.discordPriceReportSetting.findFirst({
+      where: {
+        enabled: true,
+        deliveryState: "ACTIVE",
+        nextSendAt: {
+          lte: now,
+        },
+        deliveryClaimedAt: {
+          gt: staleClaimBefore,
+        },
+      },
+      select: {
+        deliveryClaimedAt: true,
+      },
+      orderBy: [{ deliveryClaimedAt: "asc" }, { id: "asc" }],
+    }),
+  ]);
+  const eligibleAt = eligibleSetting?.nextSendAt ?? null;
+  const claimExpiresAt = claimedSetting?.deliveryClaimedAt
+    ? new Date(claimedSetting.deliveryClaimedAt.getTime() + SCHEDULED_PRICE_REPORT_CLAIM_LEASE_MS)
+    : null;
 
-  return setting?.nextSendAt ?? null;
+  if (!eligibleAt) {
+    return claimExpiresAt;
+  }
+  if (!claimExpiresAt) {
+    return eligibleAt;
+  }
+
+  return eligibleAt.getTime() <= claimExpiresAt.getTime() ? eligibleAt : claimExpiresAt;
 }
 
 function claimedSettingWhere(settingId: string, discordUserId: string, claimedAt: Date) {

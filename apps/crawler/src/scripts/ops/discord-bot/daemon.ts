@@ -343,7 +343,7 @@ export async function runDiscordBotNotificationCycle({
         );
       }
 
-      const nextDueAt = await readNextScheduledPriceReportDueAt({ client });
+      const nextDueAt = await readNextScheduledPriceReportDueAt({ client, now });
       nextSleepMs = calculateScheduledPriceReportSleepMs({
         now,
         nextDueAt,
