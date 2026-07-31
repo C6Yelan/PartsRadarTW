@@ -45,6 +45,7 @@ describe("GET /api/categories handler", () => {
         sourceName: true,
       },
     });
+    expect(client.lastAvailabilityIgrp).toBeUndefined();
     expect(await response.json()).toEqual({
       data: [
         {
@@ -101,23 +102,12 @@ describe("GET /api/categories handler", () => {
   it("publishes only SSD capacity buckets backed by active priced products", async () => {
     const client = fakeCategoriesClient(
       [category({ id: "category-7", igrp: 7, displayName: "SSD", sourceName: "SSD" })],
-      [
-        ["capacity_gb:240", "capacity_bucket:240-256"],
-        ["capacity_gb:1024", "capacity_bucket:about-1tb"],
-      ],
+      ["capacity_bucket:240-256", "capacity_bucket:about-1tb"],
     );
     const response = await createGetCategoriesHandler(client)();
     const body = await response.json();
 
-    expect(client.lastProductFindManyArgs).toEqual({
-      where: {
-        isActive: true,
-        isExcluded: false,
-        currentPrice: { isNot: null },
-        sourceCategory: { enabled: true, igrp: 7 },
-      },
-      select: { filterTags: true },
-    });
+    expect(client.lastAvailabilityIgrp).toBe(7);
     expect(
       body.data[0].facets.find((facet: { key: string }) => facet.key === "capacity_gb"),
     ).toBeUndefined();
@@ -149,8 +139,27 @@ describe("GET /api/categories handler", () => {
           throw new Error("DATABASE_URL=postgresql://partsradar:secret@localhost:5432/db");
         },
       },
-      product: {
-        findMany: async () => [],
+      readAvailableProductFacetTags: async () => [],
+    })();
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({
+      error: {
+        code: "internal_error",
+        message: API_ERROR_MESSAGES.internalError,
+      },
+    });
+  });
+
+  it("returns a generic 500 response instead of partial SSD facets when availability fails", async () => {
+    const response = await createGetCategoriesHandler({
+      sourceCategory: {
+        findMany: async () => [
+          category({ id: "category-7", igrp: 7, displayName: "SSD", sourceName: "SSD" }),
+        ],
+      },
+      readAvailableProductFacetTags: async () => {
+        throw new Error("statement timeout");
       },
     })();
 
@@ -165,7 +174,6 @@ describe("GET /api/categories handler", () => {
 });
 
 type FindManyArgs = Parameters<CategoriesReadClient["sourceCategory"]["findMany"]>[0];
-type ProductFindManyArgs = Parameters<CategoriesReadClient["product"]["findMany"]>[0];
 
 interface FakeCategory {
   id: string;
@@ -175,18 +183,18 @@ interface FakeCategory {
   enabled: boolean;
 }
 
-function fakeCategoriesClient(categories: FakeCategory[], ssdFilterTags: string[][] = []) {
+function fakeCategoriesClient(categories: FakeCategory[], availableSsdTags: string[] = []) {
   const client = {
     lastFindManyArgs: undefined as FindManyArgs | undefined,
-    lastProductFindManyArgs: undefined as ProductFindManyArgs | undefined,
+    lastAvailabilityIgrp: undefined as number | undefined,
   };
 
   return {
     get lastFindManyArgs() {
       return client.lastFindManyArgs;
     },
-    get lastProductFindManyArgs() {
-      return client.lastProductFindManyArgs;
+    get lastAvailabilityIgrp() {
+      return client.lastAvailabilityIgrp;
     },
     sourceCategory: {
       async findMany(args) {
@@ -197,15 +205,13 @@ function fakeCategoriesClient(categories: FakeCategory[], ssdFilterTags: string[
           .sort((left, right) => left.igrp - right.igrp);
       },
     },
-    product: {
-      async findMany(args) {
-        client.lastProductFindManyArgs = args;
-        return ssdFilterTags.map((filterTags) => ({ filterTags }));
-      },
+    async readAvailableProductFacetTags(igrp) {
+      client.lastAvailabilityIgrp = igrp;
+      return availableSsdTags;
     },
   } satisfies CategoriesReadClient & {
     lastFindManyArgs?: FindManyArgs;
-    lastProductFindManyArgs?: ProductFindManyArgs;
+    lastAvailabilityIgrp?: number;
   };
 }
 

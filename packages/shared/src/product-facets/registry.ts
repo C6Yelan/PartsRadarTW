@@ -350,20 +350,41 @@ const PRODUCT_FACETS_BY_IGRP: Readonly<Record<number, readonly ProductFacetDefin
 };
 
 const EMPTY_FACETS: readonly ProductFacetDefinition[] = [];
+const PUBLIC_AVAILABILITY_FACET_KEYS_BY_IGRP: Readonly<
+  Partial<Record<number, ReadonlySet<string>>>
+> = {
+  7: new Set(["capacity_bucket"]),
+};
 
 export function getProductFacetDefinitions(igrp: number): readonly ProductFacetDefinition[] {
   return PRODUCT_FACETS_BY_IGRP[igrp] ?? EMPTY_FACETS;
+}
+
+export function getPublicProductFacetAvailabilityTags(igrp: number): readonly string[] {
+  const availabilityFacetKeys = PUBLIC_AVAILABILITY_FACET_KEYS_BY_IGRP[igrp];
+
+  if (!availabilityFacetKeys) {
+    return [];
+  }
+
+  return getProductFacetDefinitions(igrp).flatMap((definition) =>
+    availabilityFacetKeys.has(definition.key)
+      ? definition.options.map((option) => `${definition.key}:${option.value}`)
+      : [],
+  );
 }
 
 export function getPublicProductFacetDefinitions(
   igrp: number,
   availableTags?: ReadonlySet<string>,
 ): readonly ProductFacetDefinition[] {
+  const availabilityFacetKeys = PUBLIC_AVAILABILITY_FACET_KEYS_BY_IGRP[igrp];
+
   return getProductFacetDefinitions(igrp).flatMap((definition) => {
     if (igrp === 7 && definition.key === "capacity_gb") {
       return [];
     }
-    if (igrp !== 7 || definition.key !== "capacity_bucket" || !availableTags) {
+    if (!availabilityFacetKeys?.has(definition.key) || !availableTags) {
       return [definition];
     }
 

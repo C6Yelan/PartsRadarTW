@@ -10,6 +10,7 @@ export type {
 } from "./product-facets/registry";
 export {
   getProductFacetDefinitions,
+  getPublicProductFacetAvailabilityTags,
   getPublicProductFacetDefinitions,
   isProductFilterTagSupported,
   PRODUCT_FACET_IGRPS,

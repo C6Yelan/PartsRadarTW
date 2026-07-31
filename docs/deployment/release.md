@@ -44,6 +44,8 @@ docker compose exec -T postgres sh -c \
 - Destructive enum／table change 必須先證明沒有仍需相容的資料，並在 disposable PostgreSQL 18 驗證 legacy、current 與 empty migration path。
 - Production 使用 `pnpm db:deploy`／`migrate` image，不使用 development migration command。
 - Host-side maintenance 依序執行 `pnpm db:deploy` 與 `pnpm db:configure-runtime-role`；Compose `migrate` service 已封裝相同順序。
+- SSD facet projection 的同步、重建、taxonomy 變更與 rollback gate 見
+  [SSD facet availability projection](product-facet-availability.md)。
 - Migration history、DDL 與 `_prisma_migrations` 只由管理連線存取；runtime role 不執行 Prisma migration。
 
 `db:configure-runtime-role` 必須確認 runtime login 不是 superuser、database owner，也沒有其他 role membership，只具有 application schema 所需的 connect、usage、DML、view read 與 sequence usage；`_prisma_migrations` 不授權給 runtime role。

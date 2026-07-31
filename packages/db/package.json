@@ -17,6 +17,10 @@
       "types": "./src/price-report/index.ts",
       "default": "./src/price-report/index.ts"
     },
+    "./product-facets": {
+      "types": "./src/product-facets/index.ts",
+      "default": "./src/product-facets/index.ts"
+    },
     "./discord-privacy": {
       "types": "./src/discord-privacy/index.ts",
       "default": "./src/discord-privacy/index.ts"
