@@ -20,6 +20,7 @@ import type {
   PublicPriceReportPreviewResult,
   PublicPriceReportSetting,
 } from "../../public-price-report";
+import { hasDiscordPermission } from "../../public-price-report/authorization";
 import type { DiscordBotEmbed, DiscordBotMessage, DiscordInteraction } from "../../types";
 
 // public-report 設定面板訊息所需的資料契約，由設定讀取流程與 interaction handler 共用。
@@ -248,24 +249,4 @@ function formatPublicReportSettingSummary(
   const filters = toPriceReportFilters(setting);
 
   return `套用設定：分類 ${formatPriceReportCategoryFilterLabel(filters, categories)}；內容 ${formatPriceReportContentFilterLabel(filters)}；關鍵字 ${formatPriceReportKeywordFilterLabel(filters)}。`;
-}
-
-// 檢查 Discord permission bitset 是否包含指定權限，避免用字串比對權限組合。
-function hasDiscordPermission(value: string | undefined, permission: bigint): boolean {
-  const bitset = parseDiscordPermissionBitset(value);
-
-  return bitset !== null && (bitset & permission) === permission;
-}
-
-// 將 Discord app_permissions 十進位字串轉為 bigint；非法值不丟錯，交由呼叫端視為無法確認。
-function parseDiscordPermissionBitset(value: string | undefined): bigint | null {
-  if (!value || !/^(0|[1-9][0-9]*)$/.test(value)) {
-    return null;
-  }
-
-  try {
-    return BigInt(value);
-  } catch {
-    return null;
-  }
 }

@@ -200,7 +200,7 @@ export async function runScheduledCycle(
         sourceFilterTagsByIgrp = filterSync.state?.tagsByIgrp ?? {};
         if (filterSync.outcome === "published") {
           log(
-            `CoolPC filter sync published. conditions=${filterSync.state?.conditionCount ?? 0} products=${filterSync.state?.productCount ?? 0} tagged=${filterSync.state?.taggedProductCount ?? 0} ambiguous=${filterSync.state?.ambiguousProductCount ?? 0}`,
+            `CoolPC filter sync published. conditions=${filterSync.state?.conditionCount ?? 0} products=${filterSync.state?.productCount ?? 0} tagged=${filterSync.state?.taggedProductCount ?? 0} ambiguous=${filterSync.state?.ambiguousProductCount ?? 0} sourceValueDrift=${filterSync.state?.sourceValueDriftCount ?? 0}`,
           );
         } else if (filterSync.outcome === "failed") {
           log(

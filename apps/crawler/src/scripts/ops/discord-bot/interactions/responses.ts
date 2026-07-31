@@ -42,6 +42,25 @@ export async function sendMissingUserResponse({
   });
 }
 
+// 對 public-report 未授權 interaction 回覆一致且不揭露設定內容的 ephemeral 訊息。
+export async function sendPublicReportAuthorizationDeniedResponse({
+  interaction,
+  options,
+  fetchImpl,
+}: {
+  interaction: DiscordInteraction;
+  options: DiscordBotOptions;
+  fetchImpl: FetchImpl;
+}): Promise<void> {
+  await sendInteractionResponse({
+    token: options.token,
+    apiBaseUrl: options.apiBaseUrl,
+    interaction,
+    fetchImpl,
+    content: "這次操作無法通過公開價格報告的權限檢查。",
+  });
+}
+
 // 回覆功能旗標停用訊息，讓 command、component 與 modal 入口共用相同送出方式。
 export async function sendFeatureDisabledResponse({
   interaction,

@@ -9,3 +9,4 @@ export {
 } from "./price-report-keyword";
 export * from "./product-facets";
 export * from "./product-image-url";
+export * from "./product-name";

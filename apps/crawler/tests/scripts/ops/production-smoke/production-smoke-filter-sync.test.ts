@@ -43,6 +43,29 @@ describe("production smoke CoolPC filter sync check", () => {
     });
   });
 
+  it("warns when upstream values drift while local matcher output remains accepted", async () => {
+    const { workspaceRoot } = await createWorkspace();
+    const statePath = join(workspaceRoot, "filter-state.json");
+    await writeCoolpcFilterSyncState(statePath, {
+      version: COOLPC_FILTER_SYNC_STATE_VERSION,
+      lastAttemptAt: "2026-07-13T07:00:00.000Z",
+      lastSuccessAt: "2026-07-13T07:00:00.000Z",
+      lastError: null,
+      sourceHash: "hash",
+      conditionCount: 63,
+      productCount: 2277,
+      taggedProductCount: 2200,
+      ambiguousProductCount: 7,
+      sourceValueDriftCount: 2,
+      tagsByIgrp: {},
+    });
+
+    await expect(checkCoolpcFilterSync(statePath, NOW)).resolves.toMatchObject({
+      status: "WARN",
+      message: expect.stringContaining("sourceValueDrift=2"),
+    });
+  });
+
   it("warns on a failed refresh while the accepted snapshot remains fresh", async () => {
     const { workspaceRoot } = await createWorkspace();
     const statePath = join(workspaceRoot, "filter-state.json");

@@ -2,9 +2,34 @@
 
 export type SourceFilterTarget = "optgroup" | "product";
 
+export type SourceFilterMatcher =
+  | {
+      kind: "includes";
+      needles: readonly string[];
+    }
+  | {
+      kind: "wattage-range";
+      minInclusive: number;
+      maxExclusive: number | null;
+      minDigits: number;
+      maxDigits: number | null;
+    };
+
+export type SourceFilterConditionMapping =
+  | {
+      tags: null;
+      matcher: null;
+      expectedSourceValues: readonly (string | null)[];
+    }
+  | {
+      tags: readonly string[];
+      matcher: SourceFilterMatcher;
+      expectedSourceValues: readonly (string | null)[];
+    };
+
 export interface SourceFilterGroupMapping {
   target: SourceFilterTarget;
-  conditions: Readonly<Record<string, readonly string[] | null>>;
+  conditions: Readonly<Record<string, SourceFilterConditionMapping>>;
 }
 
 export interface SourceFilterSectionMapping {
@@ -15,6 +40,7 @@ export interface SourceFilterSectionMapping {
 }
 
 const ignoredGroup = null;
+const DEFAULT_SOURCE_VALUES = [null, "on"] as const;
 
 export const SOURCE_FILTER_SECTION_MAPPINGS: readonly SourceFilterSectionMapping[] = [
   {
@@ -24,12 +50,12 @@ export const SOURCE_FILTER_SECTION_MAPPINGS: readonly SourceFilterSectionMapping
     groups: [
       ignoredGroup,
       group("optgroup", {
-        xeon: null,
-        "1700": ["socket:lga1700"],
-        "1851": ["socket:lga1851"],
-        Threadripper: ["socket:str5"],
-        AM4: ["socket:am4"],
-        AM5: ["socket:am5"],
+        xeon: ignoredCondition("4677"),
+        "1700": mappedCondition(["socket:lga1700"], includes("1700")),
+        "1851": mappedCondition(["socket:lga1851"], includes("1851")),
+        Threadripper: mappedCondition(["socket:str5"], includes("Threadripper")),
+        AM4: mappedCondition(["socket:am4"], includes("AM4")),
+        AM5: mappedCondition(["socket:am5"], includes("AM5")),
       }),
     ],
   },
@@ -40,20 +66,24 @@ export const SOURCE_FILTER_SECTION_MAPPINGS: readonly SourceFilterSectionMapping
     groups: [
       ignoredGroup,
       group("optgroup", {
-        "1150": null,
-        "1151": null,
-        "1200": null,
-        "1700": ["socket:lga1700"],
-        "1851": ["socket:lga1851"],
-        AM4: ["socket:am4"],
-        AM5: ["socket:am5"],
-        Threadripper: null,
+        "1150": ignoredCondition(),
+        "1151": ignoredCondition(),
+        "1200": ignoredCondition(),
+        "1700": mappedCondition(["socket:lga1700"], includes("1700")),
+        "1851": mappedCondition(["socket:lga1851"], includes("1851")),
+        AM4: mappedCondition(["socket:am4"], includes("AM4")),
+        AM5: mappedCondition(["socket:am5"], includes("AM5")),
+        Threadripper: ignoredCondition("trx50|wrx80|wrx90|Threadripper"),
       }),
       group("product", {
-        "E-ATX": ["form_factor:e-atx"],
-        ATX: ["form_factor:atx"],
-        "Micro ATX": ["form_factor:m-atx"],
-        "mini-ITX": ["form_factor:mini-itx"],
+        "E-ATX": mappedCondition(["form_factor:e-atx"], includes("E-ATX")),
+        ATX: mappedCondition(["form_factor:atx"], includes("/ATX", "(ATX"), "\\/ATX|\\(ATX"),
+        "Micro ATX": mappedCondition(
+          ["form_factor:m-atx"],
+          includes("M-ATX", "micro ATX"),
+          "M-ATX|micro ATX",
+        ),
+        "mini-ITX": mappedCondition(["form_factor:mini-itx"], includes("ITX"), "ITX"),
       }),
       ignoredGroup,
     ],
@@ -64,14 +94,14 @@ export const SOURCE_FILTER_SECTION_MAPPINGS: readonly SourceFilterSectionMapping
     controlName: "ramT",
     groups: [
       group("optgroup", {
-        桌上型: ["module_type:desktop"],
-        筆記型: ["module_type:laptop"],
-        伺服器專用: ["module_type:server"],
+        桌上型: mappedCondition(["module_type:desktop"], includes("桌上型")),
+        筆記型: mappedCondition(["module_type:laptop"], includes("NOTE", "筆記型"), "NOTE|筆記型"),
+        伺服器專用: mappedCondition(["module_type:server"], includes("伺服器專用")),
       }),
       group("optgroup", {
-        DDR3: ["memory_type:ddr3"],
-        DDR4: ["memory_type:ddr4"],
-        DDR5: ["memory_type:ddr5"],
+        DDR3: mappedCondition(["memory_type:ddr3"], includes("DDR3")),
+        DDR4: mappedCondition(["memory_type:ddr4"], includes("DDR4")),
+        DDR5: mappedCondition(["memory_type:ddr5"], includes("DDR5")),
       }),
       ignoredGroup,
     ],
@@ -82,10 +112,22 @@ export const SOURCE_FILTER_SECTION_MAPPINGS: readonly SourceFilterSectionMapping
     controlName: "ssdT",
     groups: [
       group("optgroup", {
-        "2.5吋": ["form_factor:2-5-inch"],
-        "M.2 PCIe 3.0": ["form_factor:m2", "pcie_generation:gen3"],
-        "M.2 PCIe 4.0": ["form_factor:m2", "pcie_generation:gen4"],
-        "M.2 PCIe 5.0": ["form_factor:m2", "pcie_generation:gen5"],
+        "2.5吋": mappedCondition(["form_factor:2-5-inch"], includes("2.5"), "2\\.5"),
+        "M.2 PCIe 3.0": mappedCondition(
+          ["form_factor:m2", "pcie_generation:gen3"],
+          includes("M.2 PCIe 3"),
+          "M\\.2 PCIe 3",
+        ),
+        "M.2 PCIe 4.0": mappedCondition(
+          ["form_factor:m2", "pcie_generation:gen4"],
+          includes("M.2 PCIe 4"),
+          "M\\.2 PCIe 4",
+        ),
+        "M.2 PCIe 5.0": mappedCondition(
+          ["form_factor:m2", "pcie_generation:gen5"],
+          includes("M.2 PCIe 5"),
+          "M\\.2 PCIe 5",
+        ),
       }),
       ignoredGroup,
     ],
@@ -96,14 +138,14 @@ export const SOURCE_FILTER_SECTION_MAPPINGS: readonly SourceFilterSectionMapping
     controlName: "hdT",
     groups: [
       group("optgroup", {
-        "2.5吋": ["form_factor:2-5-inch"],
-        "3.5吋": ["form_factor:3-5-inch"],
+        "2.5吋": mappedCondition(["form_factor:2-5-inch"], includes("2.5"), "2\\.5"),
+        "3.5吋": mappedCondition(["form_factor:3-5-inch"], includes("3.5"), "3\\.5"),
       }),
       group("optgroup", {
-        傳統碟: ["storage_usage:desktop"],
-        企業碟: ["storage_usage:enterprise"],
-        監控碟: ["storage_usage:surveillance"],
-        NAS碟: ["storage_usage:nas"],
+        傳統碟: mappedCondition(["storage_usage:desktop"], includes("傳統碟")),
+        企業碟: mappedCondition(["storage_usage:enterprise"], includes("企業碟")),
+        監控碟: mappedCondition(["storage_usage:surveillance"], includes("監控碟")),
+        NAS碟: mappedCondition(["storage_usage:nas"], includes("NAS碟")),
       }),
       ignoredGroup,
     ],
@@ -114,15 +156,15 @@ export const SOURCE_FILTER_SECTION_MAPPINGS: readonly SourceFilterSectionMapping
     controlName: "usbT",
     groups: [
       group("optgroup", {
-        記憶卡: ["external_type:memory-card"],
-        隨身碟: ["external_type:usb-flash"],
-        隨身SSD碟: ["external_type:external-ssd"],
-        "隨身2.5硬碟": ["external_type:external-hdd"],
-        "外接3.5硬碟": ["external_type:external-hdd"],
+        記憶卡: mappedCondition(["external_type:memory-card"], includes("記憶卡")),
+        隨身碟: mappedCondition(["external_type:usb-flash"], includes("隨身碟")),
+        隨身SSD碟: mappedCondition(["external_type:external-ssd"], includes("ssd"), "ssd"),
+        "隨身2.5硬碟": mappedCondition(["external_type:external-hdd"], includes("2.5"), "2\\.5"),
+        "外接3.5硬碟": mappedCondition(["external_type:external-hdd"], includes("3.5"), "3\\.5"),
       }),
       group("product", {
-        "Type-A": ["connector:type-a"],
-        "Type-C": ["connector:type-c"],
+        "Type-A": mappedCondition(["connector:type-a"], includes("Type-A")),
+        "Type-C": mappedCondition(["connector:type-c"], includes("Type-C")),
       }),
     ],
   },
@@ -132,8 +174,8 @@ export const SOURCE_FILTER_SECTION_MAPPINGS: readonly SourceFilterSectionMapping
     controlName: "vgaT",
     groups: [
       group("optgroup", {
-        AMD: ["gpu_chip:amd"],
-        NVIDIA: ["gpu_chip:nvidia"],
+        AMD: mappedCondition(["gpu_chip:amd"], includes("AMD")),
+        NVIDIA: mappedCondition(["gpu_chip:nvidia"], includes("NV"), "NV"),
       }),
       ignoredGroup,
     ],
@@ -144,18 +186,18 @@ export const SOURCE_FILTER_SECTION_MAPPINGS: readonly SourceFilterSectionMapping
     controlName: "caseT",
     groups: [
       group("product", {
-        "m-atx": null,
-        "no-atx": null,
-        含Power: ["included_psu:yes"],
-        無Power: null,
+        "m-atx": ignoredCondition("m-atx"),
+        "no-atx": ignoredCondition("m-atx"),
+        含Power: mappedCondition(["included_psu:yes"], includes("電源"), "電源"),
+        無Power: ignoredCondition("電源"),
       }),
       group("product", {
-        ATX: ["motherboard_support:atx"],
-        "E-ATX": ["motherboard_support:e-atx"],
-        EEB: ["motherboard_support:eeb"],
-        ITX: ["motherboard_support:mini-itx"],
-        "M-ATX": ["motherboard_support:m-atx"],
-        支援背插式: ["back_connect:yes"],
+        ATX: mappedCondition(["motherboard_support:atx"], includes("ATX"), "atx"),
+        "E-ATX": mappedCondition(["motherboard_support:e-atx"], includes("E-ATX"), "e-atx"),
+        EEB: mappedCondition(["motherboard_support:eeb"], includes("EEB")),
+        ITX: mappedCondition(["motherboard_support:mini-itx"], includes("ITX")),
+        "M-ATX": mappedCondition(["motherboard_support:m-atx"], includes("M-ATX"), "m-atx"),
+        支援背插式: mappedCondition(["back_connect:yes"], includes("背插"), "背插"),
       }),
       ignoredGroup,
     ],
@@ -166,18 +208,38 @@ export const SOURCE_FILTER_SECTION_MAPPINGS: readonly SourceFilterSectionMapping
     controlName: "psuT",
     groups: [
       group("product", {
-        "400W以下": ["wattage_range:under-400"],
-        "400~599W": ["wattage_range:400-599"],
-        "600~799W": ["wattage_range:600-799"],
-        "800~999W": ["wattage_range:800-999"],
-        "1000W以上": ["wattage_range:1000-plus"],
+        "400W以下": mappedCondition(
+          ["wattage_range:under-400"],
+          wattageRange(0, 400, 3, 3),
+          "[^0-9][^4-9][0-9]{2}W",
+        ),
+        "400~599W": mappedCondition(
+          ["wattage_range:400-599"],
+          wattageRange(400, 600, 3, 3),
+          "[^0-9][4-5][0-9]{2}W",
+        ),
+        "600~799W": mappedCondition(
+          ["wattage_range:600-799"],
+          wattageRange(600, 800, 3, 3),
+          "[^0-9][6-7][0-9]{2}W",
+        ),
+        "800~999W": mappedCondition(
+          ["wattage_range:800-999"],
+          wattageRange(800, 1000, 3, 3),
+          "[^0-9][8-9][0-9]{2}W",
+        ),
+        "1000W以上": mappedCondition(
+          ["wattage_range:1000-plus"],
+          wattageRange(1000, null, 4, null),
+          "[0-9]{4,}W",
+        ),
       }),
       group("product", {
-        "ATX 3.X": ["psu_standard:atx-3"],
-        "PCIe 5.0": null,
-        銅牌: ["efficiency:bronze"],
-        "銀牌、金牌": null,
-        "白金、鈦金": null,
+        "ATX 3.X": mappedCondition(["psu_standard:atx-3"], includes("ATX3", "ATX 3"), "ATX3|ATX 3"),
+        "PCIe 5.0": ignoredCondition("PCIe5|PCIe 5"),
+        銅牌: mappedCondition(["efficiency:bronze"], includes("銅牌")),
+        "銀牌、金牌": ignoredCondition("銀牌|金牌"),
+        "白金、鈦金": ignoredCondition("白金|鈦金"),
       }),
       ignoredGroup,
     ],
@@ -186,7 +248,53 @@ export const SOURCE_FILTER_SECTION_MAPPINGS: readonly SourceFilterSectionMapping
 
 function group(
   target: SourceFilterTarget,
-  conditions: Readonly<Record<string, readonly string[] | null>>,
+  conditions: Readonly<Record<string, SourceFilterConditionMapping>>,
 ): SourceFilterGroupMapping {
   return { target, conditions };
+}
+
+function ignoredCondition(
+  ...expectedSourceValues: readonly (string | null)[]
+): SourceFilterConditionMapping {
+  return {
+    tags: null,
+    matcher: null,
+    expectedSourceValues:
+      expectedSourceValues.length > 0 ? expectedSourceValues : DEFAULT_SOURCE_VALUES,
+  };
+}
+
+function mappedCondition(
+  tags: readonly string[],
+  matcher: SourceFilterMatcher,
+  ...expectedSourceValues: readonly (string | null)[]
+): SourceFilterConditionMapping {
+  return {
+    tags,
+    matcher,
+    expectedSourceValues:
+      expectedSourceValues.length > 0 ? expectedSourceValues : DEFAULT_SOURCE_VALUES,
+  };
+}
+
+function includes(firstNeedle: string, ...otherNeedles: readonly string[]): SourceFilterMatcher {
+  return {
+    kind: "includes",
+    needles: [firstNeedle, ...otherNeedles].map((needle) => needle.toLowerCase()),
+  };
+}
+
+function wattageRange(
+  minInclusive: number,
+  maxExclusive: number | null,
+  minDigits: number,
+  maxDigits: number | null,
+): SourceFilterMatcher {
+  return {
+    kind: "wattage-range",
+    minInclusive,
+    maxExclusive,
+    minDigits,
+    maxDigits,
+  };
 }
