@@ -23,9 +23,8 @@ export async function GET(
       product: {
         findFirst: (args) => prisma.product.findFirst(args),
       },
-      priceSnapshot: {
-        findMany: (args) => prisma.priceSnapshot.findMany(args),
-      },
+      $transaction: (callback, options) =>
+        prisma.$transaction((transaction) => callback(transaction), options),
     };
 
     return createGetProductPriceHistoryHandler(client)(id, request.url);

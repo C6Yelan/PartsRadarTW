@@ -45,6 +45,7 @@ export default function PriceHistoryPanel({
   );
   const isLoading = state === "idle" || state === "loading";
   const isInitialLoading = isLoading && !history;
+  const isDownsampled = history?.sampling?.downsampled === true;
   const isUnavailable =
     state === "error" ||
     state === "unavailable" ||
@@ -80,10 +81,17 @@ export default function PriceHistoryPanel({
 
       {history && !isUnavailable ? (
         <>
+          {isDownsampled ? (
+            <p className="history-sampling-notice">
+              此區間資料已取樣；每個時間分桶顯示首筆與末筆代表觀測，不代表完整逐筆紀錄。
+            </p>
+          ) : null}
+
           {chart ? (
             <div className="history-insight-grid">
-              <PeriodDeltaCard summary={viewSummary} />
+              <PeriodDeltaCard downsampled={isDownsampled} summary={viewSummary} />
               <HistoryRangeCard
+                downsampled={isDownsampled}
                 range={history.range}
                 rangeDays={history.rangeDays}
                 summary={viewSummary}
@@ -100,7 +108,13 @@ export default function PriceHistoryPanel({
             onActivePointKeyChange={setActivePointKey}
           />
 
-          {chart ? <HistoryRecordList key={history.range} records={viewSummary.records} /> : null}
+          {chart ? (
+            <HistoryRecordList
+              downsampled={isDownsampled}
+              key={history.range}
+              records={viewSummary.records}
+            />
+          ) : null}
         </>
       ) : null}
     </section>

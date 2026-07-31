@@ -6,19 +6,22 @@ import { InvalidQueryError } from "../../../_shared/query";
 import {
   internalErrorResponse,
   invalidQueryResponse,
-  jsonOk,
   notFoundResponse,
+  temporarilyUnavailableResponse,
 } from "../../../_shared/responses";
 import {
   PRICE_HISTORY_PRODUCT_SELECT,
-  PRICE_HISTORY_SNAPSHOT_SELECT,
+  PriceHistoryReadUnavailableError,
   type ProductPriceHistoryReadClient,
+  readBoundedPriceHistorySnapshots,
 } from "./data";
+import { PRICE_HISTORY_MAX_RESPONSE_BYTES, PRICE_HISTORY_MAX_RESPONSE_POINTS } from "./limits";
 import { PRICE_HISTORY_MILLISECONDS_PER_DAY, parsePriceHistoryRange } from "./query";
 import { type ProductPriceHistoryResponseBody, toPriceHistoryResponse } from "./response";
 
 interface ProductPriceHistoryHandlerOptions {
   now?: Date;
+  nowMilliseconds?: () => number;
 }
 
 // 建立商品價格歷史 handler；不合法 id/query 會在讀 DB 前中止，避免無效請求觸發資料查詢。
@@ -27,6 +30,8 @@ export function createGetProductPriceHistoryHandler(
   options: ProductPriceHistoryHandlerOptions = {},
 ): (productId: string, requestUrl: string) => Promise<Response> {
   return async (productId, requestUrl) => {
+    const startedAt = options.nowMilliseconds?.() ?? performance.now();
+
     try {
       const normalizedProductId = normalizeProductId(productId);
 
@@ -57,32 +62,59 @@ export function createGetProductPriceHistoryHandler(
         return notFoundResponse();
       }
 
-      const snapshots = await client.priceSnapshot.findMany({
-        where: {
-          productId: normalizedProductId,
-          ...(since
-            ? {
-                capturedAt: {
-                  gte: since,
-                },
-              }
-            : {}),
-        },
-        orderBy: {
-          capturedAt: "asc",
-        },
-        select: PRICE_HISTORY_SNAPSHOT_SELECT,
-      });
+      const snapshotRead = await readBoundedPriceHistorySnapshots(
+        client,
+        normalizedProductId,
+        since,
+      );
+      const body = toPriceHistoryResponse(
+        range,
+        snapshotRead.snapshots,
+        product,
+        since,
+        snapshotRead.downsampled,
+      );
 
-      return jsonOk<ProductPriceHistoryResponseBody>(
-        toPriceHistoryResponse(range, snapshots, product, since),
+      return boundedPriceHistoryResponse(
+        body,
+        Math.max(0, Math.round((options.nowMilliseconds?.() ?? performance.now()) - startedAt)),
       );
     } catch (error) {
       if (error instanceof InvalidQueryError) {
         return invalidQueryResponse();
       }
 
+      if (error instanceof PriceHistoryReadUnavailableError) {
+        return temporarilyUnavailableResponse();
+      }
+
       return internalErrorResponse();
     }
   };
+}
+
+function boundedPriceHistoryResponse(
+  body: ProductPriceHistoryResponseBody,
+  durationMilliseconds: number,
+): Response {
+  if (body.points.length > PRICE_HISTORY_MAX_RESPONSE_POINTS) {
+    return temporarilyUnavailableResponse();
+  }
+
+  const serializedBody = JSON.stringify(body);
+
+  if (new TextEncoder().encode(serializedBody).byteLength > PRICE_HISTORY_MAX_RESPONSE_BYTES) {
+    return temporarilyUnavailableResponse();
+  }
+
+  return new Response(serializedBody, {
+    status: 200,
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      "X-Price-History-Range": body.range,
+      "X-Price-History-Returned-Points": String(body.points.length),
+      "X-Price-History-Downsampled": String(body.sampling?.downsampled === true),
+      "X-Price-History-Duration-Ms": String(durationMilliseconds),
+    },
+  });
 }
