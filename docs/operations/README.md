@@ -72,15 +72,12 @@ Application logs 最長保存 30 天；實際 rotation 由部署端透過 Docker
 - CoolPC fetch error 只保存 bounded error class、安全 network code、HTTP status 或內部 policy 類別。
 - 不需要 raw Discord user／guild／channel ID 時，使用 masked ID、count 或 aggregate。
 
-Web API rate-limit denial logging 以每個 process 最多 256 個 LRU state 控制記憶體；同一
-scope／sanitized client hash／window 只輸出第一筆 `api_rate_limited`，其餘事件在 window
-切換時以一筆 `api_rate_limit_suppressed` 和 `suppressedCount` 彙整。Unique-key churn 達
-容量時改為全域 suppression，直到已觀察的 limiter windows 結束，再依 scope 輸出固定最多
-六筆 `api_rate_limit_saturated` 摘要；持續流量期間也由跨過每個固定 60 秒邊界後的第一次
-request 被動輸出同樣有界的摘要。這避免 LRU eviction 重新取得個別 log budget。Log
-只包含既有 16 字元 hash、client source、scope 與配額欄位，不包含 raw IP、headers、body
-或 query。Process restart 會清空這項純 observability state，但不影響 rate-limit decision
-與 HTTP contract。
+Web API rate-limit denial logging 每個 process 使用固定 60 秒 window；每個 window 最多
+輸出 10 筆 `api_rate_limited`，其餘事件只累計在六個固定 scope counters。跨過 window 後的
+第一次 request 最多輸出六筆 `api_rate_limit_suppressed` 與各自 `suppressedCount`，再重設
+固定 budget。Logging state 不依 client 數量成長；個別 log 只包含既有 16 字元 hash、client
+source、scope 與配額欄位，不包含 raw IP、headers、body 或 query。Process restart 會清空
+這項純 observability state，但不影響 rate-limit decision 與 HTTP contract。
 
 部署端需記錄 logging driver、retention、存取權限與 redaction 抽查；repository tests 不能證明主機 rotation 已生效。
 

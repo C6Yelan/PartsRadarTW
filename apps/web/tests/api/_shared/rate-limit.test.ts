@@ -14,6 +14,7 @@ import {
   type RateLimitConfig,
   type RateLimitDecision,
   type RateLimitLogEntry,
+  type RateLimitScope,
   resolveRateLimitConfig,
   withRateLimitHeaders,
 } from "../../../app/api/_shared/rate-limit";
@@ -289,7 +290,7 @@ describe("API rate limiter", () => {
     expect(response.headers.get("X-RateLimit-Reset")).toBe("1001");
   });
 
-  it("bounds repeated denial logs and summarizes the exact suppressed count on rollover", async () => {
+  it("bounds repeated denials without changing the 429 contract or logging raw IPs", async () => {
     let nowMs = 1_000_000;
     const limiter = createRateLimiter({
       config: {
@@ -319,13 +320,8 @@ describe("API rate limiter", () => {
     }
 
     expect(entries).toHaveLength(RATE_LIMIT_LOG_DEFAULTS.individualDenialsPerWindow);
-    expect(entries[0]).toMatchObject({
-      event: "api_rate_limited",
-      scope: "api:read",
-      clientIdentifierSource: "cf",
-    });
-    expect(entries[0]).not.toHaveProperty("clientIdentifier");
-    expect(JSON.stringify(entries[0])).not.toContain("203.0.113.50");
+    expect(entries.every((entry) => entry.event === "api_rate_limited")).toBe(true);
+    expect(JSON.stringify(entries)).not.toContain("203.0.113.50");
     expect(deniedResponse?.status).toBe(429);
     expect(deniedResponse?.headers.get("Retry-After")).toBe("1");
     expect(deniedResponse?.headers.get("X-RateLimit-Client-Source")).toBe("cf");
@@ -339,160 +335,75 @@ describe("API rate limiter", () => {
       },
     });
 
-    nowMs += 1000;
-    expect(
-      checkRateLimit(request, "api:read", { limiter, denialLogger: logger }).response,
-    ).toBeNull();
-    expect(entries).toHaveLength(2);
-    expect(entries[1]).toMatchObject({
+    nowMs += RATE_LIMIT_LOG_DEFAULTS.windowMs;
+    logger.observe(allowedDecision("rollover", 1061));
+
+    expect(entries.at(-1)).toMatchObject({
       event: "api_rate_limit_suppressed",
       scope: "api:read",
-      suppressedCount: 999,
+      suppressedCount: 1000 - RATE_LIMIT_LOG_DEFAULTS.individualDenialsPerWindow,
     });
-    expect(logger.stateSize()).toBe(0);
+    logger.observe(deniedDecision("new-window", 1061));
+    expect(entries.at(-1)).toMatchObject({
+      event: "api_rate_limited",
+      clientIdentifierHash: "new-window",
+    });
   });
 
-  it("keeps suppression state bounded under unique-key churn without refreshing evicted budgets", () => {
-    let nowMs = 1_000_000;
-    const entries: RateLimitLogEntry[] = [];
-    const logger = createRateLimitDenialLogger({
-      individualDenialsPerWindow: 0,
-      nowMs: () => nowMs,
-      stateCapacity: 3,
-      write: (entry) => entries.push(entry),
-    });
-
-    for (let index = 0; index < 1000; index += 1) {
-      const entryCountBefore = entries.length;
-      logger.observe(deniedDecision(`hash-${index}`, 1001));
-      expect(logger.stateSize()).toBeLessThanOrEqual(3);
-      expect(entries.length - entryCountBefore).toBe(0);
-    }
-
-    expect(logger.stateSize()).toBe(1);
-    expect(entries).toHaveLength(0);
-
-    nowMs = 1_001_000;
-    logger.observe(allowedDecision("after-saturation", 1002));
-
-    expect(entries).toEqual([
-      expect.objectContaining({
-        event: "api_rate_limit_saturated",
-        scope: "api:read",
-        suppressedCount: 1000,
-      }),
-    ]);
-    expect(logger.stateSize()).toBe(0);
-
-    const saturationEntries: RateLimitLogEntry[] = [];
-    const saturationLogger = createRateLimitDenialLogger({
-      nowMs: () => nowMs,
-      stateCapacity: 1,
-      write: (entry) => saturationEntries.push(entry),
-    });
-    saturationLogger.observe(deniedDecision("first-hash", 1002));
-    saturationLogger.observe(deniedDecision("first-hash", 1002));
-    saturationLogger.observe(deniedDecision("second-hash", 1002));
-    saturationLogger.observe(deniedDecision("first-hash", 1002));
-
-    expect(saturationEntries).toHaveLength(1);
-    expect(saturationLogger.stateSize()).toBe(1);
-
-    nowMs = 1_002_000;
-    const entryCountBeforeSaturationExit = saturationEntries.length;
-    saturationLogger.observe(deniedDecision("next-window-hash", 1003));
-
-    expect(saturationEntries.length - entryCountBeforeSaturationExit).toBe(2);
-    expect(saturationEntries.slice(-2)).toEqual([
-      expect.objectContaining({
-        event: "api_rate_limit_saturated",
-        suppressedCount: 3,
-      }),
-      expect.objectContaining({
-        event: "api_rate_limited",
-        clientIdentifierHash: "next-window-hash",
-      }),
-    ]);
-    expect(saturationLogger.stateSize()).toBe(1);
-  });
-
-  it("emits bounded periodic summaries during continuous unique-key churn", () => {
+  it("bounds unique churn and emits one exact summary for each fixed scope", () => {
     let nowMs = 2_000_000;
     const entries: RateLimitLogEntry[] = [];
     const logger = createRateLimitDenialLogger({
       nowMs: () => nowMs,
-      stateCapacity: 2,
       write: (entry) => entries.push(entry),
     });
-    const resetEpochSeconds = () => (nowMs + 60_000) / 1000;
+    const scopes = Object.keys(BASE_CONFIG.limits) as RateLimitScope[];
 
-    logger.observe(deniedDecision("initial-a", resetEpochSeconds()));
-    logger.observe(deniedDecision("initial-b", resetEpochSeconds()));
-    logger.observe(deniedDecision("initial-c", resetEpochSeconds()));
-
-    for (let second = 1; second <= 180; second += 1) {
-      nowMs = 2_000_000 + second * 1000;
-      const entryCountBefore = entries.length;
-
-      logger.observe(deniedDecision(`continuous-${second}`, resetEpochSeconds()));
-
-      expect(entries.length - entryCountBefore).toBeLessThanOrEqual(1);
-      expect(logger.stateSize()).toBe(1);
+    for (let index = 0; index < RATE_LIMIT_LOG_DEFAULTS.individualDenialsPerWindow; index += 1) {
+      logger.observe(deniedDecision(`budget-${index}`, 2060));
+    }
+    for (const scope of scopes) {
+      for (let index = 0; index < 100; index += 1) {
+        logger.observe(deniedDecision(`${scope}-${index}`, 2060, scope));
+      }
     }
 
-    expect(
-      entries
-        .filter((entry) => entry.event === "api_rate_limit_saturated")
-        .map((entry) => entry.suppressedCount),
-    ).toEqual([60, 60, 60]);
-    expect(entries.filter((entry) => entry.event === "api_rate_limited")).toHaveLength(2);
+    expect(entries).toHaveLength(RATE_LIMIT_LOG_DEFAULTS.individualDenialsPerWindow);
+    nowMs += RATE_LIMIT_LOG_DEFAULTS.windowMs;
+    const entryCountBeforeRollover = entries.length;
+    logger.observe(allowedDecision("rollover", 2120));
+
+    expect(entries.length - entryCountBeforeRollover).toBe(6);
+    expect(entries.slice(-6)).toEqual(
+      scopes.map((scope) =>
+        expect.objectContaining({
+          event: "api_rate_limit_suppressed",
+          scope,
+          suppressedCount: 100,
+        }),
+      ),
+    );
   });
 
-  it("starts a fresh fixed log budget after each limiter window", () => {
-    const entries: RateLimitLogEntry[] = [];
-    const logger = createRateLimitDenialLogger({ write: (entry) => entries.push(entry) });
-
-    logger.observe(deniedDecision("same-hash", 1001));
-    logger.observe(deniedDecision("same-hash", 1001));
-    logger.observe(deniedDecision("same-hash", 1002));
-
-    expect(entries).toEqual([
-      expect.objectContaining({ event: "api_rate_limited", resetEpochSeconds: 1001 }),
-      expect.objectContaining({
-        event: "api_rate_limit_suppressed",
-        resetEpochSeconds: 1001,
-        suppressedCount: 1,
-      }),
-      expect.objectContaining({ event: "api_rate_limited", resetEpochSeconds: 1002 }),
-    ]);
-    expect(logger.stateSize()).toBe(1);
-  });
-
-  it("preserves the 429 contract when every log write fails", async () => {
-    const limiter = createRateLimiter({
-      config: {
-        ...BASE_CONFIG,
-        limits: { ...BASE_CONFIG.limits, "api:read": 1 },
-      },
-      nowMs: () => 1_000_000,
-    });
-    const logger = createRateLimitDenialLogger({
-      write: () => {
-        throw new Error("logger unavailable");
-      },
-    });
+  it("isolates sink and logger failures from a denied response", async () => {
+    const decision = deniedDecision("safe-hash", 1001);
     const request = requestFromIp("203.0.113.60");
-
-    expect(() => logger.observe(deniedDecision("sink-failure", 1001))).not.toThrow();
-
-    expect(
-      checkRateLimit(request, "api:read", { limiter, denialLogger: logger }).response,
-    ).toBeNull();
     const response = checkRateLimit(request, "api:read", {
-      limiter,
-      denialLogger: logger,
+      limiter: { check: () => decision },
+      denialLogger: {
+        observe() {
+          throw new Error("logger unavailable");
+        },
+      },
     }).response;
 
+    expect(() =>
+      createRateLimitDenialLogger({
+        write: () => {
+          throw new Error("sink unavailable");
+        },
+      }).observe(decision),
+    ).not.toThrow();
     expect(response?.status).toBe(429);
     expect(response?.headers.get("Retry-After")).toBe("1");
     expect(response?.headers.get("X-RateLimit-Client-Source")).toBe("cf");
@@ -505,36 +416,6 @@ describe("API rate limiter", () => {
         message: "Too many requests. Please try again later.",
       },
     });
-
-    const throwingLogger = {
-      observe() {
-        throw new Error("logger state unavailable");
-      },
-      stateSize() {
-        return 0;
-      },
-    };
-    const limiterWithThrowingLogger = createRateLimiter({
-      config: {
-        ...BASE_CONFIG,
-        limits: { ...BASE_CONFIG.limits, "api:read": 1 },
-      },
-      nowMs: () => 1_000_000,
-    });
-    const throwingLoggerRequest = requestFromIp("203.0.113.61");
-
-    expect(
-      checkRateLimit(throwingLoggerRequest, "api:read", {
-        limiter: limiterWithThrowingLogger,
-        denialLogger: throwingLogger,
-      }).response,
-    ).toBeNull();
-    expect(
-      checkRateLimit(throwingLoggerRequest, "api:read", {
-        limiter: limiterWithThrowingLogger,
-        denialLogger: throwingLogger,
-      }).response?.status,
-    ).toBe(429);
   });
 });
 
@@ -549,6 +430,7 @@ function requestFromIp(ip: string): Request {
 function deniedDecision(
   clientIdentifierHash: string,
   resetEpochSeconds: number,
+  scope: RateLimitScope = "api:read",
 ): RateLimitDecision {
   return {
     allowed: false,
@@ -558,7 +440,7 @@ function deniedDecision(
     remaining: 0,
     resetEpochSeconds,
     retryAfterSeconds: 1,
-    scope: "api:read",
+    scope,
   };
 }
 
