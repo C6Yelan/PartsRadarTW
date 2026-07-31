@@ -4,11 +4,16 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  checkRateLimit,
+  createRateLimitDenialLogger,
   createRateLimiter,
   getClientIdentifier,
   getClientIdentifierInfo,
   RATE_LIMIT_DEFAULTS,
+  RATE_LIMIT_LOG_DEFAULTS,
   type RateLimitConfig,
+  type RateLimitDecision,
+  type RateLimitLogEntry,
   resolveRateLimitConfig,
   withRateLimitHeaders,
 } from "../../../app/api/_shared/rate-limit";
@@ -283,6 +288,222 @@ describe("API rate limiter", () => {
     expect(response.headers.get("X-RateLimit-Remaining")).toBe("3");
     expect(response.headers.get("X-RateLimit-Reset")).toBe("1001");
   });
+
+  it("bounds repeated denial logs and summarizes the exact suppressed count on rollover", async () => {
+    let nowMs = 1_000_000;
+    const limiter = createRateLimiter({
+      config: {
+        ...BASE_CONFIG,
+        limits: { ...BASE_CONFIG.limits, "api:read": 1 },
+      },
+      nowMs: () => nowMs,
+    });
+    const entries: RateLimitLogEntry[] = [];
+    const logger = createRateLimitDenialLogger({
+      nowMs: () => nowMs,
+      write: (entry) => entries.push(entry),
+    });
+    const request = requestFromIp("203.0.113.50");
+
+    expect(
+      checkRateLimit(request, "api:read", { limiter, denialLogger: logger }).response,
+    ).toBeNull();
+
+    let deniedResponse: Response | null = null;
+
+    for (let index = 0; index < 1000; index += 1) {
+      deniedResponse = checkRateLimit(request, "api:read", {
+        limiter,
+        denialLogger: logger,
+      }).response;
+    }
+
+    expect(entries).toHaveLength(RATE_LIMIT_LOG_DEFAULTS.individualDenialsPerWindow);
+    expect(entries[0]).toMatchObject({
+      event: "api_rate_limited",
+      scope: "api:read",
+      clientIdentifierSource: "cf",
+    });
+    expect(entries[0]).not.toHaveProperty("clientIdentifier");
+    expect(JSON.stringify(entries[0])).not.toContain("203.0.113.50");
+    expect(deniedResponse?.status).toBe(429);
+    expect(deniedResponse?.headers.get("Retry-After")).toBe("1");
+    expect(deniedResponse?.headers.get("X-RateLimit-Client-Source")).toBe("cf");
+    expect(deniedResponse?.headers.get("X-RateLimit-Limit")).toBe("1");
+    expect(deniedResponse?.headers.get("X-RateLimit-Remaining")).toBe("0");
+    expect(deniedResponse?.headers.get("X-RateLimit-Reset")).toBe("1001");
+    await expect(deniedResponse?.json()).resolves.toEqual({
+      error: {
+        code: "rate_limited",
+        message: "Too many requests. Please try again later.",
+      },
+    });
+
+    nowMs += 1000;
+    expect(
+      checkRateLimit(request, "api:read", { limiter, denialLogger: logger }).response,
+    ).toBeNull();
+    expect(entries).toHaveLength(2);
+    expect(entries[1]).toMatchObject({
+      event: "api_rate_limit_suppressed",
+      scope: "api:read",
+      suppressedCount: 999,
+    });
+    expect(logger.stateSize()).toBe(0);
+  });
+
+  it("keeps suppression state bounded under unique-key churn without refreshing evicted budgets", () => {
+    let nowMs = 1_000_000;
+    const entries: RateLimitLogEntry[] = [];
+    const logger = createRateLimitDenialLogger({
+      individualDenialsPerWindow: 0,
+      nowMs: () => nowMs,
+      stateCapacity: 3,
+      write: (entry) => entries.push(entry),
+    });
+
+    for (let index = 0; index < 1000; index += 1) {
+      const entryCountBefore = entries.length;
+      logger.observe(deniedDecision(`hash-${index}`, 1001));
+      expect(logger.stateSize()).toBeLessThanOrEqual(3);
+      expect(entries.length - entryCountBefore).toBe(0);
+    }
+
+    expect(logger.stateSize()).toBe(1);
+    expect(entries).toHaveLength(0);
+
+    nowMs = 1_001_000;
+    logger.observe(allowedDecision("after-saturation", 1002));
+
+    expect(entries).toEqual([
+      expect.objectContaining({
+        event: "api_rate_limit_saturated",
+        scope: "api:read",
+        suppressedCount: 1000,
+      }),
+    ]);
+    expect(logger.stateSize()).toBe(0);
+
+    const saturationEntries: RateLimitLogEntry[] = [];
+    const saturationLogger = createRateLimitDenialLogger({
+      nowMs: () => nowMs,
+      stateCapacity: 1,
+      write: (entry) => saturationEntries.push(entry),
+    });
+    saturationLogger.observe(deniedDecision("first-hash", 1002));
+    saturationLogger.observe(deniedDecision("first-hash", 1002));
+    saturationLogger.observe(deniedDecision("second-hash", 1002));
+    saturationLogger.observe(deniedDecision("first-hash", 1002));
+
+    expect(saturationEntries).toHaveLength(1);
+    expect(saturationLogger.stateSize()).toBe(1);
+
+    nowMs = 1_002_000;
+    const entryCountBeforeSaturationExit = saturationEntries.length;
+    saturationLogger.observe(deniedDecision("next-window-hash", 1003));
+
+    expect(saturationEntries.length - entryCountBeforeSaturationExit).toBe(2);
+    expect(saturationEntries.slice(-2)).toEqual([
+      expect.objectContaining({
+        event: "api_rate_limit_saturated",
+        suppressedCount: 3,
+      }),
+      expect.objectContaining({
+        event: "api_rate_limited",
+        clientIdentifierHash: "next-window-hash",
+      }),
+    ]);
+    expect(saturationLogger.stateSize()).toBe(1);
+  });
+
+  it("starts a fresh fixed log budget after each limiter window", () => {
+    const entries: RateLimitLogEntry[] = [];
+    const logger = createRateLimitDenialLogger({ write: (entry) => entries.push(entry) });
+
+    logger.observe(deniedDecision("same-hash", 1001));
+    logger.observe(deniedDecision("same-hash", 1001));
+    logger.observe(deniedDecision("same-hash", 1002));
+
+    expect(entries).toEqual([
+      expect.objectContaining({ event: "api_rate_limited", resetEpochSeconds: 1001 }),
+      expect.objectContaining({
+        event: "api_rate_limit_suppressed",
+        resetEpochSeconds: 1001,
+        suppressedCount: 1,
+      }),
+      expect.objectContaining({ event: "api_rate_limited", resetEpochSeconds: 1002 }),
+    ]);
+    expect(logger.stateSize()).toBe(1);
+  });
+
+  it("preserves the 429 contract when every log write fails", async () => {
+    const limiter = createRateLimiter({
+      config: {
+        ...BASE_CONFIG,
+        limits: { ...BASE_CONFIG.limits, "api:read": 1 },
+      },
+      nowMs: () => 1_000_000,
+    });
+    const logger = createRateLimitDenialLogger({
+      write: () => {
+        throw new Error("logger unavailable");
+      },
+    });
+    const request = requestFromIp("203.0.113.60");
+
+    expect(() => logger.observe(deniedDecision("sink-failure", 1001))).not.toThrow();
+
+    expect(
+      checkRateLimit(request, "api:read", { limiter, denialLogger: logger }).response,
+    ).toBeNull();
+    const response = checkRateLimit(request, "api:read", {
+      limiter,
+      denialLogger: logger,
+    }).response;
+
+    expect(response?.status).toBe(429);
+    expect(response?.headers.get("Retry-After")).toBe("1");
+    expect(response?.headers.get("X-RateLimit-Client-Source")).toBe("cf");
+    expect(response?.headers.get("X-RateLimit-Limit")).toBe("1");
+    expect(response?.headers.get("X-RateLimit-Remaining")).toBe("0");
+    expect(response?.headers.get("X-RateLimit-Reset")).toBe("1001");
+    await expect(response?.json()).resolves.toEqual({
+      error: {
+        code: "rate_limited",
+        message: "Too many requests. Please try again later.",
+      },
+    });
+
+    const throwingLogger = {
+      observe() {
+        throw new Error("logger state unavailable");
+      },
+      stateSize() {
+        return 0;
+      },
+    };
+    const limiterWithThrowingLogger = createRateLimiter({
+      config: {
+        ...BASE_CONFIG,
+        limits: { ...BASE_CONFIG.limits, "api:read": 1 },
+      },
+      nowMs: () => 1_000_000,
+    });
+    const throwingLoggerRequest = requestFromIp("203.0.113.61");
+
+    expect(
+      checkRateLimit(throwingLoggerRequest, "api:read", {
+        limiter: limiterWithThrowingLogger,
+        denialLogger: throwingLogger,
+      }).response,
+    ).toBeNull();
+    expect(
+      checkRateLimit(throwingLoggerRequest, "api:read", {
+        limiter: limiterWithThrowingLogger,
+        denialLogger: throwingLogger,
+      }).response?.status,
+    ).toBe(429);
+  });
 });
 
 function requestFromIp(ip: string): Request {
@@ -291,4 +512,31 @@ function requestFromIp(ip: string): Request {
       "CF-Connecting-IP": ip,
     },
   });
+}
+
+function deniedDecision(
+  clientIdentifierHash: string,
+  resetEpochSeconds: number,
+): RateLimitDecision {
+  return {
+    allowed: false,
+    clientIdentifierHash,
+    clientIdentifierSource: "cf",
+    limit: 1,
+    remaining: 0,
+    resetEpochSeconds,
+    retryAfterSeconds: 1,
+    scope: "api:read",
+  };
+}
+
+function allowedDecision(
+  clientIdentifierHash: string,
+  resetEpochSeconds: number,
+): RateLimitDecision {
+  return {
+    ...deniedDecision(clientIdentifierHash, resetEpochSeconds),
+    allowed: true,
+    remaining: 1,
+  };
 }
