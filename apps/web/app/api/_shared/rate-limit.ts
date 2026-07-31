@@ -10,6 +10,7 @@ import { internalErrorResponse, rateLimitedResponse } from "./responses";
 export type RateLimitScope =
   | "api:read"
   | "api:list"
+  | "api:list:movement"
   | "api:image"
   | "api:build-list"
   | "metadata:image";
@@ -18,6 +19,7 @@ export type ClientIdentifierSource = "cf" | "xff" | "unknown";
 export const RATE_LIMIT_DEFAULTS = {
   readMax: 120,
   listMax: 360,
+  movementListMax: 30,
   imageMax: 1200,
   metadataImageMax: 60,
   windowSeconds: 60,
@@ -161,6 +163,10 @@ export function createRateLimiter(options: RateLimiterOptions = {}): RateLimiter
 export function resolveRateLimitConfig(env: RateLimitEnv = process.env): RateLimitConfig {
   const readMax = readPositiveInteger(env.API_READ_RATE_LIMIT_MAX, RATE_LIMIT_DEFAULTS.readMax);
   const listMax = readPositiveInteger(env.API_LIST_RATE_LIMIT_MAX, RATE_LIMIT_DEFAULTS.listMax);
+  const movementListMax = readPositiveInteger(
+    env.API_PRODUCT_MOVEMENT_RATE_LIMIT_MAX,
+    RATE_LIMIT_DEFAULTS.movementListMax,
+  );
   const imageMax = readPositiveInteger(env.API_IMAGE_RATE_LIMIT_MAX, RATE_LIMIT_DEFAULTS.imageMax);
   const metadataImageMax = readPositiveInteger(
     env.SHARE_IMAGE_RATE_LIMIT_MAX,
@@ -180,6 +186,7 @@ export function resolveRateLimitConfig(env: RateLimitEnv = process.env): RateLim
     limits: {
       "api:read": readMax,
       "api:list": listMax,
+      "api:list:movement": movementListMax,
       "api:image": imageMax,
       "api:build-list": readMax,
       "metadata:image": metadataImageMax,

@@ -2,6 +2,12 @@
 // 定義商品列表 API 使用的 Prisma select、價格變動查詢欄位與窄 read client contract。
 
 import type { Prisma } from "@partsradar/db";
+import type {
+  ProductMovementFilters,
+  ProductMovementPageResult,
+  ProductMovementSummary,
+  ProductMovementSort,
+} from "@partsradar/db/product-movement";
 
 import type { SourceStatusReadClient } from "../source-status/data";
 
@@ -41,20 +47,9 @@ export const PRODUCT_VENDOR_SELECT = {
 } as const satisfies Prisma.ProductSelect;
 
 export const PRODUCT_PRICE_MOVEMENT_RANGE_DAYS = 30;
-
-// 價格變動摘要只需要歷史快照的商品、價格與時間，不讀取商品完整資料。
-export const PRODUCT_PRICE_MOVEMENT_SNAPSHOT_SELECT = {
-  productId: true,
-  price: true,
-  capturedAt: true,
-} as const satisfies Prisma.PriceSnapshotSelect;
-
 export type ProductRecord = Prisma.ProductGetPayload<{ select: typeof PRODUCT_SELECT }>;
 export type ProductVendorRecord = Prisma.ProductGetPayload<{
   select: typeof PRODUCT_VENDOR_SELECT;
-}>;
-export type ProductPriceMovementSnapshotRecord = Prisma.PriceSnapshotGetPayload<{
-  select: typeof PRODUCT_PRICE_MOVEMENT_SNAPSHOT_SELECT;
 }>;
 
 type ProductFindManyArgs<TSelect extends Prisma.ProductSelect> = Omit<
@@ -66,23 +61,21 @@ type ProductFindManyArgs<TSelect extends Prisma.ProductSelect> = Omit<
 
 export type ProductListFindManyArgs = ProductFindManyArgs<typeof PRODUCT_SELECT>;
 export type ProductVendorFindManyArgs = ProductFindManyArgs<typeof PRODUCT_VENDOR_SELECT>;
-export type ProductPriceMovementSnapshotFindManyArgs = Omit<
-  Prisma.PriceSnapshotFindManyArgs,
-  "select"
-> & {
-  select: typeof PRODUCT_PRICE_MOVEMENT_SNAPSHOT_SELECT;
-};
-
-// 商品列表 API handler 使用的最小讀取介面，包含列表、品牌選項、數量、價格快照與來源狀態查詢。
+// 商品列表 API handler 使用的最小讀取介面，包含列表、品牌、數量、bounded movement 與來源狀態。
 export interface ProductsReadClient extends SourceStatusReadClient {
   product: {
     findProducts(args: ProductListFindManyArgs): Promise<ProductRecord[]>;
     findVendorOptions(args: ProductVendorFindManyArgs): Promise<ProductVendorRecord[]>;
     count(args: Prisma.ProductCountArgs): Promise<number>;
   };
-  priceSnapshot: {
-    findMany(
-      args: ProductPriceMovementSnapshotFindManyArgs,
-    ): Promise<ProductPriceMovementSnapshotRecord[]>;
+  movement: {
+    findPage(args: {
+      filters: ProductMovementFilters;
+      now: Date;
+      page: number;
+      pageSize: number;
+      sort: ProductMovementSort;
+    }): Promise<ProductMovementPageResult>;
+    findSummaries(productIds: readonly string[], now: Date): Promise<ProductMovementSummary[]>;
   };
 }

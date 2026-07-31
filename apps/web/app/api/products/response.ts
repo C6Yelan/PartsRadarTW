@@ -8,10 +8,9 @@ import {
 } from "@partsradar/shared";
 import type { SourceStatusCategoryRecord } from "../source-status/data";
 import { buildSourceStatusResponse, type SourceStatus } from "../source-status/response";
-import {
+import type {
   PRODUCT_PRICE_MOVEMENT_RANGE_DAYS,
-  type ProductPriceMovementSnapshotRecord,
-  type ProductRecord,
+  ProductRecord,
 } from "./data";
 import type { ProductVendorOption } from "./query";
 
@@ -126,80 +125,5 @@ function toProductListImage(product: ProductRecord): ProductListResponseItem["im
     // 圖片路徑由 shared helper 產生，避免列表、詳細頁與 smoke test 的公開圖片 URL 漂移。
     url: createPublicProductImagePath(product.id),
     alt: product.name,
-  };
-}
-
-// 依 productId 分組歷史快照，替商品列表建立近 30 天價格變動查表。
-export function buildProductPriceMovementMap(
-  products: ProductRecord[],
-  snapshots: ProductPriceMovementSnapshotRecord[],
-  now: Date,
-) {
-  const snapshotsByProductId = new Map<string, ProductPriceMovementSnapshotRecord[]>();
-
-  for (const snapshot of snapshots) {
-    const productSnapshots = snapshotsByProductId.get(snapshot.productId) ?? [];
-    productSnapshots.push(snapshot);
-    snapshotsByProductId.set(snapshot.productId, productSnapshots);
-  }
-
-  return new Map(
-    products.map((product) => [
-      product.id,
-      toProductPriceMovement(product, snapshotsByProductId.get(product.id) ?? [], now),
-    ]),
-  );
-}
-
-// 計算目前價格相對於近 30 天基準價的變動；資料不足時回傳 null movement。
-function toProductPriceMovement(
-  product: ProductRecord,
-  snapshots: ProductPriceMovementSnapshotRecord[],
-  now = new Date(),
-): ProductListResponseItem["priceMovement"] {
-  if (!product.currentPrice) {
-    throw new Error("Product list query returned a product without current price.");
-  }
-
-  const since = new Date(now.getTime() - PRODUCT_PRICE_MOVEMENT_RANGE_DAYS * 24 * 60 * 60 * 1000);
-  const sortedSnapshots = [...snapshots].sort(
-    (left, right) => left.capturedAt.getTime() - right.capturedAt.getTime(),
-  );
-  const snapshotsInRange = sortedSnapshots.filter(
-    (snapshot) => snapshot.capturedAt.getTime() >= since.getTime(),
-  );
-  const baselineBeforeRange = sortedSnapshots.findLast(
-    (snapshot) => snapshot.capturedAt.getTime() < since.getTime(),
-  );
-  const baseline = baselineBeforeRange ?? snapshotsInRange[0] ?? null;
-  const currentPrice = product.currentPrice.priceSnapshot.price;
-
-  if (!baseline || product.currentPrice.lastSeenAt.getTime() < since.getTime()) {
-    return {
-      rangeDays: PRODUCT_PRICE_MOVEMENT_RANGE_DAYS,
-      deltaAmount: null,
-      deltaPercent: null,
-    };
-  }
-
-  const hasOnlyInitialObservation =
-    snapshotsInRange.length === 1 &&
-    snapshotsInRange[0].capturedAt.getTime() === product.currentPrice.lastSeenAt.getTime();
-
-  if (!baselineBeforeRange && hasOnlyInitialObservation) {
-    return {
-      rangeDays: PRODUCT_PRICE_MOVEMENT_RANGE_DAYS,
-      deltaAmount: null,
-      deltaPercent: null,
-    };
-  }
-
-  const deltaAmount = currentPrice - baseline.price;
-
-  return {
-    rangeDays: PRODUCT_PRICE_MOVEMENT_RANGE_DAYS,
-    deltaAmount,
-    deltaPercent:
-      baseline.price === 0 ? null : Number(((deltaAmount / baseline.price) * 100).toFixed(2)),
   };
 }

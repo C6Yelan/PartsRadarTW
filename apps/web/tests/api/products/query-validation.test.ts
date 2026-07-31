@@ -293,7 +293,7 @@ describe("GET /api/products query validation", () => {
     expect(client.productFindProductsCallCount).toBe(0);
     expect(client.productFindVendorOptionsCallCount).toBe(0);
     expect(client.productCountCallCount).toBe(0);
-    expect(client.priceSnapshotFindManyCallCount).toBe(0);
+    expect(client.movementFindSummariesCallCount).toBe(0);
     expect(client.sourceCategoryFindManyCallCount).toBe(0);
   });
 
@@ -330,7 +330,7 @@ describe("GET /api/products query validation", () => {
     expect(response.status).toBe(400);
     expect(client.productFindProductsCallCount).toBe(0);
     expect(client.productFindVendorOptionsCallCount).toBe(0);
-    expect(client.priceSnapshotFindManyCallCount).toBe(0);
+    expect(client.movementFindSummariesCallCount).toBe(0);
   });
 
   it("rejects invalid query values before reading data", async () => {

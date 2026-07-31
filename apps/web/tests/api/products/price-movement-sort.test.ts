@@ -1,12 +1,40 @@
 // apps/web/tests/api/products/price-movement-sort.test.ts
-// 驗證商品列表依 30 天價格跌幅 / 漲幅排序時，會先計算全量候選再分頁。
+// 驗證商品列表依 30 天價格跌幅 / 漲幅排序時，使用 bounded DB movement page。
 
 import { describe, expect, it } from "vitest";
 
+import {
+  PRODUCT_MOVEMENT_CANDIDATE_LIMIT,
+  ProductMovementReadUnavailableError,
+  ProductMovementWorkBudgetExceededError,
+} from "@partsradar/db/product-movement";
+
 import { createGetProductsHandler } from "../../../app/api/products/handler";
+import { selectProductsRateLimitScope } from "../../../app/api/products/route";
 import { fakeProductsClient, NOW, product, priceSnapshot } from "./support/handler-client";
 
 describe("GET /api/products price movement sorting", () => {
+  it("selects the lower heavy scope only for validated movement sorts", () => {
+    expect(
+      selectProductsRateLimitScope(
+        new Request("https://parts.example/api/products?sort=price_drop_desc"),
+      ),
+    ).toBe("api:list:movement");
+    expect(
+      selectProductsRateLimitScope(
+        new Request("https://parts.example/api/products?sort=price_rise_desc"),
+      ),
+    ).toBe("api:list:movement");
+    expect(
+      selectProductsRateLimitScope(new Request("https://parts.example/api/products?sort=price_asc")),
+    ).toBe("api:list");
+    expect(
+      selectProductsRateLimitScope(
+        new Request("https://parts.example/api/products?sort=untrusted_sort"),
+      ),
+    ).toBe("api:list");
+  });
+
   it("sorts products by the largest 30-day price drop before paginating", async () => {
     const largestDropProduct = product({
       id: "22222222-2222-2222-2222-222222222222",
@@ -54,16 +82,10 @@ describe("GET /api/products price movement sorting", () => {
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(client.lastProductFindProductsArgs).toMatchObject({
-      orderBy: [{ currentPrice: { priceSnapshot: { price: "asc" } } }, { id: "asc" }],
-    });
+    expect(client.movementFindPageCallCount).toBe(1);
+    expect(client.productCountCallCount).toBe(0);
     expect(client.lastProductFindProductsArgs?.skip).toBeUndefined();
     expect(client.lastProductFindProductsArgs?.take).toBeUndefined();
-    expect(client.lastPriceSnapshotFindManyArgs?.where).toMatchObject({
-      productId: {
-        in: [flatProduct.id, noHistoryProduct.id, smallerDropProduct.id, largestDropProduct.id],
-      },
-    });
     expect(body.data.map((item: { id: string }) => item.id)).toEqual([
       largestDropProduct.id,
       smallerDropProduct.id,
@@ -144,22 +166,10 @@ describe("GET /api/products price movement sorting", () => {
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(client.lastProductFindProductsArgs).toMatchObject({
-      orderBy: [{ currentPrice: { priceSnapshot: { price: "desc" } } }, { id: "asc" }],
-    });
+    expect(client.movementFindPageCallCount).toBe(1);
+    expect(client.productCountCallCount).toBe(0);
     expect(client.lastProductFindProductsArgs?.skip).toBeUndefined();
     expect(client.lastProductFindProductsArgs?.take).toBeUndefined();
-    expect(client.lastPriceSnapshotFindManyArgs?.where).toMatchObject({
-      productId: {
-        in: [
-          flatProduct.id,
-          noHistoryProduct.id,
-          smallerRiseProduct.id,
-          dropProduct.id,
-          largestRiseProduct.id,
-        ],
-      },
-    });
     expect(body.data.map((item: { id: string }) => item.id)).toEqual([
       largestRiseProduct.id,
       smallerRiseProduct.id,
@@ -176,6 +186,38 @@ describe("GET /api/products price movement sorting", () => {
       totalItems: 5,
       totalPages: 3,
     });
+  });
+
+  it.each([
+    new ProductMovementWorkBudgetExceededError(
+      PRODUCT_MOVEMENT_CANDIDATE_LIMIT,
+      PRODUCT_MOVEMENT_CANDIDATE_LIMIT + 1,
+    ),
+    new ProductMovementReadUnavailableError(),
+  ])("returns one stable 503 without partial data or totals: %s", async (error) => {
+    const client = fakeProductsClient({
+      products: [product()],
+      totalItems: 1,
+      sourceCategories: [],
+    });
+    client.movement.findPage = async () => {
+      throw error;
+    };
+
+    const response = await createGetProductsHandler(client, { now: () => NOW })(
+      new Request("https://parts.example/api/products?sort=price_drop_desc"),
+    );
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get("Retry-After")).toBe("60");
+    expect(await response.json()).toEqual({
+      error: {
+        code: "temporarily_unavailable",
+        message: "Service temporarily unavailable. Please try again later.",
+      },
+    });
+    expect(client.productCountCallCount).toBe(0);
+    expect(client.productFindProductsCallCount).toBe(0);
   });
 });
 
