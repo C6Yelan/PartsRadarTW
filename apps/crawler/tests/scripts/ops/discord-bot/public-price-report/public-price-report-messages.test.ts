@@ -83,11 +83,11 @@ describe("public price report messages", () => {
     );
   });
 
-  it("uses the fixed system limit of 50 public report items", () => {
+  it("uses the fixed system limit of 100 public report items", () => {
     const messages = createPublicPriceReportMessages(
       {
         priceChanges: [],
-        newProducts: Array.from({ length: 51 }, (_, index) => ({
+        newProducts: Array.from({ length: 101 }, (_, index) => ({
           productId: `product-${index}`,
           productName: `New Product ${index}`,
           category: { igrp: 12, displayName: "顯示卡" },
@@ -104,8 +104,8 @@ describe("public price report messages", () => {
     );
     const output = JSON.stringify(messages);
 
-    expect(output).toContain("products/product-49");
-    expect(output).not.toContain("products/product-50");
+    expect(output).toContain("products/product-99");
+    expect(output).not.toContain("products/product-100");
     expect(output).toContain("另有 1 個新增商品未列出");
   });
 });

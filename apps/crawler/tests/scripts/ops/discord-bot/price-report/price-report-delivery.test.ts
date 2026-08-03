@@ -165,14 +165,14 @@ describe("sendPriceReportNow delivery", () => {
   });
 
   it("splits long price reports by Discord message embed size", async () => {
-    const snapshots = Array.from({ length: 51 }, (_, index) =>
+    const snapshots = Array.from({ length: 101 }, (_, index) =>
       snapshot({
         id: `long-new-${index}`,
         productId: `long-product-${index}`,
         productName: `Long New Product ${index} ${"A".repeat(120)}`,
         crawlRunId: "new-run",
         price: 1000 + index,
-        capturedAt: `2026-06-07T03:${String(index).padStart(2, "0")}:00.000Z`,
+        capturedAt: new Date(Date.parse("2026-06-07T03:00:00.000Z") + index * 1000).toISOString(),
       }),
     );
     const client = createDiscordBotClient({
@@ -202,14 +202,14 @@ describe("sendPriceReportNow delivery", () => {
       }),
     ).resolves.toMatchObject({
       status: "sent",
-      newProductCount: 51,
-      listedCount: 50,
+      newProductCount: 101,
+      listedCount: 100,
     });
 
     const reportMessages = sendReportMessages.mock.calls[0]?.[0] ?? [];
 
     expect(reportMessages.length).toBeGreaterThan(1);
-    expect(JSON.stringify(reportMessages)).toContain("long-product-50");
+    expect(JSON.stringify(reportMessages)).toContain("long-product-100");
     expect(JSON.stringify(reportMessages)).not.toContain("long-product-0");
 
     for (const message of reportMessages) {
@@ -221,7 +221,7 @@ describe("sendPriceReportNow delivery", () => {
     expect(client.discordNotificationDelivery.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         status: "SENT",
-        itemCount: 50,
+        itemCount: 100,
         messageCount: reportMessages.length,
       }),
     });

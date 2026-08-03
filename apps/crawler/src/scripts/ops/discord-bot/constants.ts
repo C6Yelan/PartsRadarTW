@@ -5,7 +5,7 @@
 export const DEFAULT_DISCORD_API_BASE_URL = "https://discord.com/api/v10";
 export const DEFAULT_DISCORD_GATEWAY_URL = "wss://gateway.discord.gg/?v=10&encoding=json";
 export const DEFAULT_PUBLIC_BASE_URL = "https://partsradar.net";
-export const MAX_PRICE_REPORT_ITEMS = 50;
+export const MAX_PRICE_REPORT_ITEMS = 100;
 export const MAX_PRICE_REPORT_KEYWORD_LENGTH = 80;
 export const MAX_PRICE_REPORT_KEYWORD_GROUPS = 5;
 export const DEFAULT_COMMAND_COOLDOWN_SECONDS = 60;
