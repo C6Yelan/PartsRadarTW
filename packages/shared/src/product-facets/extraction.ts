@@ -119,9 +119,12 @@ function extractStorageTags(text: string, add: AddTag, includeCapacityBucket = f
 }
 
 function extractExternalStorageTags(text: string, add: AddTag): void {
-  if (/記憶卡|\b(?:SD(?:HC|XC)?|MICRO\s*SD(?:HC|XC)?)\b/.test(text)) {
+  if (/記憶卡|\b(?:SD(?:HC|XC)?|MICRO\s*SD(?:HC|XC)?|CFEXPRESS(?:\s*TYPE\s*B)?)\b/.test(text)) {
     add("external_type", "memory-card");
-  } else if (/隨身碟|格紋碟/.test(text) && !/SSD/.test(text)) {
+  } else if (
+    (/隨身碟|格紋碟|\b(?:JF790C|UC310|UV128|UV320)\b|\bDT\s+EXODIA\s+S\b/.test(text) &&
+      !/SSD/.test(text))
+  ) {
     add("external_type", "usb-flash");
   } else if (/SSD/.test(text)) {
     add("external_type", "external-ssd");
@@ -234,13 +237,12 @@ function extractGpuTags(text: string, add: AddTag): void {
     ["professional", /\b(?:NVIDIA\s+RTX\s+(?:A\d|\d{4}\s+ADA)|RTX\s+PRO|AI\s+PRO\s+R\d)/],
     ["legacy-radeon", /(?:\bR7|AXR7)\s*240\b/],
   ]);
-  addFirstNumberMatch(
-    add,
-    "vram_gb",
-    text,
+  const explicitVramGb = text.match(
     /(?:^|[/\s(-])(?:O)?(1|2|4|6|8|10|12|16|20|24|32|48|72|96)\s*G(?:B(?:D[34567])?|D[34567])?(?=$|[-/\s(),]|\p{Script=Han})/u,
-  );
-  if (/\bRTX\s*5050\b|\bRTX\s*5060(?!\s*TI)\b/.test(text)) {
+  )?.[1];
+  if (explicitVramGb) {
+    add("vram_gb", explicitVramGb);
+  } else if (/\bRTX\s*5050\b|\bRTX\s*5060(?!\s*TI)\b/.test(text)) {
     add("vram_gb", "8");
   } else if (/\bRTX\s*5070\s*TI\b|\bRTX\s*5080\b/.test(text)) {
     add("vram_gb", "16");

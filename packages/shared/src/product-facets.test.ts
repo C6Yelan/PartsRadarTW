@@ -225,8 +225,40 @@ describe("product facets", () => {
       "威剛 SD820 SSD碟 1TB 藍/讀取2000MB/s/支援iPhone15",
       ["external_type:external-ssd", "connector:type-c", "capacity_gb:1000"],
     ],
+    [
+      "GIGASTONE 1TB CFexpress Type B",
+      ["external_type:memory-card", "capacity_gb:1000"],
+    ],
+    [
+      "GIGASTONE 512G CFexpress Type B",
+      ["external_type:memory-card", "capacity_gb:512"],
+    ],
   ])("extracts current external-storage naming: %s", (name, expectedTags) => {
     expect(extractProductFilterTags(9, name)).toEqual(expectedTags);
+  });
+
+  it.each([
+    "創見 JF790C 256G",
+    "威剛 UC310 64G / Type-A / USB3.2 G1",
+    "威剛 UC310 128G / Type-A / USB3.2 G1",
+    "威剛 UV128 32G / Type-A / USB3.2 G1",
+    "威剛 UV128 64G / Type-A / USB3.2 G1",
+    "威剛 UV128 128G / Type-A / USB3.2 G1",
+    "威剛 UV320 128G / Type-A / USB3.2 G1",
+    "金士頓 DT Exodia S 512G / Type-A / USB3.2 G1",
+  ])("recognizes confirmed USB flash-drive series: %s", (name) => {
+    expect(extractProductFilterTags(9, name)).toContain("external_type:usb-flash");
+  });
+
+  it.each([
+    ["Samsung T7 Shield SSD 1TB Type-C", "external_type:external-ssd"],
+    ["USB Type-C 多功能讀卡機", null],
+  ])("does not generalize USB flash-drive models to adjacent devices: %s", (name, expectedType) => {
+    const typeTag = extractProductFilterTags(9, name).find((tag) =>
+      tag.startsWith("external_type:"),
+    );
+
+    expect(typeTag ?? null).toBe(expectedType);
   });
 
   it("extracts air cooler shape without exposing the unsupported fan-size facet", () => {
@@ -305,6 +337,53 @@ describe("product facets", () => {
       "gpu_series:rtx-50",
       "vram_gb:16",
     ]);
+  });
+
+  it("prefers explicit VRAM over the RTX 5070 model fallback", () => {
+    expect(
+      extractProductFilterTags(
+        12,
+        "技嘉 AORUS RTX5070 INFINITY 16G(2715MHz/31cm/渦流雙風扇/註五年)",
+      ),
+    ).toEqual([
+      "gpu_product_type:graphics-card",
+      "gpu_chip:nvidia",
+      "gpu_series:rtx-50",
+      "vram_gb:16",
+    ]);
+  });
+
+  it.each([
+    ["RTX 5050 12G", "12"],
+    ["RTX 5060 16G", "16"],
+    ["RTX 5070 Ti 12G", "12"],
+    ["RTX 5080 24G", "24"],
+    ["RTX 5090 24G", "24"],
+    ["RX 7650 GRE 16G", "16"],
+    ["RX 9070 XT 8G", "8"],
+    ["GT 1030 4G", "4"],
+    ["R7 240 4G", "4"],
+    ["N210 2G", "2"],
+  ])("does not add model fallback VRAM when capacity is explicit: %s", (name, expectedVram) => {
+    expect(extractProductFilterTags(12, name).filter((tag) => tag.startsWith("vram_gb:"))).toEqual([
+      `vram_gb:${expectedVram}`,
+    ]);
+  });
+
+  it.each([
+    ["RTX 5050", "8"],
+    ["RTX 5060", "8"],
+    ["RTX 5070", "12"],
+    ["RTX 5070 Ti", "16"],
+    ["RTX 5080", "16"],
+    ["RTX 5090", "32"],
+    ["RX 7650 GRE", "8"],
+    ["RX 9070 XT", "16"],
+    ["GT 1030", "2"],
+    ["R7 240", "2"],
+    ["N210", "1"],
+  ])("retains model fallback VRAM when capacity is omitted: %s", (name, expectedVram) => {
+    expect(extractProductFilterTags(12, name)).toContain(`vram_gb:${expectedVram}`);
   });
 
   it.each([

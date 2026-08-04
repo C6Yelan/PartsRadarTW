@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { extractProductFilterTags } from "@partsradar/shared";
 import {
   assessProductFilterQuality,
   auditProductFilterQuality,
@@ -59,6 +60,49 @@ describe("product filter quality audit", () => {
     expect(audit.coverage["12:vram_gb"]).toBe(1);
     expect(audit.belowMinimum).toEqual([]);
     expect(audit.conflicts).toEqual([]);
+  });
+
+  it("accepts the corrected production GPU and external-storage samples", () => {
+    const gpuId = "bded5da8-0883-4f82-9bec-998c19c20f5f";
+    const externalStorageNames = [
+      "GIGASTONE 1TB CFexpress Type B",
+      "GIGASTONE 512G CFexpress Type B",
+      "創見 JF790C 256G",
+      "威剛 UC310 64G / Type-A / USB3.2 G1",
+      "威剛 UC310 128G / Type-A / USB3.2 G1",
+      "威剛 UV128 32G / Type-A / USB3.2 G1",
+      "威剛 UV128 64G / Type-A / USB3.2 G1",
+      "威剛 UV128 128G / Type-A / USB3.2 G1",
+      "威剛 UV320 128G / Type-A / USB3.2 G1",
+      "金士頓 DT Exodia S 512G / Type-A / USB3.2 G1",
+    ];
+    const existingExternalStorage = Array.from({ length: 194 }, (_, index) =>
+      product(`existing-external-${index}`, 9, [
+        "external_type:usb-flash",
+        "capacity_gb:64",
+      ]),
+    );
+    const audit = auditProductFilterQuality([
+      product(
+        gpuId,
+        12,
+        extractProductFilterTags(
+          12,
+          "技嘉 AORUS RTX5070 INFINITY 16G(2715MHz/31cm/渦流雙風扇/註五年)",
+        ),
+      ),
+      ...existingExternalStorage,
+      ...externalStorageNames.map((name, index) =>
+        product(`corrected-external-${index}`, 9, extractProductFilterTags(9, name)),
+      ),
+      product("remaining-external-1", 9, []),
+      product("remaining-external-2", 9, []),
+    ]);
+
+    expect(audit.conflicts).not.toContain(`conflict=${gpuId}:vram_gb`);
+    expect(audit.coverage["9:external_type"]).toBe(204 / 206);
+    expect(audit.belowMinimum).not.toContain("coverage=9:external_type:194/206<95.0%");
+    expect(audit.belowMinimum).not.toContain("coverage=9:external_type:204/206<95.0%");
   });
 
   it("requires radiator size only for actual AIO liquid coolers", () => {
