@@ -102,6 +102,7 @@ RUN apt-get update \
   && chown -R node:node /var/lib/partsradar
 
 COPY --from=crawler-deploy --chown=node:node /prod/crawler ./
+COPY --from=base --chown=node:node /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
 
 USER node
 
