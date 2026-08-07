@@ -11,7 +11,7 @@
   "dependencies": {
     "@partsradar/db": "workspace:*",
     "@partsradar/shared": "workspace:*",
-    "lru-cache": "^11.5.1",
+    "lru-cache": "^11.5.2",
     "next": "^16.2.11",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
