@@ -3,9 +3,9 @@
 // 同時重用 parser helpers 做頁面驗證、候選擷取、欄位正規化與 vendor 分類判斷。
 
 import {
-  MAX_PRODUCT_NAME_LENGTH,
   createCoolpcCategoryUrl,
   extractProductFilterTags,
+  MAX_PRODUCT_NAME_LENGTH,
   mergeProductFilterTags,
   normalizeBoundedProductName,
 } from "@partsradar/shared";
@@ -230,6 +230,19 @@ function getProductExclusionReason(igrp: number, name: string): ProductExclusion
     /\b(?:H610|B760|Z790|H810|B860|Z890|A520|B550|B650E?|B840|B850|X670E?|X870E?)M?\b/i.test(name);
 
   if (isBundledCpuMotherboard) {
+    return "misclassified_bundle_product";
+  }
+
+  const isBundledPsuCoolingProduct =
+    igrp === 15 &&
+    name.includes("+") &&
+    /(?:水冷|\bAIO\b)/i.test(name) &&
+    /現省\s*\$[\d,]+/i.test(name) &&
+    /ATX\s*3(?:\.[01])?|(?:金|銀|銅|白金|鈦金)牌|全模(?:組)?|半模(?:組)?|電源供應器|\bPSU\b/i.test(
+      name,
+    );
+
+  if (isBundledPsuCoolingProduct) {
     return "misclassified_bundle_product";
   }
 

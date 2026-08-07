@@ -88,6 +88,66 @@ describe("CoolPC category product observation writer missing lifecycle", () => {
     });
   });
 
+  it("excludes existing PSU cooling bundles without deleting price history", async () => {
+    const client = new FakeCoolpcProductWriteClient();
+    const fetchedAt = new Date("2026-08-07T08:18:00.000Z");
+    const products = [
+      [
+        "GX750-LE200-BLACK",
+        "海韻 FOCUS GX-750 ATX3 金牌/全模+鈦鉭 TCOMAS LE200 360(黑)水冷 現省$2090！",
+      ],
+      [
+        "GX750-LE200-WHITE",
+        "海韻 FOCUS GX-750 ATX3(白色)金牌+鈦鉭 TCOMAS LE200 360(白)水冷 現省$2390！",
+      ],
+    ] as const;
+
+    for (const [ibuyToken, name] of products) {
+      client.seedProductWithCurrentPrice({
+        ...productItem({
+          sourceCategoryId: "category-15",
+          ibuyToken,
+          name,
+          normalizedName: name.toLocaleLowerCase("zh-TW"),
+          price: 4290,
+        }),
+        igrp: 15,
+        sourceName: "電源供應器 PSU",
+        displayName: "電源",
+        sourceItemKey: `coolpc:igrp:15:ibuy:${ibuyToken}`,
+        sourceUrl: "https://www.coolpc.com.tw/eachview.php?IGrp=15",
+      });
+    }
+
+    await writeCoolpcCategoryProductObservation({
+      client,
+      crawlRunId: "crawl-run-2",
+      rawSnapshotId: "raw-snapshot-2",
+      sourceCategoryId: "category-15",
+      fetchedAt,
+      parsedProducts: [],
+      excludedProducts: products.map(([ibuyToken]) => ({
+        ibuyToken,
+        reason: "misclassified_bundle_product",
+      })),
+    });
+
+    expect(client.products).toEqual(
+      expect.arrayContaining(
+        products.map(([ibuyToken]) =>
+          expect.objectContaining({
+            ibuyToken,
+            isActive: true,
+            isExcluded: true,
+            exclusionReason: "misclassified_bundle_product",
+          }),
+        ),
+      ),
+    );
+    expect(client.priceSnapshots).toHaveLength(2);
+    expect(client.currentPrices).toHaveLength(2);
+  });
+
   it("immediately hides an excluded conditional add-on while preserving its history", async () => {
     const client = new FakeCoolpcProductWriteClient();
     const previousSeenAt = new Date("2026-07-17T10:00:00.000Z");

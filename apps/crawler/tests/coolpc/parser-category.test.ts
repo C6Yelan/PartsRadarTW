@@ -255,6 +255,45 @@ describe("CoolPC category parser", () => {
     expect(result.items.map((item) => item.ibuyToken)).toEqual(["PSU-CATEGORY-ITEM"]);
   });
 
+  it("excludes PSU and liquid-cooler bundle promotions from the power-supply category", () => {
+    const result = parseCoolpcCategoryPage(
+      categoryProductsHtml(15, [
+        {
+          token: "GX750-LE200-BLACK",
+          name: "海韻 FOCUS GX-750 ATX3 金牌/全模+鈦鉭 TCOMAS LE200 360(黑)水冷 現省$2090！",
+        },
+        {
+          token: "GX750-LE200-WHITE",
+          name: "海韻 FOCUS GX-750 ATX3(白色)金牌+鈦鉭 TCOMAS LE200 360(白)水冷 現省$2390！",
+        },
+        { token: "GX750-SINGLE", name: "海韻 FOCUS GX-750 ATX3(750W) 金牌/全模" },
+        { token: "GX750-SALE", name: "海韻 FOCUS GX-750 ATX3 白色版 金牌 ▼下殺到 8/31" },
+      ]),
+      contextForCategory(15),
+    );
+
+    expect(result.excludedProducts).toEqual([
+      { ibuyToken: "GX750-LE200-BLACK", reason: "misclassified_bundle_product" },
+      { ibuyToken: "GX750-LE200-WHITE", reason: "misclassified_bundle_product" },
+    ]);
+    expect(result.items.map((item) => item.ibuyToken)).toEqual(["GX750-SINGLE", "GX750-SALE"]);
+  });
+
+  it.each([
+    ["PLUS-ONLY", "海韻 FOCUS GX-750 ATX3 金牌+全模"],
+    ["SAVING-ONLY", "海韻 FOCUS GX-750 ATX3 金牌 現省$500！"],
+    ["COOLING-ONLY", "海韻 FOCUS GX-750 ATX3 金牌 水冷相容"],
+    ["GIFT", "海韻 FOCUS GX-750 ATX3 金牌+贈品 現省$500！"],
+  ])("keeps PSU offers without every bundle signal: %s", (token, name) => {
+    const result = parseCoolpcCategoryPage(
+      categoryProductsHtml(15, [{ token, name }]),
+      contextForCategory(15),
+    );
+
+    expect(result.excludedProducts).toEqual([]);
+    expect(result.items.map((item) => item.ibuyToken)).toEqual([token]);
+  });
+
   it("deduplicates exact duplicate rows from reduced live case and power supply fixtures", () => {
     const fixtures = [
       [14, "coolpc-live-igrp-14-duplicate.html"],
