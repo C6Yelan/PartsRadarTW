@@ -29,11 +29,11 @@ COPY apps/crawler/package.json apps/crawler/package.json
 COPY packages/db/package.json packages/db/package.json
 COPY packages/shared/package.json packages/shared/package.json
 
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile --fetch-timeout=600000
 
 COPY . .
 
-RUN DATABASE_URL="postgresql://partsradar:partsradar@localhost:5432/partsradar?schema=public" pnpm db:generate
+RUN DATABASE_URL=unused pnpm db:generate
 
 FROM base AS web-build
 
@@ -45,6 +45,23 @@ ENV NODE_ENV=production \
   CSP_REPORT_URI=$CSP_REPORT_URI
 
 RUN pnpm build:web
+
+FROM base AS crawler-deploy
+
+RUN pnpm --config.node-linker=hoisted --config.auto-install-peers=false \
+  --filter @partsradar/crawler deploy --prod --legacy /prod/crawler \
+  && cd /prod/crawler \
+  && DATABASE_URL=unused \
+  /app/packages/db/node_modules/.bin/prisma generate \
+  --schema node_modules/@partsradar/db/prisma/schema.prisma
+
+FROM base AS migrate-deploy
+
+RUN pnpm --config.node-linker=hoisted --config.auto-install-peers=false \
+  --filter @partsradar/db deploy --legacy /prod/migrate \
+  && cd /prod/migrate \
+  && DATABASE_URL=unused \
+  /app/packages/db/node_modules/.bin/prisma generate --schema prisma/schema.prisma
 
 FROM node:24-bookworm-slim AS web
 
@@ -72,20 +89,36 @@ EXPOSE 3000
 
 CMD ["node", "apps/web/server.js"]
 
-FROM base AS crawler
+FROM node:24-bookworm-slim AS crawler
 
 ENV NODE_ENV=production
 
+WORKDIR /app
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ca-certificates openssl \
+  && rm -rf /var/lib/apt/lists/* \
+  && mkdir -p /var/lib/partsradar/snapshots /var/lib/partsradar/product-images \
+  && chown -R node:node /var/lib/partsradar
+
+COPY --from=crawler-deploy --chown=node:node /prod/crawler ./
+
 USER node
 
-# Keep the generic crawler image safe by default. Compose profiles provide the
-# scheduled daemon and manual tooling commands explicitly.
-CMD ["pnpm", "--filter", "@partsradar/crawler", "manual:crawl-coolpc-once", "--", "--help"]
+CMD ["node", "--import", "tsx", "src/scripts/manual/crawl-coolpc-once.ts", "--help"]
 
-FROM base AS migrate
+FROM node:24-bookworm-slim AS migrate
 
 ENV NODE_ENV=production
 
+WORKDIR /app
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ca-certificates openssl \
+  && rm -rf /var/lib/apt/lists/*
+
+COPY --from=migrate-deploy --chown=node:node /prod/migrate ./
+
 USER node
 
-CMD ["sh", "-c", "pnpm db:deploy && pnpm db:configure-runtime-role"]
+CMD ["sh", "-c", "./node_modules/.bin/prisma migrate deploy && node --import tsx prisma/configure-runtime-role.ts"]

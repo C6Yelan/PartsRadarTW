@@ -16,8 +16,23 @@ x-source-image-fetch-lock-env: &source-image-fetch-lock-env
   SOURCE_IMAGE_FETCH_LOCK_DIR: "/var/lib/partsradar/snapshots/.locks/source-image-fetch"
   SOURCE_IMAGE_FETCH_LOCK_STALE_SECONDS: "${SOURCE_IMAGE_FETCH_LOCK_STALE_SECONDS:-300}"
 
+x-crawler-security: &crawler-security
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  read_only: true
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,size=64m
+  cpus: 1.0
+  mem_limit: 1g
+  pids_limit: 200
+  networks:
+    - backend
+
 services:
   crawler:
+    <<: *crawler-security
     image: "${PARTSRADAR_CRAWLER_IMAGE:-partsradar-tw-crawler:local}"
     profiles:
       - manual-crawler
@@ -38,17 +53,17 @@ services:
         condition: service_completed_successfully
     command:
       [
-        "pnpm",
-        "--filter",
-        "@partsradar/crawler",
-        "manual:crawl-coolpc-once",
-        "--",
+        "node",
+        "--import",
+        "tsx",
+        "src/scripts/manual/crawl-coolpc-once.ts",
         "--storage-dir",
         "/var/lib/partsradar/snapshots",
         "--help",
       ]
 
   image-cache-backfill:
+    <<: *crawler-security
     image: "${PARTSRADAR_CRAWLER_IMAGE:-partsradar-tw-crawler:local}"
     profiles:
       - manual-crawler
@@ -69,9 +84,10 @@ services:
         condition: service_healthy
       seed:
         condition: service_completed_successfully
-    command: ["pnpm", "ops:image-cache:backfill", "--", "--help"]
+    command: ["node", "--import", "tsx", "src/scripts/ops/backfill-product-images.ts", "--help"]
 
   crawler-daemon:
+    <<: *crawler-security
     image: "${PARTSRADAR_CRAWLER_IMAGE:-partsradar-tw-crawler:local}"
     profiles:
       - scheduled-crawler
@@ -101,17 +117,17 @@ services:
         condition: service_completed_successfully
     command:
       [
-        "pnpm",
-        "--filter",
-        "@partsradar/crawler",
-        "ops:crawl-coolpc-daemon",
-        "--",
+        "node",
+        "--import",
+        "tsx",
+        "src/scripts/ops/crawl-coolpc-daemon.ts",
         "--confirm-live-fetch",
         "--storage-dir",
         "/var/lib/partsradar/snapshots",
       ]
 
   image-cache-recovery-daemon:
+    <<: *crawler-security
     image: "${PARTSRADAR_CRAWLER_IMAGE:-partsradar-tw-crawler:local}"
     profiles:
       - scheduled-crawler
@@ -141,17 +157,17 @@ services:
         condition: service_completed_successfully
     command:
       [
-        "pnpm",
-        "--filter",
-        "@partsradar/crawler",
-        "ops:image-cache:recovery-daemon",
-        "--",
+        "node",
+        "--import",
+        "tsx",
+        "src/scripts/ops/image-cache-recovery-daemon.ts",
         "--confirm-live-fetch",
         "--storage-dir",
         "/var/lib/partsradar/product-images",
       ]
 
   raw-snapshot-cleanup-daemon:
+    <<: *crawler-security
     image: "${PARTSRADAR_CRAWLER_IMAGE:-partsradar-tw-crawler:local}"
     profiles:
       - scheduled-crawler
@@ -178,11 +194,10 @@ services:
         condition: service_completed_successfully
     command:
       [
-        "pnpm",
-        "--filter",
-        "@partsradar/crawler",
-        "ops:raw-snapshots:cleanup-daemon",
-        "--",
+        "node",
+        "--import",
+        "tsx",
+        "src/scripts/ops/cleanup-raw-snapshots-daemon.ts",
         "--confirm-delete",
         "--storage-dir",
         "/var/lib/partsradar/snapshots",

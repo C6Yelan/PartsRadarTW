@@ -2,8 +2,23 @@ x-runtime-database-env: &runtime-database-env
   NODE_ENV: "production"
   DATABASE_URL: "postgresql://${POSTGRES_RUNTIME_USER:?POSTGRES_RUNTIME_USER is required}:${POSTGRES_RUNTIME_PASSWORD:?POSTGRES_RUNTIME_PASSWORD is required}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}?schema=public"
 
+x-ops-security: &ops-security
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  read_only: true
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,size=64m
+  cpus: 0.5
+  mem_limit: 512m
+  pids_limit: 100
+  networks:
+    - backend
+
 services:
   smoke-daemon:
+    <<: *ops-security
     image: "${PARTSRADAR_CRAWLER_IMAGE:-partsradar-tw-crawler:local}"
     profiles:
       - ops
@@ -66,19 +81,19 @@ services:
         condition: service_healthy
     command:
       [
-        "pnpm",
-        "--filter",
-        "@partsradar/crawler",
-        "ops:production-smoke-daemon",
+        "node",
+        "--import",
+        "tsx",
+        "src/scripts/ops/production-smoke-daemon.ts",
       ]
     healthcheck:
       test:
         [
           "CMD",
-          "pnpm",
-          "--filter",
-          "@partsradar/crawler",
-          "ops:production-smoke:health",
+          "node",
+          "--import",
+          "tsx",
+          "src/scripts/ops/check-production-smoke-progress.ts",
         ]
       interval: 60s
       timeout: 5s
@@ -86,6 +101,7 @@ services:
       start_period: 120s
 
   discord-bot:
+    <<: *ops-security
     image: "${PARTSRADAR_CRAWLER_IMAGE:-partsradar-tw-crawler:local}"
     profiles:
       - discord-bot
@@ -122,8 +138,8 @@ services:
         condition: service_completed_successfully
     command:
       [
-        "pnpm",
-        "--filter",
-        "@partsradar/crawler",
-        "ops:discord-bot",
+        "node",
+        "--import",
+        "tsx",
+        "src/scripts/ops/discord-bot.ts",
       ]

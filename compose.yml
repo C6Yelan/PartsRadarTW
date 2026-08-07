@@ -10,6 +10,15 @@ x-migration-database-env: &migration-database-env
   POSTGRES_RUNTIME_USER: "${POSTGRES_RUNTIME_USER:?POSTGRES_RUNTIME_USER is required}"
   POSTGRES_RUNTIME_PASSWORD: "${POSTGRES_RUNTIME_PASSWORD:?POSTGRES_RUNTIME_PASSWORD is required}"
 
+x-app-security: &app-security
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  read_only: true
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,size=64m
+
 services:
   postgres:
     image: ${POSTGRES_IMAGE:-postgres:18-alpine}
@@ -29,8 +38,14 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
+    cpus: 1.0
+    mem_limit: 1g
+    pids_limit: 200
+    networks:
+      - backend
 
   migrate:
+    <<: *app-security
     image: "${PARTSRADAR_MIGRATE_IMAGE:-partsradar-tw-migrate:local}"
     build:
       context: .
@@ -41,19 +56,30 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    cpus: 1.0
+    mem_limit: 1g
+    pids_limit: 200
+    networks:
+      - backend
 
   seed:
+    <<: *app-security
     image: "${PARTSRADAR_MIGRATE_IMAGE:-partsradar-tw-migrate:local}"
     build:
       context: .
       target: migrate
     restart: "no"
-    command: ["pnpm", "db:seed"]
+    command: ["node", "--import", "tsx", "prisma/seed.ts"]
     environment:
       <<: *runtime-database-env
     depends_on:
       migrate:
         condition: service_completed_successfully
+    cpus: 0.5
+    mem_limit: 512m
+    pids_limit: 100
+    networks:
+      - backend
 
   storage-init:
     image: "${PARTSRADAR_CRAWLER_IMAGE:-partsradar-tw-crawler:local}"
@@ -71,8 +97,16 @@ services:
     volumes:
       - snapshots:/var/lib/partsradar/snapshots
       - product_images:/var/lib/partsradar/product-images
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    network_mode: none
+    cpus: 0.25
+    mem_limit: 128m
+    pids_limit: 50
 
   web:
+    <<: *app-security
     image: "${PARTSRADAR_WEB_IMAGE:-partsradar-tw-web:local}"
     build:
       context: .
@@ -99,6 +133,9 @@ services:
       - "${WEB_BIND_HOST:-127.0.0.1}:${WEB_PORT:-3000}:3000"
     volumes:
       - product_images:/var/lib/partsradar/product-images:ro
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+      - /app/apps/web/.next/cache:rw,noexec,nosuid,size=256m
     depends_on:
       storage-init:
         condition: service_completed_successfully
@@ -116,8 +153,18 @@ services:
       timeout: 5s
       retries: 5
       start_period: 20s
+    cpus: 1.0
+    mem_limit: 1g
+    pids_limit: 200
+    networks:
+      - frontend
+      - backend
 
 volumes:
   postgres_data:
   snapshots:
   product_images:
+
+networks:
+  frontend:
+  backend:

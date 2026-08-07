@@ -18,7 +18,9 @@ describe("database role deployment contract", () => {
 
     expect(core).toContain("x-migration-database-env: &migration-database-env");
     expect(core).toContain("MIGRATION_DATABASE_URL:");
-    expect(dockerfile).toContain("pnpm db:deploy && pnpm db:configure-runtime-role");
+    expect(dockerfile).toContain(
+      "./node_modules/.bin/prisma migrate deploy && node --import tsx prisma/configure-runtime-role.ts",
+    );
     expect(core).toContain("<<: *migration-database-env");
     expect(core.match(/<<: \*migration-database-env/g)).toHaveLength(1);
 

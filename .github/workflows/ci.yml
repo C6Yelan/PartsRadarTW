@@ -35,6 +35,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Audit production dependencies
+        run: pnpm audit --prod --audit-level high
+
       - name: Prepare pinned cloudflared image
         run: docker pull cloudflare/cloudflared:2026.7.2@sha256:4f6655284ab3d252b7f28fedb19fe6c8fc82ee5b1295c20ac74d475e5398a52d
 
@@ -178,3 +181,28 @@ jobs:
 
       - name: Run deterministic DB-backed smoke
         run: pnpm e2e:db-smoke
+
+  image-security:
+    name: Image security (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [web, crawler, migrate]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Build production image
+        run: docker build --target "${{ matrix.target }}" --tag "partsradar-${{ matrix.target }}:ci" .
+
+      - name: Scan fixable High and Critical vulnerabilities
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: "partsradar-${{ matrix.target }}:ci"
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          vuln-type: os,library
+          severity: CRITICAL,HIGH

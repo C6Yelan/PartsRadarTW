@@ -9,6 +9,18 @@ services:
         condition: service_healthy
     environment:
       TUNNEL_TOKEN_FILE: /run/secrets/cloudflare_tunnel_token
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+    cpus: 0.5
+    mem_limit: 256m
+    pids_limit: 100
+    networks:
+      - frontend
     secrets:
       - source: cloudflare_tunnel_token
         target: cloudflare_tunnel_token
