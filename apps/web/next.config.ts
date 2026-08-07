@@ -36,6 +36,11 @@ const contentSecurityPolicy = [
 const nextConfig: NextConfig = {
   allowedDevOrigins: ["127.0.0.1"],
   output: "standalone",
+  outputFileTracingIncludes: {
+    "/products/*": [
+      "../../node_modules/.pnpm/@img+sharp-libvips-linux-x64@*/node_modules/@img/sharp-libvips-linux-x64/lib/**/*",
+    ],
+  },
   poweredByHeader: false,
   async headers() {
     return [

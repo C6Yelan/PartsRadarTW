@@ -63,7 +63,14 @@ RUN pnpm --config.node-linker=hoisted --config.auto-install-peers=false \
   && DATABASE_URL=unused \
   /app/packages/db/node_modules/.bin/prisma generate --schema prisma/schema.prisma
 
-FROM node:24-bookworm-slim AS web
+FROM node:24-bookworm-slim AS runtime
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ca-certificates openssl \
+  && rm -rf /var/lib/apt/lists/* /usr/local/lib/node_modules/npm \
+  && rm -f /usr/local/bin/npm /usr/local/bin/npx
+
+FROM runtime AS web
 
 ENV NODE_ENV=production \
   NEXT_TELEMETRY_DISABLED=1 \
@@ -71,10 +78,6 @@ ENV NODE_ENV=production \
   HOSTNAME=0.0.0.0
 
 WORKDIR /app
-
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends ca-certificates openssl \
-  && rm -rf /var/lib/apt/lists/*
 
 COPY --from=web-build --chown=node:node /app/apps/web/.next/standalone ./
 COPY --from=web-build --chown=node:node /app/apps/web/.next/static ./apps/web/.next/static
@@ -89,16 +92,13 @@ EXPOSE 3000
 
 CMD ["node", "apps/web/server.js"]
 
-FROM node:24-bookworm-slim AS crawler
+FROM runtime AS crawler
 
 ENV NODE_ENV=production
 
 WORKDIR /app
 
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends ca-certificates openssl \
-  && rm -rf /var/lib/apt/lists/* \
-  && mkdir -p /var/lib/partsradar/snapshots /var/lib/partsradar/product-images \
+RUN mkdir -p /var/lib/partsradar/snapshots /var/lib/partsradar/product-images \
   && chown -R node:node /var/lib/partsradar
 
 COPY --from=crawler-deploy --chown=node:node /prod/crawler ./
@@ -108,15 +108,11 @@ USER node
 
 CMD ["node", "--import", "tsx", "src/scripts/manual/crawl-coolpc-once.ts", "--help"]
 
-FROM node:24-bookworm-slim AS migrate
+FROM runtime AS migrate
 
 ENV NODE_ENV=production
 
 WORKDIR /app
-
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends ca-certificates openssl \
-  && rm -rf /var/lib/apt/lists/*
 
 COPY --from=migrate-deploy --chown=node:node /prod/migrate ./
 
