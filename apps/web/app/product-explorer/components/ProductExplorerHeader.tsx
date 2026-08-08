@@ -6,22 +6,30 @@ import type { SyntheticEvent } from "react";
 import { ClearIcon, SearchIcon } from "../../_shared/icons";
 import { formatTaipeiDateTime } from "../../_shared/time";
 import TopbarBrandNavigation from "../../TopbarBrandNavigation";
-import type { ProductsResponse, QueryState } from "../types";
+import type { LoadState, ProductsResponse, QueryState } from "../types";
 
 // 組裝商品探索頂部列，將搜尋 draft 與提交 / 清除事件交給上層控制。
 export function ProductExplorerHeader({
   draft,
   products,
+  productState,
   onClearSearchDraft,
   onSearchDraftChange,
   onTextFiltersSubmit,
 }: {
   draft: QueryState;
   products: ProductsResponse | null;
+  productState: LoadState;
   onClearSearchDraft: () => void;
   onSearchDraftChange: (value: string) => void;
   onTextFiltersSubmit: (event: SyntheticEvent<HTMLFormElement>) => void;
 }) {
+  const lastUpdatedLabel = products
+    ? formatTaipeiDateTime(products.meta.lastSuccessAt, "尚無資料")
+    : productState === "error" || productState === "rate_limited"
+      ? "暫時無法取得"
+      : "載入中";
+
   return (
     <header className="topbar">
       <TopbarBrandNavigation />
@@ -56,7 +64,7 @@ export function ProductExplorerHeader({
       </form>
 
       <div className="topbar-meta">
-        <span>資料最近更新：{formatTaipeiDateTime(products?.meta.lastSuccessAt, "尚無資料")}</span>
+        <span>資料最近更新：{lastUpdatedLabel}</span>
       </div>
     </header>
   );

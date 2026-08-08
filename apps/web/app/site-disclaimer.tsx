@@ -25,7 +25,7 @@ export default function SiteDisclaimer() {
       <div className="site-footer-copy">
         <p>
           {
-            "PartsRadarTW 是非官方的商品搜尋與價格整理工具；實際商品資訊、價格、庫存、購買與售後服務以來源頁為準。"
+            "PartsRadarTW 是非官方的台灣電腦零件價格查詢與追蹤工具，整理原價屋公開商品資料，提供商品搜尋、規格篩選、近期價格變動與歷史價格查詢；實際商品資訊、價格、庫存、購買與售後服務以來源頁為準。"
           }
         </p>
       </div>

@@ -3,6 +3,11 @@
 
 import { type APIRequestContext, expect, type Locator, type Page, test } from "@playwright/test";
 import { resolvePublicSiteUrl } from "../app/_shared/public-site";
+import {
+  buildJsonResponse,
+  buildProductListResponse,
+  buildVisualCategories,
+} from "./support/visual-fixtures";
 
 interface ProductListResponse {
   data: Array<{
@@ -46,6 +51,25 @@ async function expectTopbarLinks(page: Page) {
 }
 
 test.describe("public web smoke", () => {
+  test("publishes a crawler-readable homepage without false client data", {
+    tag: "@desktop-only",
+  }, async ({ request }) => {
+    const response = await request.get("/");
+    const html = await response.text();
+
+    expect(response.status()).toBe(200);
+    expect(html).not.toContain("home-topic");
+    expect(html).not.toContain("0 筆商品");
+    expect(html).not.toMatch(/資料最近更新：(?:<!-- -->)?尚無資料/);
+    expect(html).toMatch(/資料最近更新：(?:<!-- -->)?載入中/);
+    expect(html).toContain("電腦零件價格查詢與追蹤");
+    expect(html).toContain("原價屋公開商品資料");
+    expect(html).toContain("近期價格變動");
+    expect(html).toContain("歷史價格");
+    expect(html).toContain('id="website-structured-data"');
+    expect(html).toContain('"@type":"WebSite"');
+  });
+
   test("does not expose the removed internal ops route", { tag: "@desktop-only" }, async ({
     request,
   }) => {
@@ -61,21 +85,33 @@ test.describe("public web smoke", () => {
   test("loads the homepage and build list on desktop and mobile", {
     tag: "@desktop-mobile-only",
   }, async ({ page }) => {
+    await page.route(/\/api\/categories(?:\?.*)?$/, async (route) => {
+      await route.fulfill(buildJsonResponse(buildVisualCategories()));
+    });
+    await page.route(/\/api\/products(?:\?.*)?$/, async (route) => {
+      await route.fulfill(
+        buildJsonResponse(buildProductListResponse(new URL(route.request().url()))),
+      );
+    });
     await page.goto("/");
     await expect(page.getByText("PartsRadarTW").first()).toBeVisible();
     await expect(page).toHaveTitle("台灣電腦零件價格查詢與追蹤 | PartsRadarTW");
     await expect(page.locator('meta[name="description"]')).toHaveAttribute(
       "content",
-      "查詢原價屋 CPU、主機板、顯示卡、SSD 等電腦零件價格，支援規格篩選、近期價格變動與 Discord 目標價提醒。",
+      "查詢原價屋 CPU、主機板、顯示卡、SSD 等電腦零件價格，支援規格篩選、近期價格變動、歷史價格與 Discord 目標價提醒。",
     );
-    await expect(
-      page.getByRole("heading", { level: 1, name: "台灣電腦零件價格查詢與追蹤" }),
-    ).toBeVisible();
-    await expect(page.getByRole("heading", { level: 2, name: "搜尋結果" })).toBeVisible();
+    await expect(page.locator(".home-topic")).toHaveCount(0);
+    await expect(page.locator("main.dashboard-shell > .workspace-grid")).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "搜尋結果" })).toBeVisible();
+    await expect(page.getByText("400 筆商品", { exact: true })).toBeVisible();
+    await expect(page.getByText("資料最近更新：2026-07-10 16:00", { exact: true })).toBeVisible();
     await expect(page.getByRole("searchbox", { name: "搜尋商品名稱" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Discord" })).toBeVisible();
     await expect(page.getByRole("region", { name: "商品列表" })).toBeVisible();
     await expect(page.getByRole("status", { name: "網站公告" })).toHaveCount(0);
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    ).toBe(true);
     await expectTopbarLinks(page);
 
     await expectPublicFooterLinks(page);
@@ -244,6 +280,7 @@ test.describe("public web smoke", () => {
     for (const path of categoryRoutes) {
       await page.goto(`${path}?sort=price_desc&page=2`);
       await expect(page.getByRole("region", { name: "商品列表" })).toBeVisible();
+      await expect(page.getByRole("heading", { level: 1, name: "搜尋結果" })).toBeVisible();
       const canonicalUrl = new URL(
         (await page.locator('link[rel="canonical"]').getAttribute("href")) ?? "",
       );

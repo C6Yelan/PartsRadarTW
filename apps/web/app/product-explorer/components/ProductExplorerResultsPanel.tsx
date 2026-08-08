@@ -27,6 +27,7 @@ export function ProductExplorerResultsPanel({
         selectedFacetChips={toolbar.selectedFacetChips}
         selectedVendorOptions={toolbar.selectedVendorOptions}
         totalItems={toolbar.totalItems}
+        productState={toolbar.productState}
         vendorOptions={toolbar.vendorOptions}
         onClearVendors={actions.toolbar.clearVendors}
         onDraftChange={actions.toolbar.draftChange}

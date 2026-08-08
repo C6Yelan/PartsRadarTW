@@ -7,7 +7,6 @@ import CategoryPage, {
   generateStaticParams,
 } from "../../app/categories/[slug]/page";
 import { CATEGORY_MAPPINGS } from "../../app/category-slugs";
-import HomePage from "../../app/page";
 import ProductExplorer from "../../app/product-explorer/ProductExplorer";
 
 const EXPECTED_CATEGORY_SLUGS = [
@@ -50,20 +49,17 @@ describe("category route", () => {
     ).rejects.toThrow(/NEXT_HTTP_ERROR_FALLBACK;404/);
   });
 
-  it("renders the same ProductExplorer component on home and category routes", async () => {
-    const homeExplorer = getSuspenseChild(HomePage());
+  it("keeps category routes on the existing ProductExplorer contract", async () => {
     const categoryExplorer = getSuspenseChild(
       await CategoryPage({ params: Promise.resolve({ slug: "gpu" }) }),
     );
 
-    expect(homeExplorer.type).toBe(ProductExplorer);
-    expect(homeExplorer.props.routeState).toEqual({ category: null });
     expect(categoryExplorer.type).toBe(ProductExplorer);
     expect(categoryExplorer.props).toEqual({ routeState: { category: "gpu" } });
   });
 });
 
-function getSuspenseChild(element: ReturnType<typeof HomePage>) {
+function getSuspenseChild(element: Awaited<ReturnType<typeof CategoryPage>>) {
   const child = Children.only(element.props.children);
 
   if (!isValidElement<{ routeState: { category: string | null } }>(child)) {

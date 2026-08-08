@@ -1,11 +1,17 @@
 // apps/web/tests/seo/public-metadata.test.ts
 // 驗證公開 origin、crawler 規則與穩定 sitemap 路由。
 
-import { Children, isValidElement, type ReactElement, type ReactNode } from "react";
+import { Children, isValidElement, type ReactElement, type ReactNode, Suspense } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_PUBLIC_SITE_URL, resolvePublicSiteUrl } from "../../app/_shared/public-site";
-import HomePage, { metadata as homeMetadata } from "../../app/page";
+import HomePage, {
+  createHomepageStructuredData,
+  HOMEPAGE_DESCRIPTION,
+  metadata as homeMetadata,
+  serializeHomepageStructuredData,
+} from "../../app/page";
 import { metadata as priceReportMetadata } from "../../app/price-report/page";
+import ProductExplorer from "../../app/product-explorer/ProductExplorer";
 import robots from "../../app/robots";
 import sitemap from "../../app/sitemap";
 
@@ -14,35 +20,51 @@ afterEach(() => {
 });
 
 describe("public site metadata routes", () => {
-  it("publishes the exact homepage search-intent metadata and visible topic", () => {
+  it("publishes homepage metadata and structured data without a visible SEO intro", () => {
+    vi.stubEnv("PARTSRADAR_PUBLIC_BASE_URL", DEFAULT_PUBLIC_SITE_URL);
+
     expect(homeMetadata).toMatchObject({
       title: "台灣電腦零件價格查詢與追蹤 | PartsRadarTW",
-      description:
-        "查詢原價屋 CPU、主機板、顯示卡、SSD 等電腦零件價格，支援規格篩選、近期價格變動與 Discord 目標價提醒。",
+      description: HOMEPAGE_DESCRIPTION,
       alternates: {
         canonical: "/",
       },
     });
     expect(homeMetadata).not.toHaveProperty("keywords");
 
-    const explorer = Children.only(HomePage().props.children);
-    if (!isValidElement<{ children?: ReactNode }>(explorer)) {
+    const pageChildren = Children.toArray(HomePage().props.children);
+    const script = pageChildren.find(isStructuredDataScript);
+    const suspense = pageChildren.find(isSuspenseElement);
+
+    if (!script || !suspense) {
+      throw new Error("Expected homepage structured data and ProductExplorer boundary.");
+    }
+
+    const explorer = Children.only(suspense.props.children);
+    if (!isValidElement<{ routeState: { category: string | null } }>(explorer)) {
       throw new Error("Expected ProductExplorer inside the homepage Suspense boundary.");
     }
 
-    const topic = Children.only(explorer.props.children);
-    if (!isValidElement<{ children?: ReactNode; className?: string }>(topic)) {
-      throw new Error("Expected a visible homepage topic inside ProductExplorer.");
-    }
+    const serialized = script.props.children;
+    const schema = JSON.parse(serialized);
 
-    const topicChildren = Children.toArray(topic.props.children);
-    const heading = topicChildren.find(isHeading);
-    const description = topicChildren.find(isParagraph);
-
-    expect(topic.props.className).toBe("home-topic");
-    expect(heading?.props.children).toBe("台灣電腦零件價格查詢與追蹤");
-    expect(description?.props.children).toBe(
-      "查詢原價屋 CPU、主機板、顯示卡、SSD 等電腦零件價格，並使用規格篩選、近期價格變動與目標價提醒功能。",
+    expect(explorer.type).toBe(ProductExplorer);
+    expect(explorer.props).toEqual({ routeState: { category: null } });
+    expect(script.props.id).toBe("website-structured-data");
+    expect(script.props.type).toBe("application/ld+json");
+    expect(schema).toEqual(createHomepageStructuredData());
+    expect(schema).toMatchObject({
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      name: "PartsRadarTW",
+      url: "https://partsradar.net/",
+      description: HOMEPAGE_DESCRIPTION,
+      inLanguage: "zh-TW",
+    });
+    expect(serialized).not.toContain("<");
+    expect(serialized).not.toMatch(/AggregateRating|Review|totalItems|productCount|userCount/);
+    expect(serializeHomepageStructuredData("https://preview.partsradar.net/path?q=1")).toContain(
+      '"url":"https://preview.partsradar.net/"',
     );
   });
 
@@ -126,10 +148,14 @@ describe("public site metadata routes", () => {
   });
 });
 
-function isHeading(child: ReactNode): child is ReactElement<{ children: ReactNode }> {
-  return isValidElement<{ children: ReactNode }>(child) && child.type === "h1";
+function isStructuredDataScript(child: ReactNode): child is ReactElement<{
+  children: string;
+  id: string;
+  type: string;
+}> {
+  return isValidElement(child) && child.type === "script";
 }
 
-function isParagraph(child: ReactNode): child is ReactElement<{ children: ReactNode }> {
-  return isValidElement<{ children: ReactNode }>(child) && child.type === "p";
+function isSuspenseElement(child: ReactNode): child is ReactElement<{ children: ReactNode }> {
+  return isValidElement(child) && child.type === Suspense;
 }
