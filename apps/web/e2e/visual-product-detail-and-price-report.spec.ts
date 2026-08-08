@@ -535,6 +535,7 @@ test("uses compact custom price-report filters, aligned table typography, and co
   const selectedHomeRowStyle = await readStyleSnapshot(homeRow);
   expect(selectedHomeRowStyle.backgroundColor).not.toBe(homeVisibleBackground.backgroundColor);
   await expect(homeRow).toHaveCSS("box-shadow", /rgba\(120, 216, 149, 0\.44\)/);
+  await page.mouse.move(0, 0);
   await page.goto("/price-report");
 
   const reportRow = page.locator(".price-report-row").first();

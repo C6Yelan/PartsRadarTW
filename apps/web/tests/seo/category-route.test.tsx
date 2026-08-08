@@ -2,12 +2,11 @@
 
 import { Children, isValidElement } from "react";
 import { describe, expect, it } from "vitest";
-
-import { CATEGORY_MAPPINGS } from "../../app/category-slugs";
 import CategoryPage, {
   generateMetadata,
   generateStaticParams,
 } from "../../app/categories/[slug]/page";
+import { CATEGORY_MAPPINGS } from "../../app/category-slugs";
 import HomePage from "../../app/page";
 import ProductExplorer from "../../app/product-explorer/ProductExplorer";
 
@@ -35,10 +34,14 @@ describe("category route", () => {
     const metadata = await generateMetadata({ params: Promise.resolve({ slug }) });
     const category = CATEGORY_MAPPINGS.find((mapping) => mapping.slug === slug);
 
-    expect(metadata.title).toContain(category?.displayName);
-    expect(metadata.title).toContain("PartsRadarTW");
-    expect(metadata.description).toContain(category?.displayName);
-    expect(metadata.alternates?.canonical).toBe(`/categories/${slug}`);
+    expect(category).toBeDefined();
+    expect(metadata).toEqual({
+      title: `${category?.displayName} 價格查詢 | PartsRadarTW`,
+      description: `查詢原價屋 ${category?.displayName} 商品價格，並依廠商、規格、價格與上架狀態篩選。`,
+      alternates: {
+        canonical: `/categories/${slug}`,
+      },
+    });
   });
 
   it("returns the real Next.js not-found signal for an invalid slug", async () => {
@@ -54,7 +57,7 @@ describe("category route", () => {
     );
 
     expect(homeExplorer.type).toBe(ProductExplorer);
-    expect(homeExplorer.props).toEqual({ routeState: { category: null } });
+    expect(homeExplorer.props.routeState).toEqual({ category: null });
     expect(categoryExplorer.type).toBe(ProductExplorer);
     expect(categoryExplorer.props).toEqual({ routeState: { category: "gpu" } });
   });
