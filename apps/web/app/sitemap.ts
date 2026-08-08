@@ -5,6 +5,7 @@ import type { Prisma } from "@partsradar/db";
 import type { MetadataRoute } from "next";
 import { resolvePublicSiteUrl } from "./_shared/public-site";
 import { buildDefaultProductListWhere } from "./api/products/query";
+import { CATEGORY_MAPPINGS, getCategorySlug } from "./category-slugs";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +20,12 @@ const PUBLIC_SITEMAP_PATHS = [
 ] as const;
 
 const MAX_SITEMAP_URLS = 50_000;
-export const PRODUCT_SITEMAP_LIMIT = MAX_SITEMAP_URLS - PUBLIC_SITEMAP_PATHS.length;
+export const PRODUCT_SITEMAP_LIMIT =
+  MAX_SITEMAP_URLS - PUBLIC_SITEMAP_PATHS.length - CATEGORY_MAPPINGS.length;
+
+const CATEGORY_SITEMAP_SELECT = {
+  igrp: true,
+} as const satisfies Prisma.SourceCategorySelect;
 
 const PRODUCT_SITEMAP_SELECT = {
   id: true,
@@ -36,8 +42,17 @@ type ProductSitemapRecord = Prisma.ProductGetPayload<{
 type ProductSitemapFindManyArgs = Omit<Prisma.ProductFindManyArgs, "select"> & {
   select: typeof PRODUCT_SITEMAP_SELECT;
 };
+type CategorySitemapRecord = Prisma.SourceCategoryGetPayload<{
+  select: typeof CATEGORY_SITEMAP_SELECT;
+}>;
+type CategorySitemapFindManyArgs = Omit<Prisma.SourceCategoryFindManyArgs, "select"> & {
+  select: typeof CATEGORY_SITEMAP_SELECT;
+};
 
 export interface SitemapReadClient {
+  sourceCategory: {
+    findMany(args: CategorySitemapFindManyArgs): Promise<CategorySitemapRecord[]>;
+  };
   product: {
     findMany(args: ProductSitemapFindManyArgs): Promise<ProductSitemapRecord[]>;
   };
@@ -52,18 +67,38 @@ export async function createSitemap(
   options: SitemapOptions = {},
 ): Promise<MetadataRoute.Sitemap> {
   const publicSiteUrl = resolvePublicSiteUrl(options.publicSiteUrl);
-  const products = await client.product.findMany({
-    where: buildDefaultProductListWhere(),
-    orderBy: {
-      id: "asc",
-    },
-    take: PRODUCT_SITEMAP_LIMIT,
-    select: PRODUCT_SITEMAP_SELECT,
-  });
+  const [categories, products] = await Promise.all([
+    client.sourceCategory.findMany({
+      where: {
+        enabled: true,
+        igrp: {
+          in: CATEGORY_MAPPINGS.map(({ igrp }) => igrp),
+        },
+      },
+      orderBy: {
+        igrp: "asc",
+      },
+      take: CATEGORY_MAPPINGS.length,
+      select: CATEGORY_SITEMAP_SELECT,
+    }),
+    client.product.findMany({
+      where: buildDefaultProductListWhere(),
+      orderBy: {
+        id: "asc",
+      },
+      take: PRODUCT_SITEMAP_LIMIT,
+      select: PRODUCT_SITEMAP_SELECT,
+    }),
+  ]);
 
   const publicEntries = PUBLIC_SITEMAP_PATHS.map((path) => ({
     url: new URL(path, `${publicSiteUrl}/`).toString(),
   }));
+  const categoryEntries = categories.flatMap((category) => {
+    const slug = getCategorySlug(category.igrp);
+
+    return slug ? [{ url: new URL(`/categories/${slug}`, `${publicSiteUrl}/`).toString() }] : [];
+  });
   const productEntries = products.flatMap((product) =>
     product.currentPrice
       ? [
@@ -75,12 +110,15 @@ export async function createSitemap(
       : [],
   );
 
-  return [...publicEntries, ...productEntries];
+  return [...publicEntries, ...categoryEntries, ...productEntries];
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const { prisma } = await import("@partsradar/db");
   const client: SitemapReadClient = {
+    sourceCategory: {
+      findMany: (args) => prisma.sourceCategory.findMany(args),
+    },
     product: {
       findMany: (args) => prisma.product.findMany(args),
     },

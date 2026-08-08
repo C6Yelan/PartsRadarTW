@@ -41,12 +41,15 @@ describe("public site metadata routes", () => {
   it("lists stable public pages and bounded canonical product URLs", async () => {
     vi.stubEnv("PARTSRADAR_PUBLIC_BASE_URL", DEFAULT_PUBLIC_SITE_URL);
     const lastSeenAt = new Date("2026-08-08T08:30:00.000Z");
-    const client = fakeSitemapClient([
-      {
-        id: "11111111-1111-4111-8111-111111111111",
-        currentPrice: { lastSeenAt },
-      },
-    ]);
+    const client = fakeSitemapClient({
+      categories: [{ igrp: 4 }],
+      products: [
+        {
+          id: "11111111-1111-4111-8111-111111111111",
+          currentPrice: { lastSeenAt },
+        },
+      ],
+    });
 
     const entries = await createSitemap(client);
     const urls = new Set(entries.map((entry) => entry.url));
@@ -56,6 +59,7 @@ describe("public site metadata routes", () => {
         "https://partsradar.net/",
         "https://partsradar.net/about",
         "https://partsradar.net/announcements",
+        "https://partsradar.net/categories/cpu",
         "https://partsradar.net/discord",
         "https://partsradar.net/price-report",
         "https://partsradar.net/privacy",
@@ -64,6 +68,15 @@ describe("public site metadata routes", () => {
       ]),
     );
     expect(entries.at(-1)?.lastModified).toEqual(lastSeenAt);
+    expect(client.lastCategoryFindManyArgs).toMatchObject({
+      where: {
+        enabled: true,
+        igrp: { in: [4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15, 16] },
+      },
+      orderBy: { igrp: "asc" },
+      take: 12,
+      select: { igrp: true },
+    });
     expect(client.lastProductFindManyArgs).toMatchObject({
       where: {
         isActive: true,
@@ -94,15 +107,36 @@ describe("public site metadata routes", () => {
 
 type ProductSitemapFindManyArgs = Parameters<SitemapReadClient["product"]["findMany"]>[0];
 type ProductSitemapRecord = Awaited<ReturnType<SitemapReadClient["product"]["findMany"]>>[number];
+type CategorySitemapFindManyArgs = Parameters<SitemapReadClient["sourceCategory"]["findMany"]>[0];
+type CategorySitemapRecord = Awaited<
+  ReturnType<SitemapReadClient["sourceCategory"]["findMany"]>
+>[number];
 
-function fakeSitemapClient(products: ProductSitemapRecord[]) {
+function fakeSitemapClient({
+  categories,
+  products,
+}: {
+  categories: CategorySitemapRecord[];
+  products: ProductSitemapRecord[];
+}) {
   const state = {
+    lastCategoryFindManyArgs: null as CategorySitemapFindManyArgs | null,
     lastProductFindManyArgs: null as ProductSitemapFindManyArgs | null,
   };
 
   return {
+    get lastCategoryFindManyArgs() {
+      return state.lastCategoryFindManyArgs;
+    },
     get lastProductFindManyArgs() {
       return state.lastProductFindManyArgs;
+    },
+    sourceCategory: {
+      async findMany(args) {
+        state.lastCategoryFindManyArgs = args;
+
+        return categories;
+      },
     },
     product: {
       async findMany(args) {
@@ -112,6 +146,7 @@ function fakeSitemapClient(products: ProductSitemapRecord[]) {
       },
     },
   } satisfies SitemapReadClient & {
+    lastCategoryFindManyArgs: CategorySitemapFindManyArgs | null;
     lastProductFindManyArgs: ProductSitemapFindManyArgs | null;
   };
 }

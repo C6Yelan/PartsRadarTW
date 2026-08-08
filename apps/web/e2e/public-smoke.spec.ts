@@ -5,6 +5,7 @@ import { type APIRequestContext, expect, type Locator, type Page, test } from "@
 import { formatTwdPrice } from "../app/_shared/formatting";
 import { resolvePublicSiteUrl } from "../app/_shared/public-site";
 import { formatTaipeiDateTime } from "../app/_shared/time";
+import { CATEGORY_MAPPINGS } from "../app/category-slugs";
 
 interface ProductListResponse {
   data: Array<{
@@ -447,18 +448,36 @@ test.describe("public API smoke", () => {
     expect(detailHtml).toContain("原價屋公開頁面");
     expect(detailHtml).toContain("PartsRadarTW 是非官方的商品搜尋與價格整理工具");
 
+    const home = await request.get("/");
+    expect(home.status()).toBe(200);
+    const homeHtml = await home.text();
+    for (const category of CATEGORY_MAPPINGS) {
+      expect(homeHtml).toContain(`href="/categories/${category.slug}"`);
+    }
+
+    const categoryPage = await request.get("/categories/cpu");
+    expect(categoryPage.status()).toBe(200);
+    const categoryHtml = await categoryPage.text();
+    const normalizedCategoryHtml = categoryHtml.replaceAll("<!-- -->", "");
+    expect(normalizedCategoryHtml).toContain("CPU 商品價格");
+    expect(categoryHtml).toContain(detailBody.name);
+    expect(categoryHtml).toContain(`href="/products/${product.id}"`);
+    expect(categoryHtml).toContain('rel="canonical" href="https://partsradar.net/categories/cpu"');
+    expect((await request.get("/categories/not-a-category")).status()).toBe(404);
+
     const sitemap = await request.get("/sitemap.xml");
     expect(sitemap.status()).toBe(200);
     const sitemapXml = await sitemap.text();
     expect(sitemapXml).toContain(
       `<loc>${new URL(`/products/${product.id}`, `${resolvePublicSiteUrl()}/`)}</loc>`,
     );
+    expect(sitemapXml).toContain("<loc>https://partsradar.net/categories/cpu</loc>");
     expect(sitemapXml).toContain("<lastmod>");
     expect(sitemapXml).not.toContain("/products/20000000-0000-4000-8000-000000000006");
     const sitemapUrls = [...sitemapXml.matchAll(/<loc>([^<]+)<\/loc>/g)].map(
       ([, url]) => new URL(url),
     );
-    expect(sitemapUrls).toHaveLength(8);
+    expect(sitemapUrls).toHaveLength(9);
     expect(sitemapUrls.every((url) => url.search === "")).toBe(true);
 
     await page.goto(`/products/${product.id}`);
