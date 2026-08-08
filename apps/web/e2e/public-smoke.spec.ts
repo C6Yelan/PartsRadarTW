@@ -63,6 +63,15 @@ test.describe("public web smoke", () => {
   }, async ({ page }) => {
     await page.goto("/");
     await expect(page.getByText("PartsRadarTW").first()).toBeVisible();
+    await expect(page).toHaveTitle("台灣電腦零件價格查詢與追蹤 | PartsRadarTW");
+    await expect(page.locator('meta[name="description"]')).toHaveAttribute(
+      "content",
+      "查詢原價屋 CPU、主機板、顯示卡、SSD 等電腦零件價格，支援規格篩選、近期價格變動與 Discord 目標價提醒。",
+    );
+    await expect(
+      page.getByRole("heading", { level: 1, name: "台灣電腦零件價格查詢與追蹤" }),
+    ).toBeVisible();
+    await expect(page.getByRole("heading", { level: 2, name: "搜尋結果" })).toBeVisible();
     await expect(page.getByRole("searchbox", { name: "搜尋商品名稱" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Discord" })).toBeVisible();
     await expect(page.getByRole("region", { name: "商品列表" })).toBeVisible();
@@ -179,6 +188,11 @@ test.describe("public web smoke", () => {
 
     await page.goto("/price-report");
     await expect(page.getByRole("heading", { exact: true, name: "價格變動總覽" })).toBeVisible();
+    await expect(page).toHaveTitle("電腦零件降價與價格變動 | PartsRadarTW");
+    await expect(page.locator('meta[name="description"]')).toHaveAttribute(
+      "content",
+      "查看原價屋電腦零件近期降價、漲價與新增商品，掌握 CPU、顯示卡、SSD 等零件價格變動。",
+    );
     await expectTopbarLinks(page);
     await expectPublicFooterLinks(page);
 

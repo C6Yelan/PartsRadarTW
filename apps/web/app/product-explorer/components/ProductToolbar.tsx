@@ -72,12 +72,13 @@ export function ProductToolbar({
     ...selectedVendorOptions.map((option) => option.name),
     ...query.vendors.filter((vendor) => !resolvedVendorSlugs.has(vendor)),
   ].join("、");
+  const ResultsHeading = selectedCategory === null ? "h2" : "h1";
 
   return (
     <div className="results-toolbar">
       <div className="results-heading-row">
         <div className="results-title">
-          <h1>搜尋結果</h1>
+          <ResultsHeading>搜尋結果</ResultsHeading>
           <span>{formatInteger(totalItems)} 筆商品</span>
         </div>
         <div className="results-heading-actions">

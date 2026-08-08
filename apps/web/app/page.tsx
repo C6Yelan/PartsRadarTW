@@ -7,8 +7,9 @@ import { Suspense } from "react";
 import ProductExplorer from "./product-explorer/ProductExplorer";
 
 export const metadata: Metadata = {
-  title: "PartsRadarTW",
-  description: "原價屋電腦零件價格查詢工具",
+  title: "台灣電腦零件價格查詢與追蹤 | PartsRadarTW",
+  description:
+    "查詢原價屋 CPU、主機板、顯示卡、SSD 等電腦零件價格，支援規格篩選、近期價格變動與 Discord 目標價提醒。",
   alternates: {
     canonical: "/",
   },
@@ -18,7 +19,15 @@ export const metadata: Metadata = {
 export default function HomePage() {
   return (
     <Suspense fallback={<div className="page-loading">載入查詢工具</div>}>
-      <ProductExplorer routeState={{ category: null }} />
+      <ProductExplorer routeState={{ category: null }}>
+        <header className="home-topic">
+          <h1>台灣電腦零件價格查詢與追蹤</h1>
+          <p>
+            查詢原價屋 CPU、主機板、顯示卡、SSD
+            等電腦零件價格，並使用規格篩選、近期價格變動與目標價提醒功能。
+          </p>
+        </header>
+      </ProductExplorer>
     </Suspense>
   );
 }
