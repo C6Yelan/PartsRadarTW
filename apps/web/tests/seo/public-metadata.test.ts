@@ -103,7 +103,10 @@ describe("public site metadata routes", () => {
         allow: "/",
         disallow: "/api/",
       },
-      sitemap: "https://partsradar.net/sitemap.xml",
+      sitemap: [
+        "https://partsradar.net/sitemap.xml",
+        "https://partsradar.net/products/sitemap.xml",
+      ],
     });
   });
 
