@@ -13,6 +13,9 @@ export default function robots(): MetadataRoute.Robots {
       allow: "/",
       disallow: "/api/",
     },
-    sitemap: new URL("/sitemap.xml", `${publicSiteUrl}/`).toString(),
+    sitemap: [
+      new URL("/sitemap.xml", `${publicSiteUrl}/`).toString(),
+      new URL("/products/sitemap.xml", `${publicSiteUrl}/`).toString(),
+    ],
   };
 }
