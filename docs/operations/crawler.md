@@ -37,7 +37,7 @@ Live one-shot：
 
 ```bash
 docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler run --rm crawler \
-  pnpm manual:crawl-coolpc-once -- --confirm-live-fetch --storage-dir /var/lib/partsradar/snapshots
+  node --import tsx src/scripts/manual/crawl-coolpc-once.ts --confirm-live-fetch --storage-dir /var/lib/partsradar/snapshots
 ```
 
 成功標準：每個啟用分類有明確結果，沒有 suspected block，商品／價格寫入摘要合理。
@@ -52,14 +52,14 @@ Dry-run：
 
 ```bash
 docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler run --rm crawler \
-  pnpm ops:raw-snapshots:cleanup -- --storage-dir /var/lib/partsradar/snapshots
+  node --import tsx src/scripts/ops/cleanup-raw-snapshots.ts --storage-dir /var/lib/partsradar/snapshots
 ```
 
 確認摘要與備份後刪除：
 
 ```bash
 docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler run --rm crawler \
-  pnpm ops:raw-snapshots:cleanup -- --confirm-delete --storage-dir /var/lib/partsradar/snapshots
+  node --import tsx src/scripts/ops/cleanup-raw-snapshots.ts --confirm-delete --storage-dir /var/lib/partsradar/snapshots
 ```
 
 成功標準：刪除數與 dry-run 一致，沒有 retained reference 被移除，mutation lock 正常釋放。
@@ -76,14 +76,14 @@ Dry-run：
 
 ```bash
 docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler run --rm image-cache-backfill \
-  pnpm ops:image-cache:backfill -- --limit 20
+  node --import tsx src/scripts/ops/backfill-product-images.ts --limit 20
 ```
 
 確認後 live fetch：
 
 ```bash
 docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler run --rm image-cache-backfill \
-  pnpm ops:image-cache:backfill -- --confirm-live-fetch --limit 20
+  node --import tsx src/scripts/ops/backfill-product-images.ts --confirm-live-fetch --limit 20
 ```
 
 成功標準：`failed=0`，cached／reused／skipped 計數合理，web 圖片 API 可讀新 WebP。
@@ -98,14 +98,14 @@ Preview：
 
 ```bash
 docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler run --rm crawler \
-  pnpm ops:product-vendors:backfill -- --limit 100
+  node --import tsx src/scripts/ops/backfill-product-vendors.ts --limit 100
 ```
 
 確認後寫入：
 
 ```bash
 docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler run --rm crawler \
-  pnpm ops:product-vendors:backfill -- --confirm-write --limit 100
+  node --import tsx src/scripts/ops/backfill-product-vendors.ts --confirm-write --limit 100
 ```
 
 成功標準：Preview 與 write 的 selected／changed 範圍一致；無法分類的商品維持明確 null，不自行猜測品牌。
@@ -118,7 +118,7 @@ Dry-run：
 
 ```bash
 docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler run --rm crawler \
-  pnpm ops:product-filter-tags:backfill -- --dry-run
+  node --import tsx src/scripts/ops/backfill-product-filter-tags.ts --dry-run
 ```
 
 審查 JSON summary 的 `selected`、`changed`、`unchanged` 與各 category 的 `withoutTags`／`facetHits`；抽查明確否定「不含電源／未含電源」的機殼沒有 `included_psu:yes`。
@@ -127,7 +127,7 @@ docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler ru
 
 ```bash
 docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler run --rm crawler \
-  pnpm ops:product-filter-tags:backfill -- --confirm-write
+  node --import tsx src/scripts/ops/backfill-product-filter-tags.ts --confirm-write
 ```
 
 完成後再次執行 dry-run。成功標準：第二次 summary 的 `changed=0`；失敗或統計異常時停止 rollout 且不要恢復 writers。

@@ -15,6 +15,10 @@ import {
 // 顯示手動執行 production smoke 時最常用的 options；完整 env 說明仍以 runbook / .env.example 為主。
 export function printProductionSmokeHelp(): void {
   console.log(`Usage:
+  Production crawler image:
+    node --import tsx src/scripts/ops/production-smoke.ts [options]
+
+  Workspace:
   pnpm --filter @partsradar/crawler ops:production-smoke -- [options]
 
 Options:

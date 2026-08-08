@@ -7,6 +7,7 @@ import {
   parseProductionSmokeOptions,
   printProductionSmokeSummary,
 } from "../../../../src/scripts/ops/production-smoke";
+import { printProductionSmokeHelp } from "../../../../src/scripts/ops/production-smoke/options/help";
 import { createWorkspace } from "./production-smoke-workspace-support";
 
 afterEach(() => {
@@ -15,6 +16,17 @@ afterEach(() => {
 });
 
 describe("production smoke options", () => {
+  it("documents the package-manager-free production image entrypoint", () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+
+    printProductionSmokeHelp();
+
+    expect(log).toHaveBeenCalledWith(
+      expect.stringContaining("node --import tsx src/scripts/ops/production-smoke.ts [options]"),
+    );
+    log.mockRestore();
+  });
+
   it("uses conservative defaults", async () => {
     const { crawlerCwd, workspaceRoot } = await createWorkspace();
     const options = parseProductionSmokeOptions([], {}, crawlerCwd);

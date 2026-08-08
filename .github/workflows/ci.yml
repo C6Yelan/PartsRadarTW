@@ -210,6 +210,13 @@ jobs:
             "import { resolveWorkspaceRoot } from './src/scripts/shared/script-utils.ts'; const root = resolveWorkspaceRoot(); if (root !== '/app') throw new Error('Unexpected workspace root: ' + root); console.log(root)"
           docker run --rm "partsradar-${{ matrix.target }}:ci" \
             node --import tsx src/scripts/manual/crawl-coolpc-once.ts --help
+          docker run --rm \
+            --read-only \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --tmpfs /tmp:rw,noexec,nosuid,size=64m \
+            "partsradar-${{ matrix.target }}:ci" \
+            node --import tsx src/scripts/ops/production-smoke.ts --help
 
       - name: Scan fixable High and Critical vulnerabilities
         uses: aquasecurity/trivy-action@v0.36.0

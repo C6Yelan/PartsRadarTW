@@ -7,11 +7,27 @@ import { describe, expect, it } from "vitest";
 const WORKSPACE_ROOT = join(__dirname, "../../../../..");
 
 describe("public release trust-boundary documentation", () => {
+  it("keeps production container commands aligned with the lean crawler image", async () => {
+    const [operations, crawler, discord, release, workflow] = await Promise.all([
+      readFile(join(WORKSPACE_ROOT, "docs/operations/README.md"), "utf8"),
+      readFile(join(WORKSPACE_ROOT, "docs/operations/crawler.md"), "utf8"),
+      readFile(join(WORKSPACE_ROOT, "docs/operations/discord.md"), "utf8"),
+      readFile(join(WORKSPACE_ROOT, "docs/deployment/release.md"), "utf8"),
+      readFile(join(WORKSPACE_ROOT, ".github/workflows/ci.yml"), "utf8"),
+    ]);
+    const privateSmokeEntrypoint =
+      "node --import tsx src/scripts/ops/production-smoke.ts --base-url http://web:3000";
+
+    expect(operations).toContain(privateSmokeEntrypoint);
+    expect(release).toContain("[Private full smoke](../operations/README.md#full-smoke)");
+    for (const runbook of [operations, crawler, discord]) {
+      expect(runbook).not.toMatch(/\\\n\s+pnpm /);
+    }
+    expect(workflow).toContain("node --import tsx src/scripts/ops/production-smoke.ts --help");
+  });
+
   it("keeps restore fail-closed until privacy replay and Discord checks pass", async () => {
-    const recovery = await readFile(
-      join(WORKSPACE_ROOT, "docs/operations/recovery.md"),
-      "utf8",
-    );
+    const recovery = await readFile(join(WORKSPACE_ROOT, "docs/operations/recovery.md"), "utf8");
 
     expect(recovery).toContain("DISCORD_FEATURE_PUBLIC_REPORTS_ENABLED");
     expect(recovery).toContain("DISCORD_FEATURE_PERSONAL_REPORTS_ENABLED");

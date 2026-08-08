@@ -67,7 +67,7 @@ RC-09 target-watch bounded claim的migration與application rollback另須依[Tar
 - Build-context sentinel 與 image 內容檢查
 - Runtime role attributes、object grants、application 讀寫與 DDL 拒絕測試
 - 既有部署的備份與隔離還原驗證；首次部署改驗證空庫初始化
-- Private full smoke，再執行 public-only smoke
+- [Private full smoke](../operations/README.md#full-smoke)，再執行 public-only smoke
 
 Smoke threshold 是部署預設，不等於已依 production baseline 校準。WARN 必須判讀；FAIL 必須阻止 cutover。
 

@@ -2,6 +2,8 @@
 
 本 runbook 只收錄目前程式與 Compose 可執行的操作。以下指令預設從 repository root 執行，且 `.env` 已正確設定；不要在輸出或 ticket 貼出 secret。
 
+Production crawler image 不包含 `pnpm`、`npm` 或 `npx`。Host workspace 指令仍可使用 `pnpm`；所有覆寫 crawler image command 的 Compose 操作必須直接使用 `node --import tsx` 執行 image 內的 CLI。
+
 ## Runbook index
 
 | 範圍 | 文件 |
@@ -56,7 +58,7 @@ pnpm ops:production-smoke -- --public-only --base-url https://partsradar.net
 
 ```bash
 docker compose -f compose.yml -f compose.ops.yml --profile ops run --rm smoke-daemon \
-  pnpm ops:production-smoke -- --base-url http://web:3000
+  node --import tsx src/scripts/ops/production-smoke.ts --base-url http://web:3000
 ```
 
 Full smoke 另檢查 crawler run、filter sync、parse errors、來源圖片、商品篩選品質、缺圖、snapshot retention 與近期 Discord delivery。只有 FAIL 使用 non-zero exit；部署流程仍須解析並人工判讀 WARN。

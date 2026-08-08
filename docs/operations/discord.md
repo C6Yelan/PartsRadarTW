@@ -8,7 +8,7 @@
 
 ```bash
 docker compose -f compose.yml -f compose.ops.yml --profile discord-bot run --rm discord-bot \
-  pnpm ops:discord-bot -- --register-commands
+  node --import tsx src/scripts/ops/discord-bot.ts --register-commands
 ```
 
 啟動：
@@ -53,7 +53,7 @@ read -rp "Discord user ID: " DISCORD_USER_ID
 
 ```bash
 docker compose -f compose.yml -f compose.ops.yml --profile discord-bot run --rm discord-bot \
-  pnpm ops:discord-privacy -- create-verification \
+  node --import tsx src/scripts/ops/discord-privacy.ts create-verification \
   --request-type erase \
   --discord-user-id "$DISCORD_USER_ID"
 ```
@@ -68,7 +68,7 @@ read -rsp "Verification code: " PRIVACY_CODE
 printf '\n'
 printf '%s\n' "$PRIVACY_CODE" | \
   docker compose -f compose.yml -f compose.ops.yml --profile discord-bot run --rm -T discord-bot \
-    pnpm ops:discord-privacy -- verify-code --request-id "$REQUEST_ID"
+    node --import tsx src/scripts/ops/discord-privacy.ts verify-code --request-id "$REQUEST_ID"
 unset PRIVACY_CODE
 ```
 
@@ -78,14 +78,14 @@ unset PRIVACY_CODE
 
 ```bash
 docker compose -f compose.yml -f compose.ops.yml --profile discord-bot run --rm discord-bot \
-  pnpm ops:discord-privacy -- show-verification-status --request-id "$REQUEST_ID"
+  node --import tsx src/scripts/ops/discord-privacy.ts show-verification-status --request-id "$REQUEST_ID"
 ```
 
 ### 查詢
 
 ```bash
 docker compose -f compose.yml -f compose.ops.yml --profile discord-bot run --rm discord-bot \
-  pnpm ops:discord-privacy -- inspect-user --request-id "$REQUEST_ID"
+  node --import tsx src/scripts/ops/discord-privacy.ts inspect-user --request-id "$REQUEST_ID"
 ```
 
 `inspect-user` 只回傳個人報告設定、目標價提醒、通知紀錄、公開報告 actor metadata 與驗證 request 的筆數，並消耗該 request；它不是完整資料複製本。
@@ -94,7 +94,7 @@ docker compose -f compose.yml -f compose.ops.yml --profile discord-bot run --rm 
 
 ```bash
 docker compose -f compose.yml -f compose.ops.yml --profile discord-bot run --rm discord-bot \
-  pnpm ops:discord-privacy -- erase-user --request-id "$REQUEST_ID" --confirm-erase
+  node --import tsx src/scripts/ops/discord-privacy.ts erase-user --request-id "$REQUEST_ID" --confirm-erase
 ```
 
 只有明確提供 `--confirm-erase` 才會查詢並刪除資料。未提供時只回傳 `dryRun:true`，不查詢 request 對應資料，不能當作刪除預覽。
@@ -107,7 +107,7 @@ docker compose -f compose.yml -f compose.ops.yml --profile discord-bot run --rm 
 
 ```bash
 docker compose -f compose.yml -f compose.ops.yml --profile discord-bot run --rm discord-bot \
-  pnpm ops:discord-privacy -- cancel-verification --request-id "$REQUEST_ID"
+  node --import tsx src/scripts/ops/discord-privacy.ts cancel-verification --request-id "$REQUEST_ID"
 ```
 
 ## 完成與限制
