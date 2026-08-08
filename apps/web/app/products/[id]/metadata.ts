@@ -1,12 +1,12 @@
 // apps/web/app/products/[id]/metadata.ts
 // 建立商品詳細頁的 Next.js metadata，限制只使用公開商品欄位組出 SEO 與分享預覽資訊。
 
-import type { Prisma } from "@partsradar/db";
 import type { Metadata } from "next";
 import { formatTwdPrice } from "../../_shared/formatting";
 import { normalizeProductId } from "../../_shared/product-id";
 import { DEFAULT_PUBLIC_SITE_URL, resolvePublicSiteUrl } from "../../_shared/public-site";
 import { formatTaipeiDateTime } from "../../_shared/time";
+import type { ProductDetailResponseBody } from "../../api/products/[id]/response";
 
 const SITE_NAME = "PartsRadarTW";
 const FALLBACK_TITLE = `商品資訊 | ${SITE_NAME}`;
@@ -16,47 +16,17 @@ const SHARE_TITLE_MAX_LENGTH = 96;
 export const PRODUCT_SHARE_IMAGE_SIZE = { width: 1200, height: 630 } as const;
 export const PRODUCT_SHARE_IMAGE_CONTENT_TYPE = "image/png";
 
-const PRODUCT_METADATA_SELECT = {
-  id: true,
-  name: true,
-  currentPrice: {
-    select: {
-      lastSeenAt: true,
-      priceSnapshot: {
-        select: {
-          price: true,
-        },
-      },
-    },
-  },
-  sourceCategory: {
-    select: {
-      displayName: true,
-    },
-  },
-} as const satisfies Prisma.ProductSelect;
-
-export type ProductMetadataRecord = Prisma.ProductGetPayload<{
-  select: typeof PRODUCT_METADATA_SELECT;
-}>;
-export type ProductMetadataFindFirstArgs = Omit<Prisma.ProductFindFirstArgs, "select"> & {
-  select: typeof PRODUCT_METADATA_SELECT;
-};
-
-// 商品 metadata 查詢所需的最小 Prisma client contract，供 page 與測試注入。
-export interface ProductMetadataReadClient {
-  product: {
-    findFirst(args: ProductMetadataFindFirstArgs): Promise<ProductMetadataRecord | null>;
-  };
-}
-
 interface ProductMetadataOptions {
   publicSiteUrl?: string | null;
 }
 
+export type ProductMetadataReader = (
+  productId: string,
+) => Promise<ProductDetailResponseBody | null>;
+
 // 讀取商品公開欄位並建立詳細頁 metadata；無效 id、查無商品或查詢失敗時回退預設 metadata。
 export async function createProductDetailMetadata(
-  client: ProductMetadataReadClient,
+  readProduct: ProductMetadataReader,
   productId: string,
   options: ProductMetadataOptions = {},
 ): Promise<Metadata> {
@@ -68,18 +38,7 @@ export async function createProductDetailMetadata(
   }
 
   try {
-    const product = await client.product.findFirst({
-      where: {
-        id: normalizedProductId,
-        sourceCategory: {
-          enabled: true,
-        },
-        currentPrice: {
-          isNot: null,
-        },
-      },
-      select: PRODUCT_METADATA_SELECT,
-    });
+    const product = await readProduct(normalizedProductId);
 
     if (!product) {
       return createFallbackProductMetadata(publicSiteUrl, normalizedProductId);
@@ -91,22 +50,18 @@ export async function createProductDetailMetadata(
   }
 }
 
-// 將商品 metadata record 轉成 Next.js Metadata，避免暴露 crawler 內部來源 URL 或非公開欄位。
+// 將公開商品 response 轉成 Next.js Metadata，避免暴露 crawler 內部來源 URL 或非公開欄位。
 export function buildProductDetailMetadata(
-  product: ProductMetadataRecord,
+  product: ProductDetailResponseBody,
   publicSiteUrl = DEFAULT_PUBLIC_SITE_URL,
 ): Metadata {
-  if (!product.currentPrice) {
-    return createFallbackProductMetadata(publicSiteUrl, product.id);
-  }
-
   const productUrl = createAbsoluteUrl(publicSiteUrl, `/products/${product.id}`);
   const openGraphImageUrl = createAbsoluteUrl(
     publicSiteUrl,
     `/products/${product.id}/opengraph-image`,
   );
   const twitterImageUrl = createAbsoluteUrl(publicSiteUrl, `/products/${product.id}/twitter-image`);
-  const price = formatTwdPrice(product.currentPrice.priceSnapshot.price);
+  const price = formatTwdPrice(product.price.amount);
   const titleSuffix = ` - ${price} | ${SITE_NAME}`;
   const productName = truncateMetadataText(
     product.name,
@@ -114,7 +69,7 @@ export function buildProductDetailMetadata(
   );
   const title = `${productName}${titleSuffix}`;
   const shareTitle = truncateMetadataText(product.name, SHARE_TITLE_MAX_LENGTH);
-  const description = `${product.sourceCategory.displayName}｜目前 ${price}｜更新 ${formatTaipeiDateTime(product.currentPrice.lastSeenAt)}（台北時間）。實際價格與供貨以原價屋為準。`;
+  const description = `${product.category.displayName}｜目前 ${price}｜更新 ${formatTaipeiDateTime(product.price.lastSeenAt)}（台北時間）。實際價格與供貨以原價屋為準。`;
 
   return {
     title,

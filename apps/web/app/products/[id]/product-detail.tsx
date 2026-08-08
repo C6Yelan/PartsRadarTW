@@ -10,19 +10,22 @@ import TopbarBrandNavigation from "../../TopbarBrandNavigation";
 import ProductDetailActions from "./detail/ProductDetailActions";
 import ProductDetailFacts from "./detail/ProductDetailFacts";
 import ProductDetailMedia from "./detail/ProductDetailMedia";
-import type { ProductDetailLoadState } from "./detail/types";
+import type { ProductDetailBody, ProductDetailLoadState } from "./detail/types";
 import { useProductDetailViewModel } from "./detail/use-product-detail-view-model";
 import PriceHistoryPanel from "./price-history-panel";
 
 // 呈現商品詳細頁主要內容，依 view model 的載入狀態切換 loading、錯誤、空狀態與完整商品資訊。
 export default function ProductDetail({
+  initialProduct,
   productId,
   returnHref,
 }: {
+  initialProduct: ProductDetailBody;
   productId: string;
   returnHref: string;
 }) {
   const viewModel = useProductDetailViewModel({
+    initialProduct,
     productId,
     returnHref,
   });

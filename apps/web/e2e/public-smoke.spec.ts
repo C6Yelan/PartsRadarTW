@@ -2,7 +2,9 @@
 // 以 Playwright 驗證公開網站主要頁面、配單互動與 public API 的基本可用性。
 
 import { type APIRequestContext, expect, type Locator, type Page, test } from "@playwright/test";
+import { formatTwdPrice } from "../app/_shared/formatting";
 import { resolvePublicSiteUrl } from "../app/_shared/public-site";
+import { formatTaipeiDateTime } from "../app/_shared/time";
 
 interface ProductListResponse {
   data: Array<{
@@ -413,7 +415,7 @@ test.describe("public API smoke", () => {
 
   test("checks product detail, price history, cached images, and share-image bounds", {
     tag: ["@desktop-only", "@db-smoke"],
-  }, async ({ request }) => {
+  }, async ({ page, request }) => {
     const product = await fetchFirstProduct(request);
     if (!product) {
       throw new Error("The deterministic E2E seed must provide a public product.");
@@ -421,7 +423,39 @@ test.describe("public API smoke", () => {
 
     const detail = await request.get(`/api/products/${product.id}`);
     expect(detail.status()).toBe(200);
-    await expectJsonShape(detail, ["id", "name", "price"]);
+    const detailBody = (await detail.json()) as {
+      id: string;
+      name: string;
+      category: { displayName: string };
+      price: { amount: number; lastSeenAt: string };
+    };
+    expect(detailBody).toEqual(
+      expect.objectContaining({
+        id: product.id,
+        name: expect.any(String),
+        price: expect.anything(),
+      }),
+    );
+
+    const detailPage = await request.get(`/products/${product.id}`);
+    expect(detailPage.status()).toBe(200);
+    const detailHtml = await detailPage.text();
+    expect(detailHtml).toContain(detailBody.name);
+    expect(detailHtml).toContain(detailBody.category.displayName);
+    expect(detailHtml).toContain(formatTwdPrice(detailBody.price.amount));
+    expect(detailHtml).toContain(formatTaipeiDateTime(detailBody.price.lastSeenAt));
+    expect(detailHtml).toContain("原價屋公開頁面");
+    expect(detailHtml).toContain("PartsRadarTW 是非官方的商品搜尋與價格整理工具");
+
+    await page.goto(`/products/${product.id}`);
+    await expect(page.getByRole("heading", { exact: true, name: detailBody.name })).toBeVisible();
+    await expect(page.getByRole("button", { name: "複製商品連結" })).toBeVisible();
+    await expect(page.getByRole("button", { name: /加入配單|配單已達/ })).toBeVisible();
+
+    expect((await request.get("/products/not-a-product-id")).status()).toBe(404);
+    expect((await request.get("/products/20000000-0000-4000-8000-000000000099")).status()).toBe(
+      404,
+    );
 
     const priceHistory = await request.get(`/api/products/${product.id}/price-history?range=90d`);
     expect(priceHistory.status()).toBe(200);

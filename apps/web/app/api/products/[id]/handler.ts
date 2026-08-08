@@ -1,9 +1,8 @@
 // apps/web/app/api/products/[id]/handler.ts
 // 處理商品詳細 API 的商品 id 正規化、公開查詢條件與安全 JSON 回應。
 
-import { normalizeProductId } from "../../../_shared/product-id";
 import { internalErrorResponse, jsonOk, notFoundResponse } from "../../_shared/responses";
-import { PRODUCT_DETAIL_SELECT, type ProductDetailReadClient } from "./data";
+import { findPublicProductDetail, type ProductDetailReadClient } from "./data";
 import { type ProductDetailResponseBody, toProductDetailResponse } from "./response";
 
 // 建立商品詳細 API handler，只回傳啟用來源分類且仍有目前價格的公開商品資料。
@@ -12,24 +11,7 @@ export function createGetProductHandler(
 ): (productId: string) => Promise<Response> {
   return async (productId) => {
     try {
-      const normalizedProductId = normalizeProductId(productId);
-
-      if (!normalizedProductId) {
-        return notFoundResponse();
-      }
-
-      const product = await client.product.findFirst({
-        where: {
-          id: normalizedProductId,
-          sourceCategory: {
-            enabled: true,
-          },
-          currentPrice: {
-            isNot: null,
-          },
-        },
-        select: PRODUCT_DETAIL_SELECT,
-      });
+      const product = await findPublicProductDetail(client, productId);
 
       if (!product) {
         return notFoundResponse();
