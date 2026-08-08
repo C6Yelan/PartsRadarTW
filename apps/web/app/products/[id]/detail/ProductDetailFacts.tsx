@@ -45,10 +45,6 @@ export default function ProductDetailFacts({ product }: { product: ProductDetail
                 : "可能已下架"}
           </dd>
         </div>
-        <div>
-          <dt>資料來源</dt>
-          <dd>原價屋公開頁面</dd>
-        </div>
       </dl>
     </>
   );

@@ -52,8 +52,6 @@ describe("ProductDetailFacts", () => {
     expect(html).toContain("目前上架");
     expect(html).toContain("NT$ 6,990");
     expect(html).toContain("2026-07-10 16:00");
-    expect(html).toContain("資料來源");
-    expect(html).toContain("原價屋公開頁面");
   });
 });
 

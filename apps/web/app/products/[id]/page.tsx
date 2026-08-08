@@ -2,11 +2,8 @@
 // 串接 Next.js 商品詳細頁 route、metadata 產生與返回連結正規化。
 
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
-import { normalizeProductId } from "../../_shared/product-id";
 import { normalizeProductDetailReturnHref } from "../../_shared/return-href";
-import { getPublicProductDetail } from "./data";
-import { createProductDetailMetadata } from "./metadata";
+import { createProductDetailMetadata, type ProductMetadataReadClient } from "./metadata";
 import ProductDetail from "./product-detail";
 
 // Next.js app route 提供的商品詳細頁參數契約。
@@ -18,30 +15,27 @@ interface ProductDetailPageProps {
 // 依商品 id 建立商品詳細頁 SEO / Open Graph metadata，查詢失敗時由 metadata builder 回退安全預設。
 export async function generateMetadata({ params }: ProductDetailPageProps): Promise<Metadata> {
   const { id } = await params;
+  const client: ProductMetadataReadClient = {
+    product: {
+      async findFirst(args) {
+        const { prisma } = await import("@partsradar/db");
 
-  return createProductDetailMetadata(getPublicProductDetail, id);
+        return prisma.product.findFirst(args);
+      },
+    },
+  };
+
+  return createProductDetailMetadata(client, id);
 }
 
-// 商品詳細頁 server entrypoint，先確認公開商品並將初始資料交給既有 client 介面 hydration。
+// 商品詳細頁 server entrypoint，解析 route 與返回來源後交給 client-side 商品詳細介面。
 export default async function ProductDetailPage({ params, searchParams }: ProductDetailPageProps) {
   const [{ id }, resolvedSearchParams] = await Promise.all([params, searchParams]);
-  const normalizedProductId = normalizeProductId(id);
-
-  if (!normalizedProductId) {
-    notFound();
-  }
-
-  const product = await getPublicProductDetail(normalizedProductId);
-
-  if (!product) {
-    notFound();
-  }
 
   return (
     <ProductDetail
-      initialProduct={product}
-      key={normalizedProductId}
-      productId={normalizedProductId}
+      key={id}
+      productId={id}
       returnHref={normalizeProductDetailReturnHref(resolvedSearchParams.returnTo)}
     />
   );

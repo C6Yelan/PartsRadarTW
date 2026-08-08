@@ -104,18 +104,6 @@ afterEach(() => {
 });
 
 describe("public API hook states", () => {
-  it("uses the server-provided product without refetching the detail API", () => {
-    const initialProduct = { id: PRODUCT_ID } as ProductDetailBody;
-    const fetchMock = vi.fn();
-    vi.stubGlobal("fetch", fetchMock);
-
-    const result = useProductDetail(PRODUCT_ID, initialProduct);
-    runEffect(0);
-
-    expect(result).toEqual({ product: initialProduct, state: "ready" });
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
   it.each(SCENARIOS)("maps $name 429 responses to rate_limited", async (scenario) => {
     vi.stubGlobal(
       "fetch",

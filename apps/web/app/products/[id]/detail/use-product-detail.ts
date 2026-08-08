@@ -6,17 +6,11 @@ import { isRateLimitedApiError, toApiRequestError } from "../../../_shared/api-c
 import type { ProductDetailBody, ProductDetailLoadState } from "./types";
 
 // 依 product id 載入商品詳細資料；404 顯示 not-found，其餘失敗交給頁面錯誤狀態。
-export function useProductDetail(productId: string, initialProduct?: ProductDetailBody) {
-  const [state, setState] = useState<ProductDetailLoadState>(initialProduct ? "ready" : "idle");
-  const [product, setProduct] = useState<ProductDetailBody | null>(initialProduct ?? null);
+export function useProductDetail(productId: string) {
+  const [state, setState] = useState<ProductDetailLoadState>("idle");
+  const [product, setProduct] = useState<ProductDetailBody | null>(null);
 
   useEffect(() => {
-    if (initialProduct?.id === productId) {
-      setProduct(initialProduct);
-      setState("ready");
-      return;
-    }
-
     const controller = new AbortController();
     setState("loading");
     setProduct(null);
@@ -44,7 +38,7 @@ export function useProductDetail(productId: string, initialProduct?: ProductDeta
     void loadProductDetail();
 
     return () => controller.abort();
-  }, [initialProduct, productId]);
+  }, [productId]);
 
   return { product, state };
 }

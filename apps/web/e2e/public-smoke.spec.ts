@@ -2,10 +2,7 @@
 // 以 Playwright 驗證公開網站主要頁面、配單互動與 public API 的基本可用性。
 
 import { type APIRequestContext, expect, type Locator, type Page, test } from "@playwright/test";
-import { formatTwdPrice } from "../app/_shared/formatting";
 import { resolvePublicSiteUrl } from "../app/_shared/public-site";
-import { formatTaipeiDateTime } from "../app/_shared/time";
-import { CATEGORY_MAPPINGS } from "../app/category-slugs";
 
 interface ProductListResponse {
   data: Array<{
@@ -416,7 +413,7 @@ test.describe("public API smoke", () => {
 
   test("checks product detail, price history, cached images, and share-image bounds", {
     tag: ["@desktop-only", "@db-smoke"],
-  }, async ({ page, request }) => {
+  }, async ({ request }) => {
     const product = await fetchFirstProduct(request);
     if (!product) {
       throw new Error("The deterministic E2E seed must provide a public product.");
@@ -424,71 +421,7 @@ test.describe("public API smoke", () => {
 
     const detail = await request.get(`/api/products/${product.id}`);
     expect(detail.status()).toBe(200);
-    const detailBody = (await detail.json()) as {
-      id: string;
-      name: string;
-      category: { displayName: string };
-      price: { amount: number; lastSeenAt: string };
-    };
-    expect(detailBody).toEqual(
-      expect.objectContaining({
-        id: product.id,
-        name: expect.any(String),
-        price: expect.anything(),
-      }),
-    );
-
-    const detailPage = await request.get(`/products/${product.id}`);
-    expect(detailPage.status()).toBe(200);
-    const detailHtml = await detailPage.text();
-    expect(detailHtml).toContain(detailBody.name);
-    expect(detailHtml).toContain(detailBody.category.displayName);
-    expect(detailHtml).toContain(formatTwdPrice(detailBody.price.amount));
-    expect(detailHtml).toContain(formatTaipeiDateTime(detailBody.price.lastSeenAt));
-    expect(detailHtml).toContain("原價屋公開頁面");
-    expect(detailHtml).toContain("PartsRadarTW 是非官方的商品搜尋與價格整理工具");
-
-    const home = await request.get("/");
-    expect(home.status()).toBe(200);
-    const homeHtml = await home.text();
-    for (const category of CATEGORY_MAPPINGS) {
-      expect(homeHtml).toContain(`href="/categories/${category.slug}"`);
-    }
-
-    const categoryPage = await request.get("/categories/cpu");
-    expect(categoryPage.status()).toBe(200);
-    const categoryHtml = await categoryPage.text();
-    const normalizedCategoryHtml = categoryHtml.replaceAll("<!-- -->", "");
-    expect(normalizedCategoryHtml).toContain("CPU 商品價格");
-    expect(categoryHtml).toContain(detailBody.name);
-    expect(categoryHtml).toContain(`href="/products/${product.id}"`);
-    expect(categoryHtml).toContain('rel="canonical" href="https://partsradar.net/categories/cpu"');
-    expect((await request.get("/categories/not-a-category")).status()).toBe(404);
-
-    const sitemap = await request.get("/sitemap.xml");
-    expect(sitemap.status()).toBe(200);
-    const sitemapXml = await sitemap.text();
-    expect(sitemapXml).toContain(
-      `<loc>${new URL(`/products/${product.id}`, `${resolvePublicSiteUrl()}/`)}</loc>`,
-    );
-    expect(sitemapXml).toContain("<loc>https://partsradar.net/categories/cpu</loc>");
-    expect(sitemapXml).toContain("<lastmod>");
-    expect(sitemapXml).not.toContain("/products/20000000-0000-4000-8000-000000000006");
-    const sitemapUrls = [...sitemapXml.matchAll(/<loc>([^<]+)<\/loc>/g)].map(
-      ([, url]) => new URL(url),
-    );
-    expect(sitemapUrls).toHaveLength(9);
-    expect(sitemapUrls.every((url) => url.search === "")).toBe(true);
-
-    await page.goto(`/products/${product.id}`);
-    await expect(page.getByRole("heading", { exact: true, name: detailBody.name })).toBeVisible();
-    await expect(page.getByRole("button", { name: "複製商品連結" })).toBeVisible();
-    await expect(page.getByRole("button", { name: /加入配單|配單已達/ })).toBeVisible();
-
-    expect((await request.get("/products/not-a-product-id")).status()).toBe(404);
-    expect((await request.get("/products/20000000-0000-4000-8000-000000000099")).status()).toBe(
-      404,
-    );
+    await expectJsonShape(detail, ["id", "name", "price"]);
 
     const priceHistory = await request.get(`/api/products/${product.id}/price-history?range=90d`);
     expect(priceHistory.status()).toBe(200);

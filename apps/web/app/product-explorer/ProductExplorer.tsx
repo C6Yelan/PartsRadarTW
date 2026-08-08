@@ -1,9 +1,7 @@
 "use client";
-
 // apps/web/app/product-explorer/ProductExplorer.tsx
 // 提供首頁商品探索頁的 client-side 組裝入口，串接搜尋、分類、結果與聲明區塊。
 
-import CategoryDirectory from "../categories/CategoryDirectory";
 import SiteDisclaimer from "../site-disclaimer";
 import { ProductExplorerHeader } from "./components/ProductExplorerHeader";
 import { ProductExplorerResultsPanel } from "./components/ProductExplorerResultsPanel";
@@ -39,7 +37,6 @@ export default function ProductExplorer() {
 
           <ProductExplorerResultsPanel results={viewModel.results} />
         </div>
-        <CategoryDirectory />
       </main>
       <SiteDisclaimer />
     </div>

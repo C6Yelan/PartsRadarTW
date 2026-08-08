@@ -7,21 +7,18 @@ import { BUILD_LIST_MAX_QUANTITY } from "../../../build-list/constants";
 import { useBuildList } from "../../../build-list/use-build-list";
 import type { ProductShareStatus } from "../product-share";
 import { createProductShareUrl, formatProductShareStatus, shareProductUrl } from "../product-share";
-import type { ProductDetailBody } from "./types";
 import { usePriceHistoryLoader } from "./use-price-history-loader";
 import { useProductDetail } from "./use-product-detail";
 
 // 建立商品詳細頁 view model，將多個 hook 狀態整理成 page 與子元件可直接消費的區塊。
 export function useProductDetailViewModel({
-  initialProduct,
   productId,
   returnHref,
 }: {
-  initialProduct: ProductDetailBody;
   productId: string;
   returnHref: string;
 }) {
-  const { product, state } = useProductDetail(productId, initialProduct);
+  const { product, state } = useProductDetail(productId);
   const { historyRange, historyState, priceHistory, setHistoryRange } = usePriceHistoryLoader({
     product,
   });

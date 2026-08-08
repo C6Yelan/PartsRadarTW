@@ -11,8 +11,6 @@ const PRODUCT_ID = "20000000-0000-4000-8000-000000000002";
 const CRAWL_RUN_ID = "20000000-0000-4000-8000-000000000003";
 const OLD_SNAPSHOT_ID = "20000000-0000-4000-8000-000000000004";
 const CURRENT_SNAPSHOT_ID = "20000000-0000-4000-8000-000000000005";
-const EXCLUDED_PRODUCT_ID = "20000000-0000-4000-8000-000000000006";
-const EXCLUDED_SNAPSHOT_ID = "20000000-0000-4000-8000-000000000007";
 const IMAGE_BYTES = Uint8Array.from(
   Buffer.from("UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEALmk0mk0iIiIiIgBoSygABc6zbAAA", "base64"),
 );
@@ -77,20 +75,6 @@ async function main() {
             lastSeenAt: currentCapturedAt,
           },
         });
-        await tx.product.create({
-          data: {
-            id: EXCLUDED_PRODUCT_ID,
-            sourceCategoryId: CATEGORY_ID,
-            ibuyToken: "E2E-EXCLUDED-SITEMAP",
-            name: "E2E 不應收錄商品",
-            normalizedName: "e2e 不應收錄商品",
-            sourceUrl: "https://example.invalid/e2e-excluded-product",
-            isExcluded: true,
-            exclusionReason: "misclassified_bundle_product",
-            firstSeenAt: oldCapturedAt,
-            lastSeenAt: currentCapturedAt,
-          },
-        });
         await tx.priceSnapshot.createMany({
           data: [
             {
@@ -107,13 +91,6 @@ async function main() {
               capturedAt: currentCapturedAt,
               crawlRunId: CRAWL_RUN_ID,
             },
-            {
-              id: EXCLUDED_SNAPSHOT_ID,
-              productId: EXCLUDED_PRODUCT_ID,
-              price: 900,
-              capturedAt: currentCapturedAt,
-              crawlRunId: CRAWL_RUN_ID,
-            },
           ],
         });
         await tx.currentPrice.create({
@@ -124,24 +101,15 @@ async function main() {
             priceChangedAt: currentCapturedAt,
           },
         });
-        await tx.currentPrice.create({
-          data: {
-            productId: EXCLUDED_PRODUCT_ID,
-            priceSnapshotId: EXCLUDED_SNAPSHOT_ID,
-            lastSeenAt: currentCapturedAt,
-            priceChangedAt: currentCapturedAt,
-          },
-        });
       });
 
       await mkdir(storageDir, { recursive: true });
       await writeFile(join(storageDir, `${PRODUCT_ID}.webp`), IMAGE_BYTES);
     } else {
       await prisma.$transaction(async (tx) => {
-        const productIds = [PRODUCT_ID, EXCLUDED_PRODUCT_ID];
-        await tx.currentPrice.deleteMany({ where: { productId: { in: productIds } } });
-        await tx.priceSnapshot.deleteMany({ where: { productId: { in: productIds } } });
-        await tx.product.deleteMany({ where: { id: { in: productIds } } });
+        await tx.currentPrice.deleteMany({ where: { productId: PRODUCT_ID } });
+        await tx.priceSnapshot.deleteMany({ where: { productId: PRODUCT_ID } });
+        await tx.product.deleteMany({ where: { id: PRODUCT_ID } });
         await tx.crawlRun.deleteMany({ where: { id: CRAWL_RUN_ID } });
         await tx.sourceCategory.deleteMany({ where: { id: CATEGORY_ID } });
       });

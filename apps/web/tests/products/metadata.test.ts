@@ -1,11 +1,13 @@
 // apps/web/tests/products/metadata.test.ts
 // 驗證商品詳細頁 metadata 的公開欄位、canonical URL、分享預覽與安全 fallback。
 
-import { describe, expect, it, vi } from "vitest";
-import type { ProductDetailBody } from "../../app/products/[id]/detail/types";
+import { describe, expect, it } from "vitest";
 import {
   buildProductDetailMetadata,
   createProductDetailMetadata,
+  type ProductMetadataFindFirstArgs,
+  type ProductMetadataReadClient,
+  type ProductMetadataRecord,
 } from "../../app/products/[id]/metadata";
 import {
   type ProductShareImageData,
@@ -55,11 +57,11 @@ describe("product detail metadata", () => {
     const metadata = buildProductDetailMetadata(
       product({
         name: `  ${"超長顯示卡型號 ".repeat(12)}  `,
-        price: {
-          amount: 6990,
-          currency: "TWD",
-          capturedAt: "2026-05-28T15:55:00.000Z",
-          lastSeenAt: "2026-05-28T16:05:00.000Z",
+        currentPrice: {
+          lastSeenAt: new Date("2026-05-28T16:05:00.000Z"),
+          priceSnapshot: {
+            price: 6990,
+          },
         },
       }),
       PUBLIC_SITE_URL,
@@ -76,24 +78,43 @@ describe("product detail metadata", () => {
     expect(metadata.openGraph?.title).not.toContain("PartsRadarTW");
   });
 
-  it("reads the shared public product once with a normalized id", async () => {
-    const readProduct = vi.fn(async () => product());
-    const metadata = await createProductDetailMetadata(readProduct, PRODUCT_ID.toUpperCase(), {
+  it("queries public product fields for metadata without requiring image data", async () => {
+    const client = fakeProductMetadataClient(product());
+    const metadata = await createProductDetailMetadata(client, PRODUCT_ID.toUpperCase(), {
       publicSiteUrl: "https://partsradar.net/products/old?returnTo=%2F%3Fcategory%3Dstorage",
     });
 
-    expect(readProduct).toHaveBeenCalledTimes(1);
-    expect(readProduct).toHaveBeenCalledWith(PRODUCT_ID);
+    expect(client.productFindFirstCallCount).toBe(1);
+    expect(client.lastProductFindFirstArgs).toMatchObject({
+      where: {
+        id: PRODUCT_ID,
+        sourceCategory: {
+          enabled: true,
+        },
+        currentPrice: {
+          isNot: null,
+        },
+      },
+    });
+    expect(client.lastProductFindFirstArgs?.select).not.toHaveProperty("ibuyToken");
+    expect(client.lastProductFindFirstArgs?.select).not.toHaveProperty("sourceUrl");
+    expect(client.lastProductFindFirstArgs?.select.currentPrice.select.lastSeenAt).toBe(true);
+    expect(
+      client.lastProductFindFirstArgs?.select.currentPrice.select.priceSnapshot.select,
+    ).not.toHaveProperty("capturedAt");
+    expect(
+      client.lastProductFindFirstArgs?.select.currentPrice.select.priceSnapshot.select,
+    ).toEqual({ price: true });
     expect(metadata.alternates?.canonical).toBe(`https://partsradar.net/products/${PRODUCT_ID}`);
   });
 
   it("returns fallback metadata without a DB query for invalid product IDs", async () => {
-    const readProduct = vi.fn(async () => product());
-    const metadata = await createProductDetailMetadata(readProduct, "not-a-product-id", {
+    const client = fakeProductMetadataClient(product());
+    const metadata = await createProductDetailMetadata(client, "not-a-product-id", {
       publicSiteUrl: PUBLIC_SITE_URL,
     });
 
-    expect(readProduct).not.toHaveBeenCalled();
+    expect(client.productFindFirstCallCount).toBe(0);
     expect(metadata.title).toBe("商品資訊 | PartsRadarTW");
     expect(metadata.alternates?.canonical).toBe("https://partsradar.net/");
     expect(metadata.openGraph?.images).toEqual([
@@ -111,21 +132,19 @@ describe("product detail metadata", () => {
   });
 
   it("returns fallback metadata for missing products", async () => {
-    const readProduct = vi.fn(async () => null);
-    const metadata = await createProductDetailMetadata(readProduct, PRODUCT_ID, {
+    const client = fakeProductMetadataClient(null);
+    const metadata = await createProductDetailMetadata(client, PRODUCT_ID, {
       publicSiteUrl: PUBLIC_SITE_URL,
     });
 
-    expect(readProduct).toHaveBeenCalledTimes(1);
+    expect(client.productFindFirstCallCount).toBe(1);
     expect(metadata.title).toBe("商品資訊 | PartsRadarTW");
     expect(metadata.alternates?.canonical).toBe(`https://partsradar.net/products/${PRODUCT_ID}`);
   });
 
   it("returns fallback metadata when the product metadata query fails", async () => {
     const metadata = await createProductDetailMetadata(
-      async () => {
-        throw new Error("DATABASE_URL=postgresql://partsradar:secret@db:5432/app iBuyToken=secret");
-      },
+      throwingProductMetadataClient(),
       PRODUCT_ID,
       {
         publicSiteUrl: PUBLIC_SITE_URL,
@@ -191,33 +210,49 @@ function shareImageProduct(overrides: Partial<ProductShareImageData> = {}): Prod
   };
 }
 
-function product(overrides: Partial<ProductDetailBody> = {}): ProductDetailBody {
+function fakeProductMetadataClient(productResult: ProductMetadataRecord | null) {
+  const client = {
+    lastProductFindFirstArgs: null as ProductMetadataFindFirstArgs | null,
+    productFindFirstCallCount: 0,
+    product: {
+      async findFirst(args: ProductMetadataFindFirstArgs) {
+        client.productFindFirstCallCount += 1;
+        client.lastProductFindFirstArgs = args;
+
+        return productResult;
+      },
+    },
+  } satisfies ProductMetadataReadClient & {
+    lastProductFindFirstArgs: ProductMetadataFindFirstArgs | null;
+    productFindFirstCallCount: number;
+  };
+
+  return client;
+}
+
+function throwingProductMetadataClient() {
+  return {
+    product: {
+      async findFirst() {
+        throw new Error("DATABASE_URL=postgresql://partsradar:secret@db:5432/app iBuyToken=secret");
+      },
+    },
+  } satisfies ProductMetadataReadClient;
+}
+
+function product(overrides: Partial<ProductMetadataRecord> = {}): ProductMetadataRecord {
   return {
     id: PRODUCT_ID,
     name: "GPU RTX 4070",
-    category: {
-      id: "category-12",
-      igrp: 12,
+    currentPrice: {
+      lastSeenAt: new Date("2026-05-28T11:55:00.000Z"),
+      priceSnapshot: {
+        price: 6990,
+      },
+    },
+    sourceCategory: {
       displayName: "顯示卡",
-      sourceName: "顯示卡 VGA",
     },
-    image: null,
-    price: {
-      amount: 6990,
-      currency: "TWD",
-      capturedAt: "2026-05-28T11:45:00.000Z",
-      lastSeenAt: "2026-05-28T11:55:00.000Z",
-    },
-    source: {
-      name: "coolpc",
-      url: "https://www.coolpc.com.tw/evaluate.php?iBuy=GPU-RTX-4070",
-    },
-    status: {
-      isActive: true,
-      isExcluded: false,
-      exclusionReason: null,
-    },
-    lastSeenAt: "2026-05-28T11:55:00.000Z",
     ...overrides,
   };
 }

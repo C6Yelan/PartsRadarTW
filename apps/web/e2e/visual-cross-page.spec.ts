@@ -1,5 +1,5 @@
 // apps/web/e2e/visual-cross-page.spec.ts
-// 以隔離 SSR fixture 與本地 mock API 驗證跨頁 states 與 reduced-motion contracts。
+// 以本地 mock API 驗證跨頁 error/empty states 與 reduced-motion contracts。
 
 import { expect, type Locator, test } from "@playwright/test";
 import { expectNoHorizontalOverflow, expectUsableLayout } from "./support/visual-assertions";
@@ -11,12 +11,14 @@ import {
   buildProductListResponse,
   buildSourceStatusResponse,
   buildVisualCategories,
+  buildVisualProduct,
   isVisualLoopback,
   PRODUCT_ID,
   READY_ROUTE_SLUG,
 } from "./support/visual-fixtures";
 
 const ERROR_ROUTE_SLUG = "visual-error-product";
+const product = buildVisualProduct();
 let releasePriceReportLoading: (() => void) | null = null;
 
 test.beforeEach(async ({ page }) => {
@@ -44,6 +46,12 @@ test.beforeEach(async ({ page }) => {
       return;
     }
     await route.fulfill(buildJsonResponse(buildProductListResponse(requestUrl)));
+  });
+  await page.route(new RegExp(`/api/products/${ERROR_ROUTE_SLUG}(?:\\?.*)?$`), async (route) => {
+    await route.fulfill({ status: 503, body: "" });
+  });
+  await page.route(new RegExp(`/api/products/${READY_ROUTE_SLUG}(?:\\?.*)?$`), async (route) => {
+    await route.fulfill(buildJsonResponse(product));
   });
   await page.route(
     new RegExp(`/api/products/${PRODUCT_ID}/price-history(?:\\?.*)?$`),
@@ -104,9 +112,8 @@ test("keeps error and empty states usable", async ({ page }, testInfo) => {
   await expect(page.getByRole("alert").filter({ hasText: "商品資料暫時無法載入" })).toBeVisible();
   await expectNoHorizontalOverflow(page);
 
-  const missingProductResponse = await page.goto(`/products/${ERROR_ROUTE_SLUG}`);
-  expect(missingProductResponse?.status()).toBe(404);
-  await expect(page.getByRole("heading", { name: "找不到這個頁面" })).toBeVisible();
+  await page.goto(`/products/${ERROR_ROUTE_SLUG}`);
+  await expect(page.getByRole("alert").filter({ hasText: "商品資料暫時無法載入" })).toBeVisible();
   await expectNoHorizontalOverflow(page);
 
   await page.evaluate(() => window.localStorage.removeItem("partsradartw:build-list:v3"));

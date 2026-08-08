@@ -118,13 +118,6 @@ export function buildProductWhere(
   return where;
 }
 
-// 建立無 query 商品列表的既有公開條件，供其他 discovery surface 重用同一 eligibility。
-export function buildDefaultProductListWhere(): Prisma.ProductWhereInput {
-  return buildProductWhere(parseProductListQuery(new URLSearchParams()), {
-    includeVendors: true,
-  });
-}
-
 // 建立套用非品牌條件的選項查詢，並保留目前分類中已選品牌供使用者移除。
 export function buildProductVendorOptionsWhere(query: ProductListQuery): Prisma.ProductWhereInput {
   const availableVendorWhere: Prisma.ProductWhereInput = {
