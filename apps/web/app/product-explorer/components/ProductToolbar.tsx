@@ -14,6 +14,7 @@ import {
 } from "../query-state";
 import type {
   CategoryItem,
+  LoadState,
   ProductSort,
   ProductStatus,
   ProductVendorOption,
@@ -32,7 +33,8 @@ interface ProductToolbarProps {
   selectedCategory: CategorySlug | null;
   selectedFacetChips: SelectedFacetChip[];
   selectedVendorOptions: ProductVendorOption[];
-  totalItems: number;
+  totalItems: number | null;
+  productState: LoadState;
   vendorOptions: ProductVendorOption[];
   onClearVendors: () => void;
   onDraftChange: (draft: QueryState) => void;
@@ -56,6 +58,7 @@ export function ProductToolbar({
   selectedFacetChips,
   selectedVendorOptions,
   totalItems,
+  productState,
   vendorOptions,
   onClearVendors,
   onDraftChange,
@@ -72,14 +75,19 @@ export function ProductToolbar({
     ...selectedVendorOptions.map((option) => option.name),
     ...query.vendors.filter((vendor) => !resolvedVendorSlugs.has(vendor)),
   ].join("、");
-  const ResultsHeading = selectedCategory === null ? "h2" : "h1";
+  const productCountLabel =
+    totalItems === null
+      ? productState === "error" || productState === "rate_limited"
+        ? "數量暫時無法取得"
+        : "載入中"
+      : `${formatInteger(totalItems)} 筆商品`;
 
   return (
     <div className="results-toolbar">
       <div className="results-heading-row">
         <div className="results-title">
-          <ResultsHeading>搜尋結果</ResultsHeading>
-          <span>{formatInteger(totalItems)} 筆商品</span>
+          <h1>搜尋結果</h1>
+          <span>{productCountLabel}</span>
         </div>
         <div className="results-heading-actions">
           <label className="results-compact-select">

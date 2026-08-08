@@ -44,7 +44,7 @@ export function useProductExplorerViewModel({ category }: ProductExplorerRouteSt
     });
   }, [categories, category, query.facets]);
 
-  const totalItems = products?.pagination.totalItems ?? 0;
+  const totalItems = productState === "ready" ? (products?.pagination.totalItems ?? null) : null;
   const totalPages = products?.pagination.totalPages ?? 0;
   const visiblePages = getVisiblePages(query.page, totalPages);
   const shouldShowPageJump = totalPages > 10;
@@ -76,6 +76,7 @@ export function useProductExplorerViewModel({ category }: ProductExplorerRouteSt
     header: {
       draft,
       products,
+      productState,
       actions: {
         clearSearchDraft: actions.clearSearchDraft,
         updateSearchDraft: actions.updateSearchDraft,
@@ -107,6 +108,7 @@ export function useProductExplorerViewModel({ category }: ProductExplorerRouteSt
         selectedFacetChips,
         selectedVendorOptions,
         totalItems,
+        productState,
         vendorOptions,
       },
       table: {
