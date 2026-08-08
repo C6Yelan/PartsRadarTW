@@ -1,16 +1,17 @@
 // apps/web/app/product-explorer/actions/use-product-explorer-actions.ts
-// 集中商品探索頁的查詢、篩選、分頁與返回首頁互動處理。
+// 集中商品探索頁的查詢、篩選、分頁與 category route 連結處理。
 
-import { type MouseEvent, type SyntheticEvent, useEffect, useRef, useState } from "react";
+import { type SyntheticEvent, useEffect, useState } from "react";
+import type { CategorySlug } from "../../category-slugs";
 import {
   DEFAULT_QUERY,
-  getFallbackCategorySlug,
   isNonNegativeInteger,
   normalizeFacetValues,
   normalizeVendorValues,
+  toUrl,
   validatePriceRange,
 } from "../query-state";
-import type { CategoryItem, ProductVendorOption, QueryState } from "../types";
+import type { ProductVendorOption, QueryState } from "../types";
 
 const TOUCH_INPUT_MEDIA_QUERY = "(pointer: coarse)";
 
@@ -19,13 +20,15 @@ interface CategoryScopedFilters {
   facets: string[];
 }
 
-type CategoryFilterMemory = Map<string, CategoryScopedFilters>;
+type CategoryFilterMemory = Map<CategorySlug, CategoryScopedFilters>;
+const categoryFilterMemory: CategoryFilterMemory = new Map();
 
 // 建立商品探索頁 UI 事件 handler，負責把使用者操作轉成 query / draft 更新。
 export function useProductExplorerActions({
-  categories,
+  category,
   commitQuery,
   draft,
+  isReady,
   query,
   schedulePageScroll,
   setDraft,
@@ -33,12 +36,13 @@ export function useProductExplorerActions({
   totalPages,
   vendorOptions,
 }: {
-  categories: CategoryItem[];
+  category: CategorySlug | null;
   commitQuery: (
     nextQuery: QueryState,
     options?: { draftQuery?: QueryState; replace?: boolean },
   ) => void;
   draft: QueryState;
+  isReady: boolean;
   query: QueryState;
   schedulePageScroll: (page: number) => void;
   setDraft: (draft: QueryState) => void;
@@ -47,16 +51,14 @@ export function useProductExplorerActions({
   vendorOptions: ProductVendorOption[];
 }) {
   const [pageJumpValue, setPageJumpValue] = useState("");
-  const categoryFilterMemoryRef = useRef<CategoryFilterMemory>(new Map());
 
   useEffect(() => {
-    rememberCategoryFilters(
-      categoryFilterMemoryRef.current,
-      query.category,
-      query.vendors,
-      query.facets,
-    );
-  }, [query.category, query.facets, query.vendors]);
+    if (!isReady) {
+      return;
+    }
+
+    rememberCategoryFilters(categoryFilterMemory, category, query.vendors, query.facets);
+  }, [category, isReady, query.facets, query.vendors]);
 
   function updateQuery(partial: Partial<QueryState>) {
     commitQuery({
@@ -118,8 +120,8 @@ export function useProductExplorerActions({
 
   function resetFilters() {
     rememberCategoryFilters(
-      categoryFilterMemoryRef.current,
-      query.category,
+      categoryFilterMemory,
+      category,
       DEFAULT_QUERY.vendors,
       DEFAULT_QUERY.facets,
     );
@@ -142,32 +144,6 @@ export function useProductExplorerActions({
     });
   }
 
-  function returnHome(event: MouseEvent<HTMLAnchorElement>) {
-    if (
-      event.defaultPrevented ||
-      event.button !== 0 ||
-      event.metaKey ||
-      event.ctrlKey ||
-      event.altKey ||
-      event.shiftKey
-    ) {
-      return;
-    }
-
-    event.preventDefault();
-    const homeQuery = {
-      ...DEFAULT_QUERY,
-      category: getFallbackCategorySlug(categories, query.category),
-    };
-
-    commitQuery(homeQuery, {
-      draftQuery: {
-        ...homeQuery,
-        q: draft.q,
-      },
-    });
-  }
-
   function jumpToPage(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -185,26 +161,16 @@ export function useProductExplorerActions({
     setPageJumpValue("");
   }
 
-  function updateCategoryFilter(category: string) {
-    if (category === query.category) {
-      return;
-    }
-
-    rememberCategoryFilters(
-      categoryFilterMemoryRef.current,
-      query.category,
-      query.vendors,
-      query.facets,
-    );
-    const rememberedFilters = categoryFilterMemoryRef.current.get(category);
-
-    commitQuery({
+  function getCategoryHref(nextCategory: CategorySlug) {
+    const rememberedFilters = categoryFilterMemory.get(nextCategory);
+    const nextQuery = {
       ...query,
-      category,
-      vendors: normalizeVendorValues([...(rememberedFilters?.vendors ?? [])], category),
-      facets: normalizeFacetValues([...(rememberedFilters?.facets ?? [])], category),
+      vendors: normalizeVendorValues([...(rememberedFilters?.vendors ?? [])], nextCategory),
+      facets: normalizeFacetValues([...(rememberedFilters?.facets ?? [])], nextCategory),
       page: 1,
-    });
+    };
+
+    return toUrl(nextCategory, nextQuery);
   }
 
   function toggleFacetFilter(tag: string) {
@@ -213,7 +179,7 @@ export function useProductExplorerActions({
       : [...query.facets, tag];
 
     updateQuery({
-      facets: normalizeFacetValues(nextFacets, query.category),
+      facets: normalizeFacetValues(nextFacets, category),
     });
   }
 
@@ -223,7 +189,7 @@ export function useProductExplorerActions({
     updateQuery({
       facets: normalizeFacetValues(
         query.facets.filter((tag) => !removedTags.has(tag)),
-        query.category,
+        category,
       ),
     });
   }
@@ -249,14 +215,13 @@ export function useProductExplorerActions({
     clearSearchDraft,
     goToPage,
     jumpToPage,
+    getCategoryHref,
     pageJumpValue,
     removeFacetGroup,
     resetFilters,
-    returnHome,
     setPageJumpValue,
     toggleFacetFilter,
     toggleVendorFilter,
-    updateCategoryFilter,
     updateQuery,
     updateSearchDraft,
   };
@@ -264,7 +229,7 @@ export function useProductExplorerActions({
 
 function rememberCategoryFilters(
   memory: CategoryFilterMemory,
-  category: string,
+  category: CategorySlug | null,
   vendors: string[],
   facets: string[],
 ) {

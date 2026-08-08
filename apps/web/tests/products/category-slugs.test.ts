@@ -2,7 +2,13 @@
 
 import { describe, expect, it } from "vitest";
 
-import { CATEGORY_MAPPINGS, getCategoryIgrp, getCategorySlug } from "../../app/category-slugs";
+import {
+  CATEGORY_MAPPINGS,
+  getCategoryIgrp,
+  getCategoryMapping,
+  getCategoryPath,
+  getCategorySlug,
+} from "../../app/category-slugs";
 
 const EXPECTED_CATEGORY_MAPPINGS = [
   [4, "cpu"],
@@ -34,5 +40,15 @@ describe("category slug mapping", () => {
   it("does not resolve unknown public or source categories", () => {
     expect(getCategorySlug(99)).toBeNull();
     expect(getCategoryIgrp("unknown")).toBeNull();
+  });
+
+  it("uses the same mapping for route paths and user-visible names", () => {
+    expect(getCategoryPath("gpu")).toBe("/categories/gpu");
+    expect(getCategoryMapping("gpu")).toMatchObject({
+      igrp: 12,
+      slug: "gpu",
+      displayName: "顯示卡",
+    });
+    expect(getCategoryMapping("unknown")).toBeNull();
   });
 });

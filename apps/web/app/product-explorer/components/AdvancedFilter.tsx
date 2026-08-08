@@ -6,11 +6,9 @@
 import type { ProductFacetDefinition, ProductFacetOption } from "@partsradar/shared";
 import { useEffect, useRef, useState } from "react";
 import { ChevronDownIcon } from "../../_shared/icons";
+import type { CategorySlug } from "../../category-slugs";
 import type { CategoryItem } from "../types";
-import {
-  parseChipsetGroupDisplay,
-  shouldShowChipsetVendorHeading,
-} from "./chipset-group-display";
+import { parseChipsetGroupDisplay, shouldShowChipsetVendorHeading } from "./chipset-group-display";
 
 export function AdvancedFilter({
   categories,
@@ -19,7 +17,7 @@ export function AdvancedFilter({
   onToggle,
 }: {
   categories: CategoryItem[];
-  selectedCategory: string;
+  selectedCategory: CategorySlug | null;
   selectedFacets: string[];
   onToggle: (tag: string) => void;
 }) {

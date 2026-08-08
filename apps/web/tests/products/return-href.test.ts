@@ -10,8 +10,8 @@ import {
 
 describe("product detail return href", () => {
   it("allows the product explorer root path and build list path", () => {
-    expect(normalizeProductDetailReturnHref("/?category=gpu&q=ryzen&page=2")).toBe(
-      "/?category=gpu&q=ryzen&page=2",
+    expect(normalizeProductDetailReturnHref("/categories/gpu?q=ryzen&page=2")).toBe(
+      "/categories/gpu?q=ryzen&page=2",
     );
     expect(normalizeProductDetailReturnHref(["/?status=inactive", "/?q=ignored"])).toBe(
       "/?status=inactive",
@@ -26,9 +26,9 @@ describe("product detail return href", () => {
 
   it("rejects the removed legacy category query and invalid semantic categories", () => {
     expect(normalizeProductDetailReturnHref("/?igrp=7")).toBe("/");
-    expect(normalizeProductDetailReturnHref("/?category=storage&igrp=7")).toBe("/");
-    expect(normalizeProductDetailReturnHref("/?category=cpu&igrp=7")).toBe("/");
-    expect(normalizeProductDetailReturnHref("/?category=unknown")).toBe("/");
+    expect(normalizeProductDetailReturnHref("/?category=storage")).toBe("/");
+    expect(normalizeProductDetailReturnHref("/categories/gpu?category=cpu")).toBe("/");
+    expect(normalizeProductDetailReturnHref("/categories/not-a-category")).toBe("/");
   });
 
   it("falls back home for external, protocol-relative, or unsupported return URLs", () => {
@@ -46,7 +46,7 @@ describe("product detail return href", () => {
 describe("build list return href", () => {
   it("preserves complete public product explorer queries", () => {
     const returnTo =
-      "/?q=ryzen&category=cpu&vendors=amd&facet=socket%3Aam5&facet=cpu_family%3Aryzen-7&minPrice=1000&maxPrice=20000&status=all&sort=price_desc&page=3&pageSize=50";
+      "/categories/cpu?q=ryzen&vendors=amd&facet=socket%3Aam5&facet=cpu_family%3Aryzen-7&minPrice=1000&maxPrice=20000&status=all&sort=price_desc&page=3&pageSize=50";
 
     expect(normalizeBuildListReturnHref(returnTo)).toBe(returnTo);
     expect(normalizeBuildListReturnHref("/about#contact")).toBe("/about");
@@ -60,7 +60,8 @@ describe("build list return href", () => {
     expect(normalizeBuildListReturnHref("https://evil.example/path")).toBe("/");
     expect(normalizeBuildListReturnHref("//evil.example/path")).toBe("/");
     expect(normalizeBuildListReturnHref("/?igrp=4")).toBe("/");
-    expect(normalizeBuildListReturnHref("/?category=unknown")).toBe("/");
+    expect(normalizeBuildListReturnHref("/?category=cpu")).toBe("/");
+    expect(normalizeBuildListReturnHref("/categories/unknown")).toBe("/");
     expect(normalizeBuildListReturnHref("/build-list?returnTo=%2Fabout")).toBe("/");
   });
 });

@@ -328,7 +328,7 @@ test("uses compact custom price-report filters, aligned table typography, and co
   }
 
   await page.setViewportSize({ width: 1760, height: 900 });
-  await page.goto("/?category=cpu");
+  await page.goto("/categories/cpu");
   const homeFacetFilter = page.locator(".facet-filter").filter({ hasText: "腳位" });
   await homeFacetFilter.locator(".facet-menu-trigger").click();
   const homeFacetOption = homeFacetFilter.locator(".facet-option").first();

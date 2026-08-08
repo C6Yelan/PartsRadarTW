@@ -3,15 +3,14 @@
 
 import type { MetadataRoute } from "next";
 import { resolvePublicSiteUrl } from "./_shared/public-site";
+import { CATEGORY_MAPPINGS, getCategoryPath } from "./category-slugs";
 
 const PUBLIC_SITEMAP_PATHS = [
   "/",
+  ...CATEGORY_MAPPINGS.map(({ slug }) => getCategoryPath(slug)),
   "/price-report",
   "/discord",
   "/about",
-  "/announcements",
-  "/privacy",
-  "/terms",
 ] as const;
 
 export default function sitemap(): MetadataRoute.Sitemap {

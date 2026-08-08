@@ -1,109 +1,117 @@
-// 驗證商品探索頁只接受 semantic category URL，並清除已移除的 IGrp query。
+// 驗證 category route state 與商品探索 filter query / API query 的分層契約。
 
 import { describe, expect, it } from "vitest";
 
 import {
   DEFAULT_QUERY,
-  getFallbackCategorySlug,
+  createProductDetailHref,
   readQueryFromSearchParams,
   toApiSearchParams,
   toUrl,
 } from "../../app/product-explorer/query-state";
 
-describe("product explorer category query state", () => {
-  it("reads a semantic category and emits it to the browser and API", () => {
+describe("product explorer route and query state", () => {
+  it("keeps category out of QueryState and emits it only to the API query", () => {
     const query = readQueryFromSearchParams(
-      new URLSearchParams("category=gpu&vendors=asus&q=RTX&facet=gpu_chip:nvidia&facet=vram_gb:16"),
+      new URLSearchParams("vendors=asus&q=RTX&facet=gpu_chip:nvidia&facet=vram_gb:16"),
+      "gpu",
     );
 
+    expect(query).not.toHaveProperty("category");
     expect(query).toMatchObject({
-      category: "gpu",
       facets: ["gpu_chip:nvidia", "vram_gb:16"],
       vendors: ["asus"],
       q: "RTX",
     });
-    expect(toUrl(query)).toBe(
-      "/?q=RTX&category=gpu&facet=gpu_chip%3Anvidia&facet=vram_gb%3A16&vendors=asus",
+    expect(toUrl("gpu", query)).toBe(
+      "/categories/gpu?q=RTX&facet=gpu_chip%3Anvidia&facet=vram_gb%3A16&vendors=asus",
     );
 
-    const apiParams = toApiSearchParams(query);
+    const apiParams = toApiSearchParams("gpu", query);
     expect(apiParams.get("category")).toBe("gpu");
     expect(apiParams.getAll("facet")).toEqual(["gpu_chip:nvidia", "vram_gb:16"]);
     expect(apiParams.has("igrp")).toBe(false);
     expect(apiParams.has("source")).toBe(false);
   });
 
-  it("deduplicates facets and emits them in registry order", () => {
+  it("preserves the category pathname while filter, sort, and pagination state changes", () => {
+    const query = {
+      ...DEFAULT_QUERY,
+      vendors: ["asus"],
+      sort: "price_desc" as const,
+      page: 2,
+      pageSize: 50,
+    };
+
+    expect(toUrl("gpu", query)).toBe(
+      "/categories/gpu?vendors=asus&sort=price_desc&page=2&pageSize=50",
+    );
+    expect(toUrl(null, { ...DEFAULT_QUERY, q: "RTX" })).toBe("/?q=RTX");
+  });
+
+  it("carries the complete category pathname and filters into product returnTo", () => {
+    const returnTo = toUrl("gpu", {
+      ...DEFAULT_QUERY,
+      vendors: ["asus"],
+      page: 2,
+    });
+    const detailUrl = new URL(
+      createProductDetailHref("product-id", returnTo),
+      "https://partsradar.invalid",
+    );
+
+    expect(detailUrl.pathname).toBe("/products/product-id");
+    expect(detailUrl.searchParams.get("returnTo")).toBe("/categories/gpu?vendors=asus&page=2");
+  });
+
+  it("deduplicates facets and emits them in registry order for the route category", () => {
     const query = readQueryFromSearchParams(
       new URLSearchParams(
-        "category=cpu&facet=cpu_family:ryzen-7&facet=socket:am5&facet=socket:am5&facet=gpu_chip:nvidia",
+        "facet=cpu_family:ryzen-7&facet=socket:am5&facet=socket:am5&facet=gpu_chip:nvidia",
       ),
+      "cpu",
     );
 
     expect(query.facets).toEqual(["socket:am5", "cpu_family:ryzen-7"]);
-    expect(toUrl(query)).toBe("/?category=cpu&facet=socket%3Aam5&facet=cpu_family%3Aryzen-7");
+    expect(toUrl("cpu", query)).toBe(
+      "/categories/cpu?facet=socket%3Aam5&facet=cpu_family%3Aryzen-7",
+    );
   });
 
-  it("keeps legacy exact SSD capacity URLs and accepts the new bucket URL", () => {
+  it("keeps exact SSD capacity and bucket facets in the internal API request", () => {
     const query = readQueryFromSearchParams(
-      new URLSearchParams(
-        "category=storage&facet=capacity_gb:1024&facet=capacity_bucket:about-1tb",
-      ),
+      new URLSearchParams("facet=capacity_gb:1024&facet=capacity_bucket:about-1tb"),
+      "storage",
     );
 
     expect(query.facets).toEqual(["capacity_gb:1024", "capacity_bucket:about-1tb"]);
-    expect(toApiSearchParams(query).getAll("facet")).toEqual([
+    expect(toApiSearchParams("storage", query).getAll("facet")).toEqual([
       "capacity_gb:1024",
       "capacity_bucket:about-1tb",
     ]);
   });
 
-  it("clears facets without a compatible category", () => {
-    expect(readQueryFromSearchParams(new URLSearchParams("facet=socket:am5")).facets).toEqual([]);
-    expect(
-      readQueryFromSearchParams(new URLSearchParams("category=gpu&facet=socket:am5")).facets,
-    ).toEqual([]);
-  });
-
-  it.each([
-    "igrp=12",
-    "category=gpu&igrp=12",
-  ])("ignores the removed legacy query without affecting semantic categories: %s", (search) => {
-    const query = readQueryFromSearchParams(new URLSearchParams(search));
-
-    expect(query.category).toBe(search.startsWith("category=gpu") ? "gpu" : "");
-    expect(toUrl(query)).toBe(search.startsWith("category=gpu") ? "/?category=gpu" : "/");
-  });
-
-  it.each([
-    "category=unknown",
-    "igrp=99",
-  ])("clears an unknown or conflicting category query: %s", (search) => {
+  it("clears category-scoped filters on the homepage", () => {
     const query = readQueryFromSearchParams(
-      new URLSearchParams(`${search}&vendors=asus&facet=gpu_chip:nvidia`),
+      new URLSearchParams("vendors=asus&facet=gpu_chip:nvidia"),
+      null,
     );
 
-    expect(query.category).toBe("");
     expect(query.facets).toEqual([]);
     expect(query.vendors).toEqual([]);
-    expect(toUrl(query)).toBe("/");
+    expect(toApiSearchParams(null, query).has("category")).toBe(false);
+    expect(toUrl(null, query)).toBe("/");
   });
 
-  it("uses the first categories API slug as the homepage fallback", () => {
-    expect(
-      getFallbackCategorySlug(
-        [
-          {
-            id: "category-4",
-            slug: "cpu",
-            displayName: "CPU",
-            sourceName: "處理器 CPU",
-            facets: [],
-          },
-        ],
-        DEFAULT_QUERY.category,
-      ),
-    ).toBe("cpu");
-    expect(getFallbackCategorySlug([], "gpu")).toBe("gpu");
+  it("does not parse the legacy category browser query", () => {
+    const query = readQueryFromSearchParams(
+      new URLSearchParams("category=gpu&vendors=asus&facet=gpu_chip:nvidia&q=RTX"),
+      null,
+    );
+
+    expect(query).not.toHaveProperty("category");
+    expect(query.vendors).toEqual([]);
+    expect(query.facets).toEqual([]);
+    expect(toUrl(null, query)).toBe("/?q=RTX");
   });
 });

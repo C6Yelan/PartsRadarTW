@@ -178,7 +178,7 @@ test("presents build-list summary, categories, actions, and data status in one s
 test("keeps the main pages usable without horizontal overflow", async ({ page }, testInfo) => {
   test.setTimeout(60_000);
 
-  await page.goto("/?category=gpu&page=10");
+  await page.goto("/categories/gpu?page=10");
   await expect(page.getByRole("status", { name: "網站公告" })).toHaveCount(0);
   await expect(page.locator(".topbar").getByRole("link", { name: "價格變動總覽" })).toBeVisible();
   await expect(page.locator(".topbar").getByRole("link", { name: "公告" })).toBeVisible();
@@ -256,7 +256,7 @@ test("keeps the main pages usable without horizontal overflow", async ({ page },
   await expectUsableLayout(page, testInfo);
 
   if (isMobile) {
-    await page.goto("/?category=cpu");
+    await page.goto("/categories/cpu");
   } else {
     await vramFilter.getByRole("button", { name: "16 GB" }).click();
     await page.getByRole("button", { name: "移除篩選：GPU 晶片：NVIDIA" }).click();
@@ -271,9 +271,12 @@ test("keeps the main pages usable without horizontal overflow", async ({ page },
     await vramFilter.getByRole("button", { name: "全部" }).click();
     await expect(page.getByRole("checkbox", { name: "16 GB" })).not.toBeChecked();
     await vramFilter.getByRole("button", { name: "全部" }).click();
-    await page.getByRole("radiogroup", { name: "分類" }).getByText("CPU", { exact: true }).click();
+    await page
+      .getByRole("navigation", { name: "商品分類" })
+      .getByText("CPU", { exact: true })
+      .click();
   }
-  await expect.poll(() => new URL(page.url()).searchParams.get("category")).toBe("cpu");
+  await expect.poll(() => new URL(page.url()).pathname).toBe("/categories/cpu");
   await expect.poll(() => new URL(page.url()).searchParams.getAll("facet")).toEqual([]);
   await expect(page.getByRole("group", { name: "已選篩選條件" })).toHaveCount(0);
 
@@ -403,7 +406,7 @@ test("preserves product explorer state through safe build-list return links @des
   page,
 }) => {
   const originalLocation =
-    "/?q=ryzen&category=cpu&facet=socket%3Alga1700&facet=cpu_family%3Acore-i5&minPrice=1000&maxPrice=20000&vendors=intel&status=all&sort=price_desc&page=10&pageSize=50";
+    "/categories/cpu?q=ryzen&facet=socket%3Alga1700&facet=cpu_family%3Acore-i5&minPrice=1000&maxPrice=20000&vendors=intel&status=all&sort=price_desc&page=10&pageSize=50";
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(originalLocation);
 

@@ -108,7 +108,7 @@ test("keeps error and empty states usable", async ({ page }, testInfo) => {
   await expect(page.getByRole("alert").filter({ hasText: "價格變動暫時無法載入" })).toBeVisible();
   await expectNoHorizontalOverflow(page);
 
-  await page.goto("/?category=gpu&q=error");
+  await page.goto("/categories/gpu?q=error");
   await expect(page.getByRole("alert").filter({ hasText: "商品資料暫時無法載入" })).toBeVisible();
   await expectNoHorizontalOverflow(page);
 

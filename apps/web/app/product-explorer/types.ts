@@ -19,7 +19,7 @@ export type ProductSort =
 // 商品探索頁共用的 client-side 載入生命週期狀態。
 export type LoadState = "idle" | "loading" | "ready" | "error" | "rate_limited";
 
-// 分類 API 回傳項目，供左側分類篩選與預設分類選取使用。
+// 分類 API 回傳項目，供左側分類導覽與目前分類的 facet definitions 使用。
 export interface CategoryItem {
   id: string;
   slug: CategorySlug;
@@ -39,10 +39,14 @@ export interface SelectedFacetChip {
 
 export type ProductsResponse = ProductsResponseBody;
 
-// 商品探索頁的 URL query / draft state，作為搜尋、篩選、排序與分頁的單一前端狀態。
+// 商品探索頁的 route state 由 App Router 提供，不屬於 browser query parameters。
+export interface ProductExplorerRouteState {
+  category: CategorySlug | null;
+}
+
+// 商品探索頁的 URL query / draft state，只包含搜尋、篩選、排序與分頁狀態。
 export interface QueryState {
   q: string;
-  category: string;
   facets: string[];
   minPrice: string;
   maxPrice: string;

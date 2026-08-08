@@ -4,6 +4,7 @@
 "use client";
 
 import { formatInteger } from "../../_shared/formatting";
+import type { CategorySlug } from "../../category-slugs";
 import {
   DEFAULT_QUERY,
   PAGE_SIZE_OPTIONS,
@@ -28,6 +29,7 @@ interface ProductToolbarProps {
   formError: string | null;
   hasActiveFilters: boolean;
   query: QueryState;
+  selectedCategory: CategorySlug | null;
   selectedFacetChips: SelectedFacetChip[];
   selectedVendorOptions: ProductVendorOption[];
   totalItems: number;
@@ -50,6 +52,7 @@ export function ProductToolbar({
   formError,
   hasActiveFilters,
   query,
+  selectedCategory,
   selectedFacetChips,
   selectedVendorOptions,
   totalItems,
@@ -154,16 +157,16 @@ export function ProductToolbar({
             </div>
           </div>
           <VendorFilter
-            key={query.category}
+            key={selectedCategory}
             options={vendorOptions}
-            disabledLabel={query.category ? "無廠商資料" : "先選分類"}
+            disabledLabel={selectedCategory ? "無廠商資料" : "先選分類"}
             selectedOptions={selectedVendorOptions}
             selectedValues={query.vendors}
             onToggle={onToggleVendor}
           />
           <AdvancedFilter
             categories={categories}
-            selectedCategory={query.category}
+            selectedCategory={selectedCategory}
             selectedFacets={query.facets}
             onToggle={onToggleFacet}
           />

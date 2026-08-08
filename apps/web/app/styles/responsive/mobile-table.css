@@ -127,6 +127,10 @@
 }
 
 @media (max-width: 760px) {
+  body:has(.build-list-floating-link) .product-row {
+    padding-right: 76px;
+  }
+
   .pagination-bar {
     display: grid;
     grid-template-areas:

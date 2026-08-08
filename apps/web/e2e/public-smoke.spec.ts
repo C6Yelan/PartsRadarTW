@@ -193,6 +193,20 @@ test.describe("public web smoke", () => {
     request,
   }) => {
     const publicOrigin = resolvePublicSiteUrl();
+    const categoryRoutes = [
+      "/categories/cpu",
+      "/categories/motherboard",
+      "/categories/memory",
+      "/categories/storage",
+      "/categories/hard-drive",
+      "/categories/external-storage",
+      "/categories/cooler",
+      "/categories/liquid-cooling",
+      "/categories/gpu",
+      "/categories/case",
+      "/categories/power-supply",
+      "/categories/fan-accessory",
+    ];
     const publicRoutes = [
       "/",
       "/price-report",
@@ -213,6 +227,25 @@ test.describe("public web smoke", () => {
       expect(canonicalUrl.pathname).toBe(path);
     }
 
+    for (const path of categoryRoutes) {
+      await page.goto(`${path}?sort=price_desc&page=2`);
+      await expect(page.getByRole("region", { name: "商品列表" })).toBeVisible();
+      const canonicalUrl = new URL(
+        (await page.locator('link[rel="canonical"]').getAttribute("href")) ?? "",
+      );
+      expect(canonicalUrl.origin).toBe(publicOrigin);
+      expect(canonicalUrl.pathname).toBe(path);
+      expect(canonicalUrl.search).toBe("");
+    }
+
+    await page.goto("/?q=RTX");
+    expect(
+      new URL((await page.locator('link[rel="canonical"]').getAttribute("href")) ?? "").pathname,
+    ).toBe("/");
+
+    const invalidCategoryResponse = await request.get("/categories/not-a-category");
+    expect(invalidCategoryResponse.status()).toBe(404);
+
     await page.goto("/build-list");
     await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
 
@@ -228,13 +261,18 @@ test.describe("public web smoke", () => {
     expect(sitemapResponse.status()).toBe(200);
     expect(sitemapResponse.headers()["content-type"]).toContain("xml");
     const sitemapXml = await sitemapResponse.text();
+    const sitemapUrls = [...sitemapXml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => match[1]);
+    const expectedSitemapUrls = ["/", ...categoryRoutes, "/price-report", "/discord", "/about"].map(
+      (path) => new URL(path, `${publicOrigin}/`).toString(),
+    );
 
-    for (const path of publicRoutes) {
-      expect(sitemapXml).toContain(`<loc>${new URL(path, `${publicOrigin}/`).toString()}</loc>`);
-    }
-
-    expect(sitemapXml).not.toContain("/api/");
-    expect(sitemapXml).not.toContain("/build-list");
+    expect(sitemapUrls).toEqual(expectedSitemapUrls);
+    expect(sitemapUrls).toHaveLength(16);
+    expect(
+      sitemapUrls.some((url) =>
+        /\/api\/|\/products\/|\?|\/announcements|\/privacy|\/terms/.test(url),
+      ),
+    ).toBe(false);
   });
 
   test("refreshes v3 build-list intents while preserving export choice, quantity, and undo", {

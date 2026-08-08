@@ -18,7 +18,7 @@ export const metadata: Metadata = {
 export default function HomePage() {
   return (
     <Suspense fallback={<div className="page-loading">載入查詢工具</div>}>
-      <ProductExplorer />
+      <ProductExplorer routeState={{ category: null }} />
     </Suspense>
   );
 }
