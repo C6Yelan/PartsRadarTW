@@ -1,5 +1,5 @@
 // apps/web/e2e/visual-build-list.spec.ts
-// 以本地 mock API 驗證 build-list summary、global route link、return state 與 controls。
+// 以隔離 SSR fixture 與本地 mock API 驗證 build-list、global route 與 controls。
 
 import { expect, type Locator, type Page, type Route, test } from "@playwright/test";
 import { expectNoHorizontalOverflow, expectUsableLayout } from "./support/visual-assertions";
@@ -42,9 +42,6 @@ test.beforeEach(async ({ page }) => {
     await route.fulfill(
       buildJsonResponse(buildProductListResponse(new URL(route.request().url()))),
     );
-  });
-  await page.route(new RegExp(`/api/products/${READY_ROUTE_SLUG}(?:\\?.*)?$`), async (route) => {
-    await route.fulfill(buildJsonResponse(product));
   });
   await page.route(
     new RegExp(`/api/products/${PRODUCT_ID}/price-history(?:\\?.*)?$`),

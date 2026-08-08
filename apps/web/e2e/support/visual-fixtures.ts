@@ -2,6 +2,7 @@
 // 提供視覺 E2E 規格共用的不可變資料與回應 builders，不持有跨測試狀態。
 
 import { getPublicProductFacetDefinitions } from "@partsradar/shared";
+import { VISUAL_PRODUCT_FIXTURE } from "./visual-product-fixture";
 
 const VISUAL_BASE_URL = new URL(process.env.E2E_BASE_URL ?? "http://127.0.0.1:3100");
 
@@ -9,11 +10,11 @@ export const isVisualLoopback = ["127.0.0.1", "localhost", "::1"].includes(
   VISUAL_BASE_URL.hostname,
 );
 
-export const PRODUCT_ID = "11111111-1111-4111-8111-111111111111";
-export const READY_ROUTE_SLUG = "visual-ready-product";
+export const PRODUCT_ID = VISUAL_PRODUCT_FIXTURE.id;
+export const READY_ROUTE_SLUG = PRODUCT_ID;
 const PRICE_REPORT_WRAP_NAME = "AI PRO R9700 Creator / Lexar D400 / Type-C+A / USB3.1 G1";
 
-const OBSERVED_AT = "2026-07-10T08:00:00.000Z";
+const OBSERVED_AT = VISUAL_PRODUCT_FIXTURE.observedAt;
 const PRICE_REPORT_LONG_SPEC_NAME = "32GB(2920MHz/27cm/鼓風扇/註冊五年保)";
 
 export function buildJsonResponse(body: unknown) {
@@ -27,16 +28,11 @@ export function buildJsonResponse(body: unknown) {
 export function buildVisualProduct() {
   return {
     id: PRODUCT_ID,
-    name: "視覺驗證顯示卡 RTX",
-    category: {
-      id: "33333333-3333-4333-8333-333333333333",
-      igrp: 12,
-      displayName: "顯示卡",
-      sourceName: "顯示卡 VGA",
-    },
+    name: VISUAL_PRODUCT_FIXTURE.name,
+    category: VISUAL_PRODUCT_FIXTURE.category,
     image: null,
     price: {
-      amount: 18_990,
+      amount: VISUAL_PRODUCT_FIXTURE.amount,
       currency: "TWD",
       capturedAt: OBSERVED_AT,
       lastSeenAt: OBSERVED_AT,

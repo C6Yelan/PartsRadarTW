@@ -1,5 +1,5 @@
 // apps/web/e2e/visual-product-detail-and-price-report.spec.ts
-// 以本地 mock API 驗證商品 detail、price history 與 price-report presentation/state。
+// 以真實 SSR 商品 fixture 與本地 mock API 驗證 detail、history 與 price-report presentation。
 
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { expectNoHorizontalOverflow } from "./support/visual-assertions";
@@ -10,13 +10,10 @@ import {
   buildProductListResponse,
   buildSourceStatusResponse,
   buildVisualCategories,
-  buildVisualProduct,
   isVisualLoopback,
   PRODUCT_ID,
   READY_ROUTE_SLUG,
 } from "./support/visual-fixtures";
-
-const product = buildVisualProduct();
 
 test.beforeEach(async ({ page }) => {
   test.skip(!isVisualLoopback, "Visual layout tests only run against a loopback web server.");
@@ -39,9 +36,6 @@ test.beforeEach(async ({ page }) => {
     await route.fulfill(
       buildJsonResponse(buildProductListResponse(new URL(route.request().url()))),
     );
-  });
-  await page.route(new RegExp(`/api/products/${READY_ROUTE_SLUG}(?:\\?.*)?$`), async (route) => {
-    await route.fulfill(buildJsonResponse(product));
   });
   await page.route(
     new RegExp(`/api/products/${PRODUCT_ID}/price-history(?:\\?.*)?$`),
