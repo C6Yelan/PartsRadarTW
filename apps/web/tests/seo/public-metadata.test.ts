@@ -4,7 +4,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_PUBLIC_SITE_URL, resolvePublicSiteUrl } from "../../app/_shared/public-site";
 import robots from "../../app/robots";
-import sitemap from "../../app/sitemap";
+import { createSitemap, PRODUCT_SITEMAP_LIMIT, type SitemapReadClient } from "../../app/sitemap";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -38,10 +38,18 @@ describe("public site metadata routes", () => {
     });
   });
 
-  it("lists only stable public pages", () => {
+  it("lists stable public pages and bounded canonical product URLs", async () => {
     vi.stubEnv("PARTSRADAR_PUBLIC_BASE_URL", DEFAULT_PUBLIC_SITE_URL);
+    const lastSeenAt = new Date("2026-08-08T08:30:00.000Z");
+    const client = fakeSitemapClient([
+      {
+        id: "11111111-1111-4111-8111-111111111111",
+        currentPrice: { lastSeenAt },
+      },
+    ]);
 
-    const urls = new Set(sitemap().map((entry) => entry.url));
+    const entries = await createSitemap(client);
+    const urls = new Set(entries.map((entry) => entry.url));
 
     expect(urls).toEqual(
       new Set([
@@ -51,11 +59,59 @@ describe("public site metadata routes", () => {
         "https://partsradar.net/discord",
         "https://partsradar.net/price-report",
         "https://partsradar.net/privacy",
+        "https://partsradar.net/products/11111111-1111-4111-8111-111111111111",
         "https://partsradar.net/terms",
       ]),
     );
-    expect([...urls].some((url) => url.includes("/api/") || url.includes("/build-list"))).toBe(
-      false,
-    );
+    expect(entries.at(-1)?.lastModified).toEqual(lastSeenAt);
+    expect(client.lastProductFindManyArgs).toMatchObject({
+      where: {
+        isActive: true,
+        isExcluded: false,
+        sourceCategory: { enabled: true },
+        currentPrice: {
+          is: {
+            priceSnapshot: {
+              price: {},
+            },
+          },
+        },
+      },
+      orderBy: { id: "asc" },
+      take: PRODUCT_SITEMAP_LIMIT,
+      select: {
+        id: true,
+        currentPrice: { select: { lastSeenAt: true } },
+      },
+    });
+    expect(
+      [...urls].some(
+        (url) => url.includes("?") || url.includes("/api/") || url.includes("/build-list"),
+      ),
+    ).toBe(false);
   });
 });
+
+type ProductSitemapFindManyArgs = Parameters<SitemapReadClient["product"]["findMany"]>[0];
+type ProductSitemapRecord = Awaited<ReturnType<SitemapReadClient["product"]["findMany"]>>[number];
+
+function fakeSitemapClient(products: ProductSitemapRecord[]) {
+  const state = {
+    lastProductFindManyArgs: null as ProductSitemapFindManyArgs | null,
+  };
+
+  return {
+    get lastProductFindManyArgs() {
+      return state.lastProductFindManyArgs;
+    },
+    product: {
+      async findMany(args) {
+        state.lastProductFindManyArgs = args;
+
+        return products;
+      },
+    },
+  } satisfies SitemapReadClient & {
+    lastProductFindManyArgs: ProductSitemapFindManyArgs | null;
+  };
+}
