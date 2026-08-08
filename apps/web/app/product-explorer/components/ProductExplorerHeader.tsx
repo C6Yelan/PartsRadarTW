@@ -2,31 +2,29 @@
 // apps/web/app/product-explorer/components/ProductExplorerHeader.tsx
 // 呈現商品探索頁頂部品牌區、Discord 入口、全域搜尋與資料更新時間。
 
-import type { MouseEvent, SyntheticEvent } from "react";
+import type { SyntheticEvent } from "react";
 import { ClearIcon, SearchIcon } from "../../_shared/icons";
 import { formatTaipeiDateTime } from "../../_shared/time";
 import TopbarBrandNavigation from "../../TopbarBrandNavigation";
 import type { ProductsResponse, QueryState } from "../types";
 
-// 組裝首頁頂部列，將搜尋 draft 與提交 / 清除 / 返回首頁事件交給上層控制。
+// 組裝商品探索頂部列，將搜尋 draft 與提交 / 清除事件交給上層控制。
 export function ProductExplorerHeader({
   draft,
   products,
   onClearSearchDraft,
-  onReturnHome,
   onSearchDraftChange,
   onTextFiltersSubmit,
 }: {
   draft: QueryState;
   products: ProductsResponse | null;
   onClearSearchDraft: () => void;
-  onReturnHome: (event: MouseEvent<HTMLAnchorElement>) => void;
   onSearchDraftChange: (value: string) => void;
   onTextFiltersSubmit: (event: SyntheticEvent<HTMLFormElement>) => void;
 }) {
   return (
     <header className="topbar">
-      <TopbarBrandNavigation onHomeClick={onReturnHome} />
+      <TopbarBrandNavigation />
 
       <form className="topbar-search" onSubmit={onTextFiltersSubmit}>
         <label className="sr-only" htmlFor="global-search">

@@ -19,8 +19,8 @@ describe("public API rate-limit copy", () => {
           categories={[]}
           categoryState="rate_limited"
           filtersOpen={true}
-          selectedCategory=""
-          onCategoryChange={() => undefined}
+          selectedCategory={null}
+          getCategoryHref={() => "/categories/cpu"}
           onKeepDesktopOpen={() => undefined}
           onToggleOpen={() => undefined}
         />,

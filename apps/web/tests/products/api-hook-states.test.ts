@@ -72,7 +72,7 @@ const SCENARIOS: HookScenario[] = [
   {
     name: "products",
     run: () => {
-      useProducts(true, { ...DEFAULT_QUERY, category: "gpu" });
+      useProducts(true, "gpu", DEFAULT_QUERY);
     },
     stateIndex: 1,
   },

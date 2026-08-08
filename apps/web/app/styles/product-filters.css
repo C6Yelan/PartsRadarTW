@@ -81,6 +81,7 @@
   border-radius: 7px;
   color: var(--muted);
   cursor: pointer;
+  text-decoration: none;
   transition:
     background 140ms ease,
     border-color 140ms ease;
@@ -114,15 +115,9 @@
   box-shadow: 0 0 0 4px rgba(143, 180, 204, 0.12);
 }
 
-.category-option:has(input:focus-visible) {
+.category-option:focus-visible {
   outline: 2px solid rgba(166, 196, 215, 0.68);
   outline-offset: 2px;
-}
-
-.category-option input {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
 }
 
 .option-copy {

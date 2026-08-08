@@ -2,6 +2,7 @@
 // 集中商品探索頁的 client-side UI hooks，管理 query、響應式篩選面板與分頁後捲動。
 
 import { type MouseEvent, useCallback, useEffect, useRef, useState } from "react";
+import { getCategoryPath, type CategorySlug } from "../category-slugs";
 import {
   DEFAULT_QUERY,
   normalizeFacetValues,
@@ -17,20 +18,27 @@ import type { LoadState, ProductsResponse, QueryState } from "./types";
 const DESKTOP_FILTER_MEDIA_QUERY_VALUE = "(min-width: 761px)";
 
 // 管理商品探索頁 URL query、表單 draft、價格驗證與瀏覽器上一頁 / 下一頁同步。
-export function useProductExplorerQuery() {
+export function useProductExplorerQuery(category: CategorySlug | null) {
   const [isReady, setIsReady] = useState(false);
+  const [readyCategory, setReadyCategory] = useState<CategorySlug | null>(null);
   const [query, setQuery] = useState<QueryState>(DEFAULT_QUERY);
   const [draft, setDraft] = useState<QueryState>(DEFAULT_QUERY);
   const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
-    const initialQuery = readCanonicalQueryFromLocation();
+    const initialQuery = readCanonicalQueryFromLocation(category);
     setQuery(initialQuery);
     setDraft(initialQuery);
+    setReadyCategory(category);
     setIsReady(true);
 
     const handlePopState = () => {
-      const nextQuery = readCanonicalQueryFromLocation();
+      const routePathname = category ? getCategoryPath(category) : "/";
+      if (window.location.pathname !== routePathname) {
+        return;
+      }
+
+      const nextQuery = readCanonicalQueryFromLocation(category);
       setQuery(nextQuery);
       setDraft(nextQuery);
       setFormError(null);
@@ -38,14 +46,14 @@ export function useProductExplorerQuery() {
 
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
-  }, []);
+  }, [category]);
 
   const commitQuery = useCallback(
     (nextQuery: QueryState, options?: { draftQuery?: QueryState; replace?: boolean }) => {
       const normalizedQuery = {
         ...nextQuery,
-        facets: normalizeFacetValues(nextQuery.facets, nextQuery.category),
-        vendors: normalizeVendorValues(nextQuery.vendors, nextQuery.category),
+        facets: normalizeFacetValues(nextQuery.facets, category),
+        vendors: normalizeVendorValues(nextQuery.vendors, category),
         page: Math.max(1, nextQuery.page),
         pageSize: PAGE_SIZE_OPTIONS.includes(
           nextQuery.pageSize as (typeof PAGE_SIZE_OPTIONS)[number],
@@ -53,7 +61,7 @@ export function useProductExplorerQuery() {
           ? nextQuery.pageSize
           : DEFAULT_QUERY.pageSize,
       };
-      const nextUrl = toUrl(normalizedQuery);
+      const nextUrl = toUrl(category, normalizedQuery);
 
       if (options?.replace) {
         window.history.replaceState(null, "", nextUrl);
@@ -64,7 +72,7 @@ export function useProductExplorerQuery() {
       setDraft(options?.draftQuery ?? normalizedQuery);
       setFormError(null);
     },
-    [],
+    [category],
   );
 
   useEffect(() => {
@@ -99,7 +107,7 @@ export function useProductExplorerQuery() {
   }, [commitQuery, draft.minPrice, draft.maxPrice, isReady, query]);
 
   return {
-    isReady,
+    isReady: isReady && readyCategory === category,
     query,
     draft,
     formError,
@@ -109,9 +117,9 @@ export function useProductExplorerQuery() {
   };
 }
 
-function readCanonicalQueryFromLocation() {
-  const query = readQueryFromLocation();
-  const canonicalUrl = toUrl(query);
+function readCanonicalQueryFromLocation(category: CategorySlug | null) {
+  const query = readQueryFromLocation(category);
+  const canonicalUrl = toUrl(category, query);
   const currentUrl = `${window.location.pathname}${window.location.search}`;
 
   if (currentUrl !== canonicalUrl) {

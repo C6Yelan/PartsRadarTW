@@ -43,35 +43,33 @@ test("switches both movement sorts with stable filters and resets pagination @de
   page.on("request", (request) => {
     if (/\/api\/products(?:\?|$)/.test(request.url())) requests.push(new URL(request.url()));
   });
-  await page.goto("/?category=gpu&q=rise&status=all&page=3");
+  await page.goto("/categories/gpu?q=rise&status=all&page=3");
   await expect
     .poll(() => {
       const request = requests.at(-1);
       return request
         ? {
+            category: request.searchParams.get("category"),
             page: request.searchParams.get("page"),
             q: request.searchParams.get("q"),
             status: request.searchParams.get("status"),
           }
         : null;
     })
-    .toEqual({ page: "3", q: "rise", status: "all" });
+    .toEqual({ category: "gpu", page: "3", q: "rise", status: "all" });
+  expect(new URL(page.url()).searchParams.has("category")).toBe(false);
 
   const sort = page.getByRole("combobox", { name: "排序" });
   await sort.selectOption("price_drop_desc");
   await expect.poll(() => new URL(page.url()).searchParams.get("sort")).toBe("price_drop_desc");
   await expect.poll(() => new URL(page.url()).searchParams.get("page")).toBeNull();
-  await expect
-    .poll(() => requests.at(-1)?.searchParams.get("sort"))
-    .toBe("price_drop_desc");
+  await expect.poll(() => requests.at(-1)?.searchParams.get("sort")).toBe("price_drop_desc");
   await expectQueryFilters(page, { category: "gpu", facets: [], vendors: null });
   await expect(page.locator(".price-movement").first()).toContainText("−NT$ 300 / −4.8%");
 
   await sort.selectOption("price_rise_desc");
   await expect.poll(() => new URL(page.url()).searchParams.get("sort")).toBe("price_rise_desc");
-  await expect
-    .poll(() => requests.at(-1)?.searchParams.get("sort"))
-    .toBe("price_rise_desc");
+  await expect.poll(() => requests.at(-1)?.searchParams.get("sort")).toBe("price_rise_desc");
   await expect.poll(() => new URL(page.url()).searchParams.get("q")).toBe("rise");
   await expect.poll(() => new URL(page.url()).searchParams.get("status")).toBe("all");
   await expect(page.locator(".price-movement").first()).toContainText("+NT$ 300 / +4.8%");
@@ -79,7 +77,7 @@ test("switches both movement sorts with stable filters and resets pagination @de
 
 test("resets vendor, grouped facets, status, and page together @desktop-only", async ({ page }) => {
   await page.setViewportSize({ width: 1760, height: 900 });
-  await page.goto("/?category=cpu");
+  await page.goto("/categories/cpu");
 
   await selectVendor(page, "AMD");
   await selectFacetOptions(page, "腳位", ["LGA 1851", "LGA 1700"]);
@@ -125,7 +123,7 @@ test("keeps the header search independent from list filter reset @desktop-only",
   page,
 }) => {
   await page.setViewportSize({ width: 1760, height: 900 });
-  await page.goto("/?category=cpu");
+  await page.goto("/categories/cpu");
 
   const searchInput = page.getByRole("searchbox", { name: "搜尋商品名稱" });
   await expect(searchInput).toHaveAttribute("autocomplete", "off");
@@ -160,7 +158,7 @@ test("remembers vendor and facet filters independently per category @desktop-onl
   page,
 }) => {
   await page.setViewportSize({ width: 1760, height: 900 });
-  await page.goto("/?category=cpu");
+  await page.goto("/categories/cpu");
 
   await page.getByRole("searchbox", { name: "搜尋商品名稱" }).fill("遊戲主機");
   await page.getByRole("button", { name: "搜尋", exact: true }).click();
@@ -278,7 +276,7 @@ test("remembers vendor and facet filters independently per category @desktop-onl
 
 test("reset clears only the current category memory @desktop-only", async ({ page }) => {
   await page.setViewportSize({ width: 1760, height: 900 });
-  await page.goto("/?category=cpu");
+  await page.goto("/categories/cpu");
 
   await selectVendor(page, "Intel");
   await selectFacetOptions(page, "腳位", ["LGA 1700"]);
@@ -310,18 +308,15 @@ test("reset clears only the current category memory @desktop-only", async ({ pag
   await assertFacetCheckboxStates(page, "晶片組", { unchecked: ["B650"] });
 });
 
-test("keeps URL and popstate filters ahead of category memory @desktop-only", async ({ page }) => {
+test("keeps route URL filters ahead of category memory @desktop-only", async ({ page }) => {
   await page.setViewportSize({ width: 1760, height: 900 });
-  await page.goto("/?category=cpu");
+  await page.goto("/categories/cpu");
 
   await selectVendor(page, "Intel");
   await selectFacetOptions(page, "腳位", ["LGA 1700"]);
   await switchCategory(page, "主機板", "motherboard");
 
-  await page.evaluate(() => {
-    window.history.pushState(null, "", "/?category=cpu&facet=socket%3Aam5&vendors=amd");
-    window.dispatchEvent(new PopStateEvent("popstate"));
-  });
+  await page.goto("/categories/cpu?facet=socket%3Aam5&vendors=amd");
   await expectQueryFilters(page, {
     category: "cpu",
     facets: ["socket:am5"],
@@ -348,7 +343,7 @@ test("uses the initial URL and drops other category memory after reload @desktop
   page,
 }) => {
   await page.setViewportSize({ width: 1760, height: 900 });
-  await page.goto("/?category=cpu&facet=socket%3Alga1700&vendors=intel");
+  await page.goto("/categories/cpu?facet=socket%3Alga1700&vendors=intel");
 
   await expectQueryFilters(page, {
     category: "cpu",
@@ -414,11 +409,12 @@ async function assertFacetOptionsUnchecked(page: Page, facetLabel: string, optio
 }
 
 async function switchCategory(page: Page, categoryLabel: string, categorySlug: string) {
-  await page
-    .getByRole("radiogroup", { name: "分類" })
-    .getByText(categoryLabel, { exact: true })
-    .click();
-  await expect.poll(() => new URL(page.url()).searchParams.get("category")).toBe(categorySlug);
+  const categoryNavigation = page.getByRole("navigation", { name: "商品分類" });
+  if (!(await categoryNavigation.isVisible())) {
+    await page.locator(".filter-panel summary").click();
+  }
+  await categoryNavigation.getByText(categoryLabel, { exact: true }).click();
+  await expect.poll(() => new URL(page.url()).pathname).toBe(`/categories/${categorySlug}`);
   await expect(page.getByRole("region", { name: "商品列表" })).toBeVisible();
 }
 

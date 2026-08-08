@@ -38,7 +38,7 @@ describe("public site metadata routes", () => {
     });
   });
 
-  it("lists only stable public pages", () => {
+  it("lists exactly the 16 frozen canonical URLs without dynamic metadata fields", () => {
     vi.stubEnv("PARTSRADAR_PUBLIC_BASE_URL", DEFAULT_PUBLIC_SITE_URL);
 
     const urls = new Set(sitemap().map((entry) => entry.url));
@@ -47,15 +47,34 @@ describe("public site metadata routes", () => {
       new Set([
         "https://partsradar.net/",
         "https://partsradar.net/about",
-        "https://partsradar.net/announcements",
+        "https://partsradar.net/categories/case",
+        "https://partsradar.net/categories/cooler",
+        "https://partsradar.net/categories/cpu",
+        "https://partsradar.net/categories/external-storage",
+        "https://partsradar.net/categories/fan-accessory",
+        "https://partsradar.net/categories/gpu",
+        "https://partsradar.net/categories/hard-drive",
+        "https://partsradar.net/categories/liquid-cooling",
+        "https://partsradar.net/categories/memory",
+        "https://partsradar.net/categories/motherboard",
+        "https://partsradar.net/categories/power-supply",
+        "https://partsradar.net/categories/storage",
         "https://partsradar.net/discord",
         "https://partsradar.net/price-report",
-        "https://partsradar.net/privacy",
-        "https://partsradar.net/terms",
       ]),
     );
-    expect([...urls].some((url) => url.includes("/api/") || url.includes("/build-list"))).toBe(
-      false,
-    );
+    expect(urls.size).toBe(16);
+    expect(sitemap().every((entry) => Object.keys(entry).length === 1)).toBe(true);
+    expect(
+      [...urls].some(
+        (url) =>
+          url.includes("/api/") ||
+          url.includes("/products/") ||
+          url.includes("?") ||
+          url.endsWith("/announcements") ||
+          url.endsWith("/privacy") ||
+          url.endsWith("/terms"),
+      ),
+    ).toBe(false);
   });
 });

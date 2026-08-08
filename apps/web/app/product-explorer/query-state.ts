@@ -3,13 +3,12 @@
 
 import { getProductFacetDefinitions, isProductFilterTagSupported } from "@partsradar/shared";
 import { toDigitsOnly } from "../_shared/numeric-input";
-import { getCategoryIgrp } from "../category-slugs";
-import type { CategoryItem, ProductSort, ProductStatus, QueryState } from "./types";
+import { getCategoryIgrp, getCategoryPath, type CategorySlug } from "../category-slugs";
+import type { ProductSort, ProductStatus, QueryState } from "./types";
 
 // 商品探索頁的初始查詢狀態；URL 產生時會省略與預設值相同的欄位。
 export const DEFAULT_QUERY: QueryState = {
   q: "",
-  category: "",
   facets: [],
   minPrice: "",
   maxPrice: "",
@@ -41,17 +40,17 @@ export const PAGE_SIZE_OPTIONS = [5, 10, 15, 20, 50] as const;
 export const MAX_PRICE_DIGITS = 9;
 
 // 從目前瀏覽器 URL 讀取商品探索 query，無效參數會改用預設值避免頁面狀態失效。
-export function readQueryFromLocation(): QueryState {
-  return readQueryFromSearchParams(new URLSearchParams(window.location.search));
+export function readQueryFromLocation(category: CategorySlug | null): QueryState {
+  return readQueryFromSearchParams(new URLSearchParams(window.location.search), category);
 }
 
-// 將 browser search params 轉成 canonical slug state；分類只接受公開 semantic slug。
-export function readQueryFromSearchParams(params: URLSearchParams): QueryState {
-  const category = parseCategoryParam(params.get("category"));
-
+// 將 browser search params 轉成 filter state；分類由 route state 提供。
+export function readQueryFromSearchParams(
+  params: URLSearchParams,
+  category: CategorySlug | null,
+): QueryState {
   return {
     q: (params.get("q") ?? "").trim().slice(0, 100),
-    category,
     facets: normalizeFacetValues(params.getAll("facet"), category),
     minPrice: parsePriceParam(params.get("minPrice")) ?? "",
     maxPrice: parsePriceParam(params.get("maxPrice")) ?? "",
@@ -70,11 +69,13 @@ export function readQueryFromSearchParams(params: URLSearchParams): QueryState {
 }
 
 // 將前端 query 轉成 products API 使用的 search params，保留預設值以讓 API 收到完整查詢。
-export function toApiSearchParams(query: QueryState) {
+export function toApiSearchParams(category: CategorySlug | null, query: QueryState) {
   const params = new URLSearchParams();
 
   appendIfPresent(params, "q", query.q);
-  appendIfPresent(params, "category", query.category);
+  if (category) {
+    params.set("category", category);
+  }
   appendFacets(params, query.facets);
   appendIfPresent(params, "minPrice", query.minPrice);
   appendIfPresent(params, "maxPrice", query.maxPrice);
@@ -88,11 +89,10 @@ export function toApiSearchParams(query: QueryState) {
 }
 
 // 將前端 query 轉成瀏覽器 URL；預設值會省略，讓分享連結保持精簡。
-export function toUrl(query: QueryState) {
+export function toUrl(category: CategorySlug | null, query: QueryState) {
   const params = new URLSearchParams();
 
   appendIfPresent(params, "q", query.q);
-  appendIfPresent(params, "category", query.category);
   appendFacets(params, query.facets);
   appendIfPresent(params, "minPrice", query.minPrice);
   appendIfPresent(params, "maxPrice", query.maxPrice);
@@ -111,7 +111,8 @@ export function toUrl(query: QueryState) {
   }
 
   const queryString = params.toString();
-  return queryString ? `/?${queryString}` : "/";
+  const pathname = category ? getCategoryPath(category) : "/";
+  return queryString ? `${pathname}?${queryString}` : pathname;
 }
 
 // 建立商品詳細頁連結，必要時附上 returnTo 讓使用者可回到原本的列表查詢。
@@ -197,11 +198,6 @@ export function normalizeFacetValues(
   );
 }
 
-// 回首頁或重設時選擇可用分類；沒有分類資料時保留呼叫端提供的 fallback。
-export function getFallbackCategorySlug(categories: CategoryItem[], fallback: string) {
-  return categories.length > 0 ? categories[0].slug : fallback;
-}
-
 function appendIfPresent(params: URLSearchParams, name: string, value: string) {
   const trimmed = value.trim();
 
@@ -236,12 +232,6 @@ function parsePriceParam(value: string | null) {
   const normalizedValue = parseNonNegativeIntegerParam(value);
 
   return normalizedValue ? normalizedValue.slice(0, MAX_PRICE_DIGITS) : null;
-}
-
-function parseCategoryParam(categoryValue: string | null) {
-  const category = categoryValue?.trim() ?? "";
-
-  return category && getCategoryIgrp(category) !== null ? category : "";
 }
 
 function parseVendorsParam(value: string | null) {

@@ -2,53 +2,29 @@
 // apps/web/app/product-explorer/use-product-explorer-view-model.ts
 // 組裝商品探索頁的資料、查詢狀態與子元件 action 分組。
 
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { getVisiblePages } from "../_shared/pagination";
 import { useProductExplorerActions } from "./actions/use-product-explorer-actions";
 import { useCategories } from "./data/use-categories";
 import { useProducts } from "./data/use-products";
 import { usePendingPageScroll, useProductExplorerQuery, useResponsiveFiltersOpen } from "./hooks";
 import { DEFAULT_QUERY, toUrl } from "./query-state";
+import type { ProductExplorerRouteState } from "./types";
 import { useProductBuildListActions } from "./use-product-build-list-actions";
 
 // 建立 ProductExplorer 使用的 view model，將 hook 狀態整理成 header、filters 與 results 區塊。
-export function useProductExplorerViewModel() {
+export function useProductExplorerViewModel({ category }: ProductExplorerRouteState) {
   const { isReady, query, draft, formError, setDraft, setFormError, commitQuery } =
-    useProductExplorerQuery();
+    useProductExplorerQuery(category);
   const { categories, categoryState } = useCategories();
-  const { products, productState, vendorOptions } = useProducts(isReady, query);
+  const { products, productState, vendorOptions } = useProducts(isReady, category, query);
   const { filtersOpen, keepDesktopFiltersOpen, syncFiltersOpenFromToggle } =
     useResponsiveFiltersOpen();
   const { resultsPanelRef, schedulePageScroll } = usePendingPageScroll(productState, products);
   const buildList = useProductBuildListActions();
 
-  useEffect(() => {
-    if (!isReady || categoryState !== "ready" || categories.length === 0) {
-      return;
-    }
-
-    const categorySlugs = new Set<string>(categories.map((category) => category.slug));
-    if (query.category && categorySlugs.has(query.category)) {
-      return;
-    }
-
-    commitQuery(
-      {
-        ...query,
-        category: categories[0].slug,
-        vendors: DEFAULT_QUERY.vendors,
-        facets: DEFAULT_QUERY.facets,
-        page: 1,
-      },
-      {
-        replace: true,
-      },
-    );
-  }, [categories, categoryState, commitQuery, isReady, query]);
-
   const selectedFacetChips = useMemo(() => {
-    const definitions =
-      categories.find((category) => category.slug === query.category)?.facets ?? [];
+    const definitions = categories.find((item) => item.slug === category)?.facets ?? [];
     const selectedFacets = new Set(query.facets);
 
     return definitions.flatMap((definition) => {
@@ -66,13 +42,13 @@ export function useProductExplorerViewModel() {
           ]
         : [];
     });
-  }, [categories, query.category, query.facets]);
+  }, [categories, category, query.facets]);
 
   const totalItems = products?.pagination.totalItems ?? 0;
   const totalPages = products?.pagination.totalPages ?? 0;
   const visiblePages = getVisiblePages(query.page, totalPages);
   const shouldShowPageJump = totalPages > 10;
-  const productListReturnTo = toUrl(query);
+  const productListReturnTo = toUrl(category, query);
   const selectedVendorOptions = useMemo(
     () => vendorOptions.filter((option) => query.vendors.includes(option.slug)),
     [query.vendors, vendorOptions],
@@ -84,9 +60,10 @@ export function useProductExplorerViewModel() {
     query.facets.length > 0 ||
     query.vendors.length > 0;
   const actions = useProductExplorerActions({
-    categories,
+    category,
     commitQuery,
     draft,
+    isReady,
     query,
     schedulePageScroll,
     setDraft,
@@ -101,7 +78,6 @@ export function useProductExplorerViewModel() {
       products,
       actions: {
         clearSearchDraft: actions.clearSearchDraft,
-        returnHome: actions.returnHome,
         updateSearchDraft: actions.updateSearchDraft,
         applyTextFilters: actions.applyTextFilters,
       },
@@ -110,9 +86,9 @@ export function useProductExplorerViewModel() {
       categories,
       categoryState,
       filtersOpen,
-      selectedCategory: query.category,
+      selectedCategory: category,
       actions: {
-        updateCategoryFilter: actions.updateCategoryFilter,
+        getCategoryHref: actions.getCategoryHref,
         keepDesktopFiltersOpen,
         syncFiltersOpenFromToggle,
       },
@@ -127,6 +103,7 @@ export function useProductExplorerViewModel() {
         formError,
         hasActiveFilters,
         query,
+        selectedCategory: category,
         selectedFacetChips,
         selectedVendorOptions,
         totalItems,

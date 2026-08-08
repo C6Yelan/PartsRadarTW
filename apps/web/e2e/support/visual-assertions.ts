@@ -11,7 +11,9 @@ export async function expectQueryFilters(
     .poll(() => {
       const url = new URL(page.url());
       return {
-        category: url.searchParams.get("category"),
+        category: url.pathname.startsWith("/categories/")
+          ? url.pathname.slice("/categories/".length)
+          : null,
         facets: url.searchParams.getAll("facet"),
         vendors: url.searchParams.get("vendors"),
       };

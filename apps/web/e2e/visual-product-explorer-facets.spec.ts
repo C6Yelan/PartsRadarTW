@@ -51,18 +51,16 @@ test.beforeEach(async ({ page }) => {
 });
 
 test("shows separate SSD, HDD, and external-storage filters @desktop-only", async ({ page }) => {
-  await page.goto("/?category=hard-drive");
+  await page.goto("/categories/hard-drive");
 
-  const categories = page.getByRole("radiogroup", { name: "分類" });
+  const categories = page.getByRole("navigation", { name: "商品分類" });
   await expect(categories.getByText("SSD", { exact: true })).toBeVisible();
   await expect(categories.getByText("HDD", { exact: true })).toBeVisible();
   await expect(categories.getByText("外接儲存", { exact: true })).toBeVisible();
   await expect(page.locator(".facet-filter").filter({ hasText: "硬碟用途" })).toBeVisible();
 
   await categories.getByText("外接儲存", { exact: true }).click();
-  await expect
-    .poll(() => new URL(page.url()).searchParams.get("category"))
-    .toBe("external-storage");
+  await expect.poll(() => new URL(page.url()).pathname).toBe("/categories/external-storage");
   await expect(page.locator(".facet-filter").filter({ hasText: "商品類型" })).toBeVisible();
 });
 
@@ -90,7 +88,7 @@ test("keeps the product toolbar compact and readable across its layout boundary 
   for (const viewport of viewports) {
     await test.step(`${viewport.width}px product-toolbar layout`, async () => {
       await page.setViewportSize(viewport);
-      await page.goto("/?category=cpu");
+      await page.goto("/categories/cpu");
       await expect(page.getByRole("region", { name: "商品列表" })).toBeVisible();
 
       const priceInputs = page.locator(".toolbar-price-grid input");
@@ -332,7 +330,7 @@ test("keeps the product toolbar compact and readable across its layout boundary 
   console.log("toolbar/table viewport dimensions", viewportDimensions);
 
   await page.setViewportSize({ width: 1760, height: 900 });
-  await page.goto("/?category=cpu");
+  await page.goto("/categories/cpu");
   await page.getByRole("button", { name: "全部商品" }).click();
   await expect.poll(() => new URL(page.url()).searchParams.get("status")).toBe("all");
   await page.getByRole("textbox", { name: "最低價格" }).fill("1000");
@@ -356,7 +354,7 @@ test("groups selected CPU facets and keeps the vendor chip first @desktop-only",
   page,
 }) => {
   await page.setViewportSize({ width: 1760, height: 900 });
-  await page.goto("/?category=cpu");
+  await page.goto("/categories/cpu");
 
   await selectVendor(page, "Intel");
   await selectFacetOptions(page, "腳位", ["LGA 1851", "LGA 1700"]);
@@ -407,7 +405,7 @@ test("orders and clears multiple vendors without changing other filters @desktop
   page,
 }) => {
   await page.setViewportSize({ width: 1760, height: 900 });
-  await page.goto("/?category=cpu");
+  await page.goto("/categories/cpu");
 
   await selectVendor(page, "AMD");
   await selectVendor(page, "Intel");
@@ -439,7 +437,7 @@ test("keeps the vendor menu open while multi-select requests reload @desktop-onl
   page,
 }) => {
   await page.setViewportSize({ width: 1760, height: 900 });
-  await page.goto("/?category=cpu");
+  await page.goto("/categories/cpu");
 
   const vendorFilter = page.locator(".vendor-filter");
   await vendorFilter.locator(".vendor-menu-trigger").click();
@@ -505,7 +503,7 @@ test("keeps the vendor menu open while multi-select requests reload @desktop-onl
   await expect(page.locator(".vendor-filter-disabled")).toHaveText("無廠商資料");
 
   await page.goBack();
-  await expect.poll(() => new URL(page.url()).searchParams.get("category")).toBe("motherboard");
+  await expect.poll(() => new URL(page.url()).pathname).toBe("/categories/motherboard");
   await expect(page.locator(".vendor-menu-trigger")).toBeEnabled();
   await page.goBack();
   await expectQueryFilters(page, { category: "cpu", facets: [], vendors: "intel" });
@@ -514,7 +512,7 @@ test("keeps the vendor menu open while multi-select requests reload @desktop-onl
 
 test("groups non-CPU facets without clearing other definitions @desktop-only", async ({ page }) => {
   await page.setViewportSize({ width: 1760, height: 900 });
-  await page.goto("/?category=gpu");
+  await page.goto("/categories/gpu");
 
   await selectFacetOptions(page, "GPU 晶片", ["NVIDIA", "AMD"]);
   await selectFacetOptions(page, "顯示記憶體", ["16 GB"]);
@@ -532,7 +530,7 @@ test("groups non-CPU facets without clearing other definitions @desktop-only", a
 
 test("uses the active category definitions for memory chips @desktop-only", async ({ page }) => {
   await page.setViewportSize({ width: 1760, height: 900 });
-  await page.goto("/?category=memory");
+  await page.goto("/categories/memory");
 
   await selectFacetOptions(page, "使用類型", ["桌上型", "筆記型"]);
   await selectFacetOptions(page, "記憶體規格", ["DDR5"]);
@@ -552,7 +550,7 @@ test("keeps shared trigger widths and chevrons usable across categories @desktop
   await page.setViewportSize({ width: 1760, height: 900 });
 
   for (const category of ["cpu", "gpu", "memory", "external-storage"]) {
-    await page.goto(`/?category=${category}`);
+    await page.goto(`/categories/${category}`);
     const triggers = page.locator(".vendor-menu-trigger, .facet-menu-trigger");
     for (const trigger of await triggers.all()) {
       const layout = await trigger.evaluate((element) => {
@@ -572,7 +570,7 @@ test("keeps shared trigger widths and chevrons usable across categories @desktop
     await expectNoHorizontalOverflow(page);
   }
 
-  await page.goto("/?category=cpu");
+  await page.goto("/categories/cpu");
   await selectFacetOptions(page, "腳位", ["sTR5 / Threadripper"]);
   const longSummaryTrigger = page
     .locator(".facet-filter")
@@ -606,7 +604,7 @@ test("sizes short facet popovers and separates semantic option groups @desktop-o
   page,
 }) => {
   await page.setViewportSize({ width: 1760, height: 900 });
-  await page.goto("/?category=cpu");
+  await page.goto("/categories/cpu");
 
   const socketFilter = page.locator(".facet-filter").filter({ hasText: "腳位" });
   await socketFilter.locator(".facet-menu-trigger").click();
@@ -765,7 +763,7 @@ test("renders single-option facets as direct keyboard-operable controls @desktop
   page,
 }) => {
   await page.setViewportSize({ width: 1760, height: 900 });
-  await page.goto("/?category=motherboard&page=10");
+  await page.goto("/categories/motherboard?page=10");
 
   const wifiControl = page.locator(".single-option-facet").filter({ hasText: "含 Wi-Fi" });
   const wifiCheckbox = wifiControl.getByRole("checkbox", { name: "含 Wi-Fi" });
@@ -822,7 +820,7 @@ test("renders single-option facets as direct keyboard-operable controls @desktop
 test("keeps grouped facet popovers full-width and category memory usable on mobile @mobile-only", async ({
   page,
 }) => {
-  await page.goto("/?category=motherboard");
+  await page.goto("/categories/motherboard");
 
   await selectVendor(page, "ASUS");
   const chipsetFilter = page.locator(".facet-filter").filter({ hasText: "晶片組" });
@@ -873,7 +871,7 @@ test("keeps chipset and direct facet controls usable across responsive boundarie
   for (const viewport of viewports) {
     await test.step(`${viewport.width}px chipset controls`, async () => {
       await page.setViewportSize(viewport);
-      await page.goto("/?category=motherboard");
+      await page.goto("/categories/motherboard");
       const wifiControl = page.locator(".single-option-facet").filter({ hasText: "含 Wi-Fi" });
       const wifiBox = await wifiControl.boundingBox();
       expect(wifiBox?.height ?? 0).toBeGreaterThanOrEqual(viewport.width <= 760 ? 44 : 38);
@@ -910,7 +908,7 @@ test("keeps chipset and direct facet controls usable across responsive boundarie
 });
 
 test("wraps a complete grouped CPU socket chip on mobile @mobile-only", async ({ page }) => {
-  await page.goto("/?category=cpu");
+  await page.goto("/categories/cpu");
 
   await selectFacetOptions(page, "腳位", [
     "LGA 1851",
@@ -980,10 +978,11 @@ async function selectFacetOptions(page: Page, facetLabel: string, optionLabels: 
 }
 
 async function switchCategory(page: Page, categoryLabel: string, categorySlug: string) {
-  await page
-    .getByRole("radiogroup", { name: "分類" })
-    .getByText(categoryLabel, { exact: true })
-    .click();
-  await expect.poll(() => new URL(page.url()).searchParams.get("category")).toBe(categorySlug);
+  const categoryNavigation = page.getByRole("navigation", { name: "商品分類" });
+  if (!(await categoryNavigation.isVisible())) {
+    await page.locator(".filter-panel summary").click();
+  }
+  await categoryNavigation.getByText(categoryLabel, { exact: true }).click();
+  await expect.poll(() => new URL(page.url()).pathname).toBe(`/categories/${categorySlug}`);
   await expect(page.getByRole("region", { name: "商品列表" })).toBeVisible();
 }

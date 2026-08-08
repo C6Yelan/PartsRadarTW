@@ -3,9 +3,8 @@
 import { getCategoryIgrp } from "../category-slugs";
 
 const INTERNAL_RETURN_URL_ORIGIN = "https://return.partsradar.invalid";
-const ALLOWED_RETURN_PATHS = new Set(["/", "/build-list", "/price-report"]);
+const ALLOWED_PRODUCT_DETAIL_RETURN_PATHS = new Set(["/build-list", "/price-report"]);
 const BUILD_LIST_RETURN_PATHS = new Set([
-  "/",
   "/about",
   "/announcements",
   "/discord",
@@ -17,7 +16,11 @@ const PRODUCT_DETAIL_PATH_PATTERN = /^\/products\/[^/]+$/;
 
 // 將商品詳細頁的 returnTo 轉成安全 href，避免外站或不支援路徑被放進返回連結。
 export function normalizeProductDetailReturnHref(value: string | string[] | undefined) {
-  return normalizeInternalReturnHref(value, (url) => ALLOWED_RETURN_PATHS.has(url.pathname));
+  return normalizeInternalReturnHref(
+    value,
+    (url) =>
+      ALLOWED_PRODUCT_DETAIL_RETURN_PATHS.has(url.pathname) || isProductExplorerReturnUrl(url),
+  );
 }
 
 // 正規化配單頁返回來源，允許全站公開頁面與商品詳細頁，但拒絕配單自我返回。
@@ -25,7 +28,9 @@ export function normalizeBuildListReturnHref(value: string | string[] | undefine
   return normalizeInternalReturnHref(
     value,
     (url) =>
-      BUILD_LIST_RETURN_PATHS.has(url.pathname) || PRODUCT_DETAIL_PATH_PATTERN.test(url.pathname),
+      BUILD_LIST_RETURN_PATHS.has(url.pathname) ||
+      PRODUCT_DETAIL_PATH_PATTERN.test(url.pathname) ||
+      isProductExplorerReturnUrl(url),
   );
 }
 
@@ -51,26 +56,19 @@ function normalizeInternalReturnHref(
     return "/";
   }
 
-  if (url.pathname === "/" && !normalizeCategoryQuery(url.searchParams)) {
-    return "/";
-  }
-
   return `${url.pathname}${url.search}`;
 }
 
-function normalizeCategoryQuery(params: URLSearchParams) {
-  const categories = params.getAll("category");
-
-  if (categories.length > 1 || params.has("igrp")) {
+function isProductExplorerReturnUrl(url: URL) {
+  if (url.searchParams.has("category") || url.searchParams.has("igrp")) {
     return false;
   }
 
-  const category = categories[0];
-  const categoryIgrp = category === undefined ? null : getCategoryIgrp(category);
+  return url.pathname === "/" || isCategoryPath(url.pathname);
+}
 
-  if (category !== undefined && categoryIgrp === null) {
-    return false;
-  }
+function isCategoryPath(pathname: string) {
+  const match = /^\/categories\/([^/]+)$/.exec(pathname);
 
-  return true;
+  return match?.[1] !== undefined && getCategoryIgrp(match[1]) !== null;
 }
