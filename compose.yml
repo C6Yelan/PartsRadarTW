@@ -135,7 +135,7 @@ services:
       - product_images:/var/lib/partsradar/product-images:ro
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=64m
-      - /app/apps/web/.next/cache:rw,noexec,nosuid,size=256m
+      - /app/apps/web/.next/cache:rw,noexec,nosuid,size=256m,uid=1000,gid=1000,mode=0700
     depends_on:
       storage-init:
         condition: service_completed_successfully
