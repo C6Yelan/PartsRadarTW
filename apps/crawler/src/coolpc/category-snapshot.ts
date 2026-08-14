@@ -208,13 +208,15 @@ function getSourceTagJoinCoverage(
     return null;
   }
 
-  const matchedCount = items.filter((item) =>
-    Object.hasOwn(sourceTags, normalizeFilterSyncProductName(item.name)),
-  ).length;
+  const sourceProductNames = Object.keys(sourceTags);
+  const categoryProductNames = new Set(
+    items.map((item) => normalizeFilterSyncProductName(item.name)),
+  );
+  const matchedCount = sourceProductNames.filter((name) => categoryProductNames.has(name)).length;
   return {
     matchedCount,
-    totalCount: items.length,
-    ratio: matchedCount / items.length,
+    totalCount: sourceProductNames.length,
+    ratio: matchedCount / sourceProductNames.length,
   };
 }
 

@@ -14,7 +14,7 @@ import { assertCoolpcHtmlContentType, fetchCoolpcSource } from "./source-fetch";
 
 const COOLPC_FILTER_SOURCE_URL = "https://www.coolpc.com.tw/evaluate.php";
 export const DEFAULT_FILTER_SYNC_INTERVAL_SECONDS = 7 * 24 * 60 * 60;
-const FILTER_SYNC_FAILURE_RETRY_SECONDS = 6 * 60 * 60;
+const FILTER_SYNC_RETRY_COOLDOWN_SECONDS = 6 * 60 * 60;
 const MIN_TAGGED_PRODUCT_RATIO = 0.5;
 
 export interface RefreshCoolpcFilterSyncOptions {
@@ -126,13 +126,10 @@ export function isFilterSyncDue(
     return true;
   }
 
-  if (state.refreshRequestedAt && !state.lastError) {
-    return true;
-  }
-
-  const retrySeconds = state.lastError
-    ? Math.min(intervalSeconds, FILTER_SYNC_FAILURE_RETRY_SECONDS)
-    : intervalSeconds;
+  const retrySeconds =
+    state.lastError || state.refreshRequestedAt
+      ? Math.min(intervalSeconds, FILTER_SYNC_RETRY_COOLDOWN_SECONDS)
+      : intervalSeconds;
   return now.getTime() - Date.parse(state.lastAttemptAt) >= retrySeconds * 1000;
 }
 

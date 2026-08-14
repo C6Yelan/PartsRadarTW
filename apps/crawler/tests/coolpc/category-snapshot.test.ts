@@ -91,6 +91,8 @@ describe("CoolPC category snapshot processor", () => {
       snapshot: snapshot({ rawHtml }),
       sourceFilterTagsByProductName: {
         "amd ryzen 5 7500f mpk【6核/12緒】3.7g": ["socket:lga1851"],
+        "stale source product 1": ["socket:am5"],
+        "stale source product 2": ["socket:am5"],
       },
       writeProducts: productWriter.writeProducts,
     });
@@ -113,6 +115,8 @@ describe("CoolPC category snapshot processor", () => {
       }),
       sourceFilterTagsByProductName: {
         "amd ryzen 5 7500f mpk【6核/12緒】3.7g": ["socket:lga1851"],
+        "stale source product 1": ["socket:am5"],
+        "stale source product 2": ["socket:am5"],
       },
       writeProducts: productWriter.writeProducts,
     });
