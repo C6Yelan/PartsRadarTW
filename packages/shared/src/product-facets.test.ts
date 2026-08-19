@@ -141,6 +141,16 @@ describe("product facets", () => {
     expect(tags).not.toContain("form_factor:eeb");
   });
 
+  it.each([
+    ["｛測試主機板｝M-ATX", "form_factor:m-atx"],
+    ["{測試主機板}ATX", "form_factor:atx"],
+    ["｛測試主機板｝CEB", "form_factor:ceb"],
+    ["{測試主機板}EEB", "form_factor:eeb"],
+    ["｛測試主機板｝Mini-ITX", "form_factor:mini-itx"],
+  ])("accepts a closing brace before a motherboard form factor: %s", (name, expectedTag) => {
+    expect(extractProductFilterTags(5, name)).toContain(expectedTag);
+  });
+
   it("extracts memory type, capacity, and speed", () => {
     expect(extractProductFilterTags(6, "桌上型 32GB(雙通16GB*2) DDR5 6000/CL30")).toEqual([
       "module_type:desktop",

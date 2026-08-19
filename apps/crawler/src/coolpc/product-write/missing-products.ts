@@ -1,10 +1,12 @@
 // apps/crawler/src/coolpc/product-write/missing-products.ts
 // 標記某分類中「本次未抓到」的商品為缺漏，達門檻後切為停用，維持缺漏計數。
+
+import type { ProductExclusionReason } from "../parser";
 import type {
   CoolpcProductWriteDelegates,
+  ExistingProductForMissingWrite,
   WriteCoolpcCategoryProductObservationResult,
 } from "./types";
-import type { ProductExclusionReason } from "../parser";
 
 // 連續幾次成功回報才轉為停用，避免一次缺頁或暫時抓不到就誤下架。
 const MISSING_SUCCESSFUL_CRAWLS_BEFORE_INACTIVE = 6;
@@ -15,12 +17,16 @@ export async function markMissingProducts({
   fetchedAt,
   presentIbuyTokens,
   excludedProducts = new Map(),
+  existingProducts,
+  presentProductIds = new Set(),
 }: {
   client: CoolpcProductWriteDelegates;
   sourceCategoryId: string;
   fetchedAt: Date;
   presentIbuyTokens: ReadonlySet<string>;
   excludedProducts?: ReadonlyMap<string, ProductExclusionReason>;
+  existingProducts?: readonly ExistingProductForMissingWrite[];
+  presentProductIds?: ReadonlySet<string>;
 }): Promise<
   Pick<
     WriteCoolpcCategoryProductObservationResult,
@@ -28,18 +34,39 @@ export async function markMissingProducts({
   >
 > {
   // 先取出該分類下全部產品的缺漏狀態，再逐筆依 presentIbuyTokens 進行比對與更新。
-  const products = await client.product.findMany({
-    where: { sourceCategoryId },
-    select: {
-      id: true,
-      ibuyToken: true,
-      isActive: true,
-      isExcluded: true,
-      exclusionReason: true,
-      missingSince: true,
-      missingSeenCount: true,
-    },
-  });
+  const products =
+    existingProducts ??
+    (await client.product.findMany({
+      where: { sourceCategoryId },
+      select: {
+        id: true,
+        sourceCategoryId: true,
+        ibuyToken: true,
+        name: true,
+        primaryImageUrl: true,
+        isActive: true,
+        isExcluded: true,
+        exclusionReason: true,
+        missingSince: true,
+        missingSeenCount: true,
+        currentPrice: {
+          select: {
+            productId: true,
+            priceSnapshotId: true,
+            lastSeenAt: true,
+            priceChangedAt: true,
+            priceSnapshot: {
+              select: {
+                id: true,
+                productId: true,
+                price: true,
+                currency: true,
+              },
+            },
+          },
+        },
+      },
+    }));
   // 累積本次標記的變更數，供上層回報與統計使用。
   const result = {
     missingProductUpdatedCount: 0,
@@ -48,7 +75,7 @@ export async function markMissingProducts({
 
   for (const product of products) {
     // 若本次已抓到該 ibuyToken，視為仍存活，跳過缺漏邏輯。
-    if (presentIbuyTokens.has(product.ibuyToken)) {
+    if (presentIbuyTokens.has(product.ibuyToken) || presentProductIds.has(product.id)) {
       continue;
     }
 

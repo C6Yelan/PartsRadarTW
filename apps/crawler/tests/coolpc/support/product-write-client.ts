@@ -1,10 +1,10 @@
 // apps/crawler/tests/coolpc/support/product-write-client.ts
 // 提供 product-write 與 data-flow 測試用的記憶體 fake client、商品 factory 與價格資料列型別。
 
-import type { ParsedCoolpcProduct } from "../../../src/coolpc/parser/types";
-import type { ProductExclusionReason } from "../../../src/coolpc/parser";
-import type { CoolpcProductWriteClient } from "../../../src/coolpc/product-write";
 import { extractProductFilterTags } from "@partsradar/shared";
+import type { ProductExclusionReason } from "../../../src/coolpc/parser";
+import type { ParsedCoolpcProduct } from "../../../src/coolpc/parser/types";
+import type { CoolpcProductWriteClient } from "../../../src/coolpc/product-write";
 
 export interface FakeProduct {
   id: string;
@@ -96,15 +96,29 @@ export class FakeCoolpcProductWriteClient implements CoolpcProductWriteClient {
     findMany: async ({ where }: Parameters<CoolpcProductWriteClient["product"]["findMany"]>[0]) =>
       this.products
         .filter((product) => product.sourceCategoryId === where.sourceCategoryId)
-        .map((product) => ({
-          id: product.id,
-          ibuyToken: product.ibuyToken,
-          isActive: product.isActive,
-          isExcluded: product.isExcluded,
-          exclusionReason: product.exclusionReason,
-          missingSince: product.missingSince,
-          missingSeenCount: product.missingSeenCount,
-        })),
+        .map((product) => {
+          const currentPrice =
+            this.currentPrices.find((candidate) => candidate.productId === product.id) ?? null;
+          const priceSnapshot = currentPrice
+            ? (this.priceSnapshots.find(
+                (candidate) => candidate.id === currentPrice.priceSnapshotId,
+              ) ?? null)
+            : null;
+
+          return {
+            id: product.id,
+            sourceCategoryId: product.sourceCategoryId,
+            ibuyToken: product.ibuyToken,
+            name: product.name,
+            primaryImageUrl: product.primaryImageUrl,
+            isActive: product.isActive,
+            isExcluded: product.isExcluded,
+            exclusionReason: product.exclusionReason,
+            missingSince: product.missingSince,
+            missingSeenCount: product.missingSeenCount,
+            currentPrice: currentPrice && priceSnapshot ? { ...currentPrice, priceSnapshot } : null,
+          };
+        }),
     create: async ({ data }: Parameters<CoolpcProductWriteClient["product"]["create"]>[0]) => {
       const product: FakeProduct = {
         id: `product-${this.products.length + 1}`,

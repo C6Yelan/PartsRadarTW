@@ -49,14 +49,33 @@ export interface CoolpcProductWriteDelegates {
       where: { sourceCategoryId: string };
       select: {
         id: true;
+        sourceCategoryId: true;
         ibuyToken: true;
+        name: true;
+        primaryImageUrl: true;
         isActive: true;
         isExcluded: true;
         exclusionReason: true;
         missingSince: true;
         missingSeenCount: true;
+        currentPrice: {
+          select: {
+            productId: true;
+            priceSnapshotId: true;
+            lastSeenAt: true;
+            priceChangedAt: true;
+            priceSnapshot: {
+              select: {
+                id: true;
+                productId: true;
+                price: true;
+                currency: true;
+              };
+            };
+          };
+        };
       };
-    }): Promise<ExistingProductForMissingWrite[]>;
+    }): Promise<ExistingProductForCategoryWrite[]>;
     create(args: { data: ProductCreateData; select: { id: true } }): Promise<{ id: string }>;
     update(args: {
       where: { id: string };
@@ -105,9 +124,16 @@ export interface ExistingProductForPriceWrite {
   } | null;
 }
 
+export interface ExistingProductForCategoryWrite extends ExistingProductForMissingWrite {
+  name: string;
+  primaryImageUrl: string | null;
+  currentPrice: ExistingProductForPriceWrite["currentPrice"];
+}
+
 // 缺漏判斷只需要的欄位集合（active 狀態與缺漏計數）。
 export interface ExistingProductForMissingWrite {
   id: string;
+  sourceCategoryId: string;
   ibuyToken: string;
   isActive: boolean;
   isExcluded: boolean;
@@ -146,6 +172,7 @@ export interface ProductCreateData {
 
 // 再次抓到既有產品時更新的欄位，維持既有商品 identity，但更新可觀測到的顯示/連結資訊。
 export interface ProductSeenUpdateData {
+  ibuyToken?: string;
   name: string;
   normalizedName: string;
   vendorSlug: string | null;

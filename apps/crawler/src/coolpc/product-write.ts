@@ -2,6 +2,7 @@
 // 管理單一 CoolPC 分類觀測結果的持久化流程：先寫入本次看到的商品，再更新缺漏狀態並回傳摘要。
 
 import type { ParsedCoolpcProduct } from "./parser";
+import { findCoolpcContinuityMatches } from "./product-continuity";
 import { writeObservedProduct } from "./product-write/item-writer";
 import { markMissingProducts } from "./product-write/missing-products";
 import type {
@@ -63,6 +64,39 @@ async function writeCoolpcCategoryProductObservationInTransaction({
     markedInactiveProductCount: 0,
   };
   const presentIbuyTokens = new Set<string>();
+  const existingProducts = await client.product.findMany({
+    where: { sourceCategoryId },
+    select: {
+      id: true,
+      sourceCategoryId: true,
+      ibuyToken: true,
+      name: true,
+      primaryImageUrl: true,
+      isActive: true,
+      isExcluded: true,
+      exclusionReason: true,
+      missingSince: true,
+      missingSeenCount: true,
+      currentPrice: {
+        select: {
+          productId: true,
+          priceSnapshotId: true,
+          lastSeenAt: true,
+          priceChangedAt: true,
+          priceSnapshot: {
+            select: {
+              id: true,
+              productId: true,
+              price: true,
+              currency: true,
+            },
+          },
+        },
+      },
+    },
+  });
+  const continuityMatches = findCoolpcContinuityMatches(parsedProducts, existingProducts);
+  const continuedProductIds = new Set([...continuityMatches.values()].map((product) => product.id));
 
   for (const parsedProduct of parsedProducts) {
     assertParsedProductBelongsToCategory(parsedProduct, sourceCategoryId);
@@ -73,6 +107,7 @@ async function writeCoolpcCategoryProductObservationInTransaction({
       crawlRunId,
       rawSnapshotId,
       parsedProduct,
+      continuityProduct: continuityMatches.get(parsedProduct.ibuyToken),
     });
 
     result.createdProductCount += observedProductResult.createdProductCount;
@@ -90,6 +125,8 @@ async function writeCoolpcCategoryProductObservationInTransaction({
     excludedProducts: new Map(
       (excludedProducts ?? []).map((product) => [product.ibuyToken, product.reason]),
     ),
+    existingProducts,
+    presentProductIds: continuedProductIds,
   });
   result.missingProductUpdatedCount = missingResult.missingProductUpdatedCount;
   result.markedInactiveProductCount = missingResult.markedInactiveProductCount;

@@ -14,6 +14,7 @@
     "ops:production-smoke:health": "tsx src/scripts/ops/check-production-smoke-progress.ts",
     "ops:product-vendors:backfill": "tsx src/scripts/ops/backfill-product-vendors.ts",
     "ops:product-filter-tags:backfill": "tsx src/scripts/ops/backfill-product-filter-tags.ts",
+    "ops:product-identities:reconcile": "tsx src/scripts/ops/reconcile-coolpc-product-identities.ts",
     "ops:raw-snapshots:cleanup": "tsx src/scripts/ops/cleanup-raw-snapshots.ts",
     "ops:raw-snapshots:cleanup-daemon": "tsx src/scripts/ops/cleanup-raw-snapshots-daemon.ts",
     "manual:crawl-coolpc-once": "tsx src/scripts/manual/crawl-coolpc-once.ts",

@@ -179,6 +179,52 @@ describe("CoolPC category product observation writer", () => {
     expect(client.products[0]?.lastSeenAt).toEqual(nextSeenAt);
   });
 
+  it("continues an old product identity when only the encoded name token changes", async () => {
+    const client = new FakeCoolpcProductWriteClient();
+    const previousSeenAt = new Date("2026-08-19T12:32:00.000Z");
+    client.seedProductWithCurrentPrice(
+      productItem({
+        ibuyToken: "old-name-token",
+        name: "華碩 PRO WS W680-ACE(ATX/DDR5)",
+        normalizedName: "華碩 pro ws w680-ace(atx/ddr5)",
+        price: 12990,
+        fetchedAt: previousSeenAt,
+      }),
+    );
+    const fetchedAt = new Date("2026-08-19T13:02:00.000Z");
+    const renamedItem = productItem({
+      ibuyToken: "new-name-token",
+      name: "｛華碩 PRO WS W680-ACE｝ATX/DDR5",
+      normalizedName: "｛華碩 pro ws w680-ace｝atx/ddr5",
+      price: 12990,
+      fetchedAt,
+    });
+
+    const result = await writeCoolpcCategoryProductObservation({
+      client,
+      crawlRunId: "crawl-run-2",
+      sourceCategoryId: renamedItem.sourceCategoryId,
+      fetchedAt,
+      parsedProducts: [renamedItem],
+    });
+
+    expect(result).toMatchObject({
+      createdProductCount: 0,
+      updatedProductCount: 1,
+      priceSnapshotCreatedCount: 0,
+      priceUnchangedCount: 1,
+      missingProductUpdatedCount: 0,
+    });
+    expect(client.products).toHaveLength(1);
+    expect(client.products[0]).toMatchObject({
+      id: "product-1",
+      ibuyToken: "new-name-token",
+      name: renamedItem.name,
+      lastSeenAt: fetchedAt,
+      missingSeenCount: 0,
+    });
+  });
+
   it("refreshes filter tags when a product name changes without a price change", async () => {
     const client = new FakeCoolpcProductWriteClient();
     const previousItem = productItem({

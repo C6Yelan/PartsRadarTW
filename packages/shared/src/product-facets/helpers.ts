@@ -3,12 +3,12 @@ export type MatchRule = readonly [value: string, pattern: RegExp];
 
 export function extractFormFactors(text: string, add: AddTag, key: string): void {
   addAllMatches(add, key, text, [
-    ["e-atx", /(?:^|[(/,\s])E-?ATX(?=$|[^A-Z0-9-])/],
-    ["atx", /(?:^|[(/,\s])ATX(?=$|[^A-Z0-9-])/],
-    ["m-atx", /(?:^|[(/,\s])(?:M-?ATX|MICRO\s*ATX)(?=$|[^A-Z0-9-])/],
+    ["e-atx", /(?:^|[(/,\s}｝])E-?ATX(?=$|[^A-Z0-9-])/],
+    ["atx", /(?:^|[(/,\s}｝])ATX(?=$|[^A-Z0-9-])/],
+    ["m-atx", /(?:^|[(/,\s}｝])(?:M-?ATX|MICRO\s*ATX)(?=$|[^A-Z0-9-])/],
     ["mini-itx", /(?:^|[^A-Z0-9])(?:MINI-?ITX|ITX)(?=$|[^A-Z0-9])/],
-    ["ceb", /(?:^|[(/,\s])CEB(?=$|[^A-Z0-9-])/],
-    ["eeb", /(?:^|[(/,\s])EEB(?=$|[^A-Z0-9-])/],
+    ["ceb", /(?:^|[(/,\s}｝])CEB(?=$|[^A-Z0-9-])/],
+    ["eeb", /(?:^|[(/,\s}｝])EEB(?=$|[^A-Z0-9-])/],
   ]);
 }
 

@@ -24,14 +24,17 @@ export async function writeObservedProduct({
   crawlRunId,
   rawSnapshotId,
   parsedProduct,
+  continuityProduct = null,
 }: {
   client: CoolpcProductWriteDelegates;
   crawlRunId: string;
   rawSnapshotId: string | null;
   parsedProduct: ParsedCoolpcProduct;
+  continuityProduct?: ExistingProductForPriceWrite | null;
 }): Promise<ObservedProductWriteResult> {
   // 每次抓到一筆商品時，先以 sourceCategoryId + ibuyToken 判斷是否已存在商品記錄。
-  const existingProduct = await findProduct(client, parsedProduct);
+  const exactProduct = await findProduct(client, parsedProduct);
+  const existingProduct = exactProduct ?? continuityProduct;
 
   if (!existingProduct) {
     // 首次看到此商品時，用一個流程建立：商品主檔 -> 價格快照 -> current_price。
@@ -50,7 +53,7 @@ export async function writeObservedProduct({
     };
   }
 
-  await updateProductSeenData(client, existingProduct, parsedProduct);
+  await updateProductSeenData(client, existingProduct, parsedProduct, exactProduct === null);
 
   if (hasPriceChanged(existingProduct.currentPrice?.priceSnapshot ?? null, parsedProduct)) {
     const priceSnapshot = await createPriceSnapshot({
@@ -161,12 +164,13 @@ function updateProductSeenData(
   client: CoolpcProductWriteDelegates,
   existingProduct: ExistingProductForPriceWrite,
   parsedProduct: ParsedCoolpcProduct,
+  updateIdentityToken: boolean,
 ): Promise<{ id: string }> {
   // 商品重新被解析到，更新最後看到時間、名稱、網址等欄位並恢復啟用，
   // 不重建商品資料，保留既有價格歷史。
   return client.product.update({
     where: { id: existingProduct.id },
-    data: buildProductSeenUpdateData(existingProduct, parsedProduct),
+    data: buildProductSeenUpdateData(existingProduct, parsedProduct, updateIdentityToken),
     select: { id: true },
   });
 }
@@ -174,9 +178,11 @@ function updateProductSeenData(
 function buildProductSeenUpdateData(
   existingProduct: ExistingProductForPriceWrite,
   parsedProduct: ParsedCoolpcProduct,
+  updateIdentityToken: boolean,
 ): ProductSeenUpdateData {
   // 組裝「再次看到」時的更新欄位；若缺少圖片時不清空既有 primaryImageUrl。
   return {
+    ...(updateIdentityToken ? { ibuyToken: parsedProduct.ibuyToken } : {}),
     name: parsedProduct.name,
     normalizedName: parsedProduct.normalizedName,
     vendorSlug: parsedProduct.vendorSlug,
