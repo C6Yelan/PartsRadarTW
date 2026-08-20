@@ -364,6 +364,13 @@ describe("product facets", () => {
   });
 
   it.each([
+    ["｛技嘉 RTX5060Ti AERO OC 8G｝", "8"],
+    ["｛麗臺 NVIDIA RTX A1000｝8G GDDR6", "8"],
+  ])("extracts explicit VRAM across normalized brace boundaries: %s", (name, expectedVram) => {
+    expect(extractProductFilterTags(12, name)).toContain(`vram_gb:${expectedVram}`);
+  });
+
+  it.each([
     ["RTX 5050 12G", "12"],
     ["RTX 5060 16G", "16"],
     ["RTX 5070 Ti 12G", "12"],

@@ -238,7 +238,7 @@ function extractGpuTags(text: string, add: AddTag): void {
     ["legacy-radeon", /(?:\bR7|AXR7)\s*240\b/],
   ]);
   const explicitVramGb = text.match(
-    /(?:^|[/\s(-])(?:O)?(1|2|4|6|8|10|12|16|20|24|32|48|72|96)\s*G(?:B(?:D[34567])?|D[34567])?(?=$|[-/\s(),]|\p{Script=Han})/u,
+    /(?:^|[/\s(){}-])(?:O)?(1|2|4|6|8|10|12|16|20|24|32|48|72|96)\s*G(?:B(?:D[34567])?|D[34567])?(?=$|[-/\s(),{}]|\p{Script=Han})/u,
   )?.[1];
   if (explicitVramGb) {
     add("vram_gb", explicitVramGb);
