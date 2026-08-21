@@ -224,6 +224,18 @@ describe("product facets", () => {
       ["external_type:external-hdd", "connector:type-a", "capacity_gb:5000"],
     ],
     [
+      "Seagate One Touch 5T極夜黑 / Type-A / 硬體加密",
+      ["external_type:external-hdd", "connector:type-a", "capacity_gb:5000"],
+    ],
+    [
+      "威剛 HD710Pro 2TB / Type-A / 軍規",
+      ["external_type:external-hdd", "connector:type-a", "capacity_gb:2000"],
+    ],
+    [
+      "威剛 HV300 1TB / Type-A",
+      ["external_type:external-hdd", "connector:type-a", "capacity_gb:1000"],
+    ],
+    [
       "創見 4TB 25M3 / Type-A / 軍規",
       ["external_type:external-hdd", "connector:type-a", "capacity_gb:4000"],
     ],

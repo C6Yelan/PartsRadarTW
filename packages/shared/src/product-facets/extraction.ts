@@ -129,7 +129,9 @@ function extractExternalStorageTags(text: string, add: AddTag): void {
   } else if (/SSD/.test(text)) {
     add("external_type", "external-ssd");
   } else if (
-    /HDD|外接硬碟|隨身硬碟|\bCANVIO\b|\b(?:EXPANSION|ONETOUCH)\b|\b25(?:A3|M3|H3)\b/.test(text)
+    /HDD|外接硬碟|隨身硬碟|\bCANVIO\b|\b(?:EXPANSION|ONE\s*TOUCH|HD710PRO|HV300)\b|\b25(?:A3|M3|H3)\b/.test(
+      text,
+    )
   ) {
     add("external_type", "external-hdd");
   }
