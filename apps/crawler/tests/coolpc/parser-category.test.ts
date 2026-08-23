@@ -311,20 +311,45 @@ describe("CoolPC category parser", () => {
     }
   });
 
-  it("folds the reported IGrp 15 black and white LEADEX rows independently", () => {
+  it("folds the reported IGrp 14 N4 rows with source image filename differences", () => {
     const result = parseCoolpcCategoryPage(
-      fixture("coolpc-igrp-15-leadex-duplicate.html"),
-      contextForCategory(15),
+      fixture("coolpc-live-2026-08-24-igrp-14-duplicate-conflicts.html"),
+      contextForCategory(14),
     );
 
     expect(result.canImport).toBe(true);
     expect(result.items).toHaveLength(2);
-    expect(result.items.map((item) => item.ibuyToken)).toEqual([
-      "LEADEX-III-750W-BLACK",
-      "LEADEX-III-750W-WHITE",
+    expect(result.items.map((item) => item.name)).toEqual([
+      "｛喬思伯 N4 黑｝顯卡長23(Low Profile)/U高7/硬碟位3.5*6+2.5*2/NAS推薦/M-ATX【SFX】",
+      "｛喬思伯 N4 白｝顯卡長23(Low Profile)/U高7/硬碟位3.5*6+2.5*2/NAS推薦/M-ATX【SFX】",
     ]);
-    expect(result.items.map((item) => item.price)).toEqual([3790, 3790]);
+    expect(result.items.map((item) => item.primaryImageUrl)).toEqual([
+      "https://www.coolpc.com.tw/eval/14/jonsbon4.jpg",
+      "https://www.coolpc.com.tw/eval/14/jonsbon4w.jpg",
+    ]);
+    expect(result.items.map((item) => item.price)).toEqual([2990, 2990]);
     expect(result.deduplicatedItemCount).toBe(2);
+    expect(result.issues).toEqual([]);
+  });
+
+  it("folds the reported IGrp 15 LEADEX and DAGGER offer/display rows", () => {
+    const result = parseCoolpcCategoryPage(
+      fixture("coolpc-live-2026-08-24-igrp-15-duplicate-conflicts.html"),
+      contextForCategory(15),
+    );
+
+    expect(result.canImport).toBe(true);
+    expect(result.items).toHaveLength(3);
+    expect(result.items.map((item) => item.name)).toEqual([
+      "｛全漢 DAGGER PM 1200W(MIT)｝雙8/白金/全模/ATX3.1(PCIe 5.1)/主日系/10年【SFX-L】",
+      "｛振華 LEADEX III 750W(黑色) 白金｝雙8/全模/ATX3.1(PCIe 5.1)/主日系/智慧停轉/10年保",
+      "｛振華 LEADEX III 750W(白色) 白金｝雙8/全模/ATX3.1(PCIe 5.1)/主日系/智慧停轉/10年保",
+    ]);
+    expect(result.items.map((item) => item.price)).toEqual([7990, 3390, 3390]);
+    expect(result.items[0]?.primaryImageUrl).toBe(
+      "https://www.coolpc.com.tw/eval/15/fspdaggerpm1200.jpg",
+    );
+    expect(result.deduplicatedItemCount).toBe(3);
     expect(result.issues).toEqual([]);
   });
 
@@ -504,7 +529,7 @@ describe("CoolPC category parser", () => {
     }
   });
 
-  it("deduplicates only fully identical parsed product rows in the same snapshot", () => {
+  it("deduplicates identical parsed product rows in the same snapshot", () => {
     const result = parseCoolpcCategoryPage(fixture("cpu-category.duplicate-token.html"), context);
 
     expect(result.canImport).toBe(true);
@@ -513,7 +538,7 @@ describe("CoolPC category parser", () => {
     expect(result.issues).toEqual([]);
   });
 
-  it("blocks import when duplicate source identity differs only by image URL", () => {
+  it("blocks import when a duplicate token identifies a different model", () => {
     const result = parseCoolpcCategoryPage(
       fixture("cpu-category.conflicting-duplicate-token.html"),
       context,
@@ -530,18 +555,19 @@ describe("CoolPC category parser", () => {
   });
 
   it.each([
-    ["name", { name: "Conflicting duplicate token product" }],
-    ["price", { rawPriceText: "含稅：NT5,880" }],
-  ])("blocks import when duplicate source identity differs only by %s", (_field, override) => {
+    ["core model", "Test Model Pro 750W(黑色) 80Plus 金牌"],
+    ["color", "Test Model 750W(白色) 80Plus 金牌"],
+    ["capacity", "Test Model 850W(黑色) 80Plus 金牌"],
+  ])("blocks import when duplicate source identity changes %s", (_field, conflictingName) => {
     const baseProduct = {
       token: "CPU-TOKEN-001",
-      name: "AMD Ryzen 5 7500F MPK【6核/12緒】3.7G",
+      name: "Test Model 750W(黑色) 80Plus 金牌",
       rawPriceText: "含稅：NT4,880",
-      rawImageUrl: "/eval/4/amd7500f.jpg",
+      rawImageUrl: "/eval/15/test-model.jpg",
     };
     const result = parseCoolpcCategoryPage(
-      categoryProductsHtml(4, [baseProduct, { ...baseProduct, ...override }]),
-      context,
+      categoryProductsHtml(15, [baseProduct, { ...baseProduct, name: conflictingName }]),
+      contextForCategory(15),
     );
 
     expect(result.canImport).toBe(false);

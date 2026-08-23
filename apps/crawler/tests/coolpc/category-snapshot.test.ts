@@ -67,14 +67,35 @@ describe("CoolPC category snapshot processor", () => {
     ]);
   });
 
-  it("imports one row per IGrp 15 product and reports the folded count", async () => {
-    const powerSupplyCategory = category({
-      id: "category-15",
+  it.each([
+    {
+      igrp: 14,
+      sourceName: "CASE機殼(+電源)",
+      fixtureName: "coolpc-live-2026-08-24-igrp-14-duplicate-conflicts.html",
+      itemCount: 2,
+      deduplicatedItemCount: 2,
+    },
+    {
       igrp: 15,
       sourceName: "電源供應器",
-      displayName: "電源供應器",
+      fixtureName: "coolpc-live-2026-08-24-igrp-15-duplicate-conflicts.html",
+      itemCount: 3,
+      deduplicatedItemCount: 3,
+    },
+  ])("imports one row per IGrp $igrp product and reports the folded count", async ({
+    igrp,
+    sourceName,
+    fixtureName,
+    itemCount,
+    deduplicatedItemCount,
+  }) => {
+    const sourceCategory = category({
+      id: `category-${igrp}`,
+      igrp,
+      sourceName,
+      displayName: sourceName,
     });
-    const client = new FakeCrawlerWriteClient([powerSupplyCategory]);
+    const client = new FakeCrawlerWriteClient([sourceCategory]);
     const storageDir = await testEnv.createStorageDir();
     const productWriter = createProductWriterSpy();
 
@@ -82,20 +103,18 @@ describe("CoolPC category snapshot processor", () => {
       client,
       storageDir,
       crawlRunId: "crawl-run-1",
-      category: powerSupplyCategory,
-      snapshot: snapshot({
-        rawHtml: await testEnv.fixture("coolpc-igrp-15-leadex-duplicate.html"),
-      }),
+      category: sourceCategory,
+      snapshot: snapshot({ rawHtml: await testEnv.fixture(fixtureName) }),
       writeProducts: productWriter.writeProducts,
     });
 
     expect(result).toMatchObject({
       status: CRAWL_RUN_CATEGORY_RESULT_STATUSES.SUCCESS_CHANGED,
-      deduplicatedItemCount: 2,
-      productWriteSummary: { processedItemCount: 2 },
+      deduplicatedItemCount,
+      productWriteSummary: { processedItemCount: itemCount },
     });
     expect(productWriter.calls).toHaveLength(1);
-    expect(productWriter.calls[0]?.sourceItemKeys).toHaveLength(2);
+    expect(productWriter.calls[0]?.sourceItemKeys).toHaveLength(itemCount);
   });
 
   it("falls back to local tags without repeated parse errors when source-name joins are low", async () => {

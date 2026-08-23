@@ -185,8 +185,10 @@ export function parseCoolpcCategoryPage(
     const existingItem = seenItemsBySourceKey.get(sourceProductKey);
 
     if (existingItem) {
-      // 同 token 只有在完整解析後商品欄位全部相同時才能安全折疊。
-      if (hasIdenticalParsedProductFields(existingItem, item)) {
+      // 同 token 且完整商品名稱一致時視為同 SKU；價格與圖片是來源列的 offer/display 欄位。
+      if (hasEquivalentParsedProductIdentity(existingItem, item)) {
+        existingItem.price = Math.min(existingItem.price, item.price);
+        existingItem.primaryImageUrl ??= item.primaryImageUrl;
         deduplicatedItemCount += 1;
         continue;
       }
@@ -217,7 +219,7 @@ export function parseCoolpcCategoryPage(
   };
 }
 
-function hasIdenticalParsedProductFields(
+function hasEquivalentParsedProductIdentity(
   left: ParsedCoolpcProduct,
   right: ParsedCoolpcProduct,
 ): boolean {
@@ -234,8 +236,6 @@ function hasIdenticalParsedProductFields(
     left.vendorName === right.vendorName &&
     left.filterTags.length === right.filterTags.length &&
     left.filterTags.every((tag, index) => tag === right.filterTags[index]) &&
-    left.primaryImageUrl === right.primaryImageUrl &&
-    left.price === right.price &&
     left.currency === right.currency &&
     left.sourceUrl === right.sourceUrl &&
     left.fetchedAt.getTime() === right.fetchedAt.getTime()
