@@ -4,6 +4,7 @@
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { parseDaemonOptions } from "../../../../src/scripts/ops/crawl-coolpc-daemon/options";
+import { printCycleSummary } from "../../../../src/scripts/ops/crawl-coolpc-daemon/summary";
 import { createDaemonTestEnvironment } from "./crawl-coolpc-daemon-support";
 
 describe("CoolPC scheduled crawler daemon options", () => {
@@ -15,6 +16,42 @@ describe("CoolPC scheduled crawler daemon options", () => {
     expect(() => parseDaemonOptions([], {}, "/repo/apps/crawler")).toThrow(
       "Refusing scheduled CoolPC live fetch",
     );
+  });
+
+  it("logs the number of identical source rows folded for a category", () => {
+    const messages: string[] = [];
+
+    printCycleSummary(
+      {
+        crawlRunId: "crawl-run-1",
+        status: "SUCCESS_UNCHANGED",
+        stoppedBySuspectedBlock: false,
+        categoryResults: [
+          {
+            sourceCategoryId: "category-15",
+            igrp: 15,
+            status: "SUCCESS_UNCHANGED",
+            rawSnapshotId: "raw-snapshot-1",
+            errorMessage: null,
+            deduplicatedItemCount: 2,
+            productWriteSummary: null,
+          },
+        ],
+      },
+      {
+        processedItemCount: 0,
+        createdProductCount: 0,
+        createdProductIds: [],
+        updatedProductCount: 0,
+        priceSnapshotCreatedCount: 0,
+        priceUnchangedCount: 0,
+        missingProductUpdatedCount: 0,
+        markedInactiveProductCount: 0,
+      },
+      (message) => messages.push(message),
+    );
+
+    expect(messages[1]).toContain("IGrp=15 status=SUCCESS_UNCHANGED deduplicatedItems=2");
   });
 
   it("retains the one-shot CLI control", async () => {

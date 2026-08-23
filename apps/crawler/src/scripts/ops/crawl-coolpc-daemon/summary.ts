@@ -32,8 +32,11 @@ export function printCycleSummary(
     const writeSuffix = categoryResult.productWriteSummary
       ? ` items=${categoryResult.productWriteSummary.processedItemCount} createdProducts=${categoryResult.productWriteSummary.createdProductCount} updatedProducts=${categoryResult.productWriteSummary.updatedProductCount} priceSnapshots=${categoryResult.productWriteSummary.priceSnapshotCreatedCount} priceUnchanged=${categoryResult.productWriteSummary.priceUnchangedCount} missingUpdated=${categoryResult.productWriteSummary.missingProductUpdatedCount} markedInactive=${categoryResult.productWriteSummary.markedInactiveProductCount}`
       : "";
+    const deduplicationSuffix = categoryResult.deduplicatedItemCount
+      ? ` deduplicatedItems=${categoryResult.deduplicatedItemCount}`
+      : "";
     logMessage(
-      `IGrp=${categoryResult.igrp} status=${categoryResult.status}${writeSuffix}${errorSuffix}`,
+      `IGrp=${categoryResult.igrp} status=${categoryResult.status}${writeSuffix}${deduplicationSuffix}${errorSuffix}`,
     );
   }
 }

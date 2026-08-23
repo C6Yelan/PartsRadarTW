@@ -311,6 +311,23 @@ describe("CoolPC category parser", () => {
     }
   });
 
+  it("folds the reported IGrp 15 black and white LEADEX rows independently", () => {
+    const result = parseCoolpcCategoryPage(
+      fixture("coolpc-igrp-15-leadex-duplicate.html"),
+      contextForCategory(15),
+    );
+
+    expect(result.canImport).toBe(true);
+    expect(result.items).toHaveLength(2);
+    expect(result.items.map((item) => item.ibuyToken)).toEqual([
+      "LEADEX-III-750W-BLACK",
+      "LEADEX-III-750W-WHITE",
+    ]);
+    expect(result.items.map((item) => item.price)).toEqual([3790, 3790]);
+    expect(result.deduplicatedItemCount).toBe(2);
+    expect(result.issues).toEqual([]);
+  });
+
   it("keeps invalid product candidates out of parsed items and reports parse issues", () => {
     const result = parseCoolpcCategoryPage(
       fixture("cpu-category.mixed-invalid-items.html"),
@@ -487,7 +504,7 @@ describe("CoolPC category parser", () => {
     }
   });
 
-  it("deduplicates same source identity, name, and price repeats in the same snapshot", () => {
+  it("deduplicates only fully identical parsed product rows in the same snapshot", () => {
     const result = parseCoolpcCategoryPage(fixture("cpu-category.duplicate-token.html"), context);
 
     expect(result.canImport).toBe(true);
@@ -496,7 +513,7 @@ describe("CoolPC category parser", () => {
     expect(result.issues).toEqual([]);
   });
 
-  it("blocks import when duplicate source identity has conflicting product data", () => {
+  it("blocks import when duplicate source identity differs only by image URL", () => {
     const result = parseCoolpcCategoryPage(
       fixture("cpu-category.conflicting-duplicate-token.html"),
       context,
@@ -510,6 +527,27 @@ describe("CoolPC category parser", () => {
         sourceItemKey: "coolpc:igrp:4:ibuy:CPU-TOKEN-001",
       }),
     ]);
+  });
+
+  it.each([
+    ["name", { name: "Conflicting duplicate token product" }],
+    ["price", { rawPriceText: "含稅：NT5,880" }],
+  ])("blocks import when duplicate source identity differs only by %s", (_field, override) => {
+    const baseProduct = {
+      token: "CPU-TOKEN-001",
+      name: "AMD Ryzen 5 7500F MPK【6核/12緒】3.7G",
+      rawPriceText: "含稅：NT4,880",
+      rawImageUrl: "/eval/4/amd7500f.jpg",
+    };
+    const result = parseCoolpcCategoryPage(
+      categoryProductsHtml(4, [baseProduct, { ...baseProduct, ...override }]),
+      context,
+    );
+
+    expect(result.canImport).toBe(false);
+    expect(result.items).toHaveLength(1);
+    expect(result.deduplicatedItemCount).toBe(0);
+    expect(result.issues).toEqual([expect.objectContaining({ type: "duplicate_source_identity" })]);
   });
 
   it("does not parse products when content validation fails", () => {

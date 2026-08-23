@@ -32,6 +32,7 @@ describe("CoolPC crawl run writer", () => {
           sourceCategory.igrp === 4
             ? CRAWL_RUN_CATEGORY_RESULT_STATUSES.SUCCESS_UNCHANGED
             : CRAWL_RUN_CATEGORY_RESULT_STATUSES.SUCCESS_CHANGED,
+        ...(sourceCategory.igrp === 4 ? { deduplicatedItemCount: 2 } : {}),
       }),
     });
 
@@ -41,6 +42,7 @@ describe("CoolPC crawl run writer", () => {
       stoppedBySuspectedBlock: false,
     });
     expect(result.categoryResults.map((categoryResult) => categoryResult.igrp)).toEqual([4, 12]);
+    expect(result.categoryResults[0]?.deduplicatedItemCount).toBe(2);
     expect(client.crawlRuns[0]).toMatchObject({
       id: "crawl-run-1",
       status: CRAWL_RUN_STATUSES.SUCCESS_CHANGED,

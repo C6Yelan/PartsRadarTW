@@ -67,6 +67,37 @@ describe("CoolPC category snapshot processor", () => {
     ]);
   });
 
+  it("imports one row per IGrp 15 product and reports the folded count", async () => {
+    const powerSupplyCategory = category({
+      id: "category-15",
+      igrp: 15,
+      sourceName: "電源供應器",
+      displayName: "電源供應器",
+    });
+    const client = new FakeCrawlerWriteClient([powerSupplyCategory]);
+    const storageDir = await testEnv.createStorageDir();
+    const productWriter = createProductWriterSpy();
+
+    const result = await processCoolpcCategorySnapshot({
+      client,
+      storageDir,
+      crawlRunId: "crawl-run-1",
+      category: powerSupplyCategory,
+      snapshot: snapshot({
+        rawHtml: await testEnv.fixture("coolpc-igrp-15-leadex-duplicate.html"),
+      }),
+      writeProducts: productWriter.writeProducts,
+    });
+
+    expect(result).toMatchObject({
+      status: CRAWL_RUN_CATEGORY_RESULT_STATUSES.SUCCESS_CHANGED,
+      deduplicatedItemCount: 2,
+      productWriteSummary: { processedItemCount: 2 },
+    });
+    expect(productWriter.calls).toHaveLength(1);
+    expect(productWriter.calls[0]?.sourceItemKeys).toHaveLength(2);
+  });
+
   it("falls back to local tags without repeated parse errors when source-name joins are low", async () => {
     const client = new FakeCrawlerWriteClient([category({ id: "category-4", igrp: 4 })]);
     const storageDir = await testEnv.createStorageDir();

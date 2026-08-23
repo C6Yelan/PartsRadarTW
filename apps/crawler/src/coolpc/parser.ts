@@ -156,28 +156,6 @@ export function parseCoolpcCategoryPage(
     }
 
     const sourceProductKey = createCoolpcSourceProductKey(context.igrp, ibuyToken);
-    const existingItem = seenItemsBySourceKey.get(sourceProductKey);
-
-    if (existingItem) {
-      // 同一分類頁可能重複出現同一列；同 token 同資料可去重忽略，
-      // 但同 token 對應不同內容時視為身份衝突，需標記為致命問題。
-      if (existingItem.name === name && existingItem.price === price) {
-        deduplicatedItemCount += 1;
-        continue;
-      }
-
-      hasFatalIssue = true;
-      issues.push({
-        type: "duplicate_source_identity",
-        message: "Duplicate iBuy token in the same source category snapshot.",
-        rawName: name,
-        rawPriceText: candidate.rawPriceText,
-        rawToken: ibuyToken,
-        sourceItemKey: sourceProductKey,
-      });
-      continue;
-    }
-
     const vendor = classifyProductVendor(context.igrp, matchingName);
     const filterTags = mergeProductFilterTags(
       context.igrp,
@@ -204,6 +182,26 @@ export function parseCoolpcCategoryPage(
       ),
       fetchedAt: context.fetchedAt,
     };
+    const existingItem = seenItemsBySourceKey.get(sourceProductKey);
+
+    if (existingItem) {
+      // 同 token 只有在完整解析後商品欄位全部相同時才能安全折疊。
+      if (hasIdenticalParsedProductFields(existingItem, item)) {
+        deduplicatedItemCount += 1;
+        continue;
+      }
+
+      hasFatalIssue = true;
+      issues.push({
+        type: "duplicate_source_identity",
+        message: "Duplicate iBuy token in the same source category snapshot.",
+        rawName: name,
+        rawPriceText: candidate.rawPriceText,
+        rawToken: ibuyToken,
+        sourceItemKey: sourceProductKey,
+      });
+      continue;
+    }
 
     seenItemsBySourceKey.set(sourceProductKey, item);
     items.push(item);
@@ -217,6 +215,31 @@ export function parseCoolpcCategoryPage(
     deduplicatedItemCount,
     canImport: items.length > 0 && !hasFatalIssue,
   };
+}
+
+function hasIdenticalParsedProductFields(
+  left: ParsedCoolpcProduct,
+  right: ParsedCoolpcProduct,
+): boolean {
+  return (
+    left.sourceCategoryId === right.sourceCategoryId &&
+    left.igrp === right.igrp &&
+    left.sourceName === right.sourceName &&
+    left.displayName === right.displayName &&
+    left.ibuyToken === right.ibuyToken &&
+    left.sourceItemKey === right.sourceItemKey &&
+    left.name === right.name &&
+    left.normalizedName === right.normalizedName &&
+    left.vendorSlug === right.vendorSlug &&
+    left.vendorName === right.vendorName &&
+    left.filterTags.length === right.filterTags.length &&
+    left.filterTags.every((tag, index) => tag === right.filterTags[index]) &&
+    left.primaryImageUrl === right.primaryImageUrl &&
+    left.price === right.price &&
+    left.currency === right.currency &&
+    left.sourceUrl === right.sourceUrl &&
+    left.fetchedAt.getTime() === right.fetchedAt.getTime()
+  );
 }
 
 function getProductExclusionReason(igrp: number, name: string): ProductExclusionReason | null {

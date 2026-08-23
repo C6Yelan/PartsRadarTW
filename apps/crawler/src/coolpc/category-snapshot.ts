@@ -175,6 +175,9 @@ export async function processCoolpcCategorySnapshot(
       status: CRAWL_RUN_CATEGORY_RESULT_STATUSES.PARSE_FAILED,
       rawSnapshotId: rawSnapshot.id,
       errorMessage: buildParseFailureMessage(parseResult),
+      ...(parseResult.deduplicatedItemCount > 0
+        ? { deduplicatedItemCount: parseResult.deduplicatedItemCount }
+        : {}),
     };
   }
 
@@ -193,6 +196,9 @@ export async function processCoolpcCategorySnapshot(
         ? CRAWL_RUN_CATEGORY_RESULT_STATUSES.SUCCESS_UNCHANGED
         : CRAWL_RUN_CATEGORY_RESULT_STATUSES.SUCCESS_CHANGED,
     rawSnapshotId: rawSnapshot.id,
+    ...(parseResult.deduplicatedItemCount > 0
+      ? { deduplicatedItemCount: parseResult.deduplicatedItemCount }
+      : {}),
     productWriteSummary,
     ...(degradedFilterSyncJoinCoverage
       ? { filterSyncJoinCoverage: degradedFilterSyncJoinCoverage }

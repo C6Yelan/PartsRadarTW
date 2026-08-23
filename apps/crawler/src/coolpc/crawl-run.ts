@@ -98,6 +98,7 @@ export interface ProcessCrawlCategoryResult {
   status: CrawlRunCategoryResultStatusValue;
   rawSnapshotId?: string | null;
   errorMessage?: string | null;
+  deduplicatedItemCount?: number;
   productWriteSummary?: CrawlRunCategoryProductWriteSummary | null;
   filterSyncJoinCoverage?: FilterSyncJoinCoverage | null;
 }
@@ -141,6 +142,7 @@ export interface RecordedCrawlRunCategoryResult {
   status: CrawlRunCategoryResultStatusValue;
   rawSnapshotId: string | null;
   errorMessage: string | null;
+  deduplicatedItemCount?: number;
   productWriteSummary: CrawlRunCategoryProductWriteSummary | null;
   filterSyncJoinCoverage?: FilterSyncJoinCoverage | null;
 }
@@ -234,6 +236,9 @@ export async function runCoolpcCrawlOnce({
         status: result.status,
         rawSnapshotId: result.rawSnapshotId ?? null,
         errorMessage: result.errorMessage ?? null,
+        ...(result.deduplicatedItemCount
+          ? { deduplicatedItemCount: result.deduplicatedItemCount }
+          : {}),
         productWriteSummary: result.productWriteSummary ?? null,
         ...(result.filterSyncJoinCoverage
           ? { filterSyncJoinCoverage: result.filterSyncJoinCoverage }
