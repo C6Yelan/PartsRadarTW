@@ -4,8 +4,8 @@
 
 ## 開發環境
 
-- Node.js `24.16.0`，版本固定於 `.nvmrc`。
-- pnpm `11.3.0`，版本固定於根目錄 `package.json`。
+- Node.js `24.22.1`，版本固定於 `.nvmrc`。
+- pnpm `11.11.0`，版本固定於根目錄 `package.json`。
 - Docker 與 Docker Compose，用於 PostgreSQL 與部署驗證。
 - 執行瀏覽器測試時需要 Playwright Chromium。
 

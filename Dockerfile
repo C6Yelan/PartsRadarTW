@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM node:24-bookworm-slim AS base
+FROM node:24.22.1-bookworm-slim AS base
 
 ENV PNPM_HOME="/pnpm"
 ENV COREPACK_HOME="/corepack"
@@ -15,7 +15,7 @@ RUN apt-get update \
 
 RUN mkdir -p "$COREPACK_HOME" \
   && corepack enable \
-  && corepack prepare pnpm@11.3.0 --activate \
+  && corepack prepare pnpm@11.11.0 --activate \
   && chmod -R a+rX "$COREPACK_HOME"
 
 ENV COREPACK_ENABLE_NETWORK=0
@@ -63,7 +63,7 @@ RUN pnpm --config.node-linker=hoisted --config.auto-install-peers=false \
   && DATABASE_URL=unused \
   /app/packages/db/node_modules/.bin/prisma generate --schema prisma/schema.prisma
 
-FROM node:24-bookworm-slim AS runtime
+FROM node:24.22.1-bookworm-slim AS runtime
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends ca-certificates openssl \

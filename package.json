@@ -2,7 +2,7 @@
   "name": "partsradar-tw",
   "version": "0.1.0",
   "private": true,
-  "packageManager": "pnpm@11.3.0",
+  "packageManager": "pnpm@11.11.0",
   "scripts": {
     "dev": "pnpm dev:web",
     "build": "pnpm build:web",
@@ -52,7 +52,7 @@
   "devDependencies": {
     "@biomejs/biome": "^2.4.15",
     "@playwright/test": "^1.61.1",
-    "vite": "8.0.16",
-    "vitest": "^4.1.7"
+    "vite": "8.1.6",
+    "vitest": "^4.1.12"
   }
 }
