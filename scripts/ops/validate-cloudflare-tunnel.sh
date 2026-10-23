@@ -4,7 +4,7 @@ set -euo pipefail
 workspace_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$workspace_root"
 
-default_image="cloudflare/cloudflared:2026.7.2@sha256:4f6655284ab3d252b7f28fedb19fe6c8fc82ee5b1295c20ac74d475e5398a52d"
+default_image="cloudflare/cloudflared:2026.10.3@sha256:faa8e0a1475f137c910be6025f43c8e4092fdd35461b31e19fd1390657a1ff39"
 default_secret_file="/etc/partsradar/secrets/cloudflare-tunnel-token"
 cloudflared_uid=65532
 cloudflared_gid=65532

@@ -132,7 +132,7 @@ Token 由主機secret provisioning寫入，不得放在command argument、shell 
 唯一允許的預設image reference為：
 
 ```text
-cloudflare/cloudflared:2026.7.2@sha256:4f6655284ab3d252b7f28fedb19fe6c8fc82ee5b1295c20ac74d475e5398a52d
+cloudflare/cloudflared:2026.10.3@sha256:faa8e0a1475f137c910be6025f43c8e4092fdd35461b31e19fd1390657a1ff39
 ```
 
 所有 `CLOUDFLARED_IMAGE` override都必須包含 `@sha256:<64-hex-digest>`；tag-only reference一律拒絕。此image以UID/GID `65532:65532` 執行。Provisioning完成後只調整metadata，不在console讀回內容：
@@ -143,7 +143,7 @@ sudo chmod 0440 /etc/partsradar/secrets/cloudflare-tunnel-token
 scripts/ops/validate-cloudflare-tunnel.sh
 ```
 
-cloudflared 2025.4.0起支援 `TUNNEL_TOKEN_FILE`；本repository已以pinned digest的 `version`／`tunnel run --help`驗證2026.7.2。Production wrapper拒絕額外的 `--env-file`、`-f`／`--file`、`--profile`、`--project-directory`與project-name override，避免改變受審查topology或env來源。
+cloudflared 2025.4.0起支援 `TUNNEL_TOKEN_FILE`；本repository已以pinned digest的 `version`／`tunnel run --help`驗證2026.10.3。Production wrapper拒絕額外的 `--env-file`、`-f`／`--file`、`--profile`、`--project-directory`與project-name override，避免改變受審查topology或env來源。
 
 ### 初次 cutover
 
@@ -153,7 +153,7 @@ cloudflared 2025.4.0起支援 `TUNNEL_TOKEN_FILE`；本repository已以pinned di
 
 ```bash
 scripts/ops/validate-cloudflare-tunnel.sh
-docker pull cloudflare/cloudflared:2026.7.2@sha256:4f6655284ab3d252b7f28fedb19fe6c8fc82ee5b1295c20ac74d475e5398a52d
+docker pull cloudflare/cloudflared:2026.10.3@sha256:faa8e0a1475f137c910be6025f43c8e4092fdd35461b31e19fd1390657a1ff39
 scripts/ops/compose-production.sh up -d --no-build --force-recreate cloudflared
 ```
 

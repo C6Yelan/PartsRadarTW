@@ -72,23 +72,45 @@ docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler ru
 
 必須使用掛載 product image volume 的 `image-cache-backfill` service。大量手動補圖前先停止 `image-cache-recovery-daemon`，避免兩個圖片工作互相等待。
 
+既有部署先確認 PostgreSQL 與 product image volume 已就緒，再使用 `--no-deps` 執行手動工作，避免重新啟動 migration／storage init。首次部署先完成核心服務初始化。
+
 Dry-run：
 
 ```bash
-docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler run --rm image-cache-backfill \
+docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler run --rm --no-deps image-cache-backfill \
   node --import tsx src/scripts/ops/backfill-product-images.ts --limit 20
 ```
 
 確認後 live fetch：
 
 ```bash
-docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler run --rm image-cache-backfill \
+docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler run --rm --no-deps image-cache-backfill \
   node --import tsx src/scripts/ops/backfill-product-images.ts --confirm-live-fetch --limit 20
 ```
+
+`--limit` 限制選取的候選數，已存在圖片的商品也占名額；重複執行相同 limit 不保證前進。已知缺圖清單應依商品 ID 逐筆核對：
+
+```bash
+docker compose -f compose.yml -f compose.crawler.yml --profile manual-crawler run --rm --no-deps -e LOG_LEVEL=debug image-cache-backfill \
+  node --import tsx src/scripts/ops/backfill-product-images.ts --product-id <product-id>
+```
+
+確認後加 `--confirm-live-fetch`，保留預設的逾時、大小與來源限制。每次新 CLI 的第一筆請求不等待，因此逐筆啟動 CLI 時，外層應串行並在兩次 live 工作間至少等待 12 秒；不要並行啟動整份清單。未確認既有檔案需重抓時，不加 `--overwrite`。
+
+`imageCachedAt=null`、`imageCacheFailureCount=0` 可能是尚未補圖，也可能是來源 URL 更新後狀態重置。核對 `imageCacheCheckedAt`、`imageCacheNextRetryAt`、錯誤種類／HTTP status 與實際 WebP；既有檔案在 live 模式可校正 metadata。失敗項目保留逐筆原因與重試時間。
 
 成功標準：`failed=0`，cached／reused／skipped 計數合理，web 圖片 API 可讀新 WebP。
 
 失敗處理：保留 delay、timeout、size 與 host/path allowlist；不要直接 hotlink 或在 web request 中下載來源圖片。
+
+手動補圖完成且已核准恢復排程後，沿用現行 release image references 啟動 recovery daemon：
+
+```bash
+scripts/ops/compose-production.sh up -d --no-build --no-deps image-cache-recovery-daemon
+scripts/ops/compose-production.sh logs --tail 100 image-cache-recovery-daemon
+```
+
+預設每批最多讀取 25 筆，依序處理未檢查、到期重試與既有快取稽核，批次間等待 300 秒。重新核對檔案、`imageCachedAt` 與圖片 API，確認新缺圖持續被處理。
 
 ## Vendor metadata backfill
 

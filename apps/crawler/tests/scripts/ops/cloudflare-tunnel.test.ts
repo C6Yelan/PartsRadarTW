@@ -22,7 +22,7 @@ const COMPOSE_FILE = join(WORKSPACE_ROOT, "compose.tunnel.yml");
 const PRODUCTION_WRAPPER = join(WORKSPACE_ROOT, "scripts/ops/compose-production.sh");
 const VALIDATOR = join(WORKSPACE_ROOT, "scripts/ops/validate-cloudflare-tunnel.sh");
 const PINNED_IMAGE =
-  "cloudflare/cloudflared:2026.7.2@sha256:4f6655284ab3d252b7f28fedb19fe6c8fc82ee5b1295c20ac74d475e5398a52d";
+  "cloudflare/cloudflared:2026.10.3@sha256:faa8e0a1475f137c910be6025f43c8e4092fdd35461b31e19fd1390657a1ff39";
 const TOKEN_FILE_PATH = "/run/secrets/cloudflare_tunnel_token";
 const tempRoots: string[] = [];
 
@@ -347,7 +347,7 @@ describe("Cloudflare Tunnel production preflight", () => {
     "cloudflare/cloudflared:latest",
     "cloudflare/cloudflared:replace_with_pinned_version",
     "cloudflare/cloudflared:2026.7",
-    "cloudflare/cloudflared:2026.7.2",
+    "cloudflare/cloudflared:2026.10.3",
   ])("rejects a mutable or placeholder image reference: %s", (image) => {
     const root = createTempWorkspace();
     const tokenFile = join(root, "tunnel-token");
