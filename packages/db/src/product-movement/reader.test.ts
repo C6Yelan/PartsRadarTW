@@ -256,6 +256,7 @@ function validConfigState(overrides: { seqScan?: string } = {}) {
     indexOnlyScan: "on",
     indexScan: "on",
     seqScan: "off",
+    sort: "off",
     statementTimeout: `${PRODUCT_MOVEMENT_STATEMENT_TIMEOUT_MS}ms`,
     ...overrides,
   };

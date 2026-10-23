@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Prisma, PrismaClient } from "@prisma/client";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, onTestFailed } from "vitest";
 
 import {
   createProductMovementPageQuery,
@@ -21,7 +21,12 @@ import {
 import { seedCandidateHeavyFixture } from "./candidate-heavy-fixture";
 
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
-if (!testDatabaseUrl) throw new Error("TEST_DATABASE_URL is required for PostgreSQL integration tests.");
+const migrationDatabaseUrl = process.env.MIGRATION_DATABASE_URL;
+if (!testDatabaseUrl || !migrationDatabaseUrl) {
+  throw new Error(
+    "TEST_DATABASE_URL and MIGRATION_DATABASE_URL are required for PostgreSQL integration tests.",
+  );
+}
 
 const NOW = new Date("2031-07-31T12:00:00.000Z");
 const PAGE_SIZE = 100;
@@ -32,28 +37,43 @@ const categoryId = randomUUID();
 const crawlRunId = randomUUID();
 const igrp = 8_000_000 + Math.floor(Math.random() * 1_000_000);
 let client: PrismaClient;
+let maintenanceClient: PrismaClient;
 let productIds: string[] = [];
 
-beforeAll(async () => {
-  client = new PrismaClient({ adapter: new PrismaPg({ connectionString: testDatabaseUrl }) });
-  await client.sourceCategory.create({
-    data: { id: categoryId, igrp, sourceName: `${prefix}-source`, displayName: "Movement test" },
-  });
-  await client.crawlRun.create({
-    data: { id: crawlRunId, triggerType: "MANUAL", startedAt: NOW },
-  });
-  await seedCandidateHeavyFixture({
-    boundedCandidates: BOUNDED_CANDIDATES,
-    candidateLimit: PRODUCT_MOVEMENT_CANDIDATE_LIMIT,
-    categoryId,
-    client,
-    crawlRunId,
-    highHistoryObservationsPerProduct: HIGH_HISTORY_OBSERVATIONS_PER_PRODUCT,
-    now: NOW,
-    pageSize: PAGE_SIZE,
-    prefix,
-  });
-  productIds = await client.$queryRaw<Array<{ id: string }>>`
+describe.each([
+  "existing",
+  "analyzed",
+  "stale",
+] as const)("product movement PostgreSQL 18 bounds (%s statistics)", (statistics) => {
+  beforeAll(async () => {
+    client = new PrismaClient({ adapter: new PrismaPg({ connectionString: testDatabaseUrl }) });
+    maintenanceClient = new PrismaClient({
+      adapter: new PrismaPg({ connectionString: migrationDatabaseUrl }),
+    });
+    if (statistics === "stale") {
+      await analyzeMovementTables();
+    }
+    await client.sourceCategory.create({
+      data: { id: categoryId, igrp, sourceName: `${prefix}-source`, displayName: "Movement test" },
+    });
+    await client.crawlRun.create({
+      data: { id: crawlRunId, triggerType: "MANUAL", startedAt: NOW },
+    });
+    await seedCandidateHeavyFixture({
+      boundedCandidates: BOUNDED_CANDIDATES,
+      candidateLimit: PRODUCT_MOVEMENT_CANDIDATE_LIMIT,
+      categoryId,
+      client,
+      crawlRunId,
+      highHistoryObservationsPerProduct: HIGH_HISTORY_OBSERVATIONS_PER_PRODUCT,
+      now: NOW,
+      pageSize: PAGE_SIZE,
+      prefix,
+    });
+    if (statistics === "analyzed") {
+      await analyzeMovementTables();
+    }
+    productIds = await client.$queryRaw<Array<{ id: string }>>`
     SELECT product.id
     FROM pg_catalog.generate_series(1, ${PAGE_SIZE}) AS product_number
     INNER JOIN public.products AS product
@@ -62,19 +82,18 @@ beforeAll(async () => {
       )::uuid
     ORDER BY product_number ASC
   `.then((rows) => rows.map((row) => row.id));
-}, 60_000);
+  }, 60_000);
 
-afterAll(async () => {
-  if (!client) return;
-  await client.currentPrice.deleteMany({ where: { product: { sourceCategoryId: categoryId } } });
-  await client.priceSnapshot.deleteMany({ where: { product: { sourceCategoryId: categoryId } } });
-  await client.product.deleteMany({ where: { sourceCategoryId: categoryId } });
-  await client.crawlRun.deleteMany({ where: { id: crawlRunId } });
-  await client.sourceCategory.deleteMany({ where: { id: categoryId } });
-  await client.$disconnect();
-}, 60_000);
+  afterAll(async () => {
+    if (!client) return;
+    await client.currentPrice.deleteMany({ where: { product: { sourceCategoryId: categoryId } } });
+    await client.priceSnapshot.deleteMany({ where: { product: { sourceCategoryId: categoryId } } });
+    await client.product.deleteMany({ where: { sourceCategoryId: categoryId } });
+    await client.crawlRun.deleteMany({ where: { id: crawlRunId } });
+    await client.sourceCategory.deleteMany({ where: { id: categoryId } });
+    await Promise.all([client.$disconnect(), maintenanceClient.$disconnect()]);
+  }, 60_000);
 
-describe("product movement PostgreSQL 18 bounds", () => {
   it("returns fixed per-page summaries with baseline, zero, and stable semantics", async () => {
     const summaries = await readBoundedProductMovementSummaries(readerClient(), productIds, NOW);
     expect(summaries).toHaveLength(PAGE_SIZE);
@@ -250,6 +269,12 @@ describe("product movement PostgreSQL 18 bounds", () => {
   });
 });
 
+async function analyzeMovementTables(): Promise<void> {
+  await maintenanceClient.$executeRaw`
+    ANALYZE public.products, public.source_categories, public.current_prices, public.price_snapshots
+  `;
+}
+
 function readerClient() {
   return {
     $transaction: (callback, options) =>
@@ -326,6 +351,7 @@ async function explain(query: Prisma.Sql): Promise<ExplainPlanNode> {
         pg_catalog.set_config('enable_bitmapscan', 'off', true),
         pg_catalog.set_config('enable_indexscan', 'on', true),
         pg_catalog.set_config('enable_indexonlyscan', 'on', true),
+        pg_catalog.set_config('enable_sort', 'off', true),
         pg_catalog.set_config(
           'statement_timeout',
           ${`${PRODUCT_MOVEMENT_STATEMENT_TIMEOUT_MS}ms`},
@@ -335,6 +361,9 @@ async function explain(query: Prisma.Sql): Promise<ExplainPlanNode> {
     return transaction.$queryRaw<Array<{ "QUERY PLAN": unknown }>>(
       Prisma.sql`EXPLAIN (ANALYZE, BUFFERS, COSTS, FORMAT JSON) ${query}`,
     );
+  });
+  onTestFailed(() => {
+    console.error("Product movement EXPLAIN ANALYZE:", JSON.stringify(rows));
   });
   await expect(readPlannerSettings()).resolves.toEqual(settingsBefore);
   const document = rows[0]?.["QUERY PLAN"];
@@ -357,11 +386,13 @@ async function readPlannerSettings() {
       indexOnlyScan: string;
       indexScan: string;
       seqScan: string;
+      sort: string;
       statementTimeout: string;
     }>
   >`
     SELECT
       current_setting('enable_seqscan') AS "seqScan",
+      current_setting('enable_sort') AS "sort",
       current_setting('enable_bitmapscan') AS "bitmapScan",
       current_setting('enable_indexscan') AS "indexScan",
       current_setting('enable_indexonlyscan') AS "indexOnlyScan",
@@ -449,7 +480,7 @@ function assertBoundedPlanWork(root: ExplainPlanNode): void {
   const currentSnapshotProbes = nodes.filter(
     (node) =>
       node["Relation Name"] === "price_snapshots" &&
-      node["Index Name"] === "price_snapshots_pkey",
+      /^current_snapshot_lookup(?:_\d+)?$/.test(node.Alias ?? ""),
   );
   expect(currentSnapshotProbes.length).toBeGreaterThan(0);
   expect(

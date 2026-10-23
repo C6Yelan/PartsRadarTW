@@ -1,5 +1,7 @@
 // apps/crawler/tests/scripts/ops/discord-bot/support/price-report-reader-client.ts
 // 模擬個人價格報告 reader 需要的 product、priceSnapshot 與 sourceCategory delegate。
+
+import type { Prisma } from "@partsradar/db";
 import { vi } from "vitest";
 import type { TestProductWhere, TestSnapshot, TestSourceCategory } from "./data-types";
 import { toPrismaSnapshotWithProduct, toPrismaWatchProduct } from "./snapshot-records";
@@ -86,7 +88,68 @@ export function createPriceReportReaderClient({
       }));
   });
 
+  const queryRaw = async <T>(query: Prisma.Sql): Promise<T> => {
+    if (query.sql.includes("bounded_current_snapshots")) {
+      const rows = await priceSnapshotFindMany({
+        where: {
+          capturedAt: { gte: query.values[0], lte: query.values[1] },
+        },
+      });
+      return (rows as Array<ReturnType<typeof toPrismaSnapshotWithProduct>>)
+        .slice(0, Number(query.values[2]))
+        .map((row) => {
+          const source = row.product;
+          return {
+            ...row,
+            productName: source.name,
+            vendorSlug: source.vendorSlug,
+            vendorName: source.vendorName,
+            productIsExcluded: false,
+            categoryIgrp: source.sourceCategory.igrp,
+            categoryDisplayName: source.sourceCategory.displayName,
+            categoryEnabled: true,
+          };
+        }) as T;
+    }
+    if (query.sql.includes("requested_products")) {
+      const before = query.values.at(-1);
+      const rows = await Promise.all(
+        query.values.slice(0, -1).map(
+          async (productId) =>
+            (
+              await priceSnapshotFindMany({
+                where: {
+                  productId: { in: [productId] },
+                  capturedAt: { lt: before },
+                },
+              })
+            )[0],
+        ),
+      );
+      return rows.filter(Boolean) as T;
+    }
+    if (query.sql.includes("requested_snapshots")) {
+      const crawlRunId = query.values.at(-1);
+      const rows = [];
+      for (let index = 0; index < query.values.length - 1; index += 3) {
+        const previous = (
+          await priceSnapshotFindMany({
+            where: {
+              productId: { in: [query.values[index + 1]] },
+              crawlRunId: { not: crawlRunId },
+              capturedAt: { lt: query.values[index + 2] },
+            },
+          })
+        )[0];
+        if (previous) rows.push({ ...previous, currentSnapshotId: query.values[index] });
+      }
+      return rows as T;
+    }
+    throw new Error("Unexpected price report raw query.");
+  };
+
   return {
+    $queryRaw: queryRaw,
     product: {
       findFirst: productFindFirst,
     },

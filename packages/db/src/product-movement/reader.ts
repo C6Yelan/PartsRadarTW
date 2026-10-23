@@ -179,8 +179,11 @@ async function configureTransaction(transaction: ProductMovementTransactionClien
     indexOnlyScan: string;
     indexScan: string;
     seqScan: string;
+    sort: string;
     statementTimeout: string;
   }>;
+  // History probes must use index order instead of sorting every observation.
+  // PostgreSQL still permits the unavoidable final movement-page sort.
   try {
     rows = await transaction.$queryRaw(Prisma.sql`
       SELECT
@@ -188,6 +191,7 @@ async function configureTransaction(transaction: ProductMovementTransactionClien
         pg_catalog.set_config('enable_bitmapscan', 'off', true) AS "bitmapScan",
         pg_catalog.set_config('enable_indexscan', 'on', true) AS "indexScan",
         pg_catalog.set_config('enable_indexonlyscan', 'on', true) AS "indexOnlyScan",
+        pg_catalog.set_config('enable_sort', 'off', true) AS "sort",
         pg_catalog.set_config(
           'statement_timeout',
           ${`${PRODUCT_MOVEMENT_STATEMENT_TIMEOUT_MS}ms`},
@@ -206,6 +210,7 @@ async function configureTransaction(transaction: ProductMovementTransactionClien
     guard.bitmapScan !== "off" ||
     guard.indexScan !== "on" ||
     guard.indexOnlyScan !== "on" ||
+    guard.sort !== "off" ||
     guard.statementTimeout !== `${PRODUCT_MOVEMENT_STATEMENT_TIMEOUT_MS}ms`
   ) {
     throw new ProductMovementReadUnavailableError();
@@ -369,16 +374,25 @@ function createFilteredCandidatesQuery(filters: ProductMovementFilters): Prisma.
     );
   }
 
+  // Keep current-price lookups parameterized; ordinary joins may scan all history before LIMIT.
   return Prisma.sql`
     SELECT product.id AS product_id, 0::integer AS ordinal
     FROM public.products AS product
     INNER JOIN public.source_categories AS source_category
       ON source_category.id = product.source_category_id
-    INNER JOIN public.current_prices AS current_price
-      ON current_price.product_id = product.id
-    INNER JOIN public.price_snapshots AS current_snapshot
-      ON current_snapshot.id = current_price.price_snapshot_id
-      AND current_snapshot.product_id = current_price.product_id
+    INNER JOIN LATERAL (
+      SELECT product_id, price_snapshot_id
+      FROM public.current_prices
+      WHERE product_id = product.id
+      LIMIT 1
+    ) AS current_price ON TRUE
+    INNER JOIN LATERAL (
+      SELECT price
+      FROM public.price_snapshots AS current_snapshot_lookup
+      WHERE id = current_price.price_snapshot_id
+        AND product_id = current_price.product_id
+      LIMIT 1
+    ) AS current_snapshot ON TRUE
     WHERE ${Prisma.join(predicates, " AND ")}
     LIMIT ${PRODUCT_MOVEMENT_CANDIDATE_LIMIT + 1}
   `;
@@ -430,11 +444,19 @@ function createMovementQuery(
           ELSE ${deltaPercent}
         END AS delta_percent
       FROM candidate_gate AS candidate
-      INNER JOIN public.current_prices AS current_price
-        ON current_price.product_id = candidate.product_id
-      INNER JOIN public.price_snapshots AS current_snapshot
-        ON current_snapshot.id = current_price.price_snapshot_id
-        AND current_snapshot.product_id = current_price.product_id
+      INNER JOIN LATERAL (
+        SELECT product_id, price_snapshot_id, last_seen_at
+        FROM public.current_prices
+        WHERE product_id = candidate.product_id
+        LIMIT 1
+      ) AS current_price ON TRUE
+      INNER JOIN LATERAL (
+        SELECT price
+        FROM public.price_snapshots AS current_snapshot_lookup
+        WHERE id = current_price.price_snapshot_id
+          AND product_id = current_price.product_id
+        LIMIT 1
+      ) AS current_snapshot ON TRUE
       LEFT JOIN LATERAL (
         SELECT snapshot.price, TRUE AS before_range
         FROM public.price_snapshots AS snapshot

@@ -239,7 +239,9 @@ describe("product facet availability PostgreSQL integration", () => {
       prefix: "unknown",
       filterTags: Array.from({ length: UNKNOWN_TAG_PRODUCT_COUNT }, () => ["legacy:unknown"]),
     });
-    await maintenanceClient.$executeRaw`ANALYZE product_facet_eligible_products`;
+    // Refresh this fixture's product cardinality before per-product FK checks during cleanup.
+    // Empty-table ANALYZE in an earlier suite can retain a high-history product distribution.
+    await maintenanceClient.$executeRaw`ANALYZE price_snapshots, product_facet_eligible_products`;
 
     const projectionCount = await client.productFacetEligibleProduct.count();
     const largePlan = await explainAvailabilityQuery();

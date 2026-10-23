@@ -4,7 +4,16 @@
 import { randomUUID } from "node:crypto";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Prisma, PrismaClient } from "@prisma/client";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  onTestFailed,
+} from "vitest";
 import {
   claimDueTargetPriceNotifications,
   type TargetPriceNotificationClaimClient,
@@ -26,13 +35,12 @@ if (!testDatabaseUrl || !migrationDatabaseUrl) {
   );
 }
 
-const productIds = new Set<string>();
-const snapshotIds = new Set<string>();
-const watchIds = new Set<string>();
 let categoryId: string;
 let crawlRunId: string;
 let client: PrismaClient;
 let migrationClient: PrismaClient;
+let pendingScaleTest: Promise<void> | undefined;
+let cleanupPromise: Promise<void> | undefined;
 
 beforeAll(async () => {
   client = createClient(testDatabaseUrl);
@@ -406,193 +414,190 @@ describe("target price notification PostgreSQL claim", () => {
     );
   });
 
-  it("uses the pending scan index and materializes only the configured scale window", async () => {
-    const scale = 2_048;
-    const scanLimit = 64;
-    const claimLimit = 25;
-    const baseTime = new Date("2030-01-01T00:00:00.000Z").getTime();
-    const products = Array.from({ length: scale }, (_, index) => {
-      const productId = randomUUID();
-      const snapshotId = randomUUID();
-      const historySnapshotIds = Array.from({ length: 4 }, () => randomUUID());
-      const watchId = randomUUID();
-      productIds.add(productId);
-      snapshotIds.add(snapshotId);
-      for (const historySnapshotId of historySnapshotIds) {
-        snapshotIds.add(historySnapshotId);
-      }
-      watchIds.add(watchId);
-
-      return { productId, snapshotId, historySnapshotIds, watchId, index };
-    });
-    const lastProduct = products.at(-1);
-
-    if (!lastProduct) {
-      throw new Error("Target notification scale fixture is empty.");
-    }
-
-    await client.product.createMany({
-      data: products.map(({ productId, index }) => ({
-        id: productId,
-        sourceCategoryId: categoryId,
-        ibuyToken: `scale-${index}-${productId}`,
-        name: `Scale target product ${index}`,
-        normalizedName: `scale target product ${index}`,
-        sourceUrl: `https://example.invalid/scale/${productId}`,
-        firstSeenAt: new Date(baseTime),
-        lastSeenAt: new Date(baseTime),
-      })),
-    });
-    await client.priceSnapshot.createMany({
-      data: products.flatMap(({ productId, snapshotId, historySnapshotIds, index }) => [
-        {
-          id: snapshotId,
-          productId,
-          price: index < 4 ? 9_000 : 12_000,
-          capturedAt: new Date(baseTime + 30 * 60_000),
-          crawlRunId,
-        },
-        ...historySnapshotIds.map((historySnapshotId, historyIndex) => ({
-          id: historySnapshotId,
-          productId,
-          price: 13_000,
-          capturedAt: new Date(baseTime - (historyIndex + 1) * 60_000),
-          crawlRunId,
-        })),
-      ]),
-    });
-    await client.currentPrice.createMany({
-      data: products.map(({ productId, snapshotId }) => ({
-        productId,
-        priceSnapshotId: snapshotId,
-        lastSeenAt: new Date(baseTime + 30 * 60_000),
-        priceChangedAt: new Date(baseTime + 30 * 60_000),
-      })),
-    });
-    await client.discordTargetPriceWatch.createMany({
-      data: products.map(({ productId, watchId, index }) => ({
-        id: watchId,
-        discordUserId: `scale-user-${index}`,
-        productId,
-        targetPrice: 10_000,
-        notificationCursorAt: new Date(baseTime),
-        createdAt: new Date(baseTime + index),
-        updatedAt: new Date(baseTime + index),
-      })),
-    });
-    await client.$executeRaw`
-      UPDATE discord_target_price_watches
-      SET enabled = false
-      WHERE discord_user_id LIKE 'scale-user-%'
-    `;
-    await client.$executeRaw`
-      UPDATE discord_target_price_watches
-      SET enabled = true
-      WHERE discord_user_id LIKE 'scale-user-%'
-    `;
-    await migrationClient.$executeRaw`
+  it("uses the pending scan index and materializes only the configured scale window", ({
+    signal,
+  }) => {
+    pendingScaleTest = (async () => {
+      const scale = 2_048;
+      const scanLimit = 64;
+      const claimLimit = 25;
+      const baseTime = new Date("2030-01-01T00:00:00.000Z");
+      const prefix = randomUUID();
+      const [identities] = await client.$transaction(async (transaction) => {
+        await transaction.$executeRaw`
+        INSERT INTO products (
+          id, source_category_id, ibuy_token, name, normalized_name, source_url,
+          first_seen_at, last_seen_at, updated_at
+        )
+        SELECT md5(${prefix} || ':product:' || sequence_number::text)::uuid,
+          ${categoryId}::uuid, 'scale-' || sequence_number::text || '-' || ${prefix},
+          'Scale target product ' || sequence_number::text,
+          'scale target product ' || sequence_number::text,
+          'https://example.invalid/scale/' || sequence_number::text,
+          ${baseTime}::timestamptz, ${baseTime}::timestamptz, ${baseTime}::timestamptz
+        FROM generate_series(0, ${scale - 1}::integer) AS sequence_number
+      `;
+        await transaction.$executeRaw`
+        INSERT INTO price_snapshots (id, product_id, price, captured_at, crawl_run_id)
+        SELECT md5(${prefix} || ':snapshot:' || product_number::text || ':' || observation_number::text)::uuid,
+          md5(${prefix} || ':product:' || product_number::text)::uuid,
+          CASE WHEN observation_number = 0 THEN
+            CASE WHEN product_number < 4 THEN 9000 ELSE 12000 END
+            ELSE 13000 END,
+          ${baseTime}::timestamptz + CASE WHEN observation_number = 0 THEN interval '30 minutes'
+            ELSE -observation_number * interval '1 minute' END,
+          ${crawlRunId}::uuid
+        FROM generate_series(0, ${scale - 1}::integer) AS product_number
+        CROSS JOIN generate_series(0, 4) AS observation_number
+      `;
+        await transaction.$executeRaw`
+        INSERT INTO current_prices (product_id, price_snapshot_id, last_seen_at, price_changed_at, updated_at)
+        SELECT md5(${prefix} || ':product:' || sequence_number::text)::uuid,
+          md5(${prefix} || ':snapshot:' || sequence_number::text || ':0')::uuid,
+          ${baseTime}::timestamptz + interval '30 minutes',
+          ${baseTime}::timestamptz + interval '30 minutes', ${baseTime}::timestamptz
+        FROM generate_series(0, ${scale - 1}::integer) AS sequence_number
+      `;
+        await transaction.$executeRaw`
+        INSERT INTO discord_target_price_watches (
+          id, discord_user_id, product_id, target_price, notification_cursor_at, created_at, updated_at
+        )
+        SELECT md5(${prefix} || ':watch:' || sequence_number::text)::uuid,
+          'scale-user-' || sequence_number::text,
+          md5(${prefix} || ':product:' || sequence_number::text)::uuid,
+          10000, ${baseTime}::timestamptz,
+          ${baseTime}::timestamptz + sequence_number * interval '1 millisecond',
+          ${baseTime}::timestamptz + sequence_number * interval '1 millisecond'
+        FROM generate_series(0, ${scale - 1}::integer) AS sequence_number
+      `;
+        await transaction.$executeRaw`
+        UPDATE discord_target_price_watches
+        SET enabled = false
+        WHERE discord_user_id LIKE 'scale-user-%'
+      `;
+        await transaction.$executeRaw`
+        UPDATE discord_target_price_watches
+        SET enabled = true
+        WHERE discord_user_id LIKE 'scale-user-%'
+      `;
+        return transaction.$queryRaw<Array<{ firstProductId: string; lastWatchId: string }>>`
+        SELECT md5(${prefix} || ':product:0')::uuid AS "firstProductId",
+          md5(${prefix} || ':watch:' || ${String(scale - 1)})::uuid AS "lastWatchId"
+      `;
+      });
+      signal.throwIfAborted();
+      await migrationClient.$executeRaw`
       ANALYZE discord_target_price_watches, products, current_prices, price_snapshots
     `;
-    const initializationQuery = createTargetPriceNotificationRoundInitializationQuery(
-      new Date("2030-01-01T00:45:00.000Z"),
-    );
-    const initializationPlan = await client.$transaction(async (transaction) => {
-      await enforceTargetPriceNotificationBoundedPlan(transaction);
-      return transaction.$queryRaw<Array<{ "QUERY PLAN": unknown }>>(
-        Prisma.sql`EXPLAIN (ANALYZE, BUFFERS, COSTS, FORMAT JSON) ${initializationQuery}`,
+      const plans: Record<string, unknown> = {};
+      onTestFailed(() => console.error("Target claim EXPLAIN plans:", JSON.stringify(plans)));
+      const initializationQuery = createTargetPriceNotificationRoundInitializationQuery(
+        new Date("2030-01-01T00:45:00.000Z"),
       );
-    });
-    const initializationPlanNodes = collectPlanNodes(initializationPlan);
-    const highWaterIndexNodes = initializationPlanNodes.filter(
-      (node) =>
-        node["Index Name"] === "discord_target_price_watches_pending_scan_idx" &&
-        node.Alias === "watch",
-    );
-    const unboundedHighWaterScans = initializationPlanNodes.filter(
-      (node) =>
-        String(node["Node Type"]).includes("Scan") &&
-        node["Relation Name"] === "discord_target_price_watches" &&
-        totalRowsExamined(node) > 1,
-    );
-
-    expect(highWaterIndexNodes).toHaveLength(1);
-    expect(highWaterIndexNodes[0]?.["Scan Direction"]).toBe("Backward");
-    expect(totalRowsExamined(highWaterIndexNodes[0] ?? {})).toBe(1);
-    expect(unboundedHighWaterScans).toEqual([]);
-
-    const claimQuery = createTargetPriceNotificationClaimQuery(
-      {
-        claimedAt: new Date("2030-01-01T01:00:00.000Z"),
-        staleClaimBefore: new Date("2030-01-01T00:45:00.000Z"),
-        scanLimit,
-        claimLimit,
-      },
-      {
-        cursorUpdatedAt: null,
-        cursorWatchId: null,
-        roundUpperUpdatedAt: new Date(baseTime + scale - 1),
-        roundUpperWatchId: lastProduct.watchId,
-      },
-    );
-    const plan = await client.$transaction(async (transaction) => {
-      await enforceTargetPriceNotificationBoundedPlan(transaction);
-      return transaction.$queryRaw<Array<{ "QUERY PLAN": unknown }>>(
-        Prisma.sql`EXPLAIN (ANALYZE, BUFFERS, COSTS, FORMAT JSON) ${claimQuery}`,
+      const initializationPlan = await client.$transaction(async (transaction) => {
+        await enforceTargetPriceNotificationBoundedPlan(transaction);
+        return transaction.$queryRaw<Array<{ "QUERY PLAN": unknown }>>(
+          Prisma.sql`EXPLAIN (ANALYZE, BUFFERS, COSTS, FORMAT JSON) ${initializationQuery}`,
+        );
+      });
+      plans.initialization = initializationPlan;
+      const initializationPlanNodes = collectPlanNodes(initializationPlan);
+      const highWaterIndexNodes = initializationPlanNodes.filter(
+        (node) =>
+          node["Index Name"] === "discord_target_price_watches_pending_scan_idx" &&
+          node.Alias === "watch",
       );
-    });
-    const planText = JSON.stringify(plan);
-    const planNodes = collectPlanNodes(plan);
-    const scanCandidatesNode = planNodes.find(
-      (node) => node["Subplan Name"] === "CTE scan_candidates",
-    );
-    const pendingScanNodes = planNodes.filter(
-      (node) =>
-        node["Index Name"] === "discord_target_price_watches_pending_scan_idx" &&
-        node.Alias === "candidate",
-    );
-    const unboundedRelationScans = planNodes.filter(
-      (node) =>
-        String(node["Node Type"]).includes("Scan") &&
-        ["discord_target_price_watches", "products", "current_prices", "price_snapshots"].includes(
-          String(node["Relation Name"]),
-        ) &&
-        totalRowsExamined(node) > scanLimit * 2,
-    );
-    const oversizedSortOrHashNodes = planNodes.filter(
-      (node) =>
-        (node["Node Type"] === "Sort" || node["Node Type"] === "Hash") &&
-        Number(node["Actual Rows"]) > scanLimit,
-    );
-    const indexes = await client.$queryRaw<Array<{ indexdef: string; indexname: string }>>`
+      const unboundedHighWaterScans = initializationPlanNodes.filter(
+        (node) =>
+          String(node["Node Type"]).includes("Scan") &&
+          node["Relation Name"] === "discord_target_price_watches" &&
+          totalRowsExamined(node) > 1,
+      );
+
+      expect(highWaterIndexNodes).toHaveLength(1);
+      expect(highWaterIndexNodes[0]?.["Scan Direction"]).toBe("Backward");
+      expect(totalRowsExamined(highWaterIndexNodes[0] ?? {})).toBe(1);
+      expect(unboundedHighWaterScans).toEqual([]);
+
+      const claimQuery = createTargetPriceNotificationClaimQuery(
+        {
+          claimedAt: new Date("2030-01-01T01:00:00.000Z"),
+          staleClaimBefore: new Date("2030-01-01T00:45:00.000Z"),
+          scanLimit,
+          claimLimit,
+        },
+        {
+          cursorUpdatedAt: null,
+          cursorWatchId: null,
+          roundUpperUpdatedAt: new Date(baseTime.getTime() + scale - 1),
+          roundUpperWatchId: identities.lastWatchId,
+        },
+      );
+      const plan = await client.$transaction(async (transaction) => {
+        await enforceTargetPriceNotificationBoundedPlan(transaction);
+        return transaction.$queryRaw<Array<{ "QUERY PLAN": unknown }>>(
+          Prisma.sql`EXPLAIN (ANALYZE, BUFFERS, COSTS, FORMAT JSON) ${claimQuery}`,
+        );
+      });
+      plans.claim = plan;
+      const planText = JSON.stringify(plan);
+      const planNodes = collectPlanNodes(plan);
+      const scanCandidatesNode = planNodes.find(
+        (node) => node["Subplan Name"] === "CTE scan_candidates",
+      );
+      const pendingScanNodes = planNodes.filter(
+        (node) =>
+          node["Index Name"] === "discord_target_price_watches_pending_scan_idx" &&
+          node.Alias === "candidate",
+      );
+      const unboundedRelationScans = planNodes.filter(
+        (node) =>
+          String(node["Node Type"]).includes("Scan") &&
+          [
+            "discord_target_price_watches",
+            "products",
+            "current_prices",
+            "price_snapshots",
+          ].includes(String(node["Relation Name"])) &&
+          totalRowsExamined(node) > scanLimit * 2,
+      );
+      const oversizedSortOrHashNodes = planNodes.filter(
+        (node) =>
+          (node["Node Type"] === "Sort" || node["Node Type"] === "Hash") &&
+          Number(node["Actual Rows"]) > scanLimit,
+      );
+      const indexes = await client.$queryRaw<Array<{ indexdef: string; indexname: string }>>`
       SELECT indexname, indexdef
       FROM pg_indexes
       WHERE schemaname = current_schema()
         AND indexname = 'discord_target_price_watches_pending_scan_idx'
     `;
 
-    expect(planText).toContain("discord_target_price_watches_pending_scan_idx");
-    expect(scanCandidatesNode?.["Actual Rows"]).toBe(scanLimit);
-    expect(
-      pendingScanNodes.reduce(
-        (rows, node) => rows + Number(node["Actual Rows"]) * Number(node["Actual Loops"]),
-        0,
-      ),
-    ).toBe(scanLimit);
-    expect(unboundedRelationScans).toEqual([]);
-    expect(oversizedSortOrHashNodes).toEqual([]);
-    expect(claimQuery.sql).toContain("scan_candidates AS MATERIALIZED");
-    expect(claimQuery.sql).toContain("CROSS JOIN LATERAL");
-    expect(claimQuery.sql).toContain("FOR UPDATE OF watch SKIP LOCKED");
-    expect(claimQuery.sql).not.toContain(products[0]?.productId);
-    expect(indexes).toEqual([
-      {
-        indexname: "discord_target_price_watches_pending_scan_idx",
-        indexdef: expect.stringContaining("(updated_at, id)"),
-      },
-    ]);
-    expect(indexes[0]?.indexdef).toContain(
-      "WHERE ((enabled = true) AND (last_notified_at IS NULL))",
-    );
+      expect(planText).toContain("discord_target_price_watches_pending_scan_idx");
+      expect(scanCandidatesNode?.["Actual Rows"]).toBe(scanLimit);
+      expect(
+        pendingScanNodes.reduce(
+          (rows, node) => rows + Number(node["Actual Rows"]) * Number(node["Actual Loops"]),
+          0,
+        ),
+      ).toBe(scanLimit);
+      expect(unboundedRelationScans).toEqual([]);
+      expect(oversizedSortOrHashNodes).toEqual([]);
+      expect(claimQuery.sql).toContain("scan_candidates AS MATERIALIZED");
+      expect(claimQuery.sql).toContain("CROSS JOIN LATERAL");
+      expect(claimQuery.sql).toContain("FOR UPDATE OF watch SKIP LOCKED");
+      expect(claimQuery.sql).not.toContain(identities.firstProductId);
+      expect(indexes).toEqual([
+        {
+          indexname: "discord_target_price_watches_pending_scan_idx",
+          indexdef: expect.stringContaining("(updated_at, id)"),
+        },
+      ]);
+      expect(indexes[0]?.indexdef).toContain(
+        "WHERE ((enabled = true) AND (last_notified_at IS NULL))",
+      );
+    })();
+    return pendingScaleTest;
   });
 });
 
@@ -670,8 +675,6 @@ async function createWatchFixture({
   const snapshotId = randomUUID();
   const updatedAt = new Date("2030-01-01T00:00:00.000Z");
   updatedAt.setTime(updatedAt.getTime() + updatedOffsetMs);
-  productIds.add(productId);
-  watchIds.add(watchId);
 
   await client.product.create({
     data: {
@@ -688,7 +691,6 @@ async function createWatchFixture({
     },
   });
   if (hasCurrentPrice) {
-    snapshotIds.add(snapshotId);
     await client.priceSnapshot.create({
       data: {
         id: snapshotId,
@@ -791,25 +793,23 @@ async function resetScanState(): Promise<void> {
   });
 }
 
-async function cleanupFixtures(): Promise<void> {
-  const products = [...productIds];
-  const snapshots = [...snapshotIds];
-  const watches = [...watchIds];
-
-  if (watches.length > 0) {
-    await client.discordTargetPriceWatch.deleteMany({ where: { id: { in: watches } } });
-  }
-  if (products.length > 0) {
-    await client.currentPrice.deleteMany({ where: { productId: { in: products } } });
-  }
-  if (snapshots.length > 0) {
-    await client.priceSnapshot.deleteMany({ where: { id: { in: snapshots } } });
-  }
-  if (products.length > 0) {
-    await client.product.deleteMany({ where: { id: { in: products } } });
-  }
-  productIds.clear();
-  snapshotIds.clear();
-  watchIds.clear();
-  await resetScanState();
+function cleanupFixtures(): Promise<void> {
+  // Timeout does not cancel the test body; finish it before deleting its rows.
+  cleanupPromise ??= (async () => {
+    await Promise.allSettled(pendingScaleTest ? [pendingScaleTest] : []);
+    await client.discordTargetPriceWatch.deleteMany({
+      where: { product: { sourceCategoryId: categoryId } },
+    });
+    await client.currentPrice.deleteMany({
+      where: { product: { sourceCategoryId: categoryId } },
+    });
+    await client.priceSnapshot.deleteMany({
+      where: { product: { sourceCategoryId: categoryId } },
+    });
+    await client.product.deleteMany({ where: { sourceCategoryId: categoryId } });
+    await resetScanState();
+  })().finally(() => {
+    cleanupPromise = undefined;
+  });
+  return cleanupPromise;
 }

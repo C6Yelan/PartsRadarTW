@@ -1,7 +1,9 @@
 // apps/crawler/tests/scripts/ops/discord-bot/support/client.ts
 // 組合 Discord bot 測試用 fake Prisma client，讓互動、報告與 watch 測試共用資料入口。
-import type { DiscordBotClient } from "../../../../../src/scripts/ops/discord-bot/types";
+
+import type { Prisma } from "@partsradar/db";
 import { vi } from "vitest";
+import type { DiscordBotClient } from "../../../../../src/scripts/ops/discord-bot/types";
 import type {
   TestCrawlRun,
   TestDiscordNotificationDelivery,
@@ -59,6 +61,12 @@ export function createDiscordBotClient({
       (await targetPriceWatchClient.transaction(async (queryClient) =>
         callback({
           ...queryClient,
+          priceSnapshot: priceReportReaderClient.priceSnapshot,
+          $executeRaw: vi.fn(async () => 0),
+          $queryRaw: <T>(query: Prisma.Sql) =>
+            /bounded_current_snapshots|requested_products|requested_snapshots/.test(query.sql)
+              ? priceReportReaderClient.$queryRaw<T>(query)
+              : (queryClient.$queryRaw(query) as Promise<T>),
           discordNotificationDelivery,
           discordPriceReportSetting,
         }),

@@ -318,6 +318,9 @@ describe("readCrawlRunPriceChangeSummary", () => {
         : [previous],
     );
     const client = {
+      $executeRaw: vi.fn(async () => 0),
+      $transaction: async (callback: (transaction: unknown) => Promise<unknown>) =>
+        callback(client),
       priceSnapshot: {
         findMany,
       },

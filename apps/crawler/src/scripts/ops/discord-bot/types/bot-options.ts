@@ -27,7 +27,7 @@ export interface DiscordBotOptions {
 }
 
 // Discord bot 流程需要的最小資料存取介面，不直接依賴完整 PrismaClient。
-export type DiscordBotClient = PriceReportReaderClient &
+export type DiscordBotClient = Omit<PriceReportReaderClient, "$transaction"> &
   Pick<
     PrismaClient,
     | "discordNotificationDelivery"

@@ -26,7 +26,7 @@ describe("GET /api/price-report production wiring", () => {
     expect(fake.rawQueries[1]?.sql).toContain("JOIN LATERAL");
     expect(fake.sourceCategoryFindMany).toHaveBeenCalledTimes(1);
     expect(fake.productFindMany).toHaveBeenCalledTimes(1);
-    expect(fake.totalQueryCount()).toBe(4);
+    expect(fake.totalQueryCount()).toBe(5);
   });
 
   it("fails closed before predecessor reads when the production path overflows", async () => {
@@ -93,7 +93,10 @@ function createProductionPrisma(currentRowCount: number) {
 
     throw new Error("Unexpected raw query.");
   });
+  const executeRaw = vi.fn(async () => 0);
   const client = {
+    $executeRaw: executeRaw,
+    $transaction: async (callback: (transaction: unknown) => Promise<unknown>) => callback(client),
     priceSnapshot: {
       findMany: priceSnapshotFindMany,
     },
@@ -113,7 +116,10 @@ function createProductionPrisma(currentRowCount: number) {
     rawQueries,
     sourceCategoryFindMany,
     totalQueryCount: () =>
-      rawQueries.length + productFindMany.mock.calls.length + sourceCategoryFindMany.mock.calls.length,
+      rawQueries.length +
+      executeRaw.mock.calls.length +
+      productFindMany.mock.calls.length +
+      sourceCategoryFindMany.mock.calls.length,
   };
 }
 

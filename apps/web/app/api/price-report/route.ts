@@ -24,6 +24,7 @@ export function handleGetPriceReportRoute(
 export function createPriceReportApiReadClient(prisma: PrismaClient): PriceReportApiReadClient {
   return {
     priceSnapshot: prisma.priceSnapshot,
+    $transaction: (callback) => prisma.$transaction(callback),
     $queryRaw: <T>(query: Prisma.Sql) => prisma.$queryRaw<T>(query),
     product: {
       findMany: (args) => prisma.product.findMany(args),

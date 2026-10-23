@@ -55,8 +55,12 @@ export interface RecentPriceReportFilters {
 }
 
 // 價格報告 reader 保留 delegate fallback，正式 caller 可提供 parameterized raw query 以走 set-based 路徑。
-export type PriceReportReaderClient = Pick<PrismaClient, "priceSnapshot"> & {
+export type PriceReportQueryClient = Pick<PrismaClient, "priceSnapshot" | "$executeRaw"> & {
   $queryRaw?<T>(query: Prisma.Sql): Promise<T>;
+};
+
+export type PriceReportReaderClient = Omit<PriceReportQueryClient, "$executeRaw"> & {
+  $transaction<T>(callback: (transaction: PriceReportQueryClient) => Promise<T>): Promise<T>;
 };
 
 // 本次報告期間的 price snapshot 查詢結果，包含組裝報告需要的商品欄位。

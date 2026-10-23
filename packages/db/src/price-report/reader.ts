@@ -1,8 +1,8 @@
 // packages/db/src/price-report/reader.ts
 // 讀取 price snapshot 並整理成 Discord 與網站共用的價格變動與新增商品資料。
 
-import { Prisma } from "@prisma/client";
 import { tokenizePriceReportKeywordGroups } from "@partsradar/shared";
+import { Prisma } from "@prisma/client";
 import {
   assertPriceReportWorkBudget,
   PRICE_REPORT_CURRENT_SNAPSHOT_LIMIT,
@@ -20,6 +20,7 @@ import type {
   PreviousPriceSnapshot,
   PriceReportNewProductItem,
   PriceReportPriceChangeItem,
+  PriceReportQueryClient,
   PriceReportReaderClient,
   RecentPriceChangeOptions,
   RecentPriceReport,
@@ -61,116 +62,119 @@ export async function readCrawlRunPriceChangeSummary(
   client: PriceReportReaderClient,
   crawlRunId: string,
 ): Promise<CrawlRunPriceChangeReadResult> {
-  const currentSnapshots = assertPriceReportWorkBudget(
-    (await client.priceSnapshot.findMany({
-      where: {
-        crawlRunId,
-        product: {
-          isExcluded: false,
-          sourceCategory: {
-            enabled: true,
+  return client.$transaction(async (transaction) => {
+    await enforcePriceReportBoundedPlan(transaction);
+    const currentSnapshots = assertPriceReportWorkBudget(
+      (await transaction.priceSnapshot.findMany({
+        where: {
+          crawlRunId,
+          product: {
+            isExcluded: false,
+            sourceCategory: {
+              enabled: true,
+            },
           },
         },
-      },
-      select: PRICE_SNAPSHOT_WITH_PRODUCT_SELECT,
-      orderBy: CURRENT_PRICE_SNAPSHOT_ORDER_BY,
-      take: PRICE_REPORT_CURRENT_SNAPSHOT_LIMIT + 1,
-    })) as unknown as CrawlRunPriceSnapshot[],
-    "crawl_run_current",
-    PRICE_REPORT_CURRENT_SNAPSHOT_LIMIT,
-  );
+        select: PRICE_SNAPSHOT_WITH_PRODUCT_SELECT,
+        orderBy: CURRENT_PRICE_SNAPSHOT_ORDER_BY,
+        take: PRICE_REPORT_CURRENT_SNAPSHOT_LIMIT + 1,
+      })) as unknown as CrawlRunPriceSnapshot[],
+      "crawl_run_current",
+      PRICE_REPORT_CURRENT_SNAPSHOT_LIMIT,
+    );
 
-  if (currentSnapshots.length === 0) {
-    return {
-      changes: [],
-      newProducts: [],
-      snapshotCount: 0,
-      unmatchedSnapshotCount: 0,
-      unchangedSnapshotCount: 0,
-      currencyMismatchCount: 0,
-    };
-  }
+    if (currentSnapshots.length === 0) {
+      return {
+        changes: [],
+        newProducts: [],
+        snapshotCount: 0,
+        unmatchedSnapshotCount: 0,
+        unchangedSnapshotCount: 0,
+        currencyMismatchCount: 0,
+      };
+    }
 
-  const previousByCurrentSnapshot = new Map(
-    (
-      await readPreviousSnapshotsForCurrent(
-        client,
-        currentSnapshots.map(({ id, productId, capturedAt }) => ({
-          id,
-          productId,
-          capturedAt,
-        })),
-        crawlRunId,
-      )
-    ).map((snapshot) => [snapshot.currentSnapshotId, snapshot]),
-  );
-  const changes: PriceReportPriceChangeItem[] = [];
-  const newProductByProduct = new Map<string, PriceReportNewProductItem>();
-  let unmatchedSnapshotCount = 0;
-  let unchangedSnapshotCount = 0;
-  let currencyMismatchCount = 0;
+    const previousByCurrentSnapshot = new Map(
+      (
+        await readPreviousSnapshotsForCurrent(
+          transaction,
+          currentSnapshots.map(({ id, productId, capturedAt }) => ({
+            id,
+            productId,
+            capturedAt,
+          })),
+          crawlRunId,
+        )
+      ).map((snapshot) => [snapshot.currentSnapshotId, snapshot]),
+    );
+    const changes: PriceReportPriceChangeItem[] = [];
+    const newProductByProduct = new Map<string, PriceReportNewProductItem>();
+    let unmatchedSnapshotCount = 0;
+    let unchangedSnapshotCount = 0;
+    let currencyMismatchCount = 0;
 
-  for (const current of currentSnapshots) {
-    const previous = previousByCurrentSnapshot.get(current.id);
+    for (const current of currentSnapshots) {
+      const previous = previousByCurrentSnapshot.get(current.id);
 
-    if (!previous) {
-      unmatchedSnapshotCount += 1;
-      const newProduct = newProductByProduct.get(current.productId);
+      if (!previous) {
+        unmatchedSnapshotCount += 1;
+        const newProduct = newProductByProduct.get(current.productId);
 
-      if (!newProduct) {
-        newProductByProduct.set(current.productId, {
-          productId: current.product.id,
-          productName: current.product.name,
-          category: current.product.sourceCategory,
-          subcategory: toProductSubcategory(current.product),
-          currentPrice: current.price,
-          currency: current.currency,
-          firstSeenAt: current.capturedAt,
-        });
-      } else {
-        newProductByProduct.set(current.productId, {
-          ...newProduct,
-          productName: current.product.name,
-          category: current.product.sourceCategory,
-          subcategory: toProductSubcategory(current.product),
-          currentPrice: current.price,
-          currency: current.currency,
-        });
+        if (!newProduct) {
+          newProductByProduct.set(current.productId, {
+            productId: current.product.id,
+            productName: current.product.name,
+            category: current.product.sourceCategory,
+            subcategory: toProductSubcategory(current.product),
+            currentPrice: current.price,
+            currency: current.currency,
+            firstSeenAt: current.capturedAt,
+          });
+        } else {
+          newProductByProduct.set(current.productId, {
+            ...newProduct,
+            productName: current.product.name,
+            category: current.product.sourceCategory,
+            subcategory: toProductSubcategory(current.product),
+            currentPrice: current.price,
+            currency: current.currency,
+          });
+        }
+        continue;
       }
-      continue;
+
+      if (previous.currency !== current.currency) {
+        currencyMismatchCount += 1;
+        continue;
+      }
+
+      if (previous.price === current.price) {
+        unchangedSnapshotCount += 1;
+        continue;
+      }
+
+      changes.push({
+        productId: current.product.id,
+        productName: current.product.name,
+        category: current.product.sourceCategory,
+        subcategory: toProductSubcategory(current.product),
+        previousPrice: previous.price,
+        currentPrice: current.price,
+        currency: current.currency,
+        changedAt: current.capturedAt,
+        delta: current.price - previous.price,
+      });
     }
 
-    if (previous.currency !== current.currency) {
-      currencyMismatchCount += 1;
-      continue;
-    }
-
-    if (previous.price === current.price) {
-      unchangedSnapshotCount += 1;
-      continue;
-    }
-
-    changes.push({
-      productId: current.product.id,
-      productName: current.product.name,
-      category: current.product.sourceCategory,
-      subcategory: toProductSubcategory(current.product),
-      previousPrice: previous.price,
-      currentPrice: current.price,
-      currency: current.currency,
-      changedAt: current.capturedAt,
-      delta: current.price - previous.price,
-    });
-  }
-
-  return {
-    changes: changes.sort(comparePriceChanges),
-    newProducts: [...newProductByProduct.values()].sort(compareNewProducts),
-    snapshotCount: currentSnapshots.length,
-    unmatchedSnapshotCount,
-    unchangedSnapshotCount,
-    currencyMismatchCount,
-  };
+    return {
+      changes: changes.sort(comparePriceChanges),
+      newProducts: [...newProductByProduct.values()].sort(compareNewProducts),
+      snapshotCount: currentSnapshots.length,
+      unmatchedSnapshotCount,
+      unchangedSnapshotCount,
+      currencyMismatchCount,
+    };
+  });
 }
 
 // 讀取指定時間窗的完整價格報告，包含符合篩選的價格變動與新增商品。
@@ -199,112 +203,131 @@ export async function readRecentPriceReport(
     };
   }
 
-  const currentSnapshots = await readRecentCurrentSnapshots(
-    client,
-    since,
-    until,
-    normalizedFilters,
-    productFilter,
-  );
+  return client.$transaction(async (transaction) => {
+    await enforcePriceReportBoundedPlan(transaction);
+    const currentSnapshots = await readRecentCurrentSnapshots(
+      transaction,
+      since,
+      until,
+      normalizedFilters,
+      productFilter,
+    );
 
-  if (currentSnapshots.length === 0) {
-    return {
-      priceChanges: [],
-      newProducts: [],
-    };
-  }
+    if (currentSnapshots.length === 0) {
+      return {
+        priceChanges: [],
+        newProducts: [],
+      };
+    }
 
-  const productIds = [...new Set(currentSnapshots.map((snapshot) => snapshot.productId))];
-  const baselineSnapshots = await readLatestBaselines(client, productIds, since);
-  const previousSnapshots = [
-    ...baselineSnapshots,
-    ...currentSnapshots.map(({ id, productId, price, currency, capturedAt }) => ({
-      id,
-      productId,
-      price,
-      currency,
-      capturedAt,
-    })),
-  ].sort(comparePreviousSnapshots);
-  const previousByProduct = groupPreviousSnapshots(previousSnapshots);
-  const existingProductIds = new Set(
-    baselineSnapshots
-      .filter((snapshot) => snapshot.capturedAt.getTime() < since.getTime())
-      .map((snapshot) => snapshot.productId),
-  );
-  const latestChangeByProduct = new Map<string, PriceReportPriceChangeItem>();
-  const newProductByProduct = new Map<string, PriceReportNewProductItem>();
+    const productIds = [...new Set(currentSnapshots.map((snapshot) => snapshot.productId))];
+    const baselineSnapshots = await readLatestBaselines(transaction, productIds, since);
+    const previousSnapshots = [
+      ...baselineSnapshots,
+      ...currentSnapshots.map(({ id, productId, price, currency, capturedAt }) => ({
+        id,
+        productId,
+        price,
+        currency,
+        capturedAt,
+      })),
+    ].sort(comparePreviousSnapshots);
+    const previousByProduct = groupPreviousSnapshots(previousSnapshots);
+    const existingProductIds = new Set(
+      baselineSnapshots
+        .filter((snapshot) => snapshot.capturedAt.getTime() < since.getTime())
+        .map((snapshot) => snapshot.productId),
+    );
+    const latestChangeByProduct = new Map<string, PriceReportPriceChangeItem>();
+    const newProductByProduct = new Map<string, PriceReportNewProductItem>();
 
-  for (const current of currentSnapshots) {
-    if (!existingProductIds.has(current.productId)) {
-      if (!normalizedFilters.includeNewProducts) {
+    for (const current of currentSnapshots) {
+      if (!existingProductIds.has(current.productId)) {
+        if (!normalizedFilters.includeNewProducts) {
+          continue;
+        }
+
+        const newProduct = newProductByProduct.get(current.productId);
+
+        if (!newProduct) {
+          newProductByProduct.set(current.productId, {
+            productId: current.product.id,
+            productName: current.product.name,
+            category: current.product.sourceCategory,
+            subcategory: toProductSubcategory(current.product),
+            currentPrice: current.price,
+            currency: current.currency,
+            firstSeenAt: current.capturedAt,
+          });
+        } else {
+          newProductByProduct.set(current.productId, {
+            ...newProduct,
+            productName: current.product.name,
+            category: current.product.sourceCategory,
+            subcategory: toProductSubcategory(current.product),
+            currentPrice: current.price,
+            currency: current.currency,
+          });
+        }
         continue;
       }
 
-      const newProduct = newProductByProduct.get(current.productId);
+      const previous = previousByProduct
+        .get(current.productId)
+        ?.find((snapshot) => snapshot.capturedAt.getTime() < current.capturedAt.getTime());
 
-      if (!newProduct) {
-        newProductByProduct.set(current.productId, {
-          productId: current.product.id,
-          productName: current.product.name,
-          category: current.product.sourceCategory,
-          subcategory: toProductSubcategory(current.product),
-          currentPrice: current.price,
-          currency: current.currency,
-          firstSeenAt: current.capturedAt,
-        });
-      } else {
-        newProductByProduct.set(current.productId, {
-          ...newProduct,
-          productName: current.product.name,
-          category: current.product.sourceCategory,
-          subcategory: toProductSubcategory(current.product),
-          currentPrice: current.price,
-          currency: current.currency,
-        });
+      if (!previous) {
+        continue;
       }
-      continue;
+
+      if (previous.price === current.price || previous.currency !== current.currency) {
+        continue;
+      }
+
+      const delta = current.price - previous.price;
+
+      latestChangeByProduct.set(current.productId, {
+        productId: current.product.id,
+        productName: current.product.name,
+        category: current.product.sourceCategory,
+        subcategory: toProductSubcategory(current.product),
+        previousPrice: previous.price,
+        currentPrice: current.price,
+        currency: current.currency,
+        changedAt: current.capturedAt,
+        delta,
+      });
     }
 
-    const previous = previousByProduct
-      .get(current.productId)
-      ?.find((snapshot) => snapshot.capturedAt.getTime() < current.capturedAt.getTime());
+    return {
+      priceChanges: [...latestChangeByProduct.values()]
+        .filter((item) =>
+          item.delta < 0
+            ? normalizedFilters.includePriceDrops
+            : normalizedFilters.includePriceRises,
+        )
+        .sort(comparePriceChanges),
+      newProducts: [...newProductByProduct.values()].sort(compareNewProducts),
+    };
+  });
+}
 
-    if (!previous) {
-      continue;
-    }
-
-    if (previous.price === current.price || previous.currency !== current.currency) {
-      continue;
-    }
-
-    const delta = current.price - previous.price;
-
-    latestChangeByProduct.set(current.productId, {
-      productId: current.product.id,
-      productName: current.product.name,
-      category: current.product.sourceCategory,
-      subcategory: toProductSubcategory(current.product),
-      previousPrice: previous.price,
-      currentPrice: current.price,
-      currency: current.currency,
-      changedAt: current.capturedAt,
-      delta,
-    });
-  }
-
-  return {
-    priceChanges: [...latestChangeByProduct.values()]
-      .filter((item) =>
-        item.delta < 0 ? normalizedFilters.includePriceDrops : normalizedFilters.includePriceRises,
-      )
-      .sort(comparePriceChanges),
-    newProducts: [...newProductByProduct.values()].sort(compareNewProducts),
-  };
+// Keep ordered LIMIT reads on indexes rather than sorting an unbounded table scan.
+// Settings are local to the caller's transaction and never leak back to the pool.
+export async function enforcePriceReportBoundedPlan(
+  transaction: Pick<PriceReportQueryClient, "$executeRaw">,
+): Promise<void> {
+  await transaction.$executeRaw(Prisma.sql`
+    SELECT
+      set_config('enable_seqscan', 'off', true),
+      set_config('enable_bitmapscan', 'off', true),
+      set_config('enable_indexscan', 'on', true),
+      set_config('enable_indexonlyscan', 'on', true)
+  `);
 }
 
 async function readRecentCurrentSnapshots(
-  client: PriceReportReaderClient,
+  client: PriceReportQueryClient,
   since: Date,
   until: Date,
   filters: ReturnType<typeof normalizeRecentPriceReportFilters>,
@@ -410,7 +433,7 @@ function matchesRecentProduct(
 }
 
 async function readLatestBaselines(
-  client: PriceReportReaderClient,
+  client: PriceReportQueryClient,
   productIds: string[],
   before: Date,
 ): Promise<PreviousPriceSnapshot[]> {
@@ -457,7 +480,7 @@ async function readLatestBaselines(
 }
 
 async function readPreviousSnapshotsForCurrent(
-  client: PriceReportReaderClient,
+  client: PriceReportQueryClient,
   currentSnapshots: Array<Pick<PreviousPriceSnapshot, "id" | "productId" | "capturedAt">>,
   crawlRunId: string,
 ): Promise<PreviousSnapshotForCurrent[]> {
@@ -537,8 +560,8 @@ async function readInFixedBatches<TItem, TResult>(
 }
 
 function supportsRawQueries(
-  client: PriceReportReaderClient,
-): client is PriceReportReaderClient & RawPriceReportQueryClient {
+  client: PriceReportQueryClient,
+): client is PriceReportQueryClient & RawPriceReportQueryClient {
   return "$queryRaw" in client && typeof client.$queryRaw === "function";
 }
 

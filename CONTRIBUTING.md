@@ -60,6 +60,8 @@ Workspace 責任與資料流見 [Architecture](docs/architecture.md#workspace-�
 
 `pnpm test` 等同 core tests；它不是完整測試集合。`pnpm check` 會執行 typecheck、Biome lint 與 Next.js production build。
 
+`pnpm test:db` 必須使用一次性隔離 PostgreSQL 與分離的管理／runtime 帳號。管理帳號負責 fixture 統計更新，查詢仍使用 runtime 帳號。商品變動測試涵蓋既有、更新後與過期統計；失敗時會輸出原始錯誤及已取得的完整 EXPLAIN JSON。驗收必須執行整套測試，零 skipped／todo；不要只用單一案例通過作為部署依據。
+
 Playwright 在沒有 `E2E_BASE_URL` 時會建立並啟動本機 web；安裝瀏覽器：
 
 ```bash

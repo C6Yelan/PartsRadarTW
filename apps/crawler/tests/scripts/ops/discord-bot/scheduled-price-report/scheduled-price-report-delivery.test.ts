@@ -81,7 +81,7 @@ describe("scheduled price report delivery", () => {
         status: "SENT",
       }),
     });
-    expect(client.$transaction).toHaveBeenCalledTimes(1);
+    expect(client.$transaction).toHaveBeenCalledTimes(2);
     expect(client.discordPriceReportSetting.updateMany).toHaveBeenLastCalledWith({
       where: {
         id: "setting-1",

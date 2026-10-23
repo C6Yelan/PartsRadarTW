@@ -140,6 +140,8 @@ function createFakeClient(
   let productReads = 0;
   let firstPriceReadArgs: unknown;
   const client = {
+    $executeRaw: async () => 0,
+    $transaction: async (callback: (transaction: unknown) => Promise<unknown>) => callback(client),
     priceSnapshot: {
       findMany: async (args: unknown) => {
         priceReads += 1;

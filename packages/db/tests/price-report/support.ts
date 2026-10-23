@@ -105,9 +105,14 @@ export function createPriceReportReaderClient({ snapshots }: { snapshots: TestSn
       }));
   });
 
-  return {
+  const client = {
     priceSnapshot: { findMany: priceSnapshotFindMany },
-  } as unknown as PriceReportReaderClient;
+    $executeRaw: vi.fn(async () => 0),
+    $transaction: vi.fn(async (callback: (transaction: unknown) => Promise<unknown>) =>
+      callback(client),
+    ),
+  };
+  return client as unknown as PriceReportReaderClient;
 }
 
 function toPrismaSnapshotWithProduct(snapshotItem: TestSnapshot) {
