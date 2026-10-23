@@ -11,8 +11,9 @@ const PRODUCT_ID = "20000000-0000-4000-8000-000000000002";
 const CRAWL_RUN_ID = "20000000-0000-4000-8000-000000000003";
 const OLD_SNAPSHOT_ID = "20000000-0000-4000-8000-000000000004";
 const CURRENT_SNAPSHOT_ID = "20000000-0000-4000-8000-000000000005";
+// A decodable 32×32 lossless WebP so share-image smoke exercises the image branch.
 const IMAGE_BYTES = Uint8Array.from(
-  Buffer.from("UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEALmk0mk0iIiIiIgBoSygABc6zbAAA", "base64"),
+  Buffer.from("UklGRhwAAABXRUJQVlA4TBAAAAAvH8AHAAcQ/a9Z/wMR0f8A", "base64"),
 );
 
 const action = process.argv[2];

@@ -1,6 +1,7 @@
 // apps/web/tests/products/metadata.test.ts
 // 驗證商品詳細頁 metadata 的公開欄位、canonical URL、分享預覽與安全 fallback。
 
+import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 import {
   buildProductDetailMetadata,
@@ -159,18 +160,31 @@ describe("product detail metadata", () => {
 
 describe("product share image", () => {
   it("renders a 1200 by 630 PNG using only the cached product WebP", async () => {
+    const imageBytes = await sharp({
+      create: { width: 32, height: 32, channels: 4, background: "#ff0066" },
+    })
+      .webp({ lossless: true })
+      .toBuffer();
     const response = await renderProductShareImageResponse({
       product: shareImageProduct(),
-      imageBytes: Buffer.from(
-        "UklGRlIAAABXRUJQVlA4WAoAAAAQAAAAAAAAAAAAQUxQSAIAAAAAAFZQOCAqAAAAMAEAnQEqAQABAAFAJiWkAANwAP7+//8AAA==",
-        "base64",
-      ),
+      imageBytes,
     });
     const bytes = new Uint8Array(await response.arrayBuffer());
 
     expect(response.headers.get("content-type")).toBe("image/png");
     expect(bytes.byteLength).toBeGreaterThan(0);
     expect(new TextDecoder().decode(bytes.slice(1, 4))).toBe("PNG");
+    expect(await sharp(bytes).metadata()).toMatchObject({
+      format: "png",
+      width: 1200,
+      height: 630,
+    });
+    const imagePixel = await sharp(bytes)
+      .extract({ left: 225, top: 300, width: 1, height: 1 })
+      .ensureAlpha()
+      .raw()
+      .toBuffer();
+    expect([...imagePixel]).toEqual([255, 0, 102, 255]);
   });
 
   it("renders the branded product fallback when the cached image is missing", async () => {

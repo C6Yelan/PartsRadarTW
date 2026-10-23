@@ -31,8 +31,8 @@ export async function renderProductShareImageResponse({
   product: ProductShareImageData;
   imageBytes: Uint8Array | null;
 }): Promise<ImageResponse> {
-  const embeddedImageBytes = imageBytes
-    ? await convertCachedWebpForImageResponse(imageBytes).catch(() => null)
+  const embeddedImageDataUrl = imageBytes
+    ? await convertCachedWebpToDataUrl(imageBytes).catch(() => null)
     : null;
   const productName = truncateShareText(product.name, 126);
   const category = truncateShareText(product.sourceCategory.displayName, 36);
@@ -82,10 +82,10 @@ export async function renderProductShareImageResponse({
               overflow: "hidden",
             }}
           >
-            {embeddedImageBytes ? (
+            {embeddedImageDataUrl ? (
               // biome-ignore lint/performance/noImgElement: ImageResponse requires an in-memory img source.
               <img
-                src={embeddedImageBytes as unknown as string}
+                src={embeddedImageDataUrl}
                 alt=""
                 width={310}
                 height={310}
@@ -159,9 +159,9 @@ function truncateShareText(value: string, maxLength: number): string {
     : `${normalized.slice(0, maxLength - 1).trimEnd()}…`;
 }
 
-// ImageResponse 不直接解碼 WebP；使用公開 sharp API 轉為受尺寸限制的 PNG。
-async function convertCachedWebpForImageResponse(bytes: Uint8Array): Promise<Uint8Array> {
-  return sharp(bytes, {
+// 轉為有尺寸限制的 PNG data URL；ImageResponse 的二進位來源不接受 Node Buffer。
+async function convertCachedWebpToDataUrl(bytes: Uint8Array): Promise<string> {
+  const png = await sharp(bytes, {
     failOn: "error",
     limitInputPixels: EMBEDDED_IMAGE_MAX_PIXELS,
   })
@@ -173,4 +173,5 @@ async function convertCachedWebpForImageResponse(bytes: Uint8Array): Promise<Uin
     })
     .png()
     .toBuffer();
+  return `data:image/png;base64,${png.toString("base64")}`;
 }
